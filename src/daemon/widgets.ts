@@ -223,6 +223,8 @@ function wsInfo(x: Workspace) {
   return { id: x.id, name: v.workspace ?? x.id, project: v.project, branch: v.branch, base: v.base, path: x.path, port: x.port, pr: v.pr, storage: x.storage }
 }
 type WsInfo = ReturnType<typeof wsInfo>
+// an event's ws field (widgetEvent's head; a workflow's tried event in a workspace the user picked)
+export const eventWs = (x: Workspace) => (i => ({ id: i.id, name: i.name, project: i.project, branch: i.branch, pr: i.pr }))(wsInfo(x))
 const SAMPLE_WS = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fix-login', base: 'main', path: '~/code/web', port: 5173, pr: 'https://github.com/acme/web/pull/412' } // a preview's made-up one
 // a workspace's env (never makes a storage folder); gone: one archived or removed (its event's info, taken then): no
 // port, storage nor instance file to give
@@ -1483,7 +1485,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const hops = o.hops ?? 0
   const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
   const i = x && wsInfo(x)
-  const head = { event: name, at: Date.now(), ...(i && { ws: { id: i.id, name: i.name, project: i.project, branch: i.branch, pr: i.pr } }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(o.from && { from: o.from }) }
+  const head = { event: name, at: Date.now(), ...(x && { ws: eventWs(x) }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(o.from && { from: o.from }) }
   const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()

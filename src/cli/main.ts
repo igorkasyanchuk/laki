@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -28,6 +28,8 @@ for (let i = 0; i < argv.length; i++) {
   if (!textOnly && a === '--') textOnly = true
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
+  else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
+  else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
@@ -451,7 +453,24 @@ async function main() {
         if (flags.ws === '.' && !ws) throw new Error("--ws .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace")
         const named = !ws || ((await rpc('state')) as View).projects.some(p => p.id === words[0] || p.name === words[0])
         const [project, ...task] = named ? words : [undefined, ...words]
-        if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…]')
+        if (flags.event || flags['event-json']) {
+          // as if on an event: its name (else its on:), the payload from a file or stdin (else the last one heard, else a sample)
+          if (!id) throw new Error('usage: laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]')
+          const file = flags['event-json']
+          const payload = typeof file === 'string' ? JSON.parse(file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8')) : undefined
+          const ask = { id, project, ws, ...(typeof flags.event === 'string' && { event: flags.event }), ...(payload && { payload }), caller: caller() }
+          type Tried = { name: string; from: string; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string }
+          const said = (t: Tried) => [`${t.name} (${t.from === 'last' ? 'the last one heard' : t.from === 'given' ? 'yours' : 'a sample'})`, ...Object.entries(t.vars).map(([k, v]) => `  {{${k}}} ${v.length > 120 ? `${v.slice(0, 120)}…` : v}`), ...t.when.map(w => `${w.ok ? '✓' : '✗'} only when: ${w.test}`), t.start ? 'it starts' : `it doesn't start: ${t.why}`].join('\n')
+          if (flags.dry) {
+            const t: Tried = await rpc('flowEvent', ask)
+            if (!t.start) return out(t, said(t))
+            const r: Tried = await rpc('flowEvent', { ...ask, go: true, dry: true }, 180000)
+            return out(r, `${said(r)}\n${r.run}  a dry run`)
+          }
+          const r: Tried = await rpc('flowEvent', { ...ask, go: true }, 180000)
+          return out(r, `${r.run}  on ${r.name}`)
+        }
+        if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | --event [<name>] [--event-json <file|->]')
         const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
         const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)

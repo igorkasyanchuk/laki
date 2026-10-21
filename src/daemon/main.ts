@@ -19,7 +19,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
-import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
+import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
@@ -423,6 +423,7 @@ const api: Record<string, Handler> = {
   flowHistory: p => flowHistory(p), // the editor's History…: its versions, or one's text (at)
   flowRevert: p => flowRevert(p),
   flowStart: ({ caller, ...p }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
+  flowEvent: ({ caller, ...p }) => flowEvent(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false, agent: core.callerAgent(caller) } : p), // tried as if on an event: an agent's try is an agent's event
   flowStop: p => flowStop(p),
   flowAnswer: p => (notAgent(p, "answer a workflow's question"), flowAnswer(p)),
   flowTest: p => flowTest(p), // the inspector's Test: one AI call, decision or webhook, alone
@@ -450,7 +451,7 @@ const remoteNo = (method: string, p: any) =>
 // launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact'])
-const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowTrust', 'flowPause'])
+const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
 const peerOf = (sock: Socket) => {

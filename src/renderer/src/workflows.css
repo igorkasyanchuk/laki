@@ -254,3 +254,11 @@
 .wf-strip { display: flex; gap: 3px; margin-top: auto; padding-top: 4px; }
 .wf-strip i { width: 14px; height: 6px; border-radius: 3px; background: var(--kc); }
 .wf-ro { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
+.wf-heard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.wf-heard li { overflow-wrap: anywhere; }
+.wf-ev { flex-wrap: wrap; }
+.wf-tried { display: flex; flex-direction: column; gap: 4px; font-size: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--rs, 8px); }
+.wf-tried .ok { color: var(--done); }
+.wf-tried dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; max-height: 180px; overflow: auto; font: 11px/1.4 var(--mono); }
+.wf-tried dt { color: var(--muted); }
+.wf-tried dd { margin: 0; overflow-wrap: anywhere; }

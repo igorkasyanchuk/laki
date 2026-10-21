@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`; a workflow's `source` `builtin` (the templates). A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`; a workflow's `source` `builtin` (the templates); `flowEvent` (a try as if on an event), a workflow item's `events`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1162,6 +1162,18 @@ field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete* (no as
 the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
 entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts`.
+Events (`eventHooks.flows`, after the setting): `heard` keeps each project's newest payload of each event, `lastEvents`
+each workflow's last `FLOW_HEARD` (5) outcomes (`FlowHeard`: at, event, ws, run or why; the item's `events`, its settings'
+*Last 5 events*), in memory (`note` bumps `flowFiles.at`). `fromEvent(wf, name, payload, ws, o)`, one path for a real
+event and a try: the project's file read again, no workspace, problems, `byAgent` and `untrusted` (both unless `editor`;
+a real one's untrusted calls `refused`), hops, paused (not a try's), an agent's event, its own run, `only when:`, one
+live run per workspace, `here`'s live workspace; its start (`trigger` `event <name>` or `try <name>`, `evWs`, `hops`,
+`agent`) or why. `flowEvent` (`event`, else its `on:`, `custom.*`'s `custom.test`; `payload` (an object, 64 KB), else
+the last one heard (`use: 'sample'` skips it), else `sampleOf` (`SAMPLE_EVENTS`, core's fields on a made-up PR and
+workspace), `ws`: the workspace you picked as its `ws` (`eventWs`)): `from`, `last`, `payload`, `vars`, each `when`
+test's `ok`, `start`, `why`; `go` starts it (`dry`), `run` its id. main.ts makes an agent's CLI `by: 'agent'`, `editor`
+false and its `agent`; `flowStart` takes `editor` with `event` past an untrusted one. StartRun's *As if on an event*
+(`Tried`), the CLI's `--event [<name>] [--event-json <file|->]`.
 ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host; a resume that fails after
 `RESUMED` went (core drops the chat within `RESUME_FAIL`) is a closed tab, the block's error way.
 

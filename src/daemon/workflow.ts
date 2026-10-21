@@ -10,12 +10,12 @@ import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
+import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
-import { eventHooks, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
+import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { readCapped } from '../shared/conn.ts'
 
 const MAX_FILE = 256 << 10
@@ -58,7 +58,8 @@ function item(text: string, id: string, source: WorkflowSource, project?: string
   const untrusted = source === 'project' && was !== textHash(text)
   const k = agentKey(source, id, project)
   const stats = statsView(state.flowStats?.[k])
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(stats && { stats }), ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
+  const events = lastEvents.get(k)
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(stats && { stats }), ...(events?.length && { events }), ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
 }
 // a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
 // the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
@@ -427,7 +428,7 @@ export async function flowStart(o: Start) {
   if (wf.untrusted && o.trigger?.startsWith('schedule ')) refused(wf, 'schedule')
   const paused = !wf.untrusted && wf.stats?.paused // by itself only: Run, the CLI and MCP start it by hand
   if (paused && /^(schedule|event) /.test(o.trigger ?? '')) throw new Error(`paused: ${paused.why}; turn it on again in Workflows`)
-  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
+  if (wf.untrusted && (o.by === 'agent' || (o.event && !o.editor) || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)
@@ -1454,39 +1455,144 @@ function whenFails(wf: Workflow, payload: Record<string, unknown>) {
   }
 }
 let listening: { at: number; files: number; list: WorkflowItem[] } | undefined
+const onIt = (on: string | undefined, name: string) => on === name || (on === 'custom.*' && name.startsWith('custom.'))
+// what one workflow does with one event, a real one or one tried (flowEvent): its start, or why not (untrusted: a real
+// one's is told, refused). null: not this workflow's (a project's file changed since the list was read, or it's gone)
+type Heard = { wf: WorkflowItem; start: Start } | { wf: WorkflowItem; why: string; untrusted?: boolean }
+function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unknown>, ws: Workspace | undefined, o: { agent?: string; hops?: number; editor?: boolean; tried?: boolean }): Heard | null {
+  const hops = o.hops ?? 0
+  if (wf.source === 'project') { // the repo's file as it is now (a pull or an agent's edit since the list was read): its trust too
+    try {
+      wf = flowFind({ id: wf.id, source: 'project', project: wf.project })
+    } catch {
+      return null // gone
+    }
+    if (!o.tried && !onIt(wf.on, name)) return null
+  }
+  const no = (why: string, untrusted?: boolean): Heard => ({ wf, why, ...(untrusted && { untrusted }) })
+  if (!ws) return no(`the event has no workspace, so no project${o.tried ? ': pick one' : ''}`)
+  if (wf.source === 'project' && wf.project !== ws.project) return no(`${ws.name ?? ws.id} isn't in its project`)
+  if (wf.problems.length) return no(wf.problems[0])
+  if (wf.byAgent && !o.editor) return no('an agent wrote it: save it in Workflows first')
+  if (wf.untrusted && !o.editor) return no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`, true)
+  if (hops > HOPS_MAX) return no(`${hops} hops: a loop of events? dropped`)
+  if (!o.tried && wf.stats?.paused) return no(`paused: ${wf.stats.paused.why}; turn it on again in Workflows`) // a try is yours: Run starts a paused one too
+  // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
+  if (o.agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
+  const mine = runs().filter(r => runOf(r, wf))
+  if (mine.some(r => r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) return no('its own run sent it')
+  const fails = whenFails(wf, payload)
+  if (fails) return no(fails)
+  if (mine.some(r => live(r) && r.evWs === ws.id)) return no(`a run of it is live for ${ws.name ?? ws.id}`) // a worktree run's ws is its own: evWs is where its event came from
+  if (wf.where === 'here' && ws.archived) return no(`${ws.name ?? ws.id} is archived`)
+  return { wf, start: { workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `${o.tried ? 'try' : 'event'} ${name}`, event: payload, evWs: ws.id, hops, ...(o.agent && { agent: o.agent }), ...(o.editor && { editor: true }) } }
+}
+// heard since Laki started (ponytail: in memory, a restart forgets them): the newest payload of each event per project
+// (flowEvent's "the last one"), and each workflow's last FLOW_HEARD outcomes (its settings' Last events)
+const FLOW_HEARD = 5
+const heard = new Map<string, { at: number; payload: Record<string, unknown> }>()
+const lastEvents = new Map<string, FlowHeard[]>()
+function note(wf: WorkflowItem, e: FlowHeard) {
+  const k = agentKey(wf.source, wf.id, wf.project)
+  lastEvents.set(k, [e, ...(lastEvents.get(k) ?? [])].slice(0, FLOW_HEARD))
+  flowFiles.at = Date.now() // the page reads the list again
+  changed()
+  return e
+}
 eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
   const out = { flows: [] as string[], refused: [] as string[] }
   if (!flowsOn(state.settings)) return out
-  if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on && w.source !== 'builtin') } // ponytail: the files read again every 10 s, not at each event
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
-  for (let wf of listening.list) {
-    if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue
-    if (wf.source === 'project' && wf.project !== ws?.project) continue // a project's own: its events only
-    const no = (why: string) => (out.refused.push(`${wf.id}: ${why}`), log(`workflow ${wf.id} on ${name}: not started: ${why}`))
-    if (wf.source === 'project') { // the repo's file as it is now (a pull or an agent's edit since the list was read): its trust too
-      try {
-        wf = flowFind({ id: wf.id, source: 'project', project: wf.project })
-      } catch {
-        continue // gone
-      }
-      if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue
+  heard.set(`${ws?.project ?? ''}:${name}`, { at: Date.now(), payload })
+  if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on && w.source !== 'builtin') } // ponytail: the files read again every 10 s, not at each event
+  for (const w of listening.list) {
+    if (!onIt(w.on, name)) continue
+    if (w.source === 'project' && w.project !== ws?.project) continue // a project's own: its events only
+    const h = fromEvent(w, name, payload, ws, { agent, hops })
+    if (!h) continue
+    if ('why' in h) {
+      out.refused.push(`${h.wf.id}: ${h.why}`)
+      log(`workflow ${h.wf.id} on ${name}: not started: ${h.why}`)
+      if (h.untrusted) refused(h.wf, name)
+      note(h.wf, { at: Date.now(), event: name, ...(ws && { ws: ws.id }), why: h.why })
+      continue
     }
-    if (!ws) { no('the event has no workspace, so no project'); continue }
-    if (wf.problems.length) { no(wf.problems[0]); continue }
-    if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
-    if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); refused(wf, name); continue }
-    if (hops > HOPS_MAX) { no(`${hops} hops: a loop of events? dropped`); continue }
-    if (wf.stats?.paused) { no(`paused: ${wf.stats.paused.why}; turn it on again in Workflows`); continue }
-    // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-    if (agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
-    const mine = runs().filter(r => runOf(r, wf))
-    if (mine.some(r => r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) { no('its own run sent it'); continue }
-    const fails = whenFails(wf, payload)
-    if (fails) { no(fails); continue }
-    if (mine.some(r => live(r) && r.evWs === ws.id)) { no(`a run of it is live for ${ws.name ?? ws.id}`); continue } // a worktree run's ws is its own: evWs is where its event came from
-    out.flows.push(wf.id)
-    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload, evWs: ws.id, hops, ...(agent && { agent }) }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
+    out.flows.push(h.wf.id)
+    const e = note(h.wf, { at: Date.now(), event: name, ...(ws && { ws: ws.id }) })
+    flowStart(h.start).then(
+      r => ((e.run = r.id), (flowFiles.at = Date.now()), changed()),
+      err => ((e.why = (err as Error).message), log(`workflow ${h.wf.id} on ${name}: ${(err as Error).message}`)),
+    )
   }
   return out
+}
+
+// each event's fields as core sends them, on a made-up PR and workspace (flowEvent's sample; the workspace picked on
+// Run's sheet replaces its ws)
+const SAMPLE_PR = { number: 412, url: 'https://github.com/acme/web/pull/412', title: 'Fix the login redirect', draft: false }
+const SAMPLE_EVENTS: Record<string, Record<string, unknown>> = {
+  'turn.done': { last: 'Done: the redirect goes back to the page you were on; tests pass.', seconds: 95 },
+  'turn.failed': { error: 'API Error: 500', limit: false },
+  'turn.waiting': { question: 'Claude needs your permission to use Bash', options: ['Yes', 'Yes, and don’t ask again', 'No'] },
+  'pr.opened': { pr: SAMPLE_PR },
+  'pr.checks.failed': { pr: SAMPLE_PR, failing: [{ name: 'test', url: 'https://github.com/acme/web/actions/runs/1/job/2' }] },
+  'pr.checks.passed': { pr: SAMPLE_PR },
+  'pr.review': { pr: SAMPLE_PR, approved: ['octocat'], changes: [] },
+  'pr.merged': { pr: SAMPLE_PR },
+  'pr.closed': { pr: SAMPLE_PR },
+  'workspace.new': { prompt: 'Fix the login redirect', agent: 'claude' },
+  'schedule.ran': { task: { id: 'sample', name: 'Nightly dependency bumps' }, ok: true },
+  'ship.done': { ok: true, exit: 0, pr: { url: SAMPLE_PR.url, number: SAMPLE_PR.number } },
+  'flow.ended': { run: 'sample', workflow: { id: 'fix-ci', name: 'Fix CI' }, status: 'done', why: '' },
+  'limit.hit': { agent: 'claude', until: 0 },
+  'tab.new': { kind: 'agent' },
+  'port.open': { port: 5173, command: 'node vite' },
+  'gate.held': { gate: 'ship', widget: 'sample', why: 'the changelog has no line for it' },
+}
+const SAMPLE_TAB = ['turn.done', 'turn.failed', 'turn.waiting', 'limit.hit', 'tab.new'] // a tab's events: event.tab too
+function sampleOf(name: string): Record<string, unknown> {
+  const ws = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fix-login', pr: SAMPLE_PR.url }
+  return { event: name, at: Date.now(), ws, ...(SAMPLE_TAB.includes(name) && { tab: { id: 'sample', name: 'claude', agent: 'claude' } }), ...(name.startsWith('custom.') && { data: { text: 'hello' } }), ...SAMPLE_EVENTS[name] }
+}
+
+// a workflow tried as if on an event (Run's sheet, laki flow run --event): the payload it would get (given; else the
+// last real one of its project, unless use: sample; else a sample), its {{event.…}}, each only when: test, whether it
+// would start and why not; go: started the way a real one would be (fromEvent), its trigger "try <name>". A person's
+// start: an untrusted repo workflow runs from the app's sheet (editor), never from the CLI; never a skip or a pause
+export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string }) {
+  on()
+  const wf = flowFind(o)
+  if (wf.source === 'builtin') throw template(wf.name)
+  const name = String(o.event || (wf.on === 'custom.*' ? 'custom.test' : wf.on) || '')
+  if (!name) throw new Error(`${wf.name} has no on: name an event (laki flow run --event <name>)`)
+  if (name === 'custom.*' || !eventOk(name)) throw new Error(`${name}? an event: laki widget events lists them, or custom.<name>`)
+  if (o.payload !== undefined && (!o.payload || typeof o.payload !== 'object' || Array.isArray(o.payload))) throw new Error('the event: a JSON object')
+  if (o.payload && JSON.stringify(o.payload).length > 64 << 10) throw new Error('the event: 64 KB at most')
+  const pick = o.ws ? picked(o.ws, wf.project ?? o.project) : undefined
+  const project = pick?.project ?? wf.project ?? (o.project ? findProject(o.project).id : undefined)
+  const last = [...heard.entries()].filter(([k]) => (project ? k === `${project}:${name}` : k.endsWith(`:${name}`))).map(([, v]) => v).sort((a, b) => b.at - a.at)[0]
+  const from = o.payload ? 'given' : o.use !== 'sample' && last ? 'last' : 'sample'
+  let payload: Record<string, unknown> = from === 'given' ? { event: name, at: Date.now(), ...o.payload } : from === 'last' ? last!.payload : sampleOf(name)
+  if (pick && from !== 'last') payload = { ...payload, ws: eventWs(pick) } // the workspace you picked is the event's
+  const wsId = (payload.ws as { id?: unknown } | undefined)?.id
+  const ws = state.workspaces.find(w => w.id === wsId)
+  const editor = !!o.editor && o.by !== 'agent'
+  const h = fromEvent(wf, name, payload, ws, { tried: true, editor, ...(o.agent && { agent: o.agent }) })
+  const now = h?.wf ?? wf
+  const lastWs = (last?.payload.ws as { name?: string } | undefined)?.name
+  const res = {
+    name,
+    from,
+    ...(last && { last: { at: last.at, ...(lastWs && { ws: lastWs }) } }),
+    payload,
+    vars: eventVars(payload),
+    when: (now.when ?? []).map(t => ({ test: t, ok: !whenFails({ ...now, when: [t] }, payload) })),
+    start: !!h && 'start' in h,
+    ...(!h ? { why: `${wf.name} is gone` } : 'why' in h ? { why: h.why } : {}),
+  }
+  if (!o.go) return res
+  if (!h || 'why' in h) throw new Error(res.why)
+  const run = await flowStart({ ...h.start, dry: !!o.dry, ...(o.by && { by: o.by }) })
+  return { ...res, run: run.id }
 }
 flowHooks.find = o => flowFind(o)

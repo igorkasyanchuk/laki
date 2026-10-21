@@ -884,7 +884,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
             </div>
           ) : (
             <fieldset className="wf-ro" disabled={ro}>
-              <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} stats={item.stats} onTurnOn={onTurnOn} />
+              <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} stats={item.stats} onTurnOn={onTurnOn} events={item.events} onOpenRun={onOpenRun} />
             </fieldset>
           )}
         </div>
@@ -1134,7 +1134,7 @@ A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`a
 
 Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.log}}\` (the end of a wait's failed GitHub Actions logs), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
-function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom, stats, onTurnOn }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void; stats?: WorkflowItem['stats']; onTurnOn?: () => void }) {
+function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom, stats, onTurnOn, events, onOpenRun }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void; stats?: WorkflowItem['stats']; onTurnOn?: () => void; events?: WorkflowItem['events']; onOpenRun?: (id: string) => void }) {
   const b = wf.blocks.find(x => x.id === id)
   const used = b?.use ? findAction(actions, [], b.use) : undefined
   if (!b)
@@ -1189,6 +1189,29 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
             ))}
             <button className="link wf-when-add" onClick={() => edit(w => void (w.when = [...(w.when ?? []), '']))}>Add a test</button>
             <span className="wf-hint">The Case block’s tests on the event’s fields, e.g. <code>event.pr.draft equals "false"</code>. Every one must hold.</span>
+          </div>
+        )}
+        {wf.on && (
+          <div className="wf-field">
+            <label>Last {events?.length || ''} events</label>
+            {events?.length ? (
+              <ul className="wf-heard">
+                {events.map(e => (
+                  <li key={`${e.at}-${e.event}`} className={e.run ? 'ok' : e.why ? 'no' : ''}>
+                    <span className="muted small">{ago(e.at)}</span> <code>{e.event}</code>{' '}
+                    {e.run ? (
+                      <button className="link" onClick={() => onOpenRun?.(e.run!)}>started</button>
+                    ) : e.why ? (
+                      <span className="wf-bad">not started: {e.why}</span>
+                    ) : (
+                      'starting…'
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="wf-hint">None since Laki started. Run › <i>As if on an event</i> tries it with the last one or a sample.</span>
+            )}
           </div>
         )}
         <div className="wf-field">
@@ -2004,6 +2027,7 @@ function UseTemplate({ item, projects, list, api, onClose, onMade }: { item: Wor
   )
 }
 
+type Tried = { name: string; from: string; last?: { at: number; ws?: string }; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string } // flowEvent's
 // fixed: the workspace it runs in (its ⋯ › Run workflow, ⌘K); runs in: here without one picks it here
 function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
   const fix = workspaces.find(w => w.id === fixed)
@@ -2026,9 +2050,22 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
   }, [project])
   const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
   const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
+  // As if on an event (one with on:): the last one heard, or a sample in the workspace picked; what it would get first
+  const [ev, setEv] = useState<'' | 'last' | 'sample'>('')
+  const [tried, setTried] = useState<Tried | null>(null)
+  const [last, setLast] = useState<Tried['last']>()
+  const evWs = ev === 'sample' ? fixed || ws : ''
+  const ask = (use: 'last' | 'sample') => ({ id: item.id, source: item.source, project, use, ...(evWs && { ws: evWs }), editor: true })
+  useEffect(() => void (item.on && api.call<Tried>('flowEvent', { id: item.id, source: item.source, project, use: 'sample' }).then(t => setLast(t.last), () => {})), [])
+  useEffect(() => void (ev ? api.call<Tried>('flowEvent', ask(ev)).then(t => (setTried(t), setErr('')), e => (setTried(null), setErr((e as Error).message))) : setTried(null)), [ev, evWs, project])
   const go = () => {
     setBusy(true)
     setErr('')
+    if (ev)
+      return void api.call<Tried>('flowEvent', { ...ask(ev), go: true, dry }).then(
+        r => onStarted(r.run!),
+        e => (setBusy(false), setErr((e as Error).message)),
+      )
     api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
@@ -2048,9 +2085,21 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
             ))}
           </select>
         </label>
-        {item.where === 'here' && !fix && (
+        {item.on && (
+          <div className="wf-field">
+            <span>As if on an event</span>
+            <div className="seg wf-ev">
+              <button type="button" className={ev === '' ? 'on' : ''} onClick={() => setEv('')}>No, a task</button>
+              <button type="button" className={ev === 'last' ? 'on' : ''} disabled={!last} onClick={() => setEv('last')} data-tip={last ? undefined : `No ${item.on} heard since Laki started`}>
+                {last ? `The last one, ${ago(last.at)}${last.ws ? ` in ${last.ws}` : ''}` : 'The last one'}
+              </button>
+              <button type="button" className={ev === 'sample' ? 'on' : ''} onClick={() => setEv('sample')}>A sample</button>
+            </div>
+          </div>
+        )}
+        {((item.where === 'here' && ev !== 'last') || ev === 'sample') && !fix && (
           <label className="wf-field">
-            <span>Workspace</span>
+            <span>{ev === 'sample' ? 'The event’s workspace' : 'Workspace'}</span>
             <select value={ws} onChange={e => setWs(e.target.value)}>
               <option value="">pick one</option>
               {choices.map(w => (
@@ -2059,10 +2108,31 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
             </select>
           </label>
         )}
+        {tried && (
+          <div className="wf-tried">
+            <details>
+              <summary>{Object.keys(tried.vars).length} variables: <code>{'{{event.…}}'}</code></summary>
+              <dl>
+                {Object.entries(tried.vars).slice(0, 60).map(([k, v]) => (
+                  <Fragment key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v.length > 200 ? `${v.slice(0, 200)}…` : v}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </details>
+            {tried.when.map(w => (
+              <span key={w.test} className={w.ok ? 'ok' : 'wf-bad'}>{w.ok ? '✓' : '✗'} only when: {w.test}</span>
+            ))}
+            <span className={tried.start ? 'ok' : 'wf-bad'}>{tried.start ? `It starts, as on ${tried.name}` : `It wouldn't start: ${tried.why}`}</span>
+          </div>
+        )}
+        {!ev && (
         <label className="wf-field">
           <span>Task</span>
           <textarea autoFocus rows={4} value={task} placeholder={needsTask ? 'What should it work on?' : 'What should it work on? (optional)'} onChange={e => setTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), go())} />
         </label>
+        )}
         {inputs.map(i => {
           const v = vals[i.name] ?? ''
           const put = (x: string) => setVals(o => ({ ...o, [i.name]: x }))
@@ -2099,7 +2169,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws)}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || (ev ? !tried?.start : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>

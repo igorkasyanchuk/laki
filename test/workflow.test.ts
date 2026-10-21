@@ -2132,6 +2132,66 @@ test('templates (workflows/): each checks; listed last, never untrusted; save, d
   assert.equal(cli.code, 0, cli.out + cli.err)
 })
 
+test('try it with an event: the last one heard, else a sample; its variables and only when: said; a try starts as the event would; the last 5 events keep why; an untrusted repo workflow runs only from the app', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const body = '\n\n## start\ninput: task\nnext: say\n\n## say\nrun: echo got {{event.data.y}} in {{event.ws.name}}\nok: e\nfail: e\n\n## e\nend: success\n'
+  await rig.rpc('flowSave', { id: 'ship', text: `# Ship\nruns in: here · on: custom.ship\nonly when: event.data.y equals "go"${body}` })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+
+  // before any: a sample, in the workspace picked (none: it can't start, it says so)
+  let tr = await rig.rpc('flowEvent', { id: 'ship', project: p.id })
+  assert.equal(tr.from, 'sample')
+  assert.equal(tr.last, undefined)
+  assert.equal(tr.vars['event.data.text'], 'hello')
+  assert.deepEqual(tr.when, [{ test: 'event.data.y equals "go"', ok: false }])
+  assert.equal(tr.start, false)
+  assert.match(tr.why, /no workspace, so no project: pick one/)
+  tr = await rig.rpc('flowEvent', { id: 'ship', project: p.id, ws: ws.id, payload: { data: { y: 'stay' } } })
+  assert.deepEqual([tr.from, tr.vars['event.ws.name'], tr.start, tr.why], ['given', 'here', false, 'only when: event.data.y equals "go" doesn\'t hold'])
+  await assert.rejects(rig.rpc('flowEvent', { id: 'ship', project: p.id, ws: ws.id, payload: { data: { y: 'stay' } }, go: true }), /only when: event.data.y equals "go" doesn't hold/)
+  assert.deepEqual((await rig.rpc('state')).flows ?? [], [], 'a try that fails starts nothing')
+
+  // a real one: refused by only when, kept in its last events with why; then flowEvent gives that payload
+  const r = await rig.rpc('widgetEmit', { name: 'ship', data: { y: 'later' }, ws: ws.id })
+  assert.deepEqual(r.flows, [])
+  const item = async (id = 'ship') => (await rig.rpc('flowList', {})).find((w: any) => w.id === id)
+  assert.deepEqual((await item()).events.map((e: any) => [e.event, e.ws, e.why]), [['custom.ship', ws.id, 'only when: event.data.y equals "go" doesn\'t hold']])
+  tr = await rig.rpc('flowEvent', { id: 'ship', project: p.id })
+  assert.deepEqual([tr.from, tr.vars['event.data.y'], tr.last.ws, tr.start], ['last', 'later', 'here', false])
+  assert.equal((await rig.rpc('flowEvent', { id: 'ship', project: p.id, use: 'sample' })).from, 'sample', 'a sample when asked')
+
+  // a try that holds: started as the event would be, in the event's workspace, {{event.…}} filled, its trigger a try
+  const go = await rig.rpc('flowEvent', { id: 'ship', project: p.id, ws: ws.id, payload: { data: { y: 'go' } }, go: true })
+  assert.equal(go.start, true)
+  const done = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: go.run })), 'the try done')
+  assert.deepEqual([done.ws, done.task, done.trigger, done.vars['steps.say.output']], [ws.id, 'custom.ship', 'try custom.ship', 'got go in here'])
+  assert.equal((await item()).events.length, 1, 'a try is no event heard')
+
+  // a repo's workflow not allowed yet: the app's sheet (editor) runs it; the CLI's try is refused as an event is, said nowhere
+  mkdirSync(join(rig.repo, '.laki', 'workflows'), { recursive: true })
+  writeFileSync(join(rig.repo, '.laki', 'workflows', 'repo.md'), `# Repo\nruns in: here · on: custom.repo${body}`)
+  const c = await rig.connect()
+  t.after(() => c.close())
+  assert.equal((await item('repo')).untrusted, true)
+  await assert.rejects(rig.rpc('flowEvent', { id: 'repo', source: 'project', project: p.id, ws: ws.id, payload: { data: { y: 'cli' } }, go: true }), /from the repo, not allowed as it is/)
+  const cli = await rig.cli('flow', 'run', 'repo', p.name, '--event', '--ws', ws.id)
+  assert.equal(cli.code, 1)
+  assert.match(cli.err, /from the repo, not allowed as it is/)
+  const app = await rig.rpc('flowEvent', { id: 'repo', source: 'project', project: p.id, ws: ws.id, payload: { data: { y: 'app' } }, go: true, editor: true })
+  const ran = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: app.run })), 'the app’s try done')
+  assert.equal(ran.vars['steps.say.output'], 'got app in here')
+  await sleep(300)
+  assert.ok(!c.events.some(e => e.ev === 'flow' && e.kind === 'refused'), 'a try is never a skip')
+  assert.equal((await item('repo')).skipped, undefined)
+  // the CLI's --dry: the variables and the tests
+  const dry = await rig.cli('flow', 'run', 'ship', p.name, '--event', 'custom.ship', '--ws', ws.id, '--dry')
+  assert.equal(dry.code, 0, dry.err)
+  assert.match(dry.out, /^custom\.ship \(the last one heard\)$/m)
+  assert.match(dry.out, /^✗ only when: event\.data\.y equals "go"$/m)
+  assert.match(dry.out, /^it doesn't start: only when/m)
+})
+
 test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {
   const rig = await fresh(t, { config: { setup: 'echo set up' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

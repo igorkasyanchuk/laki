@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: *Run* › *As if on an event* tries one with the last event heard or a sample, showing its variables and
+  *Only when* tests first (`laki flow run --event`); its settings list the last 5 events and why each didn't start it.
 - Workflows: six templates come with Laki (fix CI, review a PR, feature to PR, triage an issue, nightly dependency
   bumps, release notes), under *Start from a template*; *Use this…* copies one into yours or a project's.
 - Workflows: each row shows its runs, success rate, median time and AI cost; one that starts by itself and fails 5

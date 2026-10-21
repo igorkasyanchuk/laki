@@ -1091,6 +1091,13 @@ from the same workspace starts none, so a burst of `turn.done` or a second faile
 gets a worktree of its own. A chain (one workflow's `flow.ended` starting another, whose end starts the first) stops
 after three hops.
 
+To try one without breaking CI, *Run* › *As if on an event*: *the last one* (the newest of that event Laki heard in
+the project since it started) or *a sample* (its fields made up, in the workspace you pick). The sheet shows the
+`{{event.…}}` variables it would get and each *Only when* test (✓ or ✗), and starts it the way the event would (a dry
+run too). Its settings list the *Last 5 events* it heard: started (a click opens the run) or not, and why. A repo's
+workflow that isn't allowed yet runs from the sheet (you're looking at it), never from `laki flow run --event`; a try
+never counts as a skip or toward a pause.
+
 The event's fields: every one has `event.event`, `event.at`, `event.ws.id`, `.name`, `.project`, `.branch`, `.pr`,
 `event.tab.id`, `.name`, `.agent` when it's a tab's, and `event.from` when an extension, a tab or an agent sent it.
 The `pr.*` events add `event.pr.number`, `.url`, `.title`, `.draft`; `pr.checks.failed` `event.failing` (a list of
@@ -1262,6 +1269,7 @@ exits 1 when one has a problem (an agent action's name and a preset's aren't kno
 laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
+laki flow run fix-ci --event --ws . --dry      # as if on its on: event (the last one, else a sample; --event-json <file|->: yours)
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
 laki flow on <workflow>                        # turn on again one paused after 5 failed runs in a row
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
