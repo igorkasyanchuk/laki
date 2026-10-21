@@ -1454,7 +1454,7 @@ const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
 const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
 const SENT_MAX = 50
-type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always)
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string; rec: EventSent } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always); rec: what laki widget events says of it
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
@@ -1492,7 +1492,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
       wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
       continue
     }
-    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent, of: x?.id })
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent, of: x?.id, rec })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`, 'warn')
     queues.set(w.id, q)
     rec.widgets.push(w.id)
@@ -1617,7 +1617,10 @@ async function handle(id: string, j: Job) {
     const ws = j.of ?? ''
     const key = grantKey(w, j.h, true)
     if (!state.widgetGrants?.[ws]?.includes(key)) {
-      const how = await approve(w, j.h, { description: `Its "${j.h}" action, on ${j.name}: an event ${j.agent} sent`, ask: 'first', ws: ws || undefined, agent: j.agent }).catch((e: Error) => void wLog(w, `event ${j.name} from ${j.agent}: action ${j.h} not run: ${e.message}`, 'warn'))
+      const how = await approve(w, j.h, { description: `Its "${j.h}" action, on ${j.name}: an event ${j.agent} sent`, ask: 'first', ws: ws || undefined, agent: j.agent }).catch((e: Error) => {
+        wLog(w, `event ${j.name} from ${j.agent}: action ${j.h} not run: ${e.message}`, 'warn')
+        ;(j.rec.refused ??= []).push(`${id}: ${j.h} not run: ${e.message}`)
+      })
       if (!how) return
       if (how === 'always') grant(w, j.h, ws, key)
     }
@@ -1817,6 +1820,7 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
   } catch {}
   let listed: string[] | undefined
   try {
+    // ponytail: a sync git per run (trusted), as the walk was; cache by the index's and the folder's mtimes if it shows
     listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
   } catch {}
   if (listed) {

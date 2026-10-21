@@ -355,6 +355,7 @@ test("an agent's event: an action handler asks first (Always kept), a fetch does
   assert.match(relayed.refused.join('\n'), /cmd: an agent sent the event, and it runs commands/)
   await until(async () => (await rig.rpc('widgetLogs', { id: 'act' })).lines.some((l: any) => /event custom\.x from claude: action act not run: Laki's window isn't open/.test(l.text)), 'not run, said')
   assert.ok(!existsSync(join(home, 'act.log')))
+  assert.ok((await rig.rpc('widgetEvents')).some((e: any) => e.event === 'custom.x' && e.refused?.some((r: string) => /^act: act not run: Laki's window isn't open/.test(r))), 'said in laki widget events')
 
   // a window: asked first; Deny runs nothing, Always runs it and keeps it for that workspace
   const app = await rig.connect()
