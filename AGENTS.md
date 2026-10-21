@@ -2089,9 +2089,11 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 42 (`ACHIEVEMENTS`, in
   `ACH_GROUPS`), each with its `how` and `go` (App's `achGo`: a page, Settings' section, the right panel's tab; an
   experimental page that's off: where it's turned on). App's `earn` unlocks one once, only for what's done from now on: a
-  call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`), a page opened (`pageEarns`), a number or value
-  of the view that moved since the last view (`upsOf`/`wentUp`; the first view only notes them), or by id (⌘J, timers,
-  the sidebar's filter, Changes, a line's comment). Kept in `settings.achievements` (`AchievementsKept`: `got`, `hidden`,
+  call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`; a `{ held }` or `{ dirty }` answer isn't), a page
+  opened (`pageEarns`), a number or value of the view that moved since the last view (`upsOf`/`wentUp`; the first view,
+  and the first after a reconnect, only notes them; a value back to unset isn't), or by id (⌘J, timers, the sidebar's
+  filter, Changes once it wasn't on screen, a line's comment, a profile: Settings' save with more presets than in use);
+  a hidden one never. Kept in `settings.achievements` (`AchievementsKept`: `got`, `hidden`,
   `off`; `SETTINGS_KEPT`), written whole by App (`achSet`, `earned` meanwhile); Settings' own save leaves it out, so an
   unlock while it's open stays. The unlock toast (`.ach-toast`, over pages) groups one action's unlocks. Tested in
   `test/achievements.test.ts`.

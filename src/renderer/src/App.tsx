@@ -1405,7 +1405,7 @@ export function App() {
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
-    toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => (earn('comment'), toast('Sent to the agent'))),
+    toAgent: (text, line) => api.call('send', { target: w.id, text, whenIdle: true }).then(() => (line && earn('comment'), toast('Sent to the agent'))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     sim: p => api.call('sim', p),
@@ -1515,21 +1515,24 @@ export function App() {
   const achSet = (o: AchievementsKept) => api.call('settingsSet', { achievements: { ...achRef.current, ...o, got: { ...achRef.current.got, ...earned.current } } })
   const earn = (id: string) => {
     const a = achRef.current
-    if (!viewRef.current || a.off || a.got?.[id] || earned.current[id]) return // no view yet: its settings unknown, written over
+    if (!viewRef.current || a.off || a.got?.[id] || earned.current[id] || a.hidden?.includes(id)) return // no view yet: its settings unknown, written over; hidden: doesn't unlock
     earned.current[id] = Date.now()
     achSet({}).catch(() => delete earned.current[id])
-    if (a.hidden?.includes(id)) return
     const fresh = Date.now() - unlockAt.current > 1500 // one action's unlocks together, not the last toast's too
     unlockAt.current = Date.now()
     setUnlocked(u => (fresh ? [id] : [...u, id]))
     clearTimeout(unlockTimer.current)
     unlockTimer.current = setTimeout(() => setUnlocked([]), 6000)
   }
+  const hiding = useRef<string[] | null>(null) // the Achievements page's ✕s not in the view yet
+  useEffect(() => void (hiding.current?.join() === (achKept.hidden ?? []).join() && (hiding.current = null)), [achKept.hidden?.join()])
   const earnRef = useRef(earn)
   earnRef.current = earn
-  useEffect(() => api.onCall((method, params) => earnedBy(method, params).forEach(id => earnRef.current(id))), [])
-  // the view's numbers and values that moved since the last view (the first: where they start, nothing earned)
+  useEffect(() => api.onCall((method, params, r) => earnedBy(method, params, r).forEach(id => earnRef.current(id))), [])
+  // the view's numbers and values that moved since the last view (the first, and the first after a reconnect: where
+  // they start, nothing earned; a daemon coming back may send its sessions a view or two late)
   const ups = useRef<Record<string, number | string>>(undefined)
+  useEffect(() => void (connected || (ups.current = undefined)), [connected])
   useEffect(() => {
     if (!view) return
     const now = upsOf(view)
@@ -1538,7 +1541,14 @@ export function App() {
   }, [view])
   useEffect(() => void (dialog && pageEarns(typeof dialog === 'string' ? dialog : settingsOf(dialog) ? 'settings' : Object.keys(dialog)[0]).forEach(earn)), [dialog])
   useEffect(() => void (find && earn('filter')), [!!find])
-  useEffect(() => void (panelShown && panelTab === 'changes' && ws && earn('changes')), [panelShown && panelTab === 'changes' && !!ws])
+  // Changes on screen, once it wasn't: not the panel as it was left when Laki started
+  const onChanges = panelShown && panelTab === 'changes' && !!ws
+  const changesWas = useRef<boolean>(undefined)
+  useEffect(() => {
+    if (!view) return
+    if (onChanges && changesWas.current === false) earn('changes')
+    changesWas.current = onChanges
+  }, [onChanges, !view])
   // the extension studio's chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
   // studio, again a moment after an ai event
   const [studioChats, setStudioChats] = useState<StudioChat[]>([])
@@ -2876,7 +2886,8 @@ export function App() {
   }
   const achHidden = achKept.hidden ?? []
   const achAll = ACHIEVEMENTS.filter(a => !achHidden.includes(a.id))
-  const achN = achAll.filter(a => achKept.got?.[a.id] || earned.current[a.id]).length // earned: before the settings say so
+  const achGot = { ...achKept.got, ...earned.current } // earned: before the settings say so
+  const achN = achAll.filter(a => achGot[a.id]).length
   // each kind's tabs that need you (the Dock's rule) and whether one works, for its rail button
   const kinds = rail ? new Map(live.map(w => [w.id, kindOf(w)])) : null
   const railSays = (k: RailKind) => {
@@ -3398,7 +3409,11 @@ export function App() {
             apps={apps}
             onClose={() => setDialog(null)}
             onSection={id => setSeenSecs(l => (l.includes(id) ? l : [...l, id]))}
-            onSave={({ achievements: _, ...s }) => call('settingsSet', s).catch(() => {})} // achievements: App's own (earn), never this page's copy from when it opened
+            onSave={({ achievements: _, ...s }) => {
+              // achievements: App's own (earn), never this page's copy from when it opened; a profile: the list longer than the one in use
+              if (s.presets && s.presets.length > (settings.presets ?? view.presets).length) earn('profile')
+              call('settingsSet', s).catch(() => {})
+            }}
             projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
@@ -3617,11 +3632,15 @@ export function App() {
         )}
         {dialog === 'achievements' && (
           <AchievementsPage
-            kept={{ ...achKept, got: { ...achKept.got, ...earned.current } }}
+            kept={{ ...achKept, got: achGot }}
             onClose={() => setDialog(null)}
             api={{
               go: achGo,
-              hide: (id, hide) => (h => void achSet({ hidden: hide ? [...h, id] : h.filter(x => x !== id) }).catch(fail))(achRef.current.hidden ?? []),
+              hide: (id, hide) => {
+                const h = (hiding.current ??= achRef.current.hidden ?? []).filter(x => x !== id) // the last ✕'s list until the view has it: two quick ones keep both
+                hiding.current = hide ? [...h, id] : h
+                void achSet({ hidden: hiding.current }).catch(fail)
+              },
               off: off => void achSet({ off }).then(() => off && (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
             }}
           />
@@ -3921,7 +3940,7 @@ export function App() {
       <VoiceBar />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {unlocked.length > 0 && (
-        <button className="ach-toast" aria-live="polite" onClick={() => (setUnlocked([]), setDialog('achievements'))}>
+        <button className={`ach-toast ${note ? 'up' : ''}` /* over a toast at the same time (an archive's Undo) */} aria-live="polite" onClick={() => (setUnlocked([]), setDialog('achievements'))}>
           <Icon name="trophy" size={14} />
           <span>
             Unlocked: <b>{ACHIEVEMENTS.find(a => a.id === unlocked.at(-1))?.title}</b>

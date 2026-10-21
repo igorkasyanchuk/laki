@@ -28,7 +28,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'jump', group: 'Agents', title: 'Jump to who needs you', how: '⌘J: the next tab waiting for you, wherever it is', icon: 'arrowRight' },
   { id: 'later', group: 'Agents', title: 'Send a message later', how: '⌘L: to an agent in 20 minutes or at 6pm', icon: 'clock' },
   { id: 'race', group: 'Agents', title: 'Race two agents', how: "The new-workspace page's More › Race: one prompt, a worktree each, then compare", icon: 'race', go: 'new', rpc: 'wsFan' },
-  { id: 'profile', group: 'Agents', title: 'Make an agent profile', how: 'An agent with its own model, effort or account', icon: 'agent', go: 'section:presets', up: v => v.settings.presets?.length ?? 0 }, // yours: the view's own grow as an agent lands on PATH
+  { id: 'profile', group: 'Agents', title: 'Make an agent profile', how: 'An agent with its own model, effort or account', icon: 'agent', go: 'section:presets' }, // App's Settings onSave: the list longer than the one in use (any edit of the defaults saves them all)
   { id: 'template', group: 'Agents', title: 'Write a prompt template', how: "A new workspace's prompt with your rules around it", icon: 'pencil', go: 'section:templates', up: v => (v.settings.templates?.length ?? 0) + count(v, p => p.config?.templates?.length ?? 0) },
   { id: 'memory', group: 'Agents', title: 'Give agents a rule', how: 'Global memory: what claude and codex should always know', icon: 'bulb', go: 'section:memory', up: v => (v.settings.memory?.length ?? 0) + count(v, p => p.memory?.filter(m => !m.auto).length ?? 0) },
 
@@ -66,11 +66,13 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'calendar', group: 'Experimental', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },
 ]
 
-// the ones a call earns: its method, and its params when they say more
-export const earnedBy = (method: string, params: any) => ACHIEVEMENTS.filter(a => a.rpc?.split('|').includes(method) && (!a.ok || a.ok(params ?? {}))).map(a => a.id)
+// the ones a call earns: its method, and its params when they say more; none when it answered that it didn't do it
+// ({ held }: a gate held ship, merge or archive; { dirty }: wsArchive ifClean asks first)
+export const earnedBy = (method: string, params: any, r?: any) =>
+  r && typeof r === 'object' && ('held' in r || 'dirty' in r) ? [] : ACHIEVEMENTS.filter(a => a.rpc?.split('|').includes(method) && (!a.ok || a.ok(params ?? {}))).map(a => a.id)
 // the ones a page earns: its dialog's name (App's pageOf)
 export const pageEarns = (page: string) => ACHIEVEMENTS.filter(a => a.page === page).map(a => a.id)
 // each up's value in a view; then the ones that went up (a number) or changed (a value) since the last
 export const upsOf = (v: View) => Object.fromEntries(ACHIEVEMENTS.filter(a => a.up).map(a => [a.id, a.up!(v)]))
 export const wentUp = (was: Record<string, number | string>, now: Record<string, number | string>) =>
-  Object.keys(now).filter(id => id in was && (typeof now[id] === 'number' ? now[id] > (was[id] as number) : now[id] !== was[id]))
+  Object.keys(now).filter(id => id in was && (typeof now[id] === 'number' ? now[id] > (was[id] as number) : now[id] !== '' && now[id] !== was[id])) // back to unset (Reset the interface): no pick

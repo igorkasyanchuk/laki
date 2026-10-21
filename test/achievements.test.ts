@@ -34,6 +34,10 @@ test('achievements: a call earns by its method and params', () => {
   assert.deepEqual(earnedBy('sim', { op: 'tap' }), ['simulator'])
   assert.deepEqual(earnedBy('sim', { op: 'frame' }), []) // the panel drawing it isn't you
   assert.deepEqual(earnedBy('screen', {}), [])
+  assert.deepEqual(earnedBy('ship', { ws: 'w' }, { id: 't' }), ['ship'])
+  assert.deepEqual(earnedBy('ship', { ws: 'w' }, { held: [{ why: 'no' }] }), []) // a gate held it: not shipped
+  assert.deepEqual(earnedBy('wsArchive', { id: 'w', ifClean: true }, { dirty: 2 }), []) // asks first: not archived yet
+  assert.deepEqual(earnedBy('wsArchive', { id: 'w' }, null), ['archive'])
   assert.deepEqual(pageEarns('board'), ['board'])
   assert.deepEqual(pageEarns('about'), [])
 })
@@ -44,9 +48,9 @@ test("achievements: the view's numbers going up and values changing earn, never 
   assert.deepEqual(wentUp({}, a), []) // nothing to compare with yet
   const split = { dir: 'row', a: { tab: 't1' }, b: { tab: 't2' }, at: 50 } as const
   const b = upsOf(view({ settings: { theme: 'dawn', templates: [{ name: 'x', text: '' }], presets: [{ name: 'c', agent: 'claude' }] }, layouts: { w: [split] }, presets: [{ name: 'c', agent: 'claude' }] }))
-  assert.deepEqual(wentUp(a, b).sort(), ['profile', 'split', 'template', 'theme'])
-  assert.deepEqual(wentUp(b, a), ['theme']) // one taken away earns nothing; the default theme picked again is a pick
+  assert.deepEqual(wentUp(a, b).sort(), ['split', 'template', 'theme']) // a profile: App's Settings save, not the view
+  assert.deepEqual(wentUp(b, a), []) // one taken away earns nothing, nor the theme back to unset (Reset the interface)
+  assert.deepEqual(wentUp(b, upsOf(view({ settings: { theme: 'default' } }))), ['theme']) // Default picked is a pick
   const mem = upsOf(view({ projects: [{ id: 'p', name: 'p', path: '/p', memory: [{ id: 'm', text: 'x', at: 1, auto: true }] }] }))
   assert.deepEqual(wentUp(a, mem), []) // an agent's memory isn't yours
-  assert.deepEqual(wentUp(a, upsOf(view({ presets: [{ name: 'gemini', agent: 'gemini' }] }))), []) // an agent landing on PATH isn't a profile of yours
 })
