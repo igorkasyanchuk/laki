@@ -1,7 +1,7 @@
 // Memory's compaction: a project's learned memories (agents' auto-memory, never the user's own) to Laki AI's model as a
 // list, back as a shorter one (duplicates merged, overlaps joined, each the gist in a line or two, stale or one-off ones
 // dropped) that replaces them; the project keeps the run (`compacted`) and <data>/memory-compact.jsonl each one's texts.
-// memoryTick (every 30 minutes, with Laki AI on and settings.memoryCompact not off) runs it every days (COMPACT_DAYS)
+// memoryTick (every 30 minutes, with Laki AI on and settings.memoryCompact.on) runs it every days (COMPACT_DAYS)
 // and as the learned ones reach MEMORY_MAX; a project's Memory tab's *Compact now* is memoryCompact.
 import { appendFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'

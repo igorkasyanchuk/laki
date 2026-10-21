@@ -443,7 +443,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree (a double fork,
 // launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact'])
 const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowTrust'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
@@ -472,9 +472,9 @@ const notAgent = (p: any, what: string) => {
   if (core.agentCaller(p.from)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
 }
 // M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's
-// menu: its own included), an extension's files, remote access, the settings remote access can't change either, and keys
+// menu: its own included), an extension's files, remote access, memory's compaction (N11: it goes to a model), the settings remote access can't change either, and keys
 // into a tab whose agent asks something (they'd answer it)
-const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access' }
+const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)' }
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')

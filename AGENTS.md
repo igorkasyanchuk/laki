@@ -1102,7 +1102,7 @@ app's window is Electron's, in no tab; the daemon's own process, `laki serve`'s,
 or `caller` over what the env said; a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
 App's dialog and notification; `always`: `crossOk`, in memory). `state` gives each project's `groups` (its seps' names) and `groupTemplates`

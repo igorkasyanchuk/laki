@@ -23,7 +23,7 @@ version it builds, with the date. -->
 - An agent can't pass for you any more by sending the app's Origin with the daemon's token: every local call is checked
   against the tabs' processes (on Linux too, without lsof), and one Laki can't place is refused. Agents can't answer
   Laki's or Laki AI's questions or another agent's menu, type into a tab that asks something, edit an extension's files,
-  start remote access or change its settings; typing into or watching another workspace's terminal asks you first.
+  start remote access or change its settings, or compact memories; typing into or watching another workspace's terminal asks you first.
 
 ## 0.24.0 · Oct 21, 2026
 

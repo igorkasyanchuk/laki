@@ -48,11 +48,12 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
     curl('widgetFileSave', { id, path: 'widget.json', text: '{}' }),
     curl('remoteStart', { hours: 1, open: true }),
     curl('settingsSet', { env: { A: '1' } }),
+    curl('memoryCompact', { project: p.id }),
     curl('settingsSet', { prScan: 5 }),
   )
-  for (const [i, what] of ['answer what Laki asks', "answer Laki AI's questions", "answer an agent's question", "edit an extension's files", 'start remote access', 'change that setting'].entries())
+  for (const [i, what] of ['answer what Laki asks', "answer Laki AI's questions", "answer an agent's question", "edit an extension's files", 'start remote access', 'change that setting', 'compact memories (they go to a model)'].entries())
     assert.equal(said[i].error, `an agent can't ${what}: it's the user's (ask them)`)
-  assert.equal(said[6].error, undefined)
+  assert.equal(said[7].error, undefined)
   assert.equal((await rig.rpc('state')).settings.env, undefined)
 
   // keys: into its own tab while it asks something, refused; another workspace's tab asks first, as a send does
