@@ -428,6 +428,12 @@ test('workflow case: if / elsif / else, a branch testing its own variable; what 
   const other = await went('something else')
   assert.equal(other.exit, 'else')
   assert.match(other.why, /nothing above matched/)
+  // a pattern that backtracks for ever ends at 200 ms, the run's error way: the daemon still answers
+  await rig.rpc('flowSave', { id: 'slow', text: route('- matches "^(a+)+$" → specs\n- equals "x" → fix\n- equals "y" → three\n- else → full').replace('# Route', '# Slow') })
+  const run = await rig.rpc('flowStart', { workflow: 'slow', project: p.id, task: `${'a'.repeat(40)}!` })
+  const r = await until(async () => (x => x.status !== 'running' && x)(await rig.rpc('flowGet', { id: run.id })), 'its regex stopped', 15000)
+  assert.match(r.log.join('\n'), /matches "\^\(a\+\)\+\$": Script execution timed out/)
+  assert.equal(await rig.rpc('ping'), 'pong')
 })
 
 test('workflow outputs: an AI call (OpenRouter) gives named outputs, a command uses them, a webhook posts them with a secret header', async t => {

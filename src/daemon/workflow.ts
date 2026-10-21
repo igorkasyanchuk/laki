@@ -519,7 +519,7 @@ async function work(r: FlowRun, b: Block) {
     }
     case 'choice': {
       const want = b.value ?? ''
-      const yes = holds(valueOf(r, vars, b.of), b.test, want)
+      const yes = held(valueOf(r, vars, b.of), b.test, want)
       const opt = b.options![yes ? 0 : 1]
       const v = valueOf(r, vars, b.of)
       if (NUM_TESTS.includes(b.test ?? '')) return leave(r, b, opt.label, `${b.of} is ${clip(v.trim() || 'empty', 30)}: ${yes ? '' : 'not '}${b.test} ${want}`)
@@ -537,7 +537,7 @@ async function work(r: FlowRun, b: Block) {
         }
         const of = br.of ?? b.of ?? ''
         const v = valueOf(r, vars, of)
-        if (holds(v, br.test, br.value)) return leave(r, b, o.label, `${of} ${br.test === 'matches' ? 'matches' : br.test} ${NUM_TESTS.includes(br.test) ? br.value : `"${br.value}"`} (${clip(v.replace(/\s+/g, ' ').trim() || 'empty', 60)})`)
+        if (held(v, br.test, br.value)) return leave(r, b, o.label, `${of} ${br.test === 'matches' ? 'matches' : br.test} ${NUM_TESTS.includes(br.test) ? br.value : `"${br.value}"`} (${clip(v.replace(/\s+/g, ' ').trim() || 'empty', 60)})`)
       }
       throw new Error('no branch matched, and no else')
     }
@@ -588,6 +588,15 @@ const valueOf = (r: FlowRun, vars: Record<string, string>, of = '') => r.vars[of
 // a case's js: branch: a JS expression over the run's variables (vars, num(name): NaN when it's empty, json(name)), 200
 // ms at most; one that throws stops the run on that block (Try again or Stop), saying why. ponytail: node:vm is no sandbox, but it runs what a run: block could
 // (an agent's workflow runs only after you save it)
+// holds, a matches test under js' 200 ms (a pattern that backtracks for ever, (a+)+$, ends there, not the daemon)
+function held(v: string, test: string | undefined, want: string) {
+  if (test !== 'matches') return holds(v, test, want)
+  try {
+    return !!runInNewContext('new RegExp(want, "i").test(v)', { v, want }, { timeout: 200 })
+  } catch (e) {
+    throw new Error(`matches "${clip(want, 60)}": ${(e as Error).message}`)
+  }
+}
 function js(expr: string, vars: Record<string, string>) {
   const v = Object.freeze({ ...vars })
   const json = (k: string) => {
