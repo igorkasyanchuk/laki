@@ -3,7 +3,7 @@
 // Stand-ins go in the test's own $HOME/bin (first on PATH).
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import type { SimCheck } from '../src/shared/types.ts'
@@ -231,7 +231,7 @@ echo "adb $*" >> "$HOME/sim.log"
 case "$*" in
   "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\nZX1  unauthorized usb:1-1 transport_id:2\\n' ;;
   *"exec-out screencap -p") cat "$HOME/screen.png" ;;
-  "-s emulator-5554 emu avd name") printf 'Pixel_9\\r\\nOK\\r\\n' ;;
+  "-s emulator-5554 emu avd name") if [ -f "$HOME/avd-ko" ]; then printf 'KO: unknown command\\r\\n'; else printf 'Pixel_9\\r\\nOK\\r\\n'; fi ;;
 esac
 exit 0
 `,
@@ -239,6 +239,9 @@ exit 0
   const l = await rig.rpc('sim', { op: 'list' })
   assert.deepEqual(l.devices, [...(ios ? [{ id: 'ios:U-1', name: 'iPhone 17', os: 'ios' }] : []), { id: 'android:emulator-5554', name: 'Pixel 9', os: 'android' }], 'booted ones, ready ones; an emulator by its AVD')
   assert.match(l.why.join('\n'), /ZX1 waits for you to allow USB debugging/, 'a phone that asks: said')
+  writeFileSync(join(rig.home, 'avd-ko'), '')
+  assert.equal((await rig.rpc('sim', { op: 'list' })).devices.at(-1).name, 'sdk gphone64 arm64', "a console that doesn't answer OK: its model")
+  rmSync(join(rig.home, 'avd-ko'))
   const checks = async () => (await rig.rpc('sim', { op: 'check' })).checks as SimCheck[]
   let c = await checks()
   const by = (id: string) => c.find(x => x.id === id)!

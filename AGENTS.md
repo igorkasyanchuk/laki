@@ -326,7 +326,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
   App's `runScript`, Deploy after `ask`);
 - `sim` (`daemon/device.ts`, `SIM_OPS`; the side panel's Simulator, SidePanel.tsx `DeviceTab`): `list` (booted iOS
-  Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones (an emulator named by its AVD, `emu avd name`), `ios:<udid>` / `android:<serial>`; `why`: what
+  Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones (an emulator named by its AVD, `emu avd name`: the name then OK, within 5 s, else its model), `ios:<udid>` / `android:<serial>`; `why`: what
   keeps a kind out), `frame` (simctl's JPEG or adb's `screencap -p`, through `sips` to a JPEG at most `FRAME_MAX` tall on
   a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden: `visibilitychange` starts them again), `shot` (`imageSave`'s path, for
   the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by `simPoints` (simctl's `getenv` `SIMULATOR_MAINSCREEN_*`: pixels over scale; idb's `describe-all` names no app on iOS 27's home screen),
@@ -1683,7 +1683,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       8px inside the main area as it changes size; a double-click on its head drops it and the size); `laki.aiFloatSize`:
       its size, from its edges and corners (`.ai-grip`s; the window clips, so they reach past the round corners).
     - `laki.aiDock`: the chat button minimized into the status bar (App's `dock`: `fly` down, `DOCK_MS`; `.sb-ai`, sticky at
-      the bar's end; its right click floats it again).
+      the bar's end; its right click, or ⌘K where no status bar shows it, floats it again).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.aiDrafts`: Laki AI's composers' unsent text and images (paths, shown again through `aiImage`), by chat:
       PromptInput.tsx `useDraft` (the AI page, floating chat and AI window share `ai:<chat>`; the studio's `widget:<id>`,
