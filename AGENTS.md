@@ -879,13 +879,13 @@ now; its `vars`, `visits`, `tabs` and `resume` copied; `first`, the block `begin
 click *Run from here*, the index row's ⋯, `laki flow again <run> [--from <block>]`. `flowRm` moves the file to
 `<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at); `flowTrash` lists
 them newest first, `flowRestore` (`trash`) puts one back where it was (refused when a file of its id is there now),
-`flowTrashTidy` (hourly and at start) drops them past 30 days or 20. `flowSave` keeps the file it replaces first
+`flowTrashTidy` (hourly and at start) drops them past 30 days or 20, and with each its history unless its file is back or another of it is still there. `flowSave` keeps the file it replaces first
 (`keepOld`: `<data>/workflow-history/yours-<id>` or `project-<project>-<id>`, `<ms>.md`, not when it's the same text,
 the last 20); `flowHistory` lists them (`at`, `size`, `first`) or gives one's `text` (`at`), `flowRevert` saves one
-through `flowSave` (so the one it replaces is kept too). The CLI's `laki flow trash` and `restore`. `finish` then `tidy`: `when done:` (`DONES`; the head's `done`, unset: archive for
+through `flowSave` (so the one it replaces is kept too; no `at`: refused). The CLI's `laki flow trash` and `restore`. `finish` then `tidy`: `when done:` (`DONES`; the head's `done`, unset: archive for
 `runs in: worktree`, else keep) archives, on `done` only, the worktree the run made (`ws.flow === r.id`) through
 `wsArchive` `ifClean` and `by: 'workflow'`; `{ dirty }`, `{ held }`, a failed or stopped run, `keep` and a workspace it
-didn't make (`here`, `ws`, the project's folder) stay, a log line each (`<name> stays: …` / `archived`); the editor's
+didn't make (`here`, `ws`, the project's folder) and a dry run's stay, a log line each; `tidying` keeps `picked` off one being archived (gates may take a while) (`<name> stays: …` / `archived`); the editor's
 *When a run is done*. `laki flow check [file.md… | folder]` (`flowCheck`, before `ensureDaemon`:
 no daemon): `parse` and `check` per file (a folder's `*.md`; none given: `./.laki/workflows`), `✓`/`✗ <name>  <file>`
 and each problem, `--json` `{file, name, problems}[]`, exit 1 on any; a `use:` slug and a preset aren't known offline. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
@@ -899,7 +899,7 @@ none for an agent without modes) go to `addTab`, which keeps them on the tab for
 core's `modelCheck` on each agent block with its preset's agent (`agentOf`) before any workspace; `check` (offline)
 names an unknown mode, a mode or fast mode an agent id lacks, and blocks sharing a tab (`tabKey`: session run of one
 agent, or `session: <block>`) in different modes; a shared session's last tab in another mode is forked, not reused.
-`bypassIn`: `flowStart` `by: 'agent'` and an agent's event refuse a workflow with a bypassPermissions block; StartRun
+`bypassIn`: `flowStart` `by: 'agent'` (MCP's; the CLI's `caller` from an agent's tab, main.ts: `agentCaller`) and an agent's event refuse a workflow with a bypassPermissions block; StartRun
 names them in red, a dry run's log too. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
 `deliver`): this turn's answer as `steps.<id>.answer`, a
 `failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
@@ -973,7 +973,7 @@ written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default a
 `inputs.x` not declared): `flowStart` `inputs` through `inputVals` (defaults, a needed one, a number, a choice; a name it
 doesn't have refused) into `r.vars['inputs.<name>']` (an optional one not given: ''), `flowVars` lists them; StartRun a
 field each (a branch's from `branches`), the CLI's repeated `--set name=value` (`sets`), MCP's `laki_workflow_run`
-`inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks). Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+`inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks), and a `runs in: here` one. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
 already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
 not waiting re-enters its block 8 s later; an agent block's is marked `resumed` (the block, its tab's chat id

@@ -195,12 +195,19 @@ export function flowRestore(o: { trash: string }) {
 // at start and hourly: past TRASH_DAYS, and past the newest TRASH_MAX, gone for good
 export function flowTrashTidy(now = Date.now()) {
   if (state.settings?.workflows !== true) return
-  const kept = new Set(flowTrash().filter((e, i) => i < TRASH_MAX && now - e.at <= TRASH_DAYS * 86400e3).map(e => e.trash))
+  const keep = flowTrash().filter((e, i) => i < TRASH_MAX && now - e.at <= TRASH_DAYS * 86400e3)
+  const kept = new Set(keep.map(e => e.trash))
   let names: string[] = []
   try {
     names = readdirSync(trashDir())
   } catch {}
-  for (const n of names) if (!kept.has(n)) rmSync(join(trashDir(), n), { recursive: true, force: true }) // one without a trash.json (cut short) too
+  for (const n of names) {
+    if (kept.has(n)) continue
+    // its history too, unless a workflow of that id is back or another of it is still in the trash
+    const m = readJson<Trashed>(join(trashDir(), n, 'trash.json'))
+    if (m && !existsSync(m.path) && !keep.some(e => histOf(e) === histOf(m))) rmSync(histOf(m), { recursive: true, force: true })
+    rmSync(join(trashDir(), n), { recursive: true, force: true }) // one without a trash.json (cut short) too
+  }
 }
 // the file as it was before a write (not when it's the same), the newest HISTORY kept
 function keepOld(h: string, path: string, text: string) {
@@ -240,6 +247,7 @@ export function flowHistory(o: Ref & { at?: number }) {
 }
 // a version back: written as a save would (the one there now goes to its history first)
 export function flowRevert(o: Ref & { at: number }) {
+  if (!Number.isFinite(Number(o.at))) throw new Error('which version? (at: flowHistory lists them)')
   const v = flowHistory(o) as { text: string }
   return flowSave({ id: o.id, source: o.source, project: o.project, text: v.text })
 }
@@ -319,6 +327,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   const name = ws.name ?? ws.id
   const p = state.projects.find(x => x.id === ws.project)
   if (ws.archived) throw new Error(`${name} is archived: restore it first`)
+  if (tidying.has(ws.id)) throw new Error(`${name} is being archived: its run is done`)
   if (!p || !usable(p) || ws.host) throw new Error(`${name} can't run workflows (Terminals, Browsers and SSH hosts can't)`)
   if (project && findProject(project).id !== p.id) throw new Error(`${name} is ${p.name}'s, not ${findProject(project).name}'s`)
   const there = runs().find(x => x !== self && live(x) && (x.ws === ws.id || x.pick === ws.id))
@@ -628,16 +637,15 @@ function agent(r: FlowRun, b: Block) {
   // back after a restart: its tab resumed the chat that has the prompt (the same chat id), so a short line, not a turn
   // of its own; a new chat (a tab that's gone, or one whose chat was) gets the whole prompt
   const back = r.resumed?.block === b.id ? r.resumed : undefined
+  r.resumed = undefined // once: a drawing tab's later() puts it back
   const same = back && alive(r.tabs[b.id])
   if (same && back.chat && same.resumeId === back.chat) {
-    if (drawing(same.id)) return later(r, b, agent)
-    r.resumed = undefined
+    if (drawing(same.id)) return void (r.resumed = back), later(r, b, agent)
     const queued = !!send(same.id, RESUMED).queued
     say(r, `${blockName(b)}: its chat resumed in ${same.name}: told to finish the step${queued ? ' (queued: it was busy)' : ''}`, RESUMED)
     r.wait = { kind: 'agent', tab: same.id, ...(queued && { queued: RESUMED }), since: Date.now(), used: 0 }
     return touch()
   }
-  if (back) (r.resumed = undefined), say(r, `${blockName(b)}: ${same ? 'a new chat in its tab' : 'its tab is gone'} after the restart: the whole prompt again`)
   if (r.turns >= (r.flow.turns ?? TURNS)) return stuck(r, b, `${r.turns} agent turns in this run`, ['Go on', 'Stop the run'])
   const ws = wsOf(r)
   if (!ws || ws.archived) throw new Error('its workspace is gone')
@@ -666,7 +674,8 @@ function agent(r: FlowRun, b: Block) {
     if (t?.workspace === ws.id && isLive(t) && t.perm === perm && !!t.fast === !!fast && !runs().some(x => x !== r && live(x) && Object.values(x.tabs).includes(t.id))) tab = t
     else forkOf = t?.resumeId ?? before?.resume?.[key]
   }
-  if (tab && drawing(tab.id)) return later(r, b, agent)
+  if (tab && drawing(tab.id)) return void (r.resumed = back), later(r, b, agent)
+  if (back) say(r, `${blockName(b)}: ${same ? 'a new chat in its tab' : 'its tab is gone'} after the restart: the whole prompt again`)
   let queued = false
   if (tab) {
     queued = !!send(tab.id, prompt).queued // after the turn under way: until it's typed in, a turn's end isn't ours
@@ -1202,6 +1211,8 @@ async function tidy(r: FlowRun) {
   if (r.status !== 'done') return stays(`the run ${r.status === 'failed' ? 'failed' : 'was stopped'}`)
   if (r.flow.done === 'keep') return stays('when done: keep')
   if (ws.flow !== r.id || ws.kind !== 'worktree') return stays("the run didn't make it") // runs in: main or here, a ws given: unset is keep
+  if (r.dry) return stays('a dry run: archiving is said, not done')
+  tidying.add(ws.id) // archive gates may take a while: no Run from here in it meanwhile (picked)
   try {
     const x = await wsArchive(ws.id, { ifClean: true, by: 'workflow' })
     if (x?.dirty) return stays(`${x.dirty} file${x.dirty === 1 ? '' : 's'} not committed`)
@@ -1209,9 +1220,12 @@ async function tidy(r: FlowRun) {
     say(r, `${name} archived: the run is done (Restore brings it back)`)
   } catch (e) {
     return stays((e as Error).message)
+  } finally {
+    tidying.delete(ws.id)
   }
   touch()
 }
+const tidying = new Set<string>()
 
 export function flowStop(o: { id: string }) {
   const r = flowGet(o)

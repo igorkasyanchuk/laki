@@ -984,7 +984,13 @@ function HistoryDialog({ item, dirty, api, onClose, onBack }: { item: WorkflowIt
   const [sel, setSel] = useState<number | null>(null)
   const [text, setText] = useState('')
   useEffect(() => void api.call<V[]>('flowHistory', ref).then(l => (setList(l), l[0] && setSel(l[0].at)), e => (api.toast((e as Error).message), setList([]))), [])
-  useEffect(() => void (sel !== null && api.call<{ text: string }>('flowHistory', { ...ref, at: sel }).then(v => setText(v.text), () => setText(''))), [sel])
+  useEffect(() => {
+    if (sel === null) return
+    let now = true // a slower answer for an earlier pick doesn't show
+    setText('')
+    api.call<{ text: string }>('flowHistory', { ...ref, at: sel }).then(v => now && setText(v.text), () => now && setText(''))
+    return () => void (now = false)
+  }, [sel])
   const lines = useMemo(() => highlightWorkflow(text), [text])
   const back = async () => {
     if (sel === null) return

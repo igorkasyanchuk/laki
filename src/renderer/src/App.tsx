@@ -1918,7 +1918,7 @@ export function App() {
   const flowMenu = (w: WorkspaceView): MenuItem[] =>
     settings.workflows !== true || rawKind(w) !== 'projects' || w.host || w.archived
       ? []
-      : [{ label: 'Run workflow', icon: 'flow', key: 'w', items: flowsHere(w).length ? flowsHere(w).map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }]
+      : (l => [{ label: 'Run workflow', icon: 'flow', key: 'w', items: l.length ? l.map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }])(flowsHere(w))
   const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
   // Run ›: the toolbar's Run ▾ for this workspace (its script, localhost, the agent and terminal actions), a submenu;
   // a terminal or a browser has none
@@ -2280,7 +2280,8 @@ export function App() {
     if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
     if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
     // Run workflow: each one, in the selected workspace (none, or one it can't run in: the Run sheet asks)
-    if (settings.workflows === true) for (const f of ws && flowMenu(ws).length ? flowsHere(ws) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: ws && flowMenu(ws).length ? wsName(ws) : 'workflow', run: () => runFlow(f, ws && flowMenu(ws).length ? ws.id : undefined) })
+    const flowWs = settings.workflows === true && ws && flowMenu(ws).length ? ws : undefined
+    if (settings.workflows === true) for (const f of flowWs ? flowsHere(flowWs) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: flowWs ? wsName(flowWs) : 'workflow', run: () => runFlow(f, flowWs?.id) })
     if (settings.birdView === true) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
     if (settings.calendar === true) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
     if (settings.desk === true) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })

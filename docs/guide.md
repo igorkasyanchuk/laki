@@ -1119,7 +1119,7 @@ workspace's status bar (or an agent tab's it sent a prompt to) shows the run and
 an agent block's decision (or *open its session* with the block picked) opens its tab. The trash can deletes a run (one under way stops
 first), after you confirm; its workspace and tabs stay. When a run ends done, the worktree it made is archived once nothing is left uncommitted
 (Restore brings it back, its branch kept), so old runs don't fill the sidebar; one with changes, a failed or stopped
-run's, and a workspace it was given stay, and the run's log says which. `when done: keep` (the workflow's settings,
+run's, a dry run's, and a workspace it was given stay, and the run's log says which. `when done: keep` (the workflow's settings,
 *When a run is done*) keeps them all. An ended run's *Run again* (also its row's ⋯, `laki flow
 again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
 the workflow. A block's right click in an ended run, *Run from here* (`--from <block>`), goes on from that block in

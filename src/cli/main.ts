@@ -446,7 +446,7 @@ async function main() {
         const [project, ...task] = named ? words : [undefined, ...words]
         if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…]')
         const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
-        const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
+        const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
       if (sub === 'trash') {
@@ -461,7 +461,7 @@ async function main() {
       if (sub === 'again') {
         // an ended run again (its task and inputs, the workflow as it is now), or --from a block: in its workspace, its state kept
         if (!id) throw new Error('usage: laki flow again <run> [--from <block>]')
-        const r: FlowRun = await rpc('flowStart', typeof flags.from === 'string' ? { from: { run: id, block: flags.from } } : { again: id }, 180000)
+        const r: FlowRun = await rpc('flowStart', { ...(typeof flags.from === 'string' ? { from: { run: id, block: flags.from } } : { again: id }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
       if (sub === 'show') {

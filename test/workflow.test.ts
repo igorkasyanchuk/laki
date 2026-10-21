@@ -1266,6 +1266,11 @@ test('workflow permission modes: perm and fast per agent block and the head’s 
   // bypass: an agent (MCP, Laki AI) can't start it; you can; a dry run says it
   await rig.rpc('flowSave', { id: 'yolo', text: MODES.replace('perm: acceptEdits', 'perm: bypassPermissions') })
   await assert.rejects(rig.rpc('flowStart', { workflow: 'yolo', project: p.id, task: 'x', by: 'agent' }), /Modes runs an agent that never asks \(bypass permissions: build\): start it yourself/)
+  rig.env.LAKI_TAB = r.tabs.build // the CLI in an agent's tab is an agent too
+  const viaCli = await rig.cli('flow', 'run', 'yolo', p.id, 'x')
+  delete rig.env.LAKI_TAB
+  assert.notEqual(viaCli.code, 0)
+  assert.match(viaCli.err, /never asks \(bypass permissions: build\): start it yourself/)
   const dry = await rig.rpc('flowStart', { workflow: 'yolo', project: p.id, task: 'x', dry: true })
   assert.ok((await rig.rpc('flowGet', { id: dry.id })).log.some((l: string) => /dry run: build would run with bypass permissions/.test(l)))
   await rig.rpc('flowStop', { id: dry.id })
@@ -1379,6 +1384,7 @@ test('workflow runs in a workspace you have: none made, no mark, one run there a
   await rig.rpc('flowSave', { id: 'tree', text: AGENT('claude', 'fix {{task}}') })
   const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' })
   await assert.rejects(rig.rpc('flowStart', { workflow: 'here', project: p.id, task: 'x' }), /Agent runs in a workspace you have: pick one/)
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, workflow: 'here', prompt: 'x', when: 'every day at 9am' }), /Agent runs in a workspace you pick, not on a schedule/)
   const count = async () => (await rig.rpc('state')).workspaces.length
   const before = await count()
   // no project: the workspace's; a worktree workflow given one runs there too
@@ -1513,12 +1519,17 @@ test('workflow trash and history: a delete goes to the trash and Undo brings it 
   h = await rig.rpc('flowHistory', { id: 'gone' })
   assert.equal(h.length, 20)
   assert.equal((await rig.rpc('flowHistory', { id: 'gone', at: h[19].at })).text, v(1), 'the first save’s file went')
+  await assert.rejects(rig.rpc('flowRevert', { id: 'gone' }), /which version\?/, 'no version: nothing written')
+  assert.equal(readFileSync(join(rig.data, 'workflows', 'gone.md'), 'utf8'), v(20))
 
-  // tidy: past 30 days, gone for good
+  // tidy: past 30 days, gone for good, its history too (not theirs: a workflow of that id is there again)
+  await rig.rpc('flowRm', { id: 'gone' })
   await rig.rpc('flowTrashTidy', { now: Date.now() + 29 * 86400e3 })
-  assert.equal((await rig.rpc('flowTrash')).length, 1)
+  assert.equal((await rig.rpc('flowTrash')).length, 2)
+  assert.ok(existsSync(join(rig.data, 'workflow-history', 'yours-gone')))
   await rig.rpc('flowTrashTidy', { now: Date.now() + 31 * 86400e3 })
   assert.deepEqual(await rig.rpc('flowTrash'), [])
+  assert.equal(existsSync(join(rig.data, 'workflow-history', 'yours-gone')), false)
 })
 
 const TIDY = (cmd: string, head = '') => `# Tidy
@@ -1573,6 +1584,8 @@ test('workflow when done: a done run’s clean worktree archived; one with chang
   await end({ workflow: 'clean', ws: mine.id }, /mine stays: the run didn't make it$/)
   assert.equal(await archived(mine.id), undefined)
   const keep = await end({ workflow: 'keep', project: p.id }, / stays: when done: keep$/)
+  const dry = await end({ workflow: 'clean', project: p.id, dry: true }, / stays: a dry run: archiving is said, not done$/)
+  assert.equal(await archived(dry.ws), undefined)
   assert.equal(await archived(keep.ws), undefined)
 })
 

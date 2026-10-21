@@ -4955,7 +4955,7 @@ const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
 export const flowFiles = { at: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
-export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project'; blocks: FlowBlock[] } } = {} // what a client sets: the daemon works out the rest
+export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project'; where: string; blocks: FlowBlock[] } } = {} // what a client sets: the daemon works out the rest
 
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
@@ -4990,6 +4990,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     if (state.settings?.workflows !== true || !flowHooks.find) throw new Error('turn Workflows on first: Settings › General › Experimental')
     const wf = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }) // throws: no such workflow
     s.source = wf.source
+    if (wf.where === 'here') throw new Error(`${wf.name} runs in a workspace you pick, not on a schedule: start it from that workspace's ⋯ › Run workflow`)
     // a scheduled run takes its inputs' defaults: each needed one must have one
     try {
       inputVals(wf.blocks.find(b => b.kind === 'start')?.inputs)
