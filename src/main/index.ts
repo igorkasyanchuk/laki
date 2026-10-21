@@ -298,6 +298,7 @@ ipcMain.handle('hotkey', (e, label: unknown) => {
     try {
       if (a && globalShortcut.register(a, () => (app.focus({ steal: true }), show()))) hotkey = a
     } catch {} // keys Electron can't name
+    trayMenu() // Open Laki shows the keys
   }
   return a ? hotkey === a : !label // false: another app has them, or they can't be a global hotkey
 })
@@ -446,7 +447,7 @@ ipcMain.on('dock-icon', (e, png: unknown) => {
 })
 // the Dock icon's count: agents waiting for you or done while you looked away (none: no badge); and the menu bar's
 // item, from the same message so the two never disagree: the count, a menu of those tabs (a click shows one, as a
-// notification's does), Open and Quit. tray false: Settings › General hid it
+// notification's does), Open (with the global hotkey) and Quit. tray false: Settings › General › Menu bar hid it
 let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
 function trayMenu() {
@@ -458,7 +459,7 @@ function trayMenu() {
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
       { type: 'separator' },
-      { label: `Open ${app.name}`, click: () => show() },
+      { label: `Open ${app.name}`, ...(hotkey && { accelerator: hotkey, registerAccelerator: false }), click: () => show() }, // its global hotkey beside it
       { label: 'Quit', click: () => app.quit() },
     ]),
   )

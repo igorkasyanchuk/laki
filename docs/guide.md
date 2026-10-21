@@ -783,7 +783,8 @@ notification; click it to jump there. Settings › General picks which (waiting,
 sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
-small window of its own over the app you're in, as the bubbles' + does. With *Turn timers* on (Settings › Appearance), a
+small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it.
+Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Appearance), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **A new session from an agent**: in a Claude Code tab, `/laki:new <the task> with codex` (or claude, gemini, grok,
 opencode; none named: claude) has the agent write the task up as a prompt and start it in a new workspace of this
@@ -1326,7 +1327,7 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
-- *General*: the agent new workspaces start with, *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+- *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
@@ -1352,7 +1353,7 @@ lit for a moment.
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
-  ✓, ✓✓ and 👀, each on by default, and where they go; *Menu bar item*: the count and its menu, on by default; *Fun
+  ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
   button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the

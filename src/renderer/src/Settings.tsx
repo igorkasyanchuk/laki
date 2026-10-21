@@ -1127,7 +1127,6 @@ const FIND: [string, string, string?][] = [
   ['ai', 'Keep pasted images (days)', 'images screenshots storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
-  ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
   ['appearance', 'Fun button', 'meme reddit smiley break joke'],
   ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
@@ -1207,6 +1206,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
@@ -3078,6 +3078,15 @@ export function SettingsPage(p: {
                 </select>
               </label>
               </Group>
+              {bridge?.badge && (
+                <Group title="Menu bar">
+                  <div className="setting-box">
+                    <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
+                      <Says title="Menu bar icon" hint="Laki's mark in the menu bar (the tray) with the count of agents that need you, as the Dock's badge; its menu lists them, new workspaces, screenshots and Open Laki with its hotkey" />
+                    </Switch>
+                  </div>
+                </Group>
+              )}
               {bridge?.hotkey && (
                 <Group title="Global hotkey">
                   <HotkeyField on={s.hotkeyOn !== false} keys={s.hotkey ?? HOTKEY} set={set} />
@@ -3359,9 +3368,6 @@ export function SettingsPage(p: {
               <div className="setting-box">
                 <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
                   <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
-                </Switch>
-                <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
-                  <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
                 </Switch>
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />

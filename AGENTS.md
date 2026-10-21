@@ -1708,7 +1708,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
-    with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`) and the screenshots; `settings.menuBar === false` destroys it). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
+    with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`), the screenshots and *Open Laki* (the global hotkey as its `accelerator`, `registerAccelerator: false`; the `hotkey` IPC builds the menu again); `settings.menuBar === false` destroys it: Settings › General › *Menu bar icon*). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.

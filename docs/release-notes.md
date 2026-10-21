@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › General › *Menu bar icon* shows or hides Laki's mark in the menu bar (it was under Appearance), and the
+  mark's *Open Laki* shows the global hotkey.
 - The window's title says where you are: the page (*Settings — Laki*) or the workspace and tab (*fix-login · claude —
   Laki*), so a screen share's picker, the Window menu and a browser's tab (remote access) name it.
 - My Desk: drag a tile anywhere on the grid; gaps stay where you leave them and a tile in the way moves down (Esc
