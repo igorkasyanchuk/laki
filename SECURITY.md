@@ -25,7 +25,8 @@ What helps a report:
 Laki runs on one person's computer. Its daemon listens on 127.0.0.1 only, behind a 256-bit token (`daemon.json`,
 0600) and Origin and Host allow-lists. An agent in a tab can read that token too, so the daemon tells an agent's calls
 from yours by the calling process (the tab whose process tree it runs in: lsof and ps, /proc on Linux), whatever
-Origin it sends, the app's included; a local call it can't place is refused (it fails closed).
+Origin it sends, the app's included; a local call it can't place is refused (it fails closed). Extensions an agent
+makes, restores or links stay off until you look at what they run, and go off again as their files change.
 
 In scope:
 
@@ -46,6 +47,8 @@ Out of scope:
 - Any program running as your user can read the daemon's token (`ponytail:` in `src/daemon/main.ts`), and a process
   an agent starts that leaves its tab's process tree (a double fork, `launchctl submit`, `open x.command`, a tmux
   server) counts as yours: per-tab tokens would close that.
+- An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
+  phone webhook or extension folders), and ask Laki AI, which acts as you.
 - The app is ad-hoc signed, not notarized: macOS asks you to allow it once (Privacy & Security › Open Anyway).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
 - Remote access with no email or PIN (*anyone with the link*) is only as safe as the link: 24 hours at most, and the
