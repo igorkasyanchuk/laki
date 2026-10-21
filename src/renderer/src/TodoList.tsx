@@ -49,7 +49,6 @@ export default function TodoListPage({ api, onClose }: { api: TodoListApi; onClo
             }}
           />
         )}
-        <p className="muted small todo-keys">Enter: the next to-do · [] and a space: a to-do · # and a space: a heading · Tab: under the one above · drag ⋮⋮ to move one · / for more</p>
       </div>
     </Page>
   )
