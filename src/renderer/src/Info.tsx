@@ -90,9 +90,11 @@ export function CiMark({ pr }: { pr: PRInfo }) {
 }
 
 // a PR author's GitHub picture (the CSP lets avatars.githubusercontent.com in); a bot's (app/…) has none, nor a
-// failed one
+// failed one, nor any with Settings' GitHub pictures off (App sets avatarsOn)
+let avatarsOn = true
+export const showAvatars = (on: boolean) => void (avatarsOn = on)
 export const Avatar = ({ login, size = 14 }: { login?: string; size?: number }) =>
-  login && /^[\w-]+$/.test(login) ? <img className="avatar" src={`https://avatars.githubusercontent.com/${login}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null
+  avatarsOn && login && /^[\w-]+$/.test(login) ? <img className="avatar" src={`https://avatars.githubusercontent.com/${login}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null
 
 export const prState = (pr: PRInfo) => (pr.draft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase())
 export const REVIEW: Record<string, string> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' }

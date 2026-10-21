@@ -356,6 +356,7 @@ export type Settings = {
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
+  avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
@@ -693,7 +694,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
 
 // specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -710,5 +711,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 98
+export const API = 99
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

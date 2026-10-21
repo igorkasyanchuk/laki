@@ -123,6 +123,7 @@ export type AppSettings = Paint & {
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
+  avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   timers?: boolean // a turn's time on its tab and row (unset: off)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
@@ -3300,6 +3301,9 @@ export function SettingsPage(p: {
                     <Says title="Your picture on your PRs" hint="Your GitHub picture beside the mark on your own PRs, as others' show theirs; off: the mark alone on yours" />
                   </Switch>
                 )}
+                <Switch className="switch-row" on={s.avatars !== false} onChange={v => set({ avatars: v })}>
+                  <Says title="GitHub pictures" hint="PR authors' and reviewers' pictures, loaded from avatars.githubusercontent.com; off: GitHub never sees the app ask for them" />
+                </Switch>
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>

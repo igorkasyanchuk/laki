@@ -512,6 +512,7 @@ export function view(): View {
     layouts: state.layouts,
     widgets: widgetsView(),
     widgetHome: widgetHome(),
+    imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
     ...(state.settings?.workflows === true && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
     api: API,
     built: BUILT,

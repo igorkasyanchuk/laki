@@ -37,6 +37,10 @@ const URL_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset', 'action', 'for
 
 // a widget's HTML without scripts, frames, forms, event attributes or URLs that go anywhere but a page (links open in
 // the browser, below) or a data: image
+// L7: the app window loads no picture from elsewhere itself (its CSP); an extension's https ones through the daemon's
+// /img (App sets how, imgKey); none set: dropped
+let viaDaemon: ((url: string) => string) | undefined
+export const imagesVia = (f?: (url: string) => string) => void (viaDaemon = f)
 export function clean(html: string): DocumentFragment {
   const t = document.createElement('template')
   t.innerHTML = html
@@ -49,6 +53,14 @@ export function clean(html: string): DocumentFragment {
       for (const a of [...el.attributes]) {
         const name = a.name.toLowerCase()
         const v = a.value.trim()
+        if (name === 'src' && /^https:/i.test(v)) {
+          viaDaemon ? el.setAttribute(a.name, viaDaemon(v)) : el.removeAttribute(a.name)
+          continue
+        }
+        if (name === 'srcset') {
+          el.removeAttribute(a.name) // its own pictures, past /img: src alone
+          continue
+        }
         if (name.startsWith('on') || (URL_ATTRS.has(name) && !(LINK.test(v) || v.startsWith('#') || /^data:image\/(png|jpe?g|gif|webp);/i.test(v)))) el.removeAttribute(a.name)
       }
       walk(el)

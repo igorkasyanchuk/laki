@@ -332,7 +332,8 @@ selected workspace's PR is in the status bar.
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
   put it first in this group), *Edit…* (its name and a default prompt template: *New workspace here…* starts
   with it; a group without one starts with no template, never the last one used) and *Remove group* (its workspaces stay).
-- A workspace with a PR shows its author's GitHub picture before the PR mark (yours on your own).
+- A workspace with a PR shows its author's GitHub picture before the PR mark (yours on your own). Settings ›
+  Appearance › *GitHub pictures* off: none are loaded.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar (⌘⇧N from the keyboard) opens a new tab: shell (⌘T), one of your profiles (claude, codex, gemini, …) or a command.

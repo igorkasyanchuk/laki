@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The app window loads pictures only from GitHub's avatars: an extension's https pictures come through Laki's daemon,
+  and Settings › Appearance › GitHub pictures turns the avatars off too.
 - A page that keeps knocking on Laki's daemon without its key no longer fills daemon.log: the first refusal is logged,
   then a count once a minute.
 - A tunnel, shared tab or remote access link left running by a daemon that crashed is stopped as Laki's daemon starts

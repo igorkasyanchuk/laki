@@ -1089,3 +1089,15 @@ test("new worktrees: the page's base is the repo's main branch; Sync the base br
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'h', base: '--upload-pack=touch x' }), /a branch, not an option/)
   assert.equal(existsSync(join(rig.repo, 'x')), false)
 })
+
+test("an extension's https picture comes through the daemon's /img, behind its own key: never the app window's fetch (L7)", async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  const v = await rig.rpc('state')
+  assert.match(v.imgKey, /\w{16,}/)
+  const img = (k: string, u: string) => fetch(`http://127.0.0.1:${port}/img?k=${k}&u=${encodeURIComponent(u)}`)
+  assert.equal((await img('nope', 'https://example.com/a.png')).status, 401)
+  assert.equal((await img(v.imgKey, 'http://example.com/a.png')).status, 400) // https only
+  assert.equal((await img(v.imgKey, 'file:///etc/passwd')).status, 400)
+  assert.equal((await img(v.imgKey, 'https://127.0.0.1:1/a.png')).status, 502) // nothing there
+})

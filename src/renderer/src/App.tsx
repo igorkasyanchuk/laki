@@ -5,7 +5,7 @@ import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
@@ -17,7 +17,7 @@ import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { Glyph as ExtGlyph, imagesVia, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
@@ -788,6 +788,9 @@ export function App() {
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
+  // L7: no https picture straight from the window: an extension's through the daemon's /img, GitHub's avatars by the switch
+  imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
+  showAvatars(view?.settings.avatars !== false)
   // Settings' Dock icon (unset: the app's own, nothing to send)
   const dockIcon = view?.settings.dockIcon
   useEffect(() => {

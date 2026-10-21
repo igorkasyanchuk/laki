@@ -129,6 +129,29 @@ function page(path: string, res: ServerResponse) {
 // ponytail: https: scripts and pictures stay, agents' reports load Chart.js and the like from a CDN; 'unsafe-inline'
 // lets a page do inline whatever a CDN's script would, so dropping https: from script-src alone keeps nothing out
 const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf' }
+// L7: an extension's https picture for the app window, whose CSP takes none from elsewhere (GitHub's avatars aside):
+// fetched here, https all the way, an image's type only, 10 MB at most; the key the view gives (imgKey). An SVG is a
+// picture in an <img> (no scripts); opened on its own, its CSP runs none either
+const IMG = /^image\/(png|jpe?g|gif|webp|avif|svg\+xml|x-icon|vnd\.microsoft\.icon)\b/i
+async function imgPage(q: URLSearchParams, res: ServerResponse) {
+  const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
+  if (!urlKeyOk(q.get('k') ?? '', 'img')) return no(401, 'bad key')
+  const u = q.get('u') ?? ''
+  if (!/^https:\/\//i.test(u) || !URL.canParse(u)) return no(400, 'an https picture only')
+  try {
+    const r = await fetch(u, { signal: AbortSignal.timeout(15000), headers: { accept: 'image/*' } })
+    const type = r.headers.get('content-type') ?? ''
+    if (!r.ok || !IMG.test(type) || !r.url.startsWith('https:')) return no(502, 'not a picture')
+    if (Number(r.headers.get('content-length')) > 10 << 20) return no(413, 'over 10 MB')
+    const body = Buffer.from(await r.arrayBuffer())
+    if (body.length > 10 << 20) return no(413, 'over 10 MB')
+    res.writeHead(200, { 'content-type': type, 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'", 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' })
+    res.end(body)
+  } catch {
+    no(502, 'not reached')
+  }
+}
+
 function artifactPage(path: string, origin: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/artifact\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
@@ -442,6 +465,7 @@ const server = createServer(async (req, res) => {
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
     if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, res) // an artifact in the app's viewer: the key in its path
+    if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
     const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)
     res.writeHead(r.code, r.headers)
