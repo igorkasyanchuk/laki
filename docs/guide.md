@@ -1236,7 +1236,15 @@ the same workspace with the run's variables, so the agents before it don't run (
 archived, Restore it first (or Run again). A run stopped by a restart goes on at its block: an agent whose chat
 came back is told to finish that step (not given the whole prompt again, so it doesn't start over), one in a new chat
 gets the prompt again, one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
-again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake). `laki flow check` reads workflow files the way Laki does and
+again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
+
+Each workflow's row says how its runs went: how many, ✓ the share of the last 30 days' that ended done, ⏱ a done run's
+median time and $ what a run spends on average (its AI calls and decisions; agents' turns aren't counted). A workflow
+that starts by itself (an event, a schedule) and fails 5 times in a row is paused: a notification says so, events and
+its schedules no longer start it (a scheduled run shows as failed, saying why), and *Run* still does. *Turn on again*
+(the note, its row's ⋯, its settings, `laki flow on <workflow>`) starts it again. A dry run counts nothing.
+
+`laki flow check` reads workflow files the way Laki does and
 names each problem, without Laki running, so a repo's pre-commit hook or CI can keep `.laki/workflows/` right; it
 exits 1 when one has a problem (an agent action's name and a preset's aren't known there: not checked).
 
@@ -1245,6 +1253,7 @@ laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
+laki flow on <workflow>                        # turn on again one paused after 5 failed runs in a row
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
 laki flow check .laki/workflows               # check workflow files (a folder: each .md), no app needed: CI, a hook
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
@@ -1802,6 +1811,7 @@ laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule 
 laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki flow again <run> [--from <block>] | flow trash | flow restore <trash-id>   # a run again | deleted workflows
+laki flow on <workflow> [project]                       # a paused workflow on again
 laki flow check [file.md… | folder]                     # check workflow files, no daemon (none: ./.laki/workflows)
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)

@@ -2020,6 +2020,53 @@ test("a repo's workflow that an event or its schedule didn't start says so once 
   assert.equal(await runs(), 1)
 })
 
+test('workflow stats: runs tallied; 5 failed runs in a row that started by themselves pause it (events, schedules), Run still starts it; on again; a done one starts over; a dry run counts nothing', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+  const c = await rig.connect()
+  t.after(() => c.close())
+  // the task says how it ends: ok → done, else failed
+  await rig.rpc('flowSave', { id: 'flaky', text: '# Flaky\nruns in: main · at once: 99 · on: custom.f\n\n## start\ninput: task\nnext: how\n\n## how\nchoice: task contains "ok"\n- yes → good\n- no → bad\n\n## good\nend: success\n\n## bad\nend: failed\n' })
+  const stats = async () => (await rig.rpc('flowList', {})).find((w: any) => w.id === 'flaky').stats
+  const go = async (o: object) => {
+    const r = await rig.rpc('flowStart', { workflow: 'flaky', project: p.id, ...o })
+    return until(async () => (x => !['queued', 'running', 'waiting'].includes(x.status) && x)(await rig.rpc('flowGet', { id: r.id })), 'it ends')
+  }
+  for (let i = 0; i < 4; i++) await go({ task: 'no', trigger: 'schedule s1' })
+  await go({ task: 'ok', trigger: 'schedule s1' }) // a done one: in a row starts over
+  assert.equal((await stats()).fails, undefined)
+  await go({ task: 'no', dry: true, trigger: 'schedule s1' }) // a dry run: nothing
+  assert.equal((await stats()).runs, 5)
+  for (let i = 0; i < 4; i++) await go({ task: 'no', trigger: 'schedule s1' })
+  assert.equal((await stats()).paused, undefined)
+  assert.equal((await stats()).fails, 4)
+  await go({ task: 'no', trigger: 'schedule s1' })
+  const st = await stats()
+  assert.deepEqual([st.runs, st.ok, st.fails, st.paused.why], [10, 0.1, 5, '5 failed runs in a row'])
+  assert.equal(typeof st.ms, 'number')
+  await until(() => c.events.some(e => e.ev === 'flow' && e.kind === 'paused' && e.name === 'Flaky' && e.wf.id === 'flaky'), 'told')
+  // paused: an event and a scheduled run are refused, Run starts it
+  await rig.rpc('widgetEmit', { name: 'f', data: {}, ws: ws.id })
+  assert.deepEqual((await rig.rpc('widgetEvents'))[0].refused, ['flaky: paused: 5 failed runs in a row; turn it on again in Workflows'])
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'flaky', project: p.id, task: 'ok', trigger: 'schedule s1' }), /^Error: paused: 5 failed runs in a row; turn it on again in Workflows/)
+  assert.equal((await go({ task: 'no' })).status, 'failed') // by hand: still runs (and counts)
+  // on again: its failures in a row forgotten; an agent can't
+  const at = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await assert.rejects(rig.rpc('flowPause', { id: 'flaky', on: true, caller: { ws: ws.id, tab: at.id } }), /an agent can't/)
+  assert.ok((await rig.cli('flow', 'ls')).out.includes('paused: 5 failed runs in a row'))
+  assert.match((await rig.cli('flow', 'on', 'flaky')).out, /Flaky is on/)
+  assert.deepEqual([(await stats()).paused, (await stats()).fails], [undefined, undefined])
+  assert.ok((await go({ task: 'ok', trigger: 'schedule s1' })).status === 'done')
+  // the last 50 kept
+  for (let i = 0; i < 45; i++) await go({ task: 'ok' })
+  await until(() => (s => s.flowStats?.['yours::flaky']?.recent.length === 50 && s.flowStats['yours::flaky'].total === 57)(JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8'))), 'recent capped at 50', 20000)
+  // deleted: its tally goes
+  await rig.rpc('flowRm', { id: 'flaky' })
+  await until(() => !JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).flowStats?.['yours::flaky'], 'its stats gone')
+})
+
 test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {
   const rig = await fresh(t, { config: { setup: 'echo set up' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`. A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1127,6 +1127,18 @@ skipped*; `flowStart` drops it from `r.flow`) and, once per file version (`told`
 `kind: 'refused'` (`name`, `wf` `{id, source, project}`, `on`, `changed`; no `id`: not a run) and bumps `flowFiles.at`;
 `trust()` clears both. App's flow handler: a notification and a toast (*Look…*: the dialog's `wf`, `WorkflowsPage`'s
 `at.wf`, its editor; never an Allow there).
+Stats (`state.flowStats`, by `agentKey`; `FlowStats` in shared/workflow.ts): `finish`'s `tally` (not a dry run's; a
+refusal isn't a run) counts `total`, keeps the last `STATS_RECENT` 50 (`at`, `status`, `ms`, `cost`: `r.cost`, what the
+run's AI calls and decisions cost, `Got.cost` from `llmSend`/`decideSend` added up in `sent()`; agents' turns aren't
+counted) and `fails` in a row (done starts over, stopped leaves it); the `PAUSE_AFTER`th (5) failed one in a row whose
+trigger is `event ` or `schedule ` (not `try `) sets `paused` (`why`), broadcasts `flow` `kind: 'paused'` (`wf`, `text`;
+App: a notification, a toast with *Turn on again*), `flowPhone`s and bumps `flowFiles.at`. Paused: the listener refuses
+its events (after hops), `flowStart` an `event `/`schedule ` trigger (the schedule's failed run says so); Run, the CLI
+and MCP start it. `flowPause` (`on`: clears `paused` and `fails`; refused from an agent, `CALLER`; the CLI's `laki flow
+on`), `flowRm` drops its stats. `item`'s `stats` is `statsView` (runs, `ok` of the last 30 days' ended, `ms` a done
+run's median, `cost` a run's average when any spent, `fails`, `paused`; dropped from `r.flow`): the index's chips
+(`StatChips`, refreshed as a run ends) and red *Paused*, its ⋯ and the settings' *Turn on again*, `laki flow ls`, MCP's
+`laki_workflows`.
 `broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
 message with `ev` as an event, though it has an `id`: the run's). A tab an agent block sends a
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the

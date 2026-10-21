@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: each row shows its runs, success rate, median time and AI cost; one that starts by itself and fails 5
+  times in a row pauses, with *Turn on again* (`laki flow on`).
 - Workflows: a repo's workflow that isn't allowed yet (or changed since) tells you the first time an event or its
   schedule doesn't start it, with *Look…*, and its row counts what it skipped.
 - Workflows: a *Wait* on CI that fails gives the next block the end of the failed GitHub Actions logs,

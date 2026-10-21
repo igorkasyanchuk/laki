@@ -441,7 +441,7 @@ async function main() {
         const list: WorkflowItem[] = await rpc('flowList', {})
         const runs: FlowView[] = (await rpc('state')).flows ?? []
         return out({ workflows: list.map(({ text, blocks, ...w }) => w), runs }, [
-          ...list.map(w => `${w.id}  ${w.source === 'project' ? `${w.project}'s` : w.source}  ${w.name}${w.problems.length ? `  ⚠ ${w.problems[0]}` : ''}`),
+          ...list.map(w => `${w.id}  ${w.source === 'project' ? `${w.project}'s` : w.source}  ${w.name}${w.stats ? `  ${w.stats.runs} runs${w.stats.ok !== undefined ? `, ${Math.round(w.stats.ok * 100)}% ok` : ''}` : ''}${w.stats?.paused ? `  paused: ${w.stats.paused.why}` : ''}${w.problems.length ? `  ⚠ ${w.problems[0]}` : ''}`),
           ...(runs.length ? ['', ...runs.map(r => `${r.id}  ${status(r)}  ${r.name}: ${r.task}`)] : []),
         ].join('\n'))
       }
@@ -476,9 +476,15 @@ async function main() {
         const ask = r.wait && 'options' in r.wait ? [`asks: ${r.wait.question}`, ...r.wait.options.map((o, n) => `  ${n}. ${o}`)] : []
         return out(r, [`${r.flow.name}: ${r.task}  ${status(r)}`, ...ask, '', ...r.decisions.map(d => `${blockName(r.flow.blocks.find(b => b.id === d.block) ?? { id: d.block, kind: 'agent' })} → ${d.exit}: ${d.why}`)].join('\n'))
       }
+      if (sub === 'on') {
+        // a paused one (5 failed runs in a row that started by themselves): events and schedules start it again
+        if (!id) throw new Error('usage: laki flow on <workflow> [project]')
+        const w: WorkflowItem = await rpc('flowPause', { id, project: words[0], on: true, caller: caller() })
+        return out(w, `${w.name} is on: events and its schedules start it again`)
+      }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | check [file.md… | folder] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | on <workflow> [project] | check [file.md… | folder] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

@@ -61,7 +61,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
-  useEffect(() => void refresh(), [view.flowFiles]) // and as a file changes (Laki AI's, an agent's)
+  const endedRuns = (view.flows ?? []).filter(ended).length
+  useEffect(() => void refresh(), [view.flowFiles, endedRuns]) // and as a file changes (Laki AI's, an agent's), and as a run ends (its stats)
   // opened to start one: its Run sheet once the list is in
   const [asked, setAsked] = useState(first?.start)
   useEffect(() => {
@@ -121,10 +122,13 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
     ])
   const wfMenu = (e: React.MouseEvent, w: WorkflowItem) =>
     openMenu(e, [
+      ...(w.stats?.paused ? [{ label: 'Turn on again', sub: w.stats.paused.why, icon: 'run', run: () => turnOn(w) } as MenuItem, null] : []),
       { label: 'Make a copy', icon: 'copy', run: () => create(intoOf(w), w) },
       null,
       { label: 'Delete', icon: 'trash', danger: true, run: () => void removeWf(w) },
     ])
+  // a paused one (5 failed runs in a row that started by themselves): events and its schedules start it again
+  const turnOn = (w: Sel) => void api.call('flowPause', { id: w.id, source: w.source, project: w.project, on: true }).then(refresh, e => api.toast((e as Error).message))
   // to the trash at once, its toast's Undo puts it back (flowRestore); its runs stay on the list
   const removeWf = (w: WorkflowItem) =>
     api.call<{ trash: string }>('flowRm', { id: w.id, source: w.source, project: w.project }).then(
@@ -250,6 +254,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                           <span className="tag">{w.source === 'project' ? pname(w.project) : 'yours'}</span>
                           <span className="tag">{WHERE_TAGS[w.where]}</span>
                           <span className="tag">{w.blocks.length} blocks</span>
+                          {w.stats?.paused && <span className="tag bad" data-tip={`${w.stats.paused.why}: events and its schedules don't start it until you turn it on again (its ⋯)`}>Paused</span>}
+                          {w.stats && <StatChips s={w.stats} />}
                           {w.byAgent && <span className="tag warn">by an agent</span>}
                           {w.untrusted && !w.byAgent && <span className="tag warn">{w.changed ? 'changed' : 'not allowed'}</span>}
                           {w.untrusted && !!w.skipped && <span className="tag warn" data-tip="Events or scheduled runs that didn’t start it since Laki started">{w.skipped === 1 ? '1 event skipped' : `${w.skipped} events skipped`}</span>}
@@ -340,6 +346,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               onRun={() => startIn(cur)}
               onOpenRun={id => setAt({ kind: 'run', id })}
               onCopy={() => create(intoOf(cur), cur)}
+              onTurnOn={() => turnOn(cur)}
             />
           ) : (
             <div className="wf-empty">{list === null ? 'Loading…' : 'That workflow is gone.'}</div>
@@ -363,6 +370,18 @@ function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string
   else if (was.current === null) was.current = now
   const p = { ...rest, value: typed !== null && was.current === now ? typed : now, onChange: (e: ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => ((was.current = null), setTyped(e.target.value), onText(e.target.value)), onBlur: () => setTyped(null) }
   return area ? <textarea {...p} /> : <input {...p} />
+}
+
+// a workflow's runs at a glance: how many, done of the last 30 days', a done run's median time, what a run spends
+function StatChips({ s }: { s: NonNullable<WorkflowItem['stats']> }) {
+  return (
+    <>
+      <span className="tag" data-tip="Runs so far">{s.runs} {s.runs === 1 ? 'run' : 'runs'}</span>
+      {s.ok !== undefined && <span className="tag" data-tip="Done, of the runs that ended in the last 30 days">✓ {Math.round(s.ok * 100)}%</span>}
+      {s.ms !== undefined && <span className="tag" data-tip="A done run's median time">⏱ {dur(s.ms)}</span>}
+      {s.cost !== undefined && <span className="tag" data-tip="What a run spends on average: its AI calls and decisions (agents' turns aren't counted)">${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}</span>}
+    </>
+  )
 }
 
 const BLANK = toFile({ id: 'workflow', name: 'New workflow', desc: 'What it does, in a line.', where: 'worktree', session: 'new', blocks: [
@@ -609,7 +628,7 @@ function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, on
 
 // ---------- the editor: canvas and inspector, or the file
 
-function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void }) {
+function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy, onTurnOn }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void }) {
   const [text, setText] = useState(drafts.get(keyOf(item)) ?? item.text)
   const [mode, setMode] = useState<'canvas' | 'file'>('canvas')
   const [pick, setPick] = useState<string | null>(null)
@@ -825,7 +844,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
               <p className="wf-hint">⌘Z brings back what you deleted; Discard goes back to the saved file.</p>
             </div>
           ) : (
-            <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
+            <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} stats={item.stats} onTurnOn={onTurnOn} />
           )}
         </div>
       ) : (
@@ -1074,12 +1093,23 @@ A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`a
 
 Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.log}}\` (the end of a wait's failed GitHub Actions logs), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
-function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void }) {
+function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom, stats, onTurnOn }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void; stats?: WorkflowItem['stats']; onTurnOn?: () => void }) {
   const b = wf.blocks.find(x => x.id === id)
   const used = b?.use ? findAction(actions, [], b.use) : undefined
   if (!b)
     return (
       <div className="wf-insp">
+        {stats?.paused && (
+          <div className="wf-paused">
+            <b>Paused</b>: {stats.paused.why}. Events and its schedules don’t start it; Run still does.{' '}
+            <button className="link" onClick={onTurnOn}>Turn on again</button>
+          </div>
+        )}
+        {stats && (
+          <div className="wf-stats">
+            <StatChips s={stats} />
+          </div>
+        )}
         <p className="wf-hint">Pick a block to change it. Drag blocks to move them; ⇧-click or a box dragged on the canvas picks several; Delete or ⌫ deletes what's picked (⌘Z brings it back). The sidebar's blocks go after the picked one (a click) or where you drop them.</p>
         <div className="wf-field">
           <label>Name</label>

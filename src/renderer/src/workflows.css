@@ -221,6 +221,10 @@
 .wf-own-row { display: grid; grid-template-columns: minmax(70px, 0.8fr) minmax(0, 1.2fr) auto; gap: 4px; align-items: center; }
 .wf-own-row input { min-width: 0; height: 26px; padding: 0 7px; font: 12px var(--mono); }
 .wf-own-row input.bad { border-color: var(--error); }
+/* a paused workflow's note, and its runs' chips, over its settings */
+.wf-paused { padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--error) 45%, var(--line)); border-radius: var(--rs, 8px); font-size: 12px; }
+.wf-paused b { color: var(--error); }
+.wf-stats { display: flex; flex-wrap: wrap; gap: 4px; }
 /* Only when: a test per row, its problem under it */
 .wf-when { display: grid; gap: 2px; }
 .wf-when-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }

@@ -1026,6 +1026,13 @@ export function App() {
           toast(words.slice(0, 160), look, 'Look…')
           return
         }
+        if (m.kind === 'paused') {
+          // 5 failed runs in a row that started by themselves: events and its schedules don't start it now
+          const on = () => void api.call('flowPause', { ...m.wf, on: true }).then(() => toast(`${m.name} is on again`), fail)
+          if (s?.notify !== false) notify(`Workflow · ${m.name}`, `paused: ${m.text}`, '', () => setDialog({ workflows: '', wf: m.wf }), s?.notifySound)
+          toast(`${m.name} is paused: ${m.text}`.slice(0, 160), on, 'Turn on again')
+          return
+        }
         const open = () => setDialog({ workflows: '', run: m.id })
         // a window (a Show you's unless modal: no; an end's with modal: yes) and a popover, each as the block says
         const win = m.kind === 'show' ? { run: m.id, name: m.name, title: m.text, body: m.body ?? '' } : { run: m.id, name: m.name, title: `${m.name}: ${m.status}`, body: m.text ?? '' }

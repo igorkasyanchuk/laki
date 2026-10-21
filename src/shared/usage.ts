@@ -42,6 +42,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs)
   laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
+  laki flow on <workflow> [project]           turn on again one paused after 5 failed runs in a row (events and its schedules start it again)
   laki flow trash | restore <trash-id>        the workflows deleted in the last 30 days | put one back
   laki flow check [file.md… | folder]        check workflow files, no daemon (none given: ./.laki/workflows); exit 1 on a problem
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch

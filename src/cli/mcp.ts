@@ -352,7 +352,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj({ project: str('a project id (laki_state): its own workflows too; with id, the project whose workflow it is; default: all, or yours'), id: str("a workflow's id: its whole file") }),
     max: 60000,
     run: async a => {
-      type W = { id: string; source: string; project?: string; name: string; desc?: string; problems: string[]; text: string }
+      type W = { id: string; source: string; project?: string; name: string; desc?: string; problems: string[]; text: string; stats?: { paused?: { at: number; why: string } } }
       const list: W[] = await rpc('flowList', { project: a.project || undefined })
       const { v, actions: all } = await kit(rpc, a.project || undefined)
       const actions = all.filter(x => x.target !== 'shell').map(x => ({ slug: x.slug, name: x.name, agent: x.target }))
@@ -361,7 +361,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         if (!w) throw new Error(`no workflow ${a.id}`)
         return { id: w.id, source: w.source, project: w.project, name: w.name, problems: w.problems, file: w.text, actions }
       }
-      return { workflows: list.map(w => ({ id: w.id, source: w.source, project: w.project, name: w.name, desc: w.desc, problems: w.problems })), actions, runs: (v.flows ?? []).map((r: { id: string; name: string; task: string; status: string; block?: string; ws?: string }) => ({ id: r.id, workflow: r.name, task: r.task, status: r.status, block: r.block, workspace: r.ws })) }
+      return { workflows: list.map(w => ({ id: w.id, source: w.source, project: w.project, name: w.name, desc: w.desc, problems: w.problems, ...(w.stats && { stats: w.stats }), ...(w.stats?.paused && { paused: w.stats.paused.why }) })), actions, runs: (v.flows ?? []).map((r: { id: string; name: string; task: string; status: string; block?: string; ws?: string }) => ({ id: r.id, workflow: r.name, task: r.task, status: r.status, block: r.block, workspace: r.ws })) }
     },
   },
   {

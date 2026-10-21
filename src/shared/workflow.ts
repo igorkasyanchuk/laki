@@ -110,7 +110,24 @@ export type Block = {
 }
 export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; when?: string[]; vars?: Record<string, string>; blocks: Block[] } // when: only when: tests on the event's fields, each must hold (whenProblem); vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project'
-export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean; untrusted?: boolean; changed?: boolean; skipped?: number } // the list's; skipped: an untrusted one's events and scheduled runs that didn't start it since Laki started; byAgent: an agent wrote it (MCP), not saved by the user since; untrusted: a project's (the repo's) not trusted as it is (flowTrust); changed: trusted once, another text now (a pull, an agent's edit)
+export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean; untrusted?: boolean; changed?: boolean; skipped?: number; stats?: FlowStatsView } // the list's; stats: its runs so far (flowStats, small); skipped: an untrusted one's events and scheduled runs that didn't start it since Laki started; byAgent: an agent wrote it (MCP), not saved by the user since; untrusted: a project's (the repo's) not trusted as it is (flowTrust); changed: trusted once, another text now (a pull, an agent's edit)
+
+// each workflow's runs (state.flowStats, by source:project:id): how many, the last STATS_RECENT ended (cost: its AI
+// calls' and decisions'), failed ones in a row; paused: PAUSE_AFTER of them in a row, the last one started by itself
+// (an event, a schedule), so events and schedules don't start it until you turn it on again (flowPause)
+export const PAUSE_AFTER = 5
+export const STATS_RECENT = 50
+export type FlowStats = { total: number; recent: { at: number; status: FlowStatus; ms: number; cost?: number }[]; fails: number; paused?: { at: number; why: string } }
+// the list's: runs, ok (done of the last 30 days' ended ones, 0 to 1), ms (done ones' median), cost (the average a run
+// spent, when any did), fails (failed in a row), paused
+export type FlowStatsView = { runs: number; ok?: number; ms?: number; cost?: number; fails?: number; paused?: { at: number; why: string } }
+export function statsView(st: FlowStats | undefined, now = Date.now()): FlowStatsView | undefined {
+  if (!st) return
+  const month = st.recent.filter(x => now - x.at <= 30 * 86400e3)
+  const done = st.recent.filter(x => x.status === 'done').map(x => x.ms).sort((a, b) => a - b)
+  const spent = st.recent.reduce((n, x) => n + (x.cost ?? 0), 0)
+  return { runs: st.total, ...(month.length && { ok: month.filter(x => x.status === 'done').length / month.length }), ...(done.length && { ms: done[(done.length - 1) >> 1] }), ...(spent > 0 && { cost: spent / st.recent.length }), ...(st.fails && { fails: st.fails }), ...(st.paused && { paused: st.paused }) }
+}
 
 export const ID = /^[a-z0-9][a-z0-9_?-]{0,40}$/i
 // a Start's inputs: line, name[?][:kind][=default], kind text (unset), number, branch or choice(a|b|…); kind stays as
@@ -849,6 +866,7 @@ export type FlowRun = {
   by?: string // an agent started it (flowStart's by: 'agent') or its event did: whose; its flow.ended is that agent's too
   evWs?: string // the workspace the event that started it came from: one live run of the workflow per such workspace
   hops?: number // the event's hops (a chain of events): its flow.ended is one more
+  cost?: number // what its AI calls and decisions cost (USD); agents' turns aren't counted
   status: FlowStatus
   cur?: string // the block it's on
   at?: number // since when

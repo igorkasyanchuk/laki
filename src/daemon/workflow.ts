@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
@@ -52,7 +52,8 @@ function item(text: string, id: string, source: WorkflowSource, project?: string
   const was = source === 'project' ? state.flowTrust?.[agentKey(source, id, project)] : undefined
   const untrusted = source === 'project' && was !== textHash(text)
   const k = agentKey(source, id, project)
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
+  const stats = statsView(state.flowStats?.[k])
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(stats && { stats }), ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
 }
 // a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
 // the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
@@ -183,6 +184,7 @@ export function flowRm(o: Ref) {
   const k = agentKey(o.source ?? 'yours', o.id, f.project)
   writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...(byAgent(k) && { byAgent: true }) } satisfies Trashed))
   markAgent(k, false)
+  if (state.flowStats?.[k]) delete state.flowStats[k], save() // its runs' tally goes with it (a restore starts over)
   flowFiles.at = Date.now()
   changed()
   return { ok: true, trash: basename(t) }
@@ -410,6 +412,8 @@ export async function flowStart(o: Start) {
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
   if (wf.untrusted && o.trigger?.startsWith('schedule ')) refused(wf, 'schedule')
+  const paused = !wf.untrusted && wf.stats?.paused // by itself only: Run, the CLI and MCP start it by hand
+  if (paused && /^(schedule|event) /.test(o.trigger ?? '')) throw new Error(`paused: ${paused.why}; turn it on again in Workflows`)
   if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
@@ -437,7 +441,7 @@ export async function flowStart(o: Start) {
   const ahead = runs().filter(r => r.status === 'queued' && runOf(r, wf)).length
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
-  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, ...flow } = wf
+  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
@@ -904,7 +908,7 @@ function outs(r: FlowRun, b: Block, text: string) {
 // the block first (what's wrong throws: the run asks you), then gives what sends it
 
 // what a request gave: its exit and why, the variables it sets, the text out: reads, what a decision isn't sure of
-type Got = { exit: string; why: string; vars: Record<string, string>; text?: string; unsure?: string[] }
+type Got = { exit: string; why: string; vars: Record<string, string>; text?: string; unsure?: string[]; cost?: number } // cost: the call's (USD), the run's r.cost
 type Send = (signal: AbortSignal, say: (line: string, detail?: string) => void) => Promise<Got>
 
 // a request under way for this run: its signal (the block's timeout, or a stop), and whether it still counts
@@ -923,6 +927,7 @@ async function sent(r: FlowRun, b: Block, send: Send) {
   const q = request(r, b)
   try {
     const got = await send(q.signal, (line, detail) => say(r, line, detail))
+    if (got.cost) r.cost = (r.cost ?? 0) + got.cost // spent, even when the run stopped meanwhile
     if (!q.mine()) return
     Object.assign(r.vars, got.vars)
     if (b.out?.length && got.text !== undefined) outs(r, b, got.text)
@@ -940,7 +945,7 @@ function llmSend(b: Block, vars: Record<string, string>, ask: string): Send {
     say(`${blockName(b)}: asks ${b.model || 'Settings › AI’s model'}`, prompt)
     const a = await aiComplete({ model: b.model, prompt, system: b.system && fill(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask })
     say(`${a.model} answered${a.cost ? ` ($${a.cost.toFixed(4)})` : ''}`, a.text)
-    return { exit: 'ok', why: `${a.model}: “${clip(a.text, 80)}”`, vars: { [`steps.${b.id}.answer`]: a.text.slice(-ANSWER_MAX) }, text: a.text }
+    return { exit: 'ok', why: `${a.model}: “${clip(a.text, 80)}”`, vars: { [`steps.${b.id}.answer`]: a.text.slice(-ANSWER_MAX) }, text: a.text, cost: a.cost }
   }
 }
 
@@ -990,7 +995,7 @@ function decideSend(b: Block, vars: Record<string, string>, before: string, ask:
     }
     say(`${a.model} decided${a.cost ? ` ($${a.cost.toFixed(5)})` : ''}`, said.join('\n'))
     // routed: the way its question's answer names (one it isn't sure of: yours, once you settle it)
-    return { exit: b.route ? got[`steps.${b.id}.${b.route}`] || 'ok' : 'ok', why: said.join(' · '), vars: got, unsure }
+    return { exit: b.route ? got[`steps.${b.id}.${b.route}`] || 'ok' : 'ok', why: said.join(' · '), vars: got, unsure, cost: a.cost }
   }
 }
 // a decision's way out: its route question's answer (yes, an option, a level's number), else ok
@@ -1265,6 +1270,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   const ended = runs().filter(x => !live(x))
   if (ended.length > FLOWS_KEPT) state.flows = runs().filter(x => live(x) || ended.indexOf(x) >= ended.length - FLOWS_KEPT)
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
+  tally(r)
   touch()
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
   widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, { ...(r.by && { from: { agent: r.by } }), hops: (r.hops ?? 0) + 1 }) // an agent's run: its end is the agent's event; one hop more than the event that started it
@@ -1272,6 +1278,38 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
   void tidy(r)
+}
+
+// a run that ended, in its workflow's tally (not a dry run's): its time and cost, failed ones in a row (a done one
+// starts them over, a stopped one leaves them be); the PAUSE_AFTERth in a row that started by itself pauses it.
+// ponytail: cost is its AI calls' and decisions' only, not its agents' turns
+function tally(r: FlowRun) {
+  if (r.dry) return
+  const k = agentKey(r.source, r.workflow, r.source === 'project' ? r.project : undefined)
+  const st = ((state.flowStats ??= {})[k] ??= { total: 0, recent: [], fails: 0 })
+  st.total++
+  st.recent = [...st.recent, { at: r.ended ?? Date.now(), status: r.status, ms: (r.ended ?? Date.now()) - r.started, ...(r.cost && { cost: r.cost }) }].slice(-STATS_RECENT)
+  if (r.status === 'done') st.fails = 0
+  else if (r.status === 'failed') st.fails++
+  if (r.status !== 'failed' || st.fails < PAUSE_AFTER || st.paused || !/^(event|schedule) /.test(r.trigger)) return
+  st.paused = { at: Date.now(), why: `${st.fails} failed runs in a row` }
+  say(r, `${r.flow.name} paused: ${st.paused.why} (events and its schedules don't start it until you turn it on again)`)
+  broadcast({ ev: 'flow', kind: 'paused', name: r.flow.name, wf: { id: r.workflow, source: r.source, project: r.source === 'project' ? r.project : undefined }, text: st.paused.why })
+  flowPhone(r.flow.name, undefined, 'is paused', `${st.paused.why}: events and its schedules don't start it until you turn it on again`)
+  flowFiles.at = Date.now() // the list's stats
+}
+
+// paused (on: false) or on again (on: true, its failures in a row forgotten); the app's, the CLI's laki flow on
+export function flowPause(o: Ref & { on: boolean }) {
+  on()
+  const wf = flowFind(o)
+  const k = agentKey(wf.source, wf.id, wf.project)
+  const st = ((state.flowStats ??= {})[k] ??= { total: 0, recent: [], fails: 0 })
+  if (o.on) (st.fails = 0), delete st.paused
+  else st.paused = { at: Date.now(), why: 'you paused it' }
+  flowFiles.at = Date.now()
+  touch()
+  return flowFind({ id: wf.id, source: wf.source, project: wf.project })
 }
 
 // when done: archive (unset: a worktree run's) archives the worktree the run made once it ended done with nothing
@@ -1425,6 +1463,7 @@ eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
     if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); refused(wf, name); continue }
     if (hops > HOPS_MAX) { no(`${hops} hops: a loop of events? dropped`); continue }
+    if (wf.stats?.paused) { no(`paused: ${wf.stats.paused.why}; turn it on again in Workflows`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     const mine = runs().filter(r => runOf(r, wf))
