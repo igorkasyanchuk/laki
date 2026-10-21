@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a *Wait* on CI that fails gives the next block the end of the failed GitHub Actions logs,
+  `{{steps.<id>.log}}`, as *fix CI* sends them, so an agent sees why, not only which check.
 - Workflows: *Only when* tests filter the event that starts one (`only when: event.pr.draft equals "false"`), a
   workspace's events start one run at a time, and a chain of events stops after three hops.
 - A notification as a plan limit nears its end: Claude's or Codex's 5-hour or weekly limit at 90% (Settings ›

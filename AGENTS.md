@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`. A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1101,7 +1101,11 @@ written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default a
 doesn't have refused) into `r.vars['inputs.<name>']` (an optional one not given: ''), `flowVars` lists them; StartRun a
 field each (a branch's from `branches`), the CLI's repeated `--set name=value` (`sets`), MCP's `laki_workflow_run`
 `inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks), and a `runs in: here` one. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
-already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
+already reported waits for a new one; on a fail `waitTick` sets `output` and `head`, then (`logging`: one per run, no
+tick meanwhile) core's `ciLogs` (prFix's loop: each failing check's `## name` and link, `failedLog` of the first 3 with
+a job, `fenced` and said to be untrusted; the scan's check `url` is its detailsUrl, so no `gh pr checks`) into
+`steps.<id>.log` ('' when none was read; a gh failure said in the run's log), and only then the fail way (a run that
+moved on meanwhile drops it). An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
 not waiting re-enters its block 8 s later; an agent block's is marked `resumed` (the block, its tab's chat id
 as Laki started), and `agent()` sends that chat, when its tab is live with the same `resumeId`, `RESUMED` (*Laki

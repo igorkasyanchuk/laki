@@ -1071,7 +1071,7 @@ A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`a
 
 \`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`retry: 2\` on an agent, run, llm, decide or extension block tries it again after a fail or an error (10 s, then 60 s), before it goes that way; a run block's \`retry on: 1, 75\`: only those exit codes. \`at: x,y\`: where it's drawn.
 
-Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
+Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.log}}\` (the end of a wait's failed GitHub Actions logs), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
 function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void }) {
   const b = wf.blocks.find(x => x.id === id)
@@ -1372,7 +1372,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           )}
         </>
       )}
-      {b.kind === 'wait' && field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 60} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />, 'Until its PR’s checks pass or fail')}
+      {b.kind === 'wait' && field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 60} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />, `Until its PR’s checks pass or fail. On fail, {{steps.${b.id}.output}} names the failed checks and {{steps.${b.id}.log}} is the end of their GitHub Actions logs, for an agent block after it`)}
       {b.kind === 'save' && (
         <>
           {field(

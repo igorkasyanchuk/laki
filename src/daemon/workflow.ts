@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { readCapped } from '../shared/conn.ts'
@@ -1121,10 +1121,15 @@ async function act(r: FlowRun, b: Block) {
   }
 }
 
-// a wait block: its PR's checks, as the scans see them; a failure on a commit already reported waits for a new one
+// a wait block: its PR's checks, as the scans see them; a failure on a commit already reported waits for a new one.
+// On a fail the end of the failed GitHub Actions logs is fetched first ({{steps.<id>.log}}, core's ciLogs, as fix CI
+// sends them), one fetch per run at a time (logging): no tick reads the checks meanwhile. ponytail: up to 3 logs of 30 s
+// each, so the fail way can be 90 s behind the scan
+const logging = new Set<string>()
 function waitTick(r: FlowRun, b: Block, now: number) {
   const ws = wsOf(r)
   if (r.dry) return leave(r, b, 'pass', 'dry run: taken as passed')
+  if (logging.has(r.id)) return
   if (now - (r.at ?? now) > (b.timeout ?? WAIT_TIMEOUT) * 60000) return leave(r, b, 'fail', `nothing after ${b.timeout ?? WAIT_TIMEOUT} min`)
   const pr = ws && prOf(ws.id)
   if (!pr) return
@@ -1135,7 +1140,19 @@ function waitTick(r: FlowRun, b: Block, now: number) {
     const bad = (pr.list ?? []).filter(c => c.state === 'fail')
     r.vars[`steps.${b.id}.output`] = bad.map(c => `${c.name}${c.url ? ` ${c.url}` : ''}`).join('\n') || 'checks fail'
     if (pr.head) r.vars[`steps.${b.id}.head`] = pr.head
-    return leave(r, b, 'fail', `${bad.map(c => c.name).join(', ') || 'checks'} failed on PR #${pr.number}`)
+    const why = `${bad.map(c => c.name).join(', ') || 'checks'} failed on PR #${pr.number}`
+    logging.add(r.id)
+    // the scan's checks: url is each one's detailsUrl, an Actions job's link that jobOf reads (no gh pr checks here)
+    const then = (text: string) => {
+      logging.delete(r.id)
+      if (!live(r) || r.cur !== b.id || r.wait?.kind !== 'wait' || r.status !== 'running') return // stopped or moved on meanwhile
+      r.vars[`steps.${b.id}.log`] = text
+      leave(r, b, 'fail', why)
+    }
+    void ciLogs(ws, bad.map(c => ({ name: c.name, link: c.url })), (n, e) => say(r, `${blockName(b)}: no log for ${n}: ${e.message}`)).then(
+      x => then(x.logs ? x.text : ''),
+      () => then(''),
+    )
   }
 }
 

@@ -1105,7 +1105,7 @@ picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in 
 equals), *Case* (if / elsif / else: its branches in order, the first that holds wins, *else* last; each tests the case's
 variable or one of its own, so *if the change is only specs → approve, else → a full review* is a Case on what an agent
 answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`), *Laki action* (open a PR, approve,
-merge, the dev server, archive), *Wait* (until its PR's checks pass or fail), *Save* (into the workspace's storage
+merge, the dev server, archive), *Wait* (until its PR's checks pass or fail; on a fail, `{{steps.<id>.log}}` is the end of up to three failed GitHub Actions logs, fenced and marked as the PR's own output, for the agent after it), *Save* (into the workspace's storage
 folder, its Artifacts: text such as an agent's answer, a file or folder of the workspace, or a link such as its PR),
 *AI call* (one prompt to a model on OpenRouter with Laki AI's key, no tools: a summary, a title, a pick; 5 minutes
 at most; its cost among Laki AI's calls), *Webhook* (a request to another system: POST unless changed, headers such as
@@ -1122,7 +1122,7 @@ notification if you like; the run keeps it, to open again) and *End*. A Case bra
 expression or a *matches* that runs past 200 ms stops the run on that block, saying why. An AI call
 takes a system prompt and a temperature, and asks for JSON when it names outputs. *Test it* under an AI call, AI
 decision or Webhook sends it once with sample values: its exit, outputs and log, without a run. Variables carry results along:
-`{{task}}`, `{{steps.plan.answer}}`, `{{steps.test.output}}`, `{{steps.hook.status}}`, `{{pr.url}}`. An agent, AI
+`{{task}}`, `{{steps.plan.answer}}`, `{{steps.test.output}}`, `{{steps.hook.status}}`, `{{steps.ci.log}}` (a failed wait's CI logs), `{{pr.url}}`. An agent, AI
 call, command or webhook can also name its **outputs** (`out: title, files`): the agent or model is asked to end with a
 JSON object with those keys (a command or a response that prints one works too), and each becomes
 `{{steps.<block>.<name>}}` for the blocks after it (a list stays JSON). Every loop needs a limit (*at most 3 times,
