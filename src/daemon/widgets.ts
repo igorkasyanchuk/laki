@@ -418,7 +418,7 @@ export function scanWidgets() {
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
-      if (project && e.s.on && e.s.trusted !== dirHash(e, true)) untrust(e) // changed in the repo since you turned it on
+      if (project && e.s.on && (e.s.trusted !== dirHash(e, true) || repoBad(e))) untrust(e) // changed in the repo since you turned it on
     }
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
@@ -766,6 +766,8 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
   // a repo's: on only after a look (laki widget what's hash), and trusted as its files are now
   if (o.on === true && w.project && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} comes with ${projName(w)}'s repo: look at what it runs first (laki widget what ${w.id})`)
+  const bad = o.on === true && repoBad(w)
+  if (bad) throw new Error(`${w.m.name || w.id} can't be trusted: ${bad}`)
   const s = readStore(w.id)
   if (o.on === true && w.project && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), changed: undefined })
   if (o.ai) {
@@ -875,13 +877,18 @@ export function widgetWhat(id: string) {
   return { name: w.m.name || w.id, on: onOf(w), text, hash }
 }
 
-// a repo's (not yours, not Laki's): its actions' commands and its scripts' text too, what you say yes to
+// a repo's (not yours, not Laki's): its actions' commands, every file trusting it covers by name, and the text of the
+// ones it runs (named in its fetch, script or an action's command, executable, or a script outside node_modules), what
+// you say yes to
 function repoShown(w: Entry) {
   const block = (t: string) => (f => `${f}\n${t}\n${f}`)('`'.repeat(Math.max(3, ...[...t.matchAll(/`+/g)].map(m => m[0].length + 1))))
   const acts = Object.entries(w.m.actions ?? {}).flatMap(([k, a]) => (c => (c ? [`${k}: ${c}`] : []))(actionCmd(a)))
+  const all = w.file ? { names: [w.file] } : repoFiles(w.dir)
+  const cmds = [w.m.fetch, w.m.script, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join('\n')
+  const runs = (n: string) => n === w.m.script || cmds.includes(n) || (!/(^|\/)node_modules\//.test(n) && (cmds.includes(basename(n)) || SCRIPT.test(n))) || ((statSync(join(w.dir, n), { throwIfNoEntry: false })?.mode ?? 0) & 0o111) !== 0
   let left = 12_000
-  const files = (w.file ? [] : filesUnder(w.dir).sort())
-    .filter(n => n !== 'widget.json' && !n.startsWith('fixtures/') && !/\.md$/i.test(n))
+  const files = (w.file ? [] : all.names.sort())
+    .filter(n => n !== 'widget.json' && runs(n))
     .flatMap(n => {
       let t = ''
       try {
@@ -894,8 +901,8 @@ function repoShown(w: Entry) {
       left -= cut.length
       return [`${n}:\n\n${block(cut.trimEnd())}`]
     })
-  const more = w.file ? 0 : filesUnder(w.dir, true, 2000).length - filesUnder(w.dir).length // hidden or in node_modules: not shown, but a change there turns it off too
-  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nIts files:\n\n${files.join('\n\n')}` : ''}${more > 0 ? `\n\nAnd ${more} more ${more === 1 ? 'file' : 'files'}, hidden or in node_modules (not shown here).` : ''}`
+  const bad = 'bad' in all && all.bad ? `\n\nIt can't be trusted: ${all.bad}.` : ''
+  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nWhat it runs:\n\n${files.join('\n\n')}` : ''}\n\nEvery file it's trusted as (a change to any turns it off):\n\n${block(all.names.sort().join('\n'))}${bad}`
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)
@@ -949,7 +956,7 @@ const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
 // a repo's extension runs only as you said yes to it: its files changed since (a pull, before the watch's scan) turn it
 // off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
 function trusted(w: Entry) {
-  if (!w.project || w.s.trusted === dirHash(w)) return
+  if (!w.project || (w.s.trusted === dirHash(w) && !repoBad(w))) return
   if (w.s.on) untrust(w)
   throw new Error(`${w.m.name || w.id} changed in ${projName(w)}'s repo: off until you look`)
 }
@@ -1744,20 +1751,71 @@ export function filesHash(w: Entry, fresh = false) {
 }
 // its own files' hash (cached by their times and sizes): a repo's extension's trust
 // every file under its folder, relative, a folder's files before its subfolders (a link as a file): none hidden, no
-// node_modules; all (a repo's, whose code may sit there too): those as well, but .git. ponytail: max files at most, a
-// change past them isn't seen
-const filesUnder = (d: string, all = false, max = 500, rel = '', out: string[] = []) => {
+// node_modules (a repo's: repoFiles). ponytail: max files at most, a change past them isn't seen
+const filesUnder = (d: string, max = 500, rel = '', out: string[] = []) => {
   let es: Dirent[] = []
   try {
     es = readdirSync(join(d, rel), { withFileTypes: true })
   } catch {}
-  es = es.filter(x => (all ? x.name !== '.git' : !x.name.startsWith('.') && x.name !== 'node_modules'))
+  es = es.filter(x => !x.name.startsWith('.') && x.name !== 'node_modules')
   for (const x of es) if (out.length < max && !x.isDirectory() && (x.isFile() || x.isSymbolicLink())) out.push(rel ? `${rel}/${x.name}` : x.name)
-  for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, all, max, rel ? `${rel}/${x.name}` : x.name, out)
+  for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, max, rel ? `${rel}/${x.name}` : x.name, out)
   return out
 }
+// a repo's extension, what trusting it covers: every file under its folder (hidden ones and node_modules too, not .git),
+// a link to a folder followed while it stays inside the folder (realpath, each folder once), a link to a file as the
+// file. bad: why it can't be trusted (a link out of it, past REPO_MAX files: a change past them wouldn't be seen)
+const REPO_MAX = 2000
+const SCRIPT = /\.(sh|bash|zsh|fish|py|rb|pl|php|js|mjs|cjs|ts|mts|lua)$/i
+function repoFiles(d: string): { names: string[]; bad?: string } {
+  let top = d
+  try {
+    top = realpathSync(d)
+  } catch {}
+  const names: string[] = []
+  let bad: string | undefined
+  // up: the folders it's in now (a link back to one of them would loop)
+  const walk = (rel: string, up: Set<string>) => {
+    let real = join(top, rel)
+    try {
+      real = realpathSync(join(d, rel))
+    } catch {}
+    if (up.has(real)) return
+    up = new Set(up).add(real)
+    let es: Dirent[] = []
+    try {
+      es = readdirSync(join(d, rel), { withFileTypes: true })
+    } catch {}
+    const subs: string[] = []
+    for (const x of es.filter(x => x.name !== '.git')) {
+      if (bad) return
+      const n = rel ? `${rel}/${x.name}` : x.name
+      let dir = x.isDirectory()
+      if (x.isSymbolicLink()) {
+        let to: string
+        try {
+          to = realpathSync(join(d, n))
+        } catch {
+          names.push(n) // a broken link: its name only
+          continue
+        }
+        if (!under(to, top)) return void (bad = `${n} links out of its folder (to ${to})`)
+        dir = statSync(to, { throwIfNoEntry: false })?.isDirectory() ?? false
+      }
+      if (dir) subs.push(n)
+      else if (names.push(n) > REPO_MAX) return void (bad = `more than ${REPO_MAX} files`)
+    }
+    for (const n of subs) if (!bad) walk(n, up)
+  }
+  walk('', new Set())
+  return { names, bad }
+}
+// a repo's that can't be trusted (repoFiles' bad): never on
+function repoBad(w: Entry) {
+  return w.project && !w.file ? repoFiles(w.dir).bad : undefined
+}
 function dirHash(w: Entry, fresh = false) {
-  const names = (w.file ? [w.file] : w.project ? filesUnder(w.dir, true, 2000) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (w.file ? [w.file] : w.project ? repoFiles(w.dir).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {

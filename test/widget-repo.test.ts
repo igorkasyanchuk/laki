@@ -3,7 +3,7 @@
 // to delete or rewrite; a host's project isn't read
 import { strict as assert } from 'node:assert'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -114,7 +114,7 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   mkdirSync(join(d, 'node_modules', 'x'), { recursive: true })
   writeFileSync(join(d, 'node_modules', 'x', 'index.js'), 'module.exports = 1\n')
   assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo/)
-  assert.match((await rig.rpc('widgetWhat', { id })).text, /And 1 more file, hidden or in node_modules/)
+  assert.match((await rig.rpc('widgetWhat', { id })).text, /```\nfetch\.sh\nlib\/run\.sh\nnode_modules\/x\/index\.js\nwidget\.json\n```/)
   await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
   await until(async () => !(await find()).running, 'its first fetch done')
   writeFileSync(join(d, '.helper.sh'), 'echo hidden\n')
@@ -144,4 +144,48 @@ test("laki widget new --dir in a repo's .laki/extensions: the repo's, off until 
   const w = (await rig.rpc('state')).widgets.find((x: any) => x.id === `${p.id}.board`)
   assert.deepEqual([w.on, w.project], [false, p.id])
   assert.ok(!existsSync(join(rig.data, 'widget-data', 'team-board.json')) && !existsSync(join(rig.data, 'widget-data', 'board.json')), 'no store of yours turned on')
+})
+
+test("a repo's extension's links: one to a folder inside is followed (a change there turns it off), one out of its folder is never trusted; past 2000 files neither; the sheet lists every file", async t => {
+  const rig = await fresh(t)
+  const d = ext(rig.repo, 'linked', { name: 'Linked', fetch: 'sh lib/run.sh' }, {})
+  mkdirSync(join(d, 'real'))
+  writeFileSync(join(d, 'real', 'run.sh'), `echo '{"n": 1}'\n`)
+  symlinkSync('real', join(d, 'lib'))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const id = `${p.id}.linked`
+  const find = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === id)
+  const what = await rig.rpc('widgetWhat', { id })
+  assert.match(what.text, /Every file it's trusted as[^`]*```\nlib\/run\.sh\nreal\/run\.sh\nwidget\.json\n```/)
+  assert.match(what.text, /What it runs:\n\nlib\/run\.sh:/)
+  await rig.rpc('widgetSet', { id, on: true, seen: what.hash })
+  assert.equal((await find()).on, true)
+  // a change behind the link: off
+  writeFileSync(join(d, 'real', 'run.sh'), `echo '{"n": 2}'\n`)
+  await rig.rpc('widgetReload')
+  assert.deepEqual([(await find()).on, (await find()).changed], [false, true])
+
+  // a link out of its folder: shown, never trusted, and one added later turns it off
+  const out = join(rig.home, 'outside')
+  mkdirSync(out)
+  writeFileSync(join(out, 'evil.sh'), 'echo pwned\n')
+  const d2 = ext(rig.repo, 'escape', { name: 'Escape', fetch: 'sh ext/evil.sh' })
+  symlinkSync(out, join(d2, 'ext'))
+  await rig.rpc('widgetReload')
+  const w2 = await rig.rpc('widgetWhat', { id: `${p.id}.escape` })
+  assert.match(w2.text, /It can't be trusted: ext links out of its folder/)
+  await assert.rejects(rig.rpc('widgetSet', { id: `${p.id}.escape`, on: true, seen: w2.hash }), /can't be trusted: ext links out of its folder/)
+  const w3 = await rig.rpc('widgetWhat', { id })
+  await rig.rpc('widgetSet', { id, on: true, seen: w3.hash })
+  symlinkSync(out, join(d, 'more'))
+  await rig.rpc('widgetReload')
+  assert.equal((await find()).on, false)
+
+  // past 2000 files: never trusted
+  const d3 = ext(rig.repo, 'big', { name: 'Big', fetch: 'echo {}' })
+  mkdirSync(join(d3, 'node_modules'))
+  for (let i = 0; i <= 2000; i++) writeFileSync(join(d3, 'node_modules', `f${i}.js`), '')
+  await rig.rpc('widgetReload')
+  const w4 = await rig.rpc('widgetWhat', { id: `${p.id}.big` })
+  await assert.rejects(rig.rpc('widgetSet', { id: `${p.id}.big`, on: true, seen: w4.hash }), /can't be trusted: more than 2000 files/)
 })

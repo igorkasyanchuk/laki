@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's extension: its turn-on sheet lists every file it's trusted as and the scripts it runs; one with a link out
+  of its folder, or past 2,000 files, can't be turned on, and a link to a folder inside it is checked like the folder.
 - Laki AI shows you a command before it runs in a shell, with *Yes, run it* / *No*: it no longer runs one on its own.
   Typed for you (Enter yours) and messages to agents need no Yes.
 - An agent's `laki new` and `laki tab` (and MCP's) can't start a command of its own (`--cmd`, a command preset): only

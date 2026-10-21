@@ -777,8 +777,10 @@ and commit it. Folders and one-file extensions both work.
 
 - **Its id** is `<project>.<id>` (`shop-web.deploys`), so it never covers yours or another project's.
 - **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
-  runs first: its fetch, its actions' commands, its scripts' text, the events it answers, its settings and what it can
-  hold; *Turn on in shop-web* turns on exactly that. From the CLI: `laki widget what shop-web.deploys`, then
+  runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (hidden ones
+  and `node_modules` too), the events it answers, its settings and what it can hold; *Turn on in shop-web* turns on
+  exactly that. A link to a folder inside it counts as that folder; one with a link out of its folder, or more than
+  2,000 files, can't be turned on. From the CLI: `laki widget what shop-web.deploys`, then
   `laki widget on shop-web.deploys --seen <hash>`.
 - **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's
   folder) turns it off and marks it *changed*: its streams and agents stop, its tools' *Always* go, and you get a toast

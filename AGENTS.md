@@ -1472,7 +1472,10 @@ its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scan
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
-`trusted` is `dirHash` (every file under the folder, `filesUnder` `all`: hidden ones and node_modules too, 2000 at most; `repoShown` counts the ones it doesn't show), and a scan that finds an on one with
+`trusted` is `dirHash` (every file under the folder, `repoFiles`: hidden ones and node_modules too, a link to a folder
+followed while its realpath stays inside (a loop back to a folder it's in skipped); `repoBad`: a link out of it or past
+`REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown` lists
+every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules), and a scan that finds an on one with
 another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`, `ungrant`, a warn line, a `widget-say`
 `notify`). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
 (no workspace: `app.open` and `custom.*` only), `widgetGates`, `widgetTools` (`ws`: MCP's `ext_*` by
