@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Phone pushes can send only who needs you (Settings › Phone pushes › What it sends): no question, choices or command
+  from the agent's screen.
 - The app can't be started with --inspect or NODE_OPTIONS any more (Electron's fuses), so another program can't run
   its own code as Laki and use what you allowed Laki (the microphone, screen recording, files).
 - Laki tells an agent by the tab its process runs in, not by its environment: an agent that hides its variables still

@@ -506,7 +506,7 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
 // Settings › Phone pushes: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
 // answer: Answer from the phone (Telegram's and ntfy's buttons; off: the choices as text only); replyTopic: the random
 // part of ntfy's reply topic (<topic>-<it>), made as answer turns on
-export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean } // answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
+export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean; detail?: 'titles' } // detail titles: who needs you only, nothing off the screen (no question, choices or buttons); answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }

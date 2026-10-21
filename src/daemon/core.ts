@@ -3696,7 +3696,7 @@ function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
     const s = sessions.get(tab.id)
     if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
     const ask = kind === 'waiting' ? askOf(s!.screenText(16)) : undefined
-    const nonce = ask && w.answer && answerOk(w) && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
+    const nonce = ask && w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
     if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
     pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
   }

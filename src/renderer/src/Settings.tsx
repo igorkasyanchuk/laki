@@ -231,6 +231,7 @@ const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
   ['json', 'Generic JSON', 'https://example.com/hook'],
 ]
 
+const DETAILS: [Webhook['detail'], string][] = [[undefined, 'The question and its choices'], ['titles', 'Only who needs you']]
 function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
   // a URL or format answers can't use (a public ntfy.sh topic) turns them off: the daemon refuses them on
   const onChange = (n: Webhook) => put(n.answer && !answerOk(n) ? { ...n, answer: false } : n)
@@ -280,12 +281,26 @@ function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChange: (w: 
         </Switch>
       </div>
       </Group>
-      <Group title="Answers" hint="A waiting agent's choices always go as text. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3)">
+      <Group title="What it sends" hint="It goes through the service you picked (ntfy, Slack, Telegram) and stays there">
+      <div className="seg" role="radiogroup" aria-label="What it sends">
+        {DETAILS.map(([v, label]) => (
+          <button key={label} type="button" role="radio" aria-checked={w.detail === v} className={w.detail === v ? 'on' : ''} onClick={() => onChange({ ...w, detail: v, ...(v && { answer: false }) })}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        {w.detail === 'titles'
+          ? 'Only which agent, in which workspace, waits or is done. Nothing it shows: no question, no choices, no buttons.'
+          : "The agent's name and workspace, the question it asks or its last question, and its numbered choices, as they are on its screen: a command or a file path may be among them."}
+      </p>
+      </Group>
+      <Group title="Answers" hint="A waiting agent's choices go as text, unless it sends titles only. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3)">
       <div className="setting-box">
         <Switch
           className="switch-row"
           on={!!w.answer}
-          disabled={!w.answer && !tapOk}
+          disabled={!w.answer && (!tapOk || w.detail === 'titles')}
           onChange={v => onChange({ ...w, answer: v, answerOff: undefined, replyTopic: w.replyTopic || (v ? [...crypto.getRandomValues(new Uint8Array(9))].map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 14) : undefined) })}
         >
           <Says

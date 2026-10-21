@@ -27,6 +27,16 @@ test('push formats: ntfy text with a Title, Slack and Telegram text, generic JSO
   })
 })
 
+test('push detail titles: who needs you only, no question, choices or buttons in any format (L8)', () => {
+  const opts = { ...p, options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }], nonce: '00112233aabbccdd' }
+  for (const format of ['ntfy', 'slack', 'telegram', 'json'] as const) {
+    const r = pushRequest({ format, detail: 'titles', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42', replyTopic: 'x' }, opts)
+    const all = `${JSON.stringify(r.headers)}${r.body}`
+    assert.match(all, /claude in fix-login is waiting for you/, format)
+    assert.doesNotMatch(all, /rm -rf|Yes|actions|reply_markup|options/, format)
+  }
+})
+
 test('push choices: as text in every format; with a nonce, Telegram buttons and ntfy actions (JSON, the first 3) to the reply topic', () => {
   const options = [1, 2, 3, 4].map(n => ({ n, label: `pick ${n}` }))
   const q = { ...p, options }

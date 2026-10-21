@@ -1561,7 +1561,8 @@ says "permission", *Allow* / *Deny* (`pick` first / last).
 Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
 `format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
-later with `askOf`'s choices as lines (JSON: `options`); with `webhook.answer` (Settings' *Answer from the phone*,
+later with `askOf`'s choices as lines (JSON: `options`; `webhook.detail` `titles`: `pushRequest` drops the question,
+choices and nonce, Settings' *What it sends*, L8); with `webhook.answer` (Settings' *Answer from the phone*,
 off by default) a `nonce` per push: Telegram's `inline_keyboard` (`callback_data` `nonce:n`) and ntfy's JSON publish
 to the server's root with `http` actions (3 at most) posting `nonce:n:sig` (`push.ts` `tapSig`: an HMAC of the
 nonce and choice with `<data>/tap-key`, 0600; `replies` drops a tap without it) to `ntfyReplies` (`<topic URL>-<replyTopic>`,

@@ -38,6 +38,7 @@ export const ntfyReplies = (w: Webhook) => {
 
 // the request the webhook's format wants
 export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit {
+  if (w.detail === 'titles') p = { ...p, question: undefined, options: undefined, nonce: undefined } // nothing off the screen goes (L8)
   const { title, body, text } = pushText(p)
   const taps = buttons(p)
   const json = (b: object): RequestInit => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })

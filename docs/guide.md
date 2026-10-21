@@ -1475,7 +1475,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
   workspace, tab, agent, message, ts}`). Once per wait or turn; muted workspaces and tabs don't push. It goes to that
   URL only (`https://`: it holds what the agent asks), and *Send test* sends one now. A wait goes a moment later,
-  with the agent's numbered choices as lines of text (JSON: `options` too). *Answer from the phone* (off by default)
+  with the agent's numbered choices as lines of text (JSON: `options` too). *What it sends* › *Only who needs you*
+  sends just which agent in which workspace waits or is done: nothing off its screen (no question, choices or
+  buttons), for a service you'd rather not show your commands. *Answer from the phone* (off by default)
   puts a button per choice on Telegram's push (taps from your bot's chat only) and ntfy's (the first 3; a tap posts
   to a reply topic, your topic's URL with a random part after it, shown there; each tap is signed with a key only Laki
   has, so a made-up one is ignored): a tap picks that choice, as a key press would, so it can allow a command. On
