@@ -764,28 +764,27 @@ function newWsWin(prompt?: string) {
 // the bubbles' Ask Laki AI: the AI page alone (?window=ai), a chat in a panel like the new-workspace one; one at a time
 let aiW: BrowserWindow | null = null
 let aiReady = false // its page listens for screenshots (ai-shot-ready)
-let aiShot: string | null = null // Screenshot to Laki AI's picture (a PNG, base64) until the page listens
+let aiShots: string[] = [] // Screenshot to Laki AI's pictures (PNGs, base64) until the page listens
 function aiWin() {
   if (aiW && !aiW.isDestroyed()) return void aiW.focus()
   aiReady = false
   const w = (aiW = panelWin({ window: 'ai' }, 560, 680, { minWidth: 420, minHeight: 360 }))
-  w.webContents.on('did-start-loading', () => aiW === w && (aiReady = false)) // a reload: it listens again as it's up
-  w.on('closed', () => aiW === w && ((aiW = null), (aiShot = null)))
+  w.webContents.on('did-navigate', () => aiW === w && (aiReady = false)) // a reload (the page, not a frame in it): it listens again as it's up
+  w.on('closed', () => aiW === w && ((aiW = null), (aiShots = [])))
 }
 // Screenshot to Laki AI (its global hotkey, the menu bar's item): a part of the screen, then the AI window with it in the
 // box and the mic on (the page's: it saves the picture and starts dictation once it has the keyboard); Esc: nothing
 function shotAsk() {
-  if (shooting) return // a screenshot is being taken: the keys again do nothing
   screenshot(true, undefined, png => {
     if (aiW && !aiW.isDestroyed() && aiReady) aiW.webContents.send('ai-shot', png)
-    else aiShot = png
+    else aiShots.push(png)
     aiWin()
   })
 }
 ipcMain.on('ai-shot-ready', e => {
   if (!aiW || e.sender !== aiW.webContents) return
   aiReady = true
-  if (aiShot) e.sender.send('ai-shot', aiShot), (aiShot = null)
+  for (const png of aiShots.splice(0)) e.sender.send('ai-shot', png)
 })
 // a tab floated out of the app (a tab's right click › Float in its own window): its terminal alone (?window=tab), in a
 // panel over every app, Space and full-screen app, resizable; one per tab. Closing it (its ✕) puts it back: the app's
@@ -921,6 +920,7 @@ if (!mac) app.on('browser-window-blur', () => setTimeout(() => setFront(own(Brow
 // (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
 // then: where the picture goes (the editor, unless a prompt asked for it: shoot); none: cancelled
 function screenshot(part: boolean, on?: Electron.Rectangle, then: (png: string) => void = annotate, none = () => {}) {
+  if (shooting) return none() // one at a time: another would end with the bubbles back in its picture
   const file = join(tmpdir(), `laki-shot-${process.pid}-${Date.now()}.png`)
   const what = part ? ['-i'] : on ? [`-R${on.x},${on.y},${on.width},${on.height}`] : ['-m']
   shooting = true
