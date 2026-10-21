@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The app can't be started with --inspect or NODE_OPTIONS any more (Electron's fuses), so another program can't run
+  its own code as Laki and use what you allowed Laki (the microphone, screen recording, files).
 - Laki tells an agent by the tab its process runs in, not by its environment: an agent that hides its variables still
   can't turn an extension on, force a held ship, run a scheduled task now or answer a workflow's question. A task an
   agent schedules is saved off, and an agent's send to, or screen read of, another workspace's tab asks you first.

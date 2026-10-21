@@ -55,6 +55,12 @@ npm run dev                       # Electron + renderer dev server on :5199
   ad-hoc, it says Apple could not verify it, and System Settings › Privacy & Security › *Open Anyway* opens it.
   `codesign --verify --deep --strict` on the built app must pass. A plain double-click everywhere needs a Developer ID
   and notarization.
+- Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, so another
+  program can't run its code as Laki (and borrow its privacy grants); `runAsNode` stays (the daemon, the CLI, hooks, MCP,
+  widget scripts and `--headless` run through `ELECTRON_RUN_AS_NODE`), and the asar ones (asar is off). Cookie encryption
+  stays off: Chromium's cookie store then waits on the Keychain's *Laki Safe Storage*, the window never reaches the daemon
+  until it's answered (pack-smoke's temp home: never), and an ad-hoc signature asks again after each update.
+  `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
   browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
 

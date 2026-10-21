@@ -69,6 +69,12 @@
       "package.json"
     ],
     "asar": false,
+    "electronFuses": {
+      "runAsNode": true,
+      "enableCookieEncryption": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false
+    },
     "protocols": [
       {
         "name": "Laki",
