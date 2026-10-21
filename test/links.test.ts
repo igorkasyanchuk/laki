@@ -19,6 +19,7 @@ test('links: workspaces, tabs, pages; nothing else', () => {
   assert.deepEqual(parseLink('laki://about'), { to: 'about' })
   assert.deepEqual(parseLink('laki://onboard'), { to: 'onboard' })
   assert.deepEqual(parseLink('laki://board'), { to: 'board' })
+  assert.deepEqual(parseLink('laki://achievements'), { to: 'achievements' })
   assert.deepEqual(parseLink('laki://ai'), { to: 'ai' })
   assert.deepEqual(parseLink('laki://Help'), { to: 'help' }) // the host as typed: a non-special scheme keeps its case
   for (const bad of ['laki://ws', 'laki://rm/x', 'https://ws/x', 'laki:ws/x', 'nonsense', 'laki://ws/%E0%A4%A']) {

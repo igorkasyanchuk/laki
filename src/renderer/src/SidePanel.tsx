@@ -33,7 +33,7 @@ export type PanelApi = {
   read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
   threads: () => Promise<Thread[]>
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
-  toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
+  toAgent: (text: string, line?: boolean) => Promise<unknown> // to the workspace's agent, when its turn ends; line: a comment on a line (an achievement)
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
@@ -266,7 +266,7 @@ function CommentBox({ path, line, text, setText, pr, api, onClose }: { path: str
     f().then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
   }
   const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: text }))
-  const toAgent = () => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`))
+  const toAgent = () => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`, true))
   return (
     <div className="dl-comment" onClick={e => e.stopPropagation()}>
       <textarea

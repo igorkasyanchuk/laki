@@ -472,7 +472,12 @@ export type Settings = {
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
   voice?: VoiceSettings // Settings › Voice: how the mic and hold Fn turn speech into text
+  achievements?: AchievementsKept // Settings › Achievements, the status bar's trophy (renderer's achievements.ts)
 }
+
+// what you did (got: an achievement's id, when), the ones you hid, off: none shown, none earned. Settings' page never
+// saves it (App strips it): an unlock while it's open would be lost
+export type AchievementsKept = { got?: Record<string, number>; hidden?: string[]; off?: boolean }
 
 // Settings › Voice: engine device, macOS dictation (the mic starts it; Fn Fn is macOS's own); cloud, Laki records and
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text

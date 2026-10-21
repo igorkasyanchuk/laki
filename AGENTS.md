@@ -2092,6 +2092,18 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   every live tab (not exited) of each live workspace, Browsers' left out, by workspace in project order, a card each
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
   show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.
+- **`Achievements.tsx`** (dialog `'achievements'`: the status bar's trophy at its end, `.sb-trophy`, ⌘K,
+  Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 42 (`ACHIEVEMENTS`, in
+  `ACH_GROUPS`), each with its `how` and `go` (App's `achGo`: a page, Settings' section, the right panel's tab; an
+  experimental page that's off: where it's turned on). App's `earn` unlocks one once, only for what's done from now on: a
+  call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`; a `{ held }` or `{ dirty }` answer isn't), a page
+  opened (`pageEarns`), a number or value of the view that moved since the last view (`upsOf`/`wentUp`; the first view,
+  and the first after a reconnect, only notes them; a value back to unset isn't), or by id (⌘J, timers, the sidebar's
+  filter, Changes once it wasn't on screen, a line's comment, a profile: Settings' save with more presets than in use);
+  a hidden one never. Kept in `settings.achievements` (`AchievementsKept`: `got`, `hidden`,
+  `off`; `SETTINGS_KEPT`), written whole by App (`achSet`; `sent`, shown and built on until the view has it); Settings' own save leaves it out, so an
+  unlock while it's open stays. The unlock toast (`.ach-toast`, over pages) groups one action's unlocks. Tested in
+  `test/achievements.test.ts`.
 - **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
   workspaces (not Terminals' or Browsers') in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one (a right
   click or `.board-more`: `BoardApi.menu`, App's open, archive, delete; Merged's ⋯: `archiveAll`, one by one), and To
@@ -2191,6 +2203,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
+| `src/shared/achievements.ts` | the achievements (42): their groups, words, where each is done, and what earns each (a call, a page, the view) |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |

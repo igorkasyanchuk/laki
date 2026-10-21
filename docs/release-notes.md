@@ -7,6 +7,9 @@ version it builds, with the date. -->
 - *Screenshot to Laki AI* (Settings › General › Global hotkey, off by default): ⌃⌥⌘S from any app, or the menu bar's
   item, picks a part of the screen and opens Laki AI's window with it attached and the mic listening; say what to do,
   then send.
+- Achievements: 42 small things to do, one action each, to get to know Laki. The trophy at the status bar's end
+  counts them and opens the list (⌘K and Settings › Achievements too); each has *Show me*, unlocks with a small toast as
+  you do it, and can be hidden, or all of them turned off.
 - Settings › General › *Menu bar icon* shows or hides Laki's mark in the menu bar (it was under Appearance), and the
   mark's *Open Laki* shows the global hotkey.
 - The window's title says where you are: the page (*Settings — Laki*) or the workspace and tab (*fix-login · claude —
