@@ -61,7 +61,10 @@ export function clean(html: string): DocumentFragment {
           el.removeAttribute(a.name) // its own pictures, past /img: src alone
           continue
         }
-        if (name.startsWith('on') || (URL_ATTRS.has(name) && !(LINK.test(v) || v.startsWith('#') || /^data:image\/(png|jpe?g|gif|webp);/i.test(v)))) el.removeAttribute(a.name)
+        // a web address only on a link (a, area): anywhere else it's a load (an SVG <image>'s href, an http src), and the
+        // CSP lets this Mac's own ports in
+        const link = el.localName === 'a' || el.localName === 'area'
+        if (name.startsWith('on') || (URL_ATTRS.has(name) && !((link && LINK.test(v)) || v.startsWith('#') || /^data:image\/(png|jpe?g|gif|webp);/i.test(v)))) el.removeAttribute(a.name)
       }
       walk(el)
     }

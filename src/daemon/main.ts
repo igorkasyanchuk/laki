@@ -135,15 +135,29 @@ const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charse
 // fetched here, https all the way, an image's type only, 10 MB at most; the key the view gives (imgKey). An SVG is a
 // picture in an <img> (no scripts); opened on its own, its CSP runs none either
 const IMG = /^image\/(png|jpe?g|gif|webp|avif|svg\+xml|x-icon|vnd\.microsoft\.icon)\b/i
+// an https address on the internet, by its name: no IP literal of this Mac or a private network, no localhost.
+// ponytail: a name that resolves to one (DNS) still goes; a lookup before each fetch if that matters
+const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[)/i
+const webOk = (u: string) => URL.canParse(u) && (x => x.protocol === 'https:' && !PRIVATE_HOST.test(x.hostname))(new URL(u))
 async function imgPage(q: URLSearchParams, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   if (!urlKeyOk(q.get('k') ?? '', 'img')) return no(401, 'bad key')
   const u = q.get('u') ?? ''
-  if (!/^https:\/\//i.test(u) || !URL.canParse(u)) return no(400, 'an https picture only')
+  if (!webOk(u)) return no(400, 'an https picture only')
   try {
-    const r = await fetch(u, { signal: AbortSignal.timeout(15000), headers: { accept: 'image/*' } })
-    const type = r.headers.get('content-type') ?? ''
-    if (!r.ok || !IMG.test(type) || !r.url.startsWith('https:')) return no(502, 'not a picture')
+    // redirects one at a time, each https and not this Mac's or the LAN's (a picture's link can't make the daemon ask them)
+    let r: Response | undefined
+    const signal = AbortSignal.timeout(15000)
+    for (let at = u, n = 0; n < 5; n++) {
+      r = await fetch(at, { signal, headers: { accept: 'image/*' }, redirect: 'manual' })
+      const to = r.status >= 300 && r.status < 400 && r.headers.get('location')
+      if (!to) break
+      at = new URL(to, at).href
+      if (!webOk(at)) return no(502, 'not a picture')
+      r = undefined
+    }
+    const type = r?.headers.get('content-type') ?? ''
+    if (!r?.ok || !IMG.test(type)) return no(502, 'not a picture')
     if (Number(r.headers.get('content-length')) > 10 << 20) return no(413, 'over 10 MB')
     const { buf: body, cut } = await readCapped(r, 10 << 20)
     if (cut) return no(413, 'over 10 MB')

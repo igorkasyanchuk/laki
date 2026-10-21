@@ -1456,8 +1456,8 @@ every 15 s with `CLOCK`'s options, its interval cleared by the cleanup), funnel,
 (`STEP`'s words, `MX`), marquee (two copies, the second `inert`; paused on hover and under reduced motion) and bento.
 `menuRow` gives each row `data-label` (its words for a confirm and `run`'s label). The app's CSP takes no `https:` pictures but GitHub's avatars (L7): the kit's images in the window go through
 the daemon's `GET /img?k=<imgKey>&u=<https URL>` (main.ts `imgPage`: the view's `imgKey`, `urlKey('img')`; `IMG` types only,
-10 MB, 15 s, its own sandbox CSP), Widgets.tsx `clean` rewriting each https `src` by App's `imagesVia` (none set: dropped;
-`srcset` dropped); Markdown's pictures are links. The guide tool's `max`: 60,000. Starters `note` (a static source) and `launcher` (`do` buttons).
+10 MB, 15 s, redirects one at a time, each `webOk`: https, no localhost, LAN or IP-literal host; its own sandbox CSP), Widgets.tsx `clean` rewriting each https `src` by App's `imagesVia` (none set: dropped;
+`srcset` dropped; a web address stays only on an `a` or `area`); Markdown's pictures are links. The guide tool's `max`: 60,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 
 Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
 action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).

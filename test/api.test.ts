@@ -1099,5 +1099,5 @@ test("an extension's https picture comes through the daemon's /img, behind its o
   assert.equal((await img('nope', 'https://example.com/a.png')).status, 401)
   assert.equal((await img(v.imgKey, 'http://example.com/a.png')).status, 400) // https only
   assert.equal((await img(v.imgKey, 'file:///etc/passwd')).status, 400)
-  assert.equal((await img(v.imgKey, 'https://127.0.0.1:1/a.png')).status, 502) // nothing there
+  for (const u of ['https://127.0.0.1:1/a.png', 'https://localhost/a.png', 'https://192.168.1.1/a.png', 'https://[::1]/a.png']) assert.equal((await img(v.imgKey, u)).status, 400, u) // never this Mac's or the LAN's
 })
