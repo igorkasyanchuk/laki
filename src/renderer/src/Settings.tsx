@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -231,7 +231,10 @@ const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
   ['json', 'Generic JSON', 'https://example.com/hook'],
 ]
 
-function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
+function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
+  // a URL or format answers can't use (a public ntfy.sh topic) turns them off: the daemon refuses them on
+  const onChange = (n: Webhook) => put(n.answer && !answerOk(n) ? { ...n, answer: false } : n)
+  const tapOk = answerOk(w)
   const [said, setSaid] = useState('') // the last Send test's outcome
   const format = w.format ?? 'ntfy'
   let bad = '' // the daemon's own check, as you type
@@ -282,13 +285,15 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
         <Switch
           className="switch-row"
           on={!!w.answer}
-          onChange={v => onChange({ ...w, answer: v, replyTopic: w.replyTopic || (v ? [...crypto.getRandomValues(new Uint8Array(9))].map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 14) : undefined) })}
+          disabled={!w.answer && !tapOk}
+          onChange={v => onChange({ ...w, answer: v, answerOff: undefined, replyTopic: w.replyTopic || (v ? [...crypto.getRandomValues(new Uint8Array(9))].map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 14) : undefined) })}
         >
           <Says
             title="Answer from the phone"
-            hint={`A tap picks that choice in the agent's menu, as a key press here would: it can allow a command or an edit. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? 'ntfy: taps come back on a reply topic; anyone who knows your topic could tap, so keep it hard to guess.' : 'Slack and JSON: the choices as text only.'}`}
+            hint={`A tap picks that choice in the agent's menu, as a key press here would: it can allow a command or an edit. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : 'Slack and JSON: the choices as text only.'}`}
           />
         </Switch>
+        {w.answerOff && !w.answer && <p className="warn small">Laki turned this off as it updated: {ANSWER_WHY}, then turn it on again.</p>}
         {w.answer && format === 'ntfy' && w.replyTopic && URL.canParse(w.url?.trim() ?? '') && (
           <p className="muted small">
             Reply topic: <code>{(u => `${u.origin}${u.pathname.replace(/\/+$/, '')}-${w.replyTopic}`)(new URL(w.url!.trim()))}</code>

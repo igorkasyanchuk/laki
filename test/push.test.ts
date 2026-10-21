@@ -1,8 +1,10 @@
 // Phone pushes (Settings › Phone pushes): each format's request, and a fake agent's turns against a local server.
 import assert from 'node:assert/strict'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { join } from 'node:path'
 import { test } from 'node:test'
-import { pushRequest, replies } from '../src/daemon/push.ts'
+import { pushRequest, replies, tapSig } from '../src/daemon/push.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
 const p = { event: 'waiting', workspace: 'fix-login', tab: 't1', agent: 'claude', question: 'Run rm -rf build?' } as const
@@ -33,10 +35,12 @@ test('push choices: as text in every format; with a nonce, Telegram buttons and 
   const tg = (nonce?: string) => JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, { ...q, nonce }).body))
   assert.equal(tg().reply_markup, undefined)
   assert.deepEqual(tg('00112233aabbccdd').reply_markup.inline_keyboard[1], [{ text: '2. pick 2', callback_data: '00112233aabbccdd:2' }])
-  const nt = JSON.parse(String(pushRequest({ format: 'ntfy', url: 'https://ntfy.sh/mine', replyTopic: 'xyz' }, { ...q, nonce: '00112233aabbccdd' }).body))
+  const nt = JSON.parse(String(pushRequest({ format: 'ntfy', url: 'https://ntfy.sh/mine', replyTopic: 'xyz' }, { ...q, nonce: '00112233aabbccdd', key: 'k' }).body))
   assert.equal(nt.topic, 'mine')
   assert.equal(nt.actions.length, 3)
-  assert.deepEqual(nt.actions[0], { action: 'http', label: '1. pick 1', url: 'https://ntfy.sh/mine-xyz', method: 'POST', body: '00112233aabbccdd:1', clear: true })
+  // each tap signed: nonce:n:<hmac of the key>
+  assert.deepEqual(nt.actions[0], { action: 'http', label: '1. pick 1', url: 'https://ntfy.sh/mine-xyz', method: 'POST', body: `00112233aabbccdd:1:${tapSig('k', '00112233aabbccdd', 1)}`, clear: true })
+  assert.match(nt.actions[0].body, /^00112233aabbccdd:1:[0-9a-f]{16}$/)
   assert.equal(typeof pushRequest({ format: 'ntfy', url: 'https://ntfy.sh/mine' }, { ...q, nonce: '00112233aabbccdd' }).body, 'string') // no reply topic: text
   const auth = JSON.parse(String(pushRequest({ format: 'ntfy', url: 'https://ntfy.example/mine?auth=XYZ', replyTopic: 'xyz' }, { ...q, nonce: '00112233aabbccdd' }).body))
   assert.equal(auth.actions[0].url, 'https://ntfy.example/mine-xyz?auth=XYZ') // the topic's auth goes with the tap
@@ -90,17 +94,40 @@ test('answer from the phone: an ntfy tap on a waiting menu picks that choice onc
   const j = JSON.parse(push.body)
   assert.deepEqual(j.actions.map((a: any) => a.label), ['1. Yes', "2. Yes, and don't ask again for rm comm…", '3. No, and tell Claude what to do diffe…'])
   const nonce = j.actions[2].body.split(':')[0]
-  queue.push(JSON.stringify({ event: 'open', id: 'o' }), JSON.stringify({ event: 'message', id: 'm1', message: 'ffffffffffffffff:1' }), JSON.stringify({ event: 'message', id: 'm2', message: `${nonce}:3` }))
+  // a tap without its signature, or with a made-up one: ignored
+  queue.push(JSON.stringify({ event: 'open', id: 'o' }), JSON.stringify({ event: 'message', id: 'm0', message: `${nonce}:3` }), JSON.stringify({ event: 'message', id: 'm00', message: `${nonce}:3:0000000000000000` }))
+  await rig.rpc('phoneTick')
+  await sleep(500)
+  assert.doesNotMatch(await rig.screen(tab.id), /picked:/)
+  queue.push(JSON.stringify({ event: 'message', id: 'm1', message: 'ffffffffffffffff:1' }), JSON.stringify({ event: 'message', id: 'm2', message: j.actions[2].body }))
   await rig.rpc('phoneTick')
   await until(async () => /picked: No, and tell Claude/.test(await rig.screen(tab.id)), 'the tap picked 3')
   // the same menu again: the old tap's nonce is spent
   await rig.rpc('send', { target: tab.id, text: 'menu' })
   await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting again')
-  queue.push(JSON.stringify({ event: 'message', id: 'm3', message: `${nonce}:1` }))
+  queue.push(JSON.stringify({ event: 'message', id: 'm3', message: j.actions[0].body }))
   await rig.rpc('phoneTick')
   await sleep(1200) // and answer holds a tab for a second after its Enter
   assert.doesNotMatch(await rig.screen(tab.id), /picked: Yes/)
   await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1, label: 'No' }), /asks something else now/)
+})
+
+test('answer from the phone over ntfy needs a topic only you read: ntfy.sh without ?auth= refused, turned off as Laki updates', async t => {
+  const rig = await fresh(t)
+  await assert.rejects(rig.rpc('settingsSet', { webhook: { url: 'https://ntfy.sh/my-topic', format: 'ntfy', answer: true, replyTopic: 'r1' } }), /ntfy\.sh's topics are public/)
+  await assert.rejects(rig.rpc('settingsSet', { webhook: { url: 'ntfy.sh/my-topic', answer: true } }), /ntfy\.sh's topics are public/) // ntfy by default; not even a URL
+  await rig.rpc('settingsSet', { webhook: { url: 'https://ntfy.sh/my-topic?auth=tk_123', format: 'ntfy', answer: true, replyTopic: 'r1' } })
+  await rig.rpc('settingsSet', { webhook: { url: 'https://ntfy.example/my-topic', format: 'ntfy', answer: true, replyTopic: 'r1' } }) // your own server
+  await rig.rpc('settingsSet', { webhook: { url: 'https://ntfy.sh/my-topic', format: 'ntfy' } }) // answers off: fine
+  // one from before: off as it loads, and Settings says why
+  await rig.stop()
+  const sp = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(sp, 'utf8'))
+  st.settings.webhook = { url: 'https://ntfy.sh/my-topic', format: 'ntfy', answer: true, replyTopic: 'r1' }
+  writeFileSync(sp, JSON.stringify(st))
+  await rig.start()
+  const w = (await rig.rpc('state')).settings.webhook
+  assert.deepEqual([w.answer, w.answerOff], [false, true])
 })
 
 test('answer from the phone: the webhook changed while a question waits (ntfy to Telegram), taps are read from the new one from its start', async t => {

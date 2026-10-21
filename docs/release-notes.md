@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Answer from the phone signs each ntfy tap, so a made-up tap is ignored, and needs a topic only you can read (your
+  own ntfy server, or ntfy.sh with ?auth=). Where it was on with a plain ntfy.sh topic, the upgrade turns it off and
+  Settings says why.
 - Expose to the world warns when *Only these emails* names a webmail domain (`*@gmail.com`, Outlook, iCloud, Proton…):
   anyone can get an address there. *Anyone with the link* says what a dev server trusts from localhost is open too.
 - An artifact's, a spec's prototype's or an extension's page link opens only that workspace's artifacts, that plan or

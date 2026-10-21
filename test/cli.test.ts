@@ -151,6 +151,7 @@ test('cli: every command, as text', async t => {
   const rig = await fresh(t, { config: { setup: 'true', run: LISTEN } })
   let r = await rig.cli('project', 'add', rig.repo)
   assert.equal(r.out, `added ${rig.repo}\n`)
+  await rig.trust('repo')
   const plain = join(rig.home, 'notes')
   mkdirSync(plain)
   await rig.cli('project', 'add', plain)

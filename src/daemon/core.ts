@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, jobOf, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, answerOk, ANSWER_WHY, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, jobOf, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -130,6 +130,8 @@ export function load() {
     else delete state.widgetGrants![ws]
   }
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
+  const hook = state.settings?.webhook
+  if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
   if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
   state.cfgTrust = true
@@ -1555,6 +1557,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 }
 
 export function settingsSet(o: Settings) {
+  if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
   const dirsWere = JSON.stringify([state.settings?.widgetDirs ?? [], state.settings?.widgetDev ?? []])
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   const { accounts: _, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
@@ -3688,12 +3691,24 @@ function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
     const s = sessions.get(tab.id)
     if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
     const ask = kind === 'waiting' ? askOf(s!.screenText(16)) : undefined
-    const nonce = ask && w.answer && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
+    const nonce = ask && w.answer && answerOk(w) && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
     if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
-    pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce }).catch(e => log(`push ${tab.id}: ${e.message}`))
+    pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
   }
   if (kind === 'waiting') setTimeout(go, 800)
   else go()
+}
+
+// what signs ntfy's taps (push.ts tapSig): Laki's own, in its data folder (0600), never in settings or state.json
+let tapKeyIs = ''
+function tapKey() {
+  if (tapKeyIs) return tapKeyIs
+  const f = join(dir, 'tap-key')
+  try {
+    tapKeyIs = readFileSync(f, 'utf8').trim()
+  } catch {}
+  if (!/^[0-9a-f]{64}$/.test(tapKeyIs)) writeFileSync(f, (tapKeyIs = randomBytes(32).toString('hex')), { mode: 0o600 })
+  return tapKeyIs
 }
 
 // Answer from the phone (webhook.answer): a push with buttons leaves its nonce here, with the tab and its choices as
@@ -3719,7 +3734,7 @@ export async function phoneTick() {
   if (tapFor !== `${w.format}|${w.url}`) tapStart(w)
   tapping = true
   try {
-    const r = await replies(w, tapCursor)
+    const r = await replies(w, tapCursor, tapKey())
     tapCursor = r.cursor
     tapFailed = ''
     for (const tap of r.taps) {
@@ -4616,6 +4631,8 @@ export function runDev(ref: string, script?: string) {
   if (script !== undefined && !RUN_SCRIPTS.includes(script as RunScript)) throw new Error(`no script "${script}": ${RUN_SCRIPTS.join(', ')}`)
   const k = (script ?? 'run') as 'run' | RunScript
   const cmd = projectConfig(ws)[k]
+  const proj = state.projects.find(p => p.id === ws.project)
+  if ((typeof cmd !== 'string' || !cmd.trim()) && proj && cfgWait(proj)) throw new Error(`${proj.name}'s .laki.json isn't trusted yet: Laki shows it, trust it there`)
   if (typeof cmd !== 'string' || !cmd.trim()) throw new Error(`no "${k}" command: set one in the project settings or .laki.json`)
   return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript) : replaceTab(ws.id, 'dev', cmd)
 }

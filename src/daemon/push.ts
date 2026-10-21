@@ -3,10 +3,15 @@
 // telemetry. Fire and forget, 5 s at most; the caller logs a failure. A waiting agent's menu goes as lines of text;
 // with Answer from the phone (webhook.answer), Telegram and ntfy get a button per choice, whose tap comes back
 // through replies() with the push's nonce.
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Option = { n: number; label: string }
-export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; title?: string } // title: its own (a workflow's)
+export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string } // title: its own (a workflow's); key: what signs ntfy's taps
+
+// an ntfy tap is nonce:n:<sig>, signed with a key in Laki's data folder (never in settings): a tap made up without it
+// is ignored. ponytail: anyone who reads the pushed topic sees the taps too, so answers need a topic only you read (answerOk)
+export const tapSig = (key: string, nonce: string, n: number) => createHmac('sha256', key).update(`${nonce}:${n}`).digest('hex').slice(0, 16)
 
 export function pushText(p: Push) {
   const title = p.title ?? (p.event === 'test' ? 'Laki: pushes reach you' : `${p.agent} in ${p.workspace} is ${p.event === 'waiting' ? 'waiting for you' : 'done'}`)
@@ -42,7 +47,7 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
       // each posting its nonce:n to the reply topic. Else a header is bytes: anything past ASCII (an emoji in a
       // name) as RFC 2047, which ntfy reads
       if (ntfyJson(w, p))
-        return json({ topic: new URL(w.url!).pathname.replace(/^\/+|\/+$/g, ''), title, message: body || title, actions: taps.slice(0, 3).map(o => ({ action: 'http', label: cut(`${o.n}. ${o.label}`, 40), url: `${ntfyReplies(w)!.url}${ntfyReplies(w)!.query}`, method: 'POST', body: `${p.nonce}:${o.n}`, clear: true })) })
+        return json({ topic: new URL(w.url!).pathname.replace(/^\/+|\/+$/g, ''), title, message: body || title, actions: taps.slice(0, 3).map(o => ({ action: 'http', label: cut(`${o.n}. ${o.label}`, 40), url: `${ntfyReplies(w)!.url}${ntfyReplies(w)!.query}`, method: 'POST', body: `${p.nonce}:${o.n}:${tapSig(p.key ?? '', p.nonce!, o.n)}`, clear: true })) })
       return { method: 'POST', headers: { title: /^[\x20-\x7e]*$/.test(title) ? title : `=?UTF-8?B?${Buffer.from(title).toString('base64')}?=` }, body: body || title }
     }
     case 'slack': // Slack reads <…> as links and mentions (<!channel>)
@@ -65,12 +70,13 @@ export async function pushTo(w: Webhook, p: Push) {
 // offset; each one acknowledged, so the button stops spinning), ntfy's messages on the reply topic (since: a message
 // id or a unix time). The cursor moves on whatever they say; only nonce:n bodies count
 export type Tap = { nonce: string; n: number }
-const TAP = /^([0-9a-f]{16}):(\d{1,2})$/
-export async function replies(w: Webhook, cursor: string): Promise<{ taps: Tap[]; cursor: string }> {
+const TAP = /^([0-9a-f]{16}):(\d{1,2})(?::([0-9a-f]{16}))?$/
+// key: ntfy's taps' (tapSig); one without its signature is ignored
+export async function replies(w: Webhook, cursor: string, key = ''): Promise<{ taps: Tap[]; cursor: string }> {
   const taps: Tap[] = []
-  const tap = (s: unknown) => {
+  const tap = (s: unknown, signed = false) => {
     const m = typeof s === 'string' ? TAP.exec(s.trim()) : null
-    if (m) taps.push({ nonce: m[1], n: Number(m[2]) })
+    if (m && (!signed || (m[3] && timingSafeEqual(Buffer.from(m[3]), Buffer.from(tapSig(key, m[1], Number(m[2]))))))) taps.push({ nonce: m[1], n: Number(m[2]) })
   }
   const get = async (url: string) => {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) })
@@ -97,7 +103,7 @@ export async function replies(w: Webhook, cursor: string): Promise<{ taps: Tap[]
     const m = JSON.parse(line)
     if (m.event !== 'message') continue
     cursor = m.id
-    tap(m.message)
+    tap(m.message, true)
   }
   return { taps, cursor }
 }

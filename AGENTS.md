@@ -1546,8 +1546,11 @@ Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with th
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
 later with `askOf`'s choices as lines (JSON: `options`); with `webhook.answer` (Settings' *Answer from the phone*,
 off by default) a `nonce` per push: Telegram's `inline_keyboard` (`callback_data` `nonce:n`) and ntfy's JSON publish
-to the server's root with `http` actions (3 at most) posting `nonce:n` to `ntfyReplies` (`<topic URL>-<replyTopic>`,
-the random part Settings makes). `awaiting` keeps each nonce with the tab and its choices; while any is there,
+to the server's root with `http` actions (3 at most) posting `nonce:n:sig` (`push.ts` `tapSig`: an HMAC of the
+nonce and choice with `<data>/tap-key`, 0600; `replies` drops a tap without it) to `ntfyReplies` (`<topic URL>-<replyTopic>`,
+the random part Settings makes). `types.ts` `answerOk`: ntfy answers need the server not to be ntfy.sh or the URL to
+carry `auth` (a public topic: anyone reads the nonces); `settingsSet` refuses another (`ANSWER_WHY`), `load` turned an old
+one off once (`webhook.answerOff`, Settings' note). `awaiting` keeps each nonce with the tab and its choices; while any is there,
 `phoneTick` (every 5 s; the API's for tests) runs `push.ts` `replies` (Telegram's `getUpdates` from `tapCursor`, only
 callback queries from the URL's `chat_id`, each acknowledged; ntfy's `/json?poll=1&since=`) and answers a tap whose
 nonce is waiting and whose tab still shows the same choices (`answer` with `label`); a nonce goes as it's used, when

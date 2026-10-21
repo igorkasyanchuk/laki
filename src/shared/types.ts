@@ -248,6 +248,18 @@ export function webhookUrl(url?: string) {
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname))) throw new Error('the webhook URL must start with https://')
   return u.href
 }
+// Answer from the phone over ntfy needs a topic only you read: ntfy.sh's are public (anyone reading one could tap), so an
+// access token (?auth=) or a server of your own. Telegram checks the chat; Slack and JSON have no taps
+export function answerOk(w: Webhook) {
+  if ((w.format ?? 'ntfy') !== 'ntfy') return true
+  try {
+    const u = new URL(webhookUrl(w.url))
+    return u.hostname !== 'ntfy.sh' || !!u.searchParams.get('auth')
+  } catch {
+    return false
+  }
+}
+export const ANSWER_WHY = "ntfy.sh's topics are public: anyone who reads yours could tap. Add an access token (?auth=…) to the URL, or use your own ntfy server"
 
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
 export const PR_BOTS = ['github-actions', 'copilot-pull-request-reviewer', 'coderabbitai'] // the review bots whose threads go to the agent (settings.prBots); other bots' are skipped
@@ -494,7 +506,7 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
 // Settings › Phone pushes: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
 // answer: Answer from the phone (Telegram's and ntfy's buttons; off: the choices as text only); replyTopic: the random
 // part of ntfy's reply topic (<topic>-<it>), made as answer turns on
-export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string }
+export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean } // answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }

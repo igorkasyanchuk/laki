@@ -367,16 +367,16 @@ test('PR scans: fields and the dev log, autoFix waiting, merge when green step b
   writeFileSync(join(gh, 'checks.json'), JSON.stringify([{ name: 'lint', bucket: 'pass', link: '' }]))
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci' }), /no failing checks on PR #5/)
 
-  // review threads: a bot's and an owner's count, a stranger's (no author, no association) doesn't
+  // review threads: a listed bot's (settings.prBots) and an owner's count, a stranger's (no author, no association) doesn't
   writeFileSync(
     join(gh, 'graphql.json'),
     JSON.stringify({ data: { viewer: { login: 'me' }, repository: { pullRequest: { reviewThreads: { nodes: [{ id: 't1', isResolved: false, isOutdated: false, path: 'a.ts', line: 3, comments: { nodes: [
-      { author: { login: 'lint', __typename: 'Bot' }, authorAssociation: 'NONE', body: 'unused' },
+      { author: { login: 'github-actions', __typename: 'Bot' }, authorAssociation: 'NONE', body: 'unused' },
       { author: { login: 'ann', __typename: 'User' }, authorAssociation: 'OWNER', body: 'rename' },
       { author: null, body: 'spam' },
     ] } }] } } } } }),
   )
-  assert.deepEqual((await rig.rpc('prThreads', { ws: ws.id }))[0].comments.map((c: any) => c.author), ['lint', 'ann'])
+  assert.deepEqual((await rig.rpc('prThreads', { ws: ws.id }))[0].comments.map((c: any) => c.author), ['github-actions', 'ann'])
 
   // comments on a line: gh's 422, gh failing silently, no URL back, then one
   const comment = { ws: ws.id, path: 'README.md', line: 1, body: 'why?' }
@@ -471,11 +471,11 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
     const n = posts.length
     await rig.rpc('send', { target: id, text: 'menu' })
     const push = await until(() => posts.slice(n).find(x => x.url === '/'), 'a push with buttons')
-    return JSON.parse(push!.body).actions[0].body.split(':')[0] as string
+    return JSON.parse(push!.body).actions.map((x: { body: string }) => x.body) as string[] // each choice's signed tap: nonce:n:sig
   }
   const na = await menu(a.id)
   const nb = await menu(b.id)
-  assert.notEqual(na, nb)
+  assert.notEqual(na[0].split(':')[0], nb[0].split(':')[0])
 
   // polls held: a second tick meanwhile does nothing; a answered here meanwhile, so the tap for it moved on
   held = []
@@ -484,7 +484,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   assert.equal(await rig.rpc('phoneTick'), null)
   await rig.rpc('answer', { tab: a.id, n: 1 })
   await until(async () => (await statusOf(a.id)) === 'idle', 'a answered here')
-  for (const r of held) r.writeHead(200).end(JSON.stringify({ event: 'message', id: 'm1', message: `${na}:3` }))
+  for (const r of held) r.writeHead(200).end(JSON.stringify({ event: 'message', id: 'm1', message: na[2] }))
   held = null
   await first
   await sleep(300)
@@ -496,7 +496,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   await rig.rpc('answer', { tab: a.id, n: 1 })
   await until(async () => (await statusOf(a.id)) === 'idle', 'a answered again')
   await sleep(1100) // answer holds a tab a second after its Enter
-  replies.push(JSON.stringify({ event: 'message', id: 'm2', message: `${na2}:3` }))
+  replies.push(JSON.stringify({ event: 'message', id: 'm2', message: na2[2] }))
   await rig.rpc('phoneTick')
   await sleep(300)
   assert.doesNotMatch(await rig.screen(a.id), /picked: No/)
@@ -506,7 +506,7 @@ test('phone: a wait over before its push, one without a menu, taps while polls a
   assert.equal(await rig.rpc('phoneTick'), null)
   assert.equal(await rig.rpc('phoneTick'), null)
   fail = false
-  replies = [JSON.stringify({ event: 'message', id: 'm3', message: `${nb}:3` })]
+  replies = [JSON.stringify({ event: 'message', id: 'm3', message: nb[2] })]
   await rig.rpc('phoneTick')
   await until(async () => /picked: No, and tell Claude/.test(await rig.screen(b.id)), 'b picked 3 from the phone')
 })
