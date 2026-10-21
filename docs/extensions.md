@@ -781,7 +781,7 @@ and commit it. Folders and one-file extensions both work.
 - **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
   runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (what git
   would commit there: tracked files and untracked ones the repo doesn't ignore, hidden ones and `node_modules` too, plus
-  the files its commands name; outside git, every file but hidden ones, `node_modules` and `__pycache__`), the events it
+  the scripts its commands name; outside git, every file but hidden ones, `node_modules` and `__pycache__`), the events it
   answers, its settings and what it can hold; *Turn on in shop-web* turns on
   exactly that. A link to a folder inside it counts as that folder; one with a link out of its folder, or more than
   2,000 files, can't be turned on. From the CLI: `laki widget what shop-web.deploys`, then

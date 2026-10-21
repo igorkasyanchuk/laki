@@ -1302,7 +1302,7 @@ first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP
 + 1, past `HOPS_MAX` 3 dropped and logged), `agent` (an emit `from.widget` while `handling` has that extension at an agent's
 event, the daemon's own, else the handler's `LAKI_EVENT_AGENT`: an emit made handling an agent's event is the agent's; the
 input adds an agent, never takes one off); a `Job` keeps `agent` and `of` (the event's workspace); `handle` asks before an
-action handler of an agent's event (`approve`, `ask: 'first'`: Always is a grant, `grant`, as a tool's, in `of`; no window,
+action handler of an agent's event (`approve`, `ask: 'first'`: Always is a grant, `grant`, as a tool's, in `of`, listed in the view's `tools` as *On an agent's event* to Revoke; no window,
 no answer or Deny: not run, a warn line), a `refresh` unasked; an agent's run (`FlowRun.by`: `flowStart` `by: 'agent'` or
 `agent`, an agent's event's) sends `flow.ended` `from.agent`; `handlerOf`:
 `on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
@@ -1531,7 +1531,7 @@ core's `projectPush`/`projectRm` scan again (a removed one's go, their stores st
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
 `trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles`: what git would commit under the folder
 (`git ls-files -z --cached --others --exclude-standard`, in it: what it writes and the repo ignores doesn't count, an
-untracked file it doesn't does), plus widget.json, its `script` and the files its commands name, ignored or not; git
+untracked file it doesn't does), plus widget.json, its `script` and the scripts its commands name (`SCRIPT` or executable: a data file a command cats isn't), ignored or not; git
 failing (not a repo): every file under it but hidden ones, node_modules and __pycache__, a link to a folder followed
 while its realpath stays inside (a loop back to a folder it's in skipped); `repoBad`: a file or link out of it (realpath)
 or past `REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown`

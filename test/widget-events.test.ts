@@ -375,6 +375,7 @@ test("an agent's event: an action handler asks first (Always kept), a fetch does
   await emit()
   await until(() => readFileSync(join(home, 'act.log'), 'utf8').trim().split('\n').length === 2, 'Always: run unasked')
   assert.equal(app.events.filter(e => e.ev === 'toolAsk' && e.widget === 'act').length, 2)
+  assert.deepEqual((await rig.rpc('state')).widgets.find((x: any) => x.id === 'act').tools, [{ action: 'act', description: "On an agent's event", ask: 'first', grants: [ws.id] }], 'its Always, to Revoke in Settings')
   // yours: never asked
   await rig.cli('widget', 'emit', 'x', '--ws', ws.id)
   await until(() => readFileSync(join(home, 'act.log'), 'utf8').includes('custom.x \n'), 'yours ran')

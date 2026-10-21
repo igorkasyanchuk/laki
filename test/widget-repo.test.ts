@@ -227,7 +227,8 @@ test("a repo's extension is trusted as git would commit it: what its fetch write
   const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
   const d = ext(rig.repo, 'w', { name: 'W', fetch: 'sh fetch.sh' }, { 'fetch.sh': `date > last.txt; mkdir -p __pycache__; date > __pycache__/x.pyc; echo '{"n": 1}'\n` })
   ext(rig.repo, 'v', { name: 'V', fetch: `date > state.txt; echo '{"n": 1}'` })
-  writeFileSync(join(rig.repo, '.gitignore'), 'last.txt\n__pycache__/\n')
+  ext(rig.repo, 'c', { name: 'C', fetch: `date > cache.json; cat cache.json >/dev/null; echo '{"n": 1}'` }) // its command names an ignored data file
+  writeFileSync(join(rig.repo, '.gitignore'), 'last.txt\n__pycache__/\ncache.json\n')
   git('add', '-A')
   git('commit', '-qm', 'extensions')
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -247,6 +248,11 @@ test("a repo's extension is trusted as git would commit it: what its fetch write
   assert.ok(existsSync(join(d, 'last.txt')) && existsSync(join(d, '__pycache__', 'x.pyc')))
   await new Promise(r => setTimeout(r, 1800)) // the watch's scan, a second after the last change
   assert.deepEqual([(await find(w)).on, (await find(w)).changed], [true, undefined])
+  const c = `${p.id}.c`
+  await turnOn(c)
+  assert.equal((await rig.rpc('widgetRun', { id: c })).error, undefined, 'a data file its command names, ignored: not code, not counted')
+  await new Promise(r => setTimeout(r, 1800))
+  assert.equal((await find(c)).on, true)
 
   // a file it writes that the repo doesn't ignore: off, named
   const v = `${p.id}.v`

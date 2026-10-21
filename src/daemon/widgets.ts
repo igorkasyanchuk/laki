@@ -651,7 +651,11 @@ export const widgetsView = (): WidgetView[] =>
     running: running.has(w.id) || undefined,
     agent: agents.has(w.id) || undefined,
     ...(scoped(w) && { scope: 'workspace' as const, inst: instView(w) }),
-    ...(toolsOf(w).length && { tools: toolsOf(w).map(([action, t]): WidgetTool => ({ action, description: t.description, ask: t.ask, grants: (k => Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(k)))(grantKey(w, action)) })) }),
+    ...((tools => tools.length && { tools })([
+      ...toolsOf(w).map(([action, t]): WidgetTool => ({ action, description: t.description, ask: t.ask, grants: grantsOf(w, action) })),
+      // an Always given to an action handler of an agent's event: there to Revoke too
+      ...[...new Set(Object.values(w.m.on ?? {}))].filter(a => a !== 'refresh' && !toolOf(w.m.actions?.[a])).flatMap((action): WidgetTool[] => (grants => (grants.length ? [{ action, description: "On an agent's event", ask: 'first', grants }] : []))(grantsOf(w, action))),
+    ])),
     byAi: w.s.by === 'ai' || undefined,
     log: logOn(w) || undefined,
     keepLog: w.s.log || undefined,
@@ -1806,7 +1810,7 @@ const filesUnder = (d: string, max = 500, rel = '', out: string[] = []) => {
 }
 // a repo's extension, what trusting it covers: what git would commit under its folder (tracked files, and untracked
 // ones the repo doesn't ignore: what it writes there and the repo ignores, a last.txt or __pycache__, doesn't count),
-// with widget.json and the files its commands name, ignored or not. Not in a repo (git fails): every file under it but
+// with widget.json and the scripts its commands name (code: a script's name or executable), ignored or not. Not in a repo (git fails): every file under it but
 // hidden ones, node_modules and __pycache__, a link to a folder followed while it stays inside the folder (realpath,
 // each folder once), a link to a file as the file. bad: why it can't be trusted (a file or link out of it, past
 // REPO_MAX files: a change past them wouldn't be seen)
@@ -1826,7 +1830,8 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
   if (listed) {
     const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
     const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
-    const names = [...new Set([...listed, ...['widget.json', w.m.script ?? '', ...named].filter(n => n && statSync(join(d, n), { throwIfNoEntry: false })?.isFile())])]
+    const code = (n: string) => (st => !!st?.isFile() && (n === 'widget.json' || n === w.m.script || SCRIPT.test(n) || (st.mode & 0o111) !== 0))(statSync(join(d, n), { throwIfNoEntry: false })) // a cache.json a command cats isn't code
+    const names = [...new Set([...listed, ...['widget.json', w.m.script ?? '', ...named].filter(n => n && code(n))])]
     if (names.length > REPO_MAX) return { names: names.slice(0, REPO_MAX), bad: `more than ${REPO_MAX} files` }
     for (const n of names) {
       let to: string
@@ -1958,6 +1963,7 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   const output = (r.stdout ?? '').slice(0, TOOL_OUT)
   return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
 }
+const grantsOf = (w: Entry, action: string) => (k => Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(k)))(grantKey(w, action)) // the workspaces with an Always for it
 // an Always: that action as it is (key: grantKey) in that workspace ('' none); one made for its older files goes
 function grant(w: Entry, action: string, ws: string, key: string) {
   const g = (state.widgetGrants ??= {})
