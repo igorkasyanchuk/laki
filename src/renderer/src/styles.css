@@ -2385,8 +2385,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .status .sb-trophy { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 2px; border: none; background: none; color: inherit; line-height: 20px; }
 .status .sb-trophy:hover, .status .sb-trophy.on { color: var(--fg); background: none; }
 .ach-toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 31; /* over a page (30) */ display: flex; align-items: center; gap: 10px; max-width: min(480px, calc(100vw - 32px)); padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); border-radius: 999px; background: var(--panel); color: var(--fg); font: inherit; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); cursor: pointer; animation: ach-in 0.25s ease-out; }
+.ach-toast.up { bottom: 84px; } /* over a toast shown with it */
 .ach-toast > svg { flex: none; color: var(--tc-yellow); }
 .ach-toast > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes ach-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .ach-toast { animation: none; } }
-.ach-toast.up { bottom: 84px; }

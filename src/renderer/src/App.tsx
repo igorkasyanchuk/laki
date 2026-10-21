@@ -1501,36 +1501,41 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
-  // Achievements (achievements.ts): each earned once, as you do it, into settings.achievements (got: when); earned
-  // keeps them here too, so two at once don't write over each other. Off: none earned, no trophy, no toast
+  // Achievements (achievements.ts): each earned once, as you do it, into settings.achievements (got: when). sent: the
+  // last one written, shown and built on until the view has it, so an unlock, a ✕ and Turn off in a row keep each
+  // other. Off: none earned, no trophy, no toast
   // ponytail: the whole object is written, so two windows earning in the same instant can lose one; a daemon method if it matters.
   // Only this window's calls count: the new-workspace and AI windows (NewWindow.tsx) earn nothing
-  const achKept: AchievementsKept = settings.achievements ?? {}
+  const sent = useRef<AchievementsKept | null>(null)
+  if (sent.current && JSON.stringify(sent.current) === JSON.stringify(settings.achievements ?? {})) sent.current = null
+  const achKept: AchievementsKept = sent.current ?? settings.achievements ?? {}
   const achRef = useRef(achKept)
   achRef.current = achKept
-  const earned = useRef<Record<string, number>>({})
   const [unlocked, setUnlocked] = useState<string[]>([]) // the unlock toast's, newest last
   const unlockTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const unlockAt = useRef(0)
-  const achSet = (o: AchievementsKept) => api.call('settingsSet', { achievements: { ...achRef.current, ...o, got: { ...achRef.current.got, ...earned.current } } })
+  const achSet = (o: AchievementsKept) => {
+    const next = (sent.current = achRef.current = { ...achRef.current, ...o })
+    return api.call('settingsSet', { achievements: next }).catch(e => {
+      if (sent.current === next) sent.current = null // the view's again: a failed unlock can be earned again
+      throw e
+    })
+  }
   const earn = (id: string) => {
     const a = achRef.current
-    if (!viewRef.current || a.off || a.got?.[id] || earned.current[id] || a.hidden?.includes(id)) return // no view yet: its settings unknown, written over; hidden: doesn't unlock
-    earned.current[id] = Date.now()
-    achSet({}).catch(() => delete earned.current[id])
+    if (!viewRef.current || a.off || a.got?.[id] || a.hidden?.includes(id)) return // no view yet: its settings unknown, written over; hidden: doesn't unlock
+    achSet({ got: { ...a.got, [id]: Date.now() } }).catch(() => {})
     const fresh = Date.now() - unlockAt.current > 1500 // one action's unlocks together, not the last toast's too
     unlockAt.current = Date.now()
     setUnlocked(u => (fresh ? [id] : [...u, id]))
     clearTimeout(unlockTimer.current)
     unlockTimer.current = setTimeout(() => setUnlocked([]), 6000)
   }
-  const hiding = useRef<string[] | null>(null) // the Achievements page's ✕s not in the view yet
-  useEffect(() => void (hiding.current?.join() === (achKept.hidden ?? []).join() && (hiding.current = null)), [achKept.hidden?.join()])
   const earnRef = useRef(earn)
   earnRef.current = earn
   useEffect(() => api.onCall((method, params, r) => earnedBy(method, params, r).forEach(id => earnRef.current(id))), [])
   // the view's numbers and values that moved since the last view (the first, and the first after a reconnect: where
-  // they start, nothing earned; a daemon coming back may send its sessions a view or two late)
+  // they start, nothing earned; a new daemon's view, an update's migrations, isn't something you did)
   const ups = useRef<Record<string, number | string>>(undefined)
   useEffect(() => void (connected || (ups.current = undefined)), [connected])
   useEffect(() => {
@@ -2886,8 +2891,7 @@ export function App() {
   }
   const achHidden = achKept.hidden ?? []
   const achAll = ACHIEVEMENTS.filter(a => !achHidden.includes(a.id))
-  const achGot = { ...achKept.got, ...earned.current } // earned: before the settings say so
-  const achN = achAll.filter(a => achGot[a.id]).length
+  const achN = achAll.filter(a => achKept.got?.[a.id]).length
   // each kind's tabs that need you (the Dock's rule) and whether one works, for its rail button
   const kinds = rail ? new Map(live.map(w => [w.id, kindOf(w)])) : null
   const railSays = (k: RailKind) => {
@@ -3632,15 +3636,11 @@ export function App() {
         )}
         {dialog === 'achievements' && (
           <AchievementsPage
-            kept={{ ...achKept, got: achGot }}
+            kept={achKept}
             onClose={() => setDialog(null)}
             api={{
               go: achGo,
-              hide: (id, hide) => {
-                const h = (hiding.current ??= achRef.current.hidden ?? []).filter(x => x !== id) // the last ✕'s list until the view has it: two quick ones keep both
-                hiding.current = hide ? [...h, id] : h
-                void achSet({ hidden: hiding.current }).catch(fail)
-              },
+              hide: (id, hide) => (h => void achSet({ hidden: hide ? [...h, id] : h }).catch(fail))((achRef.current.hidden ?? []).filter(x => x !== id)),
               off: off => void achSet({ off }).then(() => off && (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
             }}
           />
@@ -3891,7 +3891,7 @@ export function App() {
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
           {!achKept.off && (
-            <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
+            <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
               <Icon name="trophy" size={11} />
               {achN}/{achAll.length}
             </button>

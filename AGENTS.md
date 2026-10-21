@@ -2094,7 +2094,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   and the first after a reconnect, only notes them; a value back to unset isn't), or by id (⌘J, timers, the sidebar's
   filter, Changes once it wasn't on screen, a line's comment, a profile: Settings' save with more presets than in use);
   a hidden one never. Kept in `settings.achievements` (`AchievementsKept`: `got`, `hidden`,
-  `off`; `SETTINGS_KEPT`), written whole by App (`achSet`, `earned` meanwhile); Settings' own save leaves it out, so an
+  `off`; `SETTINGS_KEPT`), written whole by App (`achSet`; `sent`, shown and built on until the view has it); Settings' own save leaves it out, so an
   unlock while it's open stays. The unlock toast (`.ach-toast`, over pages) groups one action's unlocks. Tested in
   `test/achievements.test.ts`.
 - **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
