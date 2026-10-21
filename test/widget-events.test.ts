@@ -42,7 +42,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
 
   // turn.done: the handler gets it on stdin and in its file, says data and a toast
   await rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'all done' } })
-  await until(() => existsSync(join(home, 'got.json')), 'the handler ran')
+  await until(() => existsSync(join(home, 'got.json')) && existsSync(join(home, 'file.json')), 'the handler ran') // file.json: its second step
   const got = JSON.parse(readFileSync(join(home, 'got.json'), 'utf8'))
   assert.equal(got.event, 'turn.done')
   assert.equal(got.last, 'all done')
