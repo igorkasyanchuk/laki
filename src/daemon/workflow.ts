@@ -437,13 +437,13 @@ export async function flowStart(o: Start) {
 async function begin(r: FlowRun) {
   let ws: Workspace
   try {
-    ws = r.pick ? picked(r.pick, undefined, r) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
+    ws = r.pick ? picked(r.pick, undefined, r) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow, flow: r.id }) : await wsNew({ project: r.project, local: true, preset: 'none' })
   } catch (e) {
     finish(r, 'failed', `no workspace: ${(e as Error).message}`)
     throw e
   }
   r.ws = ws.id
-  if (r.where === 'worktree' && !r.pick) ws.flow = r.id // its row's mark: made by this run
+  if (r.where === 'worktree' && !r.pick) ws.flow = r.id // its row's mark: made by this run (wsNew set it already, before its events)
   if (r.first && r.of && ws.flow === r.of) ws.flow = r.id // Run from here in the worktree its run made: this one's now
   say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'}${r.first ? ', its run’s' : r.pick ? ', the one you picked' : ''})`)
   enter(r, (r.first && blockOf(r, r.first)) || r.flow.blocks.find(b => b.kind === 'start')!)
@@ -1372,7 +1372,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
-    if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }
+    if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id))))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
     flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
   }

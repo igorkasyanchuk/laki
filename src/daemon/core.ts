@@ -1680,7 +1680,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1778,7 +1778,7 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 // development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
 // the workspace's own log too once it has an id; a failure's message last
 // the CLI's laki new: from, the workspace of the agent that ran it (agentCaller); yours in a shell isn't one
-export const byCaller = <T extends NewWs>({ caller, ...o }: T): T => ({ ...o, from: o.from ?? agentCaller(caller) }) as T
+export const byCaller = <T extends NewWs>({ caller, flow: _, ...o }: T): T => ({ ...o, from: o.from ?? agentCaller(caller) }) as T // an RPC's: never a run's mark
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {
@@ -1871,6 +1871,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (o.from && state.workspaces.some(w => w.id === o.from)) ws.from = o.from
   if (!o.issued) for (const u of refsIn(o.prompt)) relate(ws, u) // the other PRs and issues it names (not an issue's text: any)
   if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
+  if (o.flow && ws.kind === 'worktree') ws.flow = o.flow // the run's, before workspace.new and its setup tab's tab.new
   // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
   for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)

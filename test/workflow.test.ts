@@ -1834,6 +1834,29 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   assert.equal((await item()).untrusted, undefined)
 })
 
+test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {
+  const rig = await fresh(t, { config: { setup: 'echo set up' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const runsOf = async (id: string) => ((await rig.rpc('state')).flows ?? []).filter((r: any) => r.workflow === id)
+  const wf = (on: string) => `# Self\nruns in: worktree · at once: 5 · on: ${on}\nwhen done: keep\n\n## start\nnext: say\n\n## say\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n`
+  await rig.rpc('flowSave', { id: 'onws', text: wf('workspace.new') })
+  await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' }) // yours: one run, in a worktree of its own (its setup tab too)
+  await until(async () => (await runsOf('onws')).length >= 1, 'it starts')
+  await sleep(2000)
+  const [r] = await runsOf('onws')
+  assert.equal((await runsOf('onws')).length, 1, 'its own worktree started no other run')
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws)?.flow, r.id, "the worktree is its run's")
+  await rig.rpc('flowRm', { id: 'onws' })
+  // on: tab.new: the run's worktree's setup tab is its own
+  await rig.rpc('flowSave', { id: 'ontab', text: wf('tab.new') })
+  const mine = (await rig.rpc('state')).workspaces.find((w: any) => w.name === 'mine' || w.id === 'mine')
+  await rig.rpc('tabNew', { ws: mine.id, preset: 'shell' })
+  await until(async () => (await runsOf('ontab')).length >= 1, 'it starts')
+  await sleep(2000)
+  assert.equal((await runsOf('ontab')).length, 1, 'its setup tab started no other run')
+})
+
 test('a workflow an agent wrote runs only from its editor in the app: a schedule, Run again and the CLI are refused; Delete then Undo keeps the mark', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

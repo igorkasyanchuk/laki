@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A workflow that starts on a new workspace or a new tab no longer starts itself again from its own run's
+  worktree.
 - A repo's workflow says which event it starts on and that it changed since you allowed it, and only you can
   allow it: an agent can't.
 - The app window loads pictures only from GitHub's avatars: an extension's https pictures come through Laki's daemon,

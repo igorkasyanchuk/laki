@@ -1305,7 +1305,8 @@ handlers (an action's is `refused`, a warn line); `handlerOf`:
 `refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
 event's workspace's project (`runs in: here`: that workspace, `ws`), a project's own in its project only; refused: no workspace, problems, `byAgent`, an
-agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run. Its
+agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run (`r.ws`, or the worktree's
+`ws.flow`: `wsNew` `flow`, set in `makeWs` before its `workspace.new` and its setup tab's `tab.new`; never an RPC's, `byCaller`). Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a
