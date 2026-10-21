@@ -1010,7 +1010,8 @@ A workflow can start by itself on an event (*Starts on* in its settings, `on: pr
 event, or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project (`runs in: here`: in that workspace),
 its task the event's name, its fields as `{{event.ws.branch}}`, `{{event.data.sha}}`. It doesn't start for an event
 with no workspace, for a workflow an agent wrote (until you save it), or for an agent's event when it runs commands (a run or
-extension block), a webhook or outward actions; `laki widget events` says why.
+extension block), a webhook or outward actions (a new workspace or tab an agent made counts as its event); `laki widget
+events` says why.
 
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,

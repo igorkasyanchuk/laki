@@ -1373,7 +1373,8 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
   if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean }): Tab {
+// agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string }): Tab {
   const ws = findWs(wsRef)
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!o.kind) presetCheck(o.preset, o.cmd)
@@ -1405,7 +1406,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
     save()
     throw e
   }
-  widgetEvent('tab.new', { kind: tab.kind }, ws.id, tab)
+  widgetEvent('tab.new', { kind: tab.kind }, ws.id, tab, o.agent ? { from: { agent: o.agent } } : {})
   return tab
 }
 
@@ -1680,7 +1681,8 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; agent?: string } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+// (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1778,7 +1780,7 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 // development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
 // the workspace's own log too once it has an id; a failure's message last
 // the CLI's laki new: from, the workspace of the agent that ran it (agentCaller); yours in a shell isn't one
-export const byCaller = <T extends NewWs>({ caller, flow: _, ...o }: T): T => ({ ...o, from: o.from ?? agentCaller(caller) }) as T // an RPC's: never a run's mark
+export const byCaller = <T extends NewWs>({ caller, flow: _, ...o }: T): T => ({ ...o, from: o.from ?? agentCaller(caller), agent: callerAgent(caller) }) as T // an RPC's: never a run's mark, nor an agent's it didn't say
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {
@@ -1799,6 +1801,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 }
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
+  const by = o.agent || (o.from ? 'agent' : undefined) // an agent's (MCP's from alone: its preset unknown)
   if (o.from) agentNoCmd(o) // an agent's (the CLI in its tab, MCP)
   if (o.base?.trim().startsWith('-')) throw new Error(`base ${o.base.trim()}? a branch, not an option`) // git worktree add would read it as one
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
@@ -1881,21 +1884,21 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   forward(ws)
   const cfg = projectConfig(ws)
   step(`${ws.id}: ${ws.kind} at ${ws.path}${ws.branch ? `, branch ${ws.branch}` : ''}, port ${ws.port}`)
-  if (cfg.setup && ws.kind === 'worktree') (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup))
+  if (cfg.setup && ws.kind === 'worktree') (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup, by))
   else if (ws.kind === 'worktree' && cfgWait(proj)) (ws.setupWait = true), save(), step(`setup: waits for you to trust ${proj.name}'s .laki.json`)
   try {
-    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars }).name} (its command: the workspace's Logs)`)
+    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
   }
-  widgetEvent('workspace.new', { prompt: o.prompt ? o.prompt.slice(0, 2000) : undefined, agent: preset === 'none' ? undefined : preset }, ws.id)
+  widgetEvent('workspace.new', { prompt: o.prompt ? o.prompt.slice(0, 2000) : undefined, agent: preset === 'none' ? undefined : preset }, ws.id, undefined, by ? { from: { agent: by } } : {}) // an agent's: a workflow that runs commands doesn't start on it
   return ws
 }
 
-function runSetup(ws: Workspace, setup: string) {
+function runSetup(ws: Workspace, setup: string, agent?: string) {
   writeFileSync(setupMarker(ws), String(Date.now()))
-  addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup })
+  addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup, agent })
 }
 
 // the app's sheet: no hash, the project's .laki.json as it is now (its text, its hash); with the hash it showed, that
@@ -4020,6 +4023,12 @@ const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 export function agentCaller(from?: { ws?: unknown; tab?: unknown }) {
   const t = typeof from?.tab === 'string' && from.tab ? state.tabs.find(x => x.id === from.tab) : undefined
   return t && (t.kind === 'agent' || shellAgents.has(t.id)) ? t.workspace : undefined
+}
+// that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs
+export function callerAgent(from?: { ws?: unknown; tab?: unknown }) {
+  if (!agentCaller(from)) return
+  const t = state.tabs.find(x => x.id === from!.tab)!
+  return t.preset ?? shellAgents.get(t.id)?.agent ?? 'agent'
 }
 // M5: the tab a local connection comes from, by its process, not its env (an agent's env -u LAKI_TAB changes nothing):
 // the socket's other end (lsof), up its parents (ps) to a tab's own process. None: no tab's (your terminal, the app,

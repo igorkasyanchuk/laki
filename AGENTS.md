@@ -1291,7 +1291,9 @@ Events, streams, push (Part 5; `test/widget-events.test.ts`): `types.ts` `WIDGET
 fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.failed` on a failure or limit, `turn.waiting`
 800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
 null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
-MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`), `wsArchive`, `wsRestore`, `dropWs`
+MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`; an agent's, `from.agent`, when an agent made it:
+`NewWs.agent`, `byCaller`'s `callerAgent` (its tab's preset), a run an agent started (`r.by`), else `from` alone: `agent`;
+its setup and agent tabs' `tab.new` too, as `addTab` `agent` is for main.ts' `tabNew` from an agent and a run's agent blocks), `wsArchive`, `wsRestore`, `dropWs`
 (`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`), `ship`'s
 tab's `onExit` after a `scanPRs` (`ship.done`: `ok`, `exit`, `pr`), workflow.ts `finish` (`flow.ended`), `checkLimit`
 (`limit.hit`, once per limit: `limitSent`, a reset within a minute the same), `addTab` and `replaceTab` (`tab.new`; not

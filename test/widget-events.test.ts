@@ -398,3 +398,43 @@ test("an agent's event: an action handler asks first (Always kept), a fetch does
   const viaMcp = (await rig.rpc('widgetEvents')).find((e: any) => e.event === 'custom.viamcp')
   assert.equal(viaMcp.from?.agent, 'agent')
 })
+
+test("a workspace an agent made: its workspace.new and its tabs' tab.new are the agent's, so a workflow that runs commands doesn't start on them; yours still do", async t => {
+  const rig = await fresh(t, { config: { setup: 'true' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'cmd', text: '# Cmd\nruns in: main · on: workspace.new\n\n## start\nnext: go\n\n## go\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n' })
+  await rig.rpc('flowSave', { id: 'wt', text: '# Wt\nruns in: worktree\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n' })
+  const evs = async (name: string, ws: string) => (await rig.rpc('widgetEvents')).filter((e: any) => e.event === name && e.ws === ws).reverse() // oldest first
+  const agentOf = (e: any) => e.from?.agent
+
+  // yours: no one's, and it starts the workflow
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id))
+  const [mine] = await evs('workspace.new', ws.id)
+  assert.deepEqual([agentOf(mine), mine.flows], [undefined, ['cmd']])
+  assert.deepEqual((await evs('tab.new', ws.id)).map(agentOf), [undefined, undefined], 'its setup and agent tabs: yours')
+
+  // an agent's laki new (its tab the caller): the agent's, the workflow refused; its setup and agent tabs' too
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'x', name: 'two', caller: { ws: ws.id, tab: tab.id } })
+  const [made] = await evs('workspace.new', two.id)
+  assert.deepEqual([agentOf(made), made.flows], ['claude', []])
+  assert.match(made.refused.join('\n'), /cmd: an agent sent the event, and it runs commands/)
+  assert.deepEqual((await evs('tab.new', two.id)).map(agentOf), ['claude', 'claude'])
+
+  // tabNew: from an agent's tab, MCP's from (its preset unknown), yours
+  const before = (await evs('tab.new', ws.id)).length
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', caller: { ws: ws.id, tab: tab.id } })
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', from: ws.id })
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  assert.deepEqual((await evs('tab.new', ws.id)).slice(before).map(agentOf), ['claude', 'agent', undefined])
+  // an RPC can't say an agent for itself away: tabNew's agent is the caller's
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', caller: { ws: ws.id, tab: tab.id }, agent: '' })
+  assert.equal(agentOf((await evs('tab.new', ws.id)).at(-1)), 'claude')
+
+  // a run an agent started: the worktree it makes is the agent's
+  const run = await rig.rpc('flowStart', { workflow: 'wt', project: p.id, task: 'x', by: 'agent' })
+  const rws = await until(async () => (await rig.rpc('flowGet', { id: run.id })).ws, "the run's worktree")
+  const [byRun] = await until(() => evs('workspace.new', rws).then(l => l.length && l), 'its workspace.new')
+  assert.deepEqual([agentOf(byRun), byRun.flows], ['agent', []])
+})

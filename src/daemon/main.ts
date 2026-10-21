@@ -221,8 +221,9 @@ const api: Record<string, Handler> = {
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
   tabNew: ({ caller, from, ...p }) => {
-    if (from || core.agentCaller(caller)) core.agentNoCmd(p) // an agent's: no command of its own
-    const t = core.addTab(p.ws, p)
+    const agent = core.callerAgent(caller) ?? (from ? 'agent' : undefined) // MCP's from alone: an agent's, its preset unknown
+    if (agent) core.agentNoCmd(p) // an agent's: no command of its own
+    const t = core.addTab(p.ws, { ...p, agent }) // its tab.new: the agent's
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
     return t
   },

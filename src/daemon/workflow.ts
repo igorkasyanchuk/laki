@@ -437,7 +437,7 @@ export async function flowStart(o: Start) {
 async function begin(r: FlowRun) {
   let ws: Workspace
   try {
-    ws = r.pick ? picked(r.pick, undefined, r) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow, flow: r.id }) : await wsNew({ project: r.project, local: true, preset: 'none' })
+    ws = r.pick ? picked(r.pick, undefined, r) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow, flow: r.id, agent: r.by }) : await wsNew({ project: r.project, local: true, preset: 'none', agent: r.by }) // an agent's run: its workspace.new is the agent's
   } catch (e) {
     finish(r, 'failed', `no workspace: ${(e as Error).message}`)
     throw e
@@ -717,7 +717,7 @@ function agent(r: FlowRun, b: Block) {
     queued = !!send(tab.id, prompt).queued // after the turn under way: until it's typed in, a turn's end isn't ours
     say(r, `${blockName(b)}: to ${tab.name}${queued ? ' (queued: it was busy)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   } else {
-    tab = addTab(ws.id, { preset, prompt, model: b.model, effort: b.effort, perm, fast, forkOf, name: key === `run:${preset}` ? undefined : blockName(b) })
+    tab = addTab(ws.id, { preset, prompt, model: b.model, effort: b.effort, perm, fast, forkOf, name: key === `run:${preset}` ? undefined : blockName(b), agent: r.by })
     const mode = permWords(perm, fast, ag)
     say(r, `${blockName(b)}: a new ${preset} tab, ${tab.name}${mode ? ` (${mode})` : ''}${forkOf ? ' (the last run’s chat, forked)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   }

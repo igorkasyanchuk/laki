@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A workspace or tab an agent made (`laki new`, MCP, a workflow run it started) is the agent's event too: a
+  workflow that runs commands doesn't start on its `workspace.new` or `tab.new`.
 - A repo's extension that writes a file the repo ignores (a `last.txt`, `__pycache__`) stays on, and when one
   turns off as changed, the notice names the files that changed.
 - An agent's event stays the agent's on the way: what an extension sends while handling one, an agent's workflow
