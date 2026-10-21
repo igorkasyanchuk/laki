@@ -62,3 +62,27 @@ test('a meme\'s picture: one redirected off https, or past 8 MB without saying s
   big = false
   assert.equal((await rig.rpc('meme')).title, 'big')
 })
+
+test("a meme's list: a redirect isn't followed (the mirror instead), nor one past 2 MB read", async t => {
+  let mirrorBig = false
+  const server = createServer((req, res) => {
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+    const hot = req.url?.match(/^\/r\/(\w+)\/hot\.json/)?.[1]
+    if (hot) return res.writeHead(302, { location: `${base}/elsewhere.json` }).end() // Reddit's list moved: not followed
+    if (req.url === '/elsewhere.json') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: { children: [{ data: { title: 'followed', url: `${base}/a.png`, permalink: '/x', author: 'x' } }] } }))
+    if (req.url?.startsWith('/gimme/')) {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      if (!mirrorBig) return res.end(JSON.stringify({ memes: req.url.startsWith('/gimme/memes/') ? [{ title: 'mirrored', postLink: 'https://redd.it/m', url: `${base}/a.png`, author: 'm' }] : [] }))
+      res.write(`{"memes": [{"title": "${'x'.repeat(3 << 20)}`) // 3 MB, never ended
+      return
+    }
+    if (req.url === '/a.png') return res.writeHead(200, { 'content-type': 'image/png' }).end(Buffer.from('pic'))
+    res.writeHead(404).end()
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void (server.closeAllConnections(), server.close()))
+  const rig = await fresh(t, { env: { LAKI_MEME_API: `http://127.0.0.1:${(server.address() as { port: number }).port}` } })
+  assert.equal((await rig.rpc('meme')).title, 'mirrored')
+  mirrorBig = true
+  await assert.rejects(rig.rpc('meme'), /no meme this time/)
+})

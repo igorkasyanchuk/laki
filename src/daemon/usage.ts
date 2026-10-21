@@ -37,7 +37,7 @@ const slow = (message: string) => Object.assign(new Error(message), { slow: true
 const when = (s: unknown) => (typeof s === 'string' && Date.parse(s)) || undefined
 
 async function get(url: string, headers: Record<string, string>, expired: string): Promise<any> {
-  const r = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) })
+  const r = await fetch(url, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error' }) // the token goes to that host only
   if (r.status === 401 || r.status === 403) throw slow(expired)
   if (r.status === 429) throw slow('Asked too often: tries again in a few minutes')
   if (!r.ok) throw new Error(`HTTP ${r.status}`)

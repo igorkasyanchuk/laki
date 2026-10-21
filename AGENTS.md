@@ -920,7 +920,7 @@ Settings' OpenRouter model, logged in `ai-calls.jsonl` as `<workflow> · <block>
 Webhook blocks (`hook`): `fill` the URL (https; http only to 127.0.0.1, localhost, [::1]) and `header:` lines with the run's variables and `env.NAME` (Settings'
 and the project's env; the log masks them, shows the URL without its query), the body `from` a workspace file (realpath
 inside it, 10 MB, `Blob`), the text (a JSON template's values escaped), else `task` and `steps.*` as JSON; `steps.<id>.status`,
-`.output`, ok on 2xx (a 3xx is the answer: `redirect: 'manual'`); 429, 5xx and network errors again (`TRIES` 3, after `Retry-After` up to 30 s, else 2 s, 6 s).
+`.output` (`readCapped`: `ANSWER_MAX` read, the rest let go), ok on 2xx (a 3xx is the answer: `redirect: 'manual'`); 429, 5xx and network errors again (`TRIES` 3, after `Retry-After` up to 30 s, else 2 s, 6 s).
 All three via `request` (`calls`: an `AbortController` per run, `kill0` aborts, `timeout` 2 min) and `sent` (a `Send`'s
 `Got`: exit, vars, outs). An llm with `out:` asks for `response_format` json; `system`, `temperature` go along.
 Decision blocks (`decide`): `aiDecide` (POST `<api without /v1>/alpha/decisions`, `apiQuestions`: yes/no is the API's
@@ -1540,7 +1540,7 @@ row says *merged* while the setting is on.
 ### Usage
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`): `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
-(`Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`; the token is the freshest of `security
+(`Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`; no redirect followed, both; the token is the freshest of `security
 find-generic-password [-a $USER] -s "Claude Code-credentials" -w` and `~/.claude/.credentials.json`) and Codex's `GET
 chatgpt.com/backend-api/wham/usage` (`$CODEX_HOME/auth.json` `tokens`, `chatgpt-account-id`). Tokens are read-only:
 never refreshed (that can sign the agent out), an expired one isn't sent. Each agent's answer is kept 5 minutes
@@ -2081,7 +2081,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |
 | `src/daemon/push.ts` | phone pushes: each format's request (`pushRequest`), the URL's check, `pushTo` |
 | `src/daemon/device.ts` | laki screen's device ops: the iOS Simulator's and apps' windows' screenshots (in points), the simulator's taps, swipes, typing and elements through idb |
-| `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
+| `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall; a list: no
+redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |

@@ -15,6 +15,7 @@ import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, json
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
+import { readCapped } from '../shared/conn.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -1011,7 +1012,7 @@ function hookSend(b: Block, vars: Record<string, string>, envs: Record<string, s
         if (signal.aborted || n >= TRIES) throw e
       }
       if (res && (n >= TRIES || (res.status !== 429 && res.status < 500))) {
-        const text = (await res.text()).slice(0, ANSWER_MAX)
+        const text = (await readCapped(res, ANSWER_MAX)).text // the rest isn't read
         if (text.trim()) say(`${blockName(b)}: ${res.status}`, text)
         return { exit: res.ok ? 'ok' : 'error', why: `${res.status} ${res.statusText}`.trim(), vars: { [`steps.${b.id}.status`]: String(res.status), [`steps.${b.id}.output`]: text }, text }
       }

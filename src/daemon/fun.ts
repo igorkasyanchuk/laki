@@ -4,6 +4,8 @@
 // and a click gets one at random that wasn't shown yet (the last 500). Only on a click; nothing NSFW or spoilered; the
 // picture comes back as a data: URL (the page's CSP loads nothing from the web), 8 MB at most.
 // LAKI_MEME_API: tests' fake server for both, on this Mac only.
+import { readCapped } from '../shared/conn.ts'
+
 const UA = 'web:laki:v1.0.0 (by /u/laki-app)' // Reddit's format: <platform>:<app>:<version> (by /u/<user>)
 const MAX = 8 << 20
 const fake = () => (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(process.env.LAKI_MEME_API ?? '') ? process.env.LAKI_MEME_API! : '')
@@ -16,10 +18,14 @@ const KEEP = 15 * 60000
 const pools = new Map<string, { at: number; posts: Post[] }>() // each subreddit's pictures, as last fetched
 const seen: string[] = [] // pictures shown (their URLs), oldest first
 
+const LIST_MAX = 2 << 20 // a list of posts: 2 MB read at most
+// a list: no redirect followed (an answer elsewhere isn't the list), 2 MB at most
 const json = async (url: string) => {
-  const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
+  const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/json' }, signal: AbortSignal.timeout(8000), redirect: 'error' })
   if (!r.ok) throw new Error(`${new URL(url).host} answered ${r.status}`)
-  return r.json()
+  const { text, cut } = await readCapped(r, LIST_MAX)
+  if (cut) throw new Error(`${new URL(url).host} answered more than ${LIST_MAX >> 20} MB`)
+  return JSON.parse(text)
 }
 // a picture's URL: https (or the fake server's), a still or a GIF
 const safe = (u: string) => u.startsWith('https://') || (!!fake() && u.startsWith(`${fake()}/`))

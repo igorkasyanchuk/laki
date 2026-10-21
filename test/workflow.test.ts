@@ -534,6 +534,7 @@ test('workflow decisions: a decision model’s answers, one it isn’t sure of a
       return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ model: 'x/fast', choices: [{ message: { content: '{"title": "T"}' } }] }))
     }
     if (q.url === '/moved') return res.writeHead(302, { location: 'https://elsewhere.example/' }).end()
+    if (q.url === '/huge') return void (res.writeHead(200, { 'content-type': 'text/plain' }), res.write('y'.repeat(5 << 20))) // 5 MB, never ended
     if (q.url === '/flaky') return ++flaky < 2 ? res.writeHead(503, { 'retry-after': '1' }).end('busy') : res.writeHead(200).end('{"ok": true}')
     res.writeHead(404).end()
   })
@@ -637,6 +638,9 @@ end: success
   // a redirect is its answer, followed nowhere; plain http only to this Mac
   const moved = await rig.rpc('flowTest', { block: { ...hook, url: `${at}/moved` } })
   assert.deepEqual([moved.exit, moved.vars['steps.h.status']], ['error', '302'])
+  // a reply past ANSWER_MAX: only that much read, the rest let go (it never ends)
+  const huge = await rig.rpc('flowTest', { block: { ...hook, url: `${at}/huge` } })
+  assert.deepEqual([huge.exit, huge.vars['steps.h.output'].length], ['ok', 20000])
   const plain = await rig.rpc('flowTest', { block: { ...hook, url: 'http://example.com/hook' } })
   assert.deepEqual([plain.exit, /an https URL \(http only to this Mac\)/.test(JSON.stringify(plain))], ['error', true])
   await assert.rejects(rig.rpc('flowTest', { block: { id: 'r', kind: 'run', cmd: 'true' } }), /Test sends an AI call/)
