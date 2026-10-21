@@ -482,7 +482,7 @@ export function check(wf: Workflow): string[] {
   if (!start) return ['no start block (## start)']
   if (wf.on && !eventOk(wf.on)) out.push(`on: ${wf.on} isn't an event (${WIDGET_EVENTS.join(', ')}, custom.<name> or custom.*)`)
   if (wf.when?.length && !wf.on) out.push('only when: tests an event: it needs on: <event>')
-  if (wf.budget && (!(wf.budget.ms! > 0 || wf.budget.usd! > 0) || (wf.budget.ms !== undefined && !(wf.budget.ms > 0)) || (wf.budget.usd !== undefined && !(wf.budget.usd > 0)))) out.push('budget: a time, dollars or both, more than 0: budget: 60 min, $5')
+  if (wf.budget && ((wf.budget.ms === undefined && wf.budget.usd === undefined) || [wf.budget.ms, wf.budget.usd].some(x => x !== undefined && !(x > 0)))) out.push('budget: a time, dollars or both, more than 0: budget: 60 min, $5')
   for (const t of wf.when ?? []) (p => p && out.push(p))(whenProblem(t))
   if (wf.blocks.filter(b => b.kind === 'start').length > 1) out.push('more than one start block')
   if (wf.perm && !PERM_IDS.includes(wf.perm)) out.push(`the workflow's permission mode ${wf.perm}? ${PERM_IDS.join(', ')}`)

@@ -1489,9 +1489,8 @@ flowHooks.start = o => flowStart(o)
 // loop), an only when: test that doesn't hold, and a second run for the workspace one came from (evWs) while one is live
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a) // daemon.log
 // its only when: tests on the event (held: a matches stops at 200 ms): the first that doesn't hold, or one that throws
-function whenFails(wf: Workflow, payload: Record<string, unknown>) {
+function whenFails(wf: Workflow, payload: Record<string, unknown>, v = eventVars(payload)) {
   if (!wf.when?.length) return
-  const v = eventVars(payload)
   for (const t of wf.when) {
     const br = branchOf(t)
     if (!br || br === 'else' || br.test === 'js' || !br.of) return `only when: ${t}? not a test` // check() says so first
@@ -1631,13 +1630,14 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   const h = fromEvent(wf, name, payload, ws, { tried: true, editor, ...(o.agent && { agent: o.agent }) })
   const now = h?.wf ?? wf
   const lastWs = (last?.payload.ws as { name?: string } | undefined)?.name
+  const vars = eventVars(payload)
   const res = {
     name,
     from,
     ...(last && o.by !== 'agent' && { last: { at: last.at, ...(lastWs && { ws: lastWs }) } }),
     payload,
-    vars: eventVars(payload),
-    when: (now.when ?? []).map(t => ({ test: t, ok: !whenFails({ ...now, when: [t] }, payload) })),
+    vars,
+    when: (now.when ?? []).map(t => ({ test: t, ok: !whenFails({ ...now, when: [t] }, payload, vars) })),
     start: !!h && 'start' in h,
     ...(!h ? { why: `${wf.name} is gone` } : 'why' in h ? { why: h.why } : {}),
   }

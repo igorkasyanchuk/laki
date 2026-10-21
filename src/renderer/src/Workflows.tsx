@@ -8,7 +8,7 @@
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Agent, FAST, findAction, mergeActions, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -398,6 +398,20 @@ function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string
   else if (was.current === null) was.current = now
   const p = { ...rest, value: typed !== null && was.current === now ? typed : now, onChange: (e: ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => ((was.current = null), setTyped(e.target.value), onText(e.target.value)), onBlur: () => setTyped(null) }
   return area ? <textarea {...p} /> : <input {...p} />
+}
+
+// a workflow's budget as typed (not its normal form until the field is left: "60 m" isn't "1h" mid-word); each
+// text that reads is kept, one that doesn't is said
+function BudgetField({ budget, onBudget }: { budget?: Budget; onBudget: (b: Budget | undefined) => void }) {
+  const [typed, setTyped] = useState<string | null>(null)
+  const text = typed ?? (budget ? budgetText(budget) : '')
+  const b = text.trim() ? budgetOf(text) : undefined
+  return (
+    <>
+      <input value={text} placeholder="none: 60 min, $5" className={typeof b === 'string' ? 'bad' : ''} onChange={e => (setTyped(e.target.value), (n => typeof n !== 'string' && onBudget(n))(e.target.value.trim() ? budgetOf(e.target.value) : undefined))} onBlur={() => setTyped(null)} />
+      {typeof b === 'string' && <span className="wf-hint wf-bad">{b}</span>}
+    </>
+  )
 }
 
 // a run's use of a limit: a bar when it has one
@@ -1239,7 +1253,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
         </div>
         <div className="wf-field">
           <label>Budget</label>
-          <Typed value={wf.budget ? budgetText(wf.budget) : ''} placeholder="none: 60 min, $5" onText={v => edit(w => void (w.budget = (b => (typeof b === 'string' ? w.budget : b))(v.trim() ? budgetOf(v) : undefined)))} />
+          <BudgetField budget={wf.budget} onBudget={b => edit(w => void (w.budget = b))} />
           <span className="wf-hint">A run’s working time (not while it waits for you) and its AI calls’ cost; past either it asks: more, or stop.</span>
         </div>
         <div className="wf-field">
