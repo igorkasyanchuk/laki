@@ -1790,6 +1790,80 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
 })
 
+test('only when: tests on the event filter its runs; one live run per workspace an event came from; a chain of events stops at HOPS_MAX', async t => {
+  // the file: only when: lines after the head, read back; check names what's wrong
+  const head = 'runs in: here · on: pr.checks.failed\nonly when: event.pr.draft equals "false"\nonly when: event.ws.branch matches "^(feat|fix)/ · x"'
+  const wf = parse(`# F\n${head}\n\n## start\nnext: e\n\n## e\nend: success\n`).workflow
+  assert.deepEqual(wf.when, ['event.pr.draft equals "false"', 'event.ws.branch matches "^(feat|fix)/ · x"'])
+  assert.equal(wf.on, 'pr.checks.failed')
+  assert.match(toFile(wf), /^runs in: here · session: new · on: pr\.checks\.failed\nonly when: event\.pr\.draft equals "false"\nonly when: event\.ws\.branch matches "\^\(feat\|fix\)\/ · x"$/m)
+  assert.deepEqual(parse(toFile(wf)).workflow.when, wf.when)
+  assert.deepEqual(check(wf), [])
+  const bad = (when: string[], on = 'custom.x') => check({ ...wf, on: on || undefined, when }).join('\n')
+  assert.match(bad(['js: true']), /no js: or else here/)
+  assert.match(bad(['else']), /no js: or else here/)
+  assert.match(bad(['steps.x.answer equals "a"']), /test an event field/)
+  assert.match(bad(['event.x matches "("']), /isn't a regular expression/)
+  assert.match(bad(['nonsense']), /only when: nonsense\? event\.<field> contains/)
+  assert.match(bad(['event.x equals "a"'], ''), /only when: tests an event: it needs on: <event>/)
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'there' })
+  const runsOf = async (id: string) => ((await rig.rpc('state')).flows ?? []).filter((r: any) => r.workflow === id)
+  const refused = async () => (await rig.rpc('widgetEvents'))[0].refused ?? []
+  const body = (cmd: string) => `\n\n## start\nnext: say\n\n## say\nrun: ${cmd}\nok: e\nfail: e\n\n## e\nend: success\n`
+
+  // a test that doesn't hold: no run, and which one said; one that holds: a run
+  await rig.rpc('flowSave', { id: 'gated', text: `# Gated\nruns in: here · on: custom.x\nonly when: event.data.ok equals "yes"\nonly when: event.data.n >= 2${body('echo {{event.data.ok}}')}` })
+  let r = await rig.rpc('widgetEmit', { name: 'x', data: { ok: 'no', n: 5 }, ws: ws.id })
+  assert.deepEqual(r.flows, [])
+  assert.deepEqual(await refused(), ['gated: only when: event.data.ok equals "yes" doesn\'t hold'])
+  r = await rig.rpc('widgetEmit', { name: 'x', data: { ok: 'yes', n: 1 }, ws: ws.id })
+  assert.deepEqual(await refused(), ['gated: only when: event.data.n >= 2 doesn\'t hold'])
+  r = await rig.rpc('widgetEmit', { name: 'x', data: { ok: 'yes', n: 3 }, ws: ws.id })
+  assert.deepEqual(r.flows, ['gated'])
+  const run = await until(async () => (x => x?.status === 'done' && x)((await runsOf('gated'))[0]), 'its run done')
+  assert.equal((await rig.rpc('flowGet', { id: run.id })).vars['steps.say.output'], 'yes')
+  assert.equal(run.evWs, ws.id)
+
+  // runs in: worktree: one live run (or queued) per workspace an event came from
+  await rig.rpc('flowSave', { id: 'wt', text: `# Wt\nruns in: worktree · at once: 1 · when done: keep · on: custom.w${body('sleep 4')}` })
+  r = await rig.rpc('widgetEmit', { name: 'w', ws: ws.id })
+  assert.deepEqual(r.flows, ['wt'])
+  const first = await until(async () => (x => x?.ws && x)((await runsOf('wt'))[0]), 'its worktree')
+  assert.notEqual(first.ws, ws.id)
+  r = await rig.rpc('widgetEmit', { name: 'w', ws: ws.id })
+  assert.deepEqual(r.flows, [])
+  assert.deepEqual(await refused(), ['wt: a run of it is live for here'])
+  r = await rig.rpc('widgetEmit', { name: 'w', ws: two.id }) // another workspace: queued behind it (at once: 1)
+  assert.deepEqual(r.flows, ['wt'])
+  await until(async () => (await runsOf('wt')).some((x: any) => x.status === 'queued' && x.evWs === two.id), 'queued')
+  r = await rig.rpc('widgetEmit', { name: 'w', ws: two.id })
+  assert.deepEqual(await refused(), ['wt: a run of it is live for there'])
+  await until(async () => (await runsOf('wt')).every((x: any) => x.status === 'done'), 'both done', 20000)
+  assert.equal((await runsOf('wt')).length, 2)
+  await rig.rpc('flowRm', { id: 'wt' })
+
+  // a chain: A's flow.ended starts B, B's starts A, each one hop more, until HOPS_MAX
+  for (const id of ['ping', 'pong']) await rig.rpc('flowSave', { id, text: `# ${id}\nruns in: main · on: flow.ended${body('true')}` })
+  await rig.rpc('flowStart', { workflow: 'ping', project: p.id, task: 'go' })
+  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.refused?.some((x: string) => /4 hops: a loop of events\? dropped/.test(x))), 'dropped past HOPS_MAX', 20000)
+  await sleep(1500)
+  const chain = [...(await runsOf('ping')), ...(await runsOf('pong'))].sort((a: any, b: any) => a.started - b.started)
+  assert.deepEqual(chain.map((x: any) => [x.workflow, x.hops ?? 0]), [['ping', 0], ['pong', 1], ['ping', 2], ['pong', 3]])
+  for (const id of ['ping', 'pong']) await rig.rpc('flowRm', { id })
+
+  // a repo's untrusted workflow: refused for trust, its tests not run
+  const file = join(rig.repo, '.laki/workflows/repo.md')
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, `# Repo\nruns in: here · on: custom.y\nonly when: event.data.ok equals "yes"${body('true')}`)
+  await rig.rpc('widgetEmit', { name: 'y', data: { ok: 'no' }, ws: ws.id })
+  assert.deepEqual(await refused(), ['repo: from the repo, not allowed as it is: open it in Workflows, then Allow or Save it'])
+})
+
 test('run blocks: {{vars}} as env references (bare, in double quotes), never shell text; in single quotes a problem', async t => {
   assert.deepEqual(shellFill(`echo {{a}} "x {{a}} {{b}}" '{{c}}' \\"{{a}}\\" {{none}}`, { a: '1', b: '2', c: '3' }), {
     cmd: `echo "$LAKI_V_0" "x $LAKI_V_0"" $LAKI_V_1""" '{{c}}' \\""$LAKI_V_0"\\" {{none}}`,

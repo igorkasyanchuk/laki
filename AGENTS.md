@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`. A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1411,9 +1411,14 @@ no answer or Deny: not run, a warn line), a `refresh` unasked; an agent's run (`
 `on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
 `refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
-event's workspace's project (`runs in: here`: that workspace, `ws`), a project's own in its project only; refused: no workspace, problems, `byAgent`, an
+event's workspace's project (`runs in: here`: that workspace, `ws`), a project's own in its project only; refused: no workspace, problems, `byAgent`,
+`untrusted`, past `HOPS_MAX` (its 5th argument, `hops`: widgetEvent's, checked here too; a run keeps it as `r.hops`, and
+`finish`'s `flow.ended` is `hops + 1`, so A's end starting B and B's starting A stops there), an
 agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run (`r.ws`, or the worktree's
-`ws.flow`: `wsNew` `flow`, set in `makeWs` before its `workspace.new` and its setup tab's `tab.new`; never an RPC's, `byCaller`). Its
+`ws.flow`: `wsNew` `flow`, set in `makeWs` before its `workspace.new` and its setup tab's `tab.new`; never an RPC's, `byCaller`),
+an `only when:` test that doesn't hold (`whenFails`: `Workflow.when`, each a Case branch on `eventVars`, through `held`, so a
+`matches` stops at 200 ms; a repo's file's as it is at each event), and a live (or queued) run of it whose `evWs` (`Start.evWs`:
+the event's workspace; a worktree run's `ws` is its own) is the event's. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a

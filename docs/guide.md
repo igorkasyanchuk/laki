@@ -1084,6 +1084,20 @@ with no workspace, for one its own run sent (a workspace or tab it made too), fo
 you save it), or for an agent's event when it runs commands (a run or extension block), a webhook or outward actions (a new workspace or tab an agent made counts as its event); `laki widget
 events` says why.
 
+*Only when* (under *Starts on*; `only when:` lines after the head in the file) filters the events: each is a Case
+branch's test on the event's fields, and every one must hold, e.g. `event.pr.draft equals "false"` or
+`event.ws.branch matches "^(feat|fix)/"`. While a run an event started is going (or waiting its turn), another event
+from the same workspace starts none, so a burst of `turn.done` or a second failed CI is one run, even when each run
+gets a worktree of its own. A chain (one workflow's `flow.ended` starting another, whose end starts the first) stops
+after three hops.
+
+The event's fields: every one has `event.event`, `event.at`, `event.ws.id`, `.name`, `.project`, `.branch`, `.pr`,
+`event.tab.id`, `.name`, `.agent` when it's a tab's, and `event.from` when an extension, a tab or an agent sent it.
+The `pr.*` events add `event.pr.number`, `.url`, `.title`, `.draft`; `pr.checks.failed` `event.failing` (a list of
+name and url); `pr.review` `event.approved` and `event.changes`; `turn.done` `event.last` and `event.seconds`;
+`flow.ended` `event.run`, `event.workflow.id`, `.name`, `event.status`, `event.why`; `custom.*` `event.data`, what
+`laki widget emit` sent.
+
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
 picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in the file; it waits for the turn to end),

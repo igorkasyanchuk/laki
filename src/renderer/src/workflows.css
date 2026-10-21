@@ -221,6 +221,12 @@
 .wf-own-row { display: grid; grid-template-columns: minmax(70px, 0.8fr) minmax(0, 1.2fr) auto; gap: 4px; align-items: center; }
 .wf-own-row input { min-width: 0; height: 26px; padding: 0 7px; font: 12px var(--mono); }
 .wf-own-row input.bad { border-color: var(--error); }
+/* Only when: a test per row, its problem under it */
+.wf-when { display: grid; gap: 2px; }
+.wf-when-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+.wf-when-row input { min-width: 0; font: 12px var(--mono); }
+.wf-when-row input.bad { border-color: var(--error); }
+.wf-when-add { justify-self: start; font-size: 12px; }
 .wf-own-name { min-width: 0; height: 26px; padding: 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; border: none; border-radius: 5px; background: none; color: var(--accent-ink); font: 12px var(--mono); cursor: grab; }
 .wf-own-name:hover { background: var(--hover); }
 .wf-awaiting { color: var(--muted); }

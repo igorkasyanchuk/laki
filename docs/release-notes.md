@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: *Only when* tests filter the event that starts one (`only when: event.pr.draft equals "false"`), a
+  workspace's events start one run at a time, and a chain of events stops after three hops.
 - A notification as a plan limit nears its end: Claude's or Codex's 5-hour or weekly limit at 90% (Settings ›
   General › *Plan limit at*: 75, 90 or 95), once per reset, while Laki is open.
 - Review's suggestions: a reviewer's ```` ```suggestion ```` shows as a small diff with *Apply* (and *Apply all* for a

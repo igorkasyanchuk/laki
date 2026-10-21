@@ -8,7 +8,7 @@
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Agent, FAST, findAction, mergeActions, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, AGENT_TIMEOUT, DONES, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, DONES, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -1103,6 +1103,22 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           <Typed list="wf-events" placeholder="only when you start it (or an event: pr.merged, custom.deploy…)" value={wf.on ?? ''} onText={v => edit(w => void (w.on = v.trim() || undefined))} />
           <datalist id="wf-events">{[...WIDGET_EVENTS, 'custom.*'].map(e => <option key={e} value={e} />)}</datalist>
         </div>
+        {wf.on && (
+          <div className="wf-field">
+            <label>Only when</label>
+            {(wf.when ?? []).map((t, i) => (
+              <div key={i} className="wf-when">
+                <div className="wf-when-row">
+                  <Typed value={t} aria-label={`Test ${i + 1}`} placeholder='event.pr.draft equals "false"' className={whenProblem(t) ? 'bad' : ''} onText={v => edit(w => void (w.when![i] = v))} />
+                  <IconButton icon="x" title="Remove this test" onClick={() => edit(w => void (w.when = (l => (l.length ? l : undefined))(w.when!.filter((_, j) => j !== i))))} />
+                </div>
+                {whenProblem(t) && <span className="wf-hint wf-bad">{whenProblem(t)}</span>}
+              </div>
+            ))}
+            <button className="link wf-when-add" onClick={() => edit(w => void (w.when = [...(w.when ?? []), '']))}>Add a test</button>
+            <span className="wf-hint">The Case block’s tests on the event’s fields, e.g. <code>event.pr.draft equals "false"</code>. Every one must hold.</span>
+          </div>
+        )}
         <div className="wf-field">
           <label>How freely its agents act</label>
           <select value={wf.perm ?? ''} onChange={e => edit(w => void (w.perm = e.target.value || undefined))}>

@@ -1465,14 +1465,14 @@ const hoursOf = () => (typeof state.settings?.widgetHours === 'string' && state.
 // it: no import cycle). The last SENT_MAX events are kept in memory, with what they reached (laki widget events)
 const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
-const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
+export const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
 const SENT_MAX = 50
 type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string; rec: EventSent } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always); rec: what laki widget events says of it
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
 const sent: EventSent[] = []
-export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined) => { flows: string[]; refused: string[] } } = {}
+export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined, hops: number) => { flows: string[]; refused: string[] } } = {}
 // its handler of that event: on[name], or on["custom.*"] for a custom one
 function handlerOf(w: Entry, name: string) {
   const on = w.m.on
@@ -1487,7 +1487,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()
-  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent)
+  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent, hops)
   if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
   if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
   let json = JSON.stringify({ ...head, ...extra })

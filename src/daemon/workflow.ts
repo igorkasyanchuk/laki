@@ -11,10 +11,10 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
-import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
+import { eventHooks, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { readCapped } from '../shared/conn.ts'
 
 const MAX_FILE = 256 << 10
@@ -361,7 +361,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string } } // evWs, hops: an event's (its workspace, its hops)
 
 // Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
 // task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
@@ -418,7 +418,7 @@ export async function flowStart(o: Start) {
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
   runs().push(r)
@@ -1230,7 +1230,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   touch()
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
-  widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, r.by ? { from: { agent: r.by } } : {}) // an agent's run: its end is the agent's event
+  widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, { ...(r.by && { from: { agent: r.by } }), hops: (r.hops ?? 0) + 1 }) // an agent's run: its end is the agent's event; one hop more than the event that started it
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
@@ -1347,11 +1347,26 @@ flowHooks.start = o => flowStart(o)
 
 // on: <event>: the event starts a run of each workflow that waits for it, in the event's workspace's project (a
 // project's own workflow only in its project), the task the event's name. Refused (and said in laki widget events): no
-// workspace, problems, one an agent wrote, an event an agent sent to one with run: or outward blocks, a workflow's
-// event of its own run (a loop). ponytail: other chains (A's event starts B, B's starts A) stop only at the queue's 20
+// workspace, problems, one an agent wrote, one not trusted, past HOPS_MAX (a chain: A's flow.ended starts B, B's starts
+// A, each one hop more), an event an agent sent to one with run: or outward blocks, a workflow's event of its own run (a
+// loop), an only when: test that doesn't hold, and a second run for the workspace one came from (evWs) while one is live
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a) // daemon.log
+// its only when: tests on the event (held: a matches stops at 200 ms): the first that doesn't hold, or one that throws
+function whenFails(wf: Workflow, payload: Record<string, unknown>) {
+  if (!wf.when?.length) return
+  const v = eventVars(payload)
+  for (const t of wf.when) {
+    const br = branchOf(t)
+    if (!br || br === 'else' || br.test === 'js' || !br.of) return `only when: ${t}? not a test` // check() says so first
+    try {
+      if (!held(v[br.of] ?? '', br.test, br.value)) return `only when: ${branchLabel(br)} doesn't hold`
+    } catch (e) {
+      return `only when: ${(e as Error).message}`
+    }
+  }
+}
 let listening: { at: number; files: number; list: WorkflowItem[] } | undefined
-eventHooks.flows = (name, payload, wsId, agent) => {
+eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
   const out = { flows: [] as string[], refused: [] as string[] }
   if (!flowsOn(state.settings)) return out
   if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on) } // ponytail: the files read again every 10 s, not at each event
@@ -1372,11 +1387,16 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
     if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); continue }
+    if (hops > HOPS_MAX) { no(`${hops} hops: a loop of events? dropped`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
-    if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project)))))) { no('its own run sent it'); continue }
+    const mine = runs().filter(r => runOf(r, wf))
+    if (mine.some(r => r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) { no('its own run sent it'); continue }
+    const fails = whenFails(wf, payload)
+    if (fails) { no(fails); continue }
+    if (mine.some(r => live(r) && r.evWs === ws.id)) { no(`a run of it is live for ${ws.name ?? ws.id}`); continue } // a worktree run's ws is its own: evWs is where its event came from
     out.flows.push(wf.id)
-    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload, ...(agent && { agent }) }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
+    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload, evWs: ws.id, hops, ...(agent && { agent }) }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
   }
   return out
 }
