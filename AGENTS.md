@@ -1754,11 +1754,12 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
   dialog (and so focused the terminal) would type a stray ⏎. On window focus or a page turning visible it sends
-  its size again, so a look is enough to get it back after a phone. OSC 8 links: http(s) open on a click (with the mouse
+  its size again, so a look is enough to get it back after a phone. Links: a plain URL (WebLinksAddon) opens on a click (with the mouse
   captured, `?1000h`…: only on ⌘-click, and a ⌘-press on a link (`over`, the link providers' hover) is kept from the
   app's mouse report by `.xterm-screen`'s listener: codex opens its links itself, two tabs otherwise; in a browser
-  elsewhere, no `bridge`, a tap too), `file://` (or a
-  bare absolute path) on ⌘-click (⌃ too, unless the mouse is captured) (`allowNonHttpProtocols`, a `title` hint on hover): App's `openPath`, a file of the
+  elsewhere, no `bridge`, a tap too); an OSC 8 http(s) one only on ⌘-click (L13: its words aren't its address; a tap
+  with no `bridge`); every link's address in the `title` on hover; `file://` (or a
+  bare absolute path) on ⌘-click (⌃ too, unless the mouse is captured) (`allowNonHttpProtocols`): App's `openPath`, a file of the
   tab's workspace in the preview, else main's `open-path` (the app window's only: a folder in Finder, a document of
   `DOCS` in its app (not HTML: L11), anything else, bundles (`BUNDLE`: an Xcode project and a playground too) too, revealed). Files dropped on it (`bridge.pathOf`) are
   pasted as their paths, shell-quoted when they need it; its `preventDefault` keeps the window's folder drop out.

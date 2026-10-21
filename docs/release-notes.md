@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- A link behind words in a terminal (Claude Code's) opens on ⌘-click only, and hovering any link shows where it goes.
 - A laki://new link fills in only the prompt and the name, never the agent, and the page says the prompt came from a
   link.
 - Opening files is more careful: an HTML file from a terminal link or the Files menu is shown in Finder (an HTML

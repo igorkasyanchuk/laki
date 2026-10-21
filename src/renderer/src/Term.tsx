@@ -69,19 +69,20 @@ export function Term({
       allowTransparency: transparent(),
       macOptionIsMeta: true,
       theme: termTheme(),
-      // OSC 8 links: a web one (claude's PR links) opened at once, as plain URLs are (xterm's own asks first; main opens
-      // http(s) only); a file:// one (claude's paths) on ⌘-click, as a terminal's, so a click to select or focus opens nothing.
-      // An app that has the mouse (codex) gets a plain click and opens its links itself: ours only on ⌘ then (`ours`)
+      // OSC 8 links (text over an address, claude's PR links and paths): on ⌘-click only (L13: the words may not be where
+      // it goes), its address on hover; a file:// one also on ⌃-click unless an app has the mouse. In a browser elsewhere
+      // (a phone, no bridge) a tap opens a web one. main opens http(s) only
       linkHandler: {
         allowNonHttpProtocols: true,
-        activate: (e, uri) => (/^https?:/i.test(uri) ? ours(e) && openExternal(uri) : filePath(uri) && (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(filePath(uri))),
-        hover: (_e, uri) => ((over = true), box.current && filePath(uri) && (box.current.title = '⌘-click to open')),
+        activate: (e, uri) => (/^https?:/i.test(uri) ? (e.metaKey || !bridge) && openExternal(uri) : filePath(uri) && (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(filePath(uri))),
+        hover: (_e, uri) => ((over = true), box.current && (box.current.title = `${filePath(uri) || uri}\n⌘-click to open`)),
         leave: () => ((over = false), box.current && (box.current.title = '')),
       },
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: () => (over = true), leave: () => (over = false) }))
+    // a plain URL (its words are its address): a click, ⌘-click when an app has the mouse (codex opens its own: `ours`)
+    term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: (_e, uri) => ((over = true), box.current && (box.current.title = uri)), leave: () => ((over = false), box.current && (box.current.title = '')) }))
     const search = new SearchAddon()
     term.loadAddon(search)
     term.open(box.current!)
