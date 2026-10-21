@@ -2,7 +2,7 @@
 // fetch command and how often it runs) and widget.html (a template, shared/widget.ts). The daemon runs each
 // widget's fetch on its schedule and keeps what it printed (JSON) in the widget's storage, <data>/widget-data/<id>.json,
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, type Dirent, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -32,7 +32,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { fails?: number; log?: boolean; trusted?: string; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[] } // trusted: a repo's extension's folder as it was when you turned it on (dirHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[] } // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
@@ -431,7 +431,8 @@ export function scanWidgets() {
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
-      if (project && e.s.on && (rf => e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)(e.file ? undefined : repoFiles(e.dir))) untrust(e) // changed in the repo since you turned it on
+      const rf = project && e.s.on && !e.file ? repoFiles(e) : undefined
+      if (project && e.s.on && (e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)) untrust(e, rf?.names) // changed in the repo since you turned it on
     }
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
@@ -445,17 +446,22 @@ export function scanWidgets() {
   changed()
 }
 
-// a repo's extension that changed since you said yes: off, changed, its streams, agents and grants gone; said once
-function untrust(e: Entry) {
+// a repo's extension that changed since you said yes: off, changed, its streams, agents and grants gone; said once,
+// with the files that changed (by the hashes kept as it was turned on), so you know what to gitignore
+function untrust(e: Entry, names?: string[]) {
   const st = readStore(e.id)
+  const was = st.files
+  const now = was && eachHash(e, names)
+  const diff = was && now ? [...new Set([...Object.keys(was), ...Object.keys(now)])].filter(n => was[n] !== now[n]).sort() : []
+  const which = diff.length ? ` (${diff.slice(0, 5).join(', ')}${diff.length > 5 ? ` and ${diff.length - 5} more` : ''})` : ''
   Object.assign(st, { on: false, changed: true })
   writeStore(e.id, st)
   Object.assign(e.s, { on: false, changed: true })
   stopStream(e.id)
   stopAgents(e.id)
   ungrant(e.id)
-  wLog(e, `its files changed in ${projName(e)}'s .laki/extensions: off until you look`, 'warn')
-  broadcast({ ev: 'widget-say', widget: e.id, notify: `from ${projName(e)} changed: off until you look` }) // App: a toast and a notification, its name first
+  wLog(e, `its files changed in ${projName(e)}'s .laki/extensions${which}: off until you look`, 'warn')
+  broadcast({ ev: 'widget-say', widget: e.id, notify: `from ${projName(e)} changed${which}: off until you look` }) // App: a toast and a notification, its name first
 }
 // each project's .laki/extensions watched (recursive), a second after the last change read again (scanWidgets: a
 // changed one goes off). ponytail: a folder made after the scan is read at the next one (a project added, a reload)
@@ -782,7 +788,7 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   const bad = o.on === true && repoBad(w)
   if (bad) throw new Error(`${w.m.name || w.id} can't be trusted: ${bad}`)
   const s = readStore(w.id)
-  if (o.on === true && w.project && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), changed: undefined })
+  if (o.on === true && w.project && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), files: eachHash(w), changed: undefined })
   if (o.ai) {
     // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
     if (w.builtin || w.dir !== join(widgetHome(), w.id)) throw new Error(`${w.m.name ?? w.id} isn't in Laki's folder: Laki AI can't change it`)
@@ -900,7 +906,7 @@ export function widgetWhat(id: string) {
 function repoShown(w: Entry) {
   const block = (t: string) => (f => `${f}\n${t}\n${f}`)('`'.repeat(Math.max(3, ...[...t.matchAll(/`+/g)].map(m => m[0].length + 1))))
   const acts = Object.entries(w.m.actions ?? {}).flatMap(([k, a]) => (c => (c ? [`${k}: ${c}`] : []))(actionCmd(a)))
-  const all = w.file ? { names: [w.file] } : repoFiles(w.dir)
+  const all = w.file ? { names: [w.file] } : repoFiles(w)
   const cmds = [w.m.fetch, w.m.script, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join('\n')
   const runs = (n: string) => n === w.m.script || cmds.includes(n) || (!/(^|\/)node_modules\//.test(n) && (cmds.includes(basename(n)) || SCRIPT.test(n))) || ((statSync(join(w.dir, n), { throwIfNoEntry: false })?.mode ?? 0) & 0o111) !== 0
   let left = 12_000
@@ -973,9 +979,9 @@ const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
 // a repo's extension runs only as you said yes to it: its files changed since (a pull, before the watch's scan) turn it
 // off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
 function trusted(w: Entry) {
-  const rf = w.project && !w.file ? repoFiles(w.dir) : undefined // one walk for both
+  const rf = w.project && !w.file ? repoFiles(w) : undefined // one listing for both
   if (!w.project || (w.s.trusted === dirHash(w, false, rf?.names) && !rf?.bad)) return
-  if (w.s.on) untrust(w)
+  if (w.s.on) untrust(w, rf?.names)
   throw new Error(`${w.m.name || w.id} changed in ${projName(w)}'s repo: off until you look`)
 }
 function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '', ms?: number) {
@@ -1795,16 +1801,40 @@ const filesUnder = (d: string, max = 500, rel = '', out: string[] = []) => {
   for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, max, rel ? `${rel}/${x.name}` : x.name, out)
   return out
 }
-// a repo's extension, what trusting it covers: every file under its folder (hidden ones and node_modules too, not .git),
-// a link to a folder followed while it stays inside the folder (realpath, each folder once), a link to a file as the
-// file. bad: why it can't be trusted (a link out of it, past REPO_MAX files: a change past them wouldn't be seen)
+// a repo's extension, what trusting it covers: what git would commit under its folder (tracked files, and untracked
+// ones the repo doesn't ignore: what it writes there and the repo ignores, a last.txt or __pycache__, doesn't count),
+// with widget.json and the files its commands name, ignored or not. Not in a repo (git fails): every file under it but
+// hidden ones, node_modules and __pycache__, a link to a folder followed while it stays inside the folder (realpath,
+// each folder once), a link to a file as the file. bad: why it can't be trusted (a file or link out of it, past
+// REPO_MAX files: a change past them wouldn't be seen)
 const REPO_MAX = 2000
 const SCRIPT = /\.(sh|bash|zsh|fish|py|rb|pl|php|js|mjs|cjs|ts|mts|lua)$/i
-function repoFiles(d: string): { names: string[]; bad?: string } {
+function repoFiles(w: Entry): { names: string[]; bad?: string } {
+  const d = w.dir
   let top = d
   try {
     top = realpathSync(d)
   } catch {}
+  let listed: string[] | undefined
+  try {
+    listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
+  } catch {}
+  if (listed) {
+    const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
+    const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
+    const names = [...new Set([...listed, ...['widget.json', w.m.script ?? '', ...named].filter(n => n && statSync(join(d, n), { throwIfNoEntry: false })?.isFile())])]
+    if (names.length > REPO_MAX) return { names: names.slice(0, REPO_MAX), bad: `more than ${REPO_MAX} files` }
+    for (const n of names) {
+      let to: string
+      try {
+        to = realpathSync(join(d, n))
+      } catch {
+        continue // gone, or a broken link: its name only
+      }
+      if (!under(to, top)) return { names, bad: `${n} links out of its folder (to ${to})` }
+    }
+    return { names }
+  }
   const names: string[] = []
   let bad: string | undefined
   // up: the folders it's in now (a link back to one of them would loop)
@@ -1820,7 +1850,7 @@ function repoFiles(d: string): { names: string[]; bad?: string } {
       es = readdirSync(join(d, rel), { withFileTypes: true })
     } catch {}
     const subs: string[] = []
-    for (const x of es.filter(x => x.name !== '.git')) {
+    for (const x of es.filter(x => !x.name.startsWith('.') && x.name !== 'node_modules' && x.name !== '__pycache__')) {
       if (bad) return
       const n = rel ? `${rel}/${x.name}` : x.name
       let dir = x.isDirectory()
@@ -1845,10 +1875,20 @@ function repoFiles(d: string): { names: string[]; bad?: string } {
 }
 // a repo's that can't be trusted (repoFiles' bad): never on
 function repoBad(w: Entry) {
-  return w.project && !w.file ? repoFiles(w.dir).bad : undefined
+  return w.project && !w.file ? repoFiles(w).bad : undefined
+}
+// a repo's: each file's own hash (12 hex), kept as it's turned on: what changed, untrust names
+function eachHash(w: Entry, names = w.file ? [w.file] : repoFiles(w).names) {
+  return Object.fromEntries(names.map(n => [n, (() => {
+    try {
+      return createHash('sha256').update(readFileSync(join(w.dir, n))).digest('hex').slice(0, 12)
+    } catch {
+      return ''
+    }
+  })()]))
 }
 function dirHash(w: Entry, fresh = false, known?: string[]) {
-  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoFiles(w.dir).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoFiles(w).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {

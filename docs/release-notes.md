@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's extension that writes a file the repo ignores (a `last.txt`, `__pycache__`) stays on, and when one
+  turns off as changed, the notice names the files that changed.
 - An agent's event stays the agent's on the way: what an extension sends while handling one, an agent's workflow
   run's end and every MCP event count as an agent's, and an extension's action for one asks you first.
 - An extension's gate that says no and exits 1 now holds the ship, merge or archive, and `laki archive` prints why

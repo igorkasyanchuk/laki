@@ -779,14 +779,20 @@ and commit it. Folders and one-file extensions both work.
 
 - **Its id** is `<project>.<id>` (`shop-web.deploys`), so it never covers yours or another project's.
 - **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
-  runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (hidden ones
-  and `node_modules` too), the events it answers, its settings and what it can hold; *Turn on in shop-web* turns on
+  runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (what git
+  would commit there: tracked files and untracked ones the repo doesn't ignore, hidden ones and `node_modules` too, plus
+  the files its commands name; outside git, every file but hidden ones, `node_modules` and `__pycache__`), the events it
+  answers, its settings and what it can hold; *Turn on in shop-web* turns on
   exactly that. A link to a folder inside it counts as that folder; one with a link out of its folder, or more than
   2,000 files, can't be turned on. From the CLI: `laki widget what shop-web.deploys`, then
   `laki widget on shop-web.deploys --seen <hash>`.
 - **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's
-  folder) turns it off and marks it *changed*: its streams and agents stop, its tools' *Always* go, and you get a toast
-  and a notification. Its page says what changed; turning it on shows you again.
+  folder, a new file an agent drops there) turns it off and marks it *changed*: its streams and agents stop, its tools'
+  *Always* go, and you get a toast and a notification naming the files that changed. Its page says what changed;
+  turning it on shows you again.
+- **Its state goes elsewhere.** An extension writes what it keeps to `$LAKI_WIDGET_FILE` (or a file the repo
+  gitignores), never next to its code: a file it writes there that the repo doesn't ignore is a change, and turns it
+  off after its first run.
 - **Only in its project.** It shows in the sidebar, the bars, the panel, the rows, the rail and the foot only while a
   workspace of that project is selected; on the Desk it's named *Deploys · shop-web*. Its ⌘K items, menus and keys,
   events, gates and tools for agents are that project's only (`app.open` and `custom.*` events with no workspace too).

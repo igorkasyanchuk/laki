@@ -1529,12 +1529,15 @@ under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` lea
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
-`trusted` is `dirHash` (every file under the folder, `repoFiles`: hidden ones and node_modules too, a link to a folder
-followed while its realpath stays inside (a loop back to a folder it's in skipped); `repoBad`: a link out of it or past
-`REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown` lists
-every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules), and a scan that finds an on one with
-another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`, `ungrant`, a warn line, a `widget-say`
-`notify`). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
+`trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles`: what git would commit under the folder
+(`git ls-files -z --cached --others --exclude-standard`, in it: what it writes and the repo ignores doesn't count, an
+untracked file it doesn't does), plus widget.json, its `script` and the files its commands name, ignored or not; git
+failing (not a repo): every file under it but hidden ones, node_modules and __pycache__, a link to a folder followed
+while its realpath stays inside (a loop back to a folder it's in skipped); `repoBad`: a file or link out of it (realpath)
+or past `REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown`
+lists every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules),
+and a scan that finds an on one with another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`,
+`ungrant`, a warn line and a `widget-say` `notify` naming the files whose `eachHash` differs, five at most). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
 (no workspace: `app.open` and `custom.*` only), `widgetGates`, `widgetTools` (`ws`: MCP's `ext_*` by
 `$LAKI_WORKSPACE`; none: no repo's) and `widgetToolCall`. `repoSays` refuses `widgetRm`, `widgetWrite`,
 `widgetFileSave` and a rename; Remix's id drops the project. `widgetNew` in a repo's folder writes no store (off) and
