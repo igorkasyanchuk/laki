@@ -189,6 +189,10 @@ test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and
   const log = () => readFileSync(join(rig.home, 'sim.log'), 'utf8')
   await assert.rejects(rig.rpc('sim', { op: 'zoom' }), /sim: zoom\? one of list, frame/)
   assert.match((await rig.rpc('sim', { op: 'list' })).why.join('\n'), /Android: adb isn't on PATH/, 'none: why')
+  // a project's own Simulator switch: kept as a boolean, over Settings' (the renderer's); anything else unset
+  const pj = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.equal((await rig.rpc('projectSet', { id: pj.id, config: { simulator: false } })).config.simulator, false, "a project's own off")
+  assert.equal((await rig.rpc('projectSet', { id: pj.id, config: { simulator: 'yes' } })).config.simulator, undefined, 'not a boolean: as Settings say')
   const ios = process.platform === 'darwin' // simctl: macOS's
   script(
     join(bin, 'xcrun'),

@@ -808,6 +808,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       env: Object.keys(env).length ? env : undefined,
       worktrees: typeof o.config.worktrees === 'string' && o.config.worktrees.trim() ? o.config.worktrees.trim().slice(0, 1000) : undefined,
       pr: prAllowOk(o.config.pr),
+      simulator: typeof o.config.simulator === 'boolean' ? o.config.simulator : undefined,
       mergeMethod: p.config?.mergeMethod, // prAct's only: a page opened before a merge would send an older one
     }
     // merge when green off for the project: its workspaces' switches go too, so turning it on again merges nothing unasked

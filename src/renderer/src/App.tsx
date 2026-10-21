@@ -3268,7 +3268,7 @@ export function App() {
               tab={panelTab}
               onTab={setPanelTab}
               api={panelApi(ws)}
-              sim={settings.simulator === true}
+              sim={project?.config?.simulator ?? settings.simulator === true} /* the project's own over Settings' */
               width={panelW}
               onWidth={setPanelW}
               onClose={() => setPanelOpen(false)}
@@ -3474,7 +3474,7 @@ export function App() {
               saveSettings: o => call('projectSet', { id: p.id, ...o }).catch(() => {}),
               ...(aiOn(settings) && { compact: { run: () => call('memoryCompact', { project: p.id }), log: () => api.call<CompactLogLine[]>('memoryCompactLog', { project: p.id }) } }),
               file: id => api.call<ProjectConfig>('projectFile', { id }),
-              global: { actions: settings.actions, templates: settings.templates },
+              global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true },
               onGlobal: sec => setDialog({ section: sec }),
               schedules: () => setDialog({ schedules: p.id }),
               setSchedule: (id, on) => call('scheduleSet', { id, on }),

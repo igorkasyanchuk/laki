@@ -630,8 +630,8 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
 - *Simulator*: a booted iOS Simulator, an Android emulator or a phone on `adb` (USB debugging), its screen live in the
   panel (a few frames a second). A click taps, a drag swipes, the box types into it (Enter sends; empty, Return), and
   the buttons press Home, Back and Apps (Android) and Lock; the camera puts a screenshot's path into the agent's prompt.
-  With several running, pick one in its menu. It's off until **Settings › Simulators** turns it on; that page also
-  checks what this Mac has, each missing piece with the command to run (*Check again* after):
+  With several running, pick one in its menu. It's off until **Settings › Simulators** turns it on, for every project;
+  a project's settings (*Simulator*) can turn it on or off for that project alone. Settings › Simulators also checks what this Mac has, each missing piece with the command to run (*Check again* after):
   - iOS: Xcode (`xcode-select` pointing at it, not the Command Line Tools alone), its license accepted
     (`sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch`), an iOS runtime
     (`xcodebuild -downloadPlatform iOS`), a simulator running (`open -a Simulator`), and for taps and typing idb

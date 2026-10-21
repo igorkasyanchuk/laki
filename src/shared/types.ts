@@ -42,7 +42,7 @@ export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: s
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
 // ports: names for the status bar's ports ({"3000": "web"})
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // worktrees, pr, mergeMethod: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean } // worktrees, pr, mergeMethod, simulator: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -748,5 +748,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 101
+export const API = 102
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

@@ -14,8 +14,8 @@ version it builds, with the date. -->
   covers nothing; it stays there until its right click floats it again.
 - The side panel's Simulator: a booted iOS Simulator, an Android emulator or a phone on adb live in the panel; click
   to tap, drag to swipe, type, Home, Back, Lock, and a screenshot into the agent's prompt. Taps and typing on iOS need
-  idb; a phone that waits for you to allow USB debugging is named. Off until Settings › Simulators turns it on, which
-  also checks what iOS and Android need on this Mac (Xcode, its license, an iOS runtime, idb; adb, an emulator, a
+  idb; a phone that waits for you to allow USB debugging is named. Off until Settings › Simulators turns it on (a project's
+  settings can turn it on or off there alone), which also checks what iOS and Android need on this Mac (Xcode, its license, an iOS runtime, idb; adb, an emulator, a
   device) and gives the command for each missing one; adb and the emulator are found in Android Studio's SDK, no PATH
   needed.
 - `laki screen shot` draws the simulator's screen in points without idb too (simctl says its size), so a spot in the

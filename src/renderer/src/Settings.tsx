@@ -783,7 +783,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
 
 const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
@@ -982,7 +982,7 @@ export function ProjectSection(p: {
   file?: (id: string) => Promise<ProjectConfig>
   rename?: boolean
   script?: keyof Scripts
-  global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with this project's
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean } // Settings' own, which go with this project's (simulator: its switch, which this project's may override)
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
@@ -1071,6 +1071,13 @@ export function ProjectSection(p: {
       </Group>
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
+      </Group>
+      <Group title="Simulator" hint="The side panel's Simulator tab in this project's workspaces: as Settings › Simulators says, or on or off here alone">
+        <select value={c.simulator === undefined ? '' : c.simulator ? 'on' : 'off'} aria-label="Simulator tab" onChange={e => setC(y => ({ ...y, simulator: e.target.value ? e.target.value === 'on' : undefined }))}>
+          <option value="">As in Settings ({p.global?.simulator ? 'on' : 'off'})</option>
+          <option value="on">On in this project</option>
+          <option value="off">Off in this project</option>
+        </select>
       </Group>
       <Group title="Expose to the world" hint="Who can open a tunnel: the popup starts from it every time; emails and *@domains, or empty for anyone with the link">
         <input value={c.expose ?? ''} aria-label="Expose to the world" placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
@@ -1297,7 +1304,7 @@ function SimSection({ check, on, onOn }: { check: () => Promise<SimCheck[]>; on:
       <Group title="Side panel">
         <div className="setting-box">
           <Switch className="switch-row" on={on} onChange={onOn}>
-            <Says title="Simulator tab" hint="The side panel's Simulator: the booted simulators and adb's devices, one picked. Laki starts none: boot one in Simulator or Android Studio" />
+            <Says title="Simulator tab" hint="The side panel's Simulator: the booted simulators and adb's devices, one picked. Laki starts none: boot one in Simulator or Android Studio. A project's settings can turn it on or off just there" />
           </Switch>
         </div>
       </Group>
@@ -2981,7 +2988,7 @@ export function SettingsPage(p: {
               file={p.projectFile}
               rename={p.renameProjects}
               script={p.script}
-              global={{ actions: s.actions, templates: s.templates }}
+              global={{ actions: s.actions, templates: s.templates, simulator: s.simulator === true }}
               taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
