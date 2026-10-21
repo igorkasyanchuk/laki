@@ -491,6 +491,9 @@ async function openrouter(o: Opts) {
 }
 // one OpenRouter call with Settings › AI's key, no tools and no chat (a workflow's AI call block): its answer, logged
 // with its cost among Laki AI's calls (ask: what made it)
+// one OpenRouter call (aiComplete, aiDecide: workflows' blocks, memory's compaction) waits 5 minutes at most, its
+// caller's stop too (LAKI_AI_WAIT_MS: tests' shorter)
+const waitOf = (signal?: AbortSignal) => AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(Number(process.env.LAKI_AI_WAIT_MS) || 5 * 60_000)])
 export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string }) {
   const key = readKey()
   if (!key) throw new Error('no OpenRouter API key: Settings › AI')
@@ -502,7 +505,7 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
       // json: an answer that is a JSON object (out:'s), where the model can
       body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], usage: { include: true }, ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
-      signal: o.signal,
+      signal: waitOf(o.signal),
     })
     const j: any = await res.json().catch(() => ({}))
     if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
@@ -594,7 +597,7 @@ export async function aiDecide(o: { model: string; state: unknown; questions: ob
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
       body: JSON.stringify({ model: o.model, state: o.state, questions: o.questions }),
-      signal: o.signal,
+      signal: waitOf(o.signal),
     })
     const j: any = await res.json().catch(() => ({}))
     if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)

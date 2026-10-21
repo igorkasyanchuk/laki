@@ -107,3 +107,18 @@ test('memory compaction when full: once, not again while a run leaves it full; a
   await learn(MEMORY_MAX - 2, 100)
   assert.deepEqual(await rig.rpc('memoryTick', {}), [p.id], 'full again since the shorter list')
 })
+
+test("memory compaction: an OpenRouter that never answers ends at the wait (LAKI_AI_WAIT_MS; 5 minutes), nothing changed", async t => {
+  const srv = createServer(() => {}) // takes the request, never answers
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const rig = await fresh(t, { env: { LAKI_AI_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_AI_WAIT_MS: '500' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('memoryAdd', { project: p.id, text: 'one' })
+  await rig.rpc('memoryAdd', { project: p.id, text: 'two' })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc' })
+  const t0 = Date.now()
+  await assert.rejects(rig.rpc('memoryCompact', { project: p.id }), /timeout|timed out|aborted/i)
+  assert.ok(Date.now() - t0 < 10_000)
+  assert.equal((await rig.rpc('state')).projects[0].memory.length, 2)
+})

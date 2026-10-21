@@ -917,7 +917,8 @@ blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `L
 `ship` (its tab's `onExit`), `prAct`, `runDev`, `wsArchive`; outward ones (`OUTWARD`) `ask` `confirm` first unless
 `ask first: no`, a dry run says them. Extension blocks (`extension`: an id): `widgetUse` (reason `workflow`, the run's workspace for a scoped one), its data as
 `steps.<id>.data` and each top field `steps.<id>.<field>` (`ANSWER_MAX` each), an off one or a failed fetch the error exit. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),
-`<file>.url`), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, `model` or
+`<file>.url`), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, 5 minutes at most with
+`aiDecide` (`waitOf`, `LAKI_AI_WAIT_MS`: tests'), memory's compaction too, `model` or
 Settings' OpenRouter model, logged in `ai-calls.jsonl` as `<workflow> · <block>`), the answer `steps.<id>.answer`.
 Webhook blocks (`hook`): `fill` the URL (https; http only to 127.0.0.1, localhost, [::1]) and `header:` lines with the run's variables and `env.NAME` (Settings'
 and the project's env; the log masks them, shows the URL without its query), the body `from` a workspace file (realpath
