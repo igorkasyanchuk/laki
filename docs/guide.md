@@ -492,7 +492,8 @@ groups gets each new workspace in the group whose name fits it (a review in *Rev
 template starts it with that template, else it picks one of yours that plainly fits the task. The bubbles' window is
 the chat alone: no Calls, Info or cost (the app's AI page has them). The chat button at the window's bottom right (every
 page but AI, Settings, Help and Specs; Settings › AI › *Chat button* hides it) opens the same chat over what
-you're doing (drag its head to move it; a double-click puts it back), and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
+you're doing (drag its head to move it; a double-click puts it back). The – on the button's corner as you rest on
+it (or its right click) minimizes it into the status bar's end, where it stays until its right click floats it again; and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
 answer, and the tab's last 40 lines. It knows Laki's built-in tools too (timers, the stopwatch, reminders, Send later,
 Bird view…) and starts a timer, a stopwatch, a reminder or a Send later when you ask (*remind me about the login PR
 in an hour*). *Laki's skill*

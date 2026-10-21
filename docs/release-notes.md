@@ -10,6 +10,8 @@ version it builds, with the date. -->
   puts it back).
 - To-dos (experimental, Settings › General): one checklist of your own, Notion's way: headings, to-dos under others,
   dragged into order. The rail's To-dos, or in its ⋯ More.
+- The chat button at the bottom right minimizes into the status bar (the – on its corner, or its right click), so it
+  covers nothing; it stays there until its right click floats it again.
 - The side panel's Simulator: a booted iOS Simulator, an Android emulator or a phone on adb live in the panel; click
   to tap, drag to swipe, type, Home, Back, Lock, and a screenshot into the agent's prompt. Taps and typing on iOS need
   idb; a phone that waits for you to allow USB debugging is named. Off until Settings › Simulators turns it on, which

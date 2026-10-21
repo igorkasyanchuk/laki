@@ -60,6 +60,7 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
 type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
+const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 function AiFloat({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<FloatAt | null>(() => load<FloatAt | null>('laki.aiFloatAt', null))
@@ -393,6 +394,17 @@ export function App() {
   const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('laki.tabs', {})) // the focused pane's session
   const [aiFloat, setAiFloat] = useState(false) // the floating Laki AI chat, open
+  // its button minimized into the status bar (laki.aiDock) until put back; fly: on its way down or back up (DOCK_MS)
+  const [aiDock, setAiDock] = useState(() => load('laki.aiDock', false))
+  const [fly, setFly] = useState<'' | 'down' | 'up' | 'landed'>('')
+  const docked = (on: boolean) => {
+    const to = on ? 'landed' : 'up' // the status bar's item pops in, or the button rises back
+    setAiDock(on)
+    store('laki.aiDock', on || undefined)
+    setFly(to)
+    setTimeout(() => setFly(f => (f === to ? '' : f)), DOCK_MS)
+  }
+  const dock = (on: boolean) => (on && !matchMedia('(prefers-reduced-motion: reduce)').matches ? (setFly('down'), setTimeout(() => docked(true), DOCK_MS - 20)) : docked(on))
   // another app in front: the window's animations (spinners, lines, a look's effects) stop where they are, so a window
   // in sight but not in use draws only what changes (styles.css' html.away); the bubbles say who's at work meanwhile
   useEffect(() => {
@@ -3775,6 +3787,18 @@ export function App() {
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
+          {aiFab && aiDock && (
+            // the AI button minimized: here until its right click puts it back
+            <button
+              className={`sb-ai ${aiFloat ? 'on' : ''} ${fly}`}
+              data-tip={`${aiFloat ? 'Close Laki AI (Esc)' : 'Ask Laki AI about what is on screen'} · right click: float the button again`}
+              onClick={() => setAiFloat(o => !o)}
+              onContextMenu={e => openMenu(e, [{ label: 'Float the button again', icon: 'popOut', run: () => dock(false) }])}
+            >
+              <Icon name="ai" size={11} />
+              AI
+            </button>
+          )}
         </div>
         )}
         {aiFab && (
@@ -3784,9 +3808,18 @@ export function App() {
                 <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} />
               </AiFloat>
             )}
-            <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)}>
-              <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
-            </button>
+            {!aiDock && (
+              <div className={`ai-fab-wrap ${fly}`}>
+                <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => openMenu(e, [{ label: 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
+                  <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
+                </button>
+                {!aiFloat && (
+                  <button type="button" className="ai-fab-min" aria-label="Minimize to the status bar" data-tip="Minimize to the status bar" onClick={() => dock(true)}>
+                    <Icon name="minus" size={10} />
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>

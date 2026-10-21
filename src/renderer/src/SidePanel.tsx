@@ -758,7 +758,8 @@ function DeviceTab({ api }: { api: PanelApi }) {
     setFrame('')
     const next = async () => {
       if (!on) return
-      if (document.hidden) return void (t = setTimeout(next, 1000))
+      // back in sight: now (a hidden page's timers run once a minute after five)
+      if (document.hidden) return void document.addEventListener('visibilitychange', next, { once: true })
       const at = Date.now()
       let wait = SIM_GAP
       try {
@@ -771,7 +772,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
       if (on) t = setTimeout(next, Math.max(0, wait - (Date.now() - at)))
     }
     void next()
-    return () => ((on = false), clearTimeout(t))
+    return () => ((on = false), clearTimeout(t), document.removeEventListener('visibilitychange', next))
   }, [dev?.id])
   const choose = (id: string) => (setPick(id), localStore(SIM_PICK, id))
   const send = (p: { op: string; [k: string]: unknown }) => {

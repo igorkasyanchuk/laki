@@ -1059,8 +1059,9 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sim-screen { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: hidden; }
 .sim-screen img { max-width: 100%; max-height: 100%; border-radius: 18px; box-shadow: 0 0 0 1px var(--line), 0 8px 26px rgba(0, 0, 0, 0.3); cursor: pointer; touch-action: none; user-select: none; }
 .sim-screen.busy img { cursor: progress; }
-.sim-tools select { min-width: 0; max-width: 60%; }
-.sim-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 12.5px; padding: 0 4px; }
+.sim-tools { flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; } /* a narrow panel: the buttons under the device, not it cut to two letters */
+.sim-tools :is(select, .sim-name) { flex: 1 1 130px; min-width: 0; max-width: max-content; } /* wraps below 130px, else as wide as its name */
+.sim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 12.5px; padding: 0 4px; }
 .sim-type { border-top: 1px solid var(--line); border-bottom: none; }
 .sim-none { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 18px; text-align: center; }
 .sim-none > .icon-svg { color: var(--accent-ink); }
@@ -1564,14 +1565,28 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-window :is(.ai-tools, .ai-error, .ai-working) { margin-left: 0; }
 /* the floating chat (Settings › AI's Chat button): a round button in the main area's bottom right corner, over the
    status bar's line, and the AI window's chat in a panel above it; over pages too. Nearly opaque, no backdrop-filter */
-.ai-fab { position: absolute; right: 16px; bottom: 34px; z-index: 41; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--panel); color: var(--accent-ink); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28); cursor: pointer; transition: transform 0.12s, background 0.12s; }
+.ai-fab-wrap { position: absolute; right: 16px; bottom: 34px; z-index: 41; }
+.ai-fab { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--panel); color: var(--accent-ink); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28); cursor: pointer; transition: transform 0.12s, background 0.12s; }
 .ai-fab:hover { transform: scale(1.06); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); }
 .ai-fab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.app:has(.overlay) :is(.ai-fab, .ai-float) { visibility: hidden; } /* a dialog (z-index 10) is over everything else: the button too */
+.app:has(.overlay) :is(.ai-fab-wrap, .ai-float) { visibility: hidden; } /* a dialog (z-index 10) is over everything else: the button too */
 .ai-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.main:has(> .artifacts) > .ai-fab { bottom: 184px; } /* over the Artifacts strip, not on it */
+/* minimize: a small – on its corner while hovered, into the status bar (App's dock, DOCK_MS) */
+.ai-fab-min { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 18px; height: 18px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); opacity: 0; transform: scale(0.6); transition: opacity 0.12s, transform 0.12s; }
+.ai-fab-wrap:hover .ai-fab-min, .ai-fab-min:focus-visible { opacity: 1; transform: none; }
+.ai-fab-min:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--panel)); }
+.ai-fab-wrap.down { pointer-events: none; animation: ai-dock 0.32s cubic-bezier(0.55, 0, 0.75, 0.3) forwards; } /* down to the status bar's end, where its item lands */
+.ai-fab-wrap.up { animation: ai-dock 0.32s cubic-bezier(0.16, 1, 0.3, 1) reverse; }
+@keyframes ai-dock { to { bottom: 2px; right: 14px; opacity: 0; transform: scale(0.3); } }
+.status .sb-ai { position: sticky; right: 0; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 6px; border: none; border-radius: 9px; background: var(--side); box-shadow: -10px 0 8px -2px var(--side); color: var(--accent-ink); line-height: 18px; } /* a full bar's overflow goes under it, never it */
+.status .sb-ai:hover { background: color-mix(in srgb, var(--accent) 14%, var(--side)); }
+.status .sb-ai.on { background: var(--accent); color: var(--accent-fg); }
+.status .sb-ai.landed { animation: sb-ai-in 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes sb-ai-in { from { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.main:has(> .artifacts) > .ai-fab-wrap { bottom: 184px; } /* over the Artifacts strip, not on it */
 .main:has(> .artifacts) > .ai-float { bottom: 234px; height: min(620px, calc(100% - 260px)); }
-.main:has(> .settings-page) > .ai-fab { bottom: 16px; } /* a page covers the status bar (and the strip) */
+.main:has(> .settings-page) > .ai-fab-wrap { bottom: 16px; } /* a page covers the status bar (and the strip) */
+.main:has(.sim-type) > .ai-fab-wrap { bottom: 76px; } /* over the Simulator's typing row, not on its Return */
 .ai-float { position: absolute; right: 16px; bottom: 84px; z-index: 41; width: min(440px, calc(100% - 32px)); height: min(620px, calc(100% - 110px)); display: flex; border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--line)); border-radius: calc(var(--rs, 12px) + 4px); overflow: hidden; box-shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.18); background: var(--panel); transform-origin: 100% 100%; animation: ai-pop 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ai-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } } /* out of the button below it */
 html.away .ai-float { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
@@ -1588,7 +1603,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-grip.l, .ai-grip.r { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; } .ai-grip.l { left: -4px; } .ai-grip.r { right: -4px; }
 .ai-grip:is(.tl, .tr, .bl, .br) { width: 16px; height: 16px; } .ai-grip.tl { top: -5px; left: -5px; cursor: nwse-resize; } .ai-grip.br { right: -5px; bottom: -5px; cursor: nwse-resize; } .ai-grip.tr { top: -5px; right: -5px; cursor: nesw-resize; } .ai-grip.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
 .ai-float[class*='sizing-'], .ai-float[class*='sizing-'] * { user-select: none; } .ai-float:is(.sizing-t, .sizing-b) * { cursor: ns-resize !important; } .ai-float:is(.sizing-l, .sizing-r) * { cursor: ew-resize !important; } .ai-float:is(.sizing-tl, .sizing-br) * { cursor: nwse-resize !important; } .ai-float:is(.sizing-tr, .sizing-bl) * { cursor: nesw-resize !important; }
-@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-window::before { transition: none; } .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-fab-min, .ai-window::before { transition: none; } .ai-fab-wrap, .sb-ai, .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
 /* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
 @property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .ai-peek { position: fixed; z-index: 9; pointer-events: none; border-radius: var(--rs, 8px); box-shadow: inset 0 0 18px 3px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 48px 10px color-mix(in srgb, var(--tc-purple) 34%, transparent), inset 0 0 110px 24px color-mix(in srgb, var(--tc-pink) 16%, transparent); animation: ai-peek 2.6s ease-out forwards; }

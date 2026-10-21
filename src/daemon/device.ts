@@ -155,6 +155,12 @@ async function droidDevices() {
     if (m?.[2] === 'unauthorized') asks.push(m[1])
     else if (m) ready.push({ serial: m[1], name: /model:(\S+)/.exec(m[3])?.[1]?.replace(/_/g, ' ') ?? m[1] })
   }
+  // an emulator by its virtual device (Pixel 10 API 37), not its model (sdk gphone64 arm64); its first line, then OK
+  await Promise.all(
+    ready
+      .filter(d => /^emulator-\d+$/.test(d.serial))
+      .map(d => adb(d.serial, ['emu', 'avd', 'name']).then(r => void ((n => n && n !== 'OK' && (d.name = n.replace(/_/g, ' ')))(String(r.stdout).split(/\r?\n/)[0].trim())), () => {})),
+  )
   return { ready, asks }
 }
 const asking = (serial: string) => `${serial} waits for you to allow USB debugging on it`
