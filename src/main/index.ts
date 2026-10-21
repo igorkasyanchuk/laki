@@ -19,6 +19,11 @@ const dev = !!process.env.ELECTRON_RENDERER_URL
 const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''
 const appPage = (url: string | undefined) => !!url && (dev ? URL.canParse(url) && new URL(url).origin === devOrigin : url.startsWith('file:'))
 const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => e.sender.getType() === 'window' && e.senderFrame === e.sender.mainFrame && appPage(e.senderFrame?.url)
+// from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
+// tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
+type Page = 'new' | 'ai' | 'tab' | 'voice'
+const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: Page[]) =>
+  fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : URL.canParse(e.senderFrame!.url) && new URL(e.senderFrame!.url).searchParams.get('window') === p)))
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
 // none reach a launch from Finder or the Dock
 const capture = app.commandLine.getSwitchValue('laki-capture')
@@ -53,12 +58,14 @@ app.on('open-url', (e, url) => {
   e.preventDefault()
   if (url.startsWith('laki:')) openLink(url)
 })
-ipcMain.on('shot-ready', () => {
+ipcMain.on('shot-ready', e => {
+  if (!from(e)) return
   shotReady = true
   if (shot) win?.webContents.send('shot', ...shot)
   shot = null
 })
-ipcMain.on('deep-link-ready', () => {
+ipcMain.on('deep-link-ready', e => {
+  if (!from(e)) return
   linkReady = true
   if (link) win?.webContents.send('deep-link', link)
   link = null
@@ -282,7 +289,8 @@ function accelOf(label: string) {
   return [m[1] && 'Control', m[2] && 'Alt', m[3] && 'Shift', m[4] && (mac ? 'Command' : 'Super'), ACCEL_KEYS[m[5]] ?? m[5]].filter(Boolean).join('+')
 }
 let hotkey = ''
-ipcMain.handle('hotkey', (_e, label: unknown) => {
+ipcMain.handle('hotkey', (e, label: unknown) => {
+  if (!from(e)) return false
   const a = typeof label === 'string' ? accelOf(label) : ''
   if (a !== hotkey) {
     if (hotkey) globalShortcut.unregister(hotkey)
@@ -329,8 +337,8 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
 })
 
 // a timer's end with its dialog (Settings › General › Timers): one of macOS's sounds, whatever notifications say
-ipcMain.on('sound', (_e, name: string) => {
-  if (typeof name === 'string' && /^[A-Za-z]+$/.test(name)) execFile('afplay', [`/System/Library/Sounds/${name}.aiff`], () => {})
+ipcMain.on('sound', (e, name: string) => {
+  if (from(e) && typeof name === 'string' && /^[A-Za-z]+$/.test(name)) execFile('afplay', [`/System/Library/Sounds/${name}.aiff`], () => {})
 })
 
 // the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
@@ -397,12 +405,13 @@ ipcMain.handle('browse', async (e, r: Browse) => {
   return { url: wc.getURL(), title: wc.getTitle() }
 })
 ipcMain.handle('pick-folder', async e => {
+  if (!from(e)) return null
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender) ?? win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button
   return r.canceled ? null : r.filePaths[0]
 })
 // macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
-ipcMain.on('dictate', () => Menu.sendActionToFirstResponder('startDictation:'))
-ipcMain.on('dictation-settings', () => shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension'))
+ipcMain.on('dictate', e => from(e, 'new', 'ai', 'voice') && Menu.sendActionToFirstResponder('startDictation:'))
+ipcMain.on('dictation-settings', e => from(e, 'new', 'ai') && shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension'))
 // Full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone in the window, the window full screen too; off: full
 // screen only if it was before. focusFull: that, while it's on (what the window's saved state keeps)
 let focusFull: boolean | null = null
@@ -413,7 +422,8 @@ ipcMain.on('full-screen', (e, on: boolean) => {
   if (!on) focusFull = null
 })
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
-ipcMain.on('glass', (_e, on: boolean) => {
+ipcMain.on('glass', (e, on: boolean) => {
+  if (!from(e)) return
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })
@@ -454,7 +464,8 @@ function trayMenu() {
   )
 }
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
-ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = [], on = true) => {
+ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true) => {
+  if (!from(e)) return
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
   if (!on) return void (tray?.destroy(), (tray = null))
@@ -750,7 +761,7 @@ function aiWin() {
 // pane, which says where it went meanwhile (floating), shows it again
 const tabWins = new Map<string, BrowserWindow>()
 const floating = () => win?.webContents.send('floating', [...tabWins.keys()])
-ipcMain.handle('floating', () => [...tabWins.keys()])
+ipcMain.handle('floating', e => (from(e) ? [...tabWins.keys()] : []))
 ipcMain.on('tab-float', (e, tab: unknown, on: unknown) => {
   if (e.sender !== win?.webContents || typeof tab !== 'string' || !/^[\w-]{1,64}$/.test(tab)) return
   const had = tabWins.get(tab)
@@ -997,7 +1008,8 @@ ipcMain.handle('capture-rect', async (e, r: { x: unknown; y: unknown; width: unk
 })
 // a part of the screen for a prompt (the Desk's Build with AI): screenshot's, the PNG back in base64; null: cancelled
 ipcMain.handle('shoot', e => (!win || e.sender !== win.webContents ? null : new Promise<string | null>(done => screenshot(true, undefined, done, () => done(null)))))
-ipcMain.on('open-external', (_e, url: string) => {
+ipcMain.on('open-external', (e, url: string) => {
+  if (!from(e, 'new', 'ai', 'tab') || typeof url !== 'string') return
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
   else if (typeof url === 'string' && url.startsWith('laki:')) openLink(url) // the AI window's link to a tab: the app window, there
 })
