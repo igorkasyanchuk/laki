@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { chatOf, shareBody, shareMd } from '../src/daemon/share.ts'
+import { chatOf, redact, shareBody, shareMd } from '../src/daemon/share.ts'
 import { fresh, until } from './helpers.ts'
 
 const line = (o: object) => `${JSON.stringify(o)}\n`
@@ -52,6 +52,23 @@ test('share: transcripts as what was said, Markdown, the page escaped', () => {
   assert.ok(!body.includes('javascript:') && body.includes('<a href="https://x.dev" target="_blank" rel="noopener noreferrer nofollow">site</a>'), 'links: http(s) only')
   assert.match(body, /<details class="tools" open><summary>2 tool calls<\/summary><div>Bash: npm test<\/div><div>Read: \/r\/a.ts<\/div><\/details>/)
   assert.equal(shareBody('x', []), '<p class="empty">Nothing here yet.</p>')
+})
+
+test('share: token-shaped strings masked; a picture shown as its link (L9)', () => {
+  const said = [
+    'export OPENAI_API_KEY=sk-proj-abcdefghijklmnop1234',
+    'gh auth token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123',
+    'curl -H "Authorization: Bearer abcdefghijklmnopqrstuvwx" https://x.dev/api?token=s3cr3t&page=2',
+    'AKIAIOSFODNN7EXAMPLE and xoxb-1234567890-abcdef and eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.abcdefghijkl',
+  ].join('\n')
+  const out = redact(said)
+  for (const s of ['sk-proj-abcdefghijklmnop1234', 'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123', 'abcdefghijklmnopqrstuvwx', 's3cr3t', 'AKIAIOSFODNN7EXAMPLE', 'xoxb-1234567890-abcdef', 'eyJhbGciOiJIUzI1NiJ9']) assert.ok(!out.includes(s), s)
+  assert.match(out, /Bearer ••••/)
+  assert.match(out, /\?token=••••&page=2/)
+  assert.equal(redact('git push origin main; npm test'), 'git push origin main; npm test') // plain words stay
+  const body = shareBody('Claude', [{ who: 'agent', text: 'Look: ![the chart](https://evil.example/pixel.png)' }])
+  assert.doesNotMatch(body, /<img/)
+  assert.match(body, /<a href="https:\/\/evil\.example\/pixel\.png"[^>]*>the chart<\/a>/)
 })
 
 test('share: a tab read-only at its link, kept up to date; the API out of its reach; stopped with the tab', async t => {

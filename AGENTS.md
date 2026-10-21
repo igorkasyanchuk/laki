@@ -687,7 +687,8 @@ shutdown). In memory only (`shares`), like tunnels; the view's `TabView.share` i
 (at most every 1.5 s, on a request): claude's or codex's transcript (`transcriptOf`: the tab's account's folder, else
 the agent's own; read on from `pos`, whole lines, into `said` by `chatOf`), else `screen` (5000 lines); a change bumps
 `v`. `shareMd` (Copy, Download), `shareBody`/`sharePage` (`shared/markdown.ts`' tree, every string escaped, links
-http(s)/mailto only; a CSP with a nonce, no inline styles); the page asks `.json?v=` every 2.5 s and swaps `main`
+http(s)/mailto only, a picture as its link; a CSP with a nonce, no inline styles, `img-src data:`); what was said goes
+through `redact` first (L9: `SECRETS`' token shapes as ••••); the page asks `.json?v=` every 2.5 s and swaps `main`
 (a LIVE badge, ENDED or OFFLINE when it can't; chat bubbles, the prompts on the right; `#latest`, *New below*,
 when something comes under where the reader is; a footer). Its `sub`: *Live · view-only · updates as it goes*.
 Tested in `test/share.test.ts`.

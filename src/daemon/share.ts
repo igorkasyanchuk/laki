@@ -76,6 +76,15 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
   return out
 }
 
+// L9: token-shaped strings masked in what a share shows (its page and Markdown): API keys (sk-…, GitHub's, Slack's, AWS's
+// key ids), a Bearer token, a JWT, a token's, key's or secret's value in a URL. ponytail: shapes, not every secret
+const SECRETS: [RegExp, string][] = [
+  [/\b(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|(?:AKIA|ASIA)[0-9A-Z]{16})\b/g, '••••'],
+  [/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, '$1••••'],
+  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '••••'],
+  [/([?&](?:token|access_token|key|api_key|apikey|secret|password|auth|sig|signature)=)[^&\s"'#<>]+/gi, '$1••••'],
+]
+export const redact = (t: string) => SECRETS.reduce((s, [re, to]) => s.replace(re, to), t)
 const fence = (t: string) => (f => `${f}\n${t}\n${f}`)('`'.repeat(Math.max(3, ...[...t.matchAll(/`+/g)].map(m => m[0].length + 1))))
 export function shareMd(title: string, agent: string, said: Said[]) {
   const parts = [`# ${title}`]
@@ -101,7 +110,9 @@ export function shareBody(agent: string, said: Said[]) {
         const n = s.text.split('\n').length
         return `<details class="tools"${n <= 3 ? ' open' : ''}><summary>${n} tool call${n === 1 ? '' : 's'}</summary>${lines}</details>`
       }
-      return `<section class="m ${s.who}"><div class="who">${s.who === 'you' ? 'You' : esc(agent)}</div><div class="md">${markdownHtml(s.text)}</div></section>`
+      // a picture as its link: the page loads nothing from elsewhere (its CSP: img-src data:)
+      const md = markdownHtml(s.text).replace(/<img src="([^"]*)" alt="([^"]*)"[^>]*>/g, (_, src, alt) => `<a href="${src}" target="_blank" rel="noopener noreferrer nofollow">${alt || src}</a>`)
+      return `<section class="m ${s.who}"><div class="who">${s.who === 'you' ? 'You' : esc(agent)}</div><div class="md">${md}</div></section>`
     })
     .join('')
 }

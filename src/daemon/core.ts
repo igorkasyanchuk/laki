@@ -16,7 +16,7 @@ import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
-import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
+import { chatOf, redact, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
@@ -3186,7 +3186,8 @@ async function shareRead(s: ShareRun) {
     key = text
   }
   if (key === s.key && s.title === tab.name) return
-  Object.assign(s, { key, title: tab.name, md: shareMd(tab.name, name, said), body: shareBody(name, said), v: s.v + 1 })
+  const shown = said.map(x => ({ ...x, text: redact(x.text) })) // token-shaped strings masked (L9)
+  Object.assign(s, { key, title: tab.name, md: shareMd(tab.name, name, shown), body: shareBody(name, shown), v: s.v + 1 })
 }
 
 async function shareServe(q: IncomingMessage, r: ServerResponse) {
@@ -3205,7 +3206,7 @@ async function shareServe(q: IncomingMessage, r: ServerResponse) {
   }
   if (m[2] === '.json') return void r.writeHead(200, { ...head, 'content-type': 'application/json' }).end(JSON.stringify({ v: s.v, title: s.title, sub: s.sub, ...(Number(u.searchParams.get('v')) !== s.v && { body: s.body }) }))
   const nonce = randomBytes(16).toString('base64')
-  const csp = `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+  const csp = `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
   r.writeHead(200, { ...head, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp }).end(sharePage({ id: s.id, title: s.title, sub: s.sub, body: s.body, v: s.v, nonce }))
 }
 

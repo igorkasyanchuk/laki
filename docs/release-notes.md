@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A shared tab masks what looks like a token or a key (sk-…, ghp_…, a Bearer token, a JWT, ?token= in a URL) and shows
+  pictures as links, and its popover says commands and output are shared as they are.
 - Phone pushes can send only who needs you (Settings › Phone pushes › What it sends): no question, choices or command
   from the agent's screen.
 - The app can't be started with --inspect or NODE_OPTIONS any more (Electron's fuses), so another program can't run

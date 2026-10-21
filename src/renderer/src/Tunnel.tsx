@@ -288,7 +288,7 @@ export function SharePop({ name, share, api, onClose }: { name: string; share?: 
             </label>
           ))}
         </div>
-        <p className="muted small">A view-only page of {name} at a random trycloudflare.com link: anyone who gets it watches it live, and can't type into it. Needs cloudflared (brew install cloudflared).</p>
+        <p className="muted small">A view-only page of {name} at a random trycloudflare.com link: anyone who gets it watches it live, and can't type into it. Commands and their output are shared as they are; Laki masks what looks like a token or a key, not every secret. Needs cloudflared (brew install cloudflared).</p>
         <div className="buttons">
           <span className="grow" />
           <button type="submit" className="primary" disabled={busy}>

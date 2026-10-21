@@ -423,7 +423,9 @@ anyone with the link can read, at a random `https://….trycloudflare.com/s/<id>
 agent's tab shows its chat (Claude Code's and Codex's: your prompts, its answers, its tool calls folded a line each);
 any other tab (a shell, a server, another agent) its terminal's text, in chat bubbles under a *LIVE* badge. It updates as
 you go on (every few seconds), follows the end while the reader is there (further up, *New below* takes them down), and has *Copy as Markdown*, *Download .md* and a *Tool calls* switch. Nobody can type into it,
-and the tunnel reaches these pages only, never the rest of Laki. A shared tab has a globe; its right click ›
+and the tunnel reaches these pages only, never the rest of Laki. Commands and output are shared as they are: Laki
+masks what looks like a token or a key (`sk-…`, `ghp_…`, a Bearer token, a JWT, `?token=` in a URL), not every
+secret, and shows pictures as links. A shared tab has a globe; its right click ›
 *Shared live view* copies or opens the link, or stops sharing. Closing the tab, archiving its workspace or stopping
 the daemon stops it too, and the link is dead after (a new share is a new link). Resources lists its cloudflared as
 *Shared tabs*.
