@@ -792,6 +792,8 @@ and commit it. Folders and one-file extensions both work.
   can't be deleted, rewritten or edited here (change it in the repo); *Remix* copies it into yours. Removing the project
   hides it; its settings stay.
 - Agents never turn it on, nor clear *changed*.
+- `laki widget dev` (or Settings' folders) on `.laki/extensions` or a folder inside it keeps it the repo's: its id,
+  off until you look.
 - It's read from the project's own folder: a branch's change to `.laki/extensions` in a worktree shows once it reaches
   that folder. A project on an SSH host isn't read.
 

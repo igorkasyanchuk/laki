@@ -189,3 +189,17 @@ test("a repo's extension's links: one to a folder inside is followed (a change t
   const w4 = await rig.rpc('widgetWhat', { id: `${p.id}.big` })
   await assert.rejects(rig.rpc('widgetSet', { id: `${p.id}.big`, on: true, seen: w4.hash }), /can't be trusted: more than 2000 files/)
 })
+
+test("laki widget dev linking a repo's .laki/extensions (or one inside it) keeps them the repo's: <project>.<id>, off until you look", async t => {
+  const rig = await fresh(t)
+  const d = ext(rig.repo, 'deploys', { name: 'Deploys', fetch: 'echo "{}"' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  for (const folder of [join(rig.repo, '.laki', 'extensions'), d]) {
+    const r = await rig.rpc('widgetDev', { folder })
+    assert.deepEqual(r.widgets.map((w: any) => [w.id, w.on]), [[`${p.id}.deploys`, false]], folder)
+    const ids = (await rig.rpc('state')).widgets.map((w: any) => w.id)
+    assert.ok(ids.includes(`${p.id}.deploys`) && !ids.includes('deploys'), 'never a plain one')
+    await assert.rejects(rig.rpc('widgetSet', { id: `${p.id}.deploys`, on: true }), /comes with .*'s repo: look at what it runs first/)
+    await rig.rpc('widgetDev', { off: folder })
+  }
+})

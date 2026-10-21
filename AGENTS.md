@@ -1468,7 +1468,8 @@ the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when 
 *Can hold*), `widgetWhat`'s text.
 
 Repo extensions (`test/widget-repo.test.ts`): `repoRoots` (each project not `kind` nor `host`: `<path>/.laki/extensions`,
-its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scanWidgets`, each an `Entry` with `project`
+its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scanWidgets` (a dev or `widgetDirs` root
+under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` leaves them off), each an `Entry` with `project`
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's

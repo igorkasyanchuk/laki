@@ -128,6 +128,15 @@ export const widgetRoots = () => [...devRoots(), widgetHome(), ...(state.setting
 // each usable project's .laki/extensions (as workflows' .laki/workflows), read from its own folder. ponytail: a
 // branch's change to them in a worktree isn't read until it reaches the project's folder
 const repoRoots = () => state.projects.filter(p => !p.kind && !p.host).map(p => ({ root: join(p.path, '.laki', 'extensions'), project: p.id }))
+// a folder of yours (dev's, Settings') inside a project's .laki/extensions: still that repo's (its id, its trust)
+const realOf = (d: string) => {
+  try {
+    return realpathSync(d)
+  } catch {
+    return d
+  }
+}
+const repoOf = (root: string) => repoRoots().find(r => under(root, r.root) || under(realOf(root), realOf(r.root)))?.project
 
 function readJson<T>(p: string): T | undefined {
   try {
@@ -398,7 +407,7 @@ export function scanWidgets() {
   rev++
   const dev = devRoots()
   // yours first, then the repos' (<project>.<id>: never over yours), then Laki's own
-  const roots: { root: string; project?: string }[] = [...widgetRoots().filter(r => r !== BUILTIN).map(root => ({ root })), ...repoRoots(), ...(BUILTIN ? [{ root: BUILTIN }] : [])]
+  const roots: { root: string; project?: string }[] = [...widgetRoots().filter(r => r !== BUILTIN).map(root => ({ root, project: repoOf(root) })), ...repoRoots(), ...(BUILTIN ? [{ root: BUILTIN }] : [])]
   for (const { root, project } of roots)
     for (const { d, file } of foldersIn(root)) {
       const id = project ? `${project}.${idOf({ d, file })}` : idOf({ d, file })
@@ -2420,7 +2429,7 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
   const mine = [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder))
   const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you turn them on (one that shadows an installed one too: they share its store)
   for (const w of mine)
-    if (onOf(w) === agent) {
+    if (onOf(w) === agent && !(w.project && !agent)) { // a repo's stays off until you look (widgetWhat)
       writeStore(w.id, { ...readStore(w.id), on: !agent })
       w.s = { ...w.s, on: !agent }
       if (agent) ungrant(w.id), stopAgents(w.id)
