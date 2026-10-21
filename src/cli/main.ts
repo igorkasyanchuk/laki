@@ -494,8 +494,8 @@ async function main() {
       if (sub === 'new') {
         const name = rest.slice(1).join(' ')
         if (!name) throw new Error(`usage: laki widget new <name> [--kind ${STARTER_KINDS.join('|')}] [--dir <folder>]`)
-        const r: { id: string; dir: string; found: boolean; repo?: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
-        return out(r, [`made ${r.id} in ${r.dir}${r.repo ? `: the repo's, off until you look (laki widget what ${r.id})` : r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
+        const r: { id: string; dir: string; found: boolean; repo?: boolean; note?: string } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined, from: caller() }, 130000)
+        return out(r, [`made ${r.id} in ${r.dir}${r.repo ? `: the repo's, off until you look (laki widget what ${r.id})` : r.note ? `: ${r.note}` : r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
       }
       if (sub === 'check') {
         const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
@@ -638,7 +638,7 @@ async function main() {
       }
       if (sub === 'restore') {
         if (!id) throw new Error('usage: laki widget restore <trash-id> (laki widget trash lists them)')
-        const w: WidgetView = await rpc('widgetRestore', { trash: id })
+        const w: WidgetView = await rpc('widgetRestore', { trash: id, from: caller() })
         return out(w, `restored ${w.id}${w.dir ? ` in ${w.dir}` : ''}${w.on ? ', on' : ''}`)
       }
       if (sub === 'remix') {

@@ -256,8 +256,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
   never `on: true`, `net: true`, `source`, `ai` or a secret setting; a place it doesn't know is refused), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on; Widgets.tsx' `act` likewise
 refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
-  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
-  clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on),
+  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off and its grants dropped; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on; `from` an agent: off, nothing run, a `note`),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
@@ -498,8 +498,9 @@ Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a hos
 `/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
 `$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents.
 Other modules add commands through `pluginFiles` (core can't import them): skill.ts' `commands/extension.md`,
-`/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command and `laki
-widget` allowed. Its hooks run `laki hook <state>`, using an absolute
+`/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command, only you start
+it (`disable-model-invocation`), and only `READ_ONLY`'s `laki widget` subcommands allowed unasked (N10: new, dev, set,
+on and the rest ask in Claude's own prompt). Its hooks run `laki hook <state>`, using an absolute
 node/Electron path and the CLI's path, and map to states:
 
 | hook | state |
@@ -1251,7 +1252,11 @@ as JSON (the icon element, a button, the rail); the CLI's `laki widget kit icons
 Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widgetRuns` every 500 ms, a line per new run
 and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT`; `settingsSet` rescans as it changes,
 like `widgetDirs`), `devRoots` first in `widgetRoots` (a dev copy shadows the installed one of its id, sharing its
-store), linking turns its widgets on and fetches them (`dev`, why `linked`). `watchDev` (from `scanWidgets`):
+store), linking turns its widgets on and fetches them (`dev`, why `linked`). An agent's link (N10, `agentCaller`):
+`settings.widgetDevAgent` (`SETTINGS_KEPT`; only `widgetDev` writes it: `settingsSet` `own`), its widgets off and an
+`Entry`'s `agentDev`, trusted as a repo's (`guarded`: on only with `seen`, `trusted`/`files`, `untrust` as they change,
+`repoBad`; one that shadows an installed one that's on goes off at its scan, never inheriting it; the view's `agentDev`,
+App's `repoSheet`); your own link of it makes it yours again. `watchDev` (from `scanWidgets`):
 `fs.watch` recursive per root (a one-file root: its folder, for its name: a save by rename ends a file's watch), 300 ms debounce, `devChanged`: `scanWidgets` again, then each of its widgets fetched
 (reason `dev`, why: the files). `scanWidgets` keeps the entry it had (`before`) when a dev widget's `manifestOf` or
 `templatesError` (shared/widget.ts `templateError`, widget.html's and every `ui` string) fails, with `devError` (the
@@ -1534,7 +1539,7 @@ files changed while you were asked*: not run, no Always).
 `approve` (the ask) is shared with `widgetAction`'s `from`: core's `agentCaller` (`from.tab` an agent tab, or a shell tab in
 `shellAgents`; `laki new`'s `byCaller` too) makes a tool's action a `widgetToolCall` (its arg as JSON input) and any other
 ask each time (`ask: 'always'`: no Always); `widgetSet` `on: true` from one is refused, `widgetDev` from one links but leaves
-them off, `widgetCheck` from one runs no off one. ponytail: the same user can read daemon.json's token. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
+them off (and guarded: `agentDev`), `widgetNew` and `widgetRestore` from one make them off, `widgetCheck` from one runs no off one. ponytail: the same user can read daemon.json's token. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
 `tool:<action>` with who and how), its stdout back (`TOOL_OUT`, 16 KB). Grants go with the extension off, its commands
 changed (`cmdsOf` at scan) or a workspace gone; `widgetGrantRm` is Settings' Revoke. App's `toolAsk`: `choose` (Allow
 once, *Always in <ws>* for first, Deny; Esc and a newer dialog: deny) and a notification with the same actions

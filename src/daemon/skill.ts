@@ -238,11 +238,15 @@ description: Make Laki extensions, also called widgets (one and the same thing),
 ---
 
 ${widgetGuide(`Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`.`)}`
+// N10: only you start it (disable-model-invocation), and it runs unasked only what reads: new, dev, set, on, write and
+// the rest ask you in Claude's own prompt
+const READ_ONLY = ['ls', 'kit', 'check', 'what', 'logs', 'render', 'events', 'tools']
 pluginFiles.push(() => ({
   'claude-plugin/commands/extension.md': `---
 description: Make or change a Laki extension (a widget): a live tile, a bar item or a button in Laki
 argument-hint: <what it shows or does>
-allowed-tools: Bash(${LAKI_CLI} widget:*)
+allowed-tools: ${READ_ONLY.map(c => `Bash(${LAKI_CLI} widget ${c}:*)`).join(', ')}
+disable-model-invocation: true
 ---
 Make or change a Laki extension for this request: $ARGUMENTS
 

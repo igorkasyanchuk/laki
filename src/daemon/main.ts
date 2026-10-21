@@ -436,7 +436,7 @@ const remoteNo = (method: string, p: any) =>
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore'])
 const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowTrust'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client with no Origin: its socket

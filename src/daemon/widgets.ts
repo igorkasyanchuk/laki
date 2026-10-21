@@ -35,7 +35,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[] } // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
-type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
+type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; agentDev?: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on); agentDev: one an agent linked (settings.widgetDevAgent): trusted as a repo's
 // scope workspace: an instance per live workspace, its data in <data>/widget-data/<id>/ws/<wsId>.json (the settings stay
 // the store's, shared); in memory its last fetch and its button's words
 type Inst = { data?: unknown; at?: number; error?: string; mock?: string; told?: string; fails?: number } // fails: fetches failed in a row (due backs off)
@@ -127,6 +127,8 @@ const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : 
 export const widgetHome = () => join(dir, 'widgets')
 // dev mode's folders (settings.widgetDev, laki widget dev): first, so a copy you work on shadows the installed one
 const devRoots = () => [...new Set((state.settings?.widgetDev ?? []).map(d => String(d).trim()).filter(Boolean).map(d => resolve(home(d))))]
+// N10: the ones an agent linked (only widgetDev writes it): their code is the agent's, trusted as a repo's (guarded)
+const agentRoots = () => (state.settings?.widgetDevAgent ?? []).map(d => resolve(home(String(d))))
 const under = (d: string, root: string) => d === root || d.startsWith(root + '/')
 export const widgetRoots = () => [...devRoots(), widgetHome(), ...(state.settings?.widgetDirs ?? []).map(d => String(d).trim()).filter(Boolean).map(d => resolve(home(d))), ...(BUILTIN ? [BUILTIN] : [])]
 // each usable project's .laki/extensions (as workflows' .laki/workflows), read from its own folder. ponytail: a
@@ -195,6 +197,10 @@ const instOk = (x: Workspace) => !x.archived && !x.host && !state.projects.find(
 // a repo's extension (.laki/extensions) is its project's only: shown, fetched, run and asked there
 const inProj = (w: Entry, x?: Workspace) => !w.project || x?.project === w.project
 const projName = (w: Entry) => state.projects.find(p => p.id === w.project)?.name ?? w.project
+// on only after a look (seen), off again once its files change: a repo's, or one in a folder an agent linked
+const guarded = (w: Entry) => !!w.project || !!w.agentDev
+const whence = (w: Entry) => (w.project ? `comes with ${projName(w)}'s repo` : 'is in a folder an agent linked')
+const where = (w: Entry) => (w.project ? `in ${projName(w)}'s repo` : 'in the folder an agent linked')
 const repoSays = (w: Entry, what: string) => `${w.m.name || w.id} is in ${projName(w)}'s .laki/extensions: ${what} there`
 // the workspace a call names: required for a scope workspace one, refused for a global one
 function wsOf(w: Entry, ws: unknown): Workspace | undefined {
@@ -427,12 +433,13 @@ export function scanWidgets() {
       }
       if (typeof m === 'string') continue
       const { data, ...s } = moveSecrets(id, m)
-      const e: Entry = { id, dir: d, file, ...(project && { project }), builtin: !project && !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s, inst: new Map(), fixtures: file ? [] : fixtureNames(d).map(n => n.slice(0, -5)) }
+      const agentDev = isDev && !project && agentRoots().some(r => under(pathOf({ d, file }), r))
+      const e: Entry = { id, dir: d, file, ...(project && { project }), ...(agentDev && { agentDev }), builtin: !project && !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s, inst: new Map(), fixtures: file ? [] : fixtureNames(d).map(n => n.slice(0, -5)) }
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
-      const rf = project && e.s.on && !e.file ? repoFiles(e) : undefined
-      if (project && e.s.on && (e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)) untrust(e, rf?.names) // changed in the repo since you turned it on
+      const rf = guarded(e) && e.s.on && !e.file ? repoFiles(e) : undefined
+      if (guarded(e) && e.s.on && (e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)) untrust(e, rf?.names) // changed since you turned it on; an agent's that shadows one on: never its on
     }
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
@@ -460,8 +467,8 @@ function untrust(e: Entry, names?: string[]) {
   stopStream(e.id)
   stopAgents(e.id)
   ungrant(e.id)
-  wLog(e, `its files changed in ${projName(e)}'s .laki/extensions${which}: off until you look`, 'warn')
-  broadcast({ ev: 'widget-say', widget: e.id, notify: `from ${projName(e)} changed${which}: off until you look` }) // App: a toast and a notification, its name first
+  wLog(e, `its files changed ${e.project ? `in ${projName(e)}'s .laki/extensions` : 'in the folder an agent linked'}${which}: off until you look`, 'warn')
+  broadcast({ ev: 'widget-say', widget: e.id, notify: `${e.project ? `from ${projName(e)} changed` : 'changed in the folder an agent linked'}${which}: off until you look` }) // App: a toast and a notification, its name first
 }
 // each project's .laki/extensions watched (recursive), a second after the last change read again (scanWidgets: a
 // changed one goes off). ponytail: a folder made after the scan is read at the next one (a project added, a reload)
@@ -663,7 +670,8 @@ export const widgetsView = (): WidgetView[] =>
     gates: (g => (g.length ? g : undefined))([...new Set(gatesOf(w).flatMap(([, x]) => gateOf(x)))]),
     project: w.project,
     repo: w.project && projName(w),
-    changed: w.s.changed,
+    agentDev: w.agentDev,
+    changed: (guarded(w) && w.s.changed) || undefined,
     ...(w.dir === join(widgetHome(), w.id) && (h => h.length && { history: h })(historyOf(w.id))),
     dev: w.dev || undefined,
     devError: w.devError,
@@ -787,12 +795,12 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   }
   // seen: the files hash of what the user was shown (the studio's Turn on): on only while it's still that
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
-  // a repo's: on only after a look (laki widget what's hash), and trusted as its files are now
-  if (o.on === true && w.project && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} comes with ${projName(w)}'s repo: look at what it runs first (laki widget what ${w.id})`)
+  // a repo's (an agent-linked one's): on only after a look (laki widget what's hash), and trusted as its files are now
+  if (o.on === true && guarded(w) && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} ${whence(w)}: look at what it runs first (laki widget what ${w.id})`)
   const bad = o.on === true && repoBad(w)
   if (bad) throw new Error(`${w.m.name || w.id} can't be trusted: ${bad}`)
   const s = readStore(w.id)
-  if (o.on === true && w.project && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), files: eachHash(w), changed: undefined })
+  if (o.on === true && guarded(w) && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), files: eachHash(w), changed: undefined })
   if (o.ai) {
     // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
     if (w.builtin || w.dir !== join(widgetHome(), w.id)) throw new Error(`${w.m.name ?? w.id} isn't in Laki's folder: Laki AI can't change it`)
@@ -900,7 +908,7 @@ export function widgetWhat(id: string) {
   const fence = '`'.repeat(Math.max(3, ...[...(code ?? '').matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run in it
   const events = Object.keys(w.m.on ?? {}).map(e => `\`${e.replace(/`/g, '')}\``) // its actions run on these, unclicked
   const holds = [...new Set(gatesOf(w).flatMap(([, a]) => gateOf(a)))] // its gates: it can hold these
-  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}${holds.length ? `\n\nIt can hold a workspace's ${holds.join(', ')}: its gate runs before each.` : ''}${w.project ? repoShown(w) : ''}`
+  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}${holds.length ? `\n\nIt can hold a workspace's ${holds.join(', ')}: its gate runs before each.` : ''}${guarded(w) ? repoShown(w) : ''}`
   return { name: w.m.name || w.id, on: onOf(w), text, hash }
 }
 
@@ -983,10 +991,10 @@ const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
 // a repo's extension runs only as you said yes to it: its files changed since (a pull, before the watch's scan) turn it
 // off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
 function trusted(w: Entry) {
-  const rf = w.project && !w.file ? repoFiles(w) : undefined // one listing for both
-  if (!w.project || (w.s.trusted === dirHash(w, false, rf?.names) && !rf?.bad)) return
+  const rf = guarded(w) && !w.file ? repoFiles(w) : undefined // one listing for both
+  if (!guarded(w) || (w.s.trusted === dirHash(w, false, rf?.names) && !rf?.bad)) return
   if (w.s.on) untrust(w, rf?.names)
-  throw new Error(`${w.m.name || w.id} changed in ${projName(w)}'s repo: off until you look`)
+  throw new Error(`${w.m.name || w.id} changed ${where(w)}: off until you look`)
 }
 function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '', ms?: number) {
   try {
@@ -1185,7 +1193,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const meta = metaOf(w, x?.id)
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   const once = o.once === true && !onOf(w)
-  if (!onOf(w) && (w.project || (!once && !(force && w.s.by !== 'ai')))) return { ok: false, error: w.project ? `${OFF(w)}: it comes with ${projName(w)}'s repo, look at what it runs (laki widget what ${w.id})` : OFF(w) } // a repo's: never once, unlooked
+  if (!onOf(w) && (guarded(w) || (!once && !(force && w.s.by !== 'ai')))) return { ok: false, error: guarded(w) ? `${OFF(w)}: it ${whence(w)}, look at what it runs (laki widget what ${w.id})` : OFF(w) } // a repo's: never once, unlooked
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script: give it a source (static, file or url)` }
   const src = sourceOf(w)
   if (once && streaming(w)) return { ok: false, error: 'a stream runs only while it is on' }
@@ -1884,7 +1892,7 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
 }
 // a repo's that can't be trusted (repoFiles' bad): never on
 function repoBad(w: Entry) {
-  return w.project && !w.file ? repoFiles(w).bad : undefined
+  return guarded(w) && !w.file ? repoFiles(w).bad : undefined
 }
 // a repo's: each file's own hash (12 hex), kept as it's turned on: what changed, untrust names
 function eachHash(w: Entry, names = w.file ? [w.file] : repoFiles(w).names) {
@@ -1906,7 +1914,7 @@ function repoNames(w: Entry, fresh: boolean) {
   return names
 }
 function dirHash(w: Entry, fresh = false, known?: string[]) {
-  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoNames(w, fresh) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {
@@ -2400,8 +2408,9 @@ export function widgetTrash() {
     .flatMap(n => (m => (m ? [{ trash: n, ...m }] : []))(readJson<Trashed>(join(trashDir(), n, 'trash.json'))))
     .sort((a, b) => b.at - a.at)
 }
-// Undo: back where it was (its link made again), on or off as it was; refused when its id or its place is taken now
-export function widgetRestore(o: { trash: string }) {
+// Undo: back where it was (its link made again), on or off as it was (an agent's: off, N10); refused when its id or its
+// place is taken now
+export function widgetRestore(o: { trash: string; from?: { ws?: string; tab?: string } }) {
   const n = String(o.trash ?? '')
   const m = /^[\w.-]+-\d+$/.test(n) ? readJson<Trashed>(join(trashDir(), n, 'trash.json')) : undefined
   if (!m) throw new Error(`no ${n} in the trash: laki widget trash lists it`)
@@ -2414,6 +2423,7 @@ export function widgetRestore(o: { trash: string }) {
   for (const [to, from] of keptOf(m.id)) if (statOf(join(t, from))) mkdirSync(dirname(to), { recursive: true }), move(join(t, from), to)
   const sec = readJson<Record<string, string>>(join(t, 'secrets.json'))
   if (sec) setSecrets(m.id, s => Object.assign(s, sec))
+  if (agentCaller(o.from)) writeStore(m.id, { ...readStore(m.id), on: false }), ungrant(m.id)
   rmSync(t, { recursive: true, force: true })
   hist.delete(m.id)
   lastN.delete(m.id) // its log's n read again from its file
@@ -2504,18 +2514,19 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
     const w = widgets.get(t)
     const folder = devRoots().find(r => (w?.dev && under(pathOf(w), r)) || r === resolve(home(t)))
     if (!folder) throw new Error(`${t} isn't linked (laki widget dev --list)`)
-    settingsSet({ widgetDev: devRoots().filter(r => r !== folder) })
+    settingsSet({ widgetDev: devRoots().filter(r => r !== folder), widgetDevAgent: agentRoots().filter(r => r !== folder) }, true)
     return { unlinked: folder, links: links() }
   }
   const folder = resolve(home(String(o.folder ?? '')))
   const found = foldersIn(folder)
   if (!o.folder || !found.length) throw new Error(`${folder} has no widget.json, nor folders with one`)
   const bad = found.map(x => [pathOf(x), x.file ? oneFile(x.d, x.file) : manifestOf(x.d)] as const).filter(([, m]) => typeof m === 'string')
-  settingsSet({ widgetDev: [...new Set([...devRoots(), folder])] }) // scans: its widgets first, watched
+  const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you look at them, then off again as they change (N10; one that shadows an installed one too: they share its store); yours makes it yours again
+  const marks = agentRoots().filter(r => r !== folder)
+  settingsSet({ widgetDev: [...new Set([...devRoots(), folder])], widgetDevAgent: agent ? [...marks, folder] : marks }, true) // scans: its widgets first, watched
   const mine = [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder))
-  const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you turn them on (one that shadows an installed one too: they share its store)
   for (const w of mine)
-    if (onOf(w) === agent && !(w.project && !agent)) { // a repo's stays off until you look (widgetWhat)
+    if (onOf(w) === agent && !(guarded(w) && !agent)) { // a repo's stays off until you look (widgetWhat)
       writeStore(w.id, { ...readStore(w.id), on: !agent })
       w.s = { ...w.s, on: !agent }
       if (agent) ungrant(w.id), stopAgents(w.id)
@@ -2528,8 +2539,9 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
 
 // laki widget new (Settings › Extensions › New ▾): a starter (widgetStarters.ts) in its own folder, <data>/widgets/<id>
 // (dir: another, empty or new, which laki widget dev then links; a one-file one goes in the folder itself), the id from
-// its name, made unique. The user's own (not by: 'ai'): on, and fetched at once
-export async function widgetNew(o: { kind?: string; name?: string; dir?: string }) {
+// its name, made unique. The user's own (not by: 'ai'): on, and fetched at once; an agent's (N10): off, nothing run
+export async function widgetNew(o: { kind?: string; name?: string; dir?: string; from?: { ws?: string; tab?: string } }) {
+  const agent = !!agentCaller(o.from)
   const kind = String(o.kind ?? 'list') as StarterKind
   if (!STARTER_KINDS.includes(kind)) throw new Error(`a kind: ${STARTER_KINDS.join(', ')}`)
   const name = String(o.name ?? '').trim().slice(0, 60)
@@ -2552,14 +2564,14 @@ export async function widgetNew(o: { kind?: string; name?: string; dir?: string 
   }
   const real = (d: string) => (statOf(d) ? realpathSync(d) : d)
   const repo = repoRoots().some(r => under(real(folder), real(r.root))) // in a repo's .laki/extensions: the repo's, off until you look
-  if (!repo) writeStore(id, { on: true }) // yours, on
+  if (!repo) writeStore(id, { on: !agent }) // yours, on
   scanWidgets()
   const at = kind === 'onefile' ? join(folder, Object.keys(files)[0]) : folder
   const w = [...widgets.values()].find(x => pathOf(x) === at || (repo && real(pathOf(x)) === real(at))) // in a folder of your own: once laki widget dev links it; a repo's: <project>.<id>
   wLog({ id: w?.id ?? id }, `made from the ${kind} starter in ${folder}`)
-  if (w && !repo && scoped(w)) refetch(w, 'manual', 'made')
-  else if (w && !repo && fetchable(w)) await widgetRun({ id: w.id, reason: 'manual', why: 'made' })
-  return { id: w?.id ?? id, dir: at, files: Object.keys(files), found: !!w, ...(repo && { repo }) }
+  if (w && !repo && !agent && scoped(w)) refetch(w, 'manual', 'made')
+  else if (w && !repo && !agent && fetchable(w)) await widgetRun({ id: w.id, reason: 'manual', why: 'made' })
+  return { id: w?.id ?? id, dir: at, files: Object.keys(files), found: !!w, ...(repo && { repo }), ...(agent && !repo && { note: 'made off: only the user turns it on (Settings › Extensions)' }) }
 }
 
 // laki widget check (the inspector's Check, MCP's laki_extension_check): what's wrong with an extension, by its id or a
@@ -2665,7 +2677,7 @@ async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Pr
     if (!w || pathOf(w) !== pathOf(x)) say('warn', 'fetch', `not run: Laki doesn't have this one (laki widget dev ${pathOf(x)} links it)`)
     else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
     else if (!onOf(w) && agent) say('warn', 'fetch', "not run: it's off, and an agent asked: the user turns it on first")
-    else if (!onOf(w) && w.project) say('warn', 'fetch', `not run: it comes with ${projName(w)}'s repo and it's off: look at what it runs first (laki widget what ${w.id})`)
+    else if (!onOf(w) && guarded(w)) say('warn', 'fetch', `not run: it ${whence(w)} and it's off: look at what it runs first (laki widget what ${w.id})`)
     else if (scoped(w) && !ws) say('warn', 'fetch', 'not run: per workspace, which one? (--ws <id>)')
     else if (streaming(w)) say('warn', 'fetch', 'not run: it streams (laki widget dev prints its lines as they come)')
     else if (sourceOf(w).kind === 'ai') say('warn', 'fetch', 'not run: an agent makes its data, and each run costs (Run now on its page runs it)')

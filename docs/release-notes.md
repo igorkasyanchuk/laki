@@ -17,6 +17,9 @@ version it builds, with the date. -->
 - Compacting agents' memories on their own (Settings › Global memory) is off until you turn it on: it sends each
   project's learned memories to Laki AI's model. It was on for anyone with Laki AI able to answer; turn it on again
   there if you want it.
+- An agent's extensions stay off until you turn them on: `laki widget new` and `laki widget restore` from an agent's
+  tab, and a folder an agent links with `laki widget dev` turns on only after you look at what it runs, and goes off
+  again when its files change. `/laki:extension` is yours to start, and asks you before it makes, links or turns on one.
 
 ## 0.24.0 · Oct 21, 2026
 

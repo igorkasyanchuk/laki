@@ -372,7 +372,7 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
         <div className="ext-note bad">
           <Icon name="conflict" />
           <span className="grow">
-            <b>Its files changed in {w.repo}'s repo:</b> off until you look at what it runs now
+            <b>Its files changed {w.repo ? `in ${w.repo}'s repo` : 'in the folder an agent linked'}:</b> off until you look at what it runs now
           </span>
           <button className="sm" onClick={() => void cfg.set(w.id, { on: true }).catch(() => {})}>
             Look…

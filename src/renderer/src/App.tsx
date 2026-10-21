@@ -1793,7 +1793,8 @@ export function App() {
     toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
     toolShow()
   }
-  // a repo's extension turned on: what it runs, the settings it needs, what it can hold; the files hash shown, or none
+  // a repo's extension (or one in a folder an agent linked) turned on: what it runs, the settings it needs, what it can
+  // hold; the files hash shown, or none
   // a repo's .laki.json not trusted as it is (cfgWait): its text, then Trust; meanwhile its setup, scripts and env wait
   const cfgSheet = async (p: Project) => {
     const c = await call<{ hash: string; text: string; trusted: boolean }>('projectTrust', { id: p.id }).catch(() => null)
@@ -1807,8 +1808,9 @@ export function App() {
     if (!what) return
     const proj = view?.projects.find(p => p.id === w.project)?.name ?? w.project
     const needs = w.options.filter(x => x.required || x.type === 'secret').map(x => `${x.label || x.key}${x.type === 'secret' ? ' (a secret, kept on this Mac)' : ''}${x.required ? ', needed' : ''}`)
-    const text = [`It comes with ${proj}'s repo (.laki/extensions)${w.changed ? ', and its files changed there since you turned it on' : ''}.`, what.text.replace(/^`{3,}$/gm, '').replace(/\n{3,}/g, '\n\n'), needs.length ? `Its settings: ${needs.join('; ')}.` : '', 'It shows and runs only in its workspaces.'].filter(Boolean).join('\n\n')
-    return (await choose(`Turn on ${what.name}?`, text, [{ label: 'Cancel' }, { label: `Turn on in ${proj}`, primary: true }])) === 1 ? what.hash : undefined
+    const from = w.project ? `It comes with ${proj}'s repo (.laki/extensions)` : "An agent linked its folder (laki widget dev): its code is the agent's"
+    const text = [`${from}${w.changed ? ', and its files changed there since you turned it on' : ''}.`, what.text.replace(/^`{3,}$/gm, '').replace(/\n{3,}/g, '\n\n'), needs.length ? `Its settings: ${needs.join('; ')}.` : '', w.project ? 'It shows and runs only in its workspaces.' : 'It turns off again as its files change.'].filter(Boolean).join('\n\n')
+    return (await choose(`Turn on ${what.name}?`, text, [{ label: 'Cancel' }, { label: w.project ? `Turn on in ${proj}` : 'Turn on', primary: true }])) === 1 ? what.hash : undefined
   }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
@@ -1818,7 +1820,7 @@ export function App() {
     // it runs first (repoSheet), on only for the files shown
     set: async (id, o) => {
       const rw = view?.widgets?.find(x => x.id === id)
-      if (o.on && !o.seen && rw?.project) {
+      if (o.on && !o.seen && (rw?.project || rw?.agentDev)) {
         const seen = await repoSheet(rw)
         if (!seen) return
         o = { ...o, seen }

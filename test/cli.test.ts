@@ -314,7 +314,8 @@ test('/laki:new and /laki:extension: claude tabs get Laki’s plugin (its comman
   assert.match(cmd, / new \. --preset <agent> --prompt '<prompt>'/)
   const ext = readFileSync(join(plugin, 'commands', 'extension.md'), 'utf8') // the laki-widget skill's guide, as a command
   assert.match(ext, /^---\ndescription: Make or change a Laki extension/)
-  assert.match(ext, /allowed-tools: Bash\(.* widget:\*\)/)
+  assert.match(ext, /allowed-tools: Bash\(.* widget ls:\*\), /) // N10: what reads, unasked; only you start it
+  assert.match(ext, /\ndisable-model-invocation: true\n/)
   assert.match(ext, /\$ARGUMENTS\n\n# Making a Laki extension/)
   assert.match(ext, /Run the laki CLI as `\/usr\/bin\/env .*`\. Below/)
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'claude'), 'claude')

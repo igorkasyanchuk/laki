@@ -802,7 +802,9 @@ project (`laki new .`), with that agent; it doesn't do the task itself. Laki giv
 through a plugin of its own (`--plugin-dir`, nothing written to `~/.claude`); other agents with the laki skill
 installed (Settings › Agent skill) take `/laki:new …` in a prompt the same way. Not in SSH hosts' tabs.
 `/laki:extension <what it shows or does>`, from the same plugin, makes or changes a Laki extension: the extension
-creator's guide, with its `laki widget` commands allowed.
+creator's guide. Only you start it (Claude never runs it on its own), and the `laki widget` commands that only read
+(`ls`, `kit`, `check`, `what`, `logs`, `render`, `events`, `tools`) run without asking; making, linking, setting or
+turning one on asks you in Claude's prompt first.
 
 With *Progress on tabs* on (Settings › General), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
@@ -926,7 +928,10 @@ Delete (its card's trash can, after you confirm) moves an extension to a trash, 
 *Undo* in the toast puts it back, on or off as it was; `laki widget trash` lists the last 30 days' and `laki widget
 restore <trash-id>` puts one back. An agent can't turn an extension on (`laki widget on` from its tab is refused; it
 may move one, resize it and change a plain setting with `laki widget set`, never a secret, its source or network access),
-`laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
+`laki widget new` and `laki widget restore` from one make it off, `laki widget dev` from one leaves the folder's
+extensions off and treats them as a repo's (on only after you look at what they run, off again as their files change,
+never the on of an installed one they share an id with; your own `laki widget dev` of that folder makes it yours again),
+and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
 button, a form, a JS page, *Pull main*, *Context* (actions in ⌘K and the right-click menus) or one file; it runs at once on sample data, and its page opens), or `laki widget new

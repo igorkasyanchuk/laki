@@ -2598,7 +2598,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               )}
               <span className="sched-tags">
                 {w.builtin && <span className="tag">built-in</span>}
-                {w.changed && !w.on && <span className="tag tag-closed" data-tip="Its files changed in the repo: off until you look">changed</span>}
+                {w.changed && !w.on && <span className="tag tag-closed" data-tip={`Its files changed ${w.repo ? 'in the repo' : 'in the folder an agent linked'}: off until you look`}>changed</span>}
                 {w.dev && <span className={`tag ${w.devError ? 'bad' : ''}`} data-tip={w.devError ? `Last good version kept: ${w.devError}` : 'Linked by laki widget dev: your folder, watched'}>dev</span>}
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}
                 {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}

@@ -3,7 +3,7 @@
 // sample data by hand, masked settings, unlinking
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdirSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -148,4 +148,68 @@ test('widget runs: an action and its fetch after, with their reason; LAKI_REFRES
   assert.equal(bad.exit, 3)
   assert.equal(bad.stderr, 'oops')
   assert.equal(bad.error, 'oops')
+})
+
+// N10: an agent's own code never runs unlooked: what laki widget new makes and restore brings back is off, a folder it
+// links is trusted as a repo's extensions are (on after a look, off again as it changes, never the on of the one it
+// shadows), and /laki:extension is yours to start, running only what reads unasked
+test("an agent's extensions: new and restored off; a folder it links trusted as a repo's; /laki:extension yours, read-only unasked", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const from = { ws: ws.id, tab: ((await until(() => rig.tab(ws.id), 'its agent')) as any).id }
+
+  // new: yours on and fetched; an agent's off, nothing run
+  const mine = await rig.rpc('widgetNew', { kind: 'number', name: 'Mine' })
+  assert.ok((await find(rig, mine.id)).at, 'yours: fetched')
+  const its = await rig.rpc('widgetNew', { kind: 'number', name: 'Its', from })
+  assert.match(its.note, /made off: only the user turns it on/)
+  assert.deepEqual([(await find(rig, its.id)).on, (await find(rig, its.id)).at], [false, undefined])
+  // restore: an agent's comes back off
+  await rig.rpc('widgetRm', { id: mine.id })
+  const [gone] = await rig.rpc('widgetTrash')
+  assert.equal((await rig.rpc('widgetRestore', { trash: gone.trash, from })).on, false)
+
+  // an installed one, on; the agent links a folder of its own, then adds one of that id there
+  const inst = join(rig.data, 'widgets', 'probe')
+  mkdirSync(inst, { recursive: true })
+  writeFileSync(join(inst, 'widget.json'), JSON.stringify({ name: 'Installed', fetch: 'echo {}' }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'probe', on: true })
+  const code = join(rig.home, 'agent-code')
+  mkdirSync(join(code, 'helper'), { recursive: true })
+  writeFileSync(join(code, 'helper', 'widget.json'), JSON.stringify({ name: 'Helper', fetch: 'echo {}' }))
+  const r = await rig.rpc('widgetDev', { folder: code, from })
+  assert.match(r.note, /linked, off/)
+  const ran = join(rig.home, 'ran')
+  mkdirSync(join(code, 'probe'))
+  writeFileSync(join(code, 'probe', 'fetch.sh'), `touch "${ran}"; echo '{}'\n`)
+  writeFileSync(join(code, 'probe', 'widget.json'), JSON.stringify({ name: 'Agent probe', fetch: 'sh fetch.sh' }))
+  let w = await until(() => find(rig, 'probe').then(w => w?.name === 'Agent probe' && w), 'its copy first')
+  await sleep(600) // the watcher's fetch, had it been on
+  w = await find(rig, 'probe')
+  assert.deepEqual([w.on, w.agentDev, existsSync(ran)], [false, true, false], "never the installed one's on")
+  // on only after a look; its run then
+  await assert.rejects(rig.rpc('widgetSet', { id: 'probe', on: true }), /is in a folder an agent linked: look at what it runs first/)
+  const { hash } = await rig.rpc('widgetWhat', { id: 'probe' })
+  await rig.rpc('widgetSet', { id: 'probe', on: true, seen: hash })
+  await until(() => existsSync(ran), 'its fetch ran once you looked')
+  // its fetch.sh changes: off, nothing of the new runs
+  rmSync(ran)
+  writeFileSync(join(code, 'probe', 'fetch.sh'), `touch "${ran}"; echo '{"n": 2}'\n`)
+  w = await until(() => find(rig, 'probe').then(w => !w.on && w), 'off as it changed')
+  assert.equal(w.changed, true)
+  assert.match((await rig.rpc('widgetRun', { id: 'probe' })).error, /is in a folder an agent linked/)
+  assert.ok(!existsSync(ran))
+  // you link it: yours again, as dev mode always was
+  await rig.rpc('widgetDev', { folder: code })
+  w = await find(rig, 'probe')
+  assert.deepEqual([w.on, w.agentDev, w.changed], [true, undefined, undefined])
+
+  const cmd = readFileSync(join(rig.data, 'claude-plugin', 'commands', 'extension.md'), 'utf8')
+  const head = cmd.split('\n---\n')[0]
+  assert.match(head, /^disable-model-invocation: true$/m)
+  assert.ok(!head.includes('widget:*'), 'no laki widget subcommand pre-allowed wholesale')
+  for (const sub of ['ls', 'kit', 'check', 'what', 'logs']) assert.ok(head.includes(` widget ${sub}:*)`), sub)
+  for (const sub of ['new', 'dev', 'set', 'on', 'push', 'action', 'tool', 'restore']) assert.ok(!head.includes(` widget ${sub}:*)`), sub)
 })

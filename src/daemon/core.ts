@@ -1572,24 +1572,26 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
   changed()
 }
 
-export function settingsSet(o: Settings) {
+// own: Laki's own call (widgetDev), the only one that writes widgetDevAgent
+export function settingsSet(o: Settings, own = false) {
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
-  const dirsWere = JSON.stringify([state.settings?.widgetDirs ?? [], state.settings?.widgetDev ?? []])
+  const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
+  const dirsWere = dirs(state.settings)
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
-  const { accounts: _, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
-  o = rest
+  const { accounts: _, widgetDevAgent, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
+  o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
   state.settings = { ...state.settings, ...o }
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
   save()
   changed()
   if ('diffStat' in o) void scanStats() // its numbers now, not at the next scan
-  if (JSON.stringify([state.settings.widgetDirs ?? [], state.settings.widgetDev ?? []]) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's too
+  if (dirs(state.settings) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's (an agent's) too
   return state.settings
 }
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements']
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements']
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
