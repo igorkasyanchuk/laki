@@ -83,7 +83,11 @@ test('the Pull main starter: per workspace, a button; git merges the base in, co
   const last = await until(() => JSON.parse(readFileSync(inst, 'utf8')).data?.last, 'its result pushed')
   assert.equal(last, 'Resolved them; the tests pass')
   assert.equal(readFileSync(join(a.path, 'README.md'), 'utf8'), 'theirs\n')
-  assert.ok(rig.fakeLog().some(l => l.bin === 'claude' && l.args[0] === '-p' && l.args.includes('--allowedTools')), 'claude -p, its tools limited')
+  const cp = rig.fakeLog().find(l => l.bin === 'claude' && l.args[0] === '-p' && l.args.includes('--allowedTools'))
+  assert.ok(cp, 'claude -p, its tools limited')
+  const allowed = cp.args[cp.args.indexOf('--allowedTools') + 1]
+  assert.match(allowed, /Bash\(git merge:\*\)/)
+  assert.doesNotMatch(allowed, /Bash\(git:\*\)/, 'git subcommands named, not all of git (push, config)')
   // dirty: refused
   writeFileSync(join(a.path, 'README.md'), 'edited')
   assert.match((await pull()).modal?.text ?? '', /Uncommitted changes/)

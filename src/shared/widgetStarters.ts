@@ -297,9 +297,9 @@ printf '{"behind": %s, "base": "%s"}\\n' "$(git rev-list --count "HEAD..$up" 2>/
 prompt() {
   echo "Bring the latest of $up into this branch: fetch it, then git merge $up (no rebase, no push). Resolve any conflicts keeping what both sides meant, run the project's tests and fix what the merge broke, then commit. End with one short line: what you merged and whether the tests pass."
 }
-# What claude -p may do unasked (git and ai): read and edit files, git, the tests; it's refused anything else. Add your
-# own test command: Bash(bin/rails test:*), Bash(make check:*)…
-TOOLS='Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(go test:*),Bash(cargo test:*),Bash(pytest:*)'
+# What claude -p may do unasked (git and ai): read and edit files, the git a merge takes (not push, reset, clean or a
+# config), the tests; it's refused anything else. Add your own test command: Bash(bin/rails test:*), Bash(make check:*)…
+TOOLS='Read,Edit,Write,Glob,Grep,Bash(git fetch:*),Bash(git merge:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(go test:*),Bash(cargo test:*),Bash(pytest:*)'
 
 # a text as a JSON string
 json() { printf '%s' "$1" | tr '\\t' ' ' | tr -d '\\000-\\010\\013-\\037' | awk 'BEGIN { printf "\\"" } { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); printf "%s%s", (NR > 1 ? "\\\\n" : ""), $0 } END { printf "\\"" }'; }
