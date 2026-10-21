@@ -388,7 +388,7 @@ export async function flowStart(o: Start) {
   // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
-  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't trusted as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
+  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)

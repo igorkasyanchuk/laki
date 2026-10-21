@@ -1896,8 +1896,17 @@ function eachHash(w: Entry, names = w.file ? [w.file] : repoFiles(w).names) {
     }
   })()]))
 }
+// a repo's file list for the view (grants' keys, built often): git at most every 2 s; a run's, an ask's, a turn-on's fresh
+const listings = new Map<string, { at: number; names: string[] }>()
+function repoNames(w: Entry, fresh: boolean) {
+  const c = listings.get(w.id)
+  if (!fresh && c && Date.now() - c.at < 2000) return c.names
+  const names = repoFiles(w).names
+  listings.set(w.id, { at: Date.now(), names })
+  return names
+}
 function dirHash(w: Entry, fresh = false, known?: string[]) {
-  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoFiles(w).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoNames(w, fresh) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {
@@ -1963,7 +1972,8 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   const output = (r.stdout ?? '').slice(0, TOOL_OUT)
   return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
 }
-const grantsOf = (w: Entry, action: string) => (k => Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(k)))(grantKey(w, action)) // the workspaces with an Always for it
+// the workspaces with an Always for it (none given: no hash made)
+const grantsOf = (w: Entry, action: string) => !Object.values(state.widgetGrants ?? {}).some(l => l.some(k => k.startsWith(`${w.id}.${action}#`))) ? [] : (k => Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(k)))(grantKey(w, action))
 // an Always: that action as it is (key: grantKey) in that workspace ('' none); one made for its older files goes
 function grant(w: Entry, action: string, ws: string, key: string) {
   const g = (state.widgetGrants ??= {})

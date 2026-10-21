@@ -1806,8 +1806,8 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'workspace.new' && e.refused?.includes('onnew: from the repo, not allowed as it is: open it in Workflows, then Allow or Save it')), 'refused, said in laki widget events')
   assert.equal(await started(), 0)
   // a schedule's and an agent's start: refused; the app's own Start: runs it
-  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, trigger: 'schedule x' }), /isn't trusted as it is yet/)
-  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, by: 'agent' }), /isn't trusted as it is yet/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, trigger: 'schedule x' }), /isn't allowed as it is yet/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, by: 'agent' }), /isn't allowed as it is yet/)
   await rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, ws: ws.id, editor: true })
   await until(async () => (await started()) === 1, "the app's Start runs it")
   // trusted as the sheet showed it (another text: refused); then an event starts it
