@@ -245,7 +245,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       const places = Array.isArray(a.places) ? a.places.map(String) : undefined
       const settings = typeof a.settings === 'string' ? JSON.parse(a.settings) : a.settings // some models send the object as JSON text
       const w: WidgetView = await rpc('widgetSet', { id: a.id, place: places, size, every: a.every, view: a.view, hide: a.hide, config: settings, from: { ws: from, tab: from ? process.env.LAKI_TAB : undefined }, agent: true })
-      const desk = placesOf(w).includes('desk') && !(await rpc<View>('state')).settings?.desk
+      const desk = placesOf(w).includes('desk') && (await rpc<View>('state')).settings?.desk === false
       const off = [!w.on && `it's off: the user turns it on`, desk && 'the Desk is off: Settings › General › Experimental turns it on'].filter(Boolean)
       return { id: w.id, on: w.on, places: placesOf(w), size: w.size.join('x'), every: w.every, view: w.full ? w.view : undefined, hide: w.hide, ...(off.length ? { note: off.join('; ') } : {}) }
     },

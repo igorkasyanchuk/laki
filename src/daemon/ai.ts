@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_PERM, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AI_ACTS, AI_PERM, AI_MODEL, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -134,7 +134,7 @@ export function aiKey(o: { key?: string | null }) {
 // with the same key. Nothing is kept: not the audio, not the text
 const MAX_AUDIO = 24 << 20 // OpenRouter's 25 MB: about 9 minutes of the renderer's 16 kHz mono
 export async function voiceText(o: { audio?: unknown }) {
-  if (state.settings?.voice?.on !== true) throw new Error('Voice is off: turn it on in Settings › General › Experimental')
+  if (!voiceOn(state.settings)) throw new Error('Voice is off: turn it on in Settings › Voice')
   const audio = typeof o.audio === 'string' ? o.audio : ''
   if (!audio) throw new Error('no audio')
   if (audio.length > MAX_AUDIO) throw new Error('a recording up to 9 minutes')

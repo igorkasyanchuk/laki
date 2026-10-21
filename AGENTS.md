@@ -163,7 +163,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   AI's model through `ai.ts` `aiOnce` (OpenRouter's `aiComplete`, or `claude -p`/`codex exec` with no tools), back as
   `{memories: [{text, from}]}`; an answer that isn't one, empty or longer changes nothing; what changed meanwhile
   stays (learned since, pinned as yours, edited: only the ones still as given are replaced); the project's `compacted`, a line in `<data>/memory-compact.jsonl` with the texts before and after),
-  `memoryCompactLog`, `memoryTick` (every 30 minutes, Laki AI on and `settings.memoryCompact.off` unset: every
+  `memoryCompactLog`, `memoryTick` (every 30 minutes, Laki AI on and able to answer (OpenRouter: a key) and `settings.memoryCompact.off` unset: every
   `memoryCompact.days` (`COMPACT_DAYS`, 7; 0: only when full) since the last, or the oldest learned one, and as the learned
   ones reach `MEMORY_MAX`, unless the last run left them full: then by days); Project.tsx' Memory tab: *Compact now*, the last run, Log;
 - `wsPeek` (a worktree's `dirty`: `git status` lines, `ahead`: commits not in its base, `unpushed`: of those on no remote;
@@ -293,8 +293,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
   image as a data URL), `planUpload` (`name`, `data` base64: `files/…`), `planWrite` (`path`, `text`: MCP's and Laki AI's,
   never README.md or spec.json), `planRm` (the app's, after `ask`); each takes `project`, `kind`, `slug`; off, each says so;
-- voice (experimental: `settings.voice.on`, Settings › General › *Experimental*; off: no Voice section, the mic is
-  macOS dictation, no hold Fn, and `voiceText` refuses; Settings › Voice): `voiceText` (`audio`: WAV in base64, 24 MB of it at most; the AI's key,
+- voice (`voiceOn`: `settings.voice.on` unless false; off: the mic is macOS dictation, no hold Fn, and `voiceText`
+  refuses; Settings › Voice, always there: picking an Engine clears an old `on: false`): `voiceText` (`audio`: WAV in base64, 24 MB of it at most; the AI's key,
   `<data>/ai-key`): OpenRouter's `POST /audio/transcriptions` with `voice.model` (unset: `VOICE_MODEL`,
   microsoft/mai-transcribe-2), returns `{ text }`; a 429 or 5xx is tried again after `VOICE_AGAIN` (1 s, 2.5 s;
   `LAKI_VOICE_AGAIN`: tests' shorter waits), then refused with OpenRouter's message and the provider's `raw`; nothing kept. `LAKI_AI_API` is tests' fake, as for Laki AI. The
@@ -731,7 +731,7 @@ gone or archived workspace is a failed run.
 
 ### Laki AI
 
-`daemon/ai.ts` (`settings.ai`, `AiSettings`; off unless `on`): a conversation that works Laki with `cli/mcp.ts`'s
+`daemon/ai.ts` (`settings.ai`, `AiSettings`; on unless `on` is false, `aiOn`): a conversation that works Laki with `cli/mcp.ts`'s
 `tools(rpc)`, given the daemon's own `call` (no HTTP), less `laki_progress`: nothing archives, deletes, ships or merges;
 with `settings.ai.skill` unset or true, Laki's skill: `cli/mcp.ts` `skillTools` (`laki_ask`, `laki_remove`: `aiQuestion` names it from state, `whatOf`; `aiAnswer` refuses a question with an ask of yours after it,
 `laki_prs`, `laki_project`, `laki_notes_write`, `laki_memory_write`, `laki_rename`, `laki_shell`: a new shell, a command typed with
@@ -791,7 +791,7 @@ would start a daemon again), `aiTotals` (shared/types.ts) today's and this month
 workspace or tab it names (`laki://ws/<id>?tab=<tab>`), and the page links the bold names it didn't (`links.ts`
 `linkWorkspaces`); a laki:// link in any Markdown goes to App's router (`api.ts` `onLakiLink`), or, in a window
 without one (the AI window), to main's `open-external`, which shows the app window and routes it (`openLink`). The renderer's `Ai.tsx` (`AiPage`: the rail's AI
-and ⌘K's (both only while `ai.on`; Settings › General › *Experimental* has the same switch), `laki://ai`; `.ai-chats`, its
+and ⌘K's (both only while `aiOn`; Settings › AI's switch), `laki://ai`; `.ai-chats`, its
 sidebar: New chat, the chat there, the earlier ones (a click `aiOpen`, the trash `aiChatRm` after `ask`; not `compact`); Chat, Calls and Info tabs; the chat Claude's way: examples, the thread in a column, a turn's tool
 calls folded into one `.ai-tools` pill (each line's *Open*: its `ws` or `target`), a message's images as `Thumbs`
 (`aiImage`, once a session each; a click shows one big in a `Modal`; one no longer kept: a chip), `PromptInput` `enter` (⏎ asks) with images and dictation, Stop; Info
@@ -1473,7 +1473,7 @@ returns its `<project>.<id>`. The renderer: App's `ownWidgets` (every place but 
 *From <project>* groups and a *changed* tag; the page's *From <project>'s .laki/extensions* tag, the changed banner
 (*Look…*), Files read-only with Remix.
 
-The studio (`WidgetStudio.tsx`, App's lazy dialog `{ studio: id ('' a new one), back }`, only while `ai.on`; `WidgetsApi`
+The studio (`WidgetStudio.tsx`, App's lazy dialog `{ studio: id ('' a new one), back }`, only while `aiOn`; `WidgetsApi`
 `studio`, `remix`, `undo`, `tryOnce`; entries: New ▾ › Make with Laki AI (`page('')` too), a row's and `WidgetCard`'s ✨
 (yours in `widgetHome()`) and Remix, ⌘K *New extension…*, links.ts' `studio`: `laki://settings/widgets/new` and
 `/<id>/studio`): `StudioChat` (Ai.tsx' `Message`, `Tools`, `turns`, `PromptInput`; empty: `STARTERS`' chips and
@@ -1733,7 +1733,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   full-screen app: `#bar` (labels: `text.ts` `initials`, two letters, unique, `pr`/`issue`/numbers skipped; a drop against the screen's left or right edge, never the top or bottom (`snap`; a row along them is still in the code, unreached: `data-side` from main's `floater-side`; `across`: the page's offsets and length along the row, main's `beside` puts the card, menu and voice windows below or above it):
   `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; `.fl-btns`: the + (×, `.on`, while
   open) and `ACTS`, the menu bar's: New task, Say it, Screenshot area, Whole screen, and Ask Laki AI while
-  `settings.ai.on` (`actsFor`, the floats' `ai`; the menu a row taller: `menuH`); `menu` stack: `.fl-acts` over the + in
+  `aiOn` (`actsFor`, the floats' `ai`; the menu a row taller: `menuH`); `menu` stack: `.fl-acts` over the + in
   the drop (`floater-size` `up`: main moves `home` so the + stays under the mouse; a hover's name and hint go to the card's
   window, `floater-tip`, cards on or not), card: `#menu`, a focusable panel beside the drop (`MENU`, its foot by the +'s,
   `floater-menu-at`; keys 1-5, arrows, ⏎, Esc; closed on blur, the bar told by `floater-menu`: a press on the + while
@@ -1899,7 +1899,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   are sections of it, under the nav's *Project settings* head (`ProjectSection`: name, a Memory row (its counts;
   *Manage*: `onMemory`, App's `{ project, tab: 'memory' }`), scripts, env; saved 400 ms after typing and on leaving).
   Global memory (`memory`: `settings.memory` through Project.tsx' `MemoryList` `global`); Release notes only with
-  `devMode`; General's Storage has `artifactsIn`, its Experimental the same `ai.on` switch as Settings › AI; Appearance's
+  `devMode`; General's Storage has `artifactsIn`, its Pages My Desk and Bird view (on unless false), Settings › AI the glow's; Appearance's
   Rail `railShells` and `railBrowsers`.
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Info (`PanelTab` `info`, first, any project: App passes `InfoTab` as
   `info`), Files (tree from the daemon's file list, search, new
@@ -1922,7 +1922,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   right after the new-workspace page's *Race* makes one): a column per live workspace of the race with its status,
   diff size, the agent's last answer and the files `diff` lists (again as `stat` moves); *Keep this one* archives
   the others (`wsArchive`, after a confirm) with *Undo* (`wsRestore`). App.tsx passes a `CompareApi`.
-- **Laki AI's glow** (experimental, `settings.aiGlow`): Laki AI's looks (`mcp.ts`' `aiRpc`: its tools' `screen` and
+- **Laki AI's glow** (`settings.aiGlow`, on unless false, Settings › AI): Laki AI's looks (`mcp.ts`' `aiRpc`: its tools' `screen` and
   `browse` with `by: 'ai'`; the OpenRouter backend's `toolsFor`, the claude/codex one's `laki mcp` with `LAKI_AI=1`; the
   chat's `whereNow` screen too) make core's `screen`/`browse` broadcast `peek` (ws, tab). App's `PeekGlow`: over that
   tab's `[data-pane]` when shown, else the window (`.ai-peek`, a conic `--peek-a` edge turning once and inset shadows,
@@ -1934,7 +1934,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   rail's count: rung reminders not ticked off. `Page` `esc={false}`; `.cal-bar` on the page (‹ *Today* ›, the title,
   Week / Month, *+ Reminder*); a day's click: `sel`, `aside.cal-side` (that day's tasks, runs and reminders, *Remind me
   this day*). App.tsx passes a `CalendarApi`.
-- **`Desk.tsx`**: My Desk (the user's word; the code's is Desk: experimental, `settings.desk`; the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
+- **`Desk.tsx`**: My Desk (the user's word; the code's is Desk: `settings.desk`, on unless false (Settings › General › Pages); the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
   among their `places` as tiles in a 12-column grid (`DESK_COLS`, rows `DESK_ROW`), `settings.deskTiles` their order and
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
@@ -1965,7 +1965,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   the dialog (`.overlay:has(.picked)`: over a page too, the Desk's, Settings') with *Copy the context* (`pickedText`,
   Markdown) and *Copy the screenshot* (`copyFile`); the press's own mouseup and click are swallowed too (`swallow`: they'd
   click what was picked). Esc or a right click stops.
-- **`Bird.tsx`**: Bird view (experimental, `settings.birdView`; the side head's eye beside Help, ⌘K; dialog `'bird'`):
+- **`Bird.tsx`**: Bird view (`settings.birdView`, on unless false (Settings › General › Pages); the side head's eye beside Help, ⌘K; dialog `'bird'`):
   every live tab (not exited) of each live workspace, Browsers' left out, by workspace in project order, a card each
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
   show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.

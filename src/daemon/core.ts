@@ -1540,7 +1540,6 @@ export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accoun
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
-  if (state.settings.voice?.on) state.settings.voice = { ...state.settings.voice, on: undefined } // its setup kept, its experimental switch off
   widgetsOff() // every extension off
   save()
   changed()

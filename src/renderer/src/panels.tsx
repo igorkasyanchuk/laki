@@ -200,7 +200,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
-  { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: Laki AI, Workflows, Specs, Calendar, Desk, Bird view, Voice', go: 'Experimental' },
+  { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: Workflows, Specs, Calendar, Notes', go: 'Experimental' },
   { id: 'presets', title: 'Set up agents & profiles', hint: 'Each profile its agent, model, effort and account: a second Claude plan, a cheaper model', go: 'Agents & profiles' },
   { id: 'remote', title: 'Try remote access', hint: 'Laki on your phone: signed in by email (Cloudflare), with a PIN, or over Tailscale', go: 'Remote access' },
   { id: 'schedules', title: 'Schedule a prompt', hint: 'An agent on a prompt every weekday at 9am, or once tomorrow', go: 'Scheduled tasks' },

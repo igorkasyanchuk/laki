@@ -2,6 +2,11 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- **Laki AI, Voice, My Desk, Bird view and Laki AI's glow are no longer experimental**: on by default. Turn one off in
+  Settings › AI (Laki AI, its glow), Settings › Voice, or Settings › General › Pages (My Desk, Bird view).
+
 ## 0.23.0 · Oct 21, 2026
 
 - Workflows: an Agent block can say how freely its agent acts (auto, accept edits, plan, bypass) and use fast mode;

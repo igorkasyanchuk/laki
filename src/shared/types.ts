@@ -363,14 +363,14 @@ export type Settings = {
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
   workflows?: boolean // experimental (Settings › General): Workflows, off unless true
-  birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
+  birdView?: boolean // Settings › General › Pages: the eye beside Help, every live session's screen at once, on unless false
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
-  desk?: boolean // experimental (Settings › General): the rail's Desk, extensions placed there as tiles, off unless true
+  desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
   notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
   deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)
-  aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
+  aiGlow?: boolean // Settings › AI: a glow over what Laki AI looks at (a tab's pane, else the window), on unless false
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
   remoteAuth?: 'email' | 'pin' | 'tailscale' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); tailscale, your tailnet (tailscale serve)
@@ -449,8 +449,9 @@ export type Settings = {
 // on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
 export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean }
 export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
+export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false // Settings › Voice: on unless turned off
 
-// Laki's own AI (daemon/ai.ts): optional (on), it works Laki through the MCP server's tools, only when asked. backend:
+// Laki's own AI (daemon/ai.ts): on unless turned off, it works Laki through the MCP server's tools, only when asked. backend:
 // OpenRouter (its key in <data>/ai-key, never here) or a CLI agent in the background (claude -p, codex exec); models:
 // each backend's (unset: AI_MODEL for OpenRouter, the agent's own for the others); steps: tool calls an ask may make
 export type AiBackend = 'openrouter' | 'claude' | 'codex'
@@ -459,6 +460,7 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex'
 // asking you with options; hideCost: no $ on the AI page
 export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean } // efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
+export const aiOn = (s?: { ai?: AiSettings }) => s?.ai?.on !== false // Settings › AI: on unless turned off
 export const AI_STEPS = 20
 export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
 // the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure

@@ -33,6 +33,7 @@ test("memory compaction: the learned ones (never yours) through Laki AI's model,
   const b = await rig.rpc('memoryAdd', { project: p.id, text: 'tests: npm test (95 s)' })
   await rig.rpc('memoryAdd', { project: p.id, text: 'the API lives in src/daemon/main.ts' })
 
+  await rig.rpc('settingsSet', { ai: { on: false } }) // on unless turned off
   await assert.rejects(rig.rpc('memoryCompact', { project: p.id }), /Laki AI is off/)
   await rig.rpc('settingsSet', { ai: { on: true } })
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc' })
@@ -78,12 +79,15 @@ test('memory compaction when full: once, not again while a run leaves it full; a
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
   await rig.rpc('projectAdd', { path: rig.repo })
   const [p] = (await rig.rpc('state')).projects
-  await rig.rpc('settingsSet', { ai: { on: true }, memoryCompact: { days: 0 } }) // only when full
-  await rig.rpc('aiKey', { key: 'sk-or-v1-abc' })
+  await rig.rpc('settingsSet', { memoryCompact: { days: 0 } }) // only when full; Laki AI on by default
   const learn = async (n: number, from: number) => {
     for (let i = from; i < from + n; i++) await rig.rpc('memoryAdd', { project: p.id, text: `fact ${i}` })
   }
-  await learn(MEMORY_MAX - 1, 0)
+  await learn(MEMORY_MAX, 0)
+  assert.deepEqual(await rig.rpc('memoryTick', {}), [], 'full, but OpenRouter without a key: not tried')
+  assert.equal((await rig.rpc('state')).projects[0].compacted, undefined)
+  await rig.rpc('memoryRm', { project: p.id, id: (await rig.rpc('state')).projects[0].memory.at(-1).id })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc' })
   assert.deepEqual(await rig.rpc('memoryTick', {}), [], 'not full yet')
   await learn(1, MEMORY_MAX)
   reply = Array.from({ length: MEMORY_MAX }, (_, i) => `merged ${i}`) // the model can't make it shorter

@@ -11,7 +11,7 @@ import { wavOf } from './text'
 let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
 api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []))))
-export const cloudVoice = () => settings.on === true && settings.engine === 'cloud' // experimental: off, the mic is macOS dictation
+export const cloudVoice = () => settings.on !== false && settings.engine === 'cloud' // off: the mic is macOS dictation
 
 const RATE = 16000 // what speech models take; a minute is about 2 MB of WAV
 const MAX_MS = 5 * 60000 // a recording stops by itself after this

@@ -104,7 +104,7 @@ export function AiPage({
     if (el) el.scrollTop = el.scrollHeight
   }, [d?.chat.length, d?.busy, tab])
   const backend = settings.backend ?? 'openrouter'
-  const ready = !!settings.on && (backend !== 'openrouter' || !!d?.key)
+  const ready = settings.on !== false && (backend !== 'openrouter' || !!d?.key)
   const can = ready && !d?.busy && !saving && (!!text.trim() || !!images.length)
   const ask = () => {
     if (!can) return
@@ -147,7 +147,7 @@ export function AiPage({
     ) : (
       <span>{label} in Laki › Settings › AI.</span>
     )
-  const note = !settings.on ? (
+  const note = settings.on === false ? (
     <>
       <b>Laki AI is off.</b> Turn it on and pick how it runs: OpenRouter with your API key, or claude -p / codex exec on your plan. {settingsLink('Set it up')}
     </>

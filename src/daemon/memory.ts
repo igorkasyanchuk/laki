@@ -6,8 +6,8 @@
 import { appendFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { COMPACT_DAYS, type CompactLogLine, type CompactRun, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX } from '../shared/types.ts'
-import { aiOnce } from './ai.ts'
+import { aiOn, COMPACT_DAYS, type CompactLogLine, type CompactRun, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX } from '../shared/types.ts'
+import { aiOnce, hasKey } from './ai.ts'
 import { changed, dir, findProject, save, state } from './core.ts'
 
 const logPath = join(dir, 'memory-compact.jsonl')
@@ -42,7 +42,7 @@ function parse(text: string, given: Memory[]): Memory[] {
 }
 
 export async function memoryCompact(o: { project: string; why?: CompactRun['why'] }) {
-  if (!state.settings?.ai?.on) throw new Error('Laki AI is off: it does the compacting (Settings › AI)')
+  if (!aiOn(state.settings)) throw new Error('Laki AI is off: it does the compacting (Settings › AI)')
   const p = findProject(o.project)
   if (going.has(p.id)) throw new Error(`${p.name}'s memory is being compacted`)
   const given = (p.memory ?? []).filter(m => m.auto)
@@ -86,10 +86,10 @@ export function memoryCompactLog(o: { project?: string; n?: number }) {
 }
 
 // due ones, one at a time: every days since the last run (never run: since its oldest learned one), or the learned list
-// full; with Laki AI on and the setting not off (now: tests move the clock)
+// full; with Laki AI on and able to answer (OpenRouter: a key), the setting not off (now: tests move the clock)
 export async function memoryTick(now = Date.now()) {
   const s = state.settings
-  if (!s?.ai?.on || s.memoryCompact?.off) return []
+  if (!s || !aiOn(s) || s.memoryCompact?.off || ((s.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) return [] // on by default: not before it can answer
   const days = s.memoryCompact?.days ?? COMPACT_DAYS
   const done: string[] = []
   for (const p of state.projects) {

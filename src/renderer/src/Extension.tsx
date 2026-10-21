@@ -104,16 +104,16 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
           ) : cur ? (
             <p className="muted small">Reading…</p>
           ) : (
-            <Start ai={!!ai?.on} home={cfg.home} onAiSettings={onAiSettings} />
+            <Start ai={ai?.on !== false} home={cfg.home} onAiSettings={onAiSettings} />
           )}
         </div>
         <aside className="ext-chat" aria-label="Laki AI">
-          {ai?.on ? (
+          {ai?.on !== false ? (
             <AiPage
               compact
               embed
               chat={chat}
-              settings={ai}
+              settings={ai ?? {}}
               workspaces={workspaces}
               onClose={onClose}
               context={context}

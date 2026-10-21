@@ -95,8 +95,9 @@ test("voice: the cloud's recording goes to OpenRouter's speech-to-text with the 
   const or = await openrouter(t, [{ text: ' make the button blue ' }, { text: 'hi' }, { text: 'hi' }, { error: { message: 'model not found' } }, busy, { text: 'again' }, busy, busy, busy, ...Array(3).fill(down)])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url, LAKI_VOICE_AGAIN: '10,20' } }) // the waits before trying again, short
   const wav = Buffer.from('RIFF fake wav').toString('base64')
-  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /Voice is off: turn it on in Settings › General › Experimental/)
-  await rig.rpc('settingsSet', { voice: { on: true } })
+  await rig.rpc('settingsSet', { voice: { on: false } }) // on unless turned off
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /Voice is off: turn it on in Settings › Voice/)
+  await rig.rpc('settingsSet', { voice: {} })
   await assert.rejects(rig.rpc('voiceText', {}), /no audio/)
   await assert.rejects(rig.rpc('voiceText', { audio: wav }), /no OpenRouter API key: Settings › Voice/)
   await rig.rpc('aiKey', { key: 'sk-or-v1-voice' })
@@ -389,7 +390,7 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' }), call('c4', 'laki_extension_on', { id: 'sh' }), call('c5', 'laki_extension_on', { id: 'src' })])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
-  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('settingsSet', { ai: { on: true }, desk: false })
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
   const tool = (name: string): ((a: object) => Promise<any>) => [...tools(rig.rpc), ...skillTools(rig.rpc)].find(x => x.name === name)!.run
   const mine = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === 'my-prs')

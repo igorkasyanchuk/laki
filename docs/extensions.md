@@ -487,7 +487,7 @@ the daemon either way.
 | `status` | the status bar's right end (a Browsers page has none) | a line high, its cells across wide |
 | `rail` | a button among the rail's icons (no rail: the sidebar's foot) | a button |
 | `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
-| `desk` | a tile on the Desk page (experimental), sized there | its full view, else its preview |
+| `desk` | a tile on the Desk page, sized there | its full view, else its preview |
 | `panel` | a tab of the right panel (⌥⌘B), after Info, Files, Changes, Review and Preview | its full view, else its preview, the panel's width |
 | `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover |
 

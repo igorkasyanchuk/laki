@@ -471,7 +471,7 @@ aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on
 *Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots in, they go with it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
-**AI** (Settings › *AI*, or the same switch in General › *Experimental*, turns it on; then *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
+**AI** (on unless Settings › *AI* turns it off, where you pick how it runs; *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
 `laki://ai`, `laki ai` in a terminal, or *Ask Laki AI* in the floating bubbles' +: a small window of its own over the app
 you're in): Laki's own assistant, one conversation that works Laki with the same tools as
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
@@ -713,7 +713,7 @@ workspace is never hidden: a folded project or group holding it, or the one you 
 - paste a screenshot (⌘V), drop image files on it, or pick them with ＋; each shows as a thumbnail, and its path
   goes after your text;
 - the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
-  (System Settings › Keyboard › Dictation) and opens it. With Voice on (experimental) and on *Cloud*, the mic records instead: a
+  (System Settings › Keyboard › Dictation) and opens it. With Settings › Voice on *Cloud*, the mic records instead: a
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
 - *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
@@ -1141,9 +1141,9 @@ laki flow check .laki/workflows               # check workflow files (a folder: 
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
-### Bird view (experimental)
+### Bird view
 
-Turn it on in Settings › General › *Experimental*; the eye beside Help (⌘K too) opens it. Every live session, agents
+On unless Settings › General › *Pages* turns it off; the eye beside Help (⌘K too) opens it. Every live session, agents
 and terminals, as a card under its workspace with its screen as it is now (read every few seconds while it's open);
 *All*, *Working* or *Needs you* (a red dot on those). A click opens that session. The cards stand in columns, each as
 tall as its screen, and each workspace is tinted with its color (its group's, else one of its own).
@@ -1159,9 +1159,9 @@ workspace it's about if any. Laki AI and agents add them too, when you ask
 `laki_reminder`). As one is due Laki notifies you (a toast too, *Open* goes to its workspace); one due while Laki was
 closed rings as it opens. Tick it off when it's done; the rail's count is the ones that rang and aren't.
 
-### My Desk (experimental)
+### My Desk
 
-Turn it on in Settings › General › *Experimental*; the rail's My Desk (⌘K too) opens it: your extensions as tiles, an
+On unless Settings › General › *Pages* turns it off; the rail's My Desk (⌘K too) opens it: your extensions as tiles, an
 overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
 ticks every place it shows in). Drag a tile's head onto another to move it, its corner to resize it; Laki keeps the
 layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
@@ -1195,9 +1195,9 @@ Specs…) and workspaces you were on, the last 25, as in a browser: open an exte
 brings My Desk back. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
 removed since is skipped. Settings › Appearance › Rail › *Back and forward* turns it off.
 
-### Laki AI's glow (experimental)
+### Laki AI's glow
 
-Turn it on in Settings › General › *Experimental*. As Laki AI looks at your screen (it reads a tab, or its chat sends
+On unless Settings › AI turns it off. As Laki AI looks at your screen (it reads a tab, or its chat sends
 the tab you're on with your ask, or it uses the agent browser), a rainbow edge turns once around that tab's pane with a
 soft light inside it, then fades: it was looking there. A tab that isn't shown, or the agent browser: the whole
 window's edge. Nothing while Laki is in the background; with reduced motion the edge stays still.
@@ -1261,7 +1261,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘, | settings |
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
-| hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (experimental: Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it) |
+| hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -1487,8 +1487,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   same for another agent); *Show* lists one agent's. Each has a slug beside its name (`xhigh-code-review`), set from
   the name as you type it and kept when you rename it, unique across your actions and every project's (type your own;
   one taken gets a `-2`): a workflow's agent block names the action by it (`use: xhigh-code-review`).
-- *Voice* (experimental: turn it on in General › *Experimental*; off, the mic is macOS dictation and the section
-  isn't there): how the prompt boxes' mic turns speech into text. *On this Mac* (the default) is macOS dictation, free
+- *Voice*: how the prompt boxes' mic turns speech into text. *On this Mac* (the default) is macOS dictation, free
   (Fn twice starts it anywhere). *Cloud* has Laki record you and a speech-to-text model on OpenRouter write it down,
   with the OpenRouter key Laki AI uses (one key for both, set in either section): *Model* picks it (MAI-Transcribe 2
   by default: 60 languages, mixed in one sentence too, about $0.10 an hour of audio; Whisper, Parakeet, GPT-4o

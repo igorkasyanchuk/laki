@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -185,12 +185,12 @@ export type AppSettings = Paint & {
   hotkey?: string // its keys (unset: HOTKEY; '': none)
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
-  birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
+  birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
-  desk?: boolean // experimental: My Desk (Desk.tsx), extensions on a page of their own, resized there, off unless true
+  desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
-  aiGlow?: boolean // experimental: Laki AI's glow (App's PeekGlow) over what it looks at, off unless true
+  aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
@@ -366,14 +366,12 @@ const VOICE_MODELS: [string, string][] = [
 function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
   const [has, setHas] = useState<boolean>()
   useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])
-  const cloud = v.engine === 'cloud'
+  const cloud = v.engine === 'cloud' && v.on !== false // turned off before it was on by default: this Mac's until Cloud is picked again
   const model = v.model || VOICE_MODEL
   const [other, setOther] = useState(!VOICE_MODELS.some(m => m[0] === model)) // Another model…: a typed id
   return (
     <>
-      <h2>
-        Voice <span className="wf-beta">experimental</span>
-      </h2>
+      <h2>Voice</h2>
       <p className="muted small">
         The mic in every prompt box, and in the cloud hold Fn: talk instead of typing. On this Mac it's macOS dictation; in the cloud Laki records you,
         a speech-to-text model on OpenRouter writes it down, and the text goes where your cursor is.
@@ -382,7 +380,7 @@ function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi
         <div className="grid2">
           <label>
             Engine
-            <select value={cloud ? 'cloud' : 'device'} onChange={e => onChange({ ...v, engine: e.target.value === 'cloud' ? 'cloud' : undefined })}>
+            <select value={cloud ? 'cloud' : 'device'} onChange={e => onChange({ ...v, on: undefined, engine: e.target.value === 'cloud' ? 'cloud' : undefined })}>
               <option value="device">On this Mac: macOS dictation</option>
               <option value="cloud">Cloud: OpenRouter</option>
             </select>
@@ -450,7 +448,7 @@ function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi
 }
 
 // presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
-function AiSection({ api, ai, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
+function AiSection({ api, ai, glow, onGlow, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
   const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
@@ -474,13 +472,16 @@ function AiSection({ api, ai, presets, onChange, imageDays, onImageDays }: { api
       <h2>AI</h2>
       <p className="muted small">
         Laki's own assistant: ask it, in words, to start workspaces, review PRs from a screenshot, send prompts to your agents or tell you what they're
-        doing. It works Laki through the same tools as <code>laki mcp</code>, only when you ask, and never archives or deletes workspaces, ships or merges. Optional:
-        off until you turn it on.
+        doing. It works Laki through the same tools as <code>laki mcp</code>, only when you ask, and never archives or deletes workspaces, ships or merges. On unless
+        you turn it off below.
       </p>
       <Group title="Laki AI">
         <div className="setting-box">
-          <Switch className="switch-row" on={!!ai.on} onChange={on => onChange({ ...ai, on })}>
+          <Switch className="switch-row" on={ai.on !== false} onChange={on => onChange({ ...ai, on })}>
             <Says title="Turn on Laki AI" hint="The AI page (the rail's AI, ⌘K) and laki ai in the terminal" />
+          </Switch>
+          <Switch className="switch-row" on={glow} onChange={onGlow}>
+            <Says title="Laki AI's glow" hint="As Laki AI reads a tab's screen or uses the agent browser, a moving glow around that tab (else the window): it was looking" />
           </Switch>
           <Switch className="switch-row" on={ai.skill !== false} onChange={skill => onChange({ ...ai, skill })}>
             <Says
@@ -1178,14 +1179,13 @@ const FIND: [string, string, string?][] = [
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
-  ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
+  ['general', 'Bird view', 'pages overview all sessions screens preview eye running'],
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
-  ['general', 'My Desk', 'experimental desk dashboard overview widgets extensions tiles resize build'],
+  ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
-  ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
-  ['general', 'Laki AI', 'experimental ai assistant chat turn on enable openrouter'],
-  ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
+  ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
+  ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
@@ -1834,7 +1834,7 @@ export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
   set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
-  desk?: boolean // Desk is on (experimental): a place too
+  desk?: boolean // Desk is on: a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
@@ -1871,7 +1871,7 @@ const PLACES: [WidgetPlace, string, string][] = [
   ['status', 'Status bar', "At the status bar's right end: a line high"],
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
-  ['desk', 'My Desk', 'A tile on the My Desk page (experimental), sized there'],
+  ['desk', 'My Desk', 'A tile on the My Desk page, sized there'],
   ['panel', 'Right panel', 'A tab of the right panel (⌥⌘B), beside Info and Files'],
   ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
 ]
@@ -2274,12 +2274,12 @@ export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s
   { key: 'schedules', label: 'Schedule', icon: 'clock' },
   { key: 'specs', label: 'Specs', icon: 'spec', when: s => s.specs === true },
   { key: 'workflows', label: 'Flows', icon: 'flow', when: s => s.workflows === true },
-  { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk === true },
+  { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
   { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar === true },
   { key: 'shells', label: 'Terminal', icon: 'terminal', when: s => s.railShells !== false },
   { key: 'browsers', label: 'Browser', icon: 'globe', when: s => s.railBrowsers !== false },
-  { key: 'ai', label: 'AI', icon: 'ai', when: s => !!s.ai?.on },
+  { key: 'ai', label: 'AI', icon: 'ai', when: s => aiOn(s) },
 ]
 // in the order set (one not in it, a page turned on since: after them, in RAIL_ITEMS' order)
 export const railSorted = <T extends { key: string }>(xs: T[], order: string[] = []) => {
@@ -2632,7 +2632,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || (p.ai && s.voice?.on === true)) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
@@ -3115,6 +3115,16 @@ export function SettingsPage(p: {
                   <CliField api={p.cli} onSkill={() => openSec('skill')} />
                 </Group>
               )}
+              <Group title="Pages" hint="On unless you turn them off">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.desk !== false} onChange={v => set({ desk: v })}>
+                  <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on My Desk and in the sidebar at once. Shows the rail's My Desk and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.birdView !== false} onChange={v => set({ birdView: v })}>
+                  <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
+                </Switch>
+              </div>
+              </Group>
               <Group title="Experimental" hint="New things to try: they may change, or go">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.specs === true} onChange={v => set({ specs: v })}>
@@ -3126,28 +3136,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.calendar === true} onChange={v => set({ calendar: v })}>
                   <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
                 </Switch>
-                <Switch className="switch-row" on={s.desk === true} onChange={v => set({ desk: v })}>
-                  <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on My Desk and in the sidebar at once. Shows the rail's My Desk and ⌘K" />
-                </Switch>
                 <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
                   <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
                 </Switch>
-                <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
-                  <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
-                </Switch>
-                <Switch className="switch-row" on={s.aiGlow === true} onChange={v => set({ aiGlow: v })}>
-                  <Says title="Laki AI's glow" hint="As Laki AI reads a tab's screen or uses the agent browser, a moving glow around that tab (else the window): it was looking. Off by default" />
-                </Switch>
-                {p.ai && (
-                  <Switch className="switch-row" on={!!s.ai?.on} onChange={on => set({ ai: { ...s.ai, on } })}>
-                    <Says title="Laki AI" hint="Laki's own assistant: ask it in words to start workspaces, send prompts to your agents or tell you what they're doing. Shows the rail's AI and ⌘K; the same switch as Settings › AI" />
-                  </Switch>
-                )}
-                {p.ai && (
-                  <Switch className="switch-row" on={s.voice?.on === true} onChange={on => set({ voice: { ...s.voice, on } })}>
-                    <Says title="Voice" hint="Talk instead of typing: speech to text in the cloud (OpenRouter, a model you pick) and hold Fn to talk, typed where the cursor is. Shows Settings › Voice; off, the mic is macOS dictation" />
-                  </Switch>
-                )}
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
@@ -3692,7 +3683,7 @@ export function SettingsPage(p: {
               <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
                 <div className="setting-box">
                   <Switch className="switch-row" on={!s.memoryCompact?.off} onChange={on => set({ memoryCompact: { ...s.memoryCompact, off: !on || undefined } })}>
-                    <Says title="On its own" hint={s.ai?.on ? `Every few days, and as a project's learned memories reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
+                    <Says title="On its own" hint={aiOn(s) ? `Every few days, and as a project's learned memories reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
                   </Switch>
                   <label className="row">
                     <Says title="Every" hint="days since the last one (0: only when full)" />
@@ -3712,8 +3703,8 @@ export function SettingsPage(p: {
               </div>
             </>
           )}
-          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
-          {sec === 'voice' && p.ai && s.voice?.on === true && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
+          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
+          {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
             <>
