@@ -78,6 +78,7 @@ git('commit', '-qm', 'init')
 
 const info = await ensureDaemon()
 const p = await rpc('projectAdd', { path: repo })
+await rpc('projectTrust', { id: p.id, hash: (await rpc<{ hash: string }>('projectTrust', { id: p.id })).hash }) // its .laki.json, as you would in the app
 const a = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'fix-cart-total', prompt: 'fix the cart total rounding' })
 const b = await rpc('wsNew', { project: p.id, preset: 'codex', name: 'dark-mode' })
 const c = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'checkout-flow' })
