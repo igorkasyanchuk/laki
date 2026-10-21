@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { QUEUE_MAX, apiQuestions, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
@@ -1766,6 +1766,43 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
   assert.deepEqual(r.flows, [])
   assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
+})
+
+test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an agent's ask only once trusted as it is; an edit stops it; the app's Start runs it", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  // as git brings it: never saved in Laki
+  const file = join(rig.repo, '.laki/workflows/onnew.md')
+  mkdirSync(dirname(file), { recursive: true })
+  const text = '# On new\nruns in: here · on: workspace.new\n\n## start\nnext: say\n\n## say\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n'
+  writeFileSync(file, text)
+  const item = () => rig.rpc('flowList', { project: p.id }).then((l: any[]) => l.find(w => w.id === 'onnew'))
+  assert.equal((await item()).untrusted, true)
+  const started = async () => ((await rig.rpc('state')).flows ?? []).filter((r: any) => r.workflow === 'onnew').length
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'workspace.new' && e.refused?.includes('onnew: from the repo, not trusted as it is: open it in Workflows, then Save or Trust it')), 'refused, said in laki widget events')
+  assert.equal(await started(), 0)
+  // a schedule's and an agent's start: refused; the app's own Start: runs it
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, trigger: 'schedule x' }), /isn't trusted as it is yet/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, by: 'agent' }), /isn't trusted as it is yet/)
+  await rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, ws: ws.id, editor: true })
+  await until(async () => (await started()) === 1, "the app's Start runs it")
+  // trusted as the sheet showed it (another text: refused); then an event starts it
+  await assert.rejects(rig.rpc('flowTrust', { id: 'onnew', project: p.id, text: 'nope' }), /changed since you looked/)
+  await rig.rpc('flowTrust', { id: 'onnew', project: p.id, text })
+  assert.equal((await item()).untrusted, undefined)
+  await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'two' })
+  await until(async () => (await started()) === 2, 'the event starts it, trusted')
+  // an edit: not trusted again
+  writeFileSync(file, text.replace('echo hi', 'echo changed'))
+  assert.equal((await item()).untrusted, true)
+  await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
+  await sleep(1500)
+  assert.equal(await started(), 2)
+  // saved in the editor: you read it, trusted
+  await rig.rpc('flowSave', { id: 'onnew', source: 'project', project: p.id, text: text.replace('echo hi', 'echo saved') })
+  assert.equal((await item()).untrusted, undefined)
 })
 
 test('a workflow an agent wrote runs only from its editor in the app: a schedule, Run again and the CLI are refused; Delete then Undo keeps the mark', async t => {

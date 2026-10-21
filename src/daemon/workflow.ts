@@ -5,7 +5,7 @@
 // restart resumes each at its block. Turn ends come from core's hooks (turnEnds), PR checks from its scans (prOf).
 // ponytail: runs only while the daemon is up (the Mac awake); a run command runs on this Mac (not an SSH host)
 import { type ChildProcess, spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
@@ -49,7 +49,26 @@ const usable = (p: Project) => !p.kind && !p.host // ponytail: not an SSH host's
 
 function item(text: string, id: string, source: WorkflowSource, project?: string, path?: string): WorkflowItem {
   const { workflow, problems } = parse(text, id)
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(agentKey(source, id, project)) && { byAgent: true }) }
+  const untrusted = source === 'project' && state.flowTrust?.[agentKey(source, id, project)] !== textHash(text)
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(agentKey(source, id, project)) && { byAgent: true }), ...(untrusted && { untrusted: true }) }
+}
+// a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
+// the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
+// event, a schedule or an agent's ask; the app's Start runs it, you're looking at it there
+const textHash = (t: string) => createHash('sha256').update(t).digest('hex')
+function trust(source: WorkflowSource, id: string, project: string | undefined, text: string) {
+  if (source !== 'project') return
+  state.flowTrust = { ...state.flowTrust, [agentKey(source, id, project)]: textHash(text) }
+}
+export function flowTrust(o: Ref & { text: string }) {
+  on()
+  const wf = flowFind({ ...o, source: 'project' })
+  if (wf.text !== o.text) throw new Error(`${wf.name} changed since you looked at it: look again`)
+  trust('project', wf.id, wf.project, wf.text)
+  save()
+  flowFiles.at = Date.now()
+  changed()
+  return { ...wf, untrusted: undefined }
 }
 
 function readDir(d: string, source: WorkflowSource, project?: string): WorkflowItem[] {
@@ -125,6 +144,7 @@ export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem 
   keepOld(histOf({ ...o, project: f.project }), f.path, text)
   writeFileSync(f.path, text)
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), o.by === 'agent')
+  if (o.by !== 'agent') trust(o.source ?? 'yours', o.id, f.project, text) // saved in the editor: you've read it
   flowFiles.at = Date.now()
   changed()
   return item(readFileSync(f.path, 'utf8'), o.id, o.source ?? 'yours', f.project, f.path)
@@ -367,6 +387,7 @@ export async function flowStart(o: Start) {
   // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
+  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't trusted as it is yet: open it in Laki's Workflows, read it, then Save or Trust it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)
@@ -1340,6 +1361,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (!ws) { no('the event has no workspace, so no project'); continue }
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
+    if (wf.untrusted) { no("from the repo, not trusted as it is: open it in Workflows, then Save or Trust it"); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }

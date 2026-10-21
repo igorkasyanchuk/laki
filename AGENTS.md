@@ -1001,7 +1001,12 @@ a new one since, its tab gone) the whole prompt; either way the mark goes and th
 to see them on, and only runs started before the daemon (`boot`) come back. Agents (MCP's `laki_workflow_write`, `by:
 'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` refuses those unless
 `editor` (StartRun's, the app's; never with `by: 'agent'`): schedules, events, Run again, Run from here, the CLI and MCP
-can't; `flowRm` keeps the mark in `trash.json` (`byAgent`), `flowRestore` puts it back.
+can't; `flowRm` keeps the mark in `trash.json` (`byAgent`), `flowRestore` puts it back. A project's (`.laki/workflows`,
+the repo's) is trusted by its text's sha256 (`state.flowTrust`, by `agentKey`), set by `flowSave` (not `by: 'agent'`,
+main.ts maps an agent's tab to it) and `flowTrust` (`text`: the file as the sheet showed it, else refused); `item`'s
+`untrusted` otherwise: `flowStart` refuses it for `by: 'agent'`, an `event` and a `schedule ` trigger, `eventHooks.flows`
+says so in `refused`; the editor's banner (*Trust it…*: `choose` with the file), the index's *not trusted* tag,
+StartRun's note.
 `broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
 message with `ev` as an event, though it has an `id`: the run's). A tab an agent block sends a
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the

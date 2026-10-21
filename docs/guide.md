@@ -1077,7 +1077,10 @@ chat button) opens its chat with the workflow in every ask (the file, your unsav
 step, it writes the workflow, you read it and *Save*.
 
 None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
-`.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). *With
+`.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). A
+project's workflow that came with the repo (git brought it, or it changed since) is *not trusted*: events, schedules
+and agents don't start it until you Save it in its editor or *Trust it…* (which shows the file); an edit asks again.
+Your own Start runs it, saying it's from the repo. *With
 Laki AI…*: say what it should do; its chat asks you a few questions first (what starts it, its steps, where it routes,
 how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it; so does the
 ⋯ in a workflow's head. A deleted one goes to the trash for 30 days: *Undo* on the note brings it back, and so does

@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
-import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy } from './workflow.ts'
+import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
@@ -361,7 +361,8 @@ const api: Record<string, Handler> = {
     aiForget(chat)
   },
   flowList: p => flowList(p), // workflows (experimental): workflow.ts
-  flowSave: p => flowSave(p),
+  flowSave: ({ caller, ...p }) => flowSave(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's tab: marked, never trusted
+  flowTrust: p => flowTrust(p), // the editor's Trust: a project's workflow as the sheet showed it
   flowRm: p => flowRm(p), // the app's Delete: to the trash, a toast's Undo is flowRestore
   flowRestore: p => flowRestore(p),
   flowTrash: () => flowTrash(), // laki flow trash

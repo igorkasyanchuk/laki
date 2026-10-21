@@ -544,7 +544,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; cfgTrust?: boolean } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; cfgTrust?: boolean } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once; flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 

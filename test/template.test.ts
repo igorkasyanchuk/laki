@@ -182,9 +182,9 @@ test("Send later's edit: its time again, read back to the same minute (ASCII dig
   assert.equal(laterText(now - 5000, now), '1m')
 })
 
-test('a settings file from another version: fields of the wrong kind left out, the rest (unknown ones too) in', () => {
+test("a settings file from another version: fields of the wrong kind left out, the rest (unknown ones too) in, this Mac's env kept", () => {
   assert.deepEqual(importable({ theme: 'starship', fontSize: '14', actions: {}, presets: null, gone: 1, env: { A: '1' } }), {
-    ok: { theme: 'starship', presets: null, gone: 1, env: { A: '1' } },
+    ok: { theme: 'starship', presets: null, gone: 1 },
     bad: ['fontSize', 'actions'],
   })
 })

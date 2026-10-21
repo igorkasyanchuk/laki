@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a project's workflow that came with the repo (or changed since) starts on an event, a schedule or an
+  agent's ask only once you Save it in its editor or *Trust it…*. Your own Start still runs it. A repo workflow you
+  used before this version: save it once.
 - A repo's `.laki.json` runs nothing until you trust it: the status bar says *.laki.json waits for you*, a click shows
   the file and *Trust this repo's .laki.json*, and an edit to it waits again. Projects you had before this version are
   trusted as their file is now. Env that changes how programs start (`PATH`, `ZDOTDIR`, `NODE_OPTIONS`, `DYLD_*`…)

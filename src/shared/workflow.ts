@@ -110,7 +110,7 @@ export type Block = {
 }
 export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project'
-export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
+export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean; untrusted?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since; untrusted: a project's (the repo's) not trusted as it is (flowTrust)
 
 export const ID = /^[a-z0-9][a-z0-9_?-]{0,40}$/i
 // a Start's inputs: line, name[?][:kind][=default], kind text (unset), number, branch or choice(a|b|…); kind stays as
