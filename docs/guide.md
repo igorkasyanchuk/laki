@@ -231,10 +231,11 @@ selected workspace's PR is in the status bar.
   (auto-memory): what agents found worth keeping as they worked there (an approach that works, a gotcha, a
   convention), each with when and who added it; past 50 the oldest goes, and the pin keeps one as yours. Claude and
   Codex get both lists at every start in the project (after Settings › *Global memory*), with how to add to them (unless the preset's *Tell it about
-  Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start. With Laki AI on,
-  its model compacts the learned list (never yours) every 7 days and as it fills up: duplicates merged, overlaps
-  joined, stale ones dropped. *Compact now* does it at once, *Log* shows each run's list before and after; Settings ›
-  *Global memory* sets how often (or only when full) or turns it off.
+  Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start. *Compact now*
+  sends the learned list (never yours) to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped;
+  *Log* shows each run's list before and after. Settings › *Global memory* › *On its own* (off until you turn it on:
+  it sends every project's learned list) does it every 7 days and as a list fills up, and sets how often (or only when
+  full).
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
   laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours

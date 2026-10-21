@@ -209,7 +209,7 @@ export type AppSettings = Paint & {
   railHide?: string[] // its buttons in ⋯ More
   sideStyle?: SideStyle // the sidebar's rows
   memory?: Memory[] // Global memory: the user's rules for every project's agents
-  memoryCompact?: { off?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own (daemon/memory.ts)
+  memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, off unless on (daemon/memory.ts)
   imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
 }
@@ -3939,8 +3939,8 @@ export function SettingsPage(p: {
               <MemoryList global memory={s.memory ?? []} save={memory => (set({ memory }), Promise.resolve())} />
               <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
                 <div className="setting-box">
-                  <Switch className="switch-row" on={!s.memoryCompact?.off} onChange={on => set({ memoryCompact: { ...s.memoryCompact, off: !on || undefined } })}>
-                    <Says title="On its own" hint={aiOn(s) ? `Every few days, and as a project's learned memories reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
+                  <Switch className="switch-row" on={s.memoryCompact?.on === true} onChange={on => set({ memoryCompact: { ...s.memoryCompact, on: on || undefined } })}>
+                    <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to Laki AI's model every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
                   </Switch>
                   <label className="row">
                     <Says title="Every" hint="days since the last one (0: only when full)" />

@@ -35,7 +35,7 @@ test("memory compaction: the learned ones (never yours) through Laki AI's model,
 
   await rig.rpc('settingsSet', { ai: { on: false } }) // on unless turned off
   await assert.rejects(rig.rpc('memoryCompact', { project: p.id }), /Laki AI is off/)
-  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('settingsSet', { ai: {} }) // on: unset
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc' })
 
   // an answer that isn't the list: nothing changes, the failure is the run's
@@ -61,13 +61,20 @@ test("memory compaction: the learned ones (never yours) through Laki AI's model,
   assert.equal(log[0].was.length, 3)
   assert.ok(readFileSync(join(rig.data, 'memory-compact.jsonl'), 'utf8').includes('npm test runs the tests'))
 
-  // on its own: not yet due, then a week later; off: never
+  // on its own: only once turned on (N11: a key saved, Laki AI on by default, sends nothing), not as 0.24 left it; then
+  // not yet due, a week later, and never once turned off again
   await rig.rpc('memoryAdd', { project: p.id, text: 'one more thing learned' })
   reply = JSON.stringify({ memories: [{ text: 'All of it', from: [] }] })
+  const hits = or.hits.length
+  assert.deepEqual(await rig.rpc('memoryTick', { now: Date.now() + 8 * 86400000 }), [])
+  await rig.rpc('settingsSet', { memoryCompact: { days: 7 } }) // as 0.24 left it: on, by then's default
+  assert.deepEqual(await rig.rpc('memoryTick', { now: Date.now() + 8 * 86400000 }), [])
+  assert.equal(or.hits.length, hits, 'nothing sent')
+  await rig.rpc('settingsSet', { memoryCompact: { on: true } })
   assert.deepEqual(await rig.rpc('memoryTick', { now: Date.now() + 86400000 }), [])
   assert.deepEqual(await rig.rpc('memoryTick', { now: Date.now() + 8 * 86400000 }), [p.id])
   assert.equal((await rig.rpc('state')).projects[0].compacted.why, 'days')
-  await rig.rpc('settingsSet', { memoryCompact: { off: true } })
+  await rig.rpc('settingsSet', { memoryCompact: { on: false } })
   await rig.rpc('memoryAdd', { project: p.id, text: 'and another' })
   assert.deepEqual(await rig.rpc('memoryTick', { now: Date.now() + 30 * 86400000 }), [])
 })
@@ -79,7 +86,7 @@ test('memory compaction when full: once, not again while a run leaves it full; a
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
   await rig.rpc('projectAdd', { path: rig.repo })
   const [p] = (await rig.rpc('state')).projects
-  await rig.rpc('settingsSet', { memoryCompact: { days: 0 } }) // only when full; Laki AI on by default
+  await rig.rpc('settingsSet', { memoryCompact: { on: true, days: 0 } }) // only when full; Laki AI on by default
   const learn = async (n: number, from: number) => {
     for (let i = from; i < from + n; i++) await rig.rpc('memoryAdd', { project: p.id, text: `fact ${i}` })
   }

@@ -86,10 +86,11 @@ export function memoryCompactLog(o: { project?: string; n?: number }) {
 }
 
 // due ones, one at a time: every days since the last run (never run: since its oldest learned one), or the learned list
-// full; with Laki AI on and able to answer (OpenRouter: a key), the setting not off (now: tests move the clock)
+// full; once you turn it on (N11: it sends them to a model; an older off is ignored), with Laki AI on and able to answer
+// (OpenRouter: a key) (now: tests move the clock)
 export async function memoryTick(now = Date.now()) {
   const s = state.settings
-  if (!s || !aiOn(s) || s.memoryCompact?.off || ((s.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) return [] // on by default: not before it can answer
+  if (!s || s.memoryCompact?.on !== true || !aiOn(s) || ((s.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) return []
   const days = s.memoryCompact?.days ?? COMPACT_DAYS
   const done: string[] = []
   for (const p of state.projects) {

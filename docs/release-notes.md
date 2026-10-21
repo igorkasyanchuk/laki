@@ -14,6 +14,9 @@ version it builds, with the date. -->
 - 12 more achievements (54): an action, a project's own template and action, a reviewed file, a file edited in Laki,
   the global hotkey, a bubble's click, Resources, the Simulators, an experimental feature, a meme and a video.
 - Fixed: Laki AI showed as on (its default) but refused every ask until you turned its switch off and on again.
+- Compacting agents' memories on their own (Settings › Global memory) is off until you turn it on: it sends each
+  project's learned memories to Laki AI's model. It was on for anyone with Laki AI able to answer; turn it on again
+  there if you want it.
 
 ## 0.24.0 · Oct 21, 2026
 

@@ -60,4 +60,5 @@ Laki sends no analytics and no crash reports. With nothing set up, it calls:
 
 Everything else only when you set it up or click it: Laki AI and Voice (OpenRouter), phone pushes (your webhook),
 Cloudflare or Tailscale (remote access, tunnels, shared tabs), memes (Reddit), a video (YouTube), an extension's own
-fetches.
+fetches. A saved OpenRouter key or a Laki AI backend alone sends no memories: compacting agents' learned ones in the
+background (Settings › Global memory › *On its own*) runs only once you turn it on.
