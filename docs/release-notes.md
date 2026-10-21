@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.24.0 · Oct 21, 2026
 
 - *Screenshot to Laki AI* (Settings › General › Global hotkey, off by default): ⌃⌥⌘S from any app, or the menu bar's
   item, picks a part of the screen and opens Laki AI's window with it attached and the mic listening; say what to do,
