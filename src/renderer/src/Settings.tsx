@@ -15,7 +15,7 @@ import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { ask, HOTKEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
+import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
 import { PICKER_KEY } from './Picker'
 import { QR } from './Tunnel'
 import { mostRoom, USAGE_AGENTS } from './Usage'
@@ -185,6 +185,8 @@ export type AppSettings = Paint & {
   pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey (unset: on)
   hotkey?: string // its keys (unset: HOTKEY; '': none)
+  shotAsk?: boolean // Screenshot to Laki AI (off unless true)
+  shotKey?: string // its keys (unset: SHOT_KEY; '': none)
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
@@ -1208,6 +1210,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
+  ['general', 'Screenshot to Laki AI', 'global hotkey screenshot region area capture dictation voice mic ask ai menu bar tray'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'pages overview all sessions screens preview eye running'],
@@ -2619,24 +2622,25 @@ function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v
   )
 }
 
-// the global hotkey (main's globalShortcut, registered by App as the settings come): on, and its keys; main says
-// when another app has them
-function HotkeyField({ on, keys, set }: { on: boolean; keys: string; set: (o: Partial<AppSettings>) => void }) {
+// a global hotkey (main's globalShortcut, registered by App as the settings come): on, and its keys; main says when
+// another app (or Laki's other one) has them. bind: main's (false: off); off: why it can't be on now
+function HotkeyField(p: { on: boolean; keys: string; def: string; title: string; hint: string; off?: string; bind: (keys: string | false) => Promise<boolean>; onOn: (on: boolean) => void; onKeys: (keys: string) => void }) {
   const [taken, setTaken] = useState(false)
-  useEffect(() => void bridge?.hotkey?.(on ? keys : '').then(ok => setTaken(!ok)), [on, keys])
+  const live = p.on && !p.off
+  useEffect(() => void p.bind(live ? p.keys : false).then(ok => setTaken(live && !ok)), [live, p.keys])
   return (
     <div className="setting-box">
-      <Switch className="switch-row" on={on} onChange={hotkeyOn => set({ hotkeyOn })}>
-        <Says title="Bring Laki forward from any app" hint="Whatever app you're in, these keys show Laki's window" />
+      <Switch className="switch-row" on={p.on} onChange={p.onOn}>
+        <Says title={p.title} hint={p.on && p.off ? p.off : p.hint} />
       </Switch>
-      {on && (
+      {live && (
         <div className="row">
           <Says title="Hotkey" hint={taken ? "These keys can't be Laki's: record others" : 'Two of ⌃ ⌥ ⌘ with a key, or one of them with Space'} />
           <span className="grow" />
-          <KeyField value={keys} def={HOTKEY} onSet={hotkey => set({ hotkey })} />
+          <KeyField value={p.keys} def={p.def} onSet={p.onKeys} />
         </div>
       )}
-      {on && taken && <p className="field-err">{keys}: another app (or macOS) has these keys, or they need two of ⌃ ⌥ ⌘ (one is enough with Space or an F key)</p>}
+      {live && taken && <p className="field-err">{p.keys}: another app (or macOS, or Laki's other hotkey) has these keys, or they need two of ⌃ ⌥ ⌘ (one is enough with Space or an F key)</p>}
     </div>
   )
 }
@@ -3089,7 +3093,29 @@ export function SettingsPage(p: {
               )}
               {bridge?.hotkey && (
                 <Group title="Global hotkey">
-                  <HotkeyField on={s.hotkeyOn !== false} keys={s.hotkey ?? HOTKEY} set={set} />
+                  <HotkeyField
+                    on={s.hotkeyOn !== false}
+                    keys={s.hotkey ?? HOTKEY}
+                    def={HOTKEY}
+                    title="Bring Laki forward from any app"
+                    hint="Whatever app you're in, these keys show Laki's window"
+                    bind={k => bridge!.hotkey!(k || '')}
+                    onOn={hotkeyOn => set({ hotkeyOn })}
+                    onKeys={hotkey => set({ hotkey })}
+                  />
+                  {bridge.shotKey && (
+                    <HotkeyField
+                      on={s.shotAsk === true}
+                      keys={s.shotKey ?? SHOT_KEY}
+                      def={SHOT_KEY}
+                      title="Screenshot to Laki AI"
+                      hint="From any app: pick a part of the screen, and Laki AI's window opens with it attached and the mic listening. Say what to do, then send. The menu bar has it too."
+                      off={aiOn(s) ? undefined : 'Laki AI answers it: turn Laki AI on in Settings › AI'}
+                      bind={k => bridge!.shotKey!(k)}
+                      onOn={shotAsk => set({ shotAsk })}
+                      onKeys={shotKey => set({ shotKey })}
+                    />
+                  )}
                 </Group>
               )}
               <Group title="Notifications" hint="Phone pushes are in their own section">

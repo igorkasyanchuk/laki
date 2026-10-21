@@ -39,7 +39,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -1512,6 +1512,8 @@ export function App() {
   const pickKey = settings.pickerKey ?? PICKER_KEY // the element picker's hotkey ('' none)
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
+  const shotKey = !view ? null : settings.shotAsk === true && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
+  useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey)), [shotKey])
   // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
   const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)

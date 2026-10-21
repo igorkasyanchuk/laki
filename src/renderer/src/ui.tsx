@@ -199,6 +199,7 @@ export const keyLabel = (e: { key: string; code: string; metaKey: boolean; ctrlK
 }
 
 export const HOTKEY = '⌃⌥⌘L' // the global hotkey's keys (settings.hotkey unset)
+export const SHOT_KEY = '⌃⌥⌘S' // Screenshot to Laki AI's (settings.shotKey unset)
 
 export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
   useEffect(() => {

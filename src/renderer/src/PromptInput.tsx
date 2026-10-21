@@ -73,6 +73,7 @@ export function PromptInput(p: {
   lead?: ReactNode // pickers right after +: then the mic goes to the right end, before send
   send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
+  shot?: { n: number; png: string } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on
   inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
 }) {
@@ -114,6 +115,18 @@ export function PromptInput(p: {
     }
     p.onBusy?.(--saving.current > 0)
   }
+  // Screenshot to Laki AI's picture, as if pasted; then the mic, once the window has the keyboard (dictation needs it:
+  // the AI window comes up as the screenshot ends), not later than that: a click into it a while after would start it
+  useEffect(() => {
+    if (!p.shot) return
+    void add([new File([Uint8Array.from(atob(p.shot.png), c => c.charCodeAt(0))], 'screenshot.png', { type: 'image/png' })])
+    if (!(cloud || p.dictate)) return
+    const go = () => (cloud ? (box.current?.focus(), void voiceStart()) : dictate())
+    if (document.hasFocus()) return void go()
+    window.addEventListener('focus', go, { once: true })
+    const t = setTimeout(() => window.removeEventListener('focus', go), 5000)
+    return () => (clearTimeout(t), window.removeEventListener('focus', go))
+  }, [p.shot?.n])
   const filesOf = (l: DataTransferItemList | FileList) => Array.from(l as ArrayLike<DataTransferItem | File>).map(x => (x instanceof File ? x : x.kind === 'file' ? x.getAsFile() : null)).filter((f): f is File => !!f)
   // images to the daemon, other files to the caller's files (none: left out); false: nothing taken
   const take = (l: DataTransferItemList | FileList) => {

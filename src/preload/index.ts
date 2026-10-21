@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('laki', {
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
+  shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label), // Screenshot to Laki AI's ('' none; false: it's off)
+  // the AI window's: Screenshot to Laki AI's picture (a PNG, base64), for its box
+  onAiShot: (cb: (png: string) => void) => {
+    ipcRenderer.on('ai-shot', (_e, png: string) => cb(png))
+    ipcRenderer.send('ai-shot-ready') // then main sends one taken before
+  },
   floatTab: (tab: string, on = true) => ipcRenderer.send('tab-float', tab, on), // a tab in a window of its own over every app, or back
   floating: (): Promise<string[]> => ipcRenderer.invoke('floating'), // the tabs in windows of their own
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),

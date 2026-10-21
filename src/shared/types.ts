@@ -464,6 +464,8 @@ export type Settings = {
   pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
+  shotAsk?: boolean // Screenshot to Laki AI: a global hotkey and a menu bar item, a part of the screen to the AI window with the mic on (off unless true; needs Laki AI)
+  shotKey?: string // its keys (unset: ui.tsx SHOT_KEY; '': none, the menu bar's item only)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetAgent?: string // Settings › Extensions' agent: the claude or codex preset an AI source runs (unset: the first claude one)
   widgetLogs?: boolean // Settings › Extensions' Keep logs for every extension (widgets.ts' logs; unset: only those with their own Keep a log)

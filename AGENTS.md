@@ -1874,8 +1874,15 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   tab goes. Main sends `floating` (the ids) as one opens or closes; App's `floated` shows `.floated` in that pane
   instead of a `Term`.
 - **The global hotkey** (`settings.hotkeyOn`, unset on; `hotkey`, unset `HOTKEY` ⌃⌥⌘L, keyLabel's text): App sends it
-  to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`; it shows the app's window), Settings'
-  `HotkeyField` too, which says when another app has it (`register` false).
+  to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`
+  through `bindKey`, `keys.open`; it shows the app's window), Settings' `HotkeyField` too, which says when another app (or
+  the other hotkey: `grab` never puts both on the same keys, and gives one the keys it asked for once the other lets go,
+  `wants`) has it (`register` false). Screenshot to Laki AI (`settings.shotAsk`, off unless true, only while `aiOn`;
+  `shotKey`, unset `SHOT_KEY` ⌃⌥⌘S): App's `shotKey` to main's `shot-hotkey` (false: off, `shotOn`; `keys.shot`), and the
+  menu bar's *Screenshot to Laki AI…* while on: `shotAsk`, `screenshot` `-i`, then `aiWin` with the PNG (`ai-shot`, or
+  `aiShot` until the page's `ai-shot-ready`: preload's `onAiShot`); `AiWindow` hands it through `AiPage` to PromptInput's
+  `shot`: added as a pasted image (`add`), then the mic on (cloud's `voiceStart`, else macOS dictation) as the window gets
+  the focus (5 s at most).
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki

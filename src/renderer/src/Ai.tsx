@@ -58,6 +58,7 @@ export function AiPage({
   embed,
   hello,
   chat,
+  shot,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
@@ -69,6 +70,7 @@ export function AiPage({
   embed?: boolean // compact, in a page of its own (the Extension page's): no close, Esc is the page's
   hello?: { title: string; text: string; examples: string[]; placeholder: string } // what an empty chat says, its examples and the box's hint
   chat?: string // a chat of its own (the Extension page's widget:<id>, the studio's too); none: the AI page's
+  shot?: { n: number; png: string } // the AI window's Screenshot to Laki AI: each new one into the box, the mic on (PromptInput's)
 }) {
   const c = chat ? { chat } : {}
   const [d, setD] = useState<AiData>()
@@ -216,6 +218,7 @@ export function AiPage({
                   dictationSettings={bridge?.dictationSettings}
                   onSubmit={ask}
                   focus={!embed}
+                  shot={shot}
                   enter
                   onBusy={setSaving}
                   rows={2}

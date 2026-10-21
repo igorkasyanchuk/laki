@@ -16,6 +16,7 @@ const GUIDE = `${REPO}/blob/main/docs/guide.md`
 
 const KEYS: [string, string][] = [
   ['⌃⌥⌘L', 'from any app: bring Laki forward (Settings › General › Global hotkey)'],
+  ['⌃⌥⌘S', 'from any app, when on: a part of the screen to Laki AI, the mic listening (Settings › General › Global hotkey)'],
   ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
   ['⌘N', 'new workspace'],
   ['⌘T / ⌘W', 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],

@@ -68,10 +68,12 @@ export function TabWindow() {
 
 export function AiWindow() {
   const view = useView()
+  const [shot, setShot] = useState<{ n: number; png: string }>() // Screenshot to Laki AI's picture, the newest: to the box, the mic on
+  useEffect(() => void bridge?.onAiShot?.(png => setShot(s => ({ n: (s?.n ?? 0) + 1, png }))), [])
   if (!view) return null
   return (
     <>
-      <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} />
+      <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} shot={shot} />
       <AskHost />
       <VoiceBar />
       <Tips />

@@ -288,20 +288,30 @@ function accelOf(label: string) {
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
   return [m[1] && 'Control', m[2] && 'Alt', m[3] && 'Shift', m[4] && (mac ? 'Command' : 'Super'), ACCEL_KEYS[m[5]] ?? m[5]].filter(Boolean).join('+')
 }
-let hotkey = ''
-ipcMain.handle('hotkey', (e, label: unknown) => {
-  if (!from(e)) return false
+type Key = 'open' | 'shot' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk)
+const keys: Record<Key, string> = { open: '', shot: '' } // what each holds
+const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show] } // what each asked for
+let shotOn = false // Screenshot to Laki AI is on (Settings › General): the menu bar has it too
+function grab(which: Key) {
+  const [a, fn] = wants[which]
+  if (a === keys[which]) return
+  if (keys[which]) globalShortcut.unregister(keys[which])
+  keys[which] = ''
+  try {
+    if (a && !Object.values(keys).includes(a) && globalShortcut.register(a, fn)) keys[which] = a // never both on the same keys
+  } catch {} // keys Electron can't name
+}
+function bindKey(which: Key, label: unknown, fn: () => void) {
   const a = typeof label === 'string' ? accelOf(label) : ''
-  if (a !== hotkey) {
-    if (hotkey) globalShortcut.unregister(hotkey)
-    hotkey = ''
-    try {
-      if (a && globalShortcut.register(a, () => (app.focus({ steal: true }), show()))) hotkey = a
-    } catch {} // keys Electron can't name
-    trayMenu() // Open Laki shows the keys
-  }
-  return a ? hotkey === a : !label // false: another app has them, or they can't be a global hotkey
-})
+  wants[which] = [a, fn]
+  grab(which)
+  grab(which === 'open' ? 'shot' : 'open') // the keys the other one asked for may be free now
+  trayMenu() // its items show the keys
+  return a ? keys[which] === a : !label // false: another app (or the other hotkey) has them, or they can't be a global hotkey
+}
+ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label, () => (app.focus({ steal: true }), show())))
+// Screenshot to Laki AI's keys ('' none); false: it's off (no menu bar item either)
+ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label !== false), bindKey('shot', shotOn ? label : '', shotAsk)))
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 ipcMain.handle('conn', async e => {
@@ -458,8 +468,9 @@ function trayMenu() {
       { label: 'New Workspace…', click: () => newWsWin() }, // the bubbles' + window: over the app you're in
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
+      ...(shotOn ? [{ label: 'Screenshot to Laki AI…', ...(keys.shot && { accelerator: keys.shot, registerAccelerator: false }), click: shotAsk }] : []),
       { type: 'separator' },
-      { label: `Open ${app.name}`, ...(hotkey && { accelerator: hotkey, registerAccelerator: false }), click: () => show() }, // its global hotkey beside it
+      { label: `Open ${app.name}`, ...(keys.open && { accelerator: keys.open, registerAccelerator: false }), click: () => show() }, // its global hotkey beside it
       { label: 'Quit', click: () => app.quit() },
     ]),
   )
@@ -752,11 +763,30 @@ function newWsWin(prompt?: string) {
 }
 // the bubbles' Ask Laki AI: the AI page alone (?window=ai), a chat in a panel like the new-workspace one; one at a time
 let aiW: BrowserWindow | null = null
+let aiReady = false // its page listens for screenshots (ai-shot-ready)
+let aiShot: string | null = null // Screenshot to Laki AI's picture (a PNG, base64) until the page listens
 function aiWin() {
   if (aiW && !aiW.isDestroyed()) return void aiW.focus()
+  aiReady = false
   const w = (aiW = panelWin({ window: 'ai' }, 560, 680, { minWidth: 420, minHeight: 360 }))
-  w.on('closed', () => aiW === w && (aiW = null))
+  w.webContents.on('did-start-loading', () => aiW === w && (aiReady = false)) // a reload: it listens again as it's up
+  w.on('closed', () => aiW === w && ((aiW = null), (aiShot = null)))
 }
+// Screenshot to Laki AI (its global hotkey, the menu bar's item): a part of the screen, then the AI window with it in the
+// box and the mic on (the page's: it saves the picture and starts dictation once it has the keyboard); Esc: nothing
+function shotAsk() {
+  if (shooting) return // a screenshot is being taken: the keys again do nothing
+  screenshot(true, undefined, png => {
+    if (aiW && !aiW.isDestroyed() && aiReady) aiW.webContents.send('ai-shot', png)
+    else aiShot = png
+    aiWin()
+  })
+}
+ipcMain.on('ai-shot-ready', e => {
+  if (!aiW || e.sender !== aiW.webContents) return
+  aiReady = true
+  if (aiShot) e.sender.send('ai-shot', aiShot), (aiShot = null)
+})
 // a tab floated out of the app (a tab's right click › Float in its own window): its terminal alone (?window=tab), in a
 // panel over every app, Space and full-screen app, resizable; one per tab. Closing it (its ✕) puts it back: the app's
 // pane, which says where it went meanwhile (floating), shows it again

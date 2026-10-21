@@ -80,6 +80,9 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **The iOS Simulator and app windows**: `laki screen shot` gives an agent a screenshot of the booted simulator or any
   app's window, and with idb it taps, swipes and types in the simulator (`laki screen tap`), to check what it built.
 - **A global hotkey**: ⌃⌥⌘L brings Laki forward from any app (Settings › General).
+- **Screenshot to Laki AI** (off until you turn it on, Settings › General › Global hotkey): ⌃⌥⌘S from any app, or the
+  menu bar's item, picks a part of the screen; Laki AI's window opens with it attached and the mic listening. Say what
+  to do, then send.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance hides it.
@@ -783,7 +786,8 @@ notification; click it to jump there. Settings › General picks which (waiting,
 sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
-small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it.
+small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
+and with *Screenshot to Laki AI* on, its item (and its keys) is there too.
 Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Appearance), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **A new session from an agent**: in a Claude Code tab, `/laki:new <the task> with codex` (or claude, gemini, grok,
@@ -1289,6 +1293,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | key | |
 |---|---|
 | ⌃⌥⌘L | from any app: bring Laki forward (Settings › General › *Global hotkey*: off, or other keys) |
+| ⌃⌥⌘S | from any app, when *Screenshot to Laki AI* is on: a part of the screen to Laki AI's window, the mic listening |
 | ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
 | ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |
@@ -1327,7 +1332,7 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
-- *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+- *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, off by default: ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
