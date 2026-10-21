@@ -50,8 +50,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Side panel** (⌥⌘B): the workspace's info (⌘I), its files (search, preview, several open as tabs, new file or folder, changed files marked),
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
   and review comments, and a browser preview of its dev server (a screenshot, or a picked element's selector,
-  HTML, CSS and screenshot, goes to the agent). Markdown files preview rendered or raw; changed images show
-  before and after. ⌘P finds a file by name.
+  HTML, CSS and screenshot, goes to the agent), and a booted iOS Simulator or Android emulator live, to tap and type
+  in. Markdown files preview rendered or raw; changed images show before and after. ⌘P finds a file by name.
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
   browser of the app's, take screenshots, click, fill in fields and read the page.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
@@ -585,7 +585,8 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   wider; a double-click on it shares the room with the terminals again. If the file changed since you started (an
   agent at work), saving asks before writing yours over it. Line ends (CRLF) stay as they were; files over 512 KB or
   not UTF-8 open in your editor instead. A right click opens it elsewhere: its default
-  app, a browser (HTML, SVG, PDF, images, JSON, XML), any editor, Finder (shows it), a terminal (in its folder);
+  app (a script, an app or an executable: shown in Finder, never run), a browser (HTML, SVG, PDF, images, JSON, XML),
+  any editor, Finder (shows it), a terminal (in its folder);
   or copies its path. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
@@ -630,7 +631,8 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   the buttons press Home, Back and Apps (Android) and Lock; the camera puts a screenshot's path into the agent's prompt.
   With several running, pick one in its menu. iOS needs Xcode (`xcode-select` pointing at it, its license accepted),
   and taps and typing need idb (`brew install facebook/fb/idb-companion`, then `pipx install fb-idb`); Android needs
-  `adb` on PATH (Android Studio's platform-tools). Nothing running: it says why and what to start.
+  `adb` on PATH (Android Studio's platform-tools). Nothing running: it says why and what to start (a phone that waits
+  for you to allow USB debugging, by name).
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
@@ -1015,8 +1017,8 @@ it stays open while runs go (✕ does).
 A workflow can start by itself on an event (*Starts on* in its settings, `on: pr.merged` in its file): any extension
 event, or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project (`runs in: here`: in that workspace),
 its task the event's name, its fields as `{{event.ws.branch}}`, `{{event.data.sha}}`. It doesn't start for an event
-with no workspace, for a workflow an agent wrote (until you save it), or for an agent's event when it runs commands (a run or
-extension block), a webhook or outward actions (a new workspace or tab an agent made counts as its event); `laki widget
+with no workspace, for one its own run sent (a workspace or tab it made too), for a workflow an agent wrote (until
+you save it), or for an agent's event when it runs commands (a run or extension block), a webhook or outward actions (a new workspace or tab an agent made counts as its event); `laki widget
 events` says why.
 
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
@@ -1028,8 +1030,8 @@ variable or one of its own, so *if the change is only specs → approve, else �
 answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`), *Laki action* (open a PR, approve,
 merge, the dev server, archive), *Wait* (until its PR's checks pass or fail), *Save* (into the workspace's storage
 folder, its Artifacts: text such as an agent's answer, a file or folder of the workspace, or a link such as its PR),
-*AI call* (one prompt to a model on OpenRouter with Laki AI's key, no tools: a summary, a title, a pick; its cost
-among Laki AI's calls), *Webhook* (a request to another system: POST unless changed, headers such as
+*AI call* (one prompt to a model on OpenRouter with Laki AI's key, no tools: a summary, a title, a pick; 5 minutes
+at most; its cost among Laki AI's calls), *Webhook* (a request to another system: POST unless changed, headers such as
 `Authorization: Bearer {{env.MY_TOKEN}}` from Settings' or the project's env, never logged; the body is your text, a
 workspace file, or else the run's variables as JSON; ok on 2xx, else error; 429 and 5xx are tried twice more, after
 the server's Retry-After), *AI decision* (a decision model on OpenRouter: Jev, GPT-6 Luna Decisions,
@@ -1039,7 +1041,8 @@ it's escaped), and answers yes/no, choice or score questions with probabilities:
 `{{steps.<block>.<question>}}` with its `.p`; under *Sure from* (70%) the run asks you instead; the questions as cards
 or as the API's JSON), *Show you* (a window over Laki with what the run made: HTML or Markdown, scrollable, with a
 notification if you like; the run keeps it, to open again) and *End*. A Case branch can also compare numbers (`>=
-0.8`) or be a JS expression over the run's variables (`num('steps.triage.urgent.p') > 0.8 && vars.task`). An AI call
+0.8`) or be a JS expression over the run's variables (`num('steps.triage.urgent.p') > 0.8 && vars.task`); an
+expression or a *matches* that runs past 200 ms stops the run on that block, saying why. An AI call
 takes a system prompt and a temperature, and asks for JSON when it names outputs. *Test it* under an AI call, AI
 decision or Webhook sends it once with sample values: its exit, outputs and log, without a run. Variables carry results along:
 `{{task}}`, `{{steps.plan.answer}}`, `{{steps.test.output}}`, `{{steps.hook.status}}`, `{{pr.url}}`. An agent, AI
@@ -1191,13 +1194,14 @@ closed rings as it opens. Tick it off when it's done; the rail's count is the on
 On unless Settings › General › *Pages* turns it off; the rail's My Desk (⌘K too) opens it: your extensions as tiles, an
 overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
 ticks every place it shows in). Drag a tile's head to put it anywhere on the grid (12 columns): gaps stay where you
-leave them, and a tile in the way moves down. Drag its corner to resize it (tiles below move down too). Laki keeps each
-tile's place and size. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to
-stay on.
+leave them, and a tile in the way moves down; Esc while you drag puts it back. Drag its corner to resize it (tiles
+below move down too). On a phone the tiles stand in one column: no drag, and the corner sets only the height. Laki
+keeps each tile's place and size. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a
+page to stay on.
 
 **Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
-right click moves or removes it (its tiles go to the first tab) or gives it an icon (*Icon…*: type to find one, or
-type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
+right click moves or removes it (its tiles go to the first tab, under the tiles there) or gives it an icon (*Icon…*:
+type to find one, or type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
 there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) opens a dialog: say what it should show, add screenshots (paste, drop, + or the
@@ -1232,6 +1236,9 @@ hide button), or ⌘[ and ⌘], go back and forward through the pages (My Desk, 
 Specs…) and workspaces you were on, the last 25, as in a browser: open an extension's settings from My Desk, and ‹
 brings My Desk back. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
 removed since is skipped. Settings › Appearance › Rail › *Back and forward* turns it off.
+
+The window's title says where you are too: the page (*Settings — Laki*), else the workspace and tab (*fix-login ·
+claude — Laki*), so a screen share's picker, the Window menu and a browser's tab (remote access) name it.
 
 ### Laki AI's glow
 
@@ -1486,13 +1493,15 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   *Artifact* tool, an MCP tool named publish, deploy, upload or share) and, for any agent, the links its last answer
   gives to Claude artifacts, gists and sites on vercel.app, netlify.app, pages.dev, github.io, fly.dev, onrender.com,
   surge.sh, web.app or workers.dev; agents are told to save anything else themselves, and to group related files in
-  a subfolder. A `.url` file with a `file:///` link (a page an agent made elsewhere on this Mac) opens that page in
-  the browser too. Each link once. Links come first in the strip and open in the browser on a click,
+  a subfolder. A `.url` file with a `file:///` link (a file an agent made elsewhere on this Mac) opens it as a
+  terminal's ⌘-click would: a document in its app, an HTML page shown in Finder. Each link once. Links come first in
+  the strip and open in the browser on a click,
   and *Info* lists them under *links*. Archiving keeps it; deleting the workspace (or removing its
   project) deletes it too, unless *Keep a deleted workspace's storage* is on. None for Terminals, Browsers and SSH hosts.
   An HTML or Markdown file opens in a viewer over the app (*Open HTML and Markdown artifacts*: *In Laki*, the default, or
   *In the browser*): HTML sandboxed, its scripts run and the CSS and pictures beside it load, it can’t read Laki or your files; Markdown
-  rendered; with *Open in the browser* and *Show in Finder*.
+  rendered; with *Open in the browser* and *Show in Finder*. *In the browser*, and every *Open in the browser*
+  (the viewer's, the gallery's, a right click's), open an HTML one as Laki's sandboxed page of it, never the file itself.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
@@ -1703,8 +1712,8 @@ laki remote | remote stop                               # remote access's link (
 `laki screen` shot and windows work on this Mac (an app's window needs Screen Recording for Laki: System Settings ›
 Privacy & Security › Screen & System Audio Recording). tap, swipe, type and describe need
 [idb](https://fbidb.io) (`brew install facebook/fb/idb-companion`, then `pipx install fb-idb`); Settings › Agent skill
-says whether it's found. They take points, and with idb a simulator screenshot is drawn in points too: a spot in the
-picture is where to tap. MCP's `laki_device` does the same.
+says whether it's found. They take points, and a simulator screenshot is drawn in points too (simctl says its size):
+a spot in the picture is where to tap. MCP's `laki_device` does the same.
 
 ### MCP
 
@@ -1716,8 +1725,9 @@ agent asks you.
 
 Laki knows an agent by where its process runs (the tab it's in, or a shell tab that runs it), not by its environment,
 so an agent can't pass for you. What an agent may not do there, the CLI refuses it too: turn an extension on, force a
-held ship or merge, run a scheduled task now or answer a workflow's question. A task it schedules is saved off (you
-turn it on in Scheduled tasks). Sending to, or reading the screen of, a tab in another workspace asks you first in
+held ship, merge or archive, run a scheduled task now, answer a workflow's question, or start a command of its own
+(`laki new` or `laki tab` with `--cmd` or a command profile: an agent or a shell only). A task it schedules is saved
+off (you turn it on in Scheduled tasks). Sending to, or reading the screen of, a tab in another workspace asks you first in
 the app (*Allow once*, *Always from <its workspace> to that one* until Laki restarts, *Deny*). Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 

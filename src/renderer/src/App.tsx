@@ -3663,7 +3663,7 @@ export function App() {
               menu: path => artMenu(ws, path),
               copy,
               page: path => (inViewer(path) ? artPage(ws, path) : undefined),
-              external: bridge?.openPath && (path => void bridge!.openPath!(`${ws.storage}/${path}`)),
+              external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
             }}
           />
         )}
@@ -3673,7 +3673,7 @@ export function App() {
             path={artView.path}
             page={artPage(w, artView.path)}
             read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
-            onExternal={bridge?.openPath && (() => void bridge!.openPath!(`${w.storage}/${artView.path}`))}
+            onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
             onReveal={bridge?.openPath && (() => revealArt(w, artView.path))}
             onClose={() => setArtView(null)}
           />

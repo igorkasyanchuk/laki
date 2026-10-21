@@ -59,8 +59,9 @@ few seconds for the HTTPS certificate. Once per tailnet and machine:
 2. On Linux, let your user run `tailscale serve` without sudo: `sudo tailscale set --operator=$USER`.
 
 On the Mac, the Tailscale app's own command is used when `tailscale` isn't on your PATH. While Laki runs, it takes
-port 443 of `tailscale serve` (another serve of yours there is replaced, and gone when Laki stops). The app's
-Settings › Remote access has the same choice: *Sign in with* › *Tailscale*, with *Funnel* and *Ask for a PIN as well*.
+port 443 of `tailscale serve` (another serve of yours there is replaced, and gone when Laki stops, or as it starts
+again after a crash). The app's Settings › Remote access has the same choice: *Sign in with* › *Tailscale*, with
+*Funnel* and *Ask for a PIN as well*.
 
 ### Cloudflare
 

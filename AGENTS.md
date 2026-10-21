@@ -1920,7 +1920,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
   `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files and https: scripts, styles, fonts and pictures,
   no `connect-src`; 50 MB a file), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
-  *Open in the browser*, *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
+  *Open in the browser* (App's `inBrowser`, the gallery's and the right click's too), *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
   its right click has *Open* (the viewer) and *Open in the browser*.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it (`any`: any

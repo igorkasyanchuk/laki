@@ -187,7 +187,8 @@ the last 50 events, and which extensions and workflows each reached (or why a wo
 `-`). `"on": { "custom.deploy.done": "refresh" }` answers it, `"custom.*"` every custom event. From an extension's own
 command (`"$LAKI_CLI" widget emit …`) `from.widget` says which, and it never gets its own; an agent's says
 `from.agent` (MCP's `laki_extension_emit` always does). For an agent's event (Laki AI's too) a handler that's an action
-asks you first in the app, as an agent's tool call does (*Always in <workspace>* keeps it; no window, no answer or Deny:
+asks you first in the app, as an agent's tool call does (*Always in <workspace>* keeps it, listed with its tools in
+Settings › Extensions as *On an agent's event*, with *Revoke*; no window, no answer or Deny:
 it doesn't run, its log says so); a `refresh` isn't asked. What an extension emits while handling one counts as the
 agent's (Laki knows which it's handling; `$LAKI_EVENT_AGENT` tells the extension), and so does a workflow run an agent
 started, its `flow.ended`. So are `workspace.new` and `tab.new` for a workspace an agent made (`laki new` in its tab,
@@ -254,15 +255,15 @@ that says no holds it, with its reason.
   review, or null; `stat`: add, del, files, or null; `by`: you, agent, auto (Merge when green, archive on merge) or
   workflow), `$LAKI_GATE` the step, and the workspace's env (`$LAKI_WORKSPACE`, `$LAKI_BRANCH`, `$LAKI_PATH`…).
 - It prints `{"ok": true}`, or `{"ok": false, "why": "the tests fail", "fix": "Make the tests pass"}` (`fix`: a prompt
-  for the agent, optional).
+  for the agent, optional). Its exit code doesn't matter: a no that exits 1 holds too.
 - Gates run together, 8 at most for a step, 30 s each, only while the extension is on; a per-workspace one with its
   workspace's instance. A command action only: an agent's action can't be one (each run costs, and it's slow).
 - **An error or no answer within 30 s:** the step goes ahead, and Laki says so (a toast, a line in its log). A gate
   that should block on its own error prints `ok: false` itself. Merge when green and archive on merge, which nobody
   watches, are held instead.
 - **Held:** the app says *Not shipped* (*Not merged*, *Not archived*), a line per gate, with *Do it anyway* (asked
-  first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` prints the
-  reasons and exits 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.
+  first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` and `laki
+  archive` print the reasons and exit 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.
 - Merge when green held: over to you once per head commit, tried again after a push or once the gate's extension
   changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
   way, the reasons as `{{steps.<id>.output}}`. Each hold sends `gate.held`.
@@ -630,7 +631,8 @@ badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the 
 | `git` | `git fetch` and `git merge` in the action: *Up to date* or *Merged main (3 new)*; only on a conflict, `claude -p` resolves it and commits |
 | `ai` | `claude -p` does it all |
 
-`claude -p` gets only the tools `TOOLS` names (read and edit files, git, the usual test commands), and runs in the
+`claude -p` gets only the tools `TOOLS` names (read and edit files, the git commands a merge takes: fetch, merge,
+status, diff, log, add and commit, never push, reset or clean; the usual test commands), and runs in the
 background: an action has 2 minutes. As it ends it pushes its last line (`laki widget push --merge '{"last": …}'`), which
 `"notify": "{{last}}"` shows as a notification and a toast. Its prompt is `prompt()` at the top of `pull.sh`.
 
@@ -836,6 +838,8 @@ and commit it. Folders and one-file extensions both work.
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
+- One that's off runs nothing from its page (the studio's preview too): its actions, `do` buttons, links, copy and
+  dialogs do nothing until you turn it on; a toast says so.
 - A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).
 - A repo's extension (`.laki/extensions`) is off until you look at what it runs, and off again when its files change
   there ([Share with your team](#share-with-your-team)).
@@ -845,7 +849,9 @@ and commit it. Folders and one-file extensions both work.
   *Always* each keep a hash of everything the extension runs (its files, its source, its actions, events and stream,
   network access); if any of it changes before your Yes, nothing runs: Laki AI asks again with what it says now.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and
-  mailto). A JS one runs in a sandboxed frame with an opaque origin, `default-src 'none'`, and only the network you allow.
+  mailto). Its https pictures (and the UI kit's) come through Laki's daemon, from a public site only (not this Mac or
+  your network), 10 MB at most; an http one or a `srcset` isn't loaded. A JS one runs in a sandboxed frame with an
+  opaque origin, `default-src 'none'`, and only the network you allow.
 - Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in
   `<data>/widget-secrets.json` (0600), given only to its fetch and actions.
 - An agent's `laki widget action` asks you; `laki widget on` is yours only. ponytail: a process of yours can still read
