@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_PERM, AI_MODEL, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -369,7 +369,7 @@ type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortS
 // conversation keeps their words alone
 export async function aiAsk(p: { text?: string; images?: string[]; chat?: string; context?: string }, rpc: Rpc) {
   const s = state.settings?.ai ?? {}
-  if (!s.on) throw new Error('Laki AI is off: Settings › AI')
+  if (!aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')
   const ask = (p.text ?? '').trim()
   const images = (p.images ?? []).filter(imageOk)
   if (!ask && !images.length) throw new Error('ask something')

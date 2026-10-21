@@ -34,9 +34,7 @@ test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
   await rig.rpc('projectAdd', { path: rig.repo })
 
-  await assert.rejects(rig.rpc('aiAsk', { text: 'hi' }), /Laki AI is off/)
-  await rig.rpc('settingsSet', { ai: { on: true } })
-  await assert.rejects(rig.rpc('aiAsk', { text: 'hi' }), /no OpenRouter API key/)
+  await assert.rejects(rig.rpc('aiAsk', { text: 'hi' }), /no OpenRouter API key/) // settings.ai never touched: on, as the app shows it
   await assert.rejects(rig.rpc('aiKey', { key: 'two words' }), /does not look like an API key/)
   assert.deepEqual(await rig.rpc('aiKey', { key: ' sk-or-v1-abc123 ' }), { key: true })
   assert.equal(statSync(join(rig.data, 'ai-key')).mode & 0o777, 0o600)
@@ -67,6 +65,13 @@ test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 
   assert.deepEqual({ ...a.calls[0], at: 0, ms: 0 }, { at: 0, ms: 0, backend: 'openrouter', model: 'anthropic/claude-sonnet-5.5', in: 200, out: 20, cost: 0.004, tools: 1, ok: true, ask: 'what are my agents doing?' })
   assert.deepEqual(a.totals.today, { calls: 1, in: 200, out: 20, cost: 0.004 })
   await until(() => ws.events.some(e => e.ev === 'ai' && !e.busy && e.chat.length === 3), 'an ai event')
+  assert.equal((await rig.rpc('state')).settings?.ai, undefined, 'answered with settings.ai unset')
+
+  // turned off: refused, nothing asked
+  await rig.rpc('settingsSet', { ai: { on: false } })
+  await assert.rejects(rig.rpc('aiAsk', { text: 'hi' }), /Laki AI is off: Settings › AI/)
+  assert.equal(or.hits.length, 2)
+  await rig.rpc('settingsSet', { ai: {} })
 
   // the next ask carries the conversation so far (asks and answers, not the tools)
   await rig.rpc('aiAsk', { text: 'and now?' })

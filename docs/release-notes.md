@@ -13,6 +13,7 @@ version it builds, with the date. -->
 - `/laki:extension` in Claude Code tabs makes or changes a Laki extension, as `/laki:new` starts a session.
 - 12 more achievements (54): an action, a project's own template and action, a reviewed file, a file edited in Laki,
   the global hotkey, a bubble's click, Resources, the Simulators, an experimental feature, a meme and a video.
+- Fixed: Laki AI showed as on (its default) but refused every ask until you turned its switch off and on again.
 
 ## 0.24.0 · Oct 21, 2026
 
