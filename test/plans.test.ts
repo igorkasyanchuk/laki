@@ -73,9 +73,11 @@ test('specs and brainstorms: off until turned on, folders outside the repo, the 
 
   // a prototype's page: the key, then its own CSP (sandboxed, no requests out)
   const { port } = rig.info()
-  const { widgetKey } = await rig.rpc('state')
+  const { key: widgetKey } = await rig.rpc('planGet', { project: p.id, kind: 'brainstorm', slug: b.slug }) // this plan's key
   const url = `http://127.0.0.1:${port}/plan/${p.id}/brainstorm/${b.slug}/prototype-cards.html`
   assert.equal((await fetch(url)).status, 401)
+  const other = (await rig.rpc('planGet', { project: p.id, kind: 'spec', slug: s.slug })).key
+  assert.equal((await fetch(`${url}?key=${other}`)).status, 401) // another plan's key
   const res = await fetch(`${url}?key=${widgetKey}`)
   assert.equal(res.status, 200)
   assert.match(res.headers.get('content-security-policy')!, /^sandbox allow-scripts; default-src 'none'/)
@@ -91,7 +93,7 @@ test('specs and brainstorms: off until turned on, folders outside the repo, the 
   await rig.rpc('settingsSet', { specs: false })
   await assert.rejects(rig.rpc('planGet', { project: p.id, kind: 'spec', slug: s.slug }), /off/)
   writeFileSync(join(s.path, 'p.html'), '<p>x</p>')
-  assert.equal((await fetch(`http://127.0.0.1:${port}/plan/${p.id}/spec/${s.slug}/p.html?key=${widgetKey}`)).status, 404)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/plan/${p.id}/spec/${s.slug}/p.html?key=${other}`)).status, 404)
 })
 
 test('specs over MCP: list, read, new and write; the prompts name the folder', async t => {

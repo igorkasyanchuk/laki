@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { type GateBy, gatesKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
+import { type GateBy, gatesKey, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -497,7 +497,7 @@ export function view(): View {
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id) }
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`) }
     }),
     tabs,
     presets: presets(),
@@ -509,7 +509,6 @@ export function view(): View {
     ...(state.settings?.calendar === true && { reminders: state.reminders!.filter(r => !r.done || r.at > Date.now() - REMINDERS_DONE) }), // done ones: the last few months'
     layouts: state.layouts,
     widgets: widgetsView(),
-    widgetKey,
     widgetHome: widgetHome(),
     ...(state.settings?.workflows === true && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
     api: API,

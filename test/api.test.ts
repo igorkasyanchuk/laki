@@ -872,7 +872,9 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   await assert.rejects(rig.rpc('fileRead', { ws: w.id, path: '../../state.json', storage: true }), /not a path inside/)
   // the app's viewer: GET /artifact/<key>/<ws>/<path>, sandboxed, its files beside it too; the key, nothing outside
   const { port } = rig.info()
-  const { widgetKey } = await rig.rpc('state')
+  const v0 = await rig.rpc('state')
+  const widgetKey = v0.workspaces.find((x: any) => x.id === w.id).artKey // this workspace's key, never the master
+  assert.equal(v0.widgetKey, undefined)
   mkdirSync(join(dir, 'site'))
   writeFileSync(join(dir, 'site', 'index.html'), '<link rel="stylesheet" href="a.css"><h1>hi</h1>')
   writeFileSync(join(dir, 'site', 'a.css'), 'h1 { color: red }')
@@ -888,7 +890,13 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`, { headers: { origin: 'https://evil.example' } })).headers.get('access-control-allow-origin'), null)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${'0'.repeat(widgetKey.length)}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/..%2f..%2fstate.json`)).status, 404)
-  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/nope/site/index.html`)).status, 404)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/nope/site/index.html`)).status, 401) // another workspace: not with this key
+  // workspace B's key opens neither A's artifacts nor a plan page
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'other' })
+  const bKey = (await rig.rpc('state')).workspaces.find((x: any) => x.id === b.id).artKey
+  assert.notEqual(bKey, widgetKey)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${bKey}/${w.id}/site/index.html`)).status, 401)
+  assert.equal((await fetch(`http://127.0.0.1:${port}/plan/${p.id}/spec/x/p.html?key=${bKey}`)).status, 401)
   rmSync(join(dir, 'site'), { recursive: true })
   // a link an agent kept (a .url file): in the view for the info panel, first in the gallery; only http(s)
   writeFileSync(join(dir, 'Project page.url'), '[InternetShortcut]\r\nURL=https://claude.ai/artifact/SyQ5\r\n')

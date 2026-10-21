@@ -291,7 +291,8 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
 
   // a JS page: no key, a theme that isn't JSON or an object, a widget that isn't there or has no page
   const { port } = rig.info()
-  const { widgetKey } = await rig.rpc('state')
+  const keys = Object.fromEntries((await rig.rpc('state')).widgets.map((w: { id: string; key: string }) => [w.id, w.key])) // each one's own
+  const widgetKey = keys.jsw
   const page = (q: string) => fetch(`http://127.0.0.1:${port}/widget/${q}`)
   let res = await page('jsw')
   assert.deepEqual([res.status, await res.text()], [401, 'bad key'])
@@ -301,9 +302,8 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
     assert.match(await res.text(), /<style>:root \{ {2}\} html/, theme)
   }
   res = await page(`nothere?key=${widgetKey}`)
-  assert.equal(res.status, 200)
-  assert.match(await res.text(), /<p style="color:#f7768e;font:12px system-ui">no widget nothere<\/p>/)
-  res = await page(`nohtml?key=${widgetKey}`)
+  assert.equal(res.status, 401) // another's key opens nothing else
+  res = await page(`nohtml?key=${keys.nohtml}`)
   assert.equal(res.status, 404, 'no widget.html and no ui')
   assert.equal(await res.text(), 'no such view')
 

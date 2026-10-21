@@ -26,7 +26,6 @@ export type WidgetApi = {
   settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page, Logs
   log?: (id: string, text: string, ws?: string) => void // a JS page's laki.log: its log (widgetLog; nothing while off)
-  key?: string // the daemon's key for JS widgets' pages
 }
 
 const LINK = /^(https?:|mailto:)/i
@@ -116,7 +115,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       return
     }
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? `&sample=${sample === true ? 1 : encodeURIComponent(sample)}` : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&h=${hide}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (w.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${w.key}${full ? '&full=1' : ''}${sample ? `&sample=${sample === true ? 1 : encodeURIComponent(sample)}` : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&h=${hide}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const root = rootOf(host.current!)
@@ -130,7 +129,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, api.key, theme, sample, size, hide]) // net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
+  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, w.key, theme, sample, size, hide]) // net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
   // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything (a button
   // clicked is done at once: uiBehave waits on what this returns)
   useEffect(() => {

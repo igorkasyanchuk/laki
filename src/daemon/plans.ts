@@ -6,12 +6,11 @@
 // The app's Specs page and a project's Specs tab; MCP's laki_plans, laki_plan_read, laki_plan_new, laki_plan_write.
 // ponytail: a removed project's plans stay in <data>/plans (they're the user's documents); a project added again with
 // the same id finds them
-import { timingSafeEqual } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { PLAN_KINDS, type Plan, type PlanFile, type PlanKind } from '../shared/types.ts'
 import { dir, findProject, IMAGES, save, slug, state } from './core.ts'
-import { widgetKey } from './widgets.ts'
+import { urlKey, urlKeyOk } from './widgets.ts'
 
 type Ref = { project: string; kind: PlanKind; slug: string }
 const FOLDER: Record<PlanKind, string> = { spec: 'specs', brainstorm: 'brainstorms' }
@@ -142,8 +141,10 @@ export function planGet(o: Ref) {
   const doc = docOf(folder)
   const markdown = read(join(folder, 'README.md')) ?? ''
   const outside = !doc || mtime(join(folder, 'README.md')) > mtime(join(folder, 'spec.json')) + 1000
-  return { plan: planOf(findProject(o.project).id, o.kind, o.slug, folder, doc), doc, markdown, outside, files: filesOf(folder) }
+  const id = findProject(o.project).id
+  return { plan: planOf(id, o.kind, o.slug, folder, doc), doc, markdown, outside, files: filesOf(folder), key: urlKey(planScope(id, o.kind, o.slug)) } // key: its prototypes' pages
 }
+const planScope = (project: string, kind: string, slug: string) => `plan:${project}/${kind}/${slug}`
 
 // the editor's save: its blocks and title, and README.md from its Markdown
 export function planSave(o: Ref & { title?: string; blocks: unknown[]; markdown?: string }) {
@@ -214,12 +215,17 @@ export function planRm(o: Ref) {
 // requests out: not even an image, which would carry its URL's key): it never reaches the app, the daemon or the user's files
 export function planPage(path: string, query: URLSearchParams): { code: number; headers: Record<string, string>; body: string } {
   const bad = (code: number, body: string) => ({ code, headers: { 'content-type': 'text/plain' }, body })
-  const key = Buffer.from(query.get('key') ?? '')
-  if (key.length !== widgetKey.length || !timingSafeEqual(key, Buffer.from(widgetKey))) return bad(401, 'bad key')
   const m = /^\/plan\/([\w.-]+)\/(spec|brainstorm)\/([\w-]+)\/(.+\.html?)$/.exec(path)
+  const id = (() => {
+    try {
+      return m && findProject(decodeURIComponent(m[1])).id
+    } catch {
+      return undefined
+    }
+  })()
+  if (!m || !id || !urlKeyOk(query.get('key'), planScope(id, m[2], m[3]))) return bad(401, 'bad key') // this plan's own key
   let body: string
   try {
-    if (!m) throw new Error('not a page')
     const file = planFile({ project: decodeURIComponent(m[1]), kind: m[2] as PlanKind, slug: m[3], path: decodeURIComponent(m[4]) })
     if (file.text === undefined) throw new Error('not text')
     body = file.text

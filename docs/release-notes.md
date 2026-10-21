@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An artifact's, a spec's prototype's or an extension's page link opens only that workspace's artifacts, that plan or
+  that extension: each has its own key now.
 - Pull requests: *fix CI* sends failing logs fenced and marked as the PR's own output, and asks before turning on for
   a PR from a fork. *review* sends only the bots in Settings › Pull requests' new *Review bots* (GitHub Actions,
   Copilot's reviewer, CodeRabbit): any other bot's comments are skipped.

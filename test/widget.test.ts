@@ -253,7 +253,8 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   const v = await rig.rpc('state')
   let res = await fetch(`http://127.0.0.1:${port}/widget/js?key=nope`)
   assert.equal(res.status, 401)
-  res = await fetch(`http://127.0.0.1:${port}/widget/js?key=${v.widgetKey}&theme=${encodeURIComponent('{"--accent":"#123456"}')}`)
+  const jsKey = v.widgets.find((x: any) => x.id === 'js').key // its own key
+  res = await fetch(`http://127.0.0.1:${port}/widget/js?key=${jsKey}&theme=${encodeURIComponent('{"--accent":"#123456"}')}`)
   assert.equal(res.status, 200)
   assert.match(res.headers.get('content-security-policy') ?? '', /^sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:$/)
   assert.equal((await fetch(`http://127.0.0.1:${port}/widget/js?key=${'é'.repeat(32)}`)).status, 401, 'a key of other bytes')
@@ -261,7 +262,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.match(page, /"n":4/, 'its default export got the last data')
   assert.match(page, /--accent: #123456;/)
   assert.doesNotMatch(page, /"<\/script>"/)
-  assert.equal((await fetch(`http://127.0.0.1:${port}/widget/js?key=${v.widgetKey}&full=1`)).status, 404, 'no full view')
+  assert.equal((await fetch(`http://127.0.0.1:${port}/widget/js?key=${jsKey}&full=1`)).status, 404, 'no full view')
 
   // actions: the arg as $WIDGET_ARG, never in the command; the laki CLI as $LAKI_CLI
   const arg = `x'; touch hacked; echo '`
@@ -363,7 +364,7 @@ test('widgets that come with Laki: My PRs, Links', async t => {
   const links = (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
   assert.equal(links.every, undefined)
   await rig.rpc('widgetSet', { id: 'links', on: true, config: { links: 'Lunch: https://food.example/order,https://linear.app' } })
-  assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgetKey}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
+  assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links').key}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
 })
 
 test('widget sizes: half a cell down is kept (a thin line), other fractions round; Links comes as one', async t => {
@@ -432,7 +433,7 @@ test('extensions: a place (sidebar, top bar, status bar), network access for a J
 
   // network: off until the user turns it on, and only a JS page's CSP opens, to https
   const { port } = rig.info()
-  const key = (await rig.rpc('state')).widgetKey
+  const key = (await find(rig, 'net')).key
   const csp = async () => (await fetch(`http://127.0.0.1:${port}/widget/net?key=${key}`)).headers.get('content-security-policy') ?? ''
   assert.equal((await find(rig, 'net')).net, undefined)
   assert.doesNotMatch(await csp(), /connect-src/)
@@ -518,7 +519,7 @@ test('extensions: a secret setting reaches its fetch only, never the view, a ren
   const never = (what: string, text: string) => assert.ok(!text.includes(SECRET) && !text.includes('old-plain-value'), `${what} has it`)
   never('the view', JSON.stringify(v.widgets.find((x: any) => x.id === 'sec').config))
   never('a render', String(await rig.rpc('widgetRender', { id: 'sec' })))
-  never('its page', await (await fetch(`http://127.0.0.1:${port}/widget/sec?key=${v.widgetKey}`)).text())
+  never('its page', await (await fetch(`http://127.0.0.1:${port}/widget/sec?key=${v.widgets.find((x: any) => x.id === 'sec').key}`)).text())
   never('ls --json', (await rig.cli('ls', '--json')).out)
   const env = (await rig.rpc('widgetRuns', { id: 'sec' })).env
   never('Env', JSON.stringify(env))

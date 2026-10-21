@@ -1390,8 +1390,8 @@ export function App() {
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
   // rest a document in its app, else shown in Finder
-  const inViewer = (path: string) => settings.artifactsIn !== 'browser' && VIEWED.test(path) && !!view?.widgetKey
-  const artPage = (w: WorkspaceView, path: string) => (view?.widgetKey && base !== null ? `${base}/artifact/${view.widgetKey}/${encodeURIComponent(w.id)}/${path.split('/').map(encodeURIComponent).join('/')}` : undefined)
+  const inViewer = (path: string) => settings.artifactsIn !== 'browser' && VIEWED.test(path)
+  const artPage = (w: WorkspaceView, path: string) => (w.artKey && base !== null ? `${base}/artifact/${w.artKey}/${encodeURIComponent(w.id)}/${path.split('/').map(encodeURIComponent).join('/')}` : undefined) // its own key: one workspace's
   const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : void bridge?.openPath?.(`${w.storage}/${path}`))
   // an artifact's right click (Files' Artifacts, the status bar's strip and its big view): open it, Finder, the clipboard
   const artMenu = (w: WorkspaceView, path: string): MenuItem[] => {
@@ -1596,7 +1596,6 @@ export function App() {
         { label: 'Edit', icon: 'settings' as const, sub: 'its place, settings and Laki AI', run: () => setDialog({ extension: w.id, back: dialog }) },
       ]),
     log: (id, text, ws) => void api.call('widgetLog', { id, text, ws, src: 'page' }).catch(() => {}),
-    key: view?.widgetKey,
   }
   widgetSay.current = widgetApi.say
   // a widget button's Laki command (the UI kit's do, a JS page's laki.do): said and asked first (a page in a browser
@@ -3449,7 +3448,6 @@ export function App() {
                 onClose={() => setDialog(null)}
                 api={{
                   call,
-                  key: view.widgetKey,
                   aiOn: aiOn(settings),
                   start: p => (setNewFor(p.project), setNewInit({ prompt: specPrompt(p) }), setDialog('new')),
                   aiSettings: () => setDialog({ section: 'ai' }),

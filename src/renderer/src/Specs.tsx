@@ -22,7 +22,6 @@ import { ask, Icon, IconButton, keep, load as stored, type MenuItem, Page, useMe
 
 export type SpecsApi = {
   call: <T = any>(method: string, params?: object) => Promise<T>
-  key?: string // the view's widgetKey: a prototype's page
   aiOn: boolean
   start: (p: Plan) => void // a spec's Start: the new-workspace page, its prompt filled in
   aiSettings: () => void
@@ -36,7 +35,7 @@ export type SpecsApi = {
   pin?: (r: Ref & { title: string }, on: boolean) => void
 }
 type Ref = { project: string; kind: PlanKind; slug: string }
-type Got = { plan: Plan; doc: { title?: string; blocks?: unknown[] } | null; markdown: string; outside: boolean; files: PlanFile[] }
+type Got = { plan: Plan; doc: { title?: string; blocks?: unknown[] } | null; markdown: string; outside: boolean; files: PlanFile[]; key?: string } // key: its prototypes' pages'
 const KIND_WORDS: Record<PlanKind, [string, string]> = { spec: ['Specs', 'spec'], brainstorm: ['Brainstorms', 'brainstorm'] }
 const KIND_SAYS: Record<PlanKind, string> = {
   spec: 'Requirements for a task, written like a Notion page: text, checklists, images, diagrams. Start a workspace from one, or point any agent at it.',
@@ -376,7 +375,7 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
           </div>
           {!output.length && <p className="muted small" data-tip={BRAINSTORM_OUTPUT}>Nothing yet. Write the idea above, then Brainstorm with Laki AI; or have any agent write files into the folder.</p>}
           {output.map(f => (
-            <OutFile key={f.path} at={at} dir={p.path} f={f} api={api} />
+            <OutFile key={f.path} at={at} dir={p.path} f={f} api={api} pageKey={got.key} />
           ))}
         </div>
       )}
@@ -502,14 +501,14 @@ const fileData = (f: File) =>
 
 // a file of a brainstorm's: Markdown as a page (its mermaid diagrams drawn), a prototype in a sandboxed frame, a diagram
 // drawn, an image; anything else by name
-function OutFile({ at, dir, f, api }: { at: Ref; dir: string; f: PlanFile; api: SpecsApi }) {
+function OutFile({ at, dir, f, api, pageKey }: { at: Ref; dir: string; f: PlanFile; api: SpecsApi; pageKey?: string }) {
   const ext = f.path.toLowerCase().match(/\.diagram\.json$|\.[^.]+$/)?.[0] ?? ''
   const [body, setBody] = useState<{ text?: string; image?: string } | null>(null)
   const [big, setBig] = useState(false)
   const [src, setSrc] = useState('')
   const page = ext === '.html' || ext === '.htm'
   useEffect(() => {
-    if (page) daemonBase().then(b => setSrc(`${b}/plan/${encodeURIComponent(at.project)}/${at.kind}/${at.slug}/${f.path.split('/').map(encodeURIComponent).join('/')}?key=${api.key ?? ''}&at=${f.at}`))
+    if (page) daemonBase().then(b => setSrc(`${b}/plan/${encodeURIComponent(at.project)}/${at.kind}/${at.slug}/${f.path.split('/').map(encodeURIComponent).join('/')}?key=${pageKey ?? ''}&at=${f.at}`))
     else if (['.md', '.diagram.json', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.txt', '.mmd'].includes(ext)) api.call('planFile', { ...at, path: f.path }).then(setBody, () => setBody({}))
   }, [f.at])
   const diagram = useMemo(() => {

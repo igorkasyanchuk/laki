@@ -3,7 +3,7 @@
 // widget's fetch on its schedule and keeps what it printed (JSON) in the widget's storage, <data>/widget-data/<id>.json,
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { type ChildProcess, spawn } from 'node:child_process'
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, type Dirent, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -80,7 +80,11 @@ export function stopAgents(id: string, fetches = false) {
 }
 let rev = 0 // each reload: the app renders its widgets again
 // what a JS widget's page asks for (GET /widget/<id>?key=…): its data is the user's, so not for any page on this Mac
-export const widgetKey = randomBytes(16).toString('hex')
+export const widgetKey = randomBytes(16).toString('hex') // the master: never in a URL, the view or a page
+// a key per thing a URL opens (artifact:<ws>, plan:<project>/<kind>/<slug>, widget:<id>), derived from the master: a
+// leaked URL opens only what it was for
+export const urlKey = (scope: string) => createHmac('sha256', widgetKey).update(scope).digest('hex').slice(0, 32)
+export const urlKeyOk = (given: string | null | undefined, scope: string) => (a => a.length === 32 && timingSafeEqual(a, Buffer.from(urlKey(scope))))(Buffer.from(given ?? ''))
 // its data's source (the user's pick, else widget.json's, else its fetch); fetches: something to run or read
 export function sourceOk(v: unknown): WidgetSource | undefined {
   if (!v || typeof v !== 'object') return undefined
@@ -612,6 +616,7 @@ function typedOf(w: Entry, secrets = false) {
 export const widgetsView = (): WidgetView[] =>
   (sec => [...widgets.values()].map(w => [w, sec[w.id] ?? {}, configOf(w)] as const))(readSecrets()).map(([w, k, c]) => ({
     id: w.id,
+    key: urlKey(`widget:${w.id}`), // its page's (GET /widget/<id>)
     name: w.m.name || w.id,
     description: w.m.description,
     dir: w.dir,
@@ -720,9 +725,8 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
 // With the user's Network access (net) it may fetch() and show images from https sites, still never the app or the daemon
 const netOf = (id: string) => !!widgets.get(id)?.s.net
 export function widgetPage(id: string, query: URLSearchParams): { code: number; headers: Record<string, string>; body: string } {
-  const key = Buffer.from(query.get('key') ?? '')
   const bad = (code: number, body: string) => ({ code, headers: { 'content-type': 'text/plain' }, body })
-  if (key.length !== widgetKey.length || !timingSafeEqual(key, Buffer.from(widgetKey))) return bad(401, 'bad key')
+  if (!urlKeyOk(query.get('key'), `widget:${id}`)) return bad(401, 'bad key')
   let html: string | null
   try {
     let vars: Record<string, string> = {}
