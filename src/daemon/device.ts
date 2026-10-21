@@ -5,12 +5,12 @@
 // open. A screenshot goes to images/ (imageSave) and comes back as its path, as the agent browser's does.
 // ponytail: the first booted simulator only (no --udid); an app's frontmost window only
 import { execFile } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
-import { DEVICE_OPS, SIM_OPS } from '../shared/types.ts'
-import { imageSave } from './core.ts'
+import { DEVICE_OPS, SIM_OPS, type SimCheck } from '../shared/types.ts'
+import { imageSave, onPath } from './core.ts'
 
 const run = promisify(execFile)
 const said = (e: unknown) => String((e as { stderr?: string }).stderr || (e as Error).message || e).trim().split('\n').slice(-3).join(' ')
@@ -134,10 +134,68 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
 // drag one swipe at its release; a stream (serve-sim, idb or axe video-stream, scrcpy's server) and live touches next
 const FRAME_MAX = 1000
 const SIM_ID = /^(ios|android):(\w[\w.:-]{0,199})$/ // no leading -: it goes to simctl, idb and adb as an argument
+// an Android SDK tool: on PATH, else in the SDK Android Studio installs ($ANDROID_HOME, $ANDROID_SDK_ROOT, its default
+// folder), so adb and the emulator work with no PATH change
+const sdkTool = (rel: string) => {
+  if (onPath(basename(rel))) return basename(rel)
+  const roots = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT, join(homedir(), process.platform === 'darwin' ? 'Library/Android/sdk' : 'Android/Sdk')]
+  return roots.map(r => r && join(r, rel)).find(f => f && existsSync(f)) || undefined
+}
+const NO_ADB = "adb isn't on PATH nor in Android Studio's SDK: install Android Studio (or brew install android-platform-tools)"
 const adb = (serial: string | null, args: string[]) =>
-  run('adb', [...(serial ? ['-s', serial] : []), ...args], { timeout: 30000, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
-    Promise.reject(new Error((e as { code?: string }).code === 'ENOENT' ? "adb isn't on PATH: Android Studio's SDK platform-tools (or brew install android-platform-tools)" : `adb: ${said({ stderr: String((e as { stderr?: Buffer }).stderr ?? ''), message: (e as Error).message })}`)),
+  run(sdkTool('platform-tools/adb') ?? 'adb', [...(serial ? ['-s', serial] : []), ...args], { timeout: 30000, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
+    Promise.reject(new Error((e as { code?: string }).code === 'ENOENT' ? NO_ADB : `adb: ${said({ stderr: String((e as { stderr?: Buffer }).stderr ?? ''), message: (e as Error).message })}`)),
   )
+// adb's devices: the ready ones, and the ones that wait for you (USB debugging not allowed yet on the phone)
+async function droidDevices() {
+  const ready: { serial: string; name: string }[] = []
+  const asks: string[] = []
+  for (const l of String((await adb(null, ['devices', '-l'])).stdout).split('\n').slice(1)) {
+    const m = /^(\S+)\s+(device|unauthorized)\b(.*)$/.exec(l.trim())
+    if (m?.[2] === 'unauthorized') asks.push(m[1])
+    else if (m) ready.push({ serial: m[1], name: /model:(\S+)/.exec(m[3])?.[1]?.replace(/_/g, ' ') ?? m[1] })
+  }
+  return { ready, asks }
+}
+const asking = (serial: string) => `${serial} waits for you to allow USB debugging on it`
+
+// Settings › Simulators: what each needs, checked on this Mac, with the fix for what's missing
+const check = (os: SimCheck['os'], id: string, label: string, ok: boolean, says: string, fix?: string, warn?: boolean): SimCheck => ({ os, id, label, ok, says, ...(!ok && fix && { fix }), ...(!ok && warn && { warn }) })
+async function iosChecks(): Promise<SimCheck[]> {
+  if (process.platform !== 'darwin') return [check('ios', 'mac', 'macOS', false, 'iOS Simulators run on a Mac only', undefined, true)]
+  const dev = await run('xcode-select', ['-p'], { timeout: 5000 }).then(r => r.stdout.trim(), () => '')
+  const xcode = dev.includes('.app/Contents/Developer') // the Command Line Tools alone have no simulator
+  const out = [check('ios', 'xcode', 'Xcode', xcode, xcode ? dev : `${dev ? `xcode-select points at ${dev}, which has no simulator` : "it isn't installed"}: get Xcode from the App Store, then`, 'sudo xcode-select -s /Applications/Xcode.app/Contents/Developer')]
+  if (!xcode) return out
+  const [runtimes, sims] = await Promise.all([
+    simctl(['list', 'runtimes', 'available', '-j'])
+      .then(r => (JSON.parse(r.stdout).runtimes as { name: string; platform?: string; isAvailable?: boolean }[]).filter(x => x.isAvailable !== false && (x.platform ?? x.name).startsWith('iOS')).map(x => x.name))
+      .catch(e => new Error(said(e))),
+    bootedSims().catch(() => []),
+  ])
+  if (runtimes instanceof Error) return [...out, check('ios', 'simctl', 'simctl', false, `${runtimes.message}: accept Xcode's license and let it finish installing`, 'sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch')]
+  const [idb, companion] = [onPath('idb'), onPath('idb_companion')]
+  return [
+    ...out,
+    check('ios', 'simctl', 'simctl', true, "works: Xcode's license accepted"),
+    check('ios', 'runtime', 'An iOS runtime', runtimes.length > 0, runtimes.join(', ') || 'none installed: Xcode › Settings › Components, or', 'xcodebuild -downloadPlatform iOS'),
+    check('ios', 'booted', 'A simulator running', sims.length > 0, sims.map(s => s.name).join(', ') || 'none now: open Simulator (its File › Open Simulator picks the device)', 'open -a Simulator', true),
+    check('ios', 'idb', 'idb, for taps and typing', idb && companion, idb && companion ? 'idb and idb_companion found' : `${[!idb && 'idb', !companion && 'idb_companion'].filter(Boolean).join(' and ')} not found: the screen shows, taps don't`, 'brew install facebook/fb/idb-companion && pipx install fb-idb', true),
+  ]
+}
+async function droidChecks(): Promise<SimCheck[]> {
+  const bin = sdkTool('platform-tools/adb')
+  const out = [check('android', 'adb', 'adb', !!bin, bin === 'adb' ? 'on PATH' : bin ?? "not on PATH, nor in Android Studio's SDK: install Android Studio (its SDK has it), or", 'brew install android-platform-tools')]
+  const emu = sdkTool('emulator/emulator')
+  const avds = emu ? await run(emu, ['-list-avds'], { timeout: 15000 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => l && !/^(INFO|WARNING|ERROR)\b/.test(l)), () => []) : []
+  out.push(check('android', 'emulator', 'An emulator', avds.length > 0, avds.join(', ') || (emu ? 'no virtual device yet' : "the emulator isn't installed (a phone on USB works too)"), emu ? 'Android Studio › Device Manager › Create virtual device' : 'Android Studio › SDK Manager › SDK Tools › Android Emulator', true))
+  if (!bin) return out
+  const d = await droidDevices().catch(e => new Error((e as Error).message))
+  if (d instanceof Error) return [...out, check('android', 'device', 'A device running', false, d.message)]
+  const says = [d.ready.map(x => x.name).join(', '), ...d.asks.map(asking)].filter(Boolean).join('; ')
+  const q = (s: string) => (/^[\w./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`) // a command to paste in a shell
+  return [...out, check('android', 'device', 'A device running', d.ready.length > 0, says || 'none now: start an emulator, or plug in a phone with USB debugging on', emu && avds[0] && `${q(emu)} -avd ${q(avds[0])}`, true)]
+}
 const deviceOf = (id: unknown) => {
   const m = SIM_ID.exec(String(id ?? ''))
   if (!m) throw new Error('which device? ios:<udid> or android:<serial>, from sim list')
@@ -159,20 +217,19 @@ const IOS_KEYS: Record<string, string[]> = { home: ['button', 'HOME'], lock: ['b
 export async function sim(p: { op: string; device?: string; x?: unknown; y?: unknown; x2?: unknown; y2?: unknown; text?: string; key?: string }) {
   const op = p.op as (typeof SIM_OPS)[number]
   if (!SIM_OPS.includes(op)) throw new Error(`sim: ${p.op}? one of ${SIM_OPS.join(', ')}`)
+  if (op === 'check') return { checks: (await Promise.all([iosChecks(), droidChecks()])).flat() }
   if (op === 'list') {
     const devices: { id: string; name: string; os: 'ios' | 'android' }[] = []
     const why: string[] = [] // what keeps one kind (or one phone) from being listed
     // both at once: adb's first call starts its server, a second or two
-    const [ios, droid] = await Promise.allSettled([process.platform === 'darwin' ? bootedSims() : Promise.resolve([]), adb(null, ['devices', '-l'])])
+    const [ios, droid] = await Promise.allSettled([process.platform === 'darwin' ? bootedSims() : Promise.resolve([]), droidDevices()])
     if (ios.status === 'fulfilled') for (const d of ios.value) devices.push({ id: `ios:${d.udid}`, name: d.name, os: 'ios' })
     else why.push(`iOS: ${(ios.reason as Error).message}`)
     if (droid.status === 'rejected') why.push(`Android: ${(droid.reason as Error).message}`)
-    else
-      for (const l of String(droid.value.stdout).split('\n').slice(1)) {
-        const m = /^(\S+)\s+(device|unauthorized)\b(.*)$/.exec(l.trim())
-        if (m?.[2] === 'unauthorized') why.push(`Android: ${m[1]} waits for you to allow USB debugging on it`)
-        else if (m) devices.push({ id: `android:${m[1]}`, name: /model:(\S+)/.exec(m[3])?.[1]?.replace(/_/g, ' ') ?? m[1], os: 'android' })
-      }
+    else {
+      for (const d of droid.value.ready) devices.push({ id: `android:${d.serial}`, name: d.name, os: 'android' })
+      for (const s of droid.value.asks) why.push(`Android: ${asking(s)}`)
+    }
     return { devices, why }
   }
   const d = deviceOf(p.device)

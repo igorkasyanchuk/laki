@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SimCheck, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -192,6 +192,7 @@ export type AppSettings = Paint & {
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
   todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
+  simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
@@ -1216,6 +1217,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
+  ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
@@ -1240,6 +1242,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
   { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
+  { id: 'simulator', label: 'Simulators', icon: 'phone', group: 'Connect' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
 
@@ -1256,6 +1259,59 @@ export type ResourcesApi = {
   stopOther?: (key: string) => Promise<unknown> // end one the daemon runs: Laki AI's ask, a tunnel, remote access
   widgetName: (id: string) => string
 }
+// Simulators: the side panel's Simulator tab (settings.simulator), and what an iOS Simulator or an Android emulator needs
+// on this Mac (the daemon's sim check), each one missing with its fix to copy
+function SimSection({ check, on, onOn }: { check: () => Promise<SimCheck[]>; on: boolean; onOn: (v: boolean) => void }) {
+  const [checks, setChecks] = useState<SimCheck[] | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(true)
+  const [copied, setCopied] = useState('') // the check whose fix was just copied
+  const run = () => (setBusy(true), check().then(c => (setChecks(c), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  useEffect(() => void run(), [])
+  const again = (
+    <button type="button" disabled={busy} onClick={run}>
+      {busy ? 'Checking…' : 'Check again'}
+    </button>
+  )
+  const list = (os: SimCheck['os']) =>
+    checks?.filter(c => c.os === os).map(c => (
+      <div key={c.id} className="sim-check" data-state={c.ok ? 'ok' : c.warn ? 'warn' : 'bad'}>
+        <Icon name={c.ok ? 'checkCircle' : c.warn ? 'alertCircle' : 'xCircle'} />
+        <div>
+          <div>
+            {c.label} <span className="muted">· {c.says}</span>
+          </div>
+          {c.fix && (
+            <div className="tunnel-code sim-fix">
+              <code>{c.fix}</code>
+              {!c.fix.includes('›') && <IconButton icon={copied === c.id ? 'check' : 'copy'} title={copied === c.id ? 'Copied' : 'Copy'} onClick={() => navigator.clipboard.writeText(c.fix!).then(() => (setCopied(c.id), setTimeout(() => setCopied(''), 2000)), e => setErr(String(e?.message ?? e)))} />}
+            </div>
+          )}
+        </div>
+      </div>
+    ))
+  return (
+    <>
+      <h2>Simulators</h2>
+      <p className="muted small">An iPhone in the iOS Simulator or an Android emulator (or a phone on USB) in the side panel: its screen live, your clicks as taps, a screenshot into the prompt for the agent.</p>
+      <Group title="Side panel">
+        <div className="setting-box">
+          <Switch className="switch-row" on={on} onChange={onOn}>
+            <Says title="Simulator tab" hint="The side panel's Simulator: the booted simulators and adb's devices, one picked. Laki starts none: boot one in Simulator or Android Studio" />
+          </Switch>
+        </div>
+      </Group>
+      {err && <p className="warn small">{err}</p>}
+      <Group title="iOS" hint="Xcode's Simulator, on a Mac. idb adds taps, swipes and typing; without it the screen still shows" act={again}>
+        {list('ios') ?? (busy && <p className="muted small">Checking…</p>)}
+      </Group>
+      <Group title="Android" hint="adb from Android Studio's SDK (Laki finds it there, no PATH needed), and an emulator or a phone with USB debugging on">
+        {list('android') ?? (busy && <p className="muted small">Checking…</p>)}
+      </Group>
+    </>
+  )
+}
+
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
 const KIND: Record<string, string> = { main: 'Laki: the app (windows, menus, notifications)', renderer: 'a window: what it draws and runs', 'gpu-process': 'GPU: drawing every window and the bubbles', network: 'network', audio: 'audio', storage: 'storage', daemon: 'the daemon: sessions, hooks, scans, the API' }
 // the last 5 minutes of the totals, a sample every 3 s while the page is open (kept while the app runs): the graph
@@ -2650,6 +2706,7 @@ export function SettingsPage(p: {
   remote?: RemoteApi
   widgets?: WidgetsApi
   resources?: ResourcesApi
+  simulator?: () => Promise<SimCheck[]> // Simulators' checks: the daemon's sim check
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
@@ -3704,6 +3761,7 @@ export function SettingsPage(p: {
               set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
           )}
+          {sec === 'simulator' && p.simulator && <SimSection check={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'memory' && (
             <>

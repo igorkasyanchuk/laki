@@ -51,7 +51,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
   and review comments, and a browser preview of its dev server (a screenshot, or a picked element's selector,
   HTML, CSS and screenshot, goes to the agent), and a booted iOS Simulator or Android emulator live, to tap and type
-  in. Markdown files preview rendered or raw; changed images show before and after. ⌘P finds a file by name.
+  in (Settings › Simulators turns it on). Markdown files preview rendered or raw; changed images show before and after. ⌘P finds a file by name.
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
   browser of the app's, take screenshots, click, fill in fields and read the page.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
@@ -629,10 +629,18 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
 - *Simulator*: a booted iOS Simulator, an Android emulator or a phone on `adb` (USB debugging), its screen live in the
   panel (a few frames a second). A click taps, a drag swipes, the box types into it (Enter sends; empty, Return), and
   the buttons press Home, Back and Apps (Android) and Lock; the camera puts a screenshot's path into the agent's prompt.
-  With several running, pick one in its menu. iOS needs Xcode (`xcode-select` pointing at it, its license accepted),
-  and taps and typing need idb (`brew install facebook/fb/idb-companion`, then `pipx install fb-idb`); Android needs
-  `adb` on PATH (Android Studio's platform-tools). Nothing running: it says why and what to start (a phone that waits
-  for you to allow USB debugging, by name).
+  With several running, pick one in its menu. It's off until **Settings › Simulators** turns it on; that page also
+  checks what this Mac has, each missing piece with the command to run (*Check again* after):
+  - iOS: Xcode (`xcode-select` pointing at it, not the Command Line Tools alone), its license accepted
+    (`sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch`), an iOS runtime
+    (`xcodebuild -downloadPlatform iOS`), a simulator running (`open -a Simulator`), and for taps and typing idb
+    (`brew install facebook/fb/idb-companion && pipx install fb-idb`).
+  - Android: `adb`, on PATH or in Android Studio's SDK (`$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, `~/Library/Android/sdk`),
+    an emulator with a virtual device (Android Studio › Device Manager), and a device running (`emulator -avd <name>`,
+    or a phone with USB debugging on).
+
+  Nothing running: the tab says why and what to start (a phone that waits for you to allow USB debugging, by name),
+  and *What's needed…* opens that page.
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is

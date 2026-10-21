@@ -3,9 +3,10 @@
 // Stand-ins go in the test's own $HOME/bin (first on PATH).
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import type { SimCheck } from '../src/shared/types.ts'
 import { connect, fresh, type Rig, until } from './helpers.ts'
 
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
@@ -182,7 +183,7 @@ exit 0
   assert.match((await rig.cli('screen', 'nope')).err, /no workspace|not found|no tab/i)
 })
 
-test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals', async t => {
+test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals; Settings › Simulators\' checks', async t => {
   const rig = await fresh(t)
   const bin = join(rig.home, 'bin')
   const log = () => readFileSync(join(rig.home, 'sim.log'), 'utf8')
@@ -194,6 +195,7 @@ test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and
     `#!/bin/sh
 echo "xcrun $*" >> "$HOME/sim.log"
 [ "$3" = devices ] && { echo '{"devices":{"iOS-26":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}]}}'; exit 0; }
+[ "$3" = runtimes ] && { echo '{"runtimes":[{"name":"iOS 26.0","platform":"iOS","isAvailable":true},{"name":"watchOS 12.0","platform":"watchOS","isAvailable":true}]}'; exit 0; }
 [ "$2" = io ] && { echo '${PNG}' | base64 -d > "$6"; exit 0; }
 [ "$2" = getenv ] && case "$4" in *WIDTH) echo 1170 ;; *HEIGHT) echo 2532 ;; *SCALE) echo 3.000000 ;; esac && exit 0
 exit 1
@@ -206,13 +208,20 @@ echo "idb $*" >> "$HOME/sim.log"
 exit 0
 `,
   )
+  script(join(bin, 'idb_companion'), '#!/bin/sh\n')
+  script(join(bin, 'xcode-select'), '#!/bin/sh\necho /Applications/Xcode.app/Contents/Developer\n')
+  // adb and the emulator where Android Studio puts them, not on PATH
+  const sdk = join(rig.home, process.platform === 'darwin' ? 'Library/Android/sdk' : 'Android/Sdk')
+  mkdirSync(join(sdk, 'platform-tools'), { recursive: true })
+  mkdirSync(join(sdk, 'emulator'), { recursive: true })
+  script(join(sdk, 'emulator/emulator'), '#!/bin/sh\necho "INFO    | Storing crashdata"\necho Pixel_9\n')
   // a screen of 1080 by 2400 pixels (its header's; sips may not read the rest: it goes as it came)
   const png = Buffer.from(PNG, 'base64')
   png.writeUInt32BE(1080, 16)
   png.writeUInt32BE(2400, 20)
   writeFileSync(join(rig.home, 'screen.png'), png)
   script(
-    join(bin, 'adb'),
+    join(sdk, 'platform-tools/adb'),
     `#!/bin/sh
 echo "adb $*" >> "$HOME/sim.log"
 case "$*" in
@@ -225,6 +234,20 @@ exit 0
   const l = await rig.rpc('sim', { op: 'list' })
   assert.deepEqual(l.devices, [...(ios ? [{ id: 'ios:U-1', name: 'iPhone 17', os: 'ios' }] : []), { id: 'android:emulator-5554', name: 'sdk gphone64 arm64', os: 'android' }], 'booted ones, ready ones')
   assert.match(l.why.join('\n'), /ZX1 waits for you to allow USB debugging/, 'a phone that asks: said')
+  const checks = async () => (await rig.rpc('sim', { op: 'check' })).checks as SimCheck[]
+  let c = await checks()
+  const by = (id: string) => c.find(x => x.id === id)!
+  assert.ok(by('adb').ok && by('adb').says.endsWith('platform-tools/adb'), "adb found in Android Studio's SDK")
+  assert.deepEqual([by('emulator').ok, by('emulator').says], [true, 'Pixel_9'], "its AVDs, the emulator's own lines left out")
+  assert.deepEqual([by('device').ok, by('device').says], [true, 'sdk gphone64 arm64; ZX1 waits for you to allow USB debugging on it'])
+  if (ios) {
+    assert.deepEqual(c.filter(x => x.os === 'ios').map(x => [x.id, x.ok]), [['xcode', true], ['simctl', true], ['runtime', true], ['booted', true], ['idb', true]])
+    assert.equal(by('runtime').says, 'iOS 26.0', 'iOS runtimes only')
+    script(join(bin, 'xcode-select'), '#!/bin/sh\necho /Library/Developer/CommandLineTools\n')
+    c = await checks()
+    assert.deepEqual(c.filter(x => x.os === 'ios').map(x => x.id), ['xcode'], 'no Xcode: nothing after it')
+    assert.ok(!by('xcode').ok && !by('xcode').warn && /xcode-select -s/.test(by('xcode').fix!), 'the Command Line Tools alone: Xcode and the switch to it')
+  }
   const droid = 'android:emulator-5554'
   await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 }), /no frame of it yet/)
   assert.match((await rig.rpc('sim', { op: 'frame', device: droid })).frame, /^data:image\/(png|jpeg);base64,/)

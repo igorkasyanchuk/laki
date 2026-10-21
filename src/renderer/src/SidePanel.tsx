@@ -37,6 +37,7 @@ export type PanelApi = {
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
+  setup?: () => void // Settings › Simulators: what a simulator needs on this Mac
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
@@ -690,8 +691,9 @@ export function SidePanel(p: {
   onRoot: (r: FilesRoot) => void
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
   ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
+  sim?: boolean // the Simulator tab (settings.simulator)
 }) {
-  const tabs = TABS.filter(t => p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview' || t.id === 'device')
+  const tabs = TABS.filter(t => (t.id === 'device' ? p.sim : p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview'))
   const ext = p.ext?.find(x => x.id === p.tab)
   const tab = ext || tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
@@ -817,9 +819,16 @@ function DeviceTab({ api }: { api: PanelApi }) {
             {w}
           </p>
         ))}
-        <button type="button" onClick={() => void look()}>
-          <Icon name="refresh" size={12} /> Look again
-        </button>
+        <div className="row-buttons">
+          <button type="button" onClick={() => void look()}>
+            <Icon name="refresh" size={12} /> Look again
+          </button>
+          {api.setup && (
+            <button type="button" onClick={api.setup}>
+              What's needed…
+            </button>
+          )}
+        </div>
       </div>
     )
   return (

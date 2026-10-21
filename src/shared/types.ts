@@ -273,8 +273,12 @@ export const RUN_SCRIPTS = ['test', 'lint', 'format', 'deploy'] as const
 // the windows open, and the simulator's hands through idb
 export const DEVICE_OPS = ['shot', 'windows', 'tap', 'swipe', 'type', 'describe'] as const
 // the side panel's Simulator (daemon/device.ts' sim): booted iOS Simulators and adb's Android devices, a frame of one, a
-// screenshot for an agent (shot: its path, an iOS one in points), and input (keys: device.ts' IOS_KEYS, DROID_KEYS)
-export const SIM_OPS = ['list', 'frame', 'shot', 'tap', 'swipe', 'type', 'key'] as const
+// screenshot for an agent (shot: its path, an iOS one in points), input (keys: device.ts' IOS_KEYS, DROID_KEYS), and
+// check: what this Mac has of what each needs (Settings › Simulators)
+export const SIM_OPS = ['list', 'frame', 'shot', 'tap', 'swipe', 'type', 'key', 'check'] as const
+// one thing a simulator needs: ok, else fix (a command to run, or where to click); warn: it works without it, in part
+// (idb: no taps), or it's what runs now (none booted)
+export type SimCheck = { os: 'ios' | 'android'; id: string; label: string; ok: boolean; says: string; fix?: string; warn?: boolean }
 export type RunScript = (typeof RUN_SCRIPTS)[number]
 // Enter (or the tab menu's Restart) in its ended tab starts it again: an agent, the run tab, a script; a deploy only
 // through Run ▾, which asks (core's input, App's tab menu)
@@ -390,6 +394,7 @@ export type Settings = {
   desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
   notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
   todoList?: boolean // experimental (Settings › General): the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), off unless true
+  simulator?: boolean // Settings › Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
   deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)

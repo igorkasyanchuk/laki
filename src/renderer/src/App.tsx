@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type SimCheck, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -1391,6 +1391,7 @@ export function App() {
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     sim: p => api.call('sim', p),
+    setup: () => setDialog({ section: 'simulator' }),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     undoHunk: async (path, hunk, lines, then) => {
       if (!(await revertOk(w))) return false
@@ -3255,6 +3256,7 @@ export function App() {
               tab={panelTab}
               onTab={setPanelTab}
               api={panelApi(ws)}
+              sim={settings.simulator === true}
               width={panelW}
               onWidth={setPanelW}
               onClose={() => setPanelOpen(false)}
@@ -3324,6 +3326,7 @@ export function App() {
             webhookTest={w => api.call('webhookTest', w)}
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
             uiReset={() => api.call('uiReset')}
+            simulator={() => api.call<{ checks: SimCheck[] }>('sim', { op: 'check' }).then(r => r.checks)}
             resources={{
               load: () => api.call<Resources>('resources'),
               tabs: view.tabs,
