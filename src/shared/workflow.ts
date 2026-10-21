@@ -820,6 +820,7 @@ export type FlowRun = {
   dry?: boolean // outward actions said, not done
   task: string
   trigger: string
+  by?: string // an agent started it (flowStart's by: 'agent') or its event did: whose; its flow.ended is that agent's too
   status: FlowStatus
   cur?: string // the block it's on
   at?: number // since when

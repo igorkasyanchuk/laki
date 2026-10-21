@@ -359,7 +359,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
 
 // Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
 // task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
@@ -415,8 +415,8 @@ export async function flowStart(o: Start) {
   const ahead = runs().filter(r => r.status === 'queued' && runOf(r, wf)).length
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
-  const { source, project, path, text, problems, byAgent: _, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, ...flow } = wf
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
   runs().push(r)
@@ -1228,7 +1228,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   touch()
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
-  widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws)
+  widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, r.by ? { from: { agent: r.by } } : {}) // an agent's run: its end is the agent's event
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
@@ -1374,7 +1374,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id))))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
-    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
+    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload, ...(agent && { agent }) }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
   }
   return out
 }

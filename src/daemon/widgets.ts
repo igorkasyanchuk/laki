@@ -1448,12 +1448,12 @@ const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
 const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
 const SENT_MAX = 50
-type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string }
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string; of?: string } // agent: an agent's event (its from.agent); of: the event's workspace (whose Always)
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
 const sent: EventSent[] = []
-export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: boolean) => { flows: string[]; refused: string[] } } = {}
+export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined) => { flows: string[]; refused: string[] } } = {}
 // its handler of that event: on[name], or on["custom.*"] for a custom one
 function handlerOf(w: Entry, name: string) {
   const on = w.m.on
@@ -1468,7 +1468,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()
-  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, !!o.from?.agent)
+  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent)
   if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
   if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
   let json = JSON.stringify({ ...head, ...extra })
@@ -1480,20 +1480,13 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
     // its workspace's only; as one is archived or removed, that one's too (its action runs on what it was, keeps nothing)
     const going = (name === 'workspace.archived' || name === 'workspace.removed') && !!x && instOk({ ...x, archived: false })
     if (scoped(w) && !(x && (instOk(x) || going))) continue
-    // an agent's event (its emit, or one an extension made while fetching for one) only fetches: an action is a command
-    // the user never asked for
-    if (o.from?.agent && h !== 'refresh') {
-      wLog(w, `event ${name} from ${o.from.agent}: action ${h} not run (an agent's event only fetches)`, 'warn')
-      ;(rec.refused ??= []).push(`${w.id}: ${h} not run, an agent's event only fetches`)
-      continue
-    }
     const q = queues.get(w.id) ?? []
     const at = scoped(w) ? x!.id : undefined
     if (h === 'refresh' && q.some(j => j.h === 'refresh' && j.ws === at && !j.gone)) {
       wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
       continue
     }
-    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent })
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent, of: x?.id })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`, 'warn')
     queues.set(w.id, q)
     rec.widgets.push(w.id)
@@ -1580,9 +1573,10 @@ export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; fr
   const ws = typeof o.ws === 'string' && o.ws ? state.workspaces.find(x => x.id === o.ws || x.name === o.ws) : undefined
   if (o.ws && !ws) throw new Error(`no workspace ${o.ws}`)
   const t = typeof o.from?.tab === 'string' ? state.tabs.find(x => x.id === o.from!.tab) : undefined
-  // Laki AI's counts as an agent's, and so does one an extension makes handling an agent's event (its LAKI_EVENT_AGENT)
-  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : typeof o.agent === 'string' && o.agent ? o.agent.slice(0, 40) : undefined
   const widget = typeof o.from?.widget === 'string' && widgets.has(o.from.widget) ? o.from.widget : undefined
+  // Laki AI's counts as an agent's, and so does one an extension makes handling an agent's event: the daemon's own
+  // handling (its handler can't drop that), else its LAKI_EVENT_AGENT. The input may add an agent, never take one off
+  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : (widget && handling.get(widget)) || (typeof o.agent === 'string' && o.agent ? o.agent.slice(0, 40) : undefined)
   const from: From = { ...(widget && { widget }), ...(t && { tab: { id: t.id, name: t.name } }), ...(agent && { agent }) }
   const hops = o.hops === undefined || o.hops === '' ? 0 : (Number(o.hops) || 0) + 1
   if (hops > HOPS_MAX) {
@@ -1606,12 +1600,26 @@ async function drain(id: string) {
     queues.delete(id)
   }
 }
+// an extension handling an agent's event: that agent's, until its handler ends (an event it emits meanwhile is the agent's)
+const handling = new Map<string, string>()
 async function handle(id: string, j: Job) {
   const w = widgets.get(id)
   if (!w || !onOf(w)) return
+  // an agent's event and an action: a command the user never asked for, asked first as an agent's tool is (Always: for
+  // that action as it is now, in the event's workspace); a fetch isn't asked
+  if (j.agent && j.h !== 'refresh') {
+    const ws = j.of ?? ''
+    const key = grantKey(w, j.h, true)
+    if (!state.widgetGrants?.[ws]?.includes(key)) {
+      const how = await approve(w, j.h, { description: `Its "${j.h}" action, on ${j.name}: an event ${j.agent} sent`, ask: 'first', ws: ws || undefined, agent: j.agent }).catch((e: Error) => void wLog(w, `event ${j.name} from ${j.agent}: action ${j.h} not run: ${e.message}`, 'warn'))
+      if (!how) return
+      if (how === 'always') grant(w, j.h, ws, key)
+    }
+  }
   const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
   writeFileSync(file, j.json, { mode: 0o600 })
   const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops), ...(j.agent && { LAKI_EVENT_AGENT: j.agent }) }, stdin: j.json, gone: j.gone }
+  if (j.agent) handling.set(id, j.agent)
   try {
     if (j.h === 'refresh' && j.gone) wLog(w, `event ${j.name}: not fetched: ${j.gone.name} is gone, nothing to keep (an action runs on it)`)
     else if (j.h === 'refresh') {
@@ -1623,6 +1631,7 @@ async function handle(id: string, j: Job) {
     }
   } finally {
     rmSync(file, { force: true })
+    handling.delete(id)
   }
 }
 
@@ -1895,12 +1904,7 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   let how = t.ask === 'never' ? 'never' : 'always' // 'always': granted before
   if (t.ask === 'always' || (t.ask === 'first' && !state.widgetGrants?.[ws]?.includes(key))) {
     how = await approve(w, o.action, { description: t.description, ask: t.ask, input, ws, tab: tab?.id ?? from.tab, agent: from.agent ?? tab?.name })
-    if (how === 'always' && t.ask === 'first') {
-      const g = (state.widgetGrants ??= {})
-      g[ws] = [...(g[ws] ?? []).filter(k => !k.startsWith(`${w.id}.${o.action}#`)), key] // one made for its older files goes
-      save()
-      changed()
-    }
+    if (how === 'always' && t.ask === 'first') grant(w, o.action, ws, key)
   }
   const env = Object.fromEntries(Object.entries(input).map(([k, v]) => [`WIDGET_INPUT_${k.toUpperCase()}`, Array.isArray(v) ? v.join(',') : typeof v === 'boolean' ? (v ? '1' : '') : String(v ?? '')]))
   const why = `${ws || 'no workspace'}${from.tab ? `/${from.tab}` : ''}${from.agent ? ` (${from.agent})` : ''}, allowed ${how}`
@@ -1909,6 +1913,13 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   if (r.ok && (r.toast || r.modal || r.close)) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, toast: r.toast, modal: r.modal, close: r.close })
   const output = (r.stdout ?? '').slice(0, TOOL_OUT)
   return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
+}
+// an Always: that action as it is (key: grantKey) in that workspace ('' none); one made for its older files goes
+function grant(w: Entry, action: string, ws: string, key: string) {
+  const g = (state.widgetGrants ??= {})
+  g[ws] = [...(g[ws] ?? []).filter(k => !k.startsWith(`${w.id}.${action}#`)), key]
+  save()
+  changed()
 }
 // the user's answer in the app (toolAsk: its dialog and a notification): once, always (a tool that asks first) or deny.
 // Refused with no window, no answer in LAKI_TOOL_WAIT, a deny, or the action changed meanwhile (a dev save, a reload):

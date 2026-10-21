@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's event stays the agent's on the way: what an extension sends while handling one, an agent's workflow
+  run's end and every MCP event count as an agent's, and an extension's action for one asks you first.
 - An extension's gate that says no and exits 1 now holds the ship, merge or archive, and `laki archive` prints why
   a gate held it and exits 1, like `laki ship`.
 - A workflow that starts on a new workspace or a new tab no longer starts itself again from its own run's

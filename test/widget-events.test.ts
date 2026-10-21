@@ -329,33 +329,70 @@ test('events of your own: emit reaches others not itself, custom.*, workspace, t
   assert.deepEqual(ps.filter((x: any) => x.level === 'error').map((x: any) => x.where), ['widget.json on.turn.don'])
 })
 
-test("an agent's event runs no extension's action (only refreshes), nor one an extension emits while fetching for it; yours does", async t => {
+test("an agent's event: an action handler asks first (Always kept), a fetch doesn't; what an extension emits handling it stays the agent's without its env; an agent's run's flow.ended and MCP's emit are agents'", async t => {
   const rig = await fresh(t)
   const home = rig.env.HOME
-  make(rig, 'act', { name: 'Act', fetch: 'echo "{}"', on: { 'custom.*': 'act' }, actions: { act: `echo "$LAKI_EVENT" >> "${home}/act.log"` } })
-  make(rig, 'relay', { name: 'Relay', fetch: `"$LAKI_CLI" widget emit relayed >/dev/null; echo "{}"`, on: { 'custom.x': 'refresh' } })
+  make(rig, 'act', { name: 'Act', fetch: 'echo "{}"', on: { 'custom.x': 'act' }, actions: { act: `echo "$LAKI_EVENT $LAKI_EVENT_AGENT" >> "${home}/act.log"` } })
+  // relay's fetch drops its env's mark: the daemon knows whose event it handles anyway
+  make(rig, 'relay', { name: 'Relay', scope: 'workspace', fetch: `env -u LAKI_EVENT_AGENT "$LAKI_CLI" widget emit relayed >/dev/null; echo "{}"`, on: { 'custom.x': 'refresh' } })
   await on(rig, 'act', 'relay')
   await rig.rpc('widgetSet', { id: 'act', log: true })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const relays = async () => (await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'custom.relayed')
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'cmd', text: '# Cmd\nruns in: main · on: custom.relayed\n\n## start\nnext: go\n\n## go\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n' })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
   const tab = await until(() => rig.tab(ws.id))
-  // an agent's: act's action isn't run, refused and said; relay refreshes, and what it emits counts as the agent's
-  const relays = async () => (await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'custom.relayed')
-  await until(async () => (await relays()).length, "relay's first fetch, as it's turned on")
-  await sleep(300)
-  for (const f of ['act.log']) rmSync(join(home, f), { force: true }) // what that one ran (yours)
-  const before = (await relays()).length
-  const r = await rig.rpc('widgetEmit', { name: 'x', from: { tab: tab.id, ws: ws.id } })
-  assert.deepEqual(r.widgets, ['relay'])
+  const emit = () => rig.rpc('widgetEmit', { name: 'x', ws: ws.id, from: { tab: tab.id, ws: ws.id } })
+
+  // no window to ask in: act's action isn't run, said in its log; relay fetches, and its emit is the agent's: the
+  // workflow with a run: block refuses it
+  let before = (await relays()).length
+  assert.deepEqual((await emit()).widgets.sort(), ['act', 'relay'])
   await until(async () => (await relays()).length > before, 'relay emitted again')
   const relayed = (await relays())[0]
   assert.equal(relayed.from.agent, 'claude')
-  assert.match(relayed.refused.join('\n'), /act: act not run, an agent's event only fetches/)
-  await sleep(500)
+  assert.match(relayed.refused.join('\n'), /cmd: an agent sent the event, and it runs commands/)
+  await until(async () => (await rig.rpc('widgetLogs', { id: 'act' })).lines.some((l: any) => /event custom\.x from claude: action act not run: Laki's window isn't open/.test(l.text)), 'not run, said')
   assert.ok(!existsSync(join(home, 'act.log')))
-  assert.ok((await rig.rpc('widgetLogs', { id: 'act' })).lines.some((l: any) => /event custom\.x from claude: action act not run/.test(l.text)))
-  // yours: it runs
-  await rig.cli('widget', 'emit', 'mine')
-  await until(() => existsSync(join(home, 'act.log')), "your event ran act's action")
-  assert.equal(readFileSync(join(home, 'act.log'), 'utf8').trim(), 'custom.mine')
+
+  // a window: asked first; Deny runs nothing, Always runs it and keeps it for that workspace
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const asked = new Set<string>()
+  const ask = () => until(() => (m => m && (asked.add(m.req), m))(app.events.find(e => e.ev === 'toolAsk' && e.widget === 'act' && !asked.has(e.req))), 'asked')
+  await emit()
+  const a1 = await ask()
+  assert.deepEqual([a1.action, a1.agent, a1.ask, a1.ws], ['act', 'claude', 'first', ws.id])
+  await rig.rpc('widgetToolAnswer', { req: a1.req, allow: 'deny' })
+  await sleep(500)
+  assert.ok(!existsSync(join(home, 'act.log')), 'denied: not run')
+  await emit()
+  await rig.rpc('widgetToolAnswer', { req: (await ask()).req, allow: 'always' })
+  await until(() => existsSync(join(home, 'act.log')), 'allowed: run')
+  assert.equal(readFileSync(join(home, 'act.log'), 'utf8').trim(), 'custom.x claude')
+  await emit()
+  await until(() => readFileSync(join(home, 'act.log'), 'utf8').trim().split('\n').length === 2, 'Always: run unasked')
+  assert.equal(app.events.filter(e => e.ev === 'toolAsk' && e.widget === 'act').length, 2)
+  // yours: never asked
+  await rig.cli('widget', 'emit', 'x', '--ws', ws.id)
+  await until(() => readFileSync(join(home, 'act.log'), 'utf8').includes('custom.x \n'), 'yours ran')
+  assert.equal(app.events.filter(e => e.ev === 'toolAsk' && e.widget === 'act').length, 2, 'yours: not asked')
+
+  // a run an agent started: its flow.ended is the agent's
+  await rig.rpc('flowSave', { id: 'plain', text: '# Plain\nruns in: main\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n' })
+  const run = await rig.rpc('flowStart', { workflow: 'plain', project: p.id, task: 'x', by: 'agent' })
+  const ended = await until(async () => (await rig.rpc('widgetEvents')).find((e: any) => e.event === 'flow.ended'), 'flow.ended')
+  assert.equal(ended.from?.agent, 'agent', JSON.stringify(ended))
+  assert.equal((await rig.rpc('flowGet', { id: run.id })).by, 'agent')
+
+  // MCP's emit, with no LAKI_TAB: an agent's
+  const msgs = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'laki_extension_emit', arguments: { name: 'viamcp' } } },
+  ]
+  const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp')
+  assert.equal(r.code, 0, r.err)
+  const viaMcp = (await rig.rpc('widgetEvents')).find((e: any) => e.event === 'custom.viamcp')
+  assert.equal(viaMcp.from?.agent, 'agent')
 })

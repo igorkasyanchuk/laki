@@ -186,9 +186,11 @@ the last 50 events, and which extensions and workflows each reached (or why a wo
 `laki_extension_emit`) sends `custom.deploy.done` with that `data` (64 KB at most; a name of letters, digits, `.`, `_`,
 `-`). `"on": { "custom.deploy.done": "refresh" }` answers it, `"custom.*"` every custom event. From an extension's own
 command (`"$LAKI_CLI" widget emit …`) `from.widget` says which, and it never gets its own; an agent's says
-`from.agent`. An agent's event (Laki AI's too) only fetches: a handler that's an action doesn't run for it (its log and
-`laki widget events` say so), and what an extension emits while handling one (`$LAKI_EVENT_AGENT`) counts as the
-agent's. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
+`from.agent` (MCP's `laki_extension_emit` always does). For an agent's event (Laki AI's too) a handler that's an action
+asks you first in the app, as an agent's tool call does (*Always in <workspace>* keeps it; no window, no answer or Deny:
+it doesn't run, its log says so); a `refresh` isn't asked. What an extension emits while handling one counts as the
+agent's (Laki knows which it's handling; `$LAKI_EVENT_AGENT` tells the extension), and so does a workflow run an agent
+started, its `flow.ended`. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
 
 A workflow can start on any of these (`on: custom.deploy.done` in its head): see the guide's Workflows. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
 window is open.
