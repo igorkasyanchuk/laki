@@ -1,5 +1,5 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
-// checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
+// checks and review comments; a phone's screen (Simulator); a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { bridge, openExternal } from './api'
@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type Check, type FixWhat, type LabelApi, typ
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
 import { ask, escapes, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
-export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | `ext:${string}` // ext: an extension placed in panel
+export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] } // at: an older daemon gives none
@@ -36,6 +36,7 @@ export type PanelApi = {
   toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
+  sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
@@ -58,6 +59,7 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'changes', label: 'Changes', icon: 'changes' },
   { id: 'review', label: 'Review', icon: 'review' },
   { id: 'preview', label: 'Preview', icon: 'globe' },
+  { id: 'device', label: 'Simulator', icon: 'phone' },
 ]
 
 // what load gives, again every few seconds while the window is in front, and on reload()
@@ -689,7 +691,7 @@ export function SidePanel(p: {
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
   ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
 }) {
-  const tabs = TABS.filter(t => p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview')
+  const tabs = TABS.filter(t => p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview' || t.id === 'device')
   const ext = p.ext?.find(x => x.id === p.tab)
   const tab = ext || tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
@@ -714,8 +716,163 @@ export function SidePanel(p: {
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
+      {tab === 'device' && <DeviceTab api={p.api} />}
       {ext && <div className="sp-ext">{ext.body}</div>}
     </div>
+  )
+}
+
+// Simulator: a booted iOS Simulator or an Android emulator (or a phone on adb) in the panel, a frame after another while
+// it shows (the daemon's sim; one asked for as the last comes, not while the window is hidden). A click is a tap, a drag
+// a swipe, the box types (Enter: it, then Return), the buttons press Home, Back, Lock…; the camera puts a screenshot's
+// path into the agent's prompt. iOS input needs idb, as laki screen's
+// ponytail: a few frames a second and a third of a second for a tap; a stream with live touches is the next step
+type SimDevice = { id: string; name: string; os: 'ios' | 'android' }
+const SIM_PICK = 'laki.sim' // the device picked last
+const SIM_GAP = 250 // ms at least between frames
+const SIM_KEY_WORDS: [key: string, label: string, icon: IconName, android?: boolean][] = [
+  ['home', 'Home', 'home'],
+  ['back', 'Back', 'back', true],
+  ['apps', 'Apps', 'layers', true],
+  ['lock', 'Lock', 'lock'],
+]
+function DeviceTab({ api }: { api: PanelApi }) {
+  const [list, setList] = useState<{ devices: SimDevice[]; why: string[] } | null>(null)
+  const [pick, setPick] = useState(() => {
+    try {
+      return localStorage.getItem(SIM_PICK) ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const [frame, setFrame] = useState('')
+  const [err, setErr] = useState('')
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false) // input on its way
+  const img = useRef<HTMLImageElement>(null)
+  const down = useRef<{ x: number; y: number } | null>(null)
+  const look = () => (setList(null), api.sim<{ devices: SimDevice[]; why: string[] }>({ op: 'list' }).then(setList, e => setList({ devices: [], why: [String(e?.message ?? e)] })))
+  useEffect(() => void look(), [])
+  const dev = list?.devices.find(d => d.id === pick) ?? list?.devices[0]
+  useEffect(() => {
+    if (!dev) return
+    let on = true
+    let t: ReturnType<typeof setTimeout> | undefined
+    setFrame('')
+    const next = async () => {
+      if (!on) return
+      if (document.hidden) return void (t = setTimeout(next, 1000))
+      const at = Date.now()
+      let wait = SIM_GAP
+      try {
+        const r = await api.sim<{ frame: string }>({ op: 'frame', device: dev.id })
+        if (on) (setFrame(r.frame), setErr(''))
+      } catch (e) {
+        if (on) setErr(String((e as Error)?.message ?? e))
+        wait = 2000 // gone, or not ready: again in a while
+      }
+      if (on) t = setTimeout(next, Math.max(0, wait - (Date.now() - at)))
+    }
+    void next()
+    return () => ((on = false), clearTimeout(t))
+  }, [dev?.id])
+  const choose = (id: string) => {
+    setPick(id)
+    try {
+      localStorage.setItem(SIM_PICK, id)
+    } catch {}
+  }
+  const send = (p: { op: string; [k: string]: unknown }) => {
+    if (!dev) return
+    setBusy(true)
+    api
+      .sim({ ...p, device: dev.id })
+      .then(() => setErr(''), e => setErr(String(e?.message ?? e)))
+      .finally(() => setBusy(false))
+  }
+  // where on the picture, as fractions of it (the image keeps its own shape: its box is the picture)
+  const spot = (e: { clientX: number; clientY: number }) => {
+    const r = img.current!.getBoundingClientRect()
+    const f = (v: number) => Math.min(1, Math.max(0, v))
+    return { x: f((e.clientX - r.left) / r.width), y: f((e.clientY - r.top) / r.height), r }
+  }
+  const up = (e: React.PointerEvent) => {
+    const a = down.current
+    down.current = null
+    if (!a || !img.current) return
+    const b = spot(e)
+    if (Math.hypot((b.x - a.x) * b.r.width, (b.y - a.y) * b.r.height) > 8) send({ op: 'swipe', x: a.x, y: a.y, x2: b.x, y2: b.y })
+    else send({ op: 'tap', x: a.x, y: a.y })
+  }
+  const toAgent = () =>
+    dev &&
+    api
+      .sim<{ path: string }>({ op: 'shot', device: dev.id })
+      .then(r => api.toPrompt(`A screenshot of the ${dev.name} ${dev.os === 'ios' ? 'simulator' : 'emulator'}: ${r.path}`))
+      .catch(e => setErr(String(e?.message ?? e)))
+  const type = () => text && (send({ op: 'type', text }), setText(''))
+  if (!list) return <div className="muted small pad">Looking for simulators…</div>
+  if (!dev)
+    return (
+      <div className="sim-none">
+        <Icon name="phone" size={22} />
+        <b>No simulator or emulator is running</b>
+        <p className="muted small">Open Simulator (Xcode › Open Developer Tool), or start an Android emulator (Android Studio's Device Manager, or emulator -avd &lt;name&gt;), then look again. A phone plugged in with USB debugging shows too.</p>
+        {list.why.map(w => (
+          <p key={w} className="warn small">
+            {w}
+          </p>
+        ))}
+        <button type="button" onClick={() => void look()}>
+          <Icon name="refresh" size={12} /> Look again
+        </button>
+      </div>
+    )
+  return (
+    <>
+      <div className="sp-tools sim-tools">
+        {list.devices.length > 1 ? (
+          <select value={dev.id} aria-label="Which device" onChange={e => choose(e.target.value)}>
+            {list.devices.map(d => (
+              <option key={d.id} value={d.id}>
+                {d.name} · {d.os === 'ios' ? 'iOS' : 'Android'}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="sim-name" data-tip={dev.id}>
+            {dev.name} · {dev.os === 'ios' ? 'iOS' : 'Android'}
+          </span>
+        )}
+        <span className="grow" />
+        {SIM_KEY_WORDS.filter(k => !k[3] || dev.os === 'android').map(([key, label, icon]) => (
+          <IconButton key={key} icon={icon} title={label} onClick={() => send({ op: 'key', key })} />
+        ))}
+        <IconButton icon="camera" title="Screenshot into the agent's prompt" onClick={() => void toAgent()} />
+        <IconButton icon="refresh" title="Look for devices again" onClick={() => void look()} />
+      </div>
+      <div className={`sim-screen ${busy ? 'busy' : ''}`}>
+        {frame ? (
+          <img
+            ref={img}
+            src={frame}
+            alt={`${dev.name}'s screen`}
+            draggable={false}
+            onPointerDown={e => e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), (down.current = spot(e)))}
+            onPointerUp={up}
+            onPointerCancel={() => (down.current = null)}
+          />
+        ) : (
+          !err && <span className="muted small">Its screen…</span>
+        )}
+      </div>
+      {err && <div className="warn small pad">{err}</div>}
+      <div className="sp-tools sim-type">
+        <input value={text} placeholder="Type into it · Enter sends" spellCheck={false} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (text ? type() : send({ op: 'key', key: 'enter' }))} />
+        <IconButton icon="enter" title="Return" onClick={() => send({ op: 'key', key: 'enter' })} />
+        <IconButton icon="eraser" title="Delete (backspace)" onClick={() => send({ op: 'key', key: 'delete' })} />
+      </div>
+    </>
   )
 }
 

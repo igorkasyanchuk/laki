@@ -272,6 +272,9 @@ export const RUN_SCRIPTS = ['test', 'lint', 'format', 'deploy'] as const
 // laki screen's ops on what isn't a web page (daemon/device.ts): a screenshot of the iOS Simulator or an app's window,
 // the windows open, and the simulator's hands through idb
 export const DEVICE_OPS = ['shot', 'windows', 'tap', 'swipe', 'type', 'describe'] as const
+// the side panel's Simulator (daemon/device.ts' sim): booted iOS Simulators and adb's Android devices, a frame of one, a
+// screenshot for an agent (shot: its path, an iOS one in points), and input (keys: device.ts' IOS_KEYS, DROID_KEYS)
+export const SIM_OPS = ['list', 'frame', 'shot', 'tap', 'swipe', 'type', 'key'] as const
 export type RunScript = (typeof RUN_SCRIPTS)[number]
 // Enter (or the tab menu's Restart) in its ended tab starts it again: an agent, the run tab, a script; a deploy only
 // through Run ▾, which asks (core's input, App's tab menu)
@@ -386,6 +389,7 @@ export type Settings = {
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
   notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
+  todoList?: boolean // experimental (Settings › General): the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), off unless true
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
   deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)
@@ -525,12 +529,38 @@ export type Todo = { id: string; project: string; text: string; at: number; imag
 export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean }
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // a tile on the Desk (experimental): an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
-export type DeskTile = { id: string; w: number; h: number; tab?: string } // tab: a DeskTab's id (none, or one gone: the first tab)
+// x, y: its cell, columns from the left and rows from the top, 0 first (none: the first spot it fits, deskLayout)
+export type DeskTile = { id: string; w: number; h: number; tab?: string; x?: number; y?: number } // tab: a DeskTab's id (none, or one gone: the first tab)
 // a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk); icon: one of the app's by name or an emoji, before its name
 export type DeskTab = { id: string; name: string; icon?: string }
 export const DESK_COLS = 12
 export const DESK_ROW = 40
 export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
+type DeskBox = { x: number; y: number; w: number; h: number }
+const overlap = (a: DeskBox, b: DeskBox) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+// where a tab's tiles go, gaps kept: first, the one being dragged or resized, where it is; then each placed one where it
+// is, top to bottom, pushed down past any it overlaps; then the rest (none placed yet: as the grid's flow put them, row
+// by row from the last one) in the first spot after it they fit
+export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T & DeskBox)[] {
+  const done: (T & DeskBox)[] = []
+  const free = (b: DeskBox) => !done.some(d => overlap(d, b))
+  const placed = (t: T) => t.x !== undefined && t.y !== undefined
+  const rest = tiles.filter(t => t.id !== first)
+  let [cy, cx] = [0, 0]
+  for (const t of [...tiles.filter(t => t.id === first), ...rest.filter(placed).sort((a, b) => a.y! - b.y! || a.x! - b.x!), ...rest.filter(t => !placed(t))]) {
+    const [w, h] = [Math.min(DESK_COLS, Math.max(1, Math.round(t.w) || 1)), Math.max(1, Math.round(t.h) || 1)]
+    let b: DeskBox | undefined
+    if (placed(t)) {
+      b = { x: Math.min(DESK_COLS - w, Math.max(0, Math.round(t.x!))), y: Math.max(0, Math.round(t.y!)), w, h }
+      while (!free(b)) b.y = Math.max(...done.filter(d => overlap(d, b!)).map(d => d.y + d.h))
+    } else {
+      for (let y = cy; !b; y++) for (let x = y === cy ? cx : 0; !b && x + w <= DESK_COLS; x++) if (free({ x, y, w, h })) b = { x, y, w, h }
+      ;[cy, cx] = [b.y, b.x + w]
+    }
+    done.push({ ...t, ...b })
+  }
+  return done
+}
 
 // remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
@@ -711,5 +741,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 100
+export const API = 101
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

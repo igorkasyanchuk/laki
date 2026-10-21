@@ -3,6 +3,8 @@
 // pasted or dropped into it <data>/notes/<id>/<name> (blocks keep files/<name>, noteFile shows an image). noteList is
 // the sidebar's: pinned first, then the newest edit, each with a preview of its text; q: every word in its title or text.
 // The renderer's Notes.tsx: BlockNote, as specs have it (SpecEditor).
+// To-dos (experimental, settings.todoList; the rail's To-dos, ⌘K): one checklist of the user's, Notion's way (checklist
+// items, headings, nested ones, dragged into order), its blocks and Markdown in <data>/todo-list.json; no files (TodoList.tsx).
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
@@ -125,6 +127,36 @@ export function noteUpload(p: { id: string; name?: string; data?: string }) {
   for (let k = 2; exists(join(folder, name)); k++) name = `${clean.slice(0, clean.length - ext.length)}-${k}${ext}`
   writeFileSync(join(folder, name), buf, { mode: 0o600 })
   return { path: `files/${name}` }
+}
+
+const listFile = join(dir, 'todo-list.json')
+const listOn = () => {
+  if (state.settings?.todoList !== true) throw new Error('To-dos are off: Settings › General › Experimental')
+}
+export type TodoList = { blocks: unknown[]; md: string; at: number }
+export function todoListGet(): TodoList {
+  listOn()
+  let text: string
+  try {
+    text = readFileSync(listFile, 'utf8')
+  } catch (e) {
+    if ((e as { code?: string }).code === 'ENOENT') return { blocks: [], md: '', at: 0 } // none yet
+    throw e
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`To-dos: ${listFile} doesn't read as JSON; fix or move it (it isn't written over meanwhile)`) // never an empty list saved over it
+  }
+}
+export function todoListSave(p: { blocks?: unknown[]; md?: string }) {
+  listOn()
+  if (!Array.isArray(p.blocks)) throw new Error('blocks: a list')
+  if (JSON.stringify(p.blocks).length + String(p.md ?? '').length > MAX_NOTE) throw new Error('too long for the list')
+  const l: TodoList = { blocks: p.blocks, md: String(p.md ?? ''), at: Date.now() }
+  writeFileSync(`${listFile}.tmp`, JSON.stringify(l), { mode: 0o600 })
+  renameSync(`${listFile}.tmp`, listFile)
+  return { at: l.at }
 }
 const exists = (f: string) => {
   try {

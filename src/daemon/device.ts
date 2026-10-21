@@ -5,11 +5,11 @@
 // open. A screenshot goes to images/ (imageSave) and comes back as its path, as the agent browser's does.
 // ponytail: the first booted simulator only (no --udid); an app's frontmost window only
 import { execFile } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { DEVICE_OPS } from '../shared/types.ts'
+import { DEVICE_OPS, SIM_OPS } from '../shared/types.ts'
 import { imageSave, onPath } from './core.ts'
 
 const run = promisify(execFile)
@@ -107,4 +107,126 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
     }
   }
   return { ok: true, simulator: sim.name }
+}
+
+// The side panel's Simulator (SidePanel.tsx' DeviceTab): a booted iOS Simulator's or an Android emulator's (or a phone
+// on adb's) screen, a frame at a time, and taps, swipes, typing and buttons into it. iOS: simctl's screenshot and idb's
+// hands (as above); Android: adb's screencap and input. A device is ios:<udid> or android:<serial>; a spot comes as a
+// fraction of the picture, made points (iOS: describe-all's screen, kept per device) or pixels (Android: the last
+// frame's). On a Mac sips makes each frame a JPEG at most FRAME_MAX tall; elsewhere it goes as it came
+// ponytail: a frame per call (the panel asks for the next as one comes, ~3 a second) and input at 0.3-0.6 s a call, a
+// drag one swipe at its release; a stream (serve-sim, idb or axe video-stream, scrcpy's server) and live touches next
+const FRAME_MAX = 1000
+const SIM_ID = /^(ios|android):([\w.:-]{1,200})$/
+const adb = (serial: string | null, args: string[]) =>
+  run('adb', [...(serial ? ['-s', serial] : []), ...args], { timeout: 30000, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
+    Promise.reject(new Error((e as { code?: string }).code === 'ENOENT' ? "adb isn't on PATH: Android Studio's SDK platform-tools (or brew install android-platform-tools)" : `adb: ${said({ stderr: String((e as { stderr?: Buffer }).stderr ?? ''), message: (e as Error).message })}`)),
+  )
+const deviceOf = (id: unknown) => {
+  const m = SIM_ID.exec(String(id ?? ''))
+  if (!m) throw new Error('which device? ios:<udid> or android:<serial>, from sim list')
+  return { os: m[1] as 'ios' | 'android', id: m[2], key: m[0] }
+}
+const iosPts = new Map<string, { width: number; height: number }>() // a simulator's screen in points
+const droidPx = new Map<string, { width: number; height: number }>() // an Android screen's pixels, as its last frame
+const pngSize = (b: Buffer) => (b.length > 24 && b.readUInt32BE(12) === 0x49484452 ? { width: b.readUInt32BE(16), height: b.readUInt32BE(20) } : undefined)
+const frac = (v: unknown, what: string) => {
+  const n = Number(v)
+  if (v === undefined || v === '' || !Number.isFinite(n) || n < 0 || n > 1) throw new Error(`${what}: a fraction of the picture, 0 to 1`)
+  return n
+}
+// adb shell's words go through the device's sh: the text single-quoted, its spaces input text's %s
+// ponytail: a literal %s in the text arrives as a space (input text's own escape)
+const droidText = (t: string) => `'${t.replace(/'/g, "'\\''").replace(/ /g, '%s')}'`
+const DROID_KEYS: Record<string, string> = { home: 'KEYCODE_HOME', back: 'KEYCODE_BACK', apps: 'KEYCODE_APP_SWITCH', lock: 'KEYCODE_POWER', enter: 'KEYCODE_ENTER', delete: 'KEYCODE_DEL' }
+const IOS_KEYS: Record<string, string[]> = { home: ['button', 'HOME'], lock: ['button', 'LOCK'], enter: ['key', '40'], delete: ['key', '42'] } // HID codes: Return, Backspace
+
+export async function sim(p: { op: string; device?: string; x?: unknown; y?: unknown; x2?: unknown; y2?: unknown; text?: string; key?: string }) {
+  const op = p.op as (typeof SIM_OPS)[number]
+  if (!SIM_OPS.includes(op)) throw new Error(`sim: ${p.op}? one of ${SIM_OPS.join(', ')}`)
+  if (op === 'list') {
+    const devices: { id: string; name: string; os: 'ios' | 'android' }[] = []
+    const why: string[] = [] // what keeps one kind from being listed
+    if (process.platform === 'darwin')
+      try {
+        const r = await simctl(['list', 'devices', 'booted', '-j'])
+        for (const d of Object.values(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>).flat()) if (d.state === 'Booted') devices.push({ id: `ios:${d.udid}`, name: d.name, os: 'ios' })
+      } catch (e) {
+        why.push(`iOS: xcrun simctl: ${said(e)} (it needs Xcode, xcode-select pointing at it, and its license accepted)`)
+      }
+    try {
+      for (const l of String((await adb(null, ['devices', '-l'])).stdout).split('\n').slice(1)) {
+        const m = /^(\S+)\s+device\b(.*)$/.exec(l.trim())
+        if (m) devices.push({ id: `android:${m[1]}`, name: /model:(\S+)/.exec(m[2])?.[1]?.replace(/_/g, ' ') ?? m[1], os: 'android' })
+      }
+    } catch (e) {
+      why.push(`Android: ${(e as Error).message}`)
+    }
+    return { devices, why }
+  }
+  const d = deviceOf(p.device)
+  // a simulator's screen in points (describe-all's first frame, the app's), kept: taps go by it, and a shot's picture
+  const points = async () => {
+    let pts = iosPts.get(d.key)
+    if (!pts) {
+      const f = (JSON.parse(await idb('describe-all', d.id)) as { frame?: { width: number; height: number } }[])[0]?.frame
+      if (!f?.width || !f.height) throw new Error("idb didn't say the screen's size")
+      iosPts.set(d.key, (pts = { width: f.width, height: f.height }))
+    }
+    return pts
+  }
+  if (op === 'shot' && d.os === 'ios') return { path: (await shot('xcrun', f => ['simctl', 'io', d.id, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, onPath('idb') ? points : undefined)).path } // in points, as laki screen's
+  if (op === 'frame' || op === 'shot') {
+    const tmp = mkdtempSync(join(tmpdir(), 'laki-sim-'))
+    try {
+      const raw = join(tmp, d.os === 'ios' ? 'raw.jpg' : 'raw.png')
+      if (d.os === 'ios') await simctl(['io', d.id, 'screenshot', '--type=jpeg', raw]).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)}`)))
+      else {
+        const png = (await adb(d.id, ['exec-out', 'screencap', '-p'])).stdout as Buffer
+        const px = pngSize(png)
+        if (!px) throw new Error("adb screencap gave no picture: is the screen on?")
+        droidPx.set(d.key, px)
+        writeFileSync(raw, png)
+      }
+      if (op === 'shot') return { path: imageSave({ data: readFileSync(raw).toString('base64'), ext: 'png' }) } // for an agent's prompt: as it came
+      const out = join(tmp, 'frame.jpg')
+      const small = process.platform === 'darwin' && (await run('sips', ['-Z', String(FRAME_MAX), '-s', 'format', 'jpeg', '-s', 'formatOptions', '70', raw, '--out', out], { timeout: 15000 }).then(() => true, () => false))
+      const type = small || d.os === 'ios' ? 'jpeg' : 'png'
+      return { frame: `data:image/${type};base64,${readFileSync(small ? out : raw).toString('base64')}` }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  }
+  if (d.os === 'ios') {
+    if (op === 'type') {
+      if (p.text) await idb('text', d.id, p.text)
+      return { ok: true }
+    }
+    if (op === 'key') {
+      const k = IOS_KEYS[String(p.key)]
+      if (!k) throw new Error(`key: on iOS, one of ${Object.keys(IOS_KEYS).join(', ')}`)
+      await idb(k[0], d.id, k[1])
+      return { ok: true }
+    }
+    const pts = await points()
+    const at = (x: unknown, y: unknown) => [String(Math.round(frac(x, 'x') * pts.width)), String(Math.round(frac(y, 'y') * pts.height))]
+    if (op === 'tap') await idb('tap', d.id, ...at(p.x, p.y))
+    else await idb('swipe', d.id, ...at(p.x, p.y), ...at(p.x2, p.y2))
+    return { ok: true }
+  }
+  if (op === 'type') {
+    if (p.text) await adb(d.id, ['shell', 'input', 'text', droidText(p.text)])
+    return { ok: true }
+  }
+  if (op === 'key') {
+    const k = DROID_KEYS[String(p.key)]
+    if (!k) throw new Error(`key: one of ${Object.keys(DROID_KEYS).join(', ')}`)
+    await adb(d.id, ['shell', 'input', 'keyevent', k])
+    return { ok: true }
+  }
+  const px = droidPx.get(d.key)
+  if (!px) throw new Error('no frame of it yet: its size comes with one')
+  const at = (x: unknown, y: unknown) => [String(Math.round(frac(x, 'x') * (px.width - 1))), String(Math.round(frac(y, 'y') * (px.height - 1)))]
+  await adb(d.id, ['shell', 'input', ...(op === 'tap' ? ['tap', ...at(p.x, p.y)] : ['swipe', ...at(p.x, p.y), ...at(p.x2, p.y2), '300'])])
+  return { ok: true }
 }

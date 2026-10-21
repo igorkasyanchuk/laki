@@ -181,6 +181,71 @@ exit 0
   assert.match((await rig.cli('screen', 'nope')).err, /no workspace|not found|no tab/i)
 })
 
+test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals', async t => {
+  const rig = await fresh(t)
+  const bin = join(rig.home, 'bin')
+  const log = () => readFileSync(join(rig.home, 'sim.log'), 'utf8')
+  await assert.rejects(rig.rpc('sim', { op: 'zoom' }), /sim: zoom\? one of list, frame/)
+  assert.match((await rig.rpc('sim', { op: 'list' })).why.join('\n'), /Android: adb isn't on PATH/, 'none: why')
+  const ios = process.platform === 'darwin' // simctl: macOS's
+  script(
+    join(bin, 'xcrun'),
+    `#!/bin/sh
+echo "xcrun $*" >> "$HOME/sim.log"
+[ "$3" = devices ] && { echo '{"devices":{"iOS-26":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}]}}'; exit 0; }
+[ "$2" = io ] && { echo '${PNG}' | base64 -d > "$6"; exit 0; }
+exit 1
+`,
+  )
+  script(
+    join(bin, 'idb'),
+    `#!/bin/sh
+echo "idb $*" >> "$HOME/sim.log"
+[ "$2" = describe-all ] && echo '[{"AXLabel":"App","frame":{"x":0,"y":0,"width":390,"height":844}}]'
+exit 0
+`,
+  )
+  // a screen of 1080 by 2400 pixels (its header's; sips may not read the rest: it goes as it came)
+  const png = Buffer.from(PNG, 'base64')
+  png.writeUInt32BE(1080, 16)
+  png.writeUInt32BE(2400, 20)
+  writeFileSync(join(rig.home, 'screen.png'), png)
+  script(
+    join(bin, 'adb'),
+    `#!/bin/sh
+echo "adb $*" >> "$HOME/sim.log"
+case "$*" in
+  "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\n' ;;
+  *"exec-out screencap -p") cat "$HOME/screen.png" ;;
+esac
+exit 0
+`,
+  )
+  const l = await rig.rpc('sim', { op: 'list' })
+  assert.deepEqual(l.devices, [...(ios ? [{ id: 'ios:U-1', name: 'iPhone 17', os: 'ios' }] : []), { id: 'android:emulator-5554', name: 'sdk gphone64 arm64', os: 'android' }], 'booted ones, ready ones')
+  const droid = 'android:emulator-5554'
+  await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 }), /no frame of it yet/)
+  assert.match((await rig.rpc('sim', { op: 'frame', device: droid })).frame, /^data:image\/(png|jpeg);base64,/)
+  await rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 })
+  await rig.rpc('sim', { op: 'swipe', device: droid, x: 0, y: 0, x2: 1, y2: 1 })
+  await rig.rpc('sim', { op: 'type', device: droid, text: "it's a test" })
+  await rig.rpc('sim', { op: 'key', device: droid, key: 'back' })
+  for (const l of ['adb -s emulator-5554 shell input tap 540 1200', 'adb -s emulator-5554 shell input swipe 0 0 1079 2399 300', "adb -s emulator-5554 shell input text 'it'\\''s%sa%stest'", 'adb -s emulator-5554 shell input keyevent KEYCODE_BACK'])
+    assert.ok(log().includes(`${l}\n`), `${l} in\n${log()}`)
+  await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 2, y: 0 }), /x: a fraction of the picture/)
+  await assert.rejects(rig.rpc('sim', { op: 'key', device: droid, key: 'nope' }), /key: one of home, back/)
+  await assert.rejects(rig.rpc('sim', { op: 'frame', device: 'ios:U 1; rm' }), /which device\?/)
+  const shot = await rig.rpc('sim', { op: 'shot', device: droid })
+  assert.ok(shot.path.startsWith(join(rig.data, 'images')) && existsSync(shot.path), 'a screenshot for a prompt, in images/')
+  if (!ios) return
+  assert.match((await rig.rpc('sim', { op: 'frame', device: 'ios:U-1' })).frame, /^data:image\/jpeg;base64,/)
+  await rig.rpc('sim', { op: 'tap', device: 'ios:U-1', x: 0.5, y: 0.25 })
+  await rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'home' })
+  await rig.rpc('sim', { op: 'type', device: 'ios:U-1', text: '-n hi' })
+  await assert.rejects(rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'back' }), /on iOS, one of home, lock/)
+  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'idb ui describe-all --udid U-1 --json', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi']) assert.ok(log().includes(l), `${l} in\n${log()}`)
+})
+
 test('archived workspaces deleted after settings.archivedDays (their branch kept); copy ignored and untracked files into new worktrees', async t => {
   const rig = await fresh(t)
   const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env, encoding: 'utf8' })

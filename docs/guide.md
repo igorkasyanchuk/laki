@@ -625,6 +625,12 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   app only). It starts on this Mac (`localhost`); the address bar and links go anywhere, without
   popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
   click outside it first. In a browser (remote access), it works only on the Mac itself.
+- *Simulator*: a booted iOS Simulator, an Android emulator or a phone on `adb` (USB debugging), its screen live in the
+  panel (a few frames a second). A click taps, a drag swipes, the box types into it (Enter sends; empty, Return), and
+  the buttons press Home, Back and Apps (Android) and Lock; the camera puts a screenshot's path into the agent's prompt.
+  With several running, pick one in its menu. iOS needs Xcode (`xcode-select` pointing at it, its license accepted),
+  and taps and typing need idb (`brew install facebook/fb/idb-companion`, then `pipx install fb-idb`); Android needs
+  `adb` on PATH (Android Studio's platform-tools). Nothing running: it says why and what to start.
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
@@ -1184,8 +1190,10 @@ closed rings as it opens. Tick it off when it's done; the rail's count is the on
 
 On unless Settings › General › *Pages* turns it off; the rail's My Desk (⌘K too) opens it: your extensions as tiles, an
 overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
-ticks every place it shows in). Drag a tile's head onto another to move it, its corner to resize it; Laki keeps the
-layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
+ticks every place it shows in). Drag a tile's head to put it anywhere on the grid (12 columns): gaps stay where you
+leave them, and a tile in the way moves down. Drag its corner to resize it (tiles below move down too). Laki keeps each
+tile's place and size. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to
+stay on.
 
 **Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
 right click moves or removes it (its tiles go to the first tab) or gives it an icon (*Icon…*: type to find one, or
@@ -1207,6 +1215,15 @@ it changed, pinned ones first, then the newest edit. A right click on one pins i
 on the right is written like a Notion page, the same editor as specs: type `/` for headings, lists, checklists,
 tables, code, quotes, images (paste or drop them in) and diagrams. It saves as you type. *New note* starts one (in
 the color you're showing only).
+
+### To-dos (experimental)
+
+Turn it on in Settings › General › *Experimental*; the rail's To-dos (⌘K too) opens one checklist of your own, written
+like a Notion page: Enter makes the next to-do, `[] ` turns a line into one, `# ` makes a heading, Tab puts a to-do
+under the one above (⇧Tab back out), and the handle (⋮⋮, on hover) drags one, with the ones under it, into place; `/`
+has the other blocks. A click on a box ticks it off; the head says how many are done. It saves as you type, in
+Laki's data folder (`todo-list.json`). Like any rail button, a right click on it moves it into ⋯ More (Settings ›
+Appearance › Rail sets the order).
 
 ### Back and forward
 

@@ -118,7 +118,8 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`). A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`); 101: To-dos
+(`todoListGet`/`todoListSave`), the side panel's Simulator (`sim`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -324,6 +325,14 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
   App's `runScript`, Deploy after `ask`);
+- `sim` (`daemon/device.ts`, `SIM_OPS`; the side panel's Simulator, SidePanel.tsx `DeviceTab`): `list` (booted iOS
+  Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones, `ios:<udid>` / `android:<serial>`; `why`: what
+  keeps a kind out), `frame` (simctl's JPEG or adb's `screencap -p`, through `sips` to a JPEG at most `FRAME_MAX` tall on
+  a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden), `shot` (`imageSave`'s path, for
+  the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by idb's `describe-all`,
+  `iosPts`, Android pixels by the last frame's PNG header, `droidPx`), `type` (adb's `input text` single-quoted for the
+  device's sh, spaces `%s`), `key` (`IOS_KEYS`, `DROID_KEYS`: back and apps Android's); an iOS `shot` in points, as laki screen's. ponytail: frames polled, a drag one swipe;
+  a stream (serve-sim, idb/axe video-stream, scrcpy) next;
 - `device` (`daemon/device.ts`; the CLI's `laki screen <op>`, MCP's `laki_device`; `DEVICE_OPS`): shot (the booted
   simulator, `xcrun simctl io <udid> screenshot`, or `app`'s frontmost window: CoreGraphics' window list through JXA
   (`osascript -l JavaScript`), `screencapture -x -o -l <id>`), scaled by `sips` to its size in points (an app window's
@@ -881,7 +890,10 @@ at each ask) and its files' names into the instructions. Tested in `test/plans.t
 ### Notes
 
 Experimental (`settings.notes`, Settings › General › *Experimental*; off: no rail button or ⌘K item, and every `note*`
-method refuses). `daemon/notes.ts`: one list for every project, `<data>/notes/<id>.json` (`Note`: title, `color` of
+method refuses). To-dos (`settings.todoList`, likewise; `todoList*` refuse off): one checklist, `<data>/todo-list.json`
+(`TodoList`: BlockNote's `blocks`, `md`, `at`), the renderer's `TodoList.tsx` (App's `lazy`, dialog `'todos'`, the
+rail's To-dos, `RAIL_MORE`'s first, ⌘K): `SpecEditor`, a new list one `checkListItem`, saved 600 ms after a change and
+as it unmounts, no files; the head's *n of m done* from its Markdown (`doneOf`). `daemon/notes.ts`: one list for every project, `<data>/notes/<id>.json` (`Note`: title, `color` of
 `TAB_COLORS`, `pinned`, BlockNote's `blocks`, `md`: their Markdown, `created`, `at`), pasted files in `<data>/notes/<id>/`
 (`noteUpload`: `files/<name>`, `-2` when taken; `noteFile`: an image as a data URL). `noteList` (`q`: every word in its
 title or `md`) gives `NoteItem`s, pinned first, then `at` (a title or text change; a pin or a color doesn't), each a
@@ -1719,6 +1731,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     ahead dropped; `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
+  - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
+    menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab,
+    then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks `wsArchive` with
     `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is). Deleting a
@@ -2020,7 +2035,11 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   rail's count: rung reminders not ticked off. `Page` `esc={false}`; `.cal-bar` on the page (‹ *Today* ›, the title,
   Week / Month, *+ Reminder*); a day's click: `sel`, `aside.cal-side` (that day's tasks, runs and reminders, *Remind me
   this day*). App.tsx passes a `CalendarApi`.
-- **`Desk.tsx`**: My Desk (the user's word; the code's is Desk: `settings.desk`, on unless false (Settings › General › Pages); the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
+- **`Desk.tsx`**: (cells: a tile's `x`, `y`, `shared/types.ts` `deskLayout`: the one dragged or resized first, then the
+  placed ones top to bottom pushed down past any they overlap, then the unplaced as CSS grid's sparse flow would; the
+  head's pointer drag (`move`, 4 px, `track`: capture, Esc, blur, edge scroll) to the cell under it, onto a
+  `[data-desk-tab]`: that tab; every tile of the tab saved in its cell after (`keep`); rendered in the saved order,
+  placed by `grid-column`/`grid-row`, `order` for a phone's one column) My Desk (the user's word; the code's is Desk: `settings.desk`, on unless false (Settings › General › Pages); the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
   among their `places` as tiles in a 12-column grid (`DESK_COLS`, rows `DESK_ROW`), `settings.deskTiles` their order and
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;

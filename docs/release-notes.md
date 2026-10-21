@@ -4,6 +4,13 @@ version it builds, with the date. -->
 
 ## Next
 
+- The window's title says where you are: the page (*Settings — Laki*) or the workspace and tab (*fix-login · claude —
+  Laki*), so a screen share's picker, the Window menu and a browser's tab (remote access) name it.
+- My Desk: drag a tile anywhere on the grid; gaps stay where you leave them and a tile in the way moves down.
+- To-dos (experimental, Settings › General): one checklist of your own, Notion's way: headings, to-dos under others,
+  dragged into order. The rail's To-dos, or in its ⋯ More.
+- The side panel's Simulator: a booted iOS Simulator or an Android emulator live in the panel; click to tap, drag to
+  swipe, type, Home, Back, Lock, and a screenshot into the agent's prompt.
 - A workspace or tab an agent made (`laki new`, `laki run`, `laki ship`, MCP, Laki AI, a workflow run it started), and
   an agent's ship and archive, are the agent's events too: a workflow that runs commands doesn't start on their
   `workspace.new`, `tab.new`, `ship.done` or `workspace.archived`.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh } from './helpers.ts'
@@ -40,4 +40,26 @@ test('notes: off unless turned on; made, saved, searched, colored, pinned, a fil
   assert.ok(!existsSync(join(rig.data, 'notes', b.id)))
   assert.deepEqual((await rig.rpc('noteList')).map((n: any) => n.id), [a.id])
   await assert.rejects(rig.rpc('noteGet', { id: b.id }), /no such note/)
+})
+
+test('to-dos: off unless turned on; one list, saved and read back, kept in a file of its own', async t => {
+  const rig = await fresh(t)
+  await assert.rejects(rig.rpc('todoListGet'), /To-dos are off/)
+  await rig.rpc('settingsSet', { todoList: true })
+  assert.deepEqual(await rig.rpc('todoListGet'), { blocks: [], md: '', at: 0 }, 'none yet')
+  const blocks = [{ type: 'heading', content: 'Today' }, { type: 'checkListItem', props: { checked: true }, content: 'ship it', children: [{ type: 'checkListItem', content: 'tests' }] }]
+  const { at } = await rig.rpc('todoListSave', { blocks, md: '## Today\n\n- [x] ship it\n  - [ ] tests\n' })
+  assert.deepEqual(await rig.rpc('todoListGet'), { blocks, md: '## Today\n\n- [x] ship it\n  - [ ] tests\n', at })
+  await assert.rejects(rig.rpc('todoListSave', { blocks: 'nope' }), /blocks: a list/)
+  await rig.rpc('settingsSet', { todoList: false })
+  await assert.rejects(rig.rpc('todoListSave', { blocks: [] }), /To-dos are off/, 'off: nothing written')
+  await rig.rpc('settingsSet', { todoList: true })
+  assert.equal((await rig.rpc('todoListGet')).at, at, 'kept while it was off')
+})
+
+test("to-dos: a file that doesn't read is never saved over with an empty list", async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { todoList: true })
+  writeFileSync(join(rig.data, 'todo-list.json'), '{"blocks": [')
+  await assert.rejects(rig.rpc('todoListGet'), /doesn't read as JSON/)
 })

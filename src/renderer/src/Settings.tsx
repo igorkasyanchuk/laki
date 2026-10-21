@@ -191,6 +191,7 @@ export type AppSettings = Paint & {
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
+  todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
@@ -1205,6 +1206,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
+  ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
   ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
@@ -2295,7 +2297,7 @@ export function StudioSessions({ api, skip }: { api: WidgetsApi; skip?: string }
 
 // the rail's buttons after Projects (Settings › Appearance › Rail, Slack's way: which show, in what order; the rest
 // go into its ⋯ More): key, words, icon; when: what has it there at all. AI stays at the rail's foot
-type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: boolean; calendar?: boolean; railShells?: boolean; railBrowsers?: boolean; ai?: { on?: boolean } }
+type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: boolean; todoList?: boolean; calendar?: boolean; railShells?: boolean; railBrowsers?: boolean; ai?: { on?: boolean } }
 export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s: RailHas) => boolean }[] = [
   { key: 'board', label: 'Board', icon: 'board' },
   { key: 'schedules', label: 'Schedule', icon: 'clock' },
@@ -2303,6 +2305,7 @@ export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s
   { key: 'workflows', label: 'Flows', icon: 'flow', when: s => s.workflows === true },
   { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
   { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
+  { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList === true },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar === true },
   { key: 'shells', label: 'Terminal', icon: 'terminal', when: s => s.railShells !== false },
   { key: 'browsers', label: 'Browser', icon: 'globe', when: s => s.railBrowsers !== false },
@@ -3163,6 +3166,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
                   <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
+                  <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
                 </Switch>
               </div>
               </Group>
