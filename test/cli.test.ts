@@ -467,3 +467,31 @@ test('cli: flow check reads workflow files with no daemon: ✓ a good one, ✗ a
   assert.match((await rig.cli('flow', 'check', join(dir, 'gone.md'))).err, /no .*gone\.md/)
   assert.equal(existsSync(join(rig.data, 'daemon.json')), false, 'no daemon started')
 })
+
+test("cli: an agent's laki new and laki tab can't start a command of its own (--cmd, a command preset); yours can", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'sh-x', agent: 'command', cmd: 'echo hi' }] })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id))
+  const as = async (...args: string[]) => {
+    Object.assign(rig.env, { LAKI_WORKSPACE: ws.id, LAKI_TAB: tab.id })
+    try {
+      return await rig.cli(...args)
+    } finally {
+      delete rig.env.LAKI_WORKSPACE
+      delete rig.env.LAKI_TAB
+    }
+  }
+  for (const args of [['new', '.', '--cmd', 'touch x', '--local'], ['new', '.', '--preset', 'sh-x', 'go'], ['tab', ws.id, '--cmd', 'touch x'], ['tab', ws.id, '--preset', 'sh-x']]) {
+    const r = await as(...args)
+    assert.notEqual(r.code, 0, args.join(' '))
+    assert.match(r.err, /an agent can't start a command of its own/, args.join(' '))
+  }
+  // an agent of a preset still works; and yours with --cmd
+  assert.equal((await as('tab', ws.id, '--preset', 'claude')).code, 0)
+  const mine = await rig.cli('tab', ws.id, '--cmd', 'sleep 5')
+  assert.equal(mine.code, 0, mine.err)
+  const n = await rig.cli('new', p.id, '--cmd', 'sleep 5', '--name', 'mine')
+  assert.equal(n.code, 0, n.err)
+})

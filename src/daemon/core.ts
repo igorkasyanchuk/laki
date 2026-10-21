@@ -1310,6 +1310,11 @@ const RESUME_FAIL = 30000 // ms: a resume of a chat that isn't there fails at on
 const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|(conversation|session|thread)\b[^\n]*not found|invalid session identifier|session does not exist/i
 
 // why addTab would refuse an agent: checked before wsNew makes a worktree for it
+// an agent's laki new / laki tab (from, agentCaller): an agent of a preset or a shell, never a command it picks (--cmd,
+// or a preset whose agent is a command): a prompt injected into it would leave a program of its own running elsewhere
+export function agentNoCmd(o: { preset?: string; cmd?: string }) {
+  if (o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command') throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
+}
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
   if (preset && !isAgent(preset) && preset !== 'shell' && preset !== 'custom' && !presetNamed(preset))
@@ -1748,6 +1753,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 }
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
+  if (o.from) agentNoCmd(o) // an agent's (the CLI in its tab, MCP)
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset

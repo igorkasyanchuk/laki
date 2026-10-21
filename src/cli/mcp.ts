@@ -139,7 +139,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     name: 'laki_new_tab',
     description: 'A new agent session (a tab) in a workspace that exists, in its folder, with a prompt: e.g. a codex review of what claude did there.',
     inputSchema: obj({ ws: str('a workspace id'), preset: str("claude, codex, gemini, grok, opencode or a preset of theirs (default: the user's default agent)"), prompt: str('what it should do'), model: str("the agent's model (default: its own)"), name: str("the tab's name, 2-4 words of what it's for, e.g. codex review (default: the agent and the prompt's first words)"), ...PLACE }, ['ws', 'prompt']),
-    run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined, beside: a.beside || undefined, edge: a.edge }), // none: a shell
+    run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined, beside: a.beside || undefined, edge: a.edge, ...(from && { from }) }), // none: a shell; from an agent's: no command preset
   },
   {
     name: 'laki_attach_pr',

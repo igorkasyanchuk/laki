@@ -356,7 +356,7 @@ async function main() {
       return out({ ok: true }, cmd === 'rename' ? `renamed ${ws}` : `attached ${words[0]} to ${ws}`)
     }
     case 'tab': {
-      const t = await rpc('tabNew', { ws: rest[0], preset: flags.preset, cmd: flags.cmd })
+      const t = await rpc('tabNew', { ws: rest[0], preset: flags.preset, cmd: flags.cmd, caller: caller() })
       return out(t, `${t.name} (${t.id})`)
     }
     case 'send': {

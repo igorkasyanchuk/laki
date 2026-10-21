@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's `laki new` and `laki tab` (and MCP's) can't start a command of its own (`--cmd`, a command preset): only
+  an agent or a shell. Yours still can.
 - Extensions: an agent's event (`laki widget emit` in its tab, Laki AI's) only makes extensions fetch again; it no
   longer runs their actions.
 - Workflows: one an agent wrote runs only from its editor's *Start* until you save it: not on a schedule, an event,

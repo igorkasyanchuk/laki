@@ -87,6 +87,7 @@ script: projects (id, path), workspaces (id, branch, path, port, pr, tabs: a | b
   new: `Makes a workspace: a git worktree on a new branch (or the folder itself with --local), set up by the project's setup
 script, with the agent started on the prompt. Prints the new workspace's id. In a Laki tab, . is this tab's project.
 Write the prompt as for a colleague who hasn't seen this conversation: the goal, where to look, how to tell it's done.
+From an agent's tab: an agent or a shell, no --cmd and no command preset.
 
   laki new . --prompt "Add CSV export to the reports page; npm test passes"
   laki new shop --preset codex --name csv-export --prompt "…"
@@ -107,7 +108,8 @@ PNG's path: read it).
   laki screen a1b2 --lines 80
   laki screen shot                              the booted simulator
   laki screen shot Safari                       Safari's front window`,
-  tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither).
+  tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither). From an agent's tab: no
+--cmd and no command preset (the user starts commands).
 
   laki tab a1b2 --preset codex
   laki tab a1b2 --cmd "npm run storybook"`,

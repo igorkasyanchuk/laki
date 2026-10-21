@@ -180,7 +180,8 @@ const api: Record<string, Handler> = {
   browseDone: p => core.browseDone(p),
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
-  tabNew: p => {
+  tabNew: ({ caller, from, ...p }) => {
+    if (from || core.agentCaller(caller)) core.agentNoCmd(p) // an agent's: no command of its own
     const t = core.addTab(p.ws, p)
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
     return t
