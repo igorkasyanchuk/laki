@@ -746,7 +746,8 @@ function DeviceTab({ api }: { api: PanelApi }) {
     }
   })
   const [frame, setFrame] = useState('')
-  const [err, setErr] = useState('')
+  const [err, setErr] = useState('') // the frames'
+  const [said, setSaid] = useState('') // input's: a frame coming doesn't clear it
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false) // input on its way
   const img = useRef<HTMLImageElement>(null)
@@ -787,7 +788,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
     setBusy(true)
     api
       .sim({ ...p, device: dev.id })
-      .then(() => setErr(''), e => setErr(String(e?.message ?? e)))
+      .then(() => setSaid(''), e => setSaid(String(e?.message ?? e)))
       .finally(() => setBusy(false))
   }
   // where on the picture, as fractions of it (the image keeps its own shape: its box is the picture)
@@ -809,7 +810,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
     api
       .sim<{ path: string }>({ op: 'shot', device: dev.id })
       .then(r => api.toPrompt(`A screenshot of the ${dev.name} ${dev.os === 'ios' ? 'simulator' : 'emulator'}: ${r.path}`))
-      .catch(e => setErr(String(e?.message ?? e)))
+      .catch(e => setSaid(String(e?.message ?? e)))
   const type = () => text && (send({ op: 'type', text }), setText(''))
   if (!list) return <div className="muted small pad">Looking for simulators…</div>
   if (!dev)
@@ -866,7 +867,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
           !err && <span className="muted small">Its screen…</span>
         )}
       </div>
-      {err && <div className="warn small pad">{err}</div>}
+      {(err || said) && <div className="warn small pad">{err || said}</div>}
       <div className="sp-tools sim-type">
         <input value={text} placeholder="Type into it · Enter sends" spellCheck={false} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (text ? type() : send({ op: 'key', key: 'enter' }))} />
         <IconButton icon="enter" title="Return" onClick={() => send({ op: 'key', key: 'enter' })} />
