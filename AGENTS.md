@@ -676,7 +676,10 @@ Expose to the world (`core.ts` `tunnelStart`): `cloudflared tunnel --url http://
 [--allowed-mail=<m>…]`, a Cloudflare Quick Tunnel; the URL is the first `https://<name>.trycloudflare.com` in its
 output that isn't `login.`. No emails: public, anyone with the link (the popup's default). Emails need
 cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels live in the daemon's memory (`tunnels`, in `WorkspaceView.tunnels`): stopped by
-`tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset 8, 0 none; `tunnelTick`, every 15 s), a workspace's teardown, and shutdown; a daemon restart ends them. One per workspace and port.
+`tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset 8, 0 none; `tunnelTick`, every 15 s), a workspace's teardown, and shutdown; a daemon restart ends them.
+Every `publisher` child (cloudflared, tailscale serve or funnel) is in `<data>/children.json` (pid, `ps -o lstart=`, its
+binary, tailscale's `off` args) while it runs; `reapChildren`, as a daemon starts, SIGTERMs those still running with the
+same start time and command (a crash or a kill -9 left them) and turns a tailscale one off (L14). One per workspace and port.
 
 Shared tabs (`core.ts` `shareStart`, `daemon/share.ts`; the app's *Share live view…*, *Shared live view* once on): a tab as a view-only page at `<tunnel>/s/<uuid>`. The pages
 have their own `node:http` server on 127.0.0.1 (`shareServe`: `/s/<id>`, `.md` (`?download`), `.json?v=`; anything

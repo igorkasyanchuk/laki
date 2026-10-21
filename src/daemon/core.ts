@@ -2962,11 +2962,53 @@ function cloudflare(target: string, mails: string[], ended: (why: string) => voi
   // the values go in as arguments of their own (=), so one starting with - is no flag
   return publisher('cloudflared', 'cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], TUNNEL_URL, ended, who)
 }
+// L14: each publisher's pid and start time in <data>/children.json while it runs: a daemon that died without stopping
+// them (a crash, a kill -9) leaves them there, and the next one stops them as it starts (reapChildren); off: what turns
+// a tailscale serve or funnel off again
+type Kid = { pid: number; start: string; bin: string; off?: string[] }
+const kids = new Map<number, Kid>()
+const kidsFile = () => join(dir, 'children.json')
+const writeKids = () => {
+  try {
+    writeFileSync(kidsFile(), JSON.stringify([...kids.values()]), { mode: 0o600 })
+  } catch (e) {
+    log('children.json', e)
+  }
+}
+const lstart = (pid: number) => run('ps', ['-o', 'lstart=,command=', '-p', String(pid)]).then(r => r.stdout.trim(), () => '')
+export async function reapChildren() {
+  let old: Kid[] = []
+  try {
+    old = JSON.parse(readFileSync(kidsFile(), 'utf8'))
+  } catch {
+    return
+  }
+  rmSync(kidsFile(), { force: true })
+  for (const k of Array.isArray(old) ? old : []) {
+    if (!Number.isInteger(k?.pid) || typeof k.start !== 'string' || typeof k.bin !== 'string') continue
+    const now = await lstart(k.pid)
+    if (now.startsWith(k.start) && now.includes(basename(k.bin))) { // the same process (a pid can be another's by now)
+      log(`stopping ${basename(k.bin)} (pid ${k.pid}): left running by a daemon that ended without stopping it`)
+      try {
+        process.kill(k.pid, 'SIGTERM')
+      } catch {}
+    }
+    if (Array.isArray(k.off) && k.off.every(a => typeof a === 'string')) await run(k.bin, k.off, { timeout: 10000 }).catch(() => {})
+  }
+}
+
 // a command that publishes something and prints its URL (cloudflared, tailscale serve), as a child of the daemon:
 // stopping it unpublishes
-function publisher(name: string, bin: string, args: string[], re: RegExp, ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
+function publisher(name: string, bin: string, args: string[], re: RegExp, ended: (why: string) => void, who: [name: string, stop: string], off?: string[]): { cf: Cf; url: Promise<string | undefined> } {
   const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] })
   own(proc, ...who)
+  const pid = proc.pid
+  if (pid)
+    void lstart(pid).then(now => {
+      const start = now.slice(0, 24) // lstart's fixed width: "Tue Oct 21 10:11:07 2026"
+      if (start && proc.exitCode === null && proc.signalCode === null) kids.set(pid, { pid, start, bin, ...(off && { off }) }), writeKids()
+    })
+  proc.on('close', () => pid && kids.delete(pid) && writeKids())
   let stopped = false
   const cf = { stop: () => ((stopped = true), proc.kill()) }
   const url = new Promise<string | undefined>((resolve, reject) => {
@@ -3024,7 +3066,7 @@ async function tsReady() {
 // stopped; funnel: tailscale funnel, the same on the internet (the tailnet's policy must allow it: its output says
 // where to turn it on). ponytail: port 443, its root; another serve of yours there is replaced while it runs
 const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
-  publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who)
+  publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who, [funnel ? 'funnel' : 'serve', '--https=443', 'off'])
 
 // tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output. hours:
 // how long it runs, as a shared tab's (SHARE_HOURS; unset: 8, so a forgotten one doesn't stay open for good)

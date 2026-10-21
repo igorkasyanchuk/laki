@@ -313,6 +313,24 @@ test('images: the kind kept, empty ones refused, month-old ones cleaned up', asy
   await assert.rejects(rig.rpc('imageSave', { data: '' }), /an image up to 20 MB/)
 })
 
+test('a tunnel a killed daemon left running is stopped as the next daemon starts (L14)', async t => {
+  const rig = await fresh(t)
+  const log = () => (existsSync(rig.env.FAKE_LOG) ? readFileSync(rig.env.FAKE_LOG, 'utf8') : '')
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  const { port, pid } = rig.info()
+  await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev' })
+  const kids = join(rig.data, 'children.json')
+  await until(() => existsSync(kids) && JSON.parse(readFileSync(kids, 'utf8')).length === 1, 'its cloudflared noted')
+  const cf = JSON.parse(readFileSync(kids, 'utf8'))[0].pid
+  process.kill(pid, 'SIGKILL') // no shutdown: cloudflared lives on
+  await until(() => { try { process.kill(pid, 0); return false } catch { return true } }, 'the daemon gone')
+  process.kill(cf, 0) // still there
+  assert.doesNotMatch(log(), new RegExp(`cloudflared ${port} stopped`))
+  await rig.start()
+  await until(() => log().includes(`cloudflared ${port} stopped`), 'the old cloudflared stopped')
+  assert.ok(!existsSync(kids) || JSON.parse(readFileSync(kids, 'utf8')).length === 0)
+})
+
 test('the Host a request names: the daemon\'s own address, or remote access\'s while it runs; another (DNS rebinding) is turned away', async t => {
   const rig = await fresh(t)
   const { port, token } = rig.info()

@@ -539,6 +539,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 })
 
 const timers: NodeJS.Timeout[] = []
+void core.reapChildren().catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   port = typeof addr === 'object' && addr ? addr.port : 0
