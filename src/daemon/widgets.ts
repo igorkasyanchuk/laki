@@ -1528,9 +1528,8 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
       const reason = `gate:${step}`
       const t0 = Date.now()
       let problem: string | undefined
-      try {
-        const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: step, LAKI_EVENT_FILE: file }, input, gateWait())
-        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+      // what it said: {"ok": …} (all of stdout, else its last line), whatever its exit code: a no that exits 1 is a no
+      const said = (out: string) => {
         const j = [out, lastLine(out)].map(t => {
           try {
             return JSON.parse(t ?? '') as unknown
@@ -1538,17 +1537,21 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
             return undefined
           }
         }).find(isObj)
-        if (!j || typeof j.ok !== 'boolean') problem = `printed no {"ok": …}: ${lastLine(out) ?? 'nothing'}`
-        else if (j.ok) wLog(w, `gate ${a} (${step}, by ${by}): ok`)
-        else {
-          const why = typeof j.why === 'string' && j.why.trim() ? j.why.trim().slice(0, 2000) : 'it said no'
-          wLog(w, `gate ${a} (${step}, by ${by}): held: ${why}`, 'warn')
-          hold(why, typeof j.fix === 'string' && j.fix.trim() ? j.fix.trim().slice(0, 8000) : undefined)
-        }
+        if (!j || typeof j.ok !== 'boolean') return false
+        if (j.ok) return wLog(w, `gate ${a} (${step}, by ${by}): ok`), true
+        const why = typeof j.why === 'string' && j.why.trim() ? j.why.trim().slice(0, 2000) : 'it said no'
+        wLog(w, `gate ${a} (${step}, by ${by}): held: ${why}`, 'warn')
+        hold(why, typeof j.fix === 'string' && j.fix.trim() ? j.fix.trim().slice(0, 8000) : undefined)
+        return true
+      }
+      try {
+        const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: step, LAKI_EVENT_FILE: file }, input, gateWait())
+        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+        if (!said(out)) problem = `printed no {"ok": …}: ${lastLine(out) ?? 'nothing'}`
       } catch (e) {
         const f = e as Failed
         ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
-        problem = f.message
+        if (!said(f.stdout ?? '')) problem = f.message
       } finally {
         rmSync(file, { force: true })
       }

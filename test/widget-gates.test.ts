@@ -139,6 +139,34 @@ test('gates: an error or no answer goes ahead for a step you start (logged, a to
   ])
 })
 
+test('gates: a no that exits 1 is a no: it holds a ship, a merge and an archive, and laki archive prints why and exits 1', async t => {
+  const { rig, remote, p } = await shipRig(t, { LAKI_PR_SCAN_MS: '3600000' })
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  make(rig, 'no1', { name: 'No1', actions: { check: { run: `echo '{"ok": false, "why": "x", "fix": "do y"}'; exit 1`, gate: ['ship', 'merge', 'archive'] } } })
+  await on(rig, 'no1')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  writeFileSync(join(ws.path, 'feature.txt'), 'done\n')
+  const no = [{ widget: 'no1', name: 'No1', gate: 'ship', why: 'x', fix: 'do y' }]
+  assert.deepEqual(await rig.rpc('ship', { ws: ws.id, message: 'Add it' }), { held: no })
+  assert.ok(!pushed(remote, ws.branch), 'not shipped')
+  // merge: a PR on its branch
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 5, state: 'OPEN', url: 'https://github.com/o/r/pull/5', headRefOid: 'h1', statusCheckRollup: [], mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' }))
+  await rig.rpc('prRefresh')
+  await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === ws.id).pr, 'its PR')
+  assert.deepEqual(await rig.rpc('prAct', { ws: ws.id, act: 'merge' }), { held: [{ ...no[0], gate: 'merge' }] })
+  assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr merge'), 'not merged')
+  assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id }), { held: [{ ...no[0], gate: 'archive' }] })
+  const c = await rig.cli('archive', ws.id)
+  assert.equal(c.code, 1)
+  assert.match(c.out, /^Not archived:\n {2}No1: x\n {4}fix: do y\nlaki archive --force does it anyway/)
+  assert.equal((await rig.rpc('state')).workspaces.find((x: any) => x.id === ws.id).archived, undefined, 'not archived')
+  // exit 1 and no {"ok": …}: a failed gate, which goes ahead for you (with a toast), as before
+  make(rig, 'no1', { name: 'No1', actions: { check: { run: 'echo broken >&2; exit 1', gate: ['archive'] } } })
+  await rig.rpc('widgetReload')
+  assert.equal(await rig.rpc('wsArchive', { id: ws.id }), null, 'archived')
+})
+
 test('gates: Merge when green held once per head, its error a hold too; again after a push or a change to the gate; a workflow takes its error way', async t => {
   const rig = await fresh(t, { env: { LAKI_PR_SCAN_MS: '3600000', LAKI_GATE_MS: '1500' } })
   const gh = rig.env.FAKE_GH

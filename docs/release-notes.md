@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An extension's gate that says no and exits 1 now holds the ship, merge or archive, and `laki archive` prints why
+  a gate held it and exits 1, like `laki ship`.
 - A workflow that starts on a new workspace or a new tab no longer starts itself again from its own run's
   worktree.
 - A repo's workflow says which event it starts on and that it changed since you allowed it, and only you can

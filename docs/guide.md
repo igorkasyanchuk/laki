@@ -928,9 +928,9 @@ each line of JSON it prints shown at once), and anything can put data in one wit
 (a cron job, a git hook, CI).
 
 **Gates**: an extension's action with `"gate": ["ship", "merge", "archive"]` runs before Laki does that to a
-workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), and you can *Do it anyway* or ask the agent to
-fix it. Merge when green held waits for a push; `laki ship` exits 1 with the reasons (`--force`: yours, never an
-agent's). Its Settings card says *Can hold: ship, merge*.
+workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), whatever its exit code, and you can *Do it
+anyway* or ask the agent to fix it. Merge when green held waits for a push; `laki ship` and `laki archive` exit 1 with
+the reasons (`--force`: yours, never an agent's). Its Settings card says *Can hold: ship, merge*.
 
 **From the repo**: a project's `.laki/extensions/` holds its team's extensions (`laki widget new "Deploys" --dir
 .laki/extensions/deploys`, then commit it). They're listed under *From <project>* as `<project>.<id>`, off: turning one

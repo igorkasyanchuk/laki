@@ -76,6 +76,11 @@ function flowCheck(paths: string[]) {
 // actions as they run, a line each, until Ctrl-C (the link stays). --off <id|folder> unlinks, --list lists them
 // who runs this (the daemon's agentCaller tells an agent's tab from yours): laki widget's action, on, dev, run and check
 const caller = () => ({ ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB })
+// a gate said no: why (and its fix), exit 1
+function held(cmd: 'ship' | 'archive', r: { held: GateHeld[] }): never {
+  out(r, [`Not ${cmd === 'ship' ? 'shipped' : 'archived'}:`, ...r.held.map(h => `  ${h.name}: ${h.why}${h.fix ? `\n    fix: ${h.fix.split('\n')[0]}` : ''}`), `laki ${cmd} --force does it anyway (you, not an agent)`].join('\n'))
+  process.exit(1)
+}
 async function dev(folder?: string) {
   type Link = { folder: string; widgets: { id: string; name: string; on: boolean; devError?: string }[] }
   if (flags.list) {
@@ -298,7 +303,9 @@ async function main() {
     case 'restore':
     case 'fork': {
       const m = { rm: 'wsRm', archive: 'wsArchive', restore: 'wsRestore', fork: 'wsFork' }[cmd]
-      const r = await rpc(m, { id: rest[0] }, 120000)
+      // archive: the extensions' gates run first (by you, or the agent whose tab this is); --force past them, yours only
+      const r = await rpc(m, { id: rest[0], ...(cmd === 'archive' && { force: !!flags.force, from: caller() }) }, 120000)
+      if (r?.held) held('archive', r)
       return out(r ?? { ok: true }, r?.id ? `${r.id}  ${r.path}` : 'ok')
     }
     case 'memory': {
@@ -397,10 +404,7 @@ async function main() {
     case 'ship': {
       // --force: past the extensions' gates; yours only (the daemon refuses it from an agent's tab)
       const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller() })
-      if (t.held) {
-        out(t, ['Not shipped:', ...t.held.map((h: GateHeld) => `  ${h.name}: ${h.why}${h.fix ? `\n    fix: ${h.fix.split('\n')[0]}` : ''}`), 'laki ship --force does it anyway (you, not an agent)'].join('\n'))
-        process.exit(1)
-      }
+      if (t.held) held('ship', t)
       return out(t, `shipping in tab ${t.name} (${t.id})`)
     }
     case 'schedule': {

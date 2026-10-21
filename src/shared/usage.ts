@@ -12,7 +12,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
                                     tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
-  laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
+  laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
   laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
@@ -140,6 +140,9 @@ prints the page's text. In a tab, <ws> is its own.
   laki browser click "button[type=submit]"
   laki browser screenshot`,
   diff: `Prints the workspace's changes against its base (what ship would put in a PR).`,
+  archive: `Archives the workspace: its worktree goes, its branch stays (laki restore brings it back). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
+
+  laki archive a1b2`,
   run: `Starts the project's run script (a dev server, on $PORT) in a tab of its own, or test, lint, format or deploy
 (the project's scripts) in theirs.
 
