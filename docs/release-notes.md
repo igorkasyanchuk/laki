@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.23.0 · Oct 21, 2026
 
 - Workflows: an Agent block can say how freely its agent acts (auto, accept edits, plan, bypass) and use fast mode;
   the workflow's head sets one for all its agents. A workflow whose agent never asks is yours to start, not an agent's.
