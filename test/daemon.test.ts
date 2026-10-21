@@ -944,10 +944,13 @@ test('worktrees go to Settings’ folder (~: home), a folder per project, or the
   const home = rig.env.HOME
   const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   assert.equal(a.path, join(rig.env.LAKI_HOME, 'worktrees', p.id, a.id))
-  await rig.rpc('settingsSet', { worktrees: '~/trees' })
+  mkdirSync(join(home, 'mine'), { mode: 0o755 })
+  await rig.rpc('settingsSet', { worktrees: '~/mine/trees' })
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
-  assert.equal(b.path, join(home, 'trees', p.id, b.id))
+  assert.equal(b.path, join(home, 'mine', 'trees', p.id, b.id))
   assert.ok(existsSync(join(b.path, '.git')))
+  // the folders Laki made are yours alone; the one you had stays as it was
+  assert.deepEqual([join(home, 'mine', 'trees'), join(home, 'mine', 'trees', p.id), join(home, 'mine')].map(d => statSync(d).mode & 0o777), [0o700, 0o700, 0o755])
   await rig.rpc('projectSet', { id: p.id, config: { worktrees: '../wt' } })
   const c = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   assert.equal(c.path, join(realpathSync(home), 'wt', c.id)) // the repo's real path

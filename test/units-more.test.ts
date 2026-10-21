@@ -6,7 +6,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { fillTemplate, isAgent, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -88,7 +88,11 @@ test("text helpers: a nameless action doesn't replace a named one, YouTube start
   assert.equal(toCsv([['a'], ['b']], ',', [[true]]), '"a"\n"b"\n', 'a new row like the one above')
   assert.equal(toCsv([['a']], ',', [[]], false), 'a')
   assert.equal(toCsv([], ','), '')
-  assert.deepEqual(importable({ presets: null, templates: null, env: [], prScan: '2', fontSize: 13, other: 'x' }), { ok: { presets: null, fontSize: 13, other: 'x' }, bad: ['templates', 'env', 'prScan'] })
+  assert.deepEqual(importable({ presets: null, templates: null, env: [], prScan: '2', fontSize: 13, other: 'x' }), { ok: { presets: null, fontSize: 13, other: 'x' }, bad: ['templates', 'prScan'] })
+  // secrets and private values: never exported, never imported (an older file's: this Mac's stay)
+  const all = { fontSize: 13, env: { K: '1' }, webhook: { url: 'https://ntfy.sh/t' }, remoteMail: 'me@x.com', tunnelMails: ['*@x.com'], flowVars: { TOKEN: 'v' }, presets: [{ name: 'a', env: { K: '1' }, agent: 'claude' }] }
+  assert.deepEqual(exportable(all), { fontSize: 13, presets: [{ name: 'a', agent: 'claude' }] })
+  assert.deepEqual(importable(all).ok, { fontSize: 13, presets: all.presets })
   // presets' env: Export leaves it out, so a preset of the same name keeps this Mac's; the file's own wins
   assert.deepEqual(importable({ presets: [{ name: 'a' }, { name: 'b', env: { X: 'file' } }, { name: 'c' }] }, { presets: [{ name: 'a', env: { K: '1' } }, { name: 'b', env: { X: 'mine' } }] }).ok.presets, [{ name: 'a', env: { K: '1' } }, { name: 'b', env: { X: 'file' } }, { name: 'c' }])
 })

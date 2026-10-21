@@ -9,7 +9,7 @@ import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
 import { ICONS } from '../../shared/icons'
 import { StarterPicker } from './UiKit'
-import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
+import { exportable, importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
@@ -2689,10 +2689,8 @@ export function SettingsPage(p: {
   const [moved, setMoved] = useState('') // what the last export or import did
   const file = useRef<HTMLInputElement>(null)
   const exportAll = () => {
-    // without its secrets (env and presets' env: API keys; the phone webhook's URL: its token), set again on that Mac;
-    // an import leaves the ones there as they are
-    const { env: _env, webhook: _hook, ...rest } = s
-    const out = { ...rest, ...(s.presets && { presets: s.presets.map(({ env: _e, ...p }) => p) }) }
+    // without its secrets and private values (text.ts exportable), set again on that Mac; an import leaves the ones there
+    const out = exportable(s)
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([JSON.stringify({ laki: 'settings', version: 1, settings: out }, null, 2)], { type: 'application/json' }))
     a.download = 'laki-settings.json'
@@ -3144,7 +3142,7 @@ export function SettingsPage(p: {
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
                 <EnvField value={s.env} onChange={env => set({ env })} />
               </Group>
-              <Group title="Move to another Mac" hint="Every setting on these pages in a file, but env, presets' env and the phone webhook (secrets: set them again there); projects and their own settings stay here">
+              <Group title="Move to another Mac" hint="Every setting on these pages in a file, but env, presets' env, the phone webhook, remote access's and tunnels' emails and workflows' variables (set them again there); projects and their own settings stay here">
                 <div className="row-buttons">
                   <button type="button" onClick={exportAll}>
                     Export…

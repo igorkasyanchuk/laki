@@ -1794,7 +1794,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     const at: At = { path, host: proj.host }
     let base = o.base || current
     let branch = `${branchPrefix()}${id}`
-    if (!proj.host) mkdirSync(dirname(path), { recursive: true }) // git makes a host's
+    if (!proj.host) mkdirSync(dirname(path), { recursive: true, mode: 0o700 }) // only the folders it makes (yours stay as they are); git makes a host's
     if (!pr) base = await synced(proj, base, step)
     const add = pr ? ['--detach', path] : [path, '-b', branch, ...(base.startsWith('origin/') ? ['--no-track'] : []), base] // --no-track: a push never goes to origin's base
     step(`git worktree add ${add.join(' ')} (in ${proj.path})`)

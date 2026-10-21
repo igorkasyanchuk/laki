@@ -1285,8 +1285,9 @@ lit for a moment.
   (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
   long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
-  every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
-  reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
+  every setting of these pages to `laki-settings.json`, but env, presets' env, the phone webhook, remote access's and
+  tunnels' emails and workflows' variables (set those again there; Import keeps the other Mac's); Import on the other
+  Mac reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
   this one keeps in another shape is left out (Import names it), the rest applies.
 - *Git & worktrees*: the branch prefix for new worktrees (default `laki/`), *Sync the base branch* (off; *Origin's*,
   recommended: git fetch, then the worktree starts off `origin/<base>`; *Fast-forward mine*: your base branch moves up to

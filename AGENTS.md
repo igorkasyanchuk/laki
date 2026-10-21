@@ -492,7 +492,7 @@ those on PATH):
 ### Projects
 
 A project is a git repository (its top level) or any other folder (`git: false`: local workspaces only,
-no branches, diff, PRs or ship). New worktrees go to `worktreesOf`: the project's `config.worktrees` (the app's only; relative: to the repo),
+no branches, diff, PRs or ship). New worktrees go to `worktreesOf` (the folders it makes 0700, a folder you had as it is): the project's `config.worktrees` (the app's only; relative: to the repo),
 else `settings.worktrees` (`~` is home) with a folder per project, else `<data>/worktrees/<project>`; a host's stay in
 `~/.laki-host`. Made ones keep their path. `config` (setup, run, teardown, expose), set in the app, wins field by field over
 the repo's `.laki.json` (`projectConfig`).
@@ -1906,7 +1906,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   Laki itself and each tab by RSS with its processes, Sleep/Open/Wake, `settings.sleepAfter`; App.tsx passes a
   `ResourcesApi`), Pull requests (`PR_KINDS`: the PR switches' prompts over `PR_PROMPTS`,
   each with Reset; `prScan`, `prTries`), and General's Export/Import (`laki-settings.json`: `{ laki:
-  'settings', version: 1, settings }`; an import goes through `paint`, so it's painted and autosaved like typing, after
+  'settings', version: 1, settings }`; text.ts `exportable` leaves `PRIVATE` out (env, webhook, remoteMail, tunnelMails,
+  flowVars, presets' env) and `importable` never takes them; an import goes through `paint`, so it's painted and autosaved like typing, after
   `KINDS` refuses a field of the wrong kind: add a new list, object or number setting there). *Find a setting* (`FIND`: section, the title as the page writes it, more
   words; add new settings there) opens a section and lights (`.spot`) the first label, row or heading that starts with
   the title. Settings' `spot` (App's dialog `{ settings, spot }`: Run ▾'s *Edit the run script…* → Scripts, *Edit actions…* → Actions)

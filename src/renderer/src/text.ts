@@ -158,11 +158,20 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
 const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array' }
+// what Export leaves out and Import never takes (this Mac's stay): secrets (env and presets' env: API keys; the phone
+// webhook's URL: its token) and what's private (remote access's and tunnels' emails, workflows' variables)
+const PRIVATE = ['env', 'webhook', 'remoteMail', 'tunnelMails', 'flowVars']
+type EnvPreset = { name: string; env?: Record<string, string> }
+export function exportable<T extends { presets?: EnvPreset[] | null }>(s: T) {
+  const out: Record<string, unknown> = Object.fromEntries(Object.entries(s).filter(([k]) => !PRIVATE.includes(k)))
+  if (s.presets) out.presets = s.presets.map(({ env: _e, ...p }) => p)
+  return out
+}
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
-type EnvPreset = { name: string; env?: Record<string, string> }
 export function importable(v: Record<string, unknown>, mine?: { presets?: EnvPreset[] | null }) {
   const kind = (x: unknown) => (x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x)
+  v = Object.fromEntries(Object.entries(v).filter(([k]) => !PRIVATE.includes(k))) // an older file's: yours stay
   const bad = Object.keys(v).filter(k => KINDS[k] && v[k] !== undefined && !KINDS[k].split(' ').includes(kind(v[k])))
   const ok = Object.fromEntries(Object.entries(v).filter(([k]) => !bad.includes(k)))
   // Export leaves presets' env out (secrets): a preset in the file keeps this Mac's, by name; the file's own wins

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings' Export no longer carries remote access's and tunnels' emails or workflows' variables, and Import keeps this
+  Mac's. The worktrees folder Laki makes is yours alone (0700).
 - Turning on an extension shows its `widget.json` as it is on disk now, even one changed a moment before.
 - A repo's extension: its turn-on sheet lists every file it's trusted as and the scripts it runs; one with a link out
   of its folder, or past 2,000 files, can't be turned on, and a link to a folder inside it is checked like the folder.
