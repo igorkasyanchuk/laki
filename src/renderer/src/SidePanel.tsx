@@ -8,13 +8,14 @@ import { PanelHandle } from './Panes'
 import { Folded, Markdown } from './MarkdownView'
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, Avatar, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
+import { type actionsFor, csvSep, linesAt, parseCsv, parseSize, previewAddr, previewUrl, reviewedLines, type RunAction, sameLines, SIZES, splitRows, type Suggestion, suggestionOf, toCsv } from './text'
 import { ask, escapes, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
-export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] } // at: an older daemon gives none
+// at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
+export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
 export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean } // lossy: not UTF-8
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
@@ -32,6 +33,7 @@ export type PanelApi = {
   setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
   read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
   threads: () => Promise<Thread[]>
+  apply: (path: string, edits: Suggestion[], then?: () => void) => Promise<unknown> // Review's suggestions put in the file, Undo in the toast; then: after it and after its Undo
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string, line?: boolean) => Promise<unknown> // to the workspace's agent, when its turn ends; line: a comment on a line (an achievement)
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
@@ -612,6 +614,32 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
   const said = (threads ?? []).filter(t => t.comments.length)
   const open = said.filter(t => !t.resolved)
   const resolved = said.filter(t => t.resolved)
+  // each file's open suggestions (a thread's newest) and the file as it is now; pending: those still as the review saw them
+  const edits = new Map<string, Suggestion[]>()
+  for (const t of open) {
+    const e = !t.outdated && editOf(t, t.comments.map(c => suggestionOf(c.body)).filter(x => !!x).at(-1)?.lines)
+    if (e) edits.set(t.path, [...(edits.get(t.path) ?? []), e])
+  }
+  const [texts, setTexts] = useState<Record<string, string | undefined>>({})
+  const [n, setN] = useState(0) // after an Apply and its Undo: read again
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setTexts({}), [p.w.id])
+  const files = [...edits.keys()].join('\n')
+  useEffect(() => {
+    let alive = true
+    for (const f of files ? files.split('\n') : []) p.api.read(f).then(c => alive && setTexts(x => ({ ...x, [f]: c.text })), () => {})
+    return () => {
+      alive = false
+    }
+  }, [files, threads, n])
+  const pending = (path: string) => (edits.get(path) ?? []).filter(e => texts[path] === undefined || sameLines(linesAt(texts[path]!, e.start, e.end), e.seen))
+  const apply = (path: string, es: Suggestion[]) => {
+    setBusy(true)
+    p.api
+      .apply(path, es, () => setN(x => x + 1))
+      .catch(() => {})
+      .finally(() => setBusy(false))
+  }
   return (
     <div className="sp-body info-body">
       <PRSection w={p.w} threads={threads ? open.length : err ? undefined : 0} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />
@@ -627,7 +655,7 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
           {!threads && !err && <span className="muted small">Loading…</span>}
           {threads && !open.length && <span className="muted small">{resolved.length ? 'No open review comments' : 'No review comments'}</span>}
           {open.map(t => (
-            <ThreadCard key={threadKey(t)} t={t} api={p.api} />
+            <ThreadCard key={threadKey(t)} t={t} api={p.api} text={texts[t.path]} pending={pending(t.path)} busy={busy} onApply={es => apply(t.path, es)} />
           ))}
           {resolved.length > 0 && (
             <details className="sp-resolved">
@@ -647,8 +675,19 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
 // a thread's key across refreshes: where it is and when it began (the daemon gives no id)
 const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`
 
-// a review thread: where (a click shows the file at that line), then each comment as Markdown
-function ThreadCard({ t, api }: { t: Thread; api: PanelApi }) {
+// a thread's suggestion as an edit: lines on the new file's side whose hunk shows them (what the review saw: Apply
+// needs the file's lines there to be those still)
+const editOf = (t: Thread, lines?: string[]): Suggestion | null => {
+  if (!lines || t.side !== 'RIGHT' || !t.line || !t.hunk) return null
+  const start = t.startLine ?? t.line
+  const seen = reviewedLines(t.hunk, t.line - start + 1)
+  return seen && { start, end: t.line, seen, lines }
+}
+
+type ApplyProps = { text?: string; pending?: Suggestion[]; busy?: boolean; onApply?: (edits: Suggestion[]) => void } // an open thread's: its file now, the file's suggestions still to apply
+
+// a review thread: where (a click shows the file at that line), then each comment as Markdown, a suggestion as a diff
+function ThreadCard({ t, api, ...a }: { t: Thread; api: PanelApi } & ApplyProps) {
   return (
     <div className="sp-thread">
       <button className="sp-thread-head" onClick={() => api.preview(t.path, t.line)} data-tip="Show the file at this line">
@@ -666,9 +705,57 @@ function ThreadCard({ t, api }: { t: Thread; api: PanelApi }) {
             <b>{c.author}</b>
             {c.at && <span className="muted">{ago(c.at)}</span>}
           </div>
-          <Folded text={c.body} lines={10} />
+          {(s =>
+            s ? (
+              <>
+                {s.rest && <Folded text={s.rest} lines={10} />}
+                <Suggested t={t} lines={s.lines} {...a} />
+              </>
+            ) : (
+              <Folded text={c.body} lines={10} />
+            ))(suggestionOf(c.body))}
         </div>
       ))}
+    </div>
+  )
+}
+
+// a comment's suggestion: the file's lines now (else what the review saw) and the suggested ones; Apply while they're
+// as the review saw them (an open thread, not outdated, on the new file's side), Apply all with the file's others
+function Suggested({ t, lines, text, pending = [], busy, onApply }: { t: Thread; lines: string[] } & ApplyProps) {
+  const e = !t.outdated && onApply ? editOf(t, lines) : null
+  const now = e && text !== undefined ? linesAt(text, e.start, e.end) : null
+  const state = !e ? '' : !now || sameLines(now, e.seen) ? 'apply' : sameLines(now, lines) ? 'applied' : 'changed'
+  const was = (state === 'changed' ? now : e?.seen) ?? []
+  return (
+    <div className="sp-sugg">
+      <div className="sp-diff">
+        {was.map((l, i) => (
+          <div key={`-${i}`} className="dl dl-del">
+            -{l}
+          </div>
+        ))}
+        {lines.map((l, i) => (
+          <div key={`+${i}`} className="dl dl-add">
+            +{l}
+          </div>
+        ))}
+        {!lines.length && <div className="dl muted">(the lines go)</div>}
+      </div>
+      {state === 'apply' && (
+        <span className="row-buttons">
+          <button type="button" disabled={busy} data-tip="Put it in the file: Undo is in the toast; nothing is committed" onClick={() => onApply!([e!])}>
+            Apply
+          </button>
+          {pending.length > 1 && (
+            <button type="button" className="link small" disabled={busy} onClick={() => onApply!(pending)}>
+              Apply all {pending.length} in {t.path.slice(t.path.lastIndexOf('/') + 1)}
+            </button>
+          )}
+        </span>
+      )}
+      {state === 'applied' && <span className="muted small">Applied: it goes in with your next commit</span>}
+      {state === 'changed' && <span className="muted small">Changed since the review: these lines aren't what it saw</span>}
     </div>
   )
 }

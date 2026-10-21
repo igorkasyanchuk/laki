@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
-import { join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
 import { connect, fresh, until } from './helpers.ts'
@@ -311,6 +311,40 @@ test('images: the kind kept, empty ones refused, month-old ones cleaned up', asy
   assert.match(path, /\.jpg$/)
   assert.deepEqual(readdirSync(images), [path.slice(images.length + 1)])
   await assert.rejects(rig.rpc('imageSave', { data: '' }), /an image up to 20 MB/)
+})
+
+test('files: any kind, its name kept (its last part, readable, never out of its folder), 25 MB at most, old ones cleaned up', async t => {
+  const rig = await fresh(t)
+  const files = join(rig.data, 'files')
+  const old = join(files, `${Date.now() - 31 * 86400e3}-old`)
+  mkdirSync(old, { recursive: true })
+  writeFileSync(join(old, 'a.pdf'), 'x')
+  const b64 = (s: string) => Buffer.from(s).toString('base64')
+  const path = await rig.rpc('fileSave', { name: 'Q3 report.pdf', data: b64('pdf!') })
+  assert.equal(path, join(files, basename(dirname(path)), 'Q3 report.pdf'))
+  assert.equal(readFileSync(path, 'utf8'), 'pdf!')
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  assert.equal(statSync(dirname(path)).mode & 0o777, 0o700)
+  assert.deepEqual(readdirSync(files), [basename(dirname(path))]) // the month-old one went
+  const named = async (name: unknown) => {
+    const p = await rig.rpc('fileSave', { name, data: '' })
+    assert.equal(dirname(dirname(p)), files)
+    return basename(p)
+  }
+  assert.equal(await named('../../state.json'), 'state.json')
+  assert.equal(await named('a/b\\c.txt'), 'c.txt')
+  for (const n of ['..', '.', '', ' ', undefined]) assert.equal(await named(n), 'file')
+  assert.equal(await named('bad\x00\x1b[31m\u202ename\n.sh'), 'bad[31mname.sh')
+  for (const n of [`${'x'.repeat(300)}.txt`, `${'日本'.repeat(100)}.md`]) {
+    const cut = await named(n)
+    assert.ok(Buffer.byteLength(cut) <= 200 && cut.endsWith(extname(n)) && n.startsWith(cut.slice(0, 20)), cut)
+  }
+  await assert.rejects(rig.rpc('fileSave', { name: 'x' }), /a file up to 25 MB/)
+  // the app's go over the socket: 25 MB, in base64, fits
+  const c = await rig.connect()
+  assert.equal(statSync(await c.call('fileSave', { name: 'big.bin', data: Buffer.alloc(25 << 20).toString('base64') })).size, 25 << 20)
+  await assert.rejects(c.call('fileSave', { name: 'big.bin', data: Buffer.alloc((25 << 20) + 1).toString('base64') }), /a file up to 25 MB/)
+  c.close()
 })
 
 test('a tunnel a killed daemon left running is stopped as the next daemon starts (L14)', async t => {
@@ -838,6 +872,23 @@ test("project notes: projectSet keeps them, blank drops them; ls --json leaves t
   assert.ok(!ls.out.includes('staging.example'), 'agents never see them')
   await rig.rpc('projectSet', { id: p.id, notes: '  \n ' })
   assert.equal((await rig.rpc('state')).projects[0].notes, undefined)
+})
+
+test("a project's color and icon: projectSet keeps them, '' clears them, anything else is refused", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const proj = async () => (await rig.rpc('state')).projects[0]
+  await rig.rpc('projectSet', { id: p.id, color: 'teal', icon: 'star' })
+  assert.equal((await proj()).color, 'teal')
+  assert.equal((await proj()).icon, 'star')
+  await rig.rpc('projectSet', { id: p.id, icon: ' 🛒 ' }) // an emoji, typed or pasted; the color stays
+  assert.deepEqual([(await proj()).color, (await proj()).icon], ['teal', '🛒'])
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, name: 'App', color: 'chartreuse' }), /chartreuse isn't a color/)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, name: 'App', icon: 'hello there' }), /an icon's name or an emoji/)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, icon: '🛒'.repeat(20) }), /an emoji/) // short only
+  assert.deepEqual([(await proj()).name, (await proj()).icon], [p.name, '🛒'], 'a refusal changes nothing')
+  await rig.rpc('projectSet', { id: p.id, color: 'none', icon: '' })
+  assert.deepEqual([(await proj()).color, (await proj()).icon], [undefined, undefined])
 })
 
 test("project memory: projectSet keeps the list, drops bad items, an empty one clears it; ls --json leaves it out", async t => {

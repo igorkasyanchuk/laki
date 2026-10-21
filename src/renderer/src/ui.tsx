@@ -1,7 +1,8 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { ICONS, type IconName, isIconName } from '../../shared/icons'
+import { emojiOf, ICONS, type IconName, isIconName } from '../../shared/icons'
+import { TAB_COLORS } from '../../shared/types'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -190,13 +191,9 @@ export function AskHost() {
 // a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
 // head: what the header shows in place of the title (the Specs page's breadcrumbs); tools: buttons before its ✕
 // esc false: Esc doesn't close it (Workflows: a page you keep open while runs go)
-// a key with its modifiers as macOS writes it (⌃⌥⇧⌘ then the key: ⇧⌘C), by the physical key (⌥C would be ç); a settable
-// hotkey is kept as this text
+// a settable hotkey is kept as keyLabel's text (shared/keys.ts: ⇧⌘C)
 export const keyRec = { on: false } // Settings' KeyField is recording: App's keys stand aside (they'd run the combo)
-export const keyLabel = (e: { key: string; code: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }) => {
-  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.code === 'Space' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key
-  return `${e.ctrlKey ? '⌃' : ''}${e.altKey ? '⌥' : ''}${e.shiftKey ? '⇧' : ''}${e.metaKey ? '⌘' : ''}${k}`
-}
+export { keyLabel } from '../../shared/keys'
 
 export const HOTKEY = '⌃⌥⌘L' // the global hotkey's keys (settings.hotkey unset)
 export const SHOT_KEY = '⌃⌥⌘S' // Screenshot to Laki AI's (settings.shotKey unset)
@@ -246,8 +243,35 @@ export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
 }
 
 // tab colors, by name: CSS --tc-<name> in each app's theme
-export const TAB_COLORS = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
+export { TAB_COLORS }
 export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(--tc-${c})` } as CSSProperties) : undefined)
+
+// a project's own mark (projectSet's icon in its color, or its emoji, a line under it in the color); none set: or (the
+// sidebar's kind icon), else nothing
+export function ProjectMark({ p, size = 12, or }: { p?: { icon?: string; color?: string }; size?: number; or?: IconName }) {
+  const i = p?.icon
+  const e = emojiOf(i)
+  const name = isIconName(i) ? i : or
+  if (!e && !name) return null
+  return (
+    <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: size }) }} aria-hidden>
+      {e ?? <Icon name={name!} size={size} />}
+    </span>
+  )
+}
+
+// Icon… (a submenu: every icon by its words, arrowLeft: arrow left, for the filter, or an emoji typed or pasted into its
+// box) and No icon once one is set: a Desk tab's, a project's
+const ICON_NAMES = Object.keys(ICONS) as IconName[]
+export const iconWords = (n: string) => n.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase()
+export const iconItems = (now: string | undefined, set: (icon?: string) => void): MenuItem[] => [
+  {
+    label: 'Icon…',
+    icon: isIconName(now) ? now : 'star',
+    items: [{ filter: 'Find an icon, or type an emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => set(e) } : null))(emojiOf(q)) }, ...ICON_NAMES.map(n => ({ label: iconWords(n), icon: n, hint: now === n ? ON : undefined, run: () => set(n) }))],
+  },
+  ...(now ? [{ label: 'No icon', icon: 'x', run: () => set() } as MenuItem] : []),
+]
 
 // a row dropped before or after another of its kind (and group: workspaces stay in their project)
 // into: onto a group's head (data-head) from a row that isn't one: first in that group (after the head)
@@ -310,10 +334,11 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 // null is a separator, { head } a section title, { colors } a row of swatches (keys 0-8). An item's key
 // runs it while the menu is open; without one it gets the first free initial of its label's words. indent: under the
 // item before it (a project's groups); sub: a line under its label; pill: a tag at its end (tone: good green, warn
-// yellow); mono: its label in the terminal's font; foot: in the menu's foot, under a line.
+// yellow); mono: its label in the terminal's font; foot: in the menu's foot, under a line; mark: drawn in place of its icon
+// (a project's ProjectMark).
 // { filter } puts a box on top (its placeholder): what's typed keeps the items it matches, and keys are for the box
 export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
-type ItemBase = { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
+type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
 export type MenuItem =
   | (ItemBase & { run: () => void; items?: never })
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -472,7 +497,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         onPointerEnter={e => hover(it, e.currentTarget)}
         onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
       >
-        <span className="menu-icon">{it.icon && <Icon name={it.icon} />}</span>
+        <span className="menu-icon">{it.mark ?? (it.icon && <Icon name={it.icon} />)}</span>
         <span className="menu-text">
           <span className={`menu-label ${it.mono ? 'mono' : ''}`}>
             <span>{it.label}</span>

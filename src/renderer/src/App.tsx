@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -10,6 +10,7 @@ import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, C
 import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
+import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
 import { VoiceBar, withImages } from './PromptInput'
@@ -36,13 +37,13 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, clock, initials, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
-import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
-import { isIconName } from '../../shared/icons'
+import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
+import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { emojiOf, isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -139,8 +140,8 @@ function AiFloat({ children }: { children: ReactNode }) {
 }
 const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
-const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
-const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // experimental: loaded as it opens
+const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
+const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
 const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m.WidgetStudio }))) // Laki AI's: loaded as it opens
 const NotesPage = lazy(() => import('./Notes')) // experimental, and BlockNote with it: loaded as it opens
 const TodoListPage = lazy(() => import('./TodoList')) // experimental, and BlockNote with it: loaded as it opens
@@ -174,11 +175,11 @@ type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
-// the Specs page (experimental): specs is a project's id, '' all; kind and slug, the one to open
+// the Specs page: specs is a project's id, '' all; kind and slug, the one to open
 const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
 // the Notes page (experimental): note, the one open ('': the first)
 const notesOf = (d: Dialog) => (d && typeof d === 'object' && 'note' in d ? d : undefined)
-// the Workflows page (experimental): run, the run to open
+// the Workflows page: run, the run to open
 const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ? d : undefined)
 // the Settings page, in any of its forms: all of it, a project's, or a section asked for
 const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && !!d && ('settings' in d || 'section' in d))
@@ -590,7 +591,7 @@ export function App() {
     const h = hist.current
     const by = j < h.i ? -1 : 1
     const s = view?.settings ?? {}
-    const off = (d: Dialog) => (d === 'desk' && s.desk === false) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView === false) || (d === 'ai' && !aiOn(s)) || (!!notesOf(d) && s.notes !== true) || (d === 'todos' && s.todoList !== true) || (!!specsOf(d) && s.specs !== true) || (!!flowsOf(d) && s.workflows !== true) || (!!studioOf(d) && !aiOn(s))
+    const off = (d: Dialog) => (d === 'desk' && s.desk === false) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView === false) || (d === 'ai' && !aiOn(s)) || (!!notesOf(d) && s.notes !== true) || (d === 'todos' && s.todoList !== true) || (!!specsOf(d) && !specsOnIn(s)) || (!!flowsOf(d) && !flowsOnIn(s)) || (!!studioOf(d) && !aiOn(s))
     const gone = (p: Place) => off(p.d) || (p.d === null && !!p.ws && !live.some(w => w.id === p.ws))
     while (h.at[j] && gone(h.at[j])) j += by
     const p = h.at[j]
@@ -603,6 +604,8 @@ export function App() {
     setDialog(to.d)
     histDrawn(n => n + 1)
   }
+  const projOf = (w?: { project: string } | null) => (w ? view?.projects.find(p => p.id === w.project) : undefined)
+  const tint = (w: WorkspaceView) => (w.color && w.color !== 'none' ? w.color : projOf(w)?.color) // its own color, else its project's
   const placeName = (p: Place) => {
     const d = p.d
     const w = live.find(x => x.id === p.ws)
@@ -624,7 +627,10 @@ export function App() {
   // workspace and its tab; a dialog over a page (⌘K, a rename) keeps the page's
   const titleAt = useRef<Dialog>(null)
   if (isPlace(dialog)) titleAt.current = dialog
-  const here = titleAt.current === null ? [ws && wsName(ws), tab?.name].filter(Boolean).join(' · ') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
+  // a workspace whose project has an emoji: it and the project's name first (🛒 web · fix-login)
+  const hereP = projOf(ws)
+  const pe = emojiOf(hereP?.icon)
+  const here = titleAt.current === null ? [pe && `${pe} ${hereP!.name}`, ws && wsName(ws), tab?.name].filter(Boolean).join(' · ') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
   const winTitle = here ? `${here} — Laki` : 'Laki'
   useEffect(() => void (document.title = winTitle), [winTitle])
   // a new studio's first ask names it: the dialog (and the place in the history) says which, so Back, ⌘K's way back and
@@ -849,6 +855,7 @@ export function App() {
   // works or waits, the waiting ones first, with what it asked or last said, then the recent ones, in the theme's colors
   const fs = view?.settings
   // a bubble's card says what the sidebar's hover card does: the branch, the agents, the PR, the diff, the ports
+  const projWords = (w: WorkspaceView) => (p => (p ? `${emojiOf(p.icon) ? `${emojiOf(p.icon)} ` : ''}${p.name}` : ''))(projOf(w)) // a card's project: its emoji too (ponytail: an icon by name isn't drawn there)
   const floatMore = (w: WorkspaceView) => {
     const pr = w.pr
     return {
@@ -865,7 +872,7 @@ export function App() {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...floatMore(w) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...floatMore(w) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
@@ -887,7 +894,7 @@ export function App() {
     })
     .sort((a, b) => Number(b.t.done) - Number(a.t.done) || b.at - a.at)
     .filter((x, i) => i < recentN || (doneAlert && x.t.done))
-    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...floatMore(w) }))
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
   const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs) }
@@ -1220,8 +1227,8 @@ export function App() {
     const tabs = view?.tabs.filter(t => t.workspace === w.id && t.status !== 'exited') ?? []
     const busy = tabs.filter(t => t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting'))
     const facts: Fact[] = [{ label: 'Project', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
-    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (stays)` })
-    facts.push({ label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
+    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (${w.codespace !== undefined ? 'only what was pushed stays' : 'stays'})` })
+    facts.push(w.codespace !== undefined ? { label: 'Codespace', value: `${w.codespace || '(being made)'}: deleted on GitHub` } : { label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
     if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: lost` : 'none uncommitted' })
     if (pk.ahead) facts.push({ label: 'Commits', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (w.pr) facts.push({ label: 'PR', value: `#${w.pr.number} ${w.pr.draft ? 'draft' : w.pr.state.toLowerCase()}${w.pr.title ? ` · ${w.pr.title}` : ''} (stays on GitHub)` })
@@ -1345,6 +1352,7 @@ export function App() {
       ...(dev && dev.status !== 'exited' ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: dev.id, data: '\x03' }) } as MenuItem] : []),
       ...(dev ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(dev.id) } as MenuItem] : []),
       ...(w.scripts ?? []).map((k): MenuItem => ({ label: SCRIPT_LABELS[k], icon: SCRIPT_ICONS[k], run: () => runScript(w, k) })),
+      ...(w.noSetup && p?.hasSetup ? [{ label: 'Run the setup script', icon: 'terminal', sub: 'Made without it', run: () => call<TabView>('run', { ws: w.id, script: 'setup' }).then(selectTab, () => {}) } as MenuItem] : []), // its tab; the item goes
       { label: `Open localhost:${w.port}`, icon: 'link', key: 'o', run: () => openPort(w.port) },
       ...actionItems(w),
       null,
@@ -1404,6 +1412,21 @@ export function App() {
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
+    // the file read again: its lines must still be what the review saw (applySuggestions), and fileWrite's was keeps an
+    // agent's write meanwhile; Undo writes the text back the same way
+    apply: async (path, edits, then) => {
+      const was = (await call<FileContent>('fileRead', { ws: w.id, path })).text
+      if (was === undefined) return toast(`${path} isn't text`)
+      let text: string
+      try {
+        text = applySuggestions(was, edits)
+      } catch (e) {
+        return toast(`${path.split('/').pop()}: ${(e as Error).message}: nothing applied`)
+      }
+      await call('fileWrite', { ws: w.id, path, text, was })
+      then?.()
+      done(`Applied ${edits.length === 1 ? 'the suggestion' : `${edits.length} suggestions`} to ${path.split('/').pop()}`, () => void call('fileWrite', { ws: w.id, path, text: was, was: text }).then(() => (then?.(), done('Back as it was')), () => {}))
+    },
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
     toAgent: (text, line) => api.call('send', { target: w.id, text, whenIdle: true }).then(() => (line && earn('comment'), toast('Sent to the agent'))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
@@ -1502,6 +1525,8 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
+  const specsOn = specsOnIn(settings) // Settings › General › Pages: on unless turned off
+  const flowsOn = flowsOnIn(settings) // the same
   // Achievements (achievements.ts): each earned once, as you do it, into settings.achievements (got: when). sent: the
   // last one written, shown and built on until the view has it, so an unlock, a ✕ and Turn off in a row keep each
   // other. Off: none earned, no trophy, no toast
@@ -1572,6 +1597,9 @@ export function App() {
     return () => (off(), clearTimeout(t))
   }, [studioOn, connected])
   const pickKey = settings.pickerKey ?? PICKER_KEY // the element picker's hotkey ('' none)
+  const kb = keyMap(settings.keys) // Settings › Keys': the keys of App's own actions in use ('' none)
+  const kh = (id: KeyId) => keyShow(kb[id]) || undefined // as a menu's hint
+  const kt = (title: string, id: KeyId) => (kb[id] ? `${title} (${keyShow(kb[id])})` : title) // a tooltip with its keys
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
   const shotKey = !view ? null : settings.shotAsk === true && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
@@ -1603,6 +1631,23 @@ export function App() {
   }
   useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
   const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
+  // a plan limit past settings.usageAt as Usage.tsx reads them: a toast, and a notification unless you're looking (or
+  // notify is off); once per window per reset (laki.limitsTold), told or not as it crosses (seen: each window's last %)
+  // ponytail: only while the app is open with the ring on screen; the daemon doesn't watch usage on its own
+  const limitsSeen = useRef<Record<string, number>>({})
+  const limits = (rows: AgentUsage[]) => {
+    const s = viewRef.current?.settings
+    const told = load<Record<string, number>>('laki.limitsTold', {})
+    const { hits, seen } = limitsCrossed(rows, s?.usageAt ?? USAGE_AT, limitsSeen.current, told)
+    limitsSeen.current = seen
+    if (!hits.length || s?.notifyOn?.usage === false) return rows
+    hits.forEach(h => (told[h.id] = h.w.resets ?? 0))
+    store('laki.limitsTold', told)
+    const says = hits.map(h => limitText(h, rows))
+    if (s?.notify !== false && !document.hasFocus()) says.forEach(t => notify('Plan limit', t, '', () => {}, s?.notifySound))
+    toast(says.join('; '))
+    return rows
+  }
   const editor = settings.editor || 'cursor'
   const targets: AppInfo[] = [...apps.filter(a => !a.browser), ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
   const editorName = targets.find(a => a.id === editor && a.id !== 'custom')?.name ?? 'editor'
@@ -2041,7 +2086,7 @@ export function App() {
   // terminal's, a browser's, a host's or an archived one)
   const flowsHere = (w: WorkspaceView) => flowItems.filter(f => f.source === 'yours' || f.project === w.project)
   const flowMenu = (w: WorkspaceView): MenuItem[] =>
-    settings.workflows !== true || rawKind(w) !== 'projects' || w.host || w.archived
+    !flowsOn || rawKind(w) !== 'projects' || w.host || w.archived
       ? []
       : (l => [{ label: 'Run workflow', icon: 'flow', key: 'w', items: l.length ? l.map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }])(flowsHere(w))
   const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
@@ -2163,7 +2208,7 @@ export function App() {
         ? [{ label: 'Restart on another account', icon: 'restore', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
         : []),
       null,
-      { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: '⌘W', run: () => closeTabs(ts) },
+      { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: kh('closeTab'), run: () => closeTabs(ts) },
       ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
       ...(ts.length === 1 ? extItems('tab', view?.workspaces.find(x => x.id === ts[0].workspace), { ws: ts[0].workspace, tab: ts[0].id }) : []),
     ]
@@ -2214,7 +2259,7 @@ export function App() {
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
     ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
-    ...(settings.specs || settings.workflows || settings.calendar || settings.notes ? ['experimental'] : []), // one turned on; else seen through Go (below)
+    ...(settings.calendar || settings.notes || settings.todoList ? ['experimental'] : []), // one turned on; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -2229,7 +2274,7 @@ export function App() {
   }, [!!view, !dialog])
   // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on)
   const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
-  useEffect(() => void (settings.workflows === true ? call<WorkflowItem[]>('flowList', {}).then(setFlowItems, () => {}) : setFlowItems([])), [settings.workflows, view?.flowFiles])
+  useEffect(() => void (flowsOn ? call<WorkflowItem[]>('flowList', {}).then(setFlowItems, () => {}) : setFlowItems([])), [flowsOn, view?.flowFiles])
   // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
   useEffect(() => {
     const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
@@ -2241,7 +2286,8 @@ export function App() {
     else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
     else if (id === 'settings') setDialog('settings')
     else if (id === 'shell') quickNew('shells')
-    else if (id === 'experimental' || (id === 'workflows' && settings.workflows !== true)) setDialog({ section: 'general', spot: 'Experimental' }) // Workflows off: where it's turned on
+    else if (id === 'experimental') setDialog({ section: 'general', spot: 'Experimental' })
+    else if (id === 'workflows' && !flowsOn) setDialog({ section: 'general', spot: 'Pages' }) // Workflows off: where it's turned on again
     else if (id === 'schedules') setDialog('schedules')
     else if (id === 'workflows') setDialog({ workflows: '' })
     else setDialog({ section: id })
@@ -2265,13 +2311,39 @@ export function App() {
   const newIn = (p: Project) => (p.kind ? quickNew(p.kind) : newWs(p.id)) // a project head's +
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
-  // keys: capture phase, before xterm.js sees them
-  const keys = useRef<(e: KeyboardEvent) => void>(() => {})
-  keys.current = e => {
+  // keys: capture phase, before xterm.js sees them. force: an action of Settings › Keys by its id (a menu bar item's,
+  // a Browsers page's ⌘T/⌘W), whatever its keys; fixed: a menu bar item's fixed key (⌘O, ⌘E…), never one of Settings ›
+  // Keys' that was given the same keys
+  const keys = useRef<(e: KeyboardEvent, force?: KeyId, fixed?: boolean) => void>(() => {})
+  keys.current = (e, force, fixed) => {
     if (keyRec.on) return // a hotkey being recorded in Settings
     // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
-    if (settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
-    if (e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyB') return void (e.preventDefault(), e.stopPropagation(), ws && togglePanel())
+    if (!force && settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
+    const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
+    // Settings › Keys' (kb): false where one doesn't apply now, so its keys go on (⌘[ in a text field: an indent)
+    const bound: Record<KeyId, false | (() => unknown)> = {
+      newWs: () => newWs(ws?.project),
+      newTab: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
+      closeTab: () => (ws?.browser !== undefined ? dialog || closePage(ws) : previewed ? closePreview() : tab && closeTabs([tab])), // a Browsers page: it closes (not under a page or dialog: it isn't in sight); else the file preview first
+      sidebar: () => setSideOpen(o => !o),
+      panel: () => ws && togglePanel(),
+      info: () => showInfo(),
+      palette: () => setDialog(d => (d === 'palette' ? null : 'palette')),
+      files: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
+      find: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
+      next: nextNeed,
+      later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
+      artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
+      full: () => toggleFull(), // full screen, or back
+      back: historyOn && !field && (() => travel(hist.current.i - 1)),
+      forward: historyOn && !field && (() => travel(hist.current.i + 1)),
+      settings: () => toSettings(),
+      help: () => setDialog(d => (d === 'help' ? null : 'help')),
+    }
+    const id = force ?? (fixed ? undefined : keyFor(e, kb))
+    const run = id && bound[id]
+    if (run) return void (e.preventDefault(), e.stopPropagation(), run())
+    if (force) return
     // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in;
     // not under a yes/no (its run's own question would replace it: a Deny, a Cancel)
     const hit = (e.altKey || e.ctrlKey) && !e.repeat && !document.querySelector('.ask-overlay') ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined
@@ -2280,35 +2352,19 @@ export function App() {
     const k = e.key.toLowerCase()
     // ⌘⇧N: the tab bar's +, its menu (shell, each agent, command) to pick from with the keys
     if (e.shiftKey && k === 'n') return void (e.preventDefault(), e.stopPropagation(), dialog || document.querySelector<HTMLElement>('.newtab-btn')?.click())
-    if (e.shiftKey && k === 'a') return void (e.preventDefault(), e.stopPropagation(), dialog || toggleArtifacts())
-    if (e.shiftKey && k === 'enter') return void (e.preventDefault(), e.stopPropagation(), toggleFull()) // ⌘⇧⏎: full screen, or back // ⌘⇧A: the Artifacts strip (not under a page: out of sight)
+    // the fixed ones (shared/keys.ts FIXED)
     const act: Record<string, () => void> = {
-      n: () => newWs(ws?.project),
-      b: () => setSideOpen(o => !o),
-      ',': () => toSettings(),
-      '/': () => setDialog(d => (d === 'help' ? null : 'help')),
       e: () => ws && openIn(editor),
       '=': () => zoom(1),
       '+': () => zoom(1),
       '-': () => zoom(-1),
       '0': () => zoom(0),
       o: openProject,
-      f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
-      t: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
-      w: () => (ws?.browser !== undefined ? dialog || closePage(ws) : previewed ? closePreview() : tab && closeTabs([tab])), // a Browsers page: it closes (not under a page or dialog: it isn't in sight); else the file preview first
-      k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
-      p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       d: () => git && togglePanel('changes'),
-      i: () => showInfo(),
-      j: nextNeed,
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
     if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
-    // ⌘[ ⌘]: back and forward, not in a text field (an editor's indent)
-    const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
-    if (historyOn && !field && (k === '[' || k === ']')) act[k] = () => travel(hist.current.i + (k === '[' ? -1 : 1))
-    if (canLater && !dialog) act.l = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)
     if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
     const t = e.target as HTMLElement | null // ⌘↑/⌘↓ in a text field move its cursor (xterm's own textarea isn't one)
     if (k.startsWith('arrow') && t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t instanceof HTMLInputElement && !/^(checkbox|radio|button|submit)$/.test(t.type))) && !t.classList.contains('xterm-helper-textarea')) return
@@ -2318,15 +2374,16 @@ export function App() {
   }
   useEffect(() => {
     const f = (e: KeyboardEvent) => keys.current(e)
-    bridge?.onBrowserKey?.(key => keys.current(new KeyboardEvent('keydown', { key, metaKey: true }))) // from a Browsers page, as if here
+    bridge?.onBrowserKey?.(key => keys.current(new KeyboardEvent('keydown', { key, metaKey: true }), isKeyId(key) ? key : undefined, !isKeyId(key))) // a menu bar item's (an id, or a fixed key) or a Browsers page's, as if here
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [])
+  useEffect(() => void bridge?.keys?.(settings.keys ?? {}), [JSON.stringify(settings.keys ?? {})]) // the menu bar's items show them
 
   // the actions, once: the ⋯ menus and the palette show the same ones
   type Action = { label: string; icon: IconName; hint?: string; key?: string; danger?: boolean; sub?: string; run: () => void }
   const newTabIn = (w: WorkspaceView | null): Action[] => [
-    { label: 'Shell', icon: 'terminal', hint: w?.id === ws?.id ? '⌘T' : undefined, run: () => newTab('shell', undefined, w) },
+    { label: 'Shell', icon: 'terminal', hint: w?.id === ws?.id ? kh('newTab') : undefined, run: () => newTab('shell', undefined, w) },
     ...(view?.presets ?? []).filter(p => !p.off).map(p => ({ label: p.name, icon: 'agent', sub: p.agent === 'command' ? 'Command' : [AGENT_NAMES[p.agent], p.model].filter(Boolean).join(' · '), run: () => newTab(p.name, undefined, w) }) as Action),
     { label: 'Command…', icon: 'terminal', run: () => (w && setWsId(w.id), setDialog('custom')) }, // the dialog is for the selected one
   ]
@@ -2352,7 +2409,7 @@ export function App() {
         ...(ws.kind === 'worktree'
           ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(ws) } as Action]
           : []),
-        ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: '⌘L', run: () => sendLater() } as Action] : []),
+        ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: kh('later'), run: () => sendLater() } as Action] : []),
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
         ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
         { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
@@ -2364,12 +2421,14 @@ export function App() {
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
-      { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : '⌘N', run: () => newIn(p) },
+      { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : kh('newWs'), run: () => newIn(p) },
       ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', run: () => setDialog({ project: p.id }) } as MenuItem]),
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
+      { label: 'Color', icon: 'palette', items: [{ colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) }] },
+      ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
       ...(p.kind ? [] : sortItems(p.sort ?? 'manual', sort => call('projectSet', { id: p.id, sort: sort ?? 'manual' }))),
       null,
       ...(p.kind ? [] : [{ label: 'Settings', icon: 'settings', key: 's', run: () => setDialog({ project: p.id, tab: 'settings' }) } as MenuItem]), // its page's Settings tab; Terminals and Browsers have none
@@ -2382,37 +2441,37 @@ export function App() {
   const palette: PaletteItem[] = useMemo(() => {
     const items: PaletteItem[] = []
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
-    if (ws) a({ label: 'Find files…', icon: 'search', hint: '⌘P', run: () => setDialog('files') }) // first: it opens a search of its own
-    for (const w of order) items.push({ label: wsName(w), hint: [w.branch || 'folder', prNum(w), 'workspace'].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
+    if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') }) // first: it opens a search of its own
+    for (const w of order) items.push({ label: wsName(w), hint: [w.branch || 'folder', prNum(w), 'workspace'].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
-      if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
+      if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
     }
-    a({ label: 'Next tab that needs you', icon: 'bell', hint: '⌘J', run: nextNeed })
+    a({ label: 'Next tab that needs you', icon: 'bell', hint: kh('next'), run: nextNeed })
     for (const { w, m } of extMenus('palette', ws)) a({ label: `${w.name}: ${m.title}`, icon: 'panel', hint: m.key ? keyText(m.key) : 'extension', run: () => void extRun(w, m, hereCtx()) })
-    a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: '⌘⇧⏎', run: () => toggleFull() })
+    a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: kh('full'), run: () => toggleFull() })
     if (aiOn(settings)) a({ label: 'Ask Laki AI later…', icon: 'timer', run: () => sendLater('ai') })
     if (aiOn(settings) && settings.ai?.float !== false && aiDock) a({ label: 'Float the Laki AI button again', icon: 'popOut', run: () => dock(false) }) // minimized: where no status bar shows it too
-    if (ws?.storage) a({ label: gallery === ws.id ? 'Hide artifacts' : 'Show artifacts', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts })
+    if (ws?.storage) a({ label: gallery === ws.id ? 'Hide artifacts' : 'Show artifacts', icon: 'image', hint: kh('artifacts'), run: toggleArtifacts })
     for (const race of new Set(live.flatMap(w => (w.race ? [w.race] : [])))) {
       const w = live.find(w => w.race === race)!
       a({ label: `Compare the race: ${wsName(w).replace(/-[^-]+$/, '')}`, icon: 'race', run: () => setDialog({ compare: race }) })
     }
-    a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
+    a({ label: 'New workspace', icon: 'plus', hint: kh('newWs'), run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'New terminal (in your home folder)', icon: 'terminal', run: () => quickNew('shells') })
     a({ label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
     a({ label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
     a({ label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
-    a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
+    a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     if (!achKept.off) a({ label: 'Achievements: what to try next', icon: 'trophy', run: () => setDialog('achievements') })
-    if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
-    if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
+    if (specsOn) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
+    if (flowsOn) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
     // Run workflow: each one, in the selected workspace (none, or one it can't run in: the Run sheet asks)
-    const flowWs = settings.workflows === true && ws && flowMenu(ws).length ? ws : undefined
-    if (settings.workflows === true) for (const f of flowWs ? flowsHere(flowWs) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: flowWs ? wsName(flowWs) : 'workflow', run: () => runFlow(f, flowWs?.id) })
+    const flowWs = flowsOn && ws && flowMenu(ws).length ? ws : undefined
+    if (flowsOn) for (const f of flowWs ? flowsHere(flowWs) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: flowWs ? wsName(flowWs) : 'workflow', run: () => runFlow(f, flowWs?.id) })
     if (settings.birdView !== false) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
     if (settings.calendar === true) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
     if (settings.desk !== false) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
@@ -2424,11 +2483,11 @@ export function App() {
     a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     if (aiOn(settings)) a({ label: 'New extension…: make one with Laki AI in the studio', icon: 'plus', run: () => setDialog({ studio: '' }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
-    a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
+    a({ label: 'Help: keys and commands', icon: 'help', hint: kh('help'), run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
     a({ label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
     a({ label: 'Expand all projects', icon: 'chevron', run: () => setFolded([]) })
-    a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
+    a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: kh('sidebar'), run: () => setSideOpen(o => !o) })
     a({ label: video ? 'Another YouTube video…' : 'Watch a YouTube video…', icon: 'youtube', run: () => setDialog('video') })
     if (video) a({ label: 'Close the video', icon: 'x', run: () => setVideo(null) })
     const ticking = timers.filter(t => t.then !== 'remind').length // reminders stay
@@ -2451,10 +2510,10 @@ export function App() {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
-      a({ label: 'Files', icon: 'file', hint: '⌥⌘B', run: () => showPanel('files') })
+      a({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
       if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
       if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
-      a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => showInfo(true) })
+      a({ label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) })
       if (tab) a({ label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
       if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
       a({ label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
@@ -2462,8 +2521,8 @@ export function App() {
       for (const k of ws.scripts ?? []) a({ label: `Run the ${k} script`, icon: SCRIPT_ICONS[k], run: () => runScript(ws, k) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
-      if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: closePreview })
-      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : '⌘W', run: () => closeTabs([tab]) })
+      if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: kh('closeTab'), run: closePreview })
+      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : kh('closeTab'), run: () => closeTabs([tab]) })
       if (ws.pr) a({ label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
       for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
       if (project && !project.kind) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
@@ -2539,13 +2598,14 @@ export function App() {
     const state = more ? rollup(wt) : 'idle' // the second line's
     const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
     const pct = status ? Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)) : -1
+    const pc = projOf(w)?.color // its bar's color where it has none of its own (styles.css' --ws-bar)
     const yes = prMarks(w.pr)
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     return (
       <div
         key={w.id}
         className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${rows.at('ws', w.id)}`}
-        style={{ ...colorVar(w.color), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
+        style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
         data-group={pin ? 'pinned' : w.project}
@@ -2587,12 +2647,18 @@ export function App() {
             <Icon name="race" size={11} />
           </span>
         )}
+        {w.codespace !== undefined && ( // a cloud workspace: its codespace's state, unless it's on
+          <span className={`ws-sched ws-cs ${w.csState === 'Failed' ? 'bad' : ''}`} data-tip={`Codespace ${w.codespace || '(being made)'}: ${csWord(w.csState)}${w.csError ? ` · ${w.csError}` : ''}`}>
+            <Icon name="cloud" size={11} />
+            {w.csState !== 'Available' && csWord(w.csState)}
+          </span>
+        )}
         {w.schedule && (
           <span className="ws-sched">
             <Icon name="clock" size={11} />
           </span>
         )}
-        {w.flow && settings.workflows === true && (
+        {w.flow && flowsOn && (
           <span className="ws-sched" data-tip={(f => (f ? `Workflow ${f.name}: ${f.status}${f.block ? ` · ${f.block}` : ''}` : 'From a workflow run'))(view.flows?.find(f => f.id === w.flow))}>
             <Icon name="flow" size={11} />
           </span>
@@ -2684,7 +2750,7 @@ export function App() {
       w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
     ].filter(Boolean)
     return (
-      <div className="ws-peek" ref={peekBox} style={{ top: peek!.top, left: peek!.left, ...colorVar(w.color) }} onPointerEnter={() => clearTimeout(peekTimer.current)} onPointerLeave={() => peekAt()}>
+      <div className="ws-peek" ref={peekBox} style={{ top: peek!.top, left: peek!.left, ...colorVar(tint(w)) }} onPointerEnter={() => clearTimeout(peekTimer.current)} onPointerLeave={() => peekAt()}>
         <div className="wp-head">
           <Glyph s={st} />
           <b>{wsName(w)}</b>
@@ -2810,11 +2876,15 @@ export function App() {
   // the tabs: in the top bar (the default), or a strip of their own under the terminals or beside them (Settings ›
   // Appearance; a phone keeps them on top)
   const tabsAt = (!narrow && (['bottom', 'left', 'right'] as const).find(x => x === settings.tabsAt)) || 'top' // an unknown value: top
+  const ctxLook = settings.contextMeter === false ? undefined : settings.contextMeter === 'ring' || settings.contextMeter === 'status' ? settings.contextMeter : 'line' // Settings › Appearance: the context meter, and how its tab shows it
+  const ctxOn = !!ctxLook
+  const costsOn = settings.costs !== false // and what agents used
   const tabList = (
     <>
       {groups.map(g => {
         const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
         const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
+        const ctx = ctxOn ? ts.flatMap(t => t.context ?? []).sort((a, b) => ctxPct(b) - ctxPct(a))[0] : undefined // a split's: the fullest
         return (
           <div
             key={ts[0]?.id}
@@ -2825,7 +2895,7 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -2842,25 +2912,25 @@ export function App() {
               </span>
             )}
             {queued > 0 && <span className="badge">+{queued}</span>}
-            <button className="x" data-tip="Close (⌘W)" aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} style={{ width: `${ctxPct(ctx)}%` }} />}
+            {ctx && ctxLook === 'ring' && <Ring p={ctxPct(ctx)} />}
+            <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
               <Icon name="x" size={10} />
             </button>
           </div>
         )
       })}
-      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N)" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title="New browser tab (⌘T)" className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
+      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N)" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
     </>
   )
   const schedTip = nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'
   const toSchedules = () => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))
   const toBoard = () => setDialog(d => (d === 'board' ? null : 'board'))
-  const specsOn = settings.specs === true // experimental: Settings › General
   const toSpecs = () => setDialog(d => (specsOf(d) ? null : { specs: '' }))
-  const SPECS_TIP = 'Specs & Brainstorms (experimental): requirements to implement, ideas to explore with Laki AI'
-  const flowsOn = settings.workflows === true // experimental: Settings › General
+  const SPECS_TIP = 'Specs & Brainstorms: requirements to implement, ideas to explore with Laki AI'
   const toFlows = () => setDialog(d => (flowsOf(d) ? null : { workflows: '' }))
   const flowsAsk = (view?.flows ?? []).filter(r => r.status === 'waiting').length
-  const FLOWS_TIP = `Workflows (experimental): blocks Laki runs for a task${flowsAsk ? ` · ${flowsAsk} ask${flowsAsk > 1 ? '' : 's'} you` : ''}`
+  const FLOWS_TIP = `Workflows: blocks Laki runs for a task${flowsAsk ? ` · ${flowsAsk} ask${flowsAsk > 1 ? '' : 's'} you` : ''}`
   const calOn = settings.calendar === true // experimental: Settings › General
   const toCal = () => setDialog(d => (d === 'calendar' ? null : 'calendar'))
   const calSoon = (view?.reminders ?? []).filter(r => !r.done && r.fired).length // rung, not ticked off
@@ -2880,7 +2950,7 @@ export function App() {
     const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, todos: !todosOn, desk: !deskOn, ai: !aiOn(settings), device: !(view.projects.find(p => p.id === ws?.project)?.config?.simulator ?? settings.simulator === true) }
     const at = k === 'panel' ? arg : k // the Simulator tab: off unless Settings › Simulators (or the project's own) turns it on
     setDialog(null)
-    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: at === 'desk' ? 'Pages' : 'Experimental' })
+    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: ['desk', 'workflows', 'specs'].includes(at) ? 'Pages' : 'Experimental' })
     else if (k === 'project') void openProject()
     else if (k === 'new') view.projects.some(p => !p.kind) ? newWs() : void openProject()
     else if (k === 'shells' || k === 'browsers') void quickNew(k)
@@ -2928,13 +2998,14 @@ export function App() {
     const mine = view.tabs.filter(t => t.workspace === w.id)
     const n = mine.filter(needsYou).length
     const k = rawKind(w)
-    const tip = `${wsName(w)}${k === 'projects' ? ` · ${view.projects.find(p => p.id === w.project)?.name ?? ''}` : ''}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : ''} · right click: its menu`
+    const tip = `${wsName(w)}${k === 'projects' ? ` · ${projWords(w)}` : ''}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : ''} · right click: its menu`
     // never lit as the open one: its kind's button above is, and the list shows the row; a mouse click lets go of the
     // focus (a key pressed later would ring it, :focus-visible), Enter or Space keeps a keyboard user's place
     return (
       <button key={`pin:${w.id}`} type="button" className="rail-kind rail-pin nodrag" aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
-        <span className="rail-icon" style={colorVar(w.color)}>
+        <span className="rail-icon" style={colorVar(tint(w))}>
           {k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
+          {k === 'projects' && <ProjectMark p={projOf(w)} size={11} /> /* its project's, at the corner */}
           {n > 0 ? <span className="rail-count">{n}</span> : mine.some(t => spins(t)) && <span className="rail-dot" />}
         </span>
         {railWords && <span className="rail-label">{wsName(w)}</span>}
@@ -2992,8 +3063,8 @@ export function App() {
   const histAt = hist.current
   const histNav = historyOn && (
     <span className="hist-nav nodrag">
-      <IconButton icon="chevronLeft" title={histAt.at[histAt.i - 1] ? `Back to ${placeName(histAt.at[histAt.i - 1])} (⌘[; right click: more)` : 'Back (⌘[)'} disabled={histAt.i < 1} onClick={() => travel(histAt.i - 1)} onContextMenu={e => histMenu(e, -1)} />
-      <IconButton icon="chevronRight" title={histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])} (⌘])` : 'Forward (⌘])'} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
+      <IconButton icon="chevronLeft" title={kt(histAt.at[histAt.i - 1] ? `Back to ${placeName(histAt.at[histAt.i - 1])}; right click: more` : 'Back', 'back')} disabled={histAt.i < 1} onClick={() => travel(histAt.i - 1)} onContextMenu={e => histMenu(e, -1)} />
+      <IconButton icon="chevronRight" title={kt(histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])}` : 'Forward', 'forward')} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
     </span>
   )
   // the rail's pages after Projects, then the other kinds; with words under the icons and more than RAIL_FIT buttons,
@@ -3049,7 +3120,7 @@ export function App() {
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
       {aiOn(settings) && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
-      {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
+      {railButton('settings', 'gear', 'Settings', settingsOf(dialog), kt('Settings', 'settings'), toSettings)}
     </nav>
   )
   // the rail's list: its kind's (a filter looks through all of them)
@@ -3067,14 +3138,14 @@ export function App() {
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
       <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
         <div className="side-head drag">
-          <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
+          <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} onClick={() => setSideOpen(false)} />
           {!railBar && histNav}
           <span className="spacer" />
           <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
           {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
           {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
-          <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
+          <IconButton icon="help" title={kt('Help: keys and commands', 'help')} on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
         </div>
         {find && (
           <div className="side-find">
@@ -3123,7 +3194,7 @@ export function App() {
                   <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
                 </span>
                 <span className="project-icon">
-                  <Icon name={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
+                  <ProjectMark p={p} or={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} />
                 </span>
                 <span className="project-name">{p.name}</span>
                 {shut && mine.length > 0 && (
@@ -3200,7 +3271,7 @@ export function App() {
           {!rail && (
             <>
               <span className="spacer" />
-              <IconButton icon="gear" title="Settings (⌘,)" label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
+              <IconButton icon="gear" title={kt('Settings', 'settings')} label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
             </>
           )}
         </div>
@@ -3209,13 +3280,13 @@ export function App() {
       {sideOpen && !listOff && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
 
       <main className="main">
-        {full && <IconButton icon="minimize" title="Exit full screen (⌘⇧⏎)" className="full-exit" onClick={() => toggleFull(false)} />}
+        {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <div className="tabbar drag" data-tabbar>
-          {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
+          {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" />
-          {ws && <IconButton icon="maximize" title="Full screen: just this tab (⌘⇧⏎)" className="nodrag" onClick={() => toggleFull(true)} />}
+          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
@@ -3504,7 +3575,7 @@ export function App() {
           </Suspense>
         ))(aiOn(settings) ? studioOf(dialog) : undefined)}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
-        {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
+        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
@@ -3671,6 +3742,7 @@ export function App() {
               },
               add: (project, text, images) => call('todoAdd', { project, text, images }),
               saveImage: (data, ext) => api.call<string>('imageSave', { data, ext }),
+              saveFile: (data, name) => api.call<string>('fileSave', { data, name }),
               rm: id => call('todoRm', { id }),
               menu: (e, w) =>
                 openMenu(e, [
@@ -3717,7 +3789,7 @@ export function App() {
               set: s => api.call('scheduleSet', s),
               rm: id => api.call('scheduleRm', { id }),
               run: id => api.call('scheduleRun', { id }),
-              flows: settings.workflows === true ? () => api.call('flowList', {}) : undefined,
+              flows: flowsOn ? () => api.call('flowList', {}) : undefined,
               open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),
               pick: async () => {
                 const path = bridge ? await bridge.pickFolder() : prompt('The folder’s full path') // a browser has no folder picker
@@ -3808,9 +3880,18 @@ export function App() {
         ))(view.workspaces.find(x => x.id === artView.ws))}
         {(ws?.browser === undefined || !connected) && ( // a browser page: none, unless something's wrong
         <div className="status">
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} /> /* remounts as agents are turned on or off */}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {ws && ws.browser === undefined && ( // a page: no port, branch or folder of its own
             <>
+              {ctxOn && tab?.context && (
+                // the focused tab's context: how full, so you compact or start a new chat in time
+                <span className="sb-ctx" data-tip={`${tab.name}'s context: ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
+                  <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
+                    <i style={{ width: `${ctxPct(tab.context)}%` }} />
+                  </span>
+                  {ctxPct(tab.context)}%
+                </span>
+              )}
               {git && (
                 // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
                 <button
@@ -3821,6 +3902,17 @@ export function App() {
                   <Icon name="fork" size={11} />
                   {branchFull ? ws.branch : shortBranch(ws.branch)}
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
+                </button>
+              )}
+              {ws.codespace !== undefined && (
+                // a cloud workspace: its codespace and its state (why it failed, cut: all of it on hover)
+                <button className="sb-flow" data-status={ws.csState === 'Failed' ? 'failed' : ws.csState === 'Available' ? undefined : 'waiting'} data-tip={`Codespace ${ws.codespace || '(being made)'}: ${csWord(ws.csState)}${ws.csError ? ` · ${ws.csError}` : ''} · click: your codespaces on GitHub`} onClick={() => openExternal('https://github.com/codespaces')}>
+                  <span className="sb-flow-icon">
+                    <Icon name="cloud" size={12} />
+                  </span>
+                  <span className="sb-flow-name">
+                    codespace<span className="muted"> · {csWord(ws.csState)}{ws.csState === 'Failed' && ws.csError ? `: ${ws.csError}` : ''}</span>
+                  </span>
                 </button>
               )}
               {(pj =>

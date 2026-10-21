@@ -1,4 +1,4 @@
-// Workflows (experimental: Settings › General; the rail's Workflows, ⌘K): an index like Scheduled tasks (the workflows,
+// Workflows (off only by Settings › General › Pages; the rail's Workflows, ⌘K): an index like Scheduled tasks (the workflows,
 // yours and each project's, and their runs), then one workflow or one run on a page of its own, breadcrumbs back. A
 // workflow opens on a canvas (blocks dragged where they go, exits as arrows) with an inspector for the picked block, or
 // as its Markdown file; both edit the same text (shared/workflow.ts parse/toFile). A run opens on the same canvas, lit
@@ -154,7 +154,6 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
       {at.kind !== 'index' && <span className="crumb-sep">›</span>}
       {at.kind === 'wf' && <b className="crumb here">{cur?.name ?? at.sel.id}</b>}
       {at.kind === 'run' && <b className="crumb here">{run ? `${run.name} · ${run.task || 'a run'}` : 'A run'}</b>}
-      <span className="wf-beta">experimental</span>
     </nav>
   )
 
@@ -346,7 +345,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
           )}
         </div>
       )}
-      {starting && <StartRun item={starting} projects={projects} workspaces={view.workspaces} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
+      {starting && <StartRun item={starting} projects={projects} presets={presets} workspaces={view.workspaces} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
       {menu}
     </Page>
   )
@@ -1068,7 +1067,7 @@ function FileEdit({ text, onText }: { text: string; onText: (t: string) => void 
 
 const FORMAT_HELP =`\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 · perm: acceptEdits · when done: keep · on: pr.merged\` (perm: its agent blocks' permission mode unless one says its own; when done: archive, a worktree run's default, archives the worktree a done run made when it's clean, keep keeps it; on: an event that starts a run by itself, its fields as \`{{event.…}}\`; optional).
 
-A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<block> · json: yes\` (perm: how freely it acts, unset the workflow's, else the agent's own, which asks; JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`popover: yes\`, \`modal: no\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown; a corner card; a macOS notification), \`end: success|stopped|failed · notify: yes · popover: yes · modal: yes · phone: yes\` (its \`>\` lines: what they say; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
+A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<block> · json: yes\` (perm: how freely it acts, unset the workflow's, else its profile's, else the agent's own, which asks; fast: unset, its profile's; JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`popover: yes\`, \`modal: no\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown; a corner card; a macOS notification), \`end: success|stopped|failed · notify: yes · popover: yes · modal: yes · phone: yes\` (its \`>\` lines: what they say; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 
 \`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`retry: 2\` on an agent, run, llm, decide or extension block tries it again after a fail or an error (10 s, then 60 s), before it goes that way; a run block's \`retry on: 1, 75\`: only those exit codes. \`at: x,y\`: where it's drawn.
 
@@ -1149,9 +1148,11 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
     <Typed area={area} rows={area ? 5 : undefined} value={v ?? ''} placeholder={ph} onText={t => set(x => f(x, t))} />
   const agents = wf.blocks.filter(x => x.kind === 'agent' && x.id !== b.id)
   // an agent block's: its preset's agent, its permission modes, the workflow's as it applies to it
-  const ag = (presets.find(p => p.name === (b.agent ?? 'claude'))?.agent ?? b.agent ?? 'claude') as Agent
+  const prof = presets.find(p => p.name === (b.agent ?? 'claude'))
+  const ag = (prof?.agent ?? b.agent ?? 'claude') as Agent
   const perms = PERMS[ag] ?? []
   const wfPerm = perms.length ? permWords(wf.perm, false, ag) : ''
+  const profPerm = perms.length ? permWords(prof?.perm, false, ag) : '' // the profile's, when the block and the workflow say none
   return (
     <div className="wf-insp">
       <div className="wf-insp-head" style={{ ['--kc' as string]: `var(--tc-${KIND_COLOR[b.kind]})` }}>
@@ -1197,17 +1198,17 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
             field(
               'How freely it acts',
               <select value={b.perm ?? ''} onChange={e => set(x => void (x.perm = e.target.value || undefined))}>
-                <option value="">{wfPerm ? `The workflow’s: ${wfPerm}` : 'The agent’s own: it asks first'}</option>
+                <option value="">{wfPerm ? `The workflow’s: ${wfPerm}` : profPerm ? `Its profile’s: ${profPerm}` : 'The agent’s own: it asks first'}</option>
                 {perms.map(([id, label, sub]) => (
                   <option key={id} value={id}>{label}: {sub}</option>
                 ))}
                 {b.perm && !perms.some(p => p[0] === b.perm) && <option value={b.perm}>{b.perm}? ({ag} hasn’t it)</option>}
               </select>,
-              permOf(wf, b, ag) === 'bypassPermissions' ? 'Never asks: an agent can’t start this workflow, only you' : 'Unattended, an agent that asks waits for you. Blocks sharing its tab need the same.',
+              (permOf(wf, b, ag) ?? prof?.perm) === 'bypassPermissions' ? 'Never asks: an agent can’t start this workflow, only you' : 'Unattended, an agent that asks waits for you. Blocks sharing its tab need the same.',
             )}
           {(FAST[ag] || b.fast) && (
             <Switch className="switch-row" on={!!b.fast} onChange={v => set(x => void (x.fast = v || undefined))}>
-              Fast mode: more speed, more usage
+              Fast mode: more speed, more usage{!b.fast && prof?.fast ? ' (on in its profile)' : ''}
             </Switch>
           )}
           {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? AGENT_TIMEOUT} onText={v => set(x => void (x.timeout = Number(v) && Number(v) !== AGENT_TIMEOUT ? Number(v) : undefined))} />, 'No answer by then: Esc, and its error way. Time it waits for you doesn’t count; silent 10 min, Laki checks in once, then asks you')}
@@ -1868,7 +1869,7 @@ function TestBlock({ b, api, project, own }: { b: Block; api: WorkflowsApi; proj
 }
 
 // fixed: the workspace it runs in (its ⋯ › Run workflow, ⌘K); runs in: here without one picks it here
-function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; workspaces: WorkspaceView[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
+function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; workspaces: WorkspaceView[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
   const fix = workspaces.find(w => w.id === fixed)
   const ok = projects.filter(p => !p.host && (item.source !== 'project' || p.id === item.project) && (item.where !== 'worktree' || p.git !== false || p.id === fix?.project))
   const [project, setProject] = useState(fix?.project ?? item.project ?? ok[0]?.id ?? '')
@@ -1888,7 +1889,7 @@ function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }
     api.call<{ branches: string[] }>('branches', { project }).then(r => setBranches(r.branches), () => setBranches([]))
   }, [project])
   const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
-  const never = bypassIn(item).map(blockName) // ponytail: a preset's agent unknown here: the workflow's perm counts for it
+  const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
   const go = () => {
     setBusy(true)
     setErr('')

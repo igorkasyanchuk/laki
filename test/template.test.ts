@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { webmail, browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize, wavOf } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prRef, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -21,6 +21,14 @@ test("prompt templates: a project's first, replacing a global one of its name", 
   assert.deepEqual(templatesFor(global, [{ name: ' fix', text: 'p fix' }, { name: 'ship', text: 'p ship' }]).map(t => t.text), ['p fix', 'p ship', 'g review'])
   assert.deepEqual(templatesFor(global), global)
   assert.deepEqual(templatesFor(undefined, global), global)
+})
+
+test("a prompt's attachments: each path on a line after the text, quoted when it has a space, a quote or a backslash", () => {
+  const img = '/Users/me/.laki/images/1-ab12cd.png'
+  const doc = '/Users/me/.laki/files/2-ef34ab/Q3 report "final".pdf'
+  assert.equal(withPaths(' look at these ', [img, doc, "/x/it's.txt"]), `look at these\n\n${img}\n"/Users/me/.laki/files/2-ef34ab/Q3 report \\"final\\".pdf"\n"/x/it's.txt"`)
+  assert.equal(withPaths('', [img]), img)
+  assert.equal(withPaths(' just text ', []), 'just text')
 })
 
 test('short paths for the status bar', () => {
@@ -280,4 +288,37 @@ test("Voice's recording as WAV: a 44-byte header, then 16-bit samples, clipped",
   assert.equal(d.getUint32(40, true), 8)
   assert.deepEqual([0, 1, 2, 3].map(i => d.getInt16(44 + i * 2, true)), [0, 32767, -32767, 32767])
   assert.deepEqual(importable({ voice: 'cloud' }).bad, ['voice'])
+})
+
+test('a plan limit at 90%: told as it crosses, once per window per reset, again after the reset', () => {
+  const H = 3600_000
+  const now = Date.UTC(2026, 9, 21, 12)
+  const row = (used: number, resets = now + 2 * H, more = {}) => ({ agent: 'claude', at: now, account: 'home', name: 'Default', windows: [{ label: '5-hour', used, resets }, { label: 'Extra usage', used: 99, note: '$99 of $100/mo' }], ...more })
+  let told: Record<string, number> = {}
+  const read = (last: Record<string, number>, used: number, resets?: number, t = now) => limitsCrossed([row(used, resets)], 90, last, told, t)
+  // below, then past it: one hit (the note's window is no limit)
+  let r = read({}, 80)
+  assert.deepEqual(r.hits, [])
+  r = read(r.seen, 92)
+  assert.deepEqual(r.hits.map(h => [h.id, h.used]), [['claude:home:5-hour', 92]])
+  told = { [r.hits[0].id]: r.hits[0].w.resets! }
+  // still past it: nothing; a reload (no last reading) told already for this reset, its time a few seconds off: nothing
+  assert.deepEqual(read(r.seen, 95).hits, [])
+  assert.deepEqual(read({}, 95, now + 2 * H + 5000).hits, [])
+  // the reset passed: 0 (the last reading's numbers until the daemon reads again), then a new window crossing again
+  r = read(r.seen, 95, now - 1, now + H)
+  assert.deepEqual(r.hits, [])
+  assert.equal(r.seen['claude:home:5-hour'], 0)
+  r = read(r.seen, 91, now + 5 * H, now + H)
+  assert.equal(r.hits.length, 1)
+  // as the app opens, already past it and not told for this reset: told once
+  told = {}
+  assert.equal(read({}, 97).hits.length, 1)
+  // another account is another window; its name only when the agent has several
+  const two = [row(50), row(93, now + 2 * H, { account: 'a1', name: 'Work' })]
+  const hits = limitsCrossed(two, 90, { 'claude:home:5-hour': 50, 'claude:a1:5-hour': 80 }, {}, now).hits
+  assert.deepEqual(hits.map(h => h.id), ['claude:a1:5-hour'])
+  assert.match(limitText(hits[0], two, now), /^Claude Code · Work · 5-hour limit at 93% · resets \S/)
+  assert.match(limitText(hits[0], [two[1]], now), /^Claude Code · 5-hour limit at 93%/)
+  assert.equal(limitsCrossed(two, 95, {}, {}, now).hits.length, 0) // the threshold
 })

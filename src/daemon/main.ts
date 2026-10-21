@@ -207,6 +207,7 @@ const api: Record<string, Handler> = {
   projectFile: p => core.projectFileConfig(p.id),
   projectTrust: p => core.projectTrust(p),
   branches: p => core.branches(p.project),
+  csMachines: p => core.csMachines(p),
   wsNew: p => core.wsNew(core.byCaller(p)),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
@@ -251,6 +252,7 @@ const api: Record<string, Handler> = {
   wsSet: p => core.wsSet(p),
   reorder: p => core.reorder(p),
   imageSave: p => core.imageSave(p),
+  fileSave: p => core.fileSave(p),
   prFix: p => core.prFix(p), // { ws, what, job? }: job: only that check's
   prLog: p => core.prLog(p), // { ws, job }: a failing check's log, its steps named (Info's Log)
   logs: p => core.logs(p), // development mode's: ws:<id> or widget:<id>
@@ -392,7 +394,7 @@ const api: Record<string, Handler> = {
   noteFile: p => noteFile(p),
   todoListGet: () => todoListGet(), // To-dos (experimental): notes.ts
   todoListSave: p => todoListSave(p),
-  planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
+  planList: p => planList(p), // specs and brainstorms: plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),
   planSave: p => planSave(p),
@@ -404,7 +406,7 @@ const api: Record<string, Handler> = {
     planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
     aiForget(chat)
   },
-  flowList: p => flowList(p), // workflows (experimental): workflow.ts
+  flowList: p => flowList(p), // workflows: workflow.ts
   flowSave: ({ caller, ...p }) => flowSave(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's tab: marked, never trusted
   flowTrust: ({ caller, ...p }) => { // the editor's Allow: a project's workflow as the sheet showed it; never an agent's (it'd let its own file run)
     if (core.agentCaller(caller)) throw new Error("an agent can't trust a workflow: it's the user's (ask them)")
@@ -569,7 +571,7 @@ function refusedWs(who: string) {
   }, 60000).unref()
 }
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: 32 << 20 }) // a pasted 20 MB image, in base64
+const wss = new WebSocketServer({ noServer: true, maxPayload: 34 << 20 }) // an attached 25 MB file (fileSave), in base64. ponytail: /rpc stays at 16 MB: the app's own go over the socket
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
@@ -653,6 +655,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(2000, core.shellTick)
   every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
+  every(Number(process.env.LAKI_METER_MS || 10000), core.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))
   every(30000, () => core.scheduleTick())

@@ -11,12 +11,14 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, answerOk, ANSWER_WHY, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, jobOf, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, againOnEnter, type Agent, AGENT_NAMES, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Check, type Doctor, EFFORTS, bypassArgs, FAST, FILE_MAX, fillTemplate, fillVars, type FixWhat, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, jobOf, type Link, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, MERGE_METHODS, type MergeMethod, permArgs, permInArgs, PERMS, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRFix, prIn, type PRLabel, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, refsIn, type Reminder, REMINDERS_MAX, type Remote, REMOTE, REMOTE_TRIES, type Resources, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Schedule, type ScheduleRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type Stat, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type Today, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
+import { emojiOf, isIconName } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
-import { chatOf, redact, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
+import { chatOf, dayOf, type Meter, meterNew, meterOf, redact, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
+import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { pushTo, replies } from './push.ts'
@@ -131,6 +133,7 @@ export function load() {
     else delete state.widgetGrants![ws]
   }
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
+  for (const w of state.workspaces) if (w.csState === 'Creating') Object.assign(w, { csState: 'Failed', csError: 'Laki stopped while gh made it: delete this workspace (gh codespace list says whether one was left)' }) // csMake's, gone with it
   const hook = state.settings?.webhook
   if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
@@ -495,10 +498,10 @@ export function view(): View {
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)) }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
-    projects: state.projects.map(p => (h => (h ? { ...p, cfgWait: h } : p))(!p.kind && cfgWait(p))),
+    projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
@@ -517,9 +520,10 @@ export function view(): View {
     widgets: widgetsView(),
     widgetHome: widgetHome(),
     imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
-    ...(state.settings?.workflows === true && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
+    ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
     api: API,
     built: BUILT,
+    today: todayView(),
   }
 }
 
@@ -775,8 +779,14 @@ function slugActions(first?: RunAction[]) {
   for (const l of order) for (const a of l) if (a && typeof a === 'object') a.slug = actionSlug(String(a.slug || a.name || ''), taken)
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[] }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string }) {
   const p = findProject(ref)
+  // its color (TAB_COLORS') and icon (an ICONS name or an emoji): '' (a color's none too) clears it; anything else is
+  // refused before any change
+  if (o.color !== undefined && !['', 'none', ...TAB_COLORS].includes(o.color)) throw new Error(`${o.color} isn't a color: one of ${TAB_COLORS.join(', ')}`)
+  if (o.icon !== undefined && o.icon !== '' && !isIconName(o.icon) && !emojiOf(o.icon)) throw new Error("a project's icon is an icon's name or an emoji")
+  if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
+  if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   if (o.name?.trim()) p.name = o.name.trim()
   if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
@@ -975,7 +985,7 @@ function mac() {
 }
 const ctlOf = (host: string) => join(dir, 'ssh', createHash('sha1').update(host).digest('hex').slice(0, 16)) // a socket's path: short
 // ServerAlive: one that connects by itself (the master just gone) still ends when the network does
-const sshOpts = (host: string) => ['-S', ctlOf(host), '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4']
+const sshOpts = (host: string) => [...cs.sshF(), '-S', ctlOf(host), '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4']
 // a tab's own connection: sshd takes 10 sessions per connection (MaxSessions), which tabs on the master would use up
 const TAB_SSH = ['-o', 'ControlPath=none', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', '-o', 'LogLevel=ERROR', '-tt'] // LogLevel: no "Connection … closed."
 
@@ -1016,12 +1026,14 @@ export function hostUp(host: string): Promise<HostRun> {
 }
 
 async function connect(host: string): Promise<HostRun> {
+  const cloud = state.workspaces.find(w => w.host === host && w.codespace !== undefined)
+  if (cloud) await csUp(cloud) // made (minutes: its tabs wait here), running, its Host entry there
   const ctl = ctlOf(host)
   mkdirSync(dirname(ctl), { recursive: true, mode: 0o700 })
   await run('ssh', ['-S', ctl, '-O', 'exit', host], { timeout: 5000 }).catch(() => {}) // one a crashed daemon left
   const mine = hosts.get(host) // this connection's (hostUp set it before the first await)
   let up = false
-  const master = spawn('ssh', ['-M', '-N', '-S', ctl, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', host], { stdio: ['ignore', 'ignore', 'pipe'] })
+  const master = spawn('ssh', ['-M', '-N', ...cs.sshF(), '-S', ctl, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', host], { stdio: ['ignore', 'ignore', 'pipe'] })
   own(master, `SSH · ${host}`)
   let err = ''
   let gone = false
@@ -1031,7 +1043,8 @@ async function connect(host: string): Promise<HostRun> {
   master.on('exit', () => {
     if (!up) return // connect's own failure: hostUp keeps it 10 s
     log(`ssh ${host}: disconnected`)
-    if (hosts.get(host) === mine) hosts.delete(host) // the next use connects again
+    if (hosts.get(host) === mine) hosts.delete(host), live.delete(host) // the next use connects again
+    if (cloud) void csRefresh() // stopped (its idle timeout), or the network went
   })
   try {
     for (let i = 0; !(await run('ssh', ['-S', ctl, '-O', 'check', host], { timeout: 5000 }).then(() => true, () => false)); i++) {
@@ -1047,6 +1060,7 @@ async function connect(host: string): Promise<HostRun> {
     await sshIn(host, 'sh -s', hostFiles(h.dir))
     if (master.exitCode !== null || master.signalCode !== null) throw new Error(sshSays(host, err || 'disconnected'))
     up = true
+    live.add(host)
     for (const w of state.workspaces) if (w.host === host && !w.archived) forward(w)
     log(`ssh ${host}: connected (${h.dir})`)
     return h
@@ -1122,7 +1136,7 @@ function hostTab(ws: Workspace, tab: Tab, o: SpawnOpts, hookKey: string) {
     `f=${q(f)}`,
     'while [ ! -e "$f.go" ]; do [ -e "$f.err" ] && { cat "$f.err"; rm -f "$f.err"; exit 255; }; sleep 0.1; done',
     'rm -f "$f.go"',
-    `exec ssh ${[...TAB_SSH, ws.host!, `exec sh "$HOME/.laki-host/${mac()}/run/${key}.sh"`].map(q).join(' ')}`,
+    `exec ssh ${[...cs.sshF(), ...TAB_SSH, ws.host!, `exec sh "$HOME/.laki-host/${mac()}/run/${key}.sh"`].map(q).join(' ')}`,
   ].join('\n')
 }
 
@@ -1135,13 +1149,17 @@ function spaced(host: string) {
   return turn
 }
 
-// pasted images and the preview's screenshots are files on this Mac: a host's agent gets copies there, by their paths
+// pasted images, attached files (fileSave's) and the preview's screenshots are files on this Mac: a host's agent gets
+// copies there, by their paths. An image by its whole path; a file by its folder, whatever its name after it (quoted,
+// with spaces), which stays the same there
 async function toHost(host: string, h: HostRun, text?: string) {
-  const images = `${join(dir, 'images')}/`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  for (const p of new Set(text?.match(new RegExp(`${images}[\\w-]+\\.[A-Za-z]+`, 'g')) ?? [])) {
-    const there = `${h.dir}/images/${basename(p)}`
+  const at = (sub: string) => `${join(dir, sub)}/`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  for (const p of new Set(text?.match(new RegExp(`${at('images')}[\\w-]+\\.[A-Za-z]+|${at('files')}[\\w-]+/`, 'g')) ?? [])) {
+    const file = p.endsWith('/')
+    const there = `${h.dir}/${file ? 'files' : 'images'}/${basename(p)}${file ? '/' : ''}`
     try {
-      await sshIn(host, `umask 077 && mkdir -p ${q(`${h.dir}/images`)} && cat > ${q(there)}`, readFileSync(p))
+      const name = file ? (readdirSync(p)[0] ?? '') : '' // fileSave's folder holds the one
+      await sshIn(host, `umask 077 && mkdir -p ${q(dirname(there + name))} && cat > ${q(there + name)}`, readFileSync(p + name))
       text = text!.split(p).join(there)
     } catch (e) {
       log(`ssh ${host}: ${p}: ${(e as Error).message}`)
@@ -1172,10 +1190,132 @@ async function readHostCfg(at: At) {
   }
   for (const p of state.projects) if (p.trusted === 'as-read' && p.host === at.host && p.path === at.path) (p.trusted = cfgHash(fileCfg(p)), save()) // from before trust (load)
 }
-// a host workspace's: its project's, never its own folder's (projectConfig; fresh: again, else only when not read yet)
+// a host workspace's: its project's, never its own folder's (projectConfig; fresh: again, else only when not read yet).
+// A cloud workspace's project is here: cfgRead reads it
 const readHostCfgs = async (ws: Workspace, fresh = true) => {
-  const path = state.projects.find(p => p.id === ws.project)?.path
-  if (path && (fresh || !hostCfg.has(`${ws.host}:${path}`))) await readHostCfg({ host: ws.host, path })
+  const p = state.projects.find(p => p.id === ws.project)
+  if (p?.host && (fresh || !hostCfg.has(`${p.host}:${p.path}`))) await readHostCfg(p)
+}
+
+// ---------- cloud workspaces (settings.cloud, experimental): a workspace of a GitHub project here that runs in a
+// Codespace, an SSH host of its own. host: Laki's name for it (codespace.ts' Host entry); path: the repo there
+// (/workspaces/<repo>), on a branch of its own off the base, as a worktree's. gh here makes it in the background
+// (wsNew answers at once, csState Creating); its tabs wait in hostTab, since connect waits for it (csUp), and print
+// why it failed. Archive stops it, Restore starts it again, Delete deletes it. ponytail: one machine type, picked as
+// it's made; no prebuilds; no .env copied (copyIncludes); ports only $PORT (forward); PRs and ship through gh on it
+
+const making = new Map<string, Promise<void>>() // by workspace: gh making its codespace
+const live = new Set<string>() // hosts with a connection up (connect)
+// one no scan should reach now: being made, stopped, not connected (a scan never wakes one, nor waits minutes for it)
+const away = (ws: Workspace) => ws.codespace !== undefined && !live.has(ws.host!)
+const csSet = (ws: Workspace, st: string, err?: string) => ((ws.csState = st), (ws.csError = err), save(), changed())
+
+// what makeWs refuses before gh
+function cloudCheck(proj: Project, o: Pick<NewWs, 'from' | 'local' | 'pr' | 'race'>) {
+  if (state.settings?.cloud !== true) throw new Error('Cloud workspaces are off: Settings › General › Experimental')
+  if (o.from) throw new Error('a codespace is yours to make, from the app: GitHub bills it') // an agent's
+  if (proj.host || proj.kind || proj.git === false) throw new Error(`a codespace needs a GitHub repository on this Mac: ${proj.name} isn't one`)
+  if (o.local || o.pr?.trim() || o.race) throw new Error("a codespace starts on a branch of its own: not Local, a PR's or a race")
+}
+const ghRepoOf = async (p: Project) => {
+  const r = cs.ghRepo(await git(p, 'remote', 'get-url', 'origin').catch(() => ''))
+  if (!r) throw new Error(`${p.name}'s origin isn't on GitHub: codespaces are GitHub's`)
+  return r
+}
+
+// the new-workspace page's machine types for a project's repo
+export async function csMachines(o: { project: string }) {
+  const p = findProject(o.project)
+  cloudCheck(p, {})
+  const repo = await ghRepoOf(p)
+  return { repo, machines: await cs.machines(repo) }
+}
+
+// a cloud workspace as makeWs pushes it, its codespace on its way (csMake); the scope, the repo and the machine
+// type asked now, not minutes later
+async function cloudNew(proj: Project, o: NewWs, base: string, step: (text: string) => void): Promise<Workspace> {
+  const repo = await ghRepoOf(proj)
+  const ms = await cs.machines(repo)
+  const machine = o.codespace?.trim() || ms[0]?.name
+  if (!machine || !ms.some(m => m.name === machine)) throw new Error(`no machine type ${machine ?? ''} for ${repo}${ms.length ? `: ${ms.map(m => m.name).join(', ')}` : ''}`)
+  const id = await uniqueWsId(slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')), proj)
+  base = base.replace(/^origin\//, '')
+  const ws: Workspace = { id, project: proj.id, path: `${cs.CS_ROOT}/${repo.split('/')[1]}`, host: `laki-cs-${id}`, branch: `${branchPrefix()}${id}`, base, kind: 'worktree', port: allocPort(), created: Date.now(), codespace: '', csState: 'Creating' }
+  step(`gh codespace create -R ${repo} -b ${base} -m ${machine}: in the background`)
+  cs.sshConfig() // its tabs' ssh lines take -F from now
+  making.set(id, csMake(ws, proj, repo, machine))
+  return ws
+}
+
+// gh makes it (minutes), it's Available, its Host entry written, its branch made there; a failure is the workspace's
+// (Failed and why: the row, the status bar, its tabs). One deleted meanwhile goes too
+async function csMake(ws: Workspace, proj: Project, repo: string, machine: string) {
+  try {
+    ws.codespace = await cs.create(proj.path, repo, ws.base, machine)
+    save()
+    changed()
+    if (!state.workspaces.includes(ws)) return void cs.remove(ws.codespace).catch(e => log(`codespace ${ws.codespace}: ${(e as Error).message}`))
+    wsLog(ws, `codespace ${ws.codespace}: made (${machine})`)
+    await cs.until(ws.codespace)
+    await cs.sshEntry(ws.codespace, ws.host!)
+    // a connection of its own: connect waits for this
+    await run('ssh', [...cs.sshF(), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=60', ws.host!, `cd ${q(ws.path)} && git checkout -q -b ${q(ws.branch)}`], { timeout: 120000 }).catch(e => {
+      throw new Error(`git checkout -b ${ws.branch} there: ${firstLine(e)}`)
+    })
+    csSet(ws, 'Available')
+    void hostUp(ws.host!).catch(() => {}) // connected: scans reach it (away), with tabs or none
+  } catch (e) {
+    csSet(ws, 'Failed', (e as Error).message)
+    wsLog(ws, `codespace: ${ws.csError}`)
+  } finally {
+    making.delete(ws.id)
+  }
+}
+
+// connect's for a cloud workspace's host: made (or why not), running (a stopped one started: Restore, Enter in a tab,
+// a restart's tabs), its Host entry there. ponytail: restoreAll starts every live one's tabs, and so it: archive one
+// to keep it stopped
+async function csUp(ws: Workspace) {
+  await making.get(ws.id)
+  if (!state.workspaces.includes(ws)) throw new Error('codespace: its workspace is gone')
+  if (!ws.codespace || ws.csState === 'Failed') throw new Error(`codespace: ${ws.csError ?? 'not made'}`)
+  let st = ws.csState
+  try {
+    st = await cs.stateOf(ws.codespace)
+    if (st !== 'Available') (csSet(ws, 'Starting'), await cs.start(ws.codespace, st))
+    if (!cs.hasEntry(ws.host!)) await cs.sshEntry(ws.codespace, ws.host!)
+    csSet(ws, 'Available')
+  } catch (e) {
+    csSet(ws, st ?? 'Shutdown', (e as Error).message)
+    throw new Error(`codespace ${ws.codespace}: ${(e as Error).message}`)
+  }
+}
+
+// each one's state as gh lists it, with the PR scan and as a connection ends: one its idle timeout stopped says so
+let listing = false
+let listSaid = ''
+async function csRefresh() {
+  const mine = state.workspaces.filter(w => w.codespace && w.csState !== 'Failed' && !making.has(w.id))
+  if (!mine.length || listing) return
+  listing = true
+  try {
+    const was = new Map(mine.map(w => [w, w.csState]))
+    const st = await cs.list()
+    const moved = mine.filter(w => st.has(w.codespace!) && st.get(w.codespace!) !== w.csState && w.csState === was.get(w)) // not what Laki set meanwhile (an archive's stop)
+    for (const w of moved) w.csState = st.get(w.codespace!)
+    if (moved.length) save(), changed()
+  } catch (e) {
+    if ((e as Error).message !== listSaid) log((listSaid = (e as Error).message)) // once, not each minute
+  } finally {
+    listing = false
+  }
+}
+
+// a cloud workspace's codespace goes with it (archivedTidy, its project removed: wsRm deletes it first, and waits),
+// and its Host entry
+function csGone(ws: Workspace) {
+  if (ws.codespace) void cs.remove(ws.codespace).catch(e => log(`codespace ${ws.codespace}: ${(e as Error).message}`))
+  cs.forget(ws.host!)
 }
 
 // ---------- tabs
@@ -1216,7 +1356,7 @@ function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, ho
     LAKI_TAB: tab.id,
     PORT: String(ws.port),
     ...(!ws.host && { LAKI_HOME: dir }), // the laki CLI's: there's none on a host
-    LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
+    LAKI_PROJECT_PATH: (p => (p?.host || !ws.host ? p?.path : undefined))(state.projects.find(p => p.id === ws.project)) ?? ws.path, // the repo itself: setup copies .env etc. from it (a codespace's: its own)
     ...(storage && { LAKI_STORAGE_FOLDER: storage }), // its files for the user to keep: every tab's the same
     // ponytail: these replace one the user set
     ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: join(hooks, 'opencode') }), // Laki's plugin, on top of the user's config
@@ -1240,8 +1380,12 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   // what it's told at the start: Laki (its preset's switch) and progress; a host has no laki CLI
   const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && memoryNote(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
+  // its permission mode and fast mode: the tab's (the new-workspace page's; '' and false: none over the profile's), else
+  // its profile's; no mode when the profile's flags set one
+  const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
+  const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, tab.fast ? 'claude-settings-fast.json' : 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
+    argv = ['claude', '--settings', join(h.dir, fast ? 'claude-settings-fast.json' : 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1268,7 +1412,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   // a profile's model and effort when the workspace picked none
   const model = tab.model || pr?.model?.trim()
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
-  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, tab.perm), ...(tab.fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
+  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
 }
@@ -1359,8 +1503,11 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 // why addTab would refuse an agent: checked before wsNew makes a worktree for it
 // an agent's laki new / laki tab (from, agentCaller): an agent of a preset or a shell, never a command it picks (--cmd,
 // or a preset whose agent is a command): a prompt injected into it would leave a program of its own running elsewhere
-export function agentNoCmd(o: { preset?: string; cmd?: string }) {
+// nor one that never asks (bypass permissions: its own pick, else its profile's mode or flags), as workflows' bypassIn
+export function agentNoCmd(o: { preset?: string; cmd?: string; perm?: string }) {
   if (o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command') throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
+  const pr = presetNamed(o.preset || state.settings?.agent || 'claude')
+  if (permInArgs(pr?.agent, pr?.args) ? bypassArgs(pr?.args) : (o.perm ?? pr?.perm) === 'bypassPermissions') throw new Error("an agent can't start an agent that never asks (bypass permissions): the user starts it")
 }
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
@@ -1389,8 +1536,8 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
   const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
-  const perm = isAgent(preset) && kind === 'agent' ? o.perm || undefined : undefined
-  const fast = isAgent(preset) && kind === 'agent' && o.fast === true ? true : undefined
+  const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
+  const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
   modelCheck(preset, model, effort, perm, fast)
   // a name with its task: an agent's prompt's words (not the workspace's first agent's: the workspace's name says it, and
   // it's titled as it is), a command's first words (npm run dev)
@@ -1401,7 +1548,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const agentName = pr?.name || (kind === 'agent' ? (preset === 'custom' ? cmdName(o.cmd!) : preset) : kind)
   const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm && { perm }), ...(fast && { fast }) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }) }
   state.tabs.push(tab)
   save()
   try {
@@ -1485,7 +1632,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
-const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (state.settings?.specs === true ? (state.settings.railPlans?.length ?? 0) : 0)
+const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
 export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string }) {
   const w = findWs(o.id)
   if (o.railPin && !w.railPin && railTaken() >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
@@ -1517,16 +1664,18 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
 }
 
 // a pasted image, kept for an agent's prompt (by its path)
-// pasted images older than settings.imageDays (Settings › AI; unset: IMAGE_DAYS) go: as one is saved, and hourly
+// pasted images and attached files (fileSave's folders) older than settings.imageDays (Settings › AI; unset: IMAGE_DAYS)
+// go: as one is saved, and hourly
 export function imagesTidy() {
-  const images = join(dir, 'images')
   const days = Number(state.settings?.imageDays) >= 1 ? Number(state.settings!.imageDays) : IMAGE_DAYS
-  let files: string[] = []
-  try {
-    files = readdirSync(images)
-  } catch {}
-  const held = new Set(state.todos?.flatMap(t => t.images ?? []).map(p => basename(p))) // a to-do's: kept until it starts
-  for (const f of files) if (Number(f.split('-')[0]) < Date.now() - days * 86400e3 && !held.has(f)) rmSync(join(images, f), { force: true })
+  const held = new Set(state.todos?.flatMap(t => t.images ?? []).flatMap(p => [basename(p), basename(dirname(p))])) // a to-do's: kept until it starts (an image by its name, a file by its folder)
+  for (const sub of ['images', 'files']) {
+    let names: string[] = []
+    try {
+      names = readdirSync(join(dir, sub))
+    } catch {}
+    for (const f of names) if (Number(f.split('-')[0]) < Date.now() - days * 86400e3 && !held.has(f)) rmSync(join(dir, sub, f), { force: true, recursive: true })
+  }
 }
 export function imageSave(o: { data: string; ext?: string }) {
   const ext = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(o.ext ?? '') ? o.ext : 'png'
@@ -1537,6 +1686,26 @@ export function imageSave(o: { data: string; ext?: string }) {
   imagesTidy()
   const path = join(images, `${Date.now()}-${randomUUID().slice(0, 6)}.${ext}`)
   writeFileSync(path, buf)
+  return path
+}
+// any other file attached to a prompt (PromptInput's chips): <data>/files/<ms>-<hex>/<its name>, a folder each so the
+// name stays as it was (0700, the file 0600); its path goes into the prompt. The name: its last part only, no control
+// or bidi characters, never '', '.' or '..', cut to 200 bytes with its extension kept
+function fileName(n: unknown) {
+  let s = String(n ?? '').split(/[/\\]/).pop()!.replace(/[\p{Cc}\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu, '').trim()
+  if (/^\.*$/.test(s)) s = 'file'
+  const ext = extname(s).length <= 16 ? extname(s) : ''
+  while (Buffer.byteLength(s) > 200) s = [...s.slice(0, s.length - ext.length)].slice(0, -1).join('') + ext
+  return s
+}
+export function fileSave(o: { name: string; data: string }) {
+  const buf = typeof o?.data === 'string' ? Buffer.from(o.data, 'base64') : null
+  if (!buf || buf.length > FILE_MAX) throw new Error('a file up to 25 MB')
+  imagesTidy()
+  const at = join(dir, 'files', `${Date.now()}-${randomUUID().slice(0, 6)}`)
+  mkdirSync(at, { recursive: true, mode: 0o700 })
+  const path = join(at, fileName(o.name))
+  writeFileSync(path, buf, { mode: 0o600 })
   return path
 }
 
@@ -1592,7 +1761,7 @@ export function settingsSet(o: Settings, own = false) {
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements']
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows'] // specs, workflows: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
@@ -1688,7 +1857,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; agent?: string } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; agent?: string; noSetup?: boolean; codespace?: string } //codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
 // (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
@@ -1817,6 +1986,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
+  if (o.codespace !== undefined) cloudCheck(proj, o)
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   // the folder's own workspace (not a scheduled run's session): Local again is that one, as it is (asked again below:
   // another wsNew may make it meanwhile)
@@ -1841,7 +2011,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     o = { ...o, name: o.name || `pr-${pr.number}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') }
   }
   let ws: Workspace
-  if (o.local || proj.git === false) {
+  if (o.codespace !== undefined) ws = await cloudNew(proj, o, o.base || current, step)
+  else if (o.local || proj.git === false) {
     const have = own()
     if (have && !o.another) return step(`${have.id}: the folder's own workspace, as it is`), have
     const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
@@ -1884,6 +2055,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (!o.issued) for (const u of refsIn(o.prompt)) relate(ws, u) // the other PRs and issues it names (not an issue's text: any)
   if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
   if (o.flow && ws.kind === 'worktree') ws.flow = o.flow // the run's, before workspace.new and its setup tab's tab.new
+  if (o.noSetup && ws.kind === 'worktree') ws.noSetup = true // its setup skipped: Run ▾ runs it later (run's setup)
   // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
   for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)
@@ -1893,8 +2065,9 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   forward(ws)
   const cfg = projectConfig(ws)
   step(`${ws.id}: ${ws.kind} at ${ws.path}${ws.branch ? `, branch ${ws.branch}` : ''}, port ${ws.port}`)
-  if (cfg.setup && ws.kind === 'worktree') (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup, by))
-  else if (ws.kind === 'worktree' && cfgWait(proj)) (ws.setupWait = true), save(), step(`setup: waits for you to trust ${proj.name}'s .laki.json`)
+  if (ws.noSetup) step('setup: skipped') // no marker: its agents start at once
+  if (cfg.setup && ws.kind === 'worktree' && !ws.noSetup) (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup, by))
+  else if (ws.kind === 'worktree' && cfgWait(proj)) (ws.setupWait = true), save(), step(`setup: waits for you to trust ${proj.name}'s .laki.json`) // a skipped one's copy too
   try {
     if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
@@ -1907,7 +2080,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
 
 function runSetup(ws: Workspace, setup: string, agent?: string) {
   writeFileSync(setupMarker(ws), String(Date.now()))
-  addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup, agent })
+  return addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup, agent })
 }
 
 // the app's sheet: no hash, the project's .laki.json as it is now (its text, its hash); with the hash it showed, that
@@ -1927,7 +2100,7 @@ export async function projectTrust(o: { id: string; hash?: string }) {
     save()
     if (!p.host) await copyIncludes(p, ws)
     const setup = projectConfig(ws).setup
-    if (setup && existsSync(ws.path)) runSetup(ws, setup)
+    if (setup && (ws.host || existsSync(ws.path)) && !ws.noSetup) runSetup(ws, setup)
   }
   return { hash, trusted: true }
 }
@@ -2002,13 +2175,13 @@ async function teardown(ws: Workspace) {
   const cfg = projectConfig(ws)
   const none: Tab = { id: '', workspace: ws.id, name: '', kind: 'shell' }
   // a worktree's, as setup is: a local workspace is the project's own folder, which other sessions (and you) still use
-  if (cfg.teardown && ws.kind === 'worktree' && ws.host)
+  if (cfg.teardown && ws.kind === 'worktree' && ws.host && ws.codespace === undefined) // a codespace's: its stop or delete
     await hostUp(ws.host)
       .then(h => sshIn(ws.host!, 'sh -s', hostScript(ws, lakiEnv(ws, none, {}, h.dir), `exec "$SHELL" -lc ${q(cfg.teardown!)}`)))
       .catch(() => {})
   else if (cfg.teardown && ws.kind === 'worktree' && existsSync(ws.path))
     await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, none), timeout: 60000 }).catch(() => {})
-  if (ws.kind === 'worktree') {
+  if (ws.kind === 'worktree' && ws.codespace === undefined) {
     const proj = state.projects.find(p => p.id === ws.project)
     if (proj) await git(proj, 'worktree', 'remove', '--force', ws.path).catch(() => {})
     if (!ws.host) rmSync(ws.path, { recursive: true, force: true })
@@ -2017,6 +2190,12 @@ async function teardown(ws: Workspace) {
     if (proj) await git(proj, 'worktree', 'prune').catch(() => {})
   }
   rmSync(setupMarker(ws), { force: true })
+  if (ws.codespace !== undefined) {
+    // its connection, nothing else's: the next use connects anew (and starts it: Restore)
+    const h = hosts.get(ws.host!)
+    hosts.delete(ws.host!), live.delete(ws.host!)
+    void h?.then(x => x.master.kill(), () => {})
+  }
 }
 
 const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
@@ -2039,11 +2218,14 @@ function dropWs(ws: Workspace) {
   state.workspaces = state.workspaces.filter(w => w !== ws)
   ports.delete(ws.id)
   prs.delete(ws.id)
+  if (ws.codespace !== undefined) csGone(ws)
 }
 
 // wsRm kills its tabs, runs teardown and removes the worktree; the branch stays.
 export async function wsRm(ref: string) {
   const ws = findWs(ref)
+  // first: one left there is billed (a failure leaves the workspace, to try again); '': none for dropWs to delete
+  if (ws.codespace) await cs.remove(ws.codespace).then(() => (ws.codespace = ''))
   await teardown(ws)
   dropWs(ws)
   rmStorage(ws)
@@ -2055,7 +2237,7 @@ export async function wsRm(ref: string) {
 // says nothing of it
 export async function wsPeek(ref: string) {
   const ws = findWs(ref)
-  if (ws.kind !== 'worktree' || ws.archived || state.projects.find(p => p.id === ws.project)?.git === false || !(ws.host || existsSync(ws.path))) return {}
+  if (ws.kind !== 'worktree' || ws.archived || away(ws) || state.projects.find(p => p.id === ws.project)?.git === false || !(ws.host || existsSync(ws.path))) return {}
   const count = (args: string[]) => git(ws, ...args).then(s => Number(s) || 0, () => undefined)
   const [dirty, ahead, unpushed] = await Promise.all([
     git(ws, '--no-optional-locks', 'status', '--porcelain').then(s => s.split('\n').filter(Boolean).length, () => undefined),
@@ -2093,13 +2275,16 @@ function rmStorage(ws: Workspace) {
 export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; held?: GateHeld[] } | undefined> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
-  if (ws.host) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
-  if (o.ifClean && (ws.host || existsSync(ws.path))) {
+  if (ws.codespace === '') throw new Error(making.has(ws.id) ? 'its codespace is still being made' : 'it has no codespace (making it failed): delete it')
+  if (ws.host && ws.codespace === undefined) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
+  if (o.ifClean && ws.codespace === undefined && (ws.host || existsSync(ws.path))) { // a stopped codespace keeps its files
     const dirty = (await git(ws, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
     if (dirty) return { dirty }
   }
   const h = await gated('archive', ws, o)
   if (h) return h
+  // stopped, its files kept for Restore. ponytail: GitHub deletes a stopped one after its retention period (30 days)
+  if (ws.codespace) await cs.stop(ws.codespace).then(() => (ws.csState = 'Shutdown'))
   await teardown(ws)
   ws.archived = true
   ws.archivedAt = Date.now()
@@ -2116,9 +2301,10 @@ export async function wsRestore(ref: string) {
   const ws = findWs(ref)
   if (!ws.archived) return ws
   const proj = findProject(ws.project)
-  await git(proj, 'worktree', 'add', ws.path, ws.branch).catch(e => {
-    throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
-  })
+  if (ws.codespace === undefined)
+    await git(proj, 'worktree', 'add', ws.path, ws.branch).catch(e => {
+      throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
+    })
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
@@ -2127,6 +2313,7 @@ export async function wsRestore(ref: string) {
   ws.port = allocPort()
   save()
   forward(ws)
+  if (ws.codespace) void hostUp(ws.host!).catch(() => {}) // started again (connect's csUp), its tabs or none
   for (const t of tabsOf(ws.id)) spawnTab(t, { resume: true })
   changed()
   widgetEvent('workspace.restored', {}, ws.id)
@@ -2135,12 +2322,13 @@ export async function wsRestore(ref: string) {
 
 // ---------- the board's to-dos (Board.tsx): prompts waiting for a workspace; starting one is wsNew, then todoRm
 
-// images: pasted ones, imageSave's paths (only those: their paths go into the prompt), kept by imagesTidy while it waits
+// images: pasted ones and attached files, imageSave's and fileSave's paths (only those: their paths go into the prompt),
+// kept by imagesTidy while it waits
 export function todoAdd(o: { project: string; text: string; images?: string[] }) {
   const p = findProject(o.project)
   const text = String(o.text ?? '').trim()
-  const kept = join(dir, 'images') + sep
-  const images = (Array.isArray(o.images) ? o.images : []).filter((x): x is string => typeof x === 'string' && resolve(x).startsWith(kept) && existsSync(x)).slice(0, 10)
+  const kept = [join(dir, 'images') + sep, join(dir, 'files') + sep]
+  const images = (Array.isArray(o.images) ? o.images : []).filter((x): x is string => typeof x === 'string' && kept.some(k => resolve(x).startsWith(k)) && existsSync(x)).slice(0, 10)
   if (!text && !images.length) throw new Error('a to-do needs its text')
   const t: Todo = { id: randomUUID().slice(0, 8), project: p.id, text, at: Date.now(), ...(images.length && { images }) }
   state.todos!.push(t)
@@ -2427,6 +2615,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
+      if (state.settings?.contextMeter !== false || state.settings?.costs !== false) setTimeout(() => meterRead(tab, true) && changed(), 1000) // its answer's usage, written by now (both off: none, as meterTick)
       for (const f of turnEnds)
         try {
           f(tab, { last: last ? String(last) : undefined, limit: r.limit, failed: p.state === 'failed' && !r.limit }) // this turn's answer: r.last may be an earlier one's
@@ -2484,7 +2673,7 @@ export function typeInto(s: Session, text: string | Promise<string>, enter = tru
   return next
 }
 
-// what's typed into a tab: on an SSH host, with the images it names copied there (toHost); never fails
+// what's typed into a tab: on an SSH host, with the images and files it names copied there (toHost); never fails
 // the agent variables ({{branch}}…, shared/types.ts AGENT_VARS) in a text going to a tab: an action's, a template's,
 // a scheduled prompt's (vars), never a message as typed
 // a workspace's agent variables (no tab's): varsIn's, and a scope workspace extension's env and {{workspace.…}}
@@ -2501,7 +2690,7 @@ export function varsIn(tab: Tab, text: string) {
 
 function textFor(tab: Tab, text: string): string | Promise<string> {
   const host = state.workspaces.find(w => w.id === tab.workspace)?.host
-  if (!host || !text.includes(join(dir, 'images'))) return text
+  if (!host || !['images', 'files'].some(sub => text.includes(join(dir, sub)))) return text
   return hostUp(host).then(h => toHost(host, h, text).then(t => t ?? text), () => text)
 }
 
@@ -3150,12 +3339,110 @@ export function stopTunnels(ws?: string) {
   for (const t of [...tunnels.values()]) if (!ws || t.ws === ws) tunnelStop({ ws: t.ws, port: t.port })
 }
 
+// ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
+
+type Tail = { file?: string; looked?: number; for?: string; since?: number; pos?: number } // for: the chat it looked for, since when
+const SHARE_READ = 32 << 20 // a transcript's most read at once: a longer one starts there (ponytail: its start is left out)
+// what was written to the tab's transcript since t's last read, whole lines only (the last may be half written); ''
+// nothing new; undefined none (another agent, a host's, not found yet, empty); fresh: it's read from its start again
+// (this chat's file found, or written anew)
+function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined {
+  const agent = tab.preset
+  if ((agent !== 'claude' && agent !== 'codex') || !tab.resumeId || state.workspaces.find(w => w.id === tab.workspace)?.host) return
+  // a chat's looked for again every 10 s at most (codex's: a walk of every session, here on the daemon's thread), every 2
+  // minutes once it's been missing for one (a chat gone, another account's folder): a new chat's is written at its first
+  // turn, whose end looks again at once (meterRead's look)
+  const now = Date.now()
+  if (t.for !== tab.resumeId) (t.for = tab.resumeId), (t.since = now), (t.looked = 0)
+  if (!t.file?.endsWith(`${tab.resumeId}.jsonl`) && now - (t.looked ?? 0) > (now - t.since! < 60000 ? 10000 : 120000)) (t.looked = now), (t.file = transcriptOf(agent, accountNamed(tab.account)?.dir ?? homeDir(agent), tab.resumeId)), (t.pos = 0), fresh()
+  if (!t.file?.endsWith(`${tab.resumeId}.jsonl`)) return void (t.file = undefined) // another chat's: none until this one's is found
+  const size = statSync(t.file, { throwIfNoEntry: false })?.size ?? 0
+  if (!size) return
+  if (size < t.pos!) (t.pos = 0), fresh() // written anew
+  if (size - t.pos! > SHARE_READ) t.pos = size - SHARE_READ // the line it lands in is cut off: JSON.parse skips it
+  if (size === t.pos) return ''
+  const buf = Buffer.alloc(size - t.pos!)
+  const fd = openSync(t.file, 'r')
+  try {
+    readSync(fd, buf, 0, buf.length, t.pos!)
+  } finally {
+    closeSync(fd)
+  }
+  const cut = buf.lastIndexOf(10) + 1
+  t.pos! += cut
+  return buf.subarray(0, cut).toString('utf8')
+}
+
+// the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on
+// every 10 s (main.ts' meterTick) and as a turn ends. Today's by chat in <data>/usage-today.json: a closed tab's stays,
+// and a restart reading each chat anew counts it once (the more of the two)
+type MeterRun = Tail & { m: Meter }
+const meters = new Map<string, MeterRun>()
+const todayPath = join(dir, 'usage-today.json')
+let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
+function spentNow() {
+  const day = dayOf(Date.now())
+  if (!spent)
+    try {
+      spent = JSON.parse(readFileSync(todayPath, 'utf8'))
+    } catch {}
+  if (spent?.day !== day || typeof spent.chats !== 'object') spent = { day, chats: {} }
+  return spent
+}
+// true: it read something new
+function meterRead(tab: Tab, look = false) { // look: a turn's end, its transcript looked for now
+  const r = meters.get(tab.id) ?? { m: meterNew() }
+  meters.set(tab.id, r)
+  if (look) r.looked = 0
+  const text = tailOf(tab, r, () => (r.m = meterNew()))
+  if (!text) return false
+  meterOf(tab.preset!, text, r.m)
+  const s = spentNow()
+  if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
+    s.chats[tab.resumeId!] = { ws: tab.workspace, tokens: r.m.today.tokens, cost: r.m.today.cost }
+    writeFileSync(`${todayPath}.tmp`, JSON.stringify(s))
+    renameSync(`${todayPath}.tmp`, todayPath)
+  }
+  return true
+}
+export function meterTick() {
+  if (state.settings?.contextMeter === false && state.settings?.costs === false) return
+  let any = false
+  const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
+  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
+  for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
+  if (any) changed()
+}
+const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
+function meterView(t: Tab): Pick<TabView, 'context' | 'usage'> {
+  const r = meters.get(t.id)
+  if (!r?.file?.endsWith(`${t.resumeId}.jsonl`)) return {} // another chat's (a /clear): until this one's is read
+  const { m } = r
+  const pr = t.preset === 'claude' ? presetOf(t) : undefined
+  // ponytail: a model made [1m] elsewhere (claude's own settings) shows against 200K until it holds more
+  const max = m.max ?? (t.preset === 'claude' ? (/\[1m\]/i.test(`${t.model || pr?.model || ''} ${pr?.args ?? ''}`) || (m.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
+  return { ...(m.used !== undefined && max && { context: { used: m.used, max } }), ...(m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+}
+// today's, the workspaces that used most first (5)
+function todayView(): Today | undefined {
+  const chats = Object.values(spentNow().chats)
+  if (!chats.length) return
+  const ws = new Map<string, { ws: string; tokens: number; cost: number }>()
+  for (const c of chats) {
+    const w = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
+    ws.set(c.ws, w)
+    w.tokens += c.tokens
+    w.cost += c.cost
+  }
+  const sum = (k: 'tokens' | 'cost') => chats.reduce((n, c) => n + c[k], 0)
+  return { tokens: sum('tokens'), cost: Math.round(sum('cost') * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })) }
+}
+
 // ---------- shared tabs (share.ts): a tab as a read-only page at <a quick tunnel>/s/<uuid> for anyone with the link,
 // kept up to date (the page asks every 2.5 s). The pages have a server of their own on 127.0.0.1, so the tunnel reaches
 // them and never the daemon's API; one tunnel for all, both stopped with the last share. Like tunnels, they live in
 // this process only: a restart ends them (a quick tunnel's URL is new each time anyway).
-type ShareRun = { id: string; tab: string; ws: string; until?: number; v: number; title: string; sub: string; md: string; body: string; read?: number; key?: string; file?: string; looked?: number; pos?: number; said?: Said[] }
-const SHARE_READ = 32 << 20 // a transcript's most read at once: a longer one starts there (ponytail: its start is left out)
+type ShareRun = Tail & { id: string; tab: string; ws: string; until?: number; v: number; title: string; sub: string; md: string; body: string; read?: number; key?: string; said?: Said[] }
 const shares = new Map<string, ShareRun>()
 type Sharing = { server: Server; cf?: Cf; base: Promise<string | undefined> } // base: the tunnel's URL
 let sharing: Sharing | undefined
@@ -3227,31 +3514,12 @@ async function shareRead(s: ShareRun) {
   const name = AGENT_NAMES[agent as Agent] ?? tab.name
   let said: Said[] | undefined
   let key: string | undefined
-  if ((agent === 'claude' || agent === 'codex') && tab.resumeId && !state.workspaces.find(w => w.id === tab.workspace)?.host) {
-    // looked for again every 10 s at most (codex's: a walk of every session): a new chat's is written at its first turn
-    if (!s.file?.endsWith(`${tab.resumeId}.jsonl`) && Date.now() - (s.looked ?? 0) > 10000) (s.looked = Date.now()), (s.file = transcriptOf(agent, accountNamed(tab.account)?.dir ?? homeDir(agent), tab.resumeId)), (s.pos = 0), (s.said = [])
-    if (!s.file?.endsWith(`${tab.resumeId}.jsonl`)) s.file = undefined // another chat's: the screen until this one's is found
-    const size = s.file ? (statSync(s.file, { throwIfNoEntry: false })?.size ?? 0) : 0
-    if (s.file && size) {
-      if (size < (s.pos ?? 0)) (s.pos = 0), (s.said = []) // written anew
-      if (size - s.pos! > SHARE_READ) s.pos = size - SHARE_READ // the line it lands in is cut off: JSON.parse skips it
-      if (size > s.pos!) {
-        const buf = Buffer.alloc(size - s.pos!)
-        const fd = openSync(s.file, 'r')
-        try {
-          readSync(fd, buf, 0, buf.length, s.pos!)
-        } finally {
-          closeSync(fd)
-        }
-        const cut = buf.lastIndexOf(10) + 1 // whole lines only: the last may be half written
-        chatOf(agent, buf.subarray(0, cut).toString('utf8'), s.said!)
-        s.pos! += cut
-      }
-      said = s.said!
-      key = `${s.file}:${s.pos}`
-    }
-  }
-  if (!said) {
+  const text = tailOf(tab, s, () => (s.said = []))
+  if (text !== undefined) {
+    said = chatOf(agent, text, (s.said ??= []))
+    key = `${s.file}:${s.pos}`
+  } else {
+    // the screen until its transcript is found
     const text = await screen(tab.id, 5000)
     said = text.trim() ? [{ who: 'screen', text }] : []
     key = text
@@ -3493,9 +3761,10 @@ export function scanPRs(): Promise<void> {
     prAgain = true // asked mid-scan (e.g. a ship just opened a PR): scan again when this one ends
     return prScan
   }
+  void csRefresh()
   // workspaces in parallel: each gh call may take seconds
-  const live = state.workspaces.filter(ws => !ws.archived && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)))
-  prScan = Promise.all(live.map(scanPR)).then(() => {
+  const scanned = state.workspaces.filter(ws => !ws.archived && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)))
+  prScan = Promise.all(scanned.map(scanPR)).then(() => {
     prScan = null
     if (prAgain) {
       prAgain = false
@@ -3932,8 +4201,9 @@ export async function prFix(o: { ws: string; what: FixWhat; job?: string }) {
   return tellAgent(ws, `${prPrompt('ci', pr)}\n${body}`)
 }
 
-type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string }
-type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; comments: { nodes: Comment[] } }
+type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string; diffHunk?: string }
+type Side = 'LEFT' | 'RIGHT'
+type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; startLine?: number | null; diffSide?: Side; startDiffSide?: Side | null; comments: { nodes: Comment[] } }
 
 // comments an agent may act on: from people with write access to the repo, or the review bots you list
 // (settings.prBots). Anyone can comment on a public PR, any app can be a bot, and the agent is told to change code and push
@@ -3944,8 +4214,8 @@ const botSaid = new Set<string>() // a skipped bot, said once per PR
 const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   viewer { login }
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes {
-    id isResolved isOutdated path line
-    comments(first: 30) { nodes { id author { login __typename } authorAssociation body createdAt } }
+    id isResolved isOutdated path line startLine diffSide startDiffSide
+    comments(first: 30) { nodes { id author { login __typename } authorAssociation body createdAt diffHunk } }
   } } } }
 }`
 
@@ -4648,7 +4918,7 @@ export async function scanStats(): Promise<void> {
   try {
     // the sidebar's (settings.diffStat, off by default), and a race's always: Compare shows them
     const on = state.settings?.diffStat === true
-    const wanted = (w: Workspace) => !w.archived && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
+    const wanted = (w: Workspace) => !w.archived && !away(w) && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
     for (const id of stats.keys()) if (!state.workspaces.some(w => w.id === id && wanted(w))) (stats.delete(id), changed())
     for (const w of state.workspaces) {
       if (!wanted(w) || (!w.host && !existsSync(w.path))) continue
@@ -4739,14 +5009,21 @@ function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<
 }
 
 // the run script (the dev server: the run tab), or a RUN_SCRIPTS one in a tab named as it; again: the one before goes
+// setup: the setup script, in a worktree made without it (wsNew noSetup) or again
 export function runDev(ref: string, script?: string, agent?: string) { // agent: an agent's laki run, or its run's
   const ws = findWs(ref)
-  if (script !== undefined && !RUN_SCRIPTS.includes(script as RunScript)) throw new Error(`no script "${script}": ${RUN_SCRIPTS.join(', ')}`)
-  const k = (script ?? 'run') as 'run' | RunScript
+  if (script !== undefined && script !== 'setup' && !RUN_SCRIPTS.includes(script as RunScript)) throw new Error(`no script "${script}": ${RUN_SCRIPTS.join(', ')}, setup`)
+  if (script === 'setup' && ws.kind !== 'worktree') throw new Error('the setup script runs in worktrees')
+  const k = (script ?? 'run') as 'run' | 'setup' | RunScript
   const cmd = projectConfig(ws)[k]
   const proj = state.projects.find(p => p.id === ws.project)
   if ((typeof cmd !== 'string' || !cmd.trim()) && proj && cfgWait(proj)) throw new Error(`${proj.name}'s .laki.json isn't trusted yet: Laki shows it, trust it there`)
   if (typeof cmd !== 'string' || !cmd.trim()) throw new Error(`no "${k}" command: set one in the project settings or .laki.json`)
+  if (k === 'setup') {
+    delete ws.noSetup // Run ▾'s Run the setup script goes
+    changed()
+    return runSetup(ws, cmd, agent) // its save
+  }
   return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript, agent) : replaceTab(ws.id, 'dev', cmd, undefined, undefined, agent)
 }
 
@@ -5133,7 +5410,8 @@ export async function prViewed(p: { ws: string; path: string; viewed: boolean; i
   return { path: p.path, state: p.viewed ? 'VIEWED' : 'UNVIEWED' }
 }
 
-// prThreads: the PR's review threads, for the side panel
+// prThreads: the PR's review threads, for the side panel. startLine: a range's first line; side: its lines' (LEFT, the
+// old file's, when a range starts there); hunk: the diff the review saw, ending at line (Review's Apply checks it)
 export async function prThreads(ref: string) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
@@ -5142,6 +5420,9 @@ export async function prThreads(ref: string) {
   return threads.map(t => ({
     path: t.path,
     line: t.line ?? undefined,
+    startLine: t.startLine ?? undefined,
+    side: t.startDiffSide === 'LEFT' ? 'LEFT' : t.diffSide,
+    hunk: t.comments.nodes[0]?.diffHunk,
     resolved: t.isResolved,
     outdated: t.isOutdated,
     comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt })),
@@ -5208,7 +5489,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     // a fetch or an action: no agent, no prompt (an action's argument, if any); a per-workspace one: one of the project's
     if (ext.scoped && ['new', 'local', 'local-new'].includes(s.ws)) throw new Error(`${ext.name} is per workspace: pick one of ${proj.name}'s`)
   } else if (s.workflow) {
-    if (state.settings?.workflows !== true || !flowHooks.find) throw new Error('turn Workflows on first: Settings › General › Experimental')
+    if (!flowsOn(state.settings) || !flowHooks.find) throw new Error('Workflows are off: turn them on in Settings › General › Pages')
     const wf = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }) // throws: no such workflow
     s.source = wf.source
     if (wf.where === 'here') throw new Error(`${wf.name} runs in a workspace you pick, not on a schedule: start it from that workspace's ⋯ › Run workflow`)
@@ -5275,7 +5556,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       // a workflow's run, unless the last one this task started is still going
       const going = state.flows?.find(f => !FLOW_ENDED.includes(f.status) && f.workflow === s.workflow && f.source === (s.source ?? 'yours') && f.project === s.project && f.trigger === `schedule ${s.id}`)
       if (going) throw new Error(`skipped: its last run (${going.id}) is still going`)
-      if (!flowHooks.start || state.settings?.workflows !== true) throw new Error('Workflows are off: Settings › General › Experimental')
+      if (!flowHooks.start || !flowsOn(state.settings)) throw new Error('Workflows are off: Settings › General › Pages')
       const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
       r.ws = run.ws
       r.what = `${run.status === 'queued' ? 'queued' : 'started'} a run of ${s.workflow} (${run.id})` // past its at once: it waits its turn

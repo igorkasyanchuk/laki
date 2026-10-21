@@ -26,10 +26,11 @@ test('cli: project add, new, ls, send, screen, rm (--json)', async t => {
   let r = await rig.cli('project', 'add', rig.repo, '--json')
   assert.equal(r.code, 0, r.err)
   const proj = JSON.parse(r.out)
-  r = await rig.cli('new', proj.id, '--preset', 'shell', '--name', 'cli-ws', '--json')
+  r = await rig.cli('new', proj.id, '--preset', 'shell', '--name', 'cli-ws', '--no-setup', '--json')
   assert.equal(r.code, 0, r.err)
   const ws = JSON.parse(r.out)
   assert.equal(ws.branch, 'laki/cli-ws')
+  assert.equal(ws.noSetup, true)
   // agents read it: no settings, env or project config in it
   await rig.rpc('settingsSet', { env: { SECRET: 'from-settings' }, webhook: { url: 'https://hook.example/bot-token' } })
   await rig.rpc('projectSet', { id: proj.id, config: { env: { SECRET: 'from-project' } } })
@@ -280,7 +281,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } },
     { jsonrpc: '2.0', method: 'notifications/initialized' },
     { jsonrpc: '2.0', id: 2, method: 'tools/list' },
-    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'laki_new_workspace', arguments: { project: proj.id, prompt: 'hi', preset: 'shell', name: 'mcp-ws' } } },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'laki_new_workspace', arguments: { project: proj.id, prompt: 'hi', preset: 'shell', name: 'mcp-ws', no_setup: true } } },
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'laki_screen', arguments: { target: 'nope' } } },
     { jsonrpc: '2.0', id: 5, method: 'resources/list' },
   ]
@@ -296,6 +297,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   assert.ok(names.includes('laki_extension_write') && got[2].result.tools.every((t: any) => !('max' in t)), 'extension tools; max is Laki AI’s, not listed')
   assert.ok(!got[3].result.isError, got[3].result.content[0].text)
   assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')
+  assert.equal(JSON.parse(got[3].result.content[0].text).noSetup, true)
   assert.equal(got[4].result.isError, true)
   assert.equal(got[5].error.code, -32601)
   const v = JSON.parse((await rig.cli('ls', '--json')).out)
@@ -496,6 +498,14 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
     assert.notEqual(r.code, 0, args.join(' '))
     assert.match(r.err, /an agent can't start a command of its own/, args.join(' '))
   }
+  // nor a profile that never asks: its mode, or its flags
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'sh-x', agent: 'command', cmd: 'echo hi' }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'yolo2', agent: 'claude', args: '--dangerously-skip-permissions' }] })
+  for (const args of [['new', '.', '--preset', 'yolo', 'go'], ['tab', ws.id, '--preset', 'yolo'], ['tab', ws.id, '--preset', 'yolo2']]) {
+    const r = await as(...args)
+    assert.notEqual(r.code, 0, args.join(' '))
+    assert.match(r.err, /an agent can't start an agent that never asks/, args.join(' '))
+  }
+  assert.equal((await rig.cli('tab', ws.id, '--preset', 'yolo')).code, 0, 'yours can')
   // an agent of a preset still works; and yours with --cmd
   assert.equal((await as('tab', ws.id, '--preset', 'claude')).code, 0)
   const mine = await rig.cli('tab', ws.id, '--cmd', 'sleep 5')

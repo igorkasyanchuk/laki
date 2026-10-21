@@ -12,7 +12,7 @@ type Bridge = {
   onFocusTab(cb: (tab: string) => void): void
   onEarn?(cb: (id: string) => void): void
   onBrowserTab?(cb: (url: string, front: boolean) => void): void // a Browsers page's link to a new tab: front, or in the background
-  onBrowserKey?(cb: (key: string) => void): void // ⌘W or ⌘T pressed in a Browsers page (the page gets keys, not the app)
+  onBrowserKey?(cb: (key: string) => void): void // a Browsers page's new or close tab (the page gets keys, not the app) or a menu bar item: a shared/keys.ts id, else a ⌘ key
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
   openExternal(url: string): void
@@ -25,6 +25,7 @@ type Bridge = {
   fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
+  keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)

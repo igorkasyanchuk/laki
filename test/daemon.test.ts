@@ -49,6 +49,7 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   const proj = async () => (await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id)
   assert.ok((await proj()).cfgWait)
   const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const skip = await rig.rpc('wsNew', { project: p.id, preset: 'none', noSetup: true }) // its copy waits too, its setup never runs
   await sleep(1500)
   assert.ok(!existsSync(join(a.path, 'env.txt')), "an untrusted file's setup doesn't run")
   const ws = async (id: string) => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === id)
@@ -65,6 +66,9 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   await until(() => existsSync(join(a.path, 'env.txt')), 'the waiting setup runs')
   assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar-\n')
   assert.equal((await ws(a.id)).setupWait, undefined)
+  assert.equal((await ws(skip.id)).setupWait, undefined)
+  await sleep(1000)
+  assert.ok(!existsSync(join(skip.path, 'env.txt')), 'skipped: trusting runs no setup')
   assert.equal(rig.out.split(".laki.json's env ZDOTDIR refused").length, 2) // said once
   // an edit: untrusted again, a new workspace's setup waits
   writeFileSync(join(rig.repo, '.laki.json'), JSON.stringify({ setup: 'touch edited' }))
@@ -161,6 +165,31 @@ test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch
   assert.equal(local.kind, 'local')
   await rig.rpc('wsRm', { id: local.id })
   assert.ok(existsSync(join(p.path, 'README.md')), 'deleting a local workspace keeps the repo')
+})
+
+test("noSetup: a worktree without its setup script, its agent at once, .worktreeinclude's files still copied; run setup later", async t => {
+  const rig = await fresh(t, { config: { setup: 'touch .setup-ran; sleep 60' } }) // ran: claude would wait a minute
+  writeFileSync(join(rig.repo, '.env'), 'A=1\n')
+  writeFileSync(join(rig.repo, '.worktreeinclude'), '/.env\n')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.equal((await rig.rpc('state')).projects[0].hasSetup, true) // the new-workspace page shows Skip the setup script
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'go', noSetup: true })
+  assert.equal(ws.noSetup, true)
+  assert.equal(readFileSync(join(ws.path, '.env'), 'utf8'), 'A=1\n')
+  let v = await rig.rpc('state')
+  assert.deepEqual(v.tabs.map((t: any) => t.name), ['claude'])
+  assert.equal(v.workspaces[0].setup, false)
+  await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().some(l => l.bin === 'claude'), 'claude at once')
+  assert.ok(!existsSync(join(ws.path, '.setup-ran')))
+  // Run ▾'s Run the setup script: run's setup, in a setup tab; the mark goes
+  const tab = await rig.rpc('run', { ws: ws.id, script: 'setup' })
+  assert.equal(tab.kind, 'setup')
+  await until(() => existsSync(join(ws.path, '.setup-ran')), 'setup ran')
+  v = await rig.rpc('state')
+  assert.equal(v.workspaces[0].noSetup, undefined)
+  assert.equal(v.workspaces[0].setup, true)
+  const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'none' })
+  await assert.rejects(rig.rpc('run', { ws: local.id, script: 'setup' }), /worktrees/)
 })
 
 test('attach, reattach, resize, multiple clients', async t => {
@@ -991,6 +1020,15 @@ test('a model and effort go into the agent\'s flags (a wrong one makes nothing);
   await rig.rpc('imageSave', { data: Buffer.from('png').toString('base64'), ext: 'png' })
   assert.equal(existsSync(old('held')), true)
   assert.equal(existsSync(old('loose')), false)
+  // an attached file too (fileSave's), held by its folder; nothing out of it
+  const oldFile = (n: string) => join(rig.data, 'files', `${then}-${n}`, 'notes.txt')
+  for (const n of ['held', 'loose']) mkdirSync(dirname(oldFile(n)), { recursive: true }), writeFileSync(oldFile(n), 'notes')
+  const doc = await rig.rpc('todoAdd', { project: p.id, text: 'read', images: [oldFile('held'), `${rig.data}/files/../state.json`] })
+  assert.deepEqual(doc.images, [oldFile('held')])
+  await rig.rpc('fileSave', { name: 'x.txt', data: '' })
+  assert.equal(existsSync(oldFile('held')), true)
+  assert.equal(existsSync(dirname(oldFile('loose'))), false)
+  await rig.rpc('todoRm', { id: doc.id })
   await rig.rpc('todoRm', { id: held.id })
   await rig.rpc('todoRm', { id: shot.id })
 
@@ -1049,4 +1087,25 @@ test("a permission mode and fast mode go into the agent's flags, kept for restar
   await until(() => rig.fakeLog().some(l => l.bin === 'codex'), 'codex')
   assert.deepEqual(rig.fakeLog().find(l => l.bin === 'codex').args.slice(-6), ['-s', 'workspace-write', '-a', 'never', '-c', 'service_tier="fast"'])
   assert.equal((await rig.tab(cx.id)).perm, 'acceptEdits')
+
+  // a profile's mode and fast mode when the workspace picks none ('' and false: none, over the profile's), read at each
+  // start; a profile whose flags set a mode keeps its own, no second flag
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'codex', agent: 'codex' }, { name: 'planner', agent: 'claude', perm: 'plan', fast: true }, { name: 'cx', agent: 'codex', perm: 'plan', fast: true }, { name: 'mine', agent: 'claude', args: '--permission-mode acceptEdits', perm: 'plan' }, { name: 'cxs', agent: 'codex', args: '-s read-only', perm: 'bypassPermissions' }] })
+  const start = async (o: object) => {
+    const t = await rig.tab((await rig.rpc('wsNew', { project: p.id, ...o })).id)
+    const args: string[] = (await until(() => rig.fakeLog().find(l => l.tab === t.id), 'its start')).args
+    const fast = args.includes('service_tier="fast"') || /claude-settings-fast\.json$/.test(args[args.indexOf('--settings') + 1])
+    return { t, modes: args.flatMap((a, i) => (['--permission-mode', '-s', '-a'].includes(args[i - 1]) || a.startsWith('--dangerously') ? [a] : [])), fast }
+  }
+  const planner = await start({ preset: 'planner' })
+  assert.deepEqual([planner.t.perm, planner.t.fast, planner.modes, planner.fast], [undefined, undefined, ['plan'], true], 'the profile’s, not kept on the tab')
+  const over = await start({ preset: 'planner', perm: 'auto', fast: false })
+  assert.deepEqual([over.t.perm, over.t.fast, over.modes, over.fast], ['auto', false, ['auto'], false], 'the tab’s own wins')
+  const asks = await start({ preset: 'planner', perm: '' })
+  assert.deepEqual([asks.t.perm, asks.modes, asks.fast], ['', [], true], 'ask first, over the profile’s mode')
+  const cxp = await start({ preset: 'cx' })
+  assert.deepEqual([cxp.modes, cxp.fast], [['read-only'], true])
+  assert.deepEqual((await start({ preset: 'mine' })).modes, ['acceptEdits'], 'its flags’ own')
+  assert.deepEqual((await start({ preset: 'mine', perm: 'auto' })).modes, ['acceptEdits'])
+  assert.deepEqual((await start({ preset: 'cxs' })).modes, ['read-only'])
 })

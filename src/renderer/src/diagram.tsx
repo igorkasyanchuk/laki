@@ -1,4 +1,4 @@
-// Diagram blocks for specs (experimental), ported from specdrop's web/diagram.tsx as it is: the editor (React Flow),
+// Diagram blocks for specs, ported from specdrop's web/diagram.tsx as it is: the editor (React Flow),
 // the inline view, read mode, wireframes' catalog, PNG export. Its styles are plans.css (specdrop's tokens as --sd-*).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'

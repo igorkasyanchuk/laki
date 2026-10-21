@@ -37,10 +37,14 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; drop files on one to type their paths; font,
   size, line height, weight, cursor and zoom, with a live preview.
-- **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots; the agent gets the text
-  and the images' paths. Prompt templates wrap it (`{{prompt}}`).
+- **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots and any other file; the agent
+  gets the text and their paths. Prompt templates wrap it (`{{prompt}}`).
 - **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
-  it for each one (5-hour, weekly, per model) and when it resets.
+  it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
+- **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
+  Settings › Appearance › *Context meter*), and a bar in the status bar, fill as
+  its chat's context does (amber past 70%, red past 90%), so you `/compact` or start fresh in time; its tooltip has
+  the tokens the chat used and ≈ what they'd cost at API prices.
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
@@ -172,7 +176,7 @@ npm link
 2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
    workspace, Settings, an extension, actions, a prompt template, a terminal or a browser, Settings' Experimental,
    Agents & profiles, remote access, Scheduled tasks, Workflows), each with a button that does it, and a theme to pick
-   from a dropdown (painted as you pick). Workflows' button opens Experimental while they're off.
+   from a dropdown (painted as you pick). Workflows' button opens Settings › General › Pages while they're off.
    A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
    stays as a bar at the sidebar's bottom (a click opens it again, ✕ hides it; *Get started* in ⌘K or the Help menu's *Get Started Again…* brings it back);
    *Don't show again* hides both.
@@ -325,6 +329,11 @@ selected workspace's PR is in the status bar.
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it), *Copy contents* (its whole terminal as text, the scrollback
   too; ⌘K's *Copy the tab's contents*) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
+- A project's ⋯ (or a right click on it) › *Color* and *Icon…* (find an icon by name, or type or paste an emoji;
+  *No icon*), also in Settings › the project: its mark before its name in the sidebar, the new-workspace page's project
+  menu, the palette (⌘K) and Settings, and an emoji before the window's title (🛒 web · fix-login). The color tints its
+  icon, its workspaces' bar where they have no color of their own, their rail pins (the project's mark at the corner)
+  and the floating bubbles.
 - Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
   half: before it), and the list scrolls as you near its top or bottom.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
@@ -482,7 +491,7 @@ email address only, unless you leave the email out on purpose (below).
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
 *Merged*; with its last answer, its PR and checks, and its turn's time when timers are on (Terminals and Browsers
 aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on hover) to open, archive or delete it;
-*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots in, they go with it) for a project, then ▷ (or drag it onto another
+*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots and files in, they go with it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
 **AI** (on unless Settings › *AI* turns it off, where you pick how it runs; *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
@@ -538,7 +547,7 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   (unset: the agent's default); memory compaction uses it too.
 
 *Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Keep pasted images* (Settings › AI › *Pasted
-images*: 30 days unless changed) is how long Laki keeps what you paste into its chats and new workspaces' prompts. *Show costs ($)* (Settings › AI › Spending, on by
+images*: 30 days unless changed) is how long Laki keeps what you paste into its chats and new workspaces' prompts, files you attach too. *Show costs ($)* (Settings › AI › Spending, on by
 default) turned off hides the money on the AI page: asks and tokens only.
 *Your instructions* (Settings › AI) is your own context for it, added after Laki's instructions at every ask: who you
 are, how you name things, what it should know. It can't lift what Laki AI may not do.
@@ -576,7 +585,21 @@ the week per model and extra usage; Codex's 5-hour and weekly windows. Each show
 reads them the way Superset and CodexBar do: with the sign-in the agent already keeps on this Mac (Claude
 Code's Keychain item or `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the
 agent's own `/usage` screen asks, at most every 5 minutes. It never refreshes a token: an expired one says so
-until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read).
+until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). As a
+limit reaches 90% (Settings › General › *Plan limit at*: 75, 90 or 95), Laki tells you once per reset: a message, and
+a notification when you're in another app (*Plan limit nearly used* turns it off). Only while Laki is open.
+until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). Under the
+agents, *Today*: the tokens your Claude Code and Codex chats used today and ≈ what they'd cost at the API's list
+prices (*≈ API price*: your plan bills its own way), with the workspaces that used most. A restart keeps it.
+
+**Context and tokens** (Claude Code and Codex tabs): Laki reads each chat's transcript as it grows (every 10 seconds
+while it works, and as a turn ends), never on an SSH host. A line along the tab's bottom edge is as long as the chat's
+context is full, in the accent color, amber past 70%, red past 90%; the status bar's bar and percent are the focused
+tab's. Their tooltips say it in tokens: *142K of 200K tokens · 71%*. Claude's window is 200K, or 1M for a `[1m]` model
+(or once it holds more than 200K); Codex says its own. The tab's tooltip also has what its chat used since it began:
+*≈ $0.42 · 1.2M tokens* (input, output and cache writes and reads, at API prices; a model Laki has no price for shows
+tokens only). Settings › Appearance › *Context meter* picks how a tab shows it (a line under the tab, a ring on it, or
+the status bar only) or turns it off; *Tokens and cost* hides the rest.
 
 **Side panel** (⌥⌘B, the panel icon; drag its edge to resize; ⌘I or ⓘ opens it on *Info*, below):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
@@ -619,6 +642,11 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   with *Send to the agent* (that check only), *Copy* and *Open on GitHub* (Info's PR has it too); *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
   agent would get), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.
+  A reviewer's suggestion (a ```` ```suggestion ```` block) shows as a small diff, the file's lines now and the
+  suggested ones, with *Apply*: it writes them into the file in the workspace, only while those lines are still what
+  the review saw (else *changed since the review*, and nothing is written); *Apply all* does each of a file's open
+  suggestions at once. The toast has *Undo*. Nothing is committed, pushed or resolved: it goes in with your next
+  commit (or the agent's). An outdated thread, or one on removed lines, has no *Apply*.
 - *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first; the address bar takes
   a path (`/admin`), another port (`:5173`), `localhost:8080/x` or any website (type `example.com` or a whole URL; in
   the app, not in a browser elsewhere); back, forward, reload, open in your browser. The devices button opens the
@@ -738,21 +766,27 @@ never the last prompt.
 - The row over the prompt, as words with a ⌄ (a hover shows they're menus): the project and its group in one menu (with
   a filter past six projects; a group puts it first in that group; the project alone, first in the project), *New
   worktree* or *Local* (in the repo itself, on its current branch), the base branch (the repo's main one; its ⌄ lists
-  every branch, with a filter), the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by
-  hand (like a full name) once you pick *Another model…*. At its right end: *Template* and the agent (a preset, *Shell*,
+  every branch, with a filter), the name (from the prompt when blank) and *More*: *Race*, a box for a model typed by
+  hand (like a full name) once you pick *Another model…*, and, for a project with a setup script, *Skip the setup
+  script* (off each time: the files `.worktreeinclude` names are still copied, the agent starts at once; Run ▾'s *Run
+  the setup script* runs it later). At its right end: *Template* and the agent (a preset, *Shell*,
   *Custom command…* or *No agent*); the agent menu marks your default and, for another agent, offers *Make … the
   default for new workspaces*.
 - The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
   name…*; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
   permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast
-  tier), the mic and its ⌄, and ↑. All of them are kept for its restarts and forks. Their menus have a filter box
+  tier), the mic and its ⌄, and ↑. All of them are kept for its restarts and forks. A profile with its own permission
+  mode or fast mode starts with them picked (its mode marked *profile* in the menu); change them for this workspace
+  only. Left as the profile's, an edit of the profile applies at the next start. Their menus have a filter box
   (type, ↑↓, ⏎), a line about each choice, the picked one in the accent with a check.
 In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
 session beside it, in the same folder, named after the prompt; *No agent* gives the folder's own back. A new
 workspace is never hidden: a folded project or group holding it, or the one you were on, opens. The prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with ＋; each shows as a thumbnail, and its path
-  goes after your text;
+  goes after your text. Any other file (a PDF, a log, a zip; up to 25 MB) goes the same way, as a chip with its name and
+  size (✕ takes it off): Laki keeps a copy for the agent to open, for as long as pasted images (Settings › AI); a path
+  with a space goes in quotes. A folder dropped in is its path, typed where the cursor is. Laki AI takes images only;
 - the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
   (System Settings › Keyboard › Dictation) and opens it. With Settings › Voice on *Cloud*, the mic records instead: a
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
@@ -813,10 +847,11 @@ in the sidebar (the workspace's row: `40%`, a line under it, or both) or both. O
 and report through the laki skill (Settings › Agent skill) or MCP's `laki_progress`.
 
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
-*Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
+*Specs*, *Flows*, *My Desk*, *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
 *AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail;
 *Terminals* or *Browsers* off: no button, and that project is in Projects' list). With labels on and more pages turned
-on than fit, the least used (Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail. Settings ›
+on than fit, the least used (To-dos, Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail: with
+the pages that are on by default, Flows and Specs. Settings ›
 Appearance › Rail › *Its buttons* picks which show (the others go into ⋯ *More*) and, dragged, their order; a right
 click on a rail button puts it into *More*, and *More*'s *Show them all on the rail* brings them back. Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
@@ -995,9 +1030,10 @@ that chat, the trash can lets one go. You can start another meanwhile: Laki AI w
 To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). The
 ones that come with Laki only turn off.
 
-### Specs & Brainstorms (experimental)
+### Specs & Brainstorms
 
-Turn them on in Settings › General › *Experimental*. Off, nothing of them shows.
+On unless Settings › General › *Pages* turns them off; then nothing of them shows. The editor (BlockNote, the diagrams)
+loads only as the page opens.
 
 A **spec** is what you want built, written like a Notion page: headings, checklists, tables, code, images (paste or
 drop them in) and diagrams (type `/` for the menu: flowchart, architecture, state, ER, swimlane, screen flow and
@@ -1035,9 +1071,9 @@ prompt. Agents with Laki's MCP server list, read and write them too
 (`laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write`: never README.md or spec.json, your words).
 A prototype runs in a sandboxed frame: no requests out, never the app or your files.
 
-### Workflows (experimental)
+### Workflows
 
-Turn them on in Settings › General › *Experimental*; the rail's *Flows* opens them (⌘K too). The page lists your
+On unless Settings › General › *Pages* turns them off; the rail's *Flows* opens them (⌘K too). The page lists your
 workflows and their runs, like Scheduled tasks; a click opens one, and the breadcrumbs go back. Esc doesn't close it:
 it stays open while runs go (✕ does).
 
@@ -1093,7 +1129,7 @@ The tab's notification is the only one.
 An Agent block can say how freely its agent acts (*How freely it acts*, `perm: acceptEdits` in the file), as the
 new-workspace page does: *Auto mode*, *Accept edits*, *Plan mode* (codex: read only) or *Bypass permissions*, and
 *Fast mode* (claude and codex). Unset, it takes the workflow's (its settings' *How freely its agents act*, `perm:` in
-its head), else the agent's own, which asks first: an unattended run then waits at the first permission prompt. Blocks
+its head), else its profile's (Settings › Agents & profiles), else the agent's own, which asks first: an unattended run then waits at the first permission prompt. Blocks
 that share a tab need the same mode, since the tab starts once (give one *A tab of its own*). A workflow with a block
 that never asks (bypass permissions) is yours to start: an agent can't (Laki AI, `laki_workflow_run`, an agent's
 event), and *Run* says which blocks.
@@ -1301,7 +1337,7 @@ settings) and shows a server icon; the toolbar's ⋯ › *Copy path* gives `devb
 - The workspace's `$PORT` on your Mac reaches the same port on the host: the preview, the toolbar's globe and Expose
   to the world work as they do here. Ports a dev server picks itself aren't forwarded, and the status bar lists none
   of a host's listening ports.
-- Pasted images and the preview's screenshots are copied to the host for its agent.
+- Pasted images, attached files and the preview's screenshots are copied to the host for its agent.
 - *Open in*: VS Code, Cursor or Windsurf open the folder there (their Remote - SSH).
 - If the connection drops, the host's tabs end; Enter starts each again (agents resume their chat).
 - Archiving a workspace needs the host reachable (its worktree is removed there); deleting one doesn't.
@@ -1309,9 +1345,31 @@ settings) and shows a server icon; the toolbar's ⋯ › *Copy path* gives `devb
   `cp "$LAKI_PROJECT_PATH/.env" .`), new files' lines in the diff size, and the agent skill (agents there have no
   `laki`).
 
+### Cloud workspaces (experimental)
+
+Turn it on in Settings › General › *Experimental*. A workspace can then run in a GitHub Codespace of its own: on the
+new-workspace page, *New worktree* ▾ › *In a codespace*, then a machine type (the ones your repo may use). The project
+is a repository on this Mac whose `origin` is on GitHub; Laki makes the codespace through your `gh`, which needs the
+codespace scope once: `gh auth refresh -s codespace` (the page says so when it's missing).
+
+- The workspace shows at once while GitHub makes the codespace (a minute or several): its tabs wait for it, and say
+  why if it fails. The row and the status bar say ☁ *codespace* and its state (being made, on, stopped, starting,
+  failed: hover for why); a click on the status bar's opens your codespaces on GitHub.
+- The codespace starts off the base branch and the workspace gets a branch of its own there (`laki/<name>`), in
+  `/workspaces/<repo>`. Everything else is as for a project over SSH (above): git, gh, setup and the agents run there
+  (install and sign in to the agents there, or in the repo's devcontainer), turns come back through the terminal, and
+  `$PORT` reaches the same port there.
+- *Archive* stops the codespace (its files stay: *Restore* starts it again, and the agents resume); *Delete* deletes
+  it on GitHub, with whatever wasn't pushed. GitHub bills it while it runs, and deletes a stopped one after its
+  retention period (30 days unless you set another). A codespace its idle timeout stopped stays stopped until you use
+  it (a tab's Enter, the Changes panel); restarting Laki starts the ones with tabs again.
+- Not yet: prebuilds, another machine type once it's made, files git ignores copied in (`.env`: use the repo's
+  Codespaces secrets), ports other than `$PORT`.
+
 ### Keys
 
-The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,.
+The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,. Settings › *Keys* changes
+most of them (not ⌘1…⌘9, ⌘↑ / ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N or the text size); these are the defaults.
 
 | key | |
 |---|---|
@@ -1356,7 +1414,7 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
 - *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, off by default: ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
-  kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
+  kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
@@ -1380,7 +1438,8 @@ lit for a moment.
   GitHub rate-limits you; the PR switches need it on), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
-  default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
+  default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
+  and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
   button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
@@ -1487,10 +1546,18 @@ lit for a moment.
   Editing has them; on by default) and
   *Dim other panes* (in a split, the panes without the keyboard fade back; on by default) and *Focus the pane under
   the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; on by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
+- *Keys*: the keys of Laki's own actions (new workspace and tab, close tab, sidebar, side panel, info, palette, find a
+  file, find, the next tab that needs you, send later, artifacts, full screen, back and forward, settings, help):
+  *Record*, then press others (⌘, ⌥ or ⌃ with a key, so typing in a terminal is never taken; ⌫ leaves none), the
+  arrow back to the default, *Reset all*. A row says when its keys are another's too (another of these, the global
+  hotkeys, *Pick an element*, a fixed key like ⌘C, or ⌃ alone: the terminal's). The menu bar and Help show the keys
+  you set; the old ones do nothing.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
-  profile is how it starts, grouped under its agent: a model and an effort (a workspace that picks its own wins),
-  an account (Claude Code and Codex), flags (e.g. `--permission-mode acceptEdits`) and environment variables. Each
+  profile is how it starts, grouped under its agent: a model and an effort, and for Claude Code and Codex a
+  permission mode and *Fast mode* (a workspace that picks its own wins), an account (Claude Code and Codex), flags
+  (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
+  environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
   don't use out of them (its tabs still start and resume). The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them; *Add a profile for…* adds another agent's). Edit `claude` or `codex` to change how every new one starts; a tab started from a profile uses its current settings when it restarts or resumes.
@@ -1696,13 +1763,14 @@ laki new app --issue https://github.com/o/app/issues/12 # a GitHub issue as the 
 laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's branch (gh pr checkout, forks too)
 laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
+laki new app --no-setup --prompt "…"                    # without the setup script (laki run <ws> setup: later)
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
 laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 laki screen fix-the-login/claude
 laki diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
-laki run fix-the-login test                             # the project's test script (lint, format, deploy) in its tab
+laki run fix-the-login test                             # the project's test script (lint, format, deploy, setup) in its tab
 laki screen shot                                        # the booted iOS Simulator's screen: a PNG's path
 laki screen shot Safari | windows                       # an app's frontmost window | the windows open
 laki screen tap 120 640 | swipe 200 700 200 200 | type "hi" | describe   # the simulator's hands (idb)
@@ -1715,7 +1783,7 @@ laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the proj
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
-laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (experimental: Workflows, below)
+laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki flow again <run> [--from <block>] | flow trash | flow restore <trash-id>   # a run again | deleted workflows
 laki flow check [file.md… | folder]                     # check workflow files, no daemon (none: ./.laki/workflows)
@@ -1854,7 +1922,7 @@ agents find their conversations by those paths. It holds:
 - `daemon.log`;
 - `claude-settings.json`: the hooks Claude gets through `--settings`;
 - `widgets/` (your extensions) and `widget-data/` (each one's settings and last data);
-- `plans/`: specs and brainstorms (experimental), a folder each;
+- `plans/`: specs and brainstorms, a folder each;
 - Laki AI's: `ai-key` (the OpenRouter key, 0600), `ai-chat.json` (the conversation), `ai-calls.jsonl` (each ask's
   tokens and cost) and `ai/` (where claude -p and codex exec run);
 - `worktrees/` and `run/`.

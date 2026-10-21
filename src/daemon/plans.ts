@@ -1,5 +1,5 @@
-// Specs and brainstorms (experimental: Settings › General, settings.specs): a folder each, outside the repo and its
-// worktrees, at <data>/plans/<project>/specs|brainstorms/<slug>/ (the project's folder kept as its `plans`). In it:
+// Specs and brainstorms (on unless Settings › General › Pages turns them off: specsOn): a folder each, outside the
+// repo and its worktrees, at <data>/plans/<project>/specs|brainstorms/<slug>/ (the project's folder kept as its `plans`). In it:
 // spec.json (the app's editor: BlockNote's blocks and the title), README.md (the same as Markdown, what agents read;
 // one newer than spec.json, written by someone else, is what the editor loads), files/ (what's pasted or drawn in it)
 // and whatever Laki AI or an agent puts beside them (ideas.md, prototype-*.html, *.diagram.json): a brainstorm's output.
@@ -8,7 +8,7 @@
 // the same id finds them
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
-import { PLAN_KINDS, type Plan, type PlanFile, type PlanKind } from '../shared/types.ts'
+import { PLAN_KINDS, type Plan, type PlanFile, type PlanKind, specsOn } from '../shared/types.ts'
 import { dir, findProject, IMAGES, save, slug, state } from './core.ts'
 import { urlKey, urlKeyOk } from './widgets.ts'
 
@@ -21,7 +21,7 @@ const MAX_WRITE = 2 << 20
 const MAX_TEXT = 2 << 20
 
 const on = () => {
-  if (state.settings?.specs !== true) throw new Error('Specs & Brainstorms are off: turn them on in Settings › General › Experimental')
+  if (!specsOn(state.settings)) throw new Error('Specs & Brainstorms are off: turn them on in Settings › General › Pages')
 }
 
 // a project's plans folder: <data>/plans/<name>-<id> (just <id> when that's its name), made at its first plan and kept

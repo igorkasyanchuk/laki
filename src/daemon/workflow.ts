@@ -1,4 +1,4 @@
-// Workflows (experimental: Settings › General, settings.workflows): the engine. A run walks its workflow's graph
+// Workflows (on unless Settings › General › Pages turns them off: flowsOn): the engine. A run walks its workflow's graph
 // (shared/workflow.ts), pinned to the version it started with, in a worktree of its own (a sidebar row, its `flow`) or
 // the project's folder. Agents think inside their blocks; everything between them is decided here, and each decision
 // (the block, the exit, why) goes in the run with its variables and a log. Runs live in state.flows (state.json), so a
@@ -9,7 +9,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
-import { agentVars, findAction, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
+import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
@@ -38,7 +38,7 @@ const RESUMED = 'Laki restarted while you were on this step. Finish it, then sto
 const STALLED = ['Nudge again', 'Try again', 'Skip it', 'Stop the run'] // a stalled agent's stuck: Stop the run last (flowAnswer's)
 
 export const on = () => {
-  if (state.settings?.workflows !== true) throw new Error('Workflows are off: turn them on in Settings › General › Experimental')
+  if (!flowsOn(state.settings)) throw new Error('Workflows are off: turn them on in Settings › General › Pages')
 }
 
 // ---------- workflows: yours (<data>/workflows), a project's (.laki/workflows in its folder); none come with Laki
@@ -218,7 +218,7 @@ export function flowRestore(o: { trash: string }) {
 }
 // at start and hourly: past TRASH_DAYS, and past the newest TRASH_MAX, gone for good
 export function flowTrashTidy(now = Date.now()) {
-  if (state.settings?.workflows !== true) return
+  if (!flowsOn(state.settings)) return
   const keep = flowTrash().filter((e, i) => i < TRASH_MAX && now - e.at <= TRASH_DAYS * 86400e3)
   const kept = new Set(keep.map(e => e.trash))
   let names: string[] = []
@@ -317,8 +317,10 @@ function decide(r: FlowRun, b: Block, exit: string, why: string, you = false) {
   if (r.decisions.length > 300) r.decisions.splice(0, r.decisions.length - 300)
 }
 const touch = () => (save(), changed())
-// an agent block's agent: its preset's (claude, codex, a command…), else the name as it is
-const agentOf = (preset?: string) => presets().find(p => p.name === (preset || 'claude'))?.agent ?? (preset || 'claude')
+// an agent block's profile, and its agent: its preset's (claude, codex, a command…), else the name as it is
+const profileOf = (preset?: string) => presets().find(p => p.name === (preset || 'claude'))
+const agentOf = (preset?: string) => profileOf(preset)?.agent ?? (preset || 'claude')
+const bypass = (wf: Workflow) => bypassIn(wf, b => profileOf(b.agent)) // its profile's mode and flags count too
 
 // what {{…}} fills: the run's own, the workspace's, its PR's (now)
 function varsOf(r: FlowRun): Record<string, string> {
@@ -399,8 +401,8 @@ export async function flowStart(o: Start) {
         throw new Error(`${wf.name} can't run: ${blockName(b)}: ${(e as Error).message}`)
       }
   }
-  const bypass = bypassIn(wf, b => agentOf(b.agent)).map(blockName)
-  if (o.by === 'agent' && bypass.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${bypass.join(', ')}): start it yourself`)
+  const never = bypass(wf).map(blockName)
+  if (o.by === 'agent' && never.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${never.join(', ')}): start it yourself`)
   const proj = findProject(pick?.project ?? o.project!)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
   if (wf.where === 'here' && !pick) throw new Error(`${wf.name} runs in a workspace you have: pick one (its ⋯ › Run workflow, or --ws)`)
@@ -421,7 +423,7 @@ export async function flowStart(o: Start) {
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}${old ? (o.from ? ` (from run ${old.id}, at ${blockName(blockOf(r, o.from.block)!)})` : ` (again: run ${old.id})`) : ''}`)
-  if (r.dry && bypass.length) say(r, `dry run: ${bypass.join(', ')} would run with bypass permissions (never asks)`)
+  if (r.dry && never.length) say(r, `dry run: ${never.join(', ')} would run with bypass permissions (never asks)`)
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
     touch()
@@ -452,7 +454,7 @@ async function begin(r: FlowRun) {
 
 // the oldest queued run of each workflow with a slot free begins (finish's, and flowTick's in case)
 function next() {
-  if (state.settings?.workflows !== true) return
+  if (!flowsOn(state.settings)) return
   const held = new Set<string>() // a workflow whose oldest waiting can't go: none after it goes either (each pins its at once)
   for (const r of runs().filter(x => x.status === 'queued').sort((a, b) => a.started - b.started)) {
     const of = { id: r.workflow, source: r.source, project: r.project }
@@ -696,7 +698,7 @@ function agent(r: FlowRun, b: Block) {
   const preset = b.agent || 'claude'
   const ag = agentOf(preset)
   if (ag === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
-  const perm = permOf(r.flow, b, ag), fast = b.fast || undefined // addTab checks them, and keeps them for restarts and resumes
+  const perm = permOf(r.flow, b, ag), fast = b.fast || undefined // addTab checks them, and keeps them for restarts and resumes; none: the profile's
   // session: run (the run's tab of that agent), new (a tab of its own), or another block's tab
   const key = b.session === 'new' ? undefined : b.session && b.session !== 'run' ? b.session : `run:${preset}`
   let tab = key ? alive(r.tabs[key]) : r.tries?.[b.id] || back ? alive(r.tabs[b.id]) : undefined // a try again or a restart: its own tab, session new too
@@ -718,7 +720,7 @@ function agent(r: FlowRun, b: Block) {
     say(r, `${blockName(b)}: to ${tab.name}${queued ? ' (queued: it was busy)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   } else {
     tab = addTab(ws.id, { preset, prompt, model: b.model, effort: b.effort, perm, fast, forkOf, name: key === `run:${preset}` ? undefined : blockName(b), agent: r.by })
-    const mode = permWords(perm, fast, ag)
+    const mode = permWords(perm ?? profileOf(preset)?.perm, fast ?? profileOf(preset)?.fast, ag)
     say(r, `${blockName(b)}: a new ${preset} tab, ${tab.name}${mode ? ` (${mode})` : ''}${forkOf ? ' (the last run’s chat, forked)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   }
   r.tabs[b.id] = tab.id
@@ -1283,7 +1285,7 @@ export function flowForget(o: { id: string }) {
 
 // every 5 s: waits, agents that went away, workspaces that did
 export function flowTick(now = Date.now()) {
-  if (state.settings?.workflows !== true) return
+  if (!flowsOn(state.settings)) return
   if (resumeLater) flowResume() // turned on since the start
   for (const r of runs()) {
     if (!live(r)) continue
@@ -1315,7 +1317,7 @@ export function flowTick(now = Date.now()) {
 let resumeLater = false
 const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
-  resumeLater = state.settings?.workflows !== true
+  resumeLater = !flowsOn(state.settings)
   if (resumeLater) return // off: they wait until it's on again
   const asks = (r: FlowRun) => r.status === 'waiting' && r.wait?.kind !== 'agent-ask' // yours wait on; an agent's ask was cut short with its turn
   // queued ones wait on (flowTick's next); one cut short before it had a workspace goes back in the queue
@@ -1351,7 +1353,7 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a) // 
 let listening: { at: number; files: number; list: WorkflowItem[] } | undefined
 eventHooks.flows = (name, payload, wsId, agent) => {
   const out = { flows: [] as string[], refused: [] as string[] }
-  if (state.settings?.workflows !== true) return out
+  if (!flowsOn(state.settings)) return out
   if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on) } // ponytail: the files read again every 10 s, not at each event
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
   for (let wf of listening.list) {
@@ -1371,7 +1373,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
     if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-    if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
+    if (agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project)))))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
     flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload, ...(agent && { agent }) }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))

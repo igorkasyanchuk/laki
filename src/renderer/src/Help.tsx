@@ -7,6 +7,7 @@ import { openExternal } from './api'
 import { Glyph } from './Glyph'
 import { REPO } from './panels'
 import { Icon, IconButton } from './ui'
+import { type KeyId, type KeyMap, keyShow } from '../../shared/keys'
 
 // a row: its key or label, what it says, more words the filter knows it by; n: a numbered step
 type Item = { id?: string; k?: ReactNode; v: ReactNode; find?: string; note?: true; n?: number }
@@ -14,38 +15,42 @@ type Sec = { id: string; title: string; kind?: 'list' | 'pre'; items: Item[] }
 
 const GUIDE = `${REPO}/blob/main/docs/guide.md`
 
-const KEYS: [string, string][] = [
-  ['⌃⌥⌘L', 'from any app: bring Laki forward (Settings › General › Global hotkey)'],
-  ['⌃⌥⌘S', 'from any app, when on: a part of the screen to Laki AI, the mic listening (Settings › General › Global hotkey)'],
-  ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
-  ['⌘N', 'new workspace'],
-  ['⌘T / ⌘W', 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],
-  ['⌘⇧N', "the tab bar's + menu: shell, an agent or a command (↑↓ ⏎, or its letter)"],
-  ['⌘1…⌘9', 'go to a tab'],
-  ['⌘↑ / ⌘↓', 'previous / next workspace'],
-  ['⌘J', 'the next tab that needs you, in any workspace'],
-  ['⌘[ / ⌘]', 'back / forward through the pages and workspaces you were on, the last 25 (Settings › Appearance › Rail turns it off)'],
-  ['⌘L', 'send a message later: to an agent or Laki AI'],
-  ['⌘⇧A', "show or hide the workspace's artifacts (the status bar's Artifacts too; click a folder to go in, ← or its path to go back; their ⋯: Finder, or the side panel's Files; right-click one to copy it)"],
-  ['⌘⇧⏎', 'full screen: just the tab, or back (also the tab bar’s ⤢)'],
-  ['⌘K', "the palette: every workspace (by its PR's number too: 123 or #123), tab and action"],
-  ['⌘P', 'find a file in the workspace'],
-  ['⌘F', 'find in the terminal (here: the filter)'],
-  ['⌘S', "save the file you're editing in the preview"],
-  ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
-  ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes"],
-  ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
-  ['⌘D', 'changes against the base branch'],
-  ['⌥⌘B', 'side panel: info, files, changes, review, preview, simulator'],
-  ['⌘I', 'workspace info, the side panel’s first tab: PR, checks, what each agent said last'],
-  ['⌘E', 'open the workspace in your editor'],
-  ['⌘B', 'hide / show the sidebar'],
-  ['⌘,', 'settings'],
-  ['⌘+ / ⌘− / ⌘0', "text in this tab bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size)"],
-  ['⌘/', 'this page'],
-  ['hold Fn', "talk, let go: it's typed where the cursor is (Settings › Voice's cloud; Esc or another key drops it)"],
-  ['Esc', 'close a page, dialog or menu; in an agent, interrupt its turn'],
-]
+// m: the keys in use (Settings › Keys)
+const keysOf = (m: KeyMap): [string, string][] => {
+  const k = (id: KeyId) => keyShow(m[id]) || 'none'
+  return [
+    ['⌃⌥⌘L', 'from any app: bring Laki forward (Settings › General › Global hotkey)'],
+    ['⌃⌥⌘S', 'from any app, when on: a part of the screen to Laki AI, the mic listening (Settings › General › Global hotkey)'],
+    ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
+    [k('newWs'), 'new workspace'],
+    [`${k('newTab')} / ${k('closeTab')}`, 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],
+    ['⌘⇧N', "the tab bar's + menu: shell, an agent or a command (↑↓ ⏎, or its letter)"],
+    ['⌘1…⌘9', 'go to a tab'],
+    ['⌘↑ / ⌘↓', 'previous / next workspace'],
+    [k('next'), 'the next tab that needs you, in any workspace'],
+    [`${k('back')} / ${k('forward')}`, 'back / forward through the pages and workspaces you were on, the last 25 (Settings › Appearance › Rail turns it off)'],
+    [k('later'), 'send a message later: to an agent or Laki AI'],
+    [k('artifacts'), "show or hide the workspace's artifacts (the status bar's Artifacts too; click a folder to go in, ← or its path to go back; their ⋯: Finder, or the side panel's Files; right-click one to copy it)"],
+    [k('full'), 'full screen: just the tab, or back (also the tab bar’s ⤢)'],
+    [k('palette'), "the palette: every workspace (by its PR's number too: 123 or #123), tab and action"],
+    [k('files'), 'find a file in the workspace'],
+    [k('find'), 'find in the terminal (here: the filter)'],
+    ['⌘S', "save the file you're editing in the preview"],
+    ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
+    ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes"],
+    ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
+    ['⌘D', 'changes against the base branch'],
+    [k('panel'), 'side panel: info, files, changes, review, preview, simulator'],
+    [k('info'), 'workspace info, the side panel’s first tab: PR, checks, what each agent said last'],
+    ['⌘E', 'open the workspace in your editor'],
+    [k('sidebar'), 'hide / show the sidebar'],
+    [k('settings'), 'settings'],
+    ['⌘+ / ⌘− / ⌘0', "text in this tab bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size)"],
+    [k('help'), 'this page'],
+    ['hold Fn', "talk, let go: it's typed where the cursor is (Settings › Voice's cloud; Esc or another key drops it)"],
+    ['Esc', 'close a page, dialog or menu; in an agent, interrupt its turn'],
+  ]
+}
 
 const GLYPHS: [string, string][] = [
   ['waiting', 'needs you: a permission prompt or a question'],
@@ -83,7 +88,7 @@ const Row = ({ id, k, children }: { id?: string; k: ReactNode; children: ReactNo
   </div>
 )
 
-export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?: boolean; zoom?: number; onClose: () => void }) {
+export function HelpPage({ cli, ship, zoom = 1, keys, onClose }: { cli: string; ship?: boolean; zoom?: number; keys: KeyMap; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<{ sec?: string; row?: string }>({}) // ids in view
   const main = useRef<HTMLDivElement>(null)
@@ -115,7 +120,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} widget tools · widget tool <id> <action> '{…}'`, "extensions' tools for agents: the list, and a call (Laki asks you first, once per workspace by default)"],
     [`${cli} widget render <id> --ws <workspace>`, "a per-workspace extension's instance (run, action and check take --ws too)"],
     [`${cli} widget check <id|folder>`, "what's wrong with an extension: widget.json, its ui against its sample and fixtures, its fetch once (--no-run)"],
-    [`${cli} flow · flow run <workflow> <project> "…" · flow show <run>`, 'workflows (Settings › General › Experimental): list them and their runs, start one on a task, see where it is'],
+    [`${cli} flow · flow run <workflow> <project> "…" · flow show <run>`, 'workflows: list them and their runs, start one on a task, see where it is'],
     [`${cli} ai "what are my agents doing?"`, 'ask Laki AI (Settings › AI); --image <png> with a screenshot; ai log: each call and its cost; ai new: start over'],
     [`${cli} mcp`, 'an MCP server for Claude Code, Codex…: Settings › Agent skill has the command that adds it'],
     [`${cli} stop`, 'stop the daemon: agents resume when it starts again'],
@@ -143,7 +148,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         'When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.',
       ].map((v, i) => ({ v, n: i + 1 })),
     },
-    { id: 'keys', title: 'Keys', items: KEYS.map(([k, v]) => ({ k: kbds(k), v })) },
+    { id: 'keys', title: 'Keys', items: [...keysOf(keys).map(([k, v]) => ({ k: kbds(k), v })), { note: true, v: 'Settings › Keys changes the keys of most of these.' }] },
     {
       id: 'status',
       title: 'Status',
@@ -189,7 +194,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         {
           id: 'workflows',
           k: <><Icon name="flow" /> Workflows</>,
-          v: 'Settings › General › Experimental. Blocks Laki runs for a task: agents, commands, Case (text, numbers, JS), asks, an AI call, an AI decision (a decision model on OpenRouter answers how true, choice or score questions, a way out per answer if you like; unsure, it asks you), a webhook, Show you (a window with HTML or Markdown), PR actions. Each block has an ID for its {{steps.<id>.…}}. The editor’s sidebar: Blocks (a click adds one after the picked block, a drag drops it on the canvas) and {{ }} Variables (a click copies one, a drag puts it in a field). Notify me (and on my phone) on Show you and End; JSON mode on agents and AI calls. A block’s right click adds one after it, duplicates or deletes it. Test it sends an AI call, decision or webhook once. Laki AI changes the open workflow, or makes one after a few questions. A scheduled task can start one. A repo’s workflow starts on an event, a schedule or an agent only once you Save it or Allow… it; one an agent wrote runs only from its editor’s Start until you save it.',
+          v: 'The rail’s Flows (Settings › General › Pages turns it off). Blocks Laki runs for a task: agents, commands, Case (text, numbers, JS), asks, an AI call, an AI decision (a decision model on OpenRouter answers how true, choice or score questions, a way out per answer if you like; unsure, it asks you), a webhook, Show you (a window with HTML or Markdown), PR actions. Each block has an ID for its {{steps.<id>.…}}. The editor’s sidebar: Blocks (a click adds one after the picked block, a drag drops it on the canvas) and {{ }} Variables (a click copies one, a drag puts it in a field). Notify me (and on my phone) on Show you and End; JSON mode on agents and AI calls. A block’s right click adds one after it, duplicates or deletes it. Test it sends an AI call, decision or webhook once. Laki AI changes the open workflow, or makes one after a few questions. A scheduled task can start one. A repo’s workflow starts on an event, a schedule or an agent only once you Save it or Allow… it; one an agent wrote runs only from its editor’s Start until you save it.',
         },
         {
           id: 'remote',
@@ -217,7 +222,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         { id: 'widgets', k: 'Extensions', v: 'Extensions (also called widgets or plugins): live views in the sidebar, the top bar, the status bar, on My Desk or as a tab of the right panel (a click opens the full view), a mark on each workspace’s row, or buttons on the rail and in the sidebar’s foot (an icon, a label and a count kept up to date, a click that runs one of its actions); their actions can show up in ⌘K, a workspace’s, tab’s or file’s right click, a key of their own, and the new-workspace prompt’s Insert menu: each a folder with widget.json (its ui: the UI kit, Settings › Extensions › UI kit) and, for a look of its own, widget.html, fed by a command, a script, a file, a URL or an agent while the app is open. Settings › Extensions lists them, Yours then Built in, each with its switch (each starts off; one that needs a setting opens at it); a click opens its page: where it shows (one place or several), its size and its full view’s, its settings, its data, runs and files. Remix (a row’s, or Files’ Remix it…) copies any one to change, yours, with Laki AI on or off. New ▾ makes one from a starter, or With Laki AI… in the studio (⌘K New extension…), saved off until you turn it on; without Laki AI, its page gives you the prompt for any AI chat. An extension’s page keeps its own chat with Laki AI. Delete puts one in the trash for 30 days (Undo). The Extension creator skill (Settings › Agent skill) has your agent make them.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
         { id: 'desk', k: 'My Desk', v: "The rail's My Desk (off: Settings › General › Pages): your extensions as tiles. Add puts one there; drag a tile's head anywhere on the grid (gaps stay, a tile in the way moves down), its corner to resize it; tabs keep tiles apart (+ adds one)." },
-        { id: 'specs', k: 'Specs & Brainstorms', v: "Experimental (Settings › General turns it on), then Specs on the rail (or the sidebar's foot, or ⌘K): specs (what to build, like a Notion page) and brainstorms (ideas Laki AI explores beside them) in one list, newest first, each with its kind; filter by words, project or kind (All, Specs, Brainstorms). New ▾ starts either, empty or from a template (Edit templates… at its foot). A click opens one the page's whole width; the breadcrumbs go back." },
+        { id: 'specs', k: 'Specs & Brainstorms', v: "Specs on the rail (or the sidebar's foot, or ⌘K; Settings › General › Pages turns it off): specs (what to build, like a Notion page) and brainstorms (ideas Laki AI explores beside them) in one list, newest first, each with its kind; filter by words, project or kind (All, Specs, Brainstorms). New ▾ starts either, empty or from a template (Edit templates… at its foot). A click opens one the page's whole width; the breadcrumbs go back." },
         { id: 'todos', k: 'To-dos', v: "Experimental (Settings › General turns it on), then To-dos on the rail (or ⌘K): one checklist of your own, like a Notion page. Enter makes the next to-do, Tab puts one under the one above, # a heading; the handle drags one into place." },
         { id: 'bird', k: 'Bird view', v: 'The eye beside Help (off: Settings › General › Pages) shows every live session at once, a card each under its workspace with its screen as it is now; All, Working or Needs you. A click opens it.' },
         { id: 'glow', k: 'Laki AI’s glow', v: 'As Laki AI reads a tab or uses the agent browser, a rainbow edge turns once around that tab (else the window), then fades. Off: Settings › AI.' },

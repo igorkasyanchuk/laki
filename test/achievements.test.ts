@@ -59,5 +59,5 @@ test("achievements: the view's numbers going up and values changing earn, never 
   assert.deepEqual(wentUp(a, mem), []) // an agent's memory isn't yours
   const own = upsOf(view({ projects: [{ id: 'p', name: 'p', path: '/p', config: { templates: [{ name: 't', text: 'x' }], actions: [{ name: 'a', text: 'x', target: 'claude' }] } }] }))
   assert.deepEqual(wentUp(a, own).sort(), ['projectAction', 'projectTemplate']) // a project's own, not the global ones
-  assert.deepEqual(wentUp(a, upsOf(view({ settings: { actions: [{ name: 'a', text: 'x', target: 'shell' }], workflows: true, specs: false } }))).sort(), ['action', 'experimental'])
+  assert.deepEqual(wentUp(a, upsOf(view({ settings: { actions: [{ name: 'a', text: 'x', target: 'shell' }], calendar: true, workflows: true } }))).sort(), ['action', 'experimental']) // workflows: on by default, not a try
 })

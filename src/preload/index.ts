@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('laki', {
   onEarn: (cb: (id: string) => void) => void ipcRenderer.on('earn', (_e, id: string) => cb(id)), // an achievement main saw: the global hotkey, a bubble's click
   onFront: (cb: (on: boolean) => void) => ipcRenderer.on('front', (_e, on: boolean) => cb(on)), // Laki in front of other apps, or not
   onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
-  onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // ⌘W or ⌘T while a Browsers page has the keyboard, or a menu bar item's key
+  onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // a Browsers page's ⌘T or ⌘W (Settings › Keys': a shared/keys.ts id), or a menu bar item's id or key
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('laki', {
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
+  keys: (over: Record<string, string>) => ipcRenderer.send('keys', over), // Settings › Keys' over shared/keys.ts' defaults: the menu shows them
   shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label), // Screenshot to Laki AI's ('' none; false: it's off)
   // the AI window's: Screenshot to Laki AI's picture (a PNG, base64), for its box
   onAiShot: (cb: (png: string) => void) => {

@@ -1,6 +1,6 @@
 // A project's page (a click on its name in the sidebar): its Notes, its Scheduled tasks, Memory (the user's items to
 // keep, and what agents learned, auto-memory: MEMORY_MAX each; claude and codex get both at every start), its Specs
-// (experimental: settings.specs; the Specs page opens one) and its Settings (Settings' own project section). Notes are
+// (settings.specs, on unless turned off; the Specs page opens one) and its Settings (Settings' own project section). Notes are
 // the user's alone: kept with the project in the daemon. App.tsx passes a ProjectApi.
 import { useEffect, useState } from 'react'
 import { type CompactLogLine, type Memory, MEMORY_MAX, type Plan, type PlanKind, type Project, type ProjectConfig, type RunAction, type Schedule, type Template } from '../../shared/types'
@@ -22,13 +22,13 @@ export const PROJECT_TABS = [
 export type ProjectTab = (typeof PROJECT_TABS)[number][0]
 export type ProjectApi = {
   save(o: { notes?: string; memory?: Memory[] }): Promise<unknown>
-  saveSettings(o: { name?: string; config: ProjectConfig; notes?: string }): unknown
+  saveSettings(o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }): unknown
   file(id: string): Promise<ProjectConfig>
   global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean } // Settings' own, which go with the project's
   onGlobal(sec: 'actions' | 'templates'): void
   schedules(): void // the Scheduled tasks page, at this project: making and changing them is there
   setSchedule(id: string, on: boolean): Promise<unknown>
-  specs?: { list(): Promise<Plan[]>; open(at?: { kind: PlanKind; slug?: string }): void } // experimental: on, the Specs tab
+  specs?: { list(): Promise<Plan[]>; open(at?: { kind: PlanKind; slug?: string }): void } // Specs on (specsOn): the Specs tab
   compact?: CompactApi // Laki AI on: the learned memories' Compact now and its log
 }
 export type CompactApi = { run(): Promise<unknown>; log(): Promise<CompactLogLine[]> }

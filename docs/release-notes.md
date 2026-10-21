@@ -4,6 +4,33 @@ version it builds, with the date. -->
 
 ## Next
 
+- A notification as a plan limit nears its end: Claude's or Codex's 5-hour or weekly limit at 90% (Settings ›
+  General › *Plan limit at*: 75, 90 or 95), once per reset, while Laki is open.
+- Review's suggestions: a reviewer's ```` ```suggestion ```` shows as a small diff with *Apply* (and *Apply all* for a
+  file's), written into the workspace's file only while its lines are as reviewed, with Undo; nothing is committed.
+- The new-workspace page's *More* › *Skip the setup script*: a worktree whose agent starts at once (`laki new
+  --no-setup`); Run ▾ › *Run the setup script* runs it later.
+- A color and an icon or emoji per project (its ⋯ › *Color* and *Icon…*, or Settings › the project): before its name in
+  the sidebar, menus, the palette and the window's title; its color on its workspaces' bar, rail pins and bubbles.
+- Attach any file to a prompt, not only screenshots: paste, drop or pick a PDF, a log, a zip (up to 25 MB) on the
+  new-workspace page or a to-do. It shows as a chip and its path goes to the agent; a folder dropped in is its path.
+- Settings › *Keys*: Laki's main keys (⌘N, ⌘T, ⌘W, ⌘K, ⌘P, ⌘J, ⌘B, ⌥⌘B…) take other keys, with a warning when
+  another action, a global hotkey or a key of macOS's has them. The menu bar and Help show the ones you set.
+- **Workflows are on for everyone**, out of Experimental: the rail's Flows, ⌘K and a workspace's *Run workflow ›*.
+  Settings › General › *Pages* turns them off.
+- **Specs & Brainstorms are on for everyone**, out of Experimental: the rail's Specs and a project's Specs tab. The
+  editor still loads only as the page opens. Settings › General › *Pages* turns them off.
+- A profile (Settings › Agents & profiles) can carry a permission mode and fast mode for Claude Code and Codex. New
+  workspaces start with them picked, still yours to change; workflows' agent blocks take them when they say none.
+- A context meter on Claude Code and Codex tabs: a line along the tab's bottom edge and a bar in the status bar fill as
+  the chat's context does, amber past 70%, red past 90% (*142K of 200K tokens · 71%*). Settings › Appearance › *Context
+  meter*: a line under the tab, a ring on it, the status bar only, or off.
+- What each Claude Code and Codex chat used, on its tab's tooltip (*≈ $0.42 · 1.2M tokens*), and today's in the plan
+  limits' popup with the workspaces that used most: an estimate at API prices. Settings › Appearance › *Tokens and
+  cost* hides it.
+- Cloud workspaces (experimental, Settings › General): the new-workspace page's *In a codespace* runs a workspace in a
+  GitHub Codespace of its own, with a machine type, through your `gh`. Archive stops it, Restore starts it again,
+  Delete deletes it.
 - The Simulator tab takes your keyboard: click its screen and type (a paste, Return, Delete and the arrows too; Esc lets
   go).
 - Settings › Simulators › *Devices*: every iPhone and iPad simulator and Android virtual device on this Mac, with

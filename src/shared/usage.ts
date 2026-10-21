@@ -12,6 +12,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
                                     tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
+            [--no-setup]            without the project's setup script (.worktreeinclude's files still copied)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
   laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
@@ -27,7 +28,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
                                               the simulator's hands, in points (needs idb); describe: its elements
-  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message> [--force]
+  laki diff <ws> | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--force]
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
                                               a hidden browser on the workspace's localhost (the app must be open);
@@ -37,7 +38,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
-  laki flow [ls]                             workflows (experimental: Settings › General) and their runs
+  laki flow [ls]                             workflows and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs)
   laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
@@ -89,7 +90,8 @@ script: projects (id, path), workspaces (id, branch, path, port, pr, tabs: a | b
 script, with the agent started on the prompt. Prints the new workspace's id. In a Laki tab, . is this tab's project.
 Write the prompt as for a colleague who hasn't seen this conversation: the goal, where to look, how to tell it's done.
 From an agent's tab: an agent or a shell, no --cmd and no command preset. A repo's .laki.json (its setup, env, scripts)
-waits until the user trusts it in the app: the workspace is made, its setup runs then.
+waits until the user trusts it in the app: the workspace is made, its setup runs then. --no-setup skips the setup
+script (laki run <ws> setup runs it later).
 
   laki new . --prompt "Add CSV export to the reports page; npm test passes"
   laki new shop --preset codex --name csv-export --prompt "…"
@@ -147,7 +149,8 @@ prints the page's text. In a tab, <ws> is its own.
 
   laki archive a1b2`,
   run: `Starts the project's run script (a dev server, on $PORT) in a tab of its own, or test, lint, format or deploy
-(the project's scripts) in theirs. A repo's .laki.json runs nothing until the user trusts it in the app: it says so.
+(the project's scripts) in theirs, or setup (the setup script: a worktree made with --no-setup, or again). A repo's
+.laki.json runs nothing until the user trusts it in the app: it says so.
 
   laki run a1b2
   laki run a1b2 test`,
@@ -165,7 +168,7 @@ late is skipped). --where: new (a worktree each run), folder, folder-new, or a w
 this workspace.
 
   laki remind "tomorrow at 9am" Check the deploy --ws .`,
-  flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
+  flow: `Workflows: graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
 have (--ws; . is this tab's, the project then its). --dry says what a PR, approve or merge would do instead of doing it.
 --set gives one of its Start's inputs (inputs: in the file), again for each; the ones without a default are needed.
 check reads workflow files as Laki would and names each problem (a repo's hook or CI: it needs no daemon). One an agent

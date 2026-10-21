@@ -5,12 +5,12 @@
 // (DeskBuild: what it should show, screenshots, files) opens the extension studio on it: Laki AI asks, then writes one
 // placed here, a tile with its sample data, off until you turn it on. App.tsx passes a DeskApi.
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
-import { ICONS, type IconName } from '../../shared/icons'
+import { emojiOf } from '../../shared/icons'
 import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, deskLayout, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
 import { type Img, PromptInput, useDraft } from './PromptInput'
-import { colorVar, Icon, IconButton, isIconName, type MenuItem, ON, Page, TAB_COLORS, useMenu } from './ui'
+import { colorVar, Icon, IconButton, iconItems, isIconName, type MenuItem, Page, TAB_COLORS, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export type DeskApi = WidgetApi & {
@@ -25,9 +25,6 @@ export const onDesk = (w: WidgetView) => placesOf(w).includes('desk') && (w.on |
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const MAIN: DeskTab = { id: 'main', name: 'My Desk' } // the one tab while none are set
 const TAB_KEY = 'laki.deskTab'
-const ICON_NAMES = Object.keys(ICONS) as IconName[] // a tab's icon picker: each by its words (arrowLeft: arrow left), for the filter
-// a tab's icon may be an emoji instead, typed or pasted into the picker's box (a flag, a keycap, a ZWJ sequence)
-const emojiOf = (s?: string) => (t => (t && t.length <= 16 && !/[\p{L}\s]/u.test(t) && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(t) ? t : undefined))(s?.trim())
 const tabNow = () => {
   try {
     return localStorage.getItem(TAB_KEY) ?? ''
@@ -128,12 +125,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   const tabMenu = (e: React.MouseEvent, t: DeskTab) =>
     openMenu(e, [
       { label: 'Rename', icon: 'pencil', run: () => setNaming(t.id) },
-      {
-        label: 'Icon…',
-        icon: isIconName(t.icon) ? t.icon : 'star',
-        items: [{ filter: 'Find an icon, or type an emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => setIcon(t.id, e) } : null))(emojiOf(q)) }, ...ICON_NAMES.map(n => ({ label: n.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(), icon: n, hint: t.icon === n ? ON : undefined, run: () => setIcon(t.id, n) }))],
-      },
-      ...(t.icon ? [{ label: 'No icon', icon: 'x', run: () => setIcon(t.id) } as MenuItem] : []),
+      ...iconItems(t.icon, i => setIcon(t.id, i)),
       { colors: TAB_COLORS, value: t.color, pick: c => setColor(t.id, c) },
       ...(tabList[0].id !== t.id ? [{ label: 'Move left', icon: 'chevronLeft', run: () => shiftTab(t.id, -1) } as MenuItem] : []),
       ...(tabList.at(-1)!.id !== t.id ? [{ label: 'Move right', icon: 'chevronRight', run: () => shiftTab(t.id, 1) } as MenuItem] : []),

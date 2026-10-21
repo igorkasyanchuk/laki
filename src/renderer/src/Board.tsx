@@ -1,14 +1,14 @@
 // The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by where it is (its agents
 // at work, waiting for you, done, a PR open, merged), and To do: prompts waiting for a workspace. Start, or a drag
 // onto another column, makes one with the default agent; a click on a card opens its workspace, a right click (or ⋯)
-// is its menu: open, archive, delete; Merged's ⋯ archives them all. A to-do takes screenshots pasted or dropped in: their
-// paths go after its text as it starts.
+// is its menu: open, archive, delete; Merged's ⋯ archives them all. A to-do takes screenshots and files pasted or dropped
+// in: their paths go after its text as it starts.
 import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
 import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
 import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
-import { type Img, PromptInput } from './PromptInput'
+import { FileChip, type Img, PromptInput } from './PromptInput'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
 export type BoardApi = {
@@ -16,6 +16,7 @@ export type BoardApi = {
   start: (t: Todo) => Promise<unknown>
   add: (project: string, text: string, images: string[]) => Promise<unknown>
   saveImage: (base64: string, ext: string) => Promise<string> // imageSave: the saved file's path
+  saveFile: (base64: string, name: string) => Promise<string> // fileSave: another file's
   rm: (id: string) => Promise<unknown>
   menu: (e: MouseEvent, w: WorkspaceView) => void // a card's: open, archive, delete
   archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Merged's ⋯
@@ -30,6 +31,7 @@ const COLUMNS = [
 ] as const
 type Column = (typeof COLUMNS)[number][0]
 const TODO = 'text/x-laki-todo' // a dragged to-do's id
+const isImage = (p: string) => /\/images\/[^/]+$/.test(p) // imageSave's (<data>/images/…), else fileSave's (<data>/files/<id>/<name>)
 
 // where a workspace is: what its agents do first (a usage limit resumes by itself: still running; a failed one needs
 // you), then its PR
@@ -87,7 +89,8 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
           {todos.map(t => (
             <div key={t.id} className={`board-card todo ${starting.includes(t.id) ? 'busy' : ''}`} draggable onDragStart={e => e.dataTransfer.setData(TODO, t.id)}>
               {t.text && <div className="board-text">{t.text}</div>}
-              {!!t.images?.length && <Thumbs paths={t.images} />}
+              {!!t.images?.some(isImage) && <Thumbs paths={t.images.filter(isImage)} />}
+              {t.images?.filter(p => !isImage(p)).map(p => <FileChip key={p} path={p} />)}
               <div className="board-foot">
                 <span className="muted small">{name(t.project)}</span>
                 <span className="spacer" />
@@ -104,7 +107,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
           ))}
           {projects.length > 0 && (
             <form className="board-add" onSubmit={add}>
-              <PromptInput value={text} onChange={setText} images={images} onImages={setImages} save={api.saveImage} onSubmit={add} onBusy={setSaving} rows={3} focus={false} placeholder="What should an agent do? Paste or drop screenshots. (⌘⏎ adds it)" />
+              <PromptInput value={text} onChange={setText} images={images} onImages={setImages} save={api.saveImage} saveFile={api.saveFile} onSubmit={add} onBusy={setSaving} rows={3} focus={false} placeholder="What should an agent do? Paste or drop screenshots and files. (⌘⏎ adds it)" />
               <div className="board-foot">
                 {projects.length > 1 && (
                   <select value={project} onChange={e => setPick(e.target.value)} title="Project">

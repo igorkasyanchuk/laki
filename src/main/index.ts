@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
+import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import type { View } from '../shared/types.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -121,9 +122,11 @@ app.on('web-contents-created', (_e, wc) => {
     // the popup itself opens no more windows: its links to a new one load in it
     guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
     guest.on('context-menu', (_e, p) => pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))
-    // ⌘W and ⌘T are the app's (close this page, open another), not the page's: it gets the keys while it has the focus
+    // new and close tab (⌘T, ⌘W: Settings › Keys') are the app's (open another page, close this one), not the page's:
+    // it gets the keys while it has the focus
     guest.on('before-input-event', (e, i) => {
-      if (i.type === 'keyDown' && i.meta && !i.control && !i.alt && !i.shift && /^[tw]$/i.test(i.key)) e.preventDefault(), wc.send('browser-key', i.key.toLowerCase())
+      const id = i.type === 'keyDown' ? keyFor({ key: i.key, code: i.code, metaKey: i.meta, ctrlKey: i.control, altKey: i.alt, shiftKey: i.shift }, keysNow) : undefined
+      if (id === 'newTab' || id === 'closeTab') e.preventDefault(), wc.send('browser-key', id)
     })
   })
 })
@@ -284,12 +287,14 @@ function show(tab?: string) {
 // the global hotkey (Settings › General, ui.tsx keyLabel's text: ⌃⌥⌘L; '' none): Laki forward from any app. False:
 // another app (or macOS) has those keys
 const ACCEL_KEYS: Record<string, string> = { Space: 'Space', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Enter: 'Return', '+': 'Plus' }
+const COMBO = /^(⌃?)(⌥?)(⇧?)(⌘?)(.+)$/
+const accel = (m: RegExpExecArray, cmd = mac ? 'Command' : 'Super') => [m[1] && 'Control', m[2] && 'Alt', m[3] && 'Shift', m[4] && cmd, ACCEL_KEYS[m[5]] ?? m[5]].filter(Boolean).join('+')
 function accelOf(label: string) {
-  const m = /^(⌃?)(⌥?)(⇧?)(⌘?)(.+)$/.exec(label)
+  const m = COMBO.exec(label)
   const mods = [m?.[1], m?.[2], m?.[4]].filter(Boolean).length
   // a key with one of ⌃ ⌥ ⌘ (⌘K, ⌥A) would be taken from every app: two of them, or one with Space or an F key
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
-  return [m[1] && 'Control', m[2] && 'Alt', m[3] && 'Shift', m[4] && (mac ? 'Command' : 'Super'), ACCEL_KEYS[m[5]] ?? m[5]].filter(Boolean).join('+')
+  return accel(m)
 }
 type Key = 'open' | 'shot' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk)
 const keys: Record<Key, string> = { open: '', shot: '' } // what each holds
@@ -1115,22 +1120,31 @@ async function quitCompletely() {
 }
 
 // the renderer owns ⌘W/⌘N/⌘T/⌘K…: the menu shows each key without registering it (the key still goes to App's
-// keys), and a click sends it there as browser-key, as a Browsers page does
+// keys), and a click sends it there as browser-key, as a Browsers page does: a fixed one's key, or one of Settings ›
+// Keys' by its id (bound: its keys in keysNow, from the app window's keys IPC, which builds the menu again)
 // ponytail: Toggle Sidebar has one title; Show/Hide by its state would need the renderer to rebuild the menu
+let keysNow = keyMap()
 const key = (label: string, accelerator: string, k: string): MenuItemConstructorOptions => ({
   label,
   accelerator,
   registerAccelerator: false,
   click: () => (show(), win?.webContents.send('browser-key', k)),
 })
-Menu.setApplicationMenu(
+const bound = (label: string, id: KeyId): MenuItemConstructorOptions => ({
+  label,
+  accelerator: (m => (m ? accel(m, 'CmdOrCtrl') : undefined))(COMBO.exec(keysNow[id])), // none: '' (no keys)
+  registerAccelerator: false,
+  click: () => (show(), win?.webContents.send('browser-key', id)),
+})
+ipcMain.on('keys', (e, over: unknown) => from(e) && ((keysNow = keyMap(over)), appMenu()))
+const appMenu = () => Menu.setApplicationMenu(
   Menu.buildFromTemplate([
     {
       label: app.name,
       submenu: [
         { label: `About ${app.name}`, click: () => openLink('laki://about') }, // the renderer's: with the website
         { type: 'separator' },
-        key('Settings…', 'CmdOrCtrl+,', ','),
+        bound('Settings…', 'settings'),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -1145,14 +1159,14 @@ Menu.setApplicationMenu(
     {
       label: 'File',
       submenu: [
-        key('New Workspace…', 'CmdOrCtrl+N', 'n'),
-        key('New Tab', 'CmdOrCtrl+T', 't'),
+        bound('New Workspace…', 'newWs'),
+        bound('New Tab', 'newTab'),
         key('Open Project Folder…', 'CmdOrCtrl+O', 'o'),
         { type: 'separator' },
-        key('Go to File…', 'CmdOrCtrl+P', 'p'),
+        bound('Go to File…', 'files'),
         key('Open in Editor', 'CmdOrCtrl+E', 'e'),
         { type: 'separator' },
-        key('Close Tab', 'CmdOrCtrl+W', 'w'),
+        bound('Close Tab', 'closeTab'),
       ],
     },
     {
@@ -1168,17 +1182,17 @@ Menu.setApplicationMenu(
         { role: 'delete' },
         { role: 'selectAll' },
         { type: 'separator' },
-        key('Find…', 'CmdOrCtrl+F', 'f'),
+        bound('Find…', 'find'),
       ],
     },
     {
       label: 'View',
       submenu: [
-        key('Toggle Sidebar', 'CmdOrCtrl+B', 'b'),
-        key('Workspace Info', 'CmdOrCtrl+I', 'i'),
+        bound('Toggle Sidebar', 'sidebar'),
+        bound('Workspace Info', 'info'),
         key('Changes', 'CmdOrCtrl+D', 'd'),
         { type: 'separator' },
-        key('Command Palette…', 'CmdOrCtrl+K', 'k'),
+        bound('Command Palette…', 'palette'),
         { type: 'separator' },
         key('Bigger Text in This Tab', 'CmdOrCtrl+Plus', '='),
         key('Smaller Text in This Tab', 'CmdOrCtrl+-', '-'),
@@ -1193,7 +1207,7 @@ Menu.setApplicationMenu(
     {
       label: 'Go',
       submenu: [
-        key('Next That Needs You', 'CmdOrCtrl+J', 'j'),
+        bound('Next That Needs You', 'next'),
         key('Previous Workspace', 'CmdOrCtrl+Up', 'ArrowUp'),
         key('Next Workspace', 'CmdOrCtrl+Down', 'ArrowDown'),
         { type: 'separator' },
@@ -1205,12 +1219,13 @@ Menu.setApplicationMenu(
     {
       role: 'help',
       submenu: [
-        key(`${app.name} Help`, 'CmdOrCtrl+/', '/'),
+        bound(`${app.name} Help`, 'help'),
         { label: 'Get Started Again…', click: () => openLink('laki://onboard') }, // the first steps, after Don't show again too
       ],
     },
   ]),
 )
+appMenu()
 
 app.whenReady().then(async () => {
   if (app.isPackaged) app.setAsDefaultProtocolClient('laki')

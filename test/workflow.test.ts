@@ -154,13 +154,16 @@ end: success · notify: yes
 end: failed
 `
 
-test('workflow runs: off until turned on, a worktree each, agents, commands, choices, asks, saves, a dry run’s actions', async t => {
+test('workflow runs: on unless turned off, a worktree each, agents, commands, choices, asks, saves, a dry run’s actions', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await assert.rejects(rig.rpc('flowList', {}), /Workflows are off: turn them on in Settings › General › Experimental/)
-  assert.equal((await rig.rpc('state')).flows, undefined)
+  assert.deepEqual(await rig.rpc('flowList', {}), [], 'a fresh state: on with no setting, none come with Laki')
+  assert.equal(typeof (await rig.rpc('state')).flowFiles, 'number', 'the view has them')
+  await rig.rpc('settingsSet', { workflows: false })
+  await assert.rejects(rig.rpc('flowList', {}), /Workflows are off: turn them on in Settings › General › Pages/)
+  assert.equal((await rig.rpc('state')).flowFiles, undefined)
   await rig.rpc('settingsSet', { workflows: true })
-  assert.deepEqual(await rig.rpc('flowList', {}), [], 'none come with Laki')
+  assert.deepEqual(await rig.rpc('flowList', {}), [])
 
   // yours, and a project's (in its repo); a built-in is read-only; a run refuses one with problems
   await rig.rpc('flowSave', { id: 'test', text: FLOW })
@@ -1284,6 +1287,25 @@ test('workflow permission modes: perm and fast per agent block and the head’s 
   const dry = await rig.rpc('flowStart', { workflow: 'yolo', project: p.id, task: 'x', dry: true })
   assert.ok((await rig.rpc('flowGet', { id: dry.id })).log.some((l: string) => /dry run: build would run with bypass permissions/.test(l)))
   await rig.rpc('flowStop', { id: dry.id })
+
+  // a block and the head with no mode: its profile's (and its fast mode); a profile that never asks, by its mode or its
+  // flags, is the user's to start too
+  const profiled = (name: string) => MODES.replace(' · perm: acceptEdits', '').replace('agent: claude\n> build', `agent: ${name}\n> build`)
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'quick', agent: 'claude', perm: 'plan', fast: true }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'skip', agent: 'claude', args: '--dangerously-skip-permissions', perm: 'plan' }] })
+  for (const name of ['yolo', 'skip']) {
+    await rig.rpc('flowSave', { id: name, text: profiled(name) })
+    await assert.rejects(rig.rpc('flowStart', { workflow: name, project: p.id, task: 'x', by: 'agent' }), /never asks \(bypass permissions: build\): start it yourself/, name)
+  }
+  await rig.rpc('flowSave', { id: 'quick', text: profiled('quick') })
+  const q = await rig.rpc('flowStart', { workflow: 'quick', project: p.id, task: 'x' })
+  const qr = await until(async () => {
+    const x = await rig.rpc('flowGet', { id: q.id })
+    return x.status === 'done' && x
+  }, 'done', 20000)
+  const args: string[] = rig.fakeLog().find(l => l.bin === 'claude' && l.tab === qr.tabs.build).args
+  assert.equal(args[args.indexOf('--permission-mode') + 1], 'plan')
+  assert.match(args[args.indexOf('--settings') + 1], /claude-settings-fast\.json$/)
+  assert.ok(qr.log.some((l: string) => /build: a new quick tab, .* \(plan mode · fast\)/.test(l)), qr.log.join('\n'))
 })
 
 // the paths a user hits first: a restart mid turn, a usage limit, real PR checks, an agent's tab closed

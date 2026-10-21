@@ -120,11 +120,19 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
 `chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`); 101: To-dos
 (`todoListGet`/`todoListSave`), the side panel's Simulator (`sim`, `check`; settings' `simulator`); 102: a project's `simulator`, kept by `projectSet`; 103: `sim`
-`devices`, `start`, `stop`. A
+`devices`, `start`, `stop`; 104: the meters (a tab's `context` and `usage`, the view's `today`), `prThreads`' `startLine`, `side` and
+`hunk`, `wsNew` `noSetup` and a workspace's `noSetup`, a project's `hasSetup` (the view's), `run` `script: 'setup'`, a project's `color`
+(`TAB_COLORS`) and `icon` (an `ICONS` name or an emoji), kept by `projectSet`, `fileSave` (`name`, `data`: `<data>/files/<id>/<name>`,
+`FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
+profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
+view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
+`codespace`, `csState` and `csError`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
-- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `notes`: the user's Markdown, the
+- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
+  and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
+  refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
   the project page's Memory, the whole list (the user's `MEMORY_MAX`, refused past it unless it had more; agents'
   `auto` ones, the newest `MEMORY_MAX`), likewise left out of MCP's state (MCP's `laki_memory` reads it); `seps`: the sidebar's groups (the app's word: a
@@ -156,7 +164,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
   race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`, `images`:
-  `imageSave`'s paths only, 10 at most, after the text in the prompt as it starts; the board's `Thumbs`), `todoRm`;
+  `imageSave`'s and `fileSave`'s paths only, 10 at most, after the text in the prompt as it starts; the board's `Thumbs`,
+  a file's `FileChip`), `todoRm`;
 - the calendar's reminders (experimental, `settings.calendar`; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
   `when.ts` `parseAt`'s words, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
   rings again; `done`; `ws`), `reminderRm`, `reminderTick` (every 30 s and as the first client connects; with no client
@@ -214,6 +223,12 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is
   skipped; failures go to `daemon.log`, never fail the workspace;
+- `wsNew` `noSetup` (a worktree; the new-workspace page's More › *Skip the setup script*, shown for the project view's
+  `hasSetup`: `projectConfig`'s setup; off each time, never in `LastNew` or a draft; `laki new --no-setup`, MCP's
+  `no_setup`; a race's and a PR's too): no `runSetup`, so no marker (`settingUp` false: agents start at once),
+  `copyIncludes` still, the creation log's `setup: skipped`; untrusted, `setupWait` as before (`projectTrust` copies
+  only); the workspace's `noSetup` until `run` `script: 'setup'` (worktrees only, trusted only: Run ▾'s *Run the setup
+  script*, `laki run <ws> setup`) runs it and clears it;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
@@ -225,7 +240,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `fileUndo` (`path`: its status from `--name-status -M`, untracked as A; its content first kept by `hash-object -w`;
   `git restore --source=<base> --worktree`, an A removed, an R's old path restored and the new removed), `hunkRedo`
   (`id`: `git apply -R`, or the blobs written back; `undos`, the last 20 per workspace in memory); nothing staged;
-  the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
+  the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads` (each thread's `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
+  comment's `diffHunk`), `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `prAct` (`act` approve, close or merge, each only where the project's `prAllows` says (`config.pr`:
   approve, close, merge on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`
@@ -244,7 +260,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   lines; Changes' *PR #n*), `prFiles` (GraphQL: the PR's node id and each file's `viewerViewedState`, VIEWED, UNVIEWED,
   DISMISSED; owner and repo from the PR's URL) and `prViewed` (`path`, `viewed`, `id`: `markFileAsViewed` /
   `unmarkFileAsViewed`; Changes' Viewed boxes, in both views, a ticked file folded and dimmed, *n/m viewed*), `prLabels` (the PR's repo's, `gh label list -R`, kept a minute per repo; a color only as GitHub's 6 hex digits: `labelOf`) and `prLabel` (`label`, `on`: `gh pr edit --add-label=` / `--remove-label=` `-R` by the PR's URL, shown at once, then a scan; a name with a comma refused: gh splits there): `PRSection`'s tag button (`LabelApi`), a PR's `labels` from the scan (`PR_FIELDS`), `prAct` (`act` approve or close: `gh pr review --approve` / `gh pr close` by the PR's URL, after the
-  app's confirm; an open PR only), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
+  app's confirm; an open PR only), `imageSave` (the preview's screenshots too), `fileSave` (below), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`, links followed, by `realpath`);
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view; `sample`: filled with widget.json's `sample` and `sampleConfig` over its settings, `at` two minutes ago,
@@ -304,7 +320,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
   `act`'s Yes is `remove` here, `runAct`, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
-- specs and brainstorms (experimental, `settings.specs`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
+- specs and brainstorms (`settings.specs`, `specsOn`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
   image as a data URL), `planUpload` (`name`, `data` base64: `files/…`), `planWrite` (`path`, `text`: MCP's and Laki AI's,
   never README.md or spec.json), `planRm` (the app's, after `ask`); each takes `project`, `kind`, `slug`; off, each says so;
@@ -388,7 +404,8 @@ window: it can run the agent browser). Tabs on screen in a focused window get no
 ### Profiles and accounts
 
 Settings › *Agents & profiles* (the code's word stays *preset*): each preset can carry `model` and `effort` (`agentCmd`:
-the tab's own, from the new-workspace page, wins) and, for claude and codex, `account`. `daemon/accounts.ts`: an
+the tab's own, from the new-workspace page, wins), for claude and codex `perm` and `fast` (likewise; below), and
+`account`. `daemon/accounts.ts`: an
 `Account` (`settings.accounts`, only through `accountAdd`/`accountSet`/`accountRm`: `settingsSet` drops `accounts`, so an
 import never brings folders) is a folder `<data>/accounts/<agent>-<id>` given as `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
 (`accountEnv`, in `lakiEnv`, not on a host); `HOME_ACCOUNT` (`home`) is the agent's own sign-in, no env at all (that
@@ -542,7 +559,7 @@ or a fork can't swap in its own setup, teardown, run, env, copy or ports). Its t
 sha256 of its JSON); a file that isn't that gives its `ports` only (`cfgWait`, the view's project `cfgWait`: App's
 status bar *.laki.json waits for you* and `cfgSheet`, also after the new-workspace page makes one); `projectTrust` (no
 `hash`: its text and hash; with the shown one: trusted, then each `setupWait` workspace (made meanwhile) gets
-`copyIncludes` and its setup). `ENV_BAD` (`ZDOTDIR`, `BASH_ENV`, `ENV`, `NODE_OPTIONS`, `PATH`, `DYLD_*`, `LD_*`,
+`copyIncludes` and its setup, a `noSetup` one's copy only). `ENV_BAD` (`ZDOTDIR`, `BASH_ENV`, `ENV`, `NODE_OPTIONS`, `PATH`, `DYLD_*`, `LD_*`,
 `*_BASE_URL`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`) never comes from the file, trusted or not, each said once in
 daemon.log. `load` trusts projects from before (no `state.cfgTrust`) as their file is (a host's `as-read`: at its first
 read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: true`.
@@ -575,12 +592,35 @@ A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: 
 - `.laki.json` there: `hostCfg` (null: none), the project's folder's, read by `readHostCfg`/`readHostCfgs` (project add, `wsNew`, `wsRestore`,
   a tab's start when not read yet, each PR scan: `hostSync`, which also follows the branch); `projectConfig` reads the
   cache. `wsArchive` needs the host up (teardown there would fail quietly); `diff` gets new files' diffs in one call.
-- `toHost` copies the images a prompt or `send` names (`<data>/images/…`) to the host and rewrites their paths
-  (`textFor`, `typeInto` takes a promise). `files`, `fileRead` (`hostFileRead`: base64), `fileNew`, `diff`, stats run
+- `toHost` copies the images a prompt or `send` names (`<data>/images/…`) to the host and rewrites their paths, and
+  attached files by their folder (`<data>/files/<id>/`: the one file in it to the same name there, only the folder
+  rewritten, so a quoted name with spaces stays whole) (`textFor`, `typeInto` takes a promise). `files`, `fileRead` (`hostFileRead`: base64), `fileNew`, `diff`, stats run
   there; `openIn` opens `vscode|cursor|windsurf://vscode-remote/ssh-remote+<host><path>`, other apps refuse.
 - Not there (ponytail): `copyIncludes`, port scans (`scanPorts` sees none), new files' lines in `stat`, a local
   workspace's branch sync, the agent skill. Tested with `test/fakes/ssh` (every host is this machine; `nohost`
   refuses) in `test/ssh.test.ts`.
+- `-F <data>/ssh/config` (`codespace.ts` `sshF`: once the file is there, on `sshOpts`, the master's spawn and a tab's
+  ssh line): `<data>/ssh/codespaces/*` first (ssh takes an option's first value: a `Host *` of yours never wins over a
+  codespace's own; they name only `laki-cs-*`), then `Include ~/.ssh/config`, `/etc/ssh/ssh_config` (-F reads neither),
+  so plain hosts read as before.
+- Cloud workspaces (experimental, `settings.cloud`; `core.ts`' section, `daemon/codespace.ts`: gh on this Mac): a
+  workspace of a local GitHub project (`origin`, `ghRepo`) with a host of its own, `codespace` its codespace's name ('' while
+  made), `csState` (gh's word; `Creating`, `Failed` with `csError`). `wsNew` `codespace` (a machine type, '': the repo's
+  first; `cloudCheck`: the setting, not an agent's (`from`: GitHub bills it), not a host's or a folder's, not Local, a
+  PR or a race) asks `machines` (`gh api repos/<o/r>/codespaces/machines`: the scope, the repo and the type, at once;
+  `csMachines`, the new-workspace page's *In a codespace* picker), then answers with the workspace (`cloudNew`: host
+  `laki-cs-<id>`, path `<CS_ROOT>/<repo>`, `/workspaces` unless `LAKI_CS_ROOT`, tests'; branch `laki/<id>` off the base),
+  while `csMake` (`making`) runs `gh codespace create -R -b -m --default-permissions`, waits for Available (`until`),
+  writes its Host entry (`gh codespace ssh --config`, its `Host` line renamed: `sshEntry`) and makes the branch there (a
+  one-off ssh), then connects. `connect` waits for it (`csUp`: made or its `csError`; a stopped one started:
+  `gh api -X POST user/codespaces/<name>/start`, then `until`), so its tabs wait in `hostTab` and print why it failed.
+  `away` (made, stopped or not connected: `live`) keeps scans off it (PRs, `stat`, `wsPeek`): none wakes it.
+  `csRefresh` (`gh codespace list`, with each `scanPRs` and as its master exits) keeps `csState` current. Archive:
+  `gh codespace stop` (no `ifClean`: its files stay; no teardown script), Restore: `hostUp` (starts it), Delete:
+  `gh codespace delete --force` first (a failure keeps the workspace), `dropWs`' `csGone` for the rest
+  (`archivedTidy`, a project removed); `load` marks one left `Creating` `Failed`. `SCOPE`: gh without the codespace
+  scope says `gh auth refresh -s codespace`. Tested with `test/fakes/gh`'s `codespace` (its create clones the
+  project into `$LAKI_CS_ROOT/<repo>`, a state file each) and `fakes/ssh` in `test/ssh.test.ts`.
 
 ### Presets
 
@@ -596,7 +636,11 @@ effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/
 model_reasoning_effort="…"`, the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
 `--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json`, the same with `fastMode`; codex `-c
-service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). `view` gives a running or waiting tab `runAt`, its turn's start (set
+service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
+is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):
+the page shows the profile's as picked and sends only a change from it (`permSent`, `fastSent`). A profile whose `args`
+set a mode (`permInArgs`: claude's `--permission-mode`, `--dangerously-skip-permissions`; codex's `-s`, `-a`,
+`--full-auto`…) gets none of Laki's, the page no picker, Settings' select off. `view` gives a running or waiting tab `runAt`, its turn's start (set
 there: each change of status comes with `changed()`), for the turn timers (`settings.timers`).
 
 ### Interrupts
@@ -698,9 +742,14 @@ PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's 
   Messages go to the first live claude/codex tab with `send({ whenIdle })`. Each starts with `prPrompt`: the
   `settings.prPrompts` text for ci, review or conflict, else `PR_PROMPTS` (`shared/types.ts`), `{{pr}}`, `{{url}}`,
   `{{base}}` filled in; the checks' logs or the threads follow. Info's send buttons use the same.
-- Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths. `imagesTidy`
-  (at each save and hourly) deletes the ones older than `settings.imageDays` (Settings › AI › *Pasted images*; unset:
-  `IMAGE_DAYS`, 30), Laki AI's chats' too.
+- Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths. Any other file
+  (`fileSave`: `name`, `data` base64, `FILE_MAX` 25 MB, an empty one too) goes to `<data>/files/<ms>-<hex>/<its name>`
+  (the folder 0700, the file 0600; `fileName`: its last part, no control or bidi characters, never '', '.' or '..', 200
+  bytes at most, its extension kept), its path back. 25 MB is 33 in base64: the socket's `maxPayload` is 34 MB, `/rpc`
+  stays at 16 (the app's go over the socket). `imagesTidy` (at each save and hourly) deletes the ones older than
+  `settings.imageDays` (Settings › AI › *Pasted images*; unset: `IMAGE_DAYS`, 30), Laki AI's chats' too, and the files'
+  folders; a waiting to-do's stay (an image by its name, a file by its folder). Laki AI never takes a file: `imageOk`
+  reads `<data>/images` only.
 
 ### Tunnels
 
@@ -719,8 +768,9 @@ else 404), so the one tunnel (`cloudflare`, no mails, Resources' `share`) never 
 with the first share and stop with the last (`stopShares`: a tab, a workspace's teardown, a closed tab, Resources,
 shutdown). In memory only (`shares`), like tunnels; the view's `TabView.share` is `{url, until}` (`shareLink`):
 `hours` (`SHARE_HOURS`) sets `until`; `shareTick` (every 15 s) and a reader's next ask stop one past it. `shareRead`
-(at most every 1.5 s, on a request): claude's or codex's transcript (`transcriptOf`: the tab's account's folder, else
-the agent's own; read on from `pos`, whole lines, into `said` by `chatOf`), else `screen` (5000 lines); a change bumps
+(at most every 1.5 s, on a request): claude's or codex's transcript (`tailOf`, the meters' too: `transcriptOf`, the tab's
+account's folder, else the agent's own, a chat looked for every 10 s at most (2 minutes once it's been missing a minute; a turn's end looks at once), a new one at once; read on from `pos`, whole lines, `SHARE_READ` at
+most; none on a host; into `said` by `chatOf`), else `screen` (5000 lines); a change bumps
 `v`. `shareMd` (Copy, Download), `shareBody`/`sharePage` (`shared/markdown.ts`' tree, every string escaped, links
 http(s)/mailto only, a picture as its link; a CSP with a nonce, no inline styles, `img-src data:`); what was said goes
 through `redact` first (L9: `SECRETS`' token shapes as ••••); the page asks `.json?v=` every 2.5 s and swaps `main`
@@ -873,8 +923,9 @@ Laki AI*: main's `aiWin`, `?window=ai`, `NewWindow.tsx` `AiWindow`: `AiPage` `co
 
 ### Specs & Brainstorms
 
-Experimental (`settings.specs`, Settings › General › *Experimental*; off: no rail button, foot button, ⌘K item, project
-tab, and the daemon's `plan*` methods and `GET /plan/` refuse). `daemon/plans.ts`: a folder each, outside
+On unless `settings.specs` is false (`shared/types.ts` `specsOn`, Settings › General › *Pages*; kept by `uiReset`,
+`SETTINGS_KEPT`; off: no rail button, foot button, ⌘K item, project tab, and the daemon's `plan*` methods and `GET
+/plan/` refuse; the page's BlockNote, Mantine and React Flow still load only as it opens). `daemon/plans.ts`: a folder each, outside
 the repo and its worktrees, `<data>/plans/<project>/specs|brainstorms/<slug>/` (the project's folder: `Project.plans`,
 `<name>-<id>` or `<id>`, made with the first; kept when the project goes): `spec.json` (`{ title, blocks }`, BlockNote's),
 `README.md` (`# title` and the blocks as Markdown, `specmd.ts` `blocksToMarkdown`, headings a level down; what agents
@@ -927,8 +978,9 @@ first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-
 
 ### Workflows
 
-Experimental (`settings.workflows`, Settings › General › *Experimental*; off: no rail button, foot button or ⌘K item,
-the view has no `flows`, and every `flow*` method refuses). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
+On unless `settings.workflows` is false (`shared/types.ts` `flowsOn`, Settings › General › *Pages*; kept by `uiReset`,
+`SETTINGS_KEPT`; off: no rail button, foot button or ⌘K item, the view has no `flows`, every `flow*` method refuses,
+and no run starts on an event or a schedule). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
 `EXITS`, a choice's and an ask's options as exits, `max` per block), the file (`parse`/`toFile`: `# Name`, a
 description, `runs in: · session: · at once: · turns: · perm: · on:` (`on`: an event, `eventOk`, that starts a run; `perm`: its agent blocks' permission mode), a `## id` per block, its first kind key, `> ` text, `- label →
 id`, `next:`/`ok:`… lines, `max: 3 → id`, `at: x,y`), `check` (no start, an exit to no block, nothing leads to a block,
@@ -969,11 +1021,11 @@ in the same workspace, else `forkOf` its `resume`); a tab that just started wait
 500 ms; a run block waits for the setup script, `settingUp`); `use`: an agent action by its slug, else its name
 (`findAction` over Settings' and the project's own `config.actions`, the app's as Run ▾ has them; not a shell's), its
 text stamped and first, the block's after. An agent block's `perm` and `fast` (`permOf`: its own, else the head's `perm`,
-none for an agent without modes) go to `addTab`, which keeps them on the tab for restarts and resumes; `flowStart` runs
+none for an agent without modes; neither: its profile's, as any tab's) go to `addTab`, which keeps them on the tab for restarts and resumes; `flowStart` runs
 core's `modelCheck` on each agent block with its preset's agent (`agentOf`) before any workspace; `check` (offline)
 names an unknown mode, a mode or fast mode an agent id lacks, and blocks sharing a tab (`tabKey`: session run of one
 agent, or `session: <block>`) in different modes; a shared session's last tab in another mode is forked, not reused.
-`bypassIn`: `flowStart` `by: 'agent'` (MCP's; the CLI's `caller` from an agent's tab, main.ts: `agentCaller`) and an agent's event refuse a workflow with a bypassPermissions block; StartRun
+`bypassIn` (its `profile`: a block's profile's `perm` counts, and its `args` when they set the mode, `bypassArgs`): `flowStart` `by: 'agent'` (MCP's; the CLI's `caller` from an agent's tab, main.ts: `agentCaller`) and an agent's event refuse a workflow with a bypassPermissions block; StartRun
 names them in red, a dry run's log too. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
 `deliver`): this turn's answer as `steps.<id>.answer`, a
 `failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
@@ -1627,6 +1679,14 @@ turn is posted 800 ms later (its menu is often drawn after the hook; none if it 
 per choice of the tab's `ask` (`NotifyAction`: `n` and `label`, main calls `answer` with both), else, when its text
 says "permission", *Allow* / *Deny* (`pick` first / last).
 
+A plan limit nearly used (`notifyOn.usage`, on unless false; Settings › General's *Plan limit at*, `settings.usageAt`:
+75, 90, 95, unset `USAGE_AT` 90): App's `limits`, the ring's `load` (Usage.tsx asks each minute), runs `text.ts`
+`limitsCrossed`: a window (agent, account, label; a `note` one isn't a limit, one past its reset is at 0) at it now and
+below it at the last reading (`limitsSeen`; none, as the app opens: past it counts), not told for this reset
+(`laki.limitsTold`: each window's `resets` as said, within an hour the same); `limitText` says it, the account named when
+the agent has several; a toast, and a notification unless the window has the focus or `notify` is false. ponytail: only
+while the app is open with the ring on screen (not a Browsers page); the daemon doesn't watch usage itself.
+
 Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
 `format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
@@ -1658,16 +1718,43 @@ find-generic-password [-a $USER] -s "Claude Code-credentials" -w` and `~/.claude
 chatgpt.com/backend-api/wham/usage` (`$CODEX_HOME/auth.json` `tokens`, `chatgpt-account-id`). Tokens are read-only:
 never refreshed (that can sign the agent out), an expired one isn't sent. Each agent's answer is kept 5 minutes
 (`USAGE_TTL`: Anthropic turns away faster pollers; a 429 or a turned-away token too), one that asked no server or failed on the way 1
-(`AGAIN`); `settings.usage[agent] === false` skips it. The renderer asks every minute. Tests set `LAKI_USAGE_API`
+(`AGAIN`); `settings.usage[agent] === false` skips it. The renderer asks every minute (and notifies near a limit: Notifications). Tests set `LAKI_USAGE_API`
 (a fake server for both; only `http://127.0.0.1` or `localhost` count: a session's env can reach a daemon the CLI starts) and get a fake `security`
 (`test/fakes`) reading `$HOME/keychain`: never the real Keychain.
+
+### Meters
+
+A claude or codex tab's context and what its chat used (`core.ts` `meterTick`, every 10 s, `LAKI_METER_MS`: tests'; and
+1 s after a turn's end; both settings off: the tick reads none; an archived workspace's tabs skipped): each tab's transcript read on by `tailOf` (a `MeterRun` per tab:
+its file, `pos`; another chat's file, a /clear: none until this one's), parsed by `share.ts` `meterOf` (only lines that
+name `"usage"`, `token_count` or `turn_context`). Claude: an answer's lines share a `message.id`, the last one's usage
+counts (`msg`, `was`); `used` is its `input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens` (not a
+sidechain's; `<synthetic>` skipped); the window `WINDOW` (200K), 1M for a `[1m]` model (the tab's or its preset's
+`model`, the preset's args) or once `used` is past it. Codex: `turn_context`'s model, the last `token_count`'s
+`last_token_usage.total_tokens` of `model_context_window`, its `total_token_usage` growing (`total`: a smaller one is
+counted anew). Tokens: input, output, cache writes and reads; cost by `shared/types.ts` `PRICES` (`costOf`, the first
+regex on the model; `priced`: some had one, else tokens only). `meterView`: `TabView.context` `{ used, max }`, `usage`
+`{ tokens, cost? }`. Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
+per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
+what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
+(`todayView`: tokens, cost, the 5 workspaces that used most). The renderer (`settings.contextMeter`, `settings.costs`,
+on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): App's `tabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line
+along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and tooltip lines, the status bar's `.sb-ctx` (the focused tab's,
+`.usage-bar`), `UsageButton`'s `today` (*Today*, *≈ API price*); `Usage.tsx` `level` (amber past 70, red past 90),
+`ctxText`, `usageText`. Tested in `test/meter.test.ts`.
 
 ### Renderer
 
 `src/renderer/src`:
 
 - **`App.tsx`**: the sidebar, tab bar, toolbar, send bar, palette items and keys.
-  - Keys are handled in a capture-phase `keydown` through the `act` map; xterm never sees ⌘ keys. ⌘⇧N clicks the tab
+  - Keys are handled in a capture-phase `keydown`; xterm never sees ⌘ keys. Settings › Keys' (`shared/keys.ts` `KEYS`:
+    17 actions, an id, words and a default each; `settings.keys` over them, `keyMap`: '' none, one `keyOk` refuses (no
+    ⌘, ⌥ or ⌃) the default) go first, after the picker's: `kb`, `keyFor` (the layout's character, `keyLabel(e, true)`,
+    then the physical key: Dvorak's ⌘K, Cyrillic's, ⌥'s) into `bound` (false: not now, the key goes on: ⌘[ in a
+    field); a rebound one's old keys do nothing. `keys.current`'s `force` runs one by id (`browser-key` with an id: the
+    menu bar's, a Browsers page's). The rest (`FIXED`: ⌘1…⌘9, ⌘↑ ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N, zoom) are the `act` map's. `kh`
+    and `kt` put the keys in use in menus' hints and tooltips; `bridge.keys` sends `settings.keys` to main. ⌘⇧N clicks the tab
     bar's + (`.newtab-btn`): a menu opened by a key's click (`detail` 0) has its first item picked (`Menu` `first`).
     ⌘⇧A is `toggleArtifacts` (the status bar's Artifacts strip, `gallery`); ⌘L is Send later (`canLater`); ⌘⇧⏎ is
     `toggleFull` (the tab bar's ⤢): `.app.full` hides the chrome (styles.css), `.full-exit` brings it back, and main's
@@ -1687,6 +1774,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.active`: when each agent tab last worked or waited (ms), for the bubbles' recent ones; closed tabs drop out.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
+    - `laki.limitsTold`: each plan limit window's reset it was told for (`limitsCrossed`: once per reset).
     - `laki.recent`: the palette's last 30 picks, by label: first in it, and ahead of a close match.
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
     - `laki.zoom`: each tab's ⌘± text size, in points over `settings.fontSize` (App's `sizeOf`; ⌘0 drops it; closed tabs'
@@ -1723,7 +1811,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       back as it closes: a terminal that kept it took Esc to its agent; its title has a ✕; the AI page's `Page` has `esc` false); a `Modal` with something typed in it nods at a click outside instead of closing
       (`loose`: the palette closes anyway).
     - Settings › General › Development › *Reset the interface* (`resetUi`): the daemon's `uiReset` (core.ts: every setting
-      but `SETTINGS_KEPT`, what the user set up or wrote, back to unset, the experimental ones too; `widgetsOff`: every
+      but `SETTINGS_KEPT`, what the user set up or wrote (`specs` and `workflows` too: on unless false), back to unset, the experimental ones too; `widgetsOff`: every
       extension off), then removes every `laki.*` key but `UI_KEEP` (timers, stopwatches, drafts; Get started shows
       again), then reloads: add a key that holds what the user made there, and a setting that's set up or written to
       `SETTINGS_KEPT`.
@@ -1749,9 +1837,13 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     a Terminals or Browsers row (`kind`: no port, PR or agent to tell of).
   - A workspace with a PR gets GitHub's mark in the sidebar (`.ws-pr`, its `prState` as colors; an open one's failing
     checks a red mark of their own before it, `.ws-pr.ci`, as conflicts get theirs: a red GitHub mark is a closed PR),
-    unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`).
+    unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`), or their own `icon` in
+    their `color` (ui.tsx `ProjectMark`, `.p-mark`: an emoji with a line in it; also the new-workspace page's project
+    menu (a menu item's `mark`), the palette's workspaces and tabs (`PaletteItem` `mark`), Settings' nav, a rail pin's
+    corner); App's `tint`: a workspace's color, else its project's (the peek card, rail pins, the bubbles).
   - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). Rows are inset and
-    rounded (hover and selection one item each), the selected one with a short bar (`--ws-bar`: its color or the accent; a
+    rounded (hover and selection one item each), the selected one with a short bar (`--ws-bar`: its color, its project's
+    (`--proj-c`, set inline: every row's bar, no tint) or the accent; a
     look's `.ws.sel` background replaces it), `.needs` (a tab of `needsYou`) a bold name; a project with none shows
     *New workspace* (`.ws-new`). A row shows
     `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) growing in after its marks, which slide left. The PR mark is red
@@ -1768,7 +1860,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
   - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
-    menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab,
+    menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab
+    (after `<emoji> <project>` when its project's icon is an emoji),
     then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks `wsArchive` with
@@ -1814,8 +1907,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     keeps to the list; `SideHandle` `at`. Its settings: `railLabels` (off:
     `data-bare`, icons only, `railW` 52), `railShells` and `railBrowsers` (off: `railOf` makes that kind `projects`, no
     button, its project in Projects' list; `rawKind` still gives a pin its icon and leaves out *Run ›*). With words, past
-    `RAIL_FIT` buttons above the pins, `RAIL_MORE`'s (calendar, workflows, specs, board: the least used first) go into a
-    ⋯ More menu, lit while its page is open. `settings.railOrder` and `railHide` (Settings › Appearance › Rail's
+    `RAIL_FIT` buttons above the pins, `RAIL_MORE`'s (todos, calendar, workflows, specs, board: the least used first; the default
+    pages: workflows and specs) go into a ⋯ More menu, lit while its page is open. `settings.railOrder` and `railHide` (Settings › Appearance › Rail's
     `RailField`: `RAIL_ITEMS`' boxes, an HTML5 drag; `railSorted`; AI fixed at the foot): the order and the ones put
     into More; a right click on the rail (`railMenu`) moves one there, More's foot shows them all again or opens it.
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
@@ -1859,7 +1952,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `settings.floater`, unset: on). App's `floats` (each workspace whose agent tab works or waits, waiting first, then
   `floaterRecent` (0-5, 3 unset) workspaces whose agent worked last, by `laki.active`, as `idle` or `done` (done first; idle
   longer than `floaterRecentHours`, 4 unset, 0 never: out, a minute's tick ages them); at most `floaterMax`:
-  `tab`, name, project, status, its color, what it asked or last said, and `floatMore`'s branch, agents, PR and
+  `tab`, name, project (`projWords`: its emoji first; ponytail: an icon by name isn't drawn there), status, its color
+  (`tint`), what it asked or last said, and `floatMore`'s branch, agents, PR and
   lines for the card), the theme's colors and the options (`style`:
   `floaterStyle`, `cards`: `floaterCards`, `add`: `floaterNew`, `menu`: `floaterMenu`, `voiceTo`: `floaterVoiceTo`) go to
   main (`bridge.floats`);
@@ -1979,7 +2073,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   prompt, the daemons' first-4-words rule) and `shortPath` (the ⋯'s *Copy path* hint).
 - **`PromptInput.tsx`**: a prompt with pasted/dropped images (saved by the daemon) and dictation (the mic's ⌄: where
   macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end;
-  `withImages` appends their paths. The mic keeps the text box focused and starts dictation 150 ms later: macOS
+  `saveFile` (`fileSave`; the new-workspace page's and the board's, never Laki AI's): any other file (HEIC, SVG too) a
+  `FileChip` (icon, name, size, ✕; an `Img` without `url`), refused past `FILE_MAX` before it's read (the socket would
+  drop); `files`: the caller's own (Desk's). A folder dropped in is its path typed at the cursor (`pathText`, Term.tsx's
+  drop), never read (`webkitGetAsEntry`). `withImages` appends their paths (`text.ts` `withPaths`: a line each, in
+  JSON's quotes when one has a space, a quote or a backslash). The mic keeps the text box focused and starts dictation 150 ms later: macOS
   learns the web view's text field a moment after focus, and dictation started before that stops at once.
 - **`Info.tsx`**: the right panel's Info tab (`InfoTab`, App's `SidePanel` `info`; ⌘I and ⓘ open the panel on it): the
   workspace's name with a rename pencil (`.info-name`), then `.info-facts`: a card of one-line `Row`s, the whole value in `data-tip`, a
@@ -2001,7 +2099,9 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `tip`: its tooltip (Run ▾'s actions: their text); `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc
   clears it first, its `typed` an item for what's typed itself, first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
-  tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
+  tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, shared/types.ts' (the daemon checks a project's), `colorVar`: CSS `--tc-<name>`),
+  `iconItems` (*Icon…*: every `ICONS` name by `iconWords`, an emoji typed or pasted, `emojiOf`; *No icon*: a Desk tab's, a
+  project's), `ProjectMark`,
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
@@ -2028,7 +2128,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
   `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
-  them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's; the global sections, it and Actions, open with a `Scope` note, `.set-scope`: Global, everywhere, and where a project's own go; a project's two say *This project*: only there, with the global ones, counted (`mergeActions`, `templatesFor`), and a link to the global list), Remote access (`RemoteSection`, shown when App.tsx
+  them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's; the global sections, it and Actions, open with a `Scope` note, `.set-scope`: Global, everywhere, and where a project's own go; a project's two say *This project*: only there, with the global ones, counted (`mergeActions`, `templatesFor`), and a link to the global list), Keys (`KeysSection`: a `KeyField` per `KEYS` action, Reset all, `keyClash` against the global hotkeys and the picker as `others`; `settings.keys` only the changed ones), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…72h or Forever, then the QR code and link), and `ScriptsField` (a project's
   setup/teardown/run scripts, Import from a file), Resources (`ResourcesSection`: `resources` every 3 s while open,
   Laki itself and each tab by RSS with its processes, Sleep/Open/Wake, `settings.sleepAfter`; App.tsx passes a
@@ -2044,7 +2144,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   are sections of it, under the nav's *Project settings* head (`ProjectSection`: name, a Memory row (its counts;
   *Manage*: `onMemory`, App's `{ project, tab: 'memory' }`), scripts, env; saved 400 ms after typing and on leaving).
   Global memory (`memory`: `settings.memory` through Project.tsx' `MemoryList` `global`); Release notes only with
-  `devMode`; General's Storage has `artifactsIn`, its Pages My Desk and Bird view (on unless false), Settings › AI the glow's; Appearance's
+  `devMode`; General's Storage has `artifactsIn`, its Pages My Desk, Bird view, Specs & Brainstorms and Workflows (on unless false), Settings › AI the glow's; Appearance's
   Rail `railShells` and `railBrowsers`.
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Info (`PanelTab` `info`, first, any project: App passes `InfoTab` as
   `info`), Files (tree from the daemon's file list, search, new
@@ -2052,7 +2152,14 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   hunks; a click opens `CommentBox`: the PR, or the agent; an image, `IMAGE`, is `ImageDiff`: `PanelApi.read` with `base`
   for before, as `<img>`, SVG too, a click for full size), Review (`PRSection` from `Info.tsx` with the open
   threads' count; `ThreadCard`s: file:line, a click previews it there, each comment's author, `ago` of its `at` and its
-  body as `Folded` Markdown; resolved ones in a `<details>`), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line; App keeps several, `openFiles`, a tab each over it, `.pv-tabs`,
+  body as `Folded` Markdown; resolved ones in a `<details>`; a ```` ```suggestion ```` block (`text.ts` `suggestionOf`: 3+
+  backticks or tildes, the first one) as `Suggested`, a small diff of the file's lines now (`linesAt`, `PanelApi.read`
+  per file with one) and the suggested ones, with Apply (`editOf`: an open thread, not outdated, `side` RIGHT, `hunk`
+  given; what the review saw is `reviewedLines`, the hunk's new-side lines ending at `line`, `startLine..line` long) and
+  *Apply all n in <file>* (each open thread's newest, those still as seen): App's `PanelApi.apply`, `fileRead`, then
+  `applySuggestions` (bottom-up; refused as "changed since the review" unless each range is what was seen, overlaps
+  refused; the replaced lines' endings, the file's last newline as it was), `fileWrite` with `was`, a toast whose Undo
+  writes it back the same way; no commit, push or resolve. Tested in `test/suggest.test.ts`), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line; App keeps several, `openFiles`, a tab each over it, `.pv-tabs`,
   by `fileKey`, each with its own `edit`; `shownFile`: each workspace's in front; ⌘W or a middle click closes one, an
   edit asked first; its left edge is a `PanelHandle`, `previewW`), `FileFinder` (⌘P, `findFiles`: a
   basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Shell actions, each item's `tip` its text, cut at `ACTION_TIP`; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon.
@@ -2086,7 +2193,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
   renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, under the tiles there, in one `save`) or gives it
   an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
-  `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*) or a color (`DeskTab.color`, `TAB_COLORS`,
+  `typed` item *Use 🚀*; ui.tsx' `iconItems`: *Icon…*, a submenu, `setIcon`; *No icon*) or a color (`DeskTab.color`, `TAB_COLORS`,
   `setColor`: its icon in it, else `.desk-dot`), a
   head dropped on a tab moves the tile there (`moveTo`: no cell, so under the tiles there), a tile's ⋯ › *Move to tab*
   too (or *A new tab*); Add puts one on the tab shown; *Fetch* only that tab's. Cells: a tile's `x`, `y` (`shared/types.ts`
@@ -2150,9 +2257,10 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   *Show all*; a click goes to the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
   `laki.runsSeen` (localStorage: the newest run the page showed).
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
-  every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset.
+  every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset, then
+  *Today* (the view's `today`: Meters, above).
   `USAGE_AGENTS` names the agents Settings › Appearance has switches for.
-- **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys, status glyphs, where things are, the main CLI
+- **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys (`keysOf`: Settings › Keys' in use, App's `kb`), status glyphs, where things are, the main CLI
   commands and recipes (`cli`: the app's command; `ship`: list `ship`), each section a `Sec` of `Item`s. Laid out
   like Settings (`.settings-nav`, `.help-nav`): a filter (focused as it opens, not on a touch screen; ⌘F or / goes to
   it; Esc clears it, then closes the page) keeps the rows with every word typed in their text (`textOf`) or `find`;
@@ -2191,21 +2299,22 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main (every IPC handler checks its sender: `fromApp`, the token's; `from(e, …pages)`: the app window, else only the pages named, `new`, `ai`, `tab` by `?window=`, `voice` the bubbles'; the bubbles', the editor's and a floated tab's own by their window): single instance, starts the daemon, window (where it was left: `window.json` in userData, `winAt`, bounds, maximized, full screen; else maximized; hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running; File, Edit, View and Go list the renderer's ⌘ keys: `key()`, `registerAccelerator: false`, a click sends `browser-key`), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m` (the bubbles hidden meanwhile: `shooting`), then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card, menu and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
+| `src/main/index.ts` | Electron main (every IPC handler checks its sender: `fromApp`, the token's; `from(e, …pages)`: the app window, else only the pages named, `new`, `ai`, `tab` by `?window=`, `voice` the bubbles'; the bubbles', the editor's and a floated tab's own by their window): single instance, starts the daemon, window (where it was left: `window.json` in userData, `winAt`, bounds, maximized, full screen; else maximized; hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running; File, Edit, View and Go list the renderer's ⌘ keys: `key()`, `registerAccelerator: false`, a click sends `browser-key`; Settings › Keys' through `bound()`, its keys from `keysNow`, the `keys` IPC's (`from(e)`: the app window; `keyMap` checks them; `appMenu` builds it again), a click sends its id; a Browsers page's `before-input-event` takes `newTab`/`closeTab`'s keys by `keyFor`), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m` (the bubbles hidden meanwhile: `shooting`), then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card, menu and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), shotKey and onAiShot (Screenshot to Laki AI's keys; the AI window's picture), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
-| `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page |
+| `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page; the meters' `meterOf`: a transcript's context and tokens |
+| `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/notes.ts` | notes (experimental): one JSON file each, their pasted files, the list with search |
 | `src/renderer/src/Notes.tsx` | the Notes page: the list with search and colors, the open note in BlockNote (SpecEditor) |
-| `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |
+| `src/daemon/plans.ts` | specs and brainstorms: their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |
-| `src/daemon/workflow.ts` | workflows (experimental): the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
+| `src/daemon/workflow.ts` | workflows: the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
 | `src/shared/workflow.ts` | workflows' model and Markdown file, `check`, the format in words (MCP's and Laki AI's) |
 | `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas with its blocks and variables sidebar, inspector, file, runs |
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
@@ -2235,12 +2344,13 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |
+| `src/shared/keys.ts` | Settings › Keys: `KEYS` (the rebindable actions, their defaults), `keyLabel`, `keyMap`, `keyFor`, `keyClash` (another action, `others`, `FIXED`, ⌃ alone), `keyShow`; App's, main's menu's, Help's |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `keys` (Settings › Keys' resolution, matching, clashes), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts` |
 
 ## Conventions

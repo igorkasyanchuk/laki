@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { fillTemplate, mergeActions, prRef, type RunAction, type TabView, type Template, templated, templatesFor } from '../../shared/types.ts'
+import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, prRef, type RunAction, type TabView, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
@@ -9,11 +9,19 @@ export { fillTemplate, mergeActions, prRef, templated, templatesFor } // shared:
 // a workspace's name from what was typed, not the template around it (as the daemons do: its first words)
 export const nameOf = (prompt: string) => prompt.trim().split(/\s+/).slice(0, 4).join(' ') || undefined
 
+// the prompt an agent gets: the text, then each pasted image's or attached file's path on a line of its own, in quotes
+// (JSON's) when it has a space, a quote or a backslash: the agent reads it whole
+export const pathText = (p: string) => (/[\s"'\\]/.test(p) ? JSON.stringify(p) : p)
+export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.map(pathText).join('\n')].filter(Boolean).join('\n\n')
+
 // a path for the status bar: ~ for the home folder, and only the last two folders of a long one
 export function shortPath(p: string) {
   const parts = p.replace(/^\/Users\/[^/]+(?=\/|$)/, '~').split('/')
   return parts.length > 4 ? [parts[0], '…', ...parts.slice(-2)].join('/') : parts.join('/')
 }
+
+// a cloud workspace's state (gh's word, or Laki's while it's made) as the row and the status bar say it
+export const csWord = (st = '') => (({ Available: 'on', Shutdown: 'stopped', ShuttingDown: 'stopping', Creating: 'being made', Provisioning: 'being made', Queued: 'being made', Starting: 'starting', Failed: 'failed' }) as Record<string, string>)[st] ?? st.toLowerCase()
 
 // what the daemons take: an address, or *@domain for a whole domain (cloudflared's wildcard domains)
 export const MAIL_OK = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/
@@ -161,7 +169,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array' }
+const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object' }
 // what Export leaves out and Import never takes (this Mac's stay): secrets (env and presets' env: API keys; the phone
 // webhook's URL: its token) and what's private (remote access's and tunnels' emails, workflows' variables)
 const PRIVATE = ['env', 'webhook', 'remoteMail', 'tunnelMails', 'flowVars']
@@ -267,6 +275,57 @@ export function splitRows<T extends { old?: number; new?: number }>(lines: T[]):
   return rows
 }
 
+// a review comment's ```suggestion block (GitHub's: 3 or more backticks or tildes, suggestion the info string's first
+// word; unclosed, it runs to the end): the lines it puts in place of the thread's ([]: deletes them), and the comment
+// without it. The first one only
+export function suggestionOf(body: string): { lines: string[]; rest: string } | null {
+  const ls = body.split(/\r?\n/)
+  for (let i = 0; i < ls.length; i++) {
+    const m = /^( {0,3})(`{3,}|~{3,})[ \t]*suggestion([ \t].*)?$/.exec(ls[i])
+    if (!m || (m[2][0] === '`' && m[3]?.includes('`'))) continue
+    const close = new RegExp(`^ {0,3}${m[2][0]}{${m[2].length},}[ \\t]*$`)
+    let j = i + 1
+    while (j < ls.length && !close.test(ls[j])) j++
+    const indent = new RegExp(`^ {0,${m[1].length}}`)
+    return { lines: ls.slice(i + 1, j).map(l => l.replace(indent, '')), rest: [...ls.slice(0, i), ...ls.slice(j + 1)].join('\n').trim() }
+  }
+  return null
+}
+
+// the new file's last n lines in a review comment's diff hunk (GitHub's diffHunk ends at the comment's line): what the
+// review saw there; null: the hunk has fewer
+export function reviewedLines(hunk: string, n: number): string[] | null {
+  const ls = hunk.split(/\r?\n/)
+  if (ls.at(-1) === '') ls.pop()
+  const right = ls.filter(l => !/^(@@|-|\\)/.test(l)).map(l => l.slice(1))
+  return n > 0 && right.length >= n ? right.slice(-n) : null
+}
+
+// a review suggestion as an edit: lines start..end (from 1) were seen, become lines
+export type Suggestion = { start: number; end: number; seen: string[]; lines: string[] }
+const piecesOf = (text: string) => text.split(/(?<=\n)/) // each line with its own ending, the last one's maybe none
+const bare = (p: string) => p.replace(/\r?\n$/, '')
+export const linesAt = (text: string, start: number, end: number) => piecesOf(text).slice(start - 1, end).map(bare)
+export const sameLines = (a?: string[] | null, b?: string[] | null) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b)
+
+// suggestions put in a file's text, bottom-up so the line numbers hold: each one's lines must still be what the review
+// saw, else it throws and nothing changes. New lines take the replaced ones' line endings (else the file's), the last
+// one its last's; the file ends with a newline only if it did
+export function applySuggestions(text: string, edits: Suggestion[]) {
+  const ps = piecesOf(text)
+  const down = [...edits].sort((a, b) => b.start - a.start)
+  down.forEach((e, i) => {
+    if (i && e.end >= down[i - 1].start) throw new Error('two suggestions on the same lines: apply them one at a time')
+    const now = ps.slice(e.start - 1, e.end)
+    if (e.start < 1 || e.end < e.start || e.end > ps.length || !sameLines(now.map(bare), e.seen)) throw new Error('changed since the review')
+    const eol = (now.find(p => p.endsWith('\n')) ?? text).includes('\r\n') ? '\r\n' : '\n'
+    const last = now.at(-1)!.slice(bare(now.at(-1)!).length)
+    ps.splice(e.start - 1, now.length, ...e.lines.map((l, k) => l + (k === e.lines.length - 1 ? last : eol)))
+  })
+  const out = ps.join('')
+  return !text || text.endsWith('\n') ? out : out.replace(/\r?\n$/, '')
+}
+
 // Voice's recording as a WAV file (voice.ts, for OpenRouter's speech-to-text): one channel of samples (-1..1) as 16-bit PCM
 export function wavOf(samples: Float32Array, rate: number) {
   const b = new DataView(new ArrayBuffer(44 + samples.length * 2))
@@ -323,4 +382,33 @@ export class Line<T extends { req: string }> {
     if (i > 0) this.items.unshift(...this.items.splice(i, 1))
     return i > 0
   }
+}
+
+// a plan limit nearly used (App, on each of Usage.tsx's minute reads): a window (agent, account, label) at `at`% or more
+// now and below it at the last reading (last: each window's then; none, as the app opens: past it already counts),
+// unless told for this reset (told: each window's reset when it was said; within an hour is the same one, as Codex's may
+// come from "in n seconds"). A window past its reset is at 0; one with a note (an amount, extra usage) isn't a limit.
+// seen: last as it is now
+export const USAGE_AT = 90
+export type LimitHit = { id: string; r: AgentUsage; w: UsageWindow; used: number }
+export function limitsCrossed(rows: AgentUsage[], at: number, last: Record<string, number>, told: Record<string, number>, now = Date.now()) {
+  const seen = { ...last }
+  const hits: LimitHit[] = []
+  for (const r of rows)
+    for (const w of r.windows) {
+      if (w.note) continue
+      const id = `${r.agent}:${r.account ?? HOME_ACCOUNT}:${w.label}`
+      const used = w.resets && w.resets <= now ? 0 : w.used
+      const was = last[id]
+      seen[id] = used
+      if (used >= at && (was === undefined || was < at) && !(id in told && Math.abs(told[id] - (w.resets ?? 0)) < 3600_000)) hits.push({ id, r, w, used })
+    }
+  return { hits, seen }
+}
+// "Claude Code · 5-hour limit at 92% · resets 5:00 PM": the account named when the agent has several
+export function limitText({ r, w, used }: LimitHit, rows: AgentUsage[], now = Date.now()) {
+  const who = [AGENT_NAMES[r.agent as Agent] ?? r.agent, rows.filter(x => x.agent === r.agent).length > 1 && r.name].filter(Boolean).join(' · ')
+  const at = w.resets && new Date(w.resets)
+  const when = at && at.toLocaleString([], at.toDateString() === new Date(now).toDateString() ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+  return `${who} · ${w.label} limit at ${used}%${when ? ` · resets ${when}` : ''}`
 }

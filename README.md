@@ -12,11 +12,11 @@ worktree. Agents keep running when the window is closed.
   restart or a usage limit.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
-- **Specs & Brainstorms** (experimental): write what to build like a Notion page (checklists, images, diagrams), from
+- **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
   your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
   options, a mind map, diagrams and clickable prototypes. Both in one list, filtered by kind, and *New* ▾ for either.
   Folders outside the repo that any agent can read.
-- **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
+- **Workflows**: blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
   approve, the build, tests until they pass, a PR, CI until green). Blocks can call a model on OpenRouter or a webhook,
   ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
 show you what a run made (a window, a popover in the corner, a macOS notification), and name outputs (`{{steps.sum.title}}`) the next blocks use; your own

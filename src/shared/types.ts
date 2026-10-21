@@ -29,8 +29,37 @@ export const PERMS: Partial<Record<Agent, [id: string, label: string, sub: strin
   ],
 }
 export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
+// a profile's flags that set how freely it acts already: then no mode of Laki's goes in (agentCmd), and one that never
+// asks counts as bypassPermissions
+const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
+export const permInArgs = (agent?: string, args?: string) => !!args && !!PERM_FLAGS[agent as Agent]?.test(args)
+export const bypassArgs = (args?: string) => !!args && /(^|\s)(--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--permission-mode[\s=]+['"]?bypassPermissions)\b/.test(args)
 // fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
 export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
+// API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a
+// transcript's model (claude's message.model, codex's turn_context) prices a tab's tokens (core.ts' meters).
+// ponytail: dated 2026-10, edited by hand; a long prompt's higher rate, 1-hour cache writes, fast mode and batch left
+// out; a model not here: tokens only
+export const PRICES: [RegExp, [input: number, output: number, write: number, read: number]][] = [
+  [/fable-5-1|mythos-5-1/, [10, 50, 12.5, 0.25]],
+  [/fable-5|mythos-5/, [10, 50, 12.5, 1]],
+  [/opus-5-5/, [4, 20, 5, 0.2]],
+  [/opus-(5|4-[5-8])/, [5, 25, 6.25, 0.5]],
+  [/opus-4/, [15, 75, 18.75, 1.5]], // 4 and 4.1
+  [/sonnet-5/, [2, 10, 2.5, 0.2]],
+  [/sonnet-(4|3-7)/, [3, 15, 3.75, 0.3]],
+  [/haiku-5-5/, [0.1, 0.5, 0.125, 0.01]],
+  [/haiku-4-5/, [1, 5, 1.25, 0.1]],
+  [/haiku-3-5/, [0.8, 4, 1, 0.08]],
+  [/^gpt-5\.2/, [1.75, 14, 0, 0.175]],
+  [/^gpt-5(\.1)?(-codex)?-mini/, [0.25, 2, 0, 0.025]],
+  [/^gpt-5(\.1)?(-codex(-max)?)?$/, [1.25, 10, 0, 0.125]],
+]
+// what tokens cost at those prices (write, read: cache; input: the rest); undefined: a model not in PRICES
+export function costOf(model: string | undefined, n: { input: number; output: number; write?: number; read?: number }) {
+  const p = model && PRICES.find(([re]) => re.test(model))?.[1]
+  return p ? (n.input * p[0] + n.output * p[1] + (n.write ?? 0) * p[2] + (n.read ?? 0) * p[3]) / 1e6 : undefined
+}
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
@@ -70,6 +99,9 @@ export type Project = {
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
   trusted?: string // its .laki.json as you trusted it (projectTrust: sha256 of its JSON); one that isn't that gives its port names only
   cfgWait?: string // the view's: its .laki.json's hash while it has more than port names and you haven't trusted it as it is
+  hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's Skip the setup script
+  color?: string // TAB_COLORS': an accent (its icon, its workspaces' bar where they have none of their own, rail pins, bubbles)
+  icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
 export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
@@ -81,6 +113,8 @@ export const MEMORY_AUTO_LEN = 600 // an agent's memory: the gist, in a line or 
 export type CompactRun = { at: number; why: 'you' | 'days' | 'full'; ok: boolean; before: number; after: number; ms?: number; error?: string }
 export type CompactLogLine = CompactRun & { project: string; was?: string[]; now?: string[] }
 export const COMPACT_DAYS = 7 // settings.memoryCompact.days unset
+// the colors a tab, workspace, group, project, note or Desk tab can have (CSS --tc-<name>; ui.tsx colorVar)
+export const TAB_COLORS = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
 export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
@@ -107,6 +141,7 @@ export type Workspace = {
   created: number
   archived?: boolean
   setupWait?: boolean // made while its project's .laki.json wasn't trusted: its copy and setup run as you trust it
+  noSetup?: boolean // made without its setup script (wsNew noSetup): Run ▾'s Run the setup script (run's setup) clears it
   archivedAt?: number // when (ms), for settings.archivedDays
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
@@ -131,6 +166,9 @@ export type Workspace = {
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
   storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab, removed with it unless settings.keepStorage)
   flow?: string // the workflow run that made it (its mark in the sidebar)
+  codespace?: string // a cloud workspace's GitHub Codespace (settings.cloud): its name, '' while gh makes it; host: Laki's ssh name for it, path: the repo there
+  csState?: string // its state as gh says it (Available, Shutdown, Starting…), Creating while it's made, Failed when that failed
+  csError?: string // why making or starting it failed
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -303,8 +341,8 @@ export type Tab = {
   muted?: boolean // no notifications from it
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
-  perm?: string // how freely it acts (PERMS' id; unset: its own default), kept for restarts
-  fast?: boolean // fast mode (FAST), kept for restarts
+  perm?: string // how freely it acts (PERMS' id; '': the agent's own; unset: its profile's), kept for restarts
+  fast?: boolean // fast mode (FAST; unset: its profile's), kept for restarts
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
@@ -335,9 +373,9 @@ export function taskTitle(prompt: string, words = 6) {
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
 // off: switched off in Settings: out of the pickers (new tab, new workspace, races, scheduled tasks); its tabs still start
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
-// Laki at its starts (unset: told); model, effort: its tabs' unless a workspace picks its own; account: an Account's id
-// or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; account?: string }
+// Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
+// own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; account?: string }
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -350,8 +388,8 @@ export const HOME_ACCOUNT = 'home'
 // who an account signs in as (accounts): its email and plan, read from its folder; signedIn: it has a sign-in
 export type AccountView = { id: string; agent: AccountAgent; name: string; dir: string; email?: string; plan?: string; signedIn: boolean; default: boolean }
 
-// what a notification is about: an agent waiting for you, done with its turn, at a usage limit
-export type NotifyKind = 'waiting' | 'done' | 'limit'
+// what a notification is about: an agent waiting for you, done with its turn, at a usage limit; a plan limit nearly used (the app's own: usage)
+export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
 export type Settings = {
@@ -369,6 +407,7 @@ export type Settings = {
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  usageAt?: number // a plan limit's % that notifies (notifyOn.usage): 75, 90, 95 (unset: USAGE_AT, 90)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
   timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
@@ -390,13 +429,14 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
-  specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
-  workflows?: boolean // experimental (Settings › General): Workflows, off unless true
+  specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
+  workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)
   birdView?: boolean // Settings › General › Pages: the eye beside Help, every live session's screen at once, on unless false
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
   notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
   todoList?: boolean // experimental (Settings › General): the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), off unless true
+  cloud?: boolean // experimental (Settings › General): Cloud workspaces, a workspace in a GitHub Codespace (core.ts, daemon/codespace.ts), off unless true
   simulator?: boolean // Settings › Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
@@ -456,7 +496,7 @@ export type Settings = {
   railBrowsers?: boolean // the rail's Browser button; off: Browsers is a project in Projects' list (unset: on)
   railOrder?: string[] // the rail's buttons after Projects, in this order (RAIL_ITEMS' keys; one not in it: after them)
   railHide?: string[] // the rail's buttons put into its ⋯ More menu (Settings › Appearance › Rail, Slack's way)
-  imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
+  imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
   memoryCompact?: { on?: boolean; days?: number } // on (off unless true: it sends them to a model): agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; else only Compact now
@@ -466,6 +506,7 @@ export type Settings = {
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railPlans?: PlanPin[] // specs and brainstorms pinned to the rail (RAIL_PINS at most), oldest first
+  keys?: Record<string, string> // Settings › Keys: App's own actions' keys over shared/keys.ts' KEYS ({ id: keys } as keyLabel writes them; '': none)
   pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
@@ -478,11 +519,16 @@ export type Settings = {
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
   voice?: VoiceSettings // Settings › Voice: how the mic and hold Fn turn speech into text
   achievements?: AchievementsKept // Settings › Achievements, the status bar's trophy (renderer's achievements.ts)
+  contextMeter?: boolean | 'line' | 'ring' | 'status' // Settings › Appearance: how full a claude or codex tab's context is, in the status bar and on its tab as a line (unset, true) or a ring, or not there (status); false: none
+  costs?: boolean // Settings › Appearance: what each claude and codex tab used, tokens and ≈ API price, and today's in the plan limits' popup (unset: on)
 }
 
 // what you did (got: an achievement's id, when), the ones you hid, off: none shown, none earned. Settings' page never
 // saves it (App strips it): an unlock while it's open would be lost
 export type AchievementsKept = { got?: Record<string, number>; hidden?: string[]; off?: boolean }
+// Settings › General › Pages: Specs & Brainstorms and Workflows, on unless turned off
+export const specsOn = (s?: { specs?: boolean }) => s?.specs !== false
+export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 
 // Settings › Voice: engine device, macOS dictation (the mic starts it; Fn Fn is macOS's own); cloud, Laki records and
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
@@ -588,7 +634,8 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
-export const IMAGE_DAYS = 30 // days a pasted image is kept (<data>/images: Laki AI's chats, prompts) unless Settings › AI says otherwise
+export const IMAGE_DAYS = 30 // days a pasted image or an attached file is kept (<data>/images, <data>/files: Laki AI's chats, prompts) unless Settings › AI says otherwise
+export const FILE_MAX = 25 << 20 // an attached file's bytes at most (fileSave; PromptInput checks first: past the socket's maxPayload, its connection drops)
 // an earlier chat of the AI page's (New chat keeps the one it ends): its file's name, its first ask, its last message, its messages
 export type AiPast = { id: string; title: string; at: number; n: number }
 // an extension studio's chat (widget:<id>): its first ask, its last message's time, whether Laki AI works on it now
@@ -649,7 +696,7 @@ export type PR = {
 export type Ask = { options: { n: number; label: string }[]; at: number }
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number } } // runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: core.ts' meters)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -743,9 +790,11 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string; today?: Today } // built: its build's time (none from source); flowFiles: when a workflow file last changed; today: what the agents used today
+// today's tokens and ≈ cost at API prices (core.ts' meters, <data>/usage-today.json), the workspaces that used most first
+export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
-// specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
+// specs and brainstorms (settings.specs, specsOn; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
 export const PLAN_KINDS = ['spec', 'brainstorm'] as const
 export type PlanKind = (typeof PLAN_KINDS)[number]
@@ -760,5 +809,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 103
+export const API = 104
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

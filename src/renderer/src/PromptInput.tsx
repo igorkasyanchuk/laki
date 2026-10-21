@@ -1,13 +1,17 @@
 // A prompt for an agent: text, screenshots pasted or dropped in (the daemon saves them; their paths go
-// after the text, and the agent opens them), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
+// after the text, and the agent opens them), other files too where the caller says how they're saved (saveFile: chips;
+// a folder dropped in is its path, typed in), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { api, openExternal } from './api'
+import { FILE_MAX } from '../../shared/types'
+import { bytes } from '../../shared/widget'
+import { api, bridge, openExternal } from './api'
+import { pathText, withPaths } from './text'
 import { Icon, keep, load, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
-export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
+export type Img = { path: string; url?: string; size?: number } // saved file, and a data: URL for an image's thumbnail (none: another file, a chip; size: its bytes)
 
 // a Laki AI composer's unsent text and pasted images, per chat (laki.aiDrafts, by key; images as their paths, shown again
 // through aiImage, one no longer kept left out): back as the chat opens again, after a restart too, until sent or emptied
@@ -25,7 +29,7 @@ export function useDraft(key: string) {
     if (!paths.length) return
     let on = true
     void Promise.all(paths.map(path => api.call<string>('aiImage', { path }).then(url => ({ path, url }), () => null))).then(
-      got => on && setH(x => (x.key === key ? { ...x, images: [...got.filter((i): i is Img => !!i), ...x.images], ready: true } : x)),
+      got => on && setH(x => (x.key === key ? { ...x, images: [...got.filter((i): i is NonNullable<typeof i> => !!i), ...x.images], ready: true } : x)),
     )
     return () => void (on = false)
   }, [key])
@@ -43,7 +47,21 @@ export function useDraft(key: string) {
 }
 
 // the prompt the agent gets
-export const withImages = (text: string, imgs: { path: string }[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
+export const withImages = (text: string, imgs: { path: string }[]) => withPaths(text, imgs.map(i => i.path))
+
+// an attached file (fileSave's: <data>/files/<id>/<its name>): its icon, name and size, and its ✕ where it can go
+export const FileChip = ({ path, size, onRemove }: { path: string; size?: number; onRemove?: () => void }) => (
+  <span className="prompt-file" data-tip={path}>
+    <Icon name="file" size={13} />
+    <span className="prompt-file-name">{path.split('/').pop()}</span>
+    {size !== undefined && <span className="muted">{bytes(size)}</span>}
+    {onRemove && (
+      <button type="button" aria-label="Remove" onClick={onRemove}>
+        ×
+      </button>
+    )}
+  </span>
+)
 
 // what agents read (claude, codex): other images (HEIC, SVG, …) are refused
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
@@ -76,6 +94,7 @@ export function PromptInput(p: {
   shot?: { n: number; png: string } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on
   inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
+  saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
@@ -100,15 +119,18 @@ export function PromptInput(p: {
     setErr('')
     p.onBusy?.(++saving.current > 0)
     for (const f of files) {
-      const ext = EXT[f.type]
-      if (!ext) {
-        setErr(`${f.name || 'image'}: PNG, JPEG, GIF or WebP only`)
+      const ext = EXT[f.type] // else a file (HEIC, SVG too): saveFile's, or refused
+      // too big: refused before it's read (past the socket's maxPayload the connection drops)
+      const no = !ext && !p.saveFile ? 'PNG, JPEG, GIF or WebP only' : f.size > (ext ? 20 << 20 : FILE_MAX) ? `over ${ext ? 20 : 25} MB` : ''
+      if (no) {
+        setErr(`${f.name || 'image'}: ${no}`)
         continue
       }
       try {
         const url = await read(f)
-        const path = await p.save(url.slice(url.indexOf(',') + 1), ext)
-        p.onImages(x => [...x, { path, url }])
+        const data = url.slice(url.indexOf(',') + 1)
+        const path = ext ? await p.save(data, ext) : await p.saveFile!(data, f.name)
+        p.onImages(x => [...x, ext ? { path, url } : { path, size: f.size }])
       } catch (e) {
         setErr(`${f.name || 'image'}: ${(e as Error).message}`)
       }
@@ -128,18 +150,23 @@ export function PromptInput(p: {
     return () => (clearTimeout(t), window.removeEventListener('focus', go))
   }, [p.shot?.n])
   const filesOf = (l: DataTransferItemList | FileList) => Array.from(l as ArrayLike<DataTransferItem | File>).map(x => (x instanceof File ? x : x.kind === 'file' ? x.getAsFile() : null)).filter((f): f is File => !!f)
-  // images to the daemon, other files to the caller's files (none: left out); false: nothing taken
-  const take = (l: DataTransferItemList | FileList) => {
-    const fs = filesOf(l)
-    const imgs = fs.filter(f => f.type.startsWith('image/'))
+  // images to the daemon, other files to the caller's files, else saveFile's (neither: left out); false: nothing taken
+  const take = (fs: File[]) => {
+    const kept = fs.filter(f => f.type.startsWith('image/') || (p.saveFile && !p.files))
     const rest = p.files ? fs.filter(f => !f.type.startsWith('image/')) : []
-    if (imgs.length) add(imgs)
+    if (kept.length) add(kept)
     if (rest.length) p.files!(rest)
-    return imgs.length + rest.length > 0
+    return kept.length + rest.length > 0
   }
-  const paste = (e: ClipboardEvent) => take(e.clipboardData.items) && e.preventDefault() // text pastes as usual
-  // handled here: the default prevented tells the window's own drop (folders become projects) to keep out
-  const drop = (e: DragEvent) => take(e.dataTransfer.files) && e.preventDefault()
+  const paste = (e: ClipboardEvent) => take(filesOf(e.clipboardData.items)) && e.preventDefault() // text pastes as usual
+  // handled here: the default prevented tells the window's own drop (folders become projects) to keep out. A folder is
+  // its path, typed in at the cursor (quoted), as a terminal's drop: never read
+  const drop = (e: DragEvent) => {
+    const all = Array.from(e.dataTransfer.items).flatMap(i => (f => (f ? [{ f, dir: !!i.webkitGetAsEntry()?.isDirectory }] : []))(i.kind === 'file' ? i.getAsFile() : null))
+    const dirs = all.filter(x => x.dir).map(x => x.f)
+    if (dirs.length) bridge?.pathOf ? insertText(`${dirs.map(f => pathText(bridge!.pathOf!(f))).join(' ')} `) : setErr(`${dirs[0].name}: a folder; drop the files in it`)
+    if (take(all.filter(x => !x.dir).map(x => x.f)) || dirs.length) e.preventDefault()
+  }
   const mic = (cloud || p.dictate) && (
     <span className="mic-split">
       <button
@@ -197,20 +224,24 @@ export function PromptInput(p: {
       />
       {p.images.length > 0 && (
         <div className="prompt-images">
-          {p.images.map(i => (
-            <div key={i.path} className="prompt-image" data-tip={i.path}>
-              <img src={i.url} alt="" />
-              <button type="button" aria-label="Remove" onClick={() => p.onImages(x => x.filter(y => y !== i))}>
-                ×
-              </button>
-            </div>
-          ))}
+          {p.images.map(i =>
+            i.url ? (
+              <div key={i.path} className="prompt-image" data-tip={i.path}>
+                <img src={i.url} alt="" />
+                <button type="button" aria-label="Remove" onClick={() => p.onImages(x => x.filter(y => y !== i))}>
+                  ×
+                </button>
+              </div>
+            ) : (
+              <FileChip key={i.path} path={i.path} size={i.size} onRemove={() => p.onImages(x => x.filter(y => y !== i))} />
+            ),
+          )}
         </div>
       )}
       <div className="prompt-tools">
-        <label className="ib" data-tip={p.files ? 'Attach images or files (or paste or drop them in)' : 'Attach images (or paste or drop them in)'}>
+        <label className="ib" data-tip={p.files || p.saveFile ? 'Attach images or files (or paste or drop them in)' : 'Attach images (or paste or drop them in)'}>
           <Icon name="plus" />
-          <input type="file" accept={p.files ? undefined : 'image/*'} multiple hidden onChange={e => (take(e.target.files!), (e.target.value = ''))} />
+          <input type="file" accept={p.files || p.saveFile ? undefined : 'image/*'} multiple hidden onChange={e => (take(filesOf(e.target.files!)), (e.target.value = ''))} />
         </label>
         {p.lead}
         {!p.lead && mic}

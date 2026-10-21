@@ -6,10 +6,12 @@ import { blocksToMarkdown, normalizeDiagram, readmeBody } from '../src/renderer/
 import { brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planTemplates, specPrompt } from '../src/shared/plans.ts'
 import { fresh } from './helpers.ts'
 
-test('specs and brainstorms: off until turned on, folders outside the repo, the editor’s save, files, agents’ output', async t => {
+test('specs and brainstorms: on unless turned off, folders outside the repo, the editor’s save, files, agents’ output', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await assert.rejects(rig.rpc('planList', {}), /off: turn them on in Settings › General › Experimental/)
+  assert.deepEqual(await rig.rpc('planList', {}), [], 'a fresh state: on with no setting')
+  await rig.rpc('settingsSet', { specs: false })
+  await assert.rejects(rig.rpc('planList', {}), /off: turn them on in Settings › General › Pages/)
   await rig.rpc('settingsSet', { specs: true })
   assert.deepEqual(await rig.rpc('planList', {}), [])
 

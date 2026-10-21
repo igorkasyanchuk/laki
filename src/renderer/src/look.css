@@ -92,8 +92,8 @@
 /* the theme's accent, its waiting color from 70%, its error's from 90% */
 .usage-ring .track { stroke: color-mix(in srgb, var(--accent) 22%, transparent); }
 .usage-ring .fill { stroke: var(--accent); stroke-linecap: round; filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)); }
-.usage-ring.mid .fill, .usage-bar.mid i { stroke: var(--waiting); background: var(--waiting); }
-.usage-ring.high .fill, .usage-bar.high i { stroke: var(--error); background: var(--error); }
+.usage-ring.mid .fill, .usage-bar.mid i, .tab-ctx.mid { stroke: var(--waiting); background: var(--waiting); }
+.usage-ring.high .fill, .usage-bar.high i, .tab-ctx.high { stroke: var(--error); background: var(--error); }
 .tunnel-pop.usage-pop { width: 420px; }
 .usage-agent { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .usage-name { display: flex; align-items: baseline; gap: 8px; }
@@ -103,6 +103,7 @@
 .usage-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .usage-pct { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .usage-when { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-row.usage-spent { grid-template-columns: minmax(0, 1fr) 5em 8em; }
 /* Settings: switches as rows, glass's sliders */
 .switch-row.toggle { background: none; } /* not button.on's */
 .switch-row { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 4px 0; text-align: left; color: var(--fg); font-size: 13px; }

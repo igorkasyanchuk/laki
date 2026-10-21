@@ -1,9 +1,9 @@
-// Workflows (experimental, settings.workflows): a graph of blocks Laki runs for a task. Agents think inside their
+// Workflows (settings.workflows, flowsOn): a graph of blocks Laki runs for a task. Agents think inside their
 // blocks; the daemon (daemon/workflow.ts) walks the graph, keeps each run's decisions, state and log, and resumes it
 // after a restart. One Markdown file per workflow, none to start with: yours (<data>/workflows/<id>.md) or a project's
 // (.laki/workflows/<id>.md in its repo). This file is the format both sides share: parse, toFile, check.
 
-import { type Agent, eventOk, FAST, isAgent, PERMS, WIDGET_EVENTS } from './types.ts'
+import { type Agent, bypassArgs, eventOk, FAST, isAgent, PERMS, permInArgs, type Preset, WIDGET_EVENTS } from './types.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -151,8 +151,14 @@ export const PERM_IDS = [...new Set(Object.values(PERMS).flatMap(l => (l ?? []).
 export const permOf = (wf: Pick<Workflow, 'perm'>, b: Block, agent = b.agent || 'claude') => b.perm ?? (isAgent(agent) && !PERMS[agent] ? undefined : wf.perm)
 // a mode in a block's words (accept edits · fast), as the new-workspace page names it
 export const permWords = (perm?: string, fast?: boolean, agent = 'claude') => [perm && ((PERMS[agent as Agent] ?? PERMS.claude)!.find(p => p[0] === perm)?.[1].toLowerCase() ?? perm), fast && 'fast'].filter(Boolean).join(' · ')
-// the blocks whose agent never asks (bypassPermissions): an agent can't start the workflow (agentOf: a preset's agent)
-export const bypassIn = (wf: Workflow, agentOf?: (b: Block) => string) => wf.blocks.filter(b => b.kind === 'agent' && permOf(wf, b, agentOf?.(b)) === 'bypassPermissions')
+// the blocks whose agent never asks (bypassPermissions): an agent can't start the workflow. profile: a block's (by its
+// agent's name): its agent, its perm when the block and the workflow give none, and its flags, which win when they set a
+// mode (agentCmd)
+export const bypassIn = (wf: Workflow, profile?: (b: Block) => Pick<Preset, 'agent' | 'perm' | 'args'> | undefined) =>
+  wf.blocks.filter(b => {
+    const p = b.kind === 'agent' ? profile?.(b) : undefined
+    return b.kind === 'agent' && (permInArgs(p?.agent, p?.args) ? bypassArgs(p?.args) : (permOf(wf, b, p?.agent) ?? p?.perm) === 'bypassPermissions')
+  })
 // the tab an agent block's prompt goes to in a run: its own (session new), another block's (session: <id>), else the
 // run's tab of its agent
 function tabKey(by: Map<string, Block>, b: Block, seen = new Set<string>()): string {
@@ -857,7 +863,7 @@ var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; th
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked. Its inputs, besides the task, on one line: "inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m" (name[?][:kind][=default]; kinds text (the default), number, branch, choice(a|b|…); ? optional): each is {{inputs.<name>}}, asked for as the run starts (laki_workflow_run's inputs); a scheduled run takes the defaults.
-- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed). perm: how freely it acts (claude and codex; unset: the head's perm:, else the agent's own, which asks, and an unattended run stops at its first permission prompt): ${PERM_IDS.map(id => `${id} (${PERMS.claude!.find(p => p[0] === id)![2].replace(/;/g, ',')})`).join(', ')}; codex's are its sandbox and approvals in the same spirit (plan: read only). An agent can't start a workflow with a bypassPermissions block. fast: yes is fast mode (claude, codex: more speed, more usage). Blocks sharing a tab (session run of the same agent, or session: <block>) need the same perm and fast: the tab starts once.
+- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed). perm: how freely it acts (claude and codex; unset: the head's perm:, else its profile's (Settings › Agents & profiles), else the agent's own, which asks, and an unattended run stops at its first permission prompt): ${PERM_IDS.map(id => `${id} (${PERMS.claude!.find(p => p[0] === id)![2].replace(/;/g, ',')})`).join(', ')}; codex's are its sandbox and approvals in the same spirit (plan: read only). An agent can't start a workflow with a bypassPermissions block. fast: yes is fast mode (claude, codex: more speed, more usage; unset: its profile's). Blocks sharing a tab (session run of the same agent, or session: <block>) need the same perm and fast: the tab starts once.
 - run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines. Its {{vars}} go in as environment variables, never as text the shell reads: write them bare or in double quotes ("{{event.pr.title}}"), never in single quotes (check says so).
 - ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.

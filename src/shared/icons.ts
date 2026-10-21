@@ -373,6 +373,9 @@ export const ICON_GROUPS: Record<string, readonly IconName[]> = {
   Interface: ['square', 'circle', 'triangle', 'diamond', 'hexagon', 'checkCircle', 'xCircle', 'plusCircle', 'minusCircle', 'alertCircle', 'checkSquare', 'plusSquare', 'menu', 'grid', 'list', 'listChecks', 'columns', 'layout', 'sliders', 'toggleOn', 'toggleOff', 'alignLeft', 'alignCenter', 'bold', 'italic', 'underline', 'type', 'quote', 'unlink', 'zoomIn', 'zoomOut', 'crop', 'scissors', 'brush', 'eraser', 'pointer', 'grip', 'moreVertical', 'infinity', 'power', 'loader'],
 }
 export const isIconName = (s: unknown): s is IconName => typeof s === 'string' && Object.hasOwn(ICONS, s)
+// an emoji in place of an icon (a Desk tab's, a project's), typed or pasted into the picker's box (a flag, a keycap, a ZWJ
+// sequence): short, no letters or spaces
+export const emojiOf = (s: unknown) => (t => (t && t.length <= 16 && !/[\p{L}\s]/u.test(t) && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(t) ? t : undefined))(typeof s === 'string' ? s.trim() : undefined)
 // an icon as SVG markup, for HTML built as text (the UI kit)
 export const iconSvg = (name: IconName, size = 14) =>
   `<svg class="k-icon" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${name === 'github' ? 'currentColor' : 'none'}" stroke="${name === 'github' ? 'none' : 'currentColor'}" stroke-width="${name === 'more' ? 2.4 : 1.4}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`

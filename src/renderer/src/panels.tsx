@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type Doctor, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, type LogLine, MODELS, prIn, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -8,7 +8,7 @@ import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Img, PromptInput, withImages } from './PromptInput'
 import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
-import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -239,11 +239,11 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
-  { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: Workflows, Specs, Calendar, Notes', go: 'Experimental' },
+  { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: Calendar, Notes, To-dos', go: 'Experimental' },
   { id: 'presets', title: 'Set up agents & profiles', hint: 'Each profile its agent, model, effort and account: a second Claude plan, a cheaper model', go: 'Agents & profiles' },
   { id: 'remote', title: 'Try remote access', hint: 'Laki on your phone: signed in by email (Cloudflare), with a PIN, or over Tailscale', go: 'Remote access' },
   { id: 'schedules', title: 'Schedule a prompt', hint: 'An agent on a prompt every weekday at 9am, or once tomorrow', go: 'Scheduled tasks' },
-  { id: 'workflows', title: 'Try a workflow', hint: 'Experimental: blocks Laki runs for a task (agents, commands, your answers, a PR); turn it on in Experimental', go: 'Workflows' },
+  { id: 'workflows', title: 'Try a workflow', hint: 'Blocks Laki runs for a task: agents, commands, your answers, a PR', go: 'Workflows' },
 ]
 
 export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
@@ -451,7 +451,7 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean } // perm: PERMS' id; vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string } // codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (More's; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -506,7 +506,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       perm: same ? last.perm : undefined,
       fast: same ? last.fast : undefined,
       base: '',
-      ...(d && { ...d, project: proj, preset, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...(!there && { place: undefined, base: '' }) }),
+      ...(d && { ...d, project: proj, preset, noSetup: undefined, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...(!there && { place: undefined, base: '' }) }),
       ...(initial && (({ linked: _, ...x }) => x)(initial)),
       ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
@@ -543,12 +543,31 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const tpl = ti < 0 ? '' : String(ti)
   const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base, pr: prRef('', p.prompt) })
   const plain = proj?.git === false // a folder without git: local only
-  const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
+  const inCs = view.settings.cloud === true && !plain && !proj?.host && p.codespace !== undefined // In a codespace (experimental)
+  // its repo's machine types (the first picked), or why there are none (gh's words: the codespace scope…)
+  const [machines, setMachines] = useState<{ name: string; display: string }[] | string>([])
+  useEffect(() => {
+    if (!inCs || !p.project) return
+    setMachines([])
+    api.call<{ machines: { name: string; display: string }[] }>('csMachines', { project: p.project }).then(
+      r => (setMachines(r.machines), setP(x => (x.codespace !== undefined && !r.machines.some(m => m.name === x.codespace) ? { ...x, codespace: r.machines[0]?.name ?? '' } : x))),
+      e => setMachines((e as Error).message),
+    )
+  }, [inCs, p.project])
+  const prof = view.presets.find(x => x.name === p.preset)
+  const starts = prof?.agent // what the preset starts: its model and effort flags
+  // its permission mode ('': ask first) and fast mode: picked here, else the profile's (none when its flags set the mode);
+  // sent only when it isn't the profile's, so an edit of the profile applies at the next start
+  const ownPerm = permInArgs(starts, prof?.args)
+  const permPick = ownPerm ? '' : (p.perm ?? prof?.perm ?? '')
+  const fastPick = p.fast ?? !!prof?.fast
+  const permSent = !ownPerm && permPick !== (prof?.perm ?? '') && (!permPick || PERMS[starts as Agent]?.some(x => x[0] === permPick)) ? permPick : undefined
+  const fastSent = FAST[starts as Agent] && fastPick !== !!prof?.fast ? fastPick : undefined
   const [rivals, setRivals] = useState<string[]>(() => draft?.rivals ?? []) // a race: the other presets on the same prompt
   // a draft's prompt a link's replaced (the bubbles' voice prompt to a new session): kept, a click swaps it back
   const [prev, setPrev] = useState<string | undefined>(() => (initial?.prompt?.trim() && draft?.p.prompt?.trim() && draft.p.prompt !== initial.prompt ? draft.p.prompt : draft?.prev))
   const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command' && !x.off).map(x => x.name)
-  const racing = !p.local && !plain && isAgent(starts) && rivals.some(r => racers.includes(r))
+  const racing = !p.local && !plain && !inCs && isAgent(starts) && rivals.some(r => racers.includes(r))
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   // opened for a project the view didn't have yet (the first one, from Welcome: projectAdd answers before the state
   // does): it once the view has it
@@ -576,10 +595,12 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   }, [busy])
   const doing = fan
     ? `Making ${fan.length} worktrees, one after another`
-    : p.local || plain
+    : inCs
+      ? `Asking GitHub for a codespace off ${p.base || 'the current branch'}`
+      : p.local || plain
         ? `Opening ${proj?.name ?? 'the folder'}`
         : `Making a worktree off ${p.base || 'the current branch'}`
-  const then = p.local || plain ? 'then its tabs start' : secs < 12 ? 'then the files git ignores (.env…) are copied and the agent starts' : 'still going: a big repo takes a while'
+  const then = inCs ? 'then it shows in the sidebar while GitHub makes it (minutes): its tabs wait for it' : p.local || plain ? 'then its tabs start' : secs < 12 ? 'then the files git ignores (.env…) are copied and the agent starts' : 'still going: a big repo takes a while'
   // something typed or picked that a close shouldn't lose
   const dirty = !!(p.prompt?.trim() || p.name?.trim() || (p.preset === 'custom' && p.cmd?.trim()) || images.length || rivals.length || prev)
   useEffect(() => void (busy || keep(DRAFT, dirty ? ({ p, images, rivals, tpl: tplName, prev } satisfies Draft) : undefined)), [p, images, rivals, tplName, prev]) // while it's made: submit dropped it
@@ -587,14 +608,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const submit = async () => {
     if (busy || saving) return
     setBusy(true)
-    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: p.perm === 'bypassPermissions' ? undefined : p.perm /* never by itself: picked each time */, fast: p.fast, place: p.place, tpl: tplName, agent } satisfies LastNew)
+    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: permSent === 'bypassPermissions' ? undefined : permSent /* never by itself: picked each time */, fast: fastSent, place: p.place, tpl: tplName, agent } satisfies LastNew)
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own && PERMS[starts]?.some(x => x[0] === p.perm) ? p.perm : undefined, fast: own && FAST[starts] && p.fast ? true : undefined, fan, ...(tpl && { vars: true }) })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -610,7 +631,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const sep = proj?.seps?.find(s => s.id === p.place)
   const canName = !p.local && !plain
   const canModel = isAgent(starts) && !racing // a race's agents keep their own
-  const canRace = !p.local && !plain && isAgent(starts) && racers.length > 0
+  const canRace = !p.local && !plain && !inCs && isAgent(starts) && racers.length > 0
+  const canSkip = !p.local && !plain && !!proj?.hasSetup // a worktree of a project with a setup script
   // the project and its groups in one menu: a group's items under its project
   const placeMenu = (e: MouseEvent) =>
     openMenu(
@@ -618,7 +640,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       [
         ...(view.projects.length > 6 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
         ...view.projects.flatMap(x => [
-        { label: x.name, icon: x.git === false ? 'folder' : 'fork', hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
+        { label: x.name, mark: <ProjectMark p={x} or={x.git === false ? 'folder' : 'fork'} size={14} />, hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
         ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }) }) }) as MenuItem),
         ]),
       ],
@@ -632,7 +654,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   // a preset's line: its command, or the agent and its args; none when it would only say its name again (codex: Codex)
   const presetSays = (x: (typeof view.presets)[number]) => {
     const acct = x.account && (x.account === HOME_ACCOUNT ? 'default sign-in' : view.settings.accounts?.find(a => a.id === x.account)?.name)
-    const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.model, x.effort, acct, x.args].filter(Boolean).join(' · ')
+    const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.model, x.effort, PERMS[x.agent]?.find(m => m[0] === x.perm)?.[1].toLowerCase(), x.fast && FAST[x.agent] && 'fast', acct, x.args].filter(Boolean).join(' · ')
     return say.toLowerCase() === x.name.toLowerCase() ? undefined : say
   }
   const on = view.presets.filter(x => !x.off)
@@ -672,18 +694,22 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     openMenu(e, [{ head: 'Effort' }, { label: 'default', mono: true, sub: 'The model’s own', hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) }, ...(efforts ?? []).map(x => ({ label: x, mono: true, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)])
   // how freely it acts: unset, the agent asks as it always does
   const perms = (ag && PERMS[ag]) ?? []
-  const perm = perms.find(x => x[0] === p.perm)
+  const perm = perms.find(x => x[0] === permPick)
+  const profPill = (id: string) => (prof?.perm && id === prof.perm ? 'profile' : undefined) // the profile's own
   const permMenu = (e: MouseEvent) =>
     openMenu(e, [
       { head: 'Permission mode' },
-      { label: 'Ask first', icon: 'shield', sub: `${ag ? AGENT_NAMES[ag] : 'The agent'}’s own: it asks before it acts`, hint: !perm ? ON : undefined, run: () => set({ perm: undefined }) },
-      ...perms.map(([id, label, sub]) => ({ label, sub, icon: id === 'bypassPermissions' ? 'alertCircle' : id === 'plan' ? 'eye' : 'shieldCheck', danger: id === 'bypassPermissions', hint: perm?.[0] === id ? ON : undefined, run: () => set({ perm: id }) }) as MenuItem),
+      { label: 'Ask first', icon: 'shield', sub: `${ag ? AGENT_NAMES[ag] : 'The agent'}’s own: it asks before it acts`, hint: !perm ? ON : undefined, run: () => set({ perm: '' }) },
+      ...perms.map(([id, label, sub]) => ({ label, sub, icon: id === 'bypassPermissions' ? 'alertCircle' : id === 'plan' ? 'eye' : 'shieldCheck', danger: id === 'bypassPermissions', pill: profPill(id), hint: perm?.[0] === id ? ON : undefined, run: () => set({ perm: id }) }) as MenuItem),
     ])
   const whereMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'New worktree', icon: 'fork', sub: 'A git worktree of its own, off the base branch', hint: !p.local ? ON : undefined, run: () => set({ local: false }) },
-      { label: 'Local', icon: 'folder', sub: `In the repo itself, on ${current || 'the branch it’s on'}`, hint: p.local ? ON : undefined, run: () => set({ local: true }) },
+      { label: 'New worktree', icon: 'fork', sub: 'A git worktree of its own, off the base branch', hint: !p.local && !inCs ? ON : undefined, run: () => set({ local: false, codespace: undefined }) },
+      { label: 'Local', icon: 'folder', sub: `In the repo itself, on ${current || 'the branch it’s on'}`, hint: p.local ? ON : undefined, run: () => set({ local: true, codespace: undefined }) },
+      ...(view.settings.cloud === true && !proj?.host ? [{ label: 'In a codespace', icon: 'cloud', sub: 'A GitHub Codespace of its own, off the base branch (GitHub bills it)', hint: inCs ? ON : undefined, run: () => set({ local: false, codespace: p.codespace ?? '' }) } as MenuItem] : []),
     ])
+  const machineMenu = (e: MouseEvent) =>
+    openMenu(e, [{ head: 'Machine type' }, ...(typeof machines === 'string' ? [] : machines).map(m => ({ label: m.display, sub: m.name, hint: p.codespace === m.name ? ON : undefined, run: () => set({ codespace: m.name }) }) as MenuItem)])
   const tplMenu = (e: MouseEvent) =>
     openMenu(
       e,
@@ -726,7 +752,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           <Icon name="chevron" size={11} />
         </button>
       )}
-      {perms.length > 0 && (
+      {perms.length > 0 && !ownPerm && (
         <button type="button" className={`nw-pick ${perm?.[0] === 'bypassPermissions' ? 'warn' : ''}`} aria-haspopup="menu" data-tip={perm ? perm[2] : 'Permission mode: how freely it acts'} onClick={permMenu}>
           <span>{perm?.[1] ?? 'Ask first'}</span>
           <Icon name="chevron" size={11} />
@@ -735,7 +761,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     </>
   )
   const fast = canModel && ag && FAST[ag] && (
-    <button type="button" className={`ib nw-fast ${p.fast ? 'on' : ''}`} aria-pressed={!!p.fast} aria-label="Fast mode" data-tip={p.fast ? 'Fast mode is on: quicker answers, at a higher price' : 'Fast mode: quicker answers, at a higher price'} onMouseDown={e => e.preventDefault()} onClick={() => set({ fast: !p.fast })}>
+    <button type="button" className={`ib nw-fast ${fastPick ? 'on' : ''}`} aria-pressed={fastPick} aria-label="Fast mode" data-tip={fastPick ? 'Fast mode is on: quicker answers, at a higher price' : 'Fast mode: quicker answers, at a higher price'} onMouseDown={e => e.preventDefault()} onClick={() => set({ fast: !fastPick })}>
       <Icon name="zap" />
     </button>
   )
@@ -746,7 +772,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       {fan && !busy && <span className="nw-send-n">{fan.length}</span>}
     </button>
   )
-  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`].filter(Boolean).join(' · ')
+  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`, canSkip && p.noSetup && 'no setup'].filter(Boolean).join(' · ')
   const toggle = () => setAdv(o => !o)
   return (
     <Page title="New workspace" onClose={onClose}>
@@ -755,7 +781,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         {/* the row over the prompt: where it's made on the left, what starts on the right */}
         <div className="nw-top">
           <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its project, and where in the sidebar: first in it, or in one of its groups" onClick={placeMenu}>
-            <Icon name={plain ? 'folder' : 'fork'} />
+            <ProjectMark p={proj} or={plain ? 'folder' : 'fork'} size={14} />
             <span>
               {proj?.name}
               {sep && <span className="muted"> › {sep.name || 'Unnamed group'}</span>}
@@ -768,8 +794,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
             </span>
           ) : (
             <>
-              <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="A worktree of its own, or the repo itself" onClick={whereMenu}>
-                <span>{p.local ? 'Local' : 'New worktree'}</span>
+              <button type="button" className="nw-pick" aria-haspopup="menu" data-tip={view.settings.cloud === true ? 'A worktree of its own, the repo itself, or a codespace' : 'A worktree of its own, or the repo itself'} onClick={whereMenu}>
+                <span>{p.local ? 'Local' : inCs ? 'In a codespace' : 'New worktree'}</span>
                 <Icon name="chevron" size={11} />
               </button>
               {p.local ? (
@@ -784,6 +810,19 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                   {branches.length > 0 && <IconButton icon="chevron" title="Pick the base branch" className="nw-chip-more" onClick={baseMenu} />}
                 </span>
               )}
+              {inCs &&
+                (typeof machines === 'string' ? (
+                  <span className="nw-pick quiet warn" data-tip={machines}>
+                    <Icon name="alertCircle" />
+                    <span>{machines}</span>
+                  </span>
+                ) : (
+                  <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its machine type: GitHub bills by it" onClick={machineMenu}>
+                    <Icon name="cloud" />
+                    <span>{machines.find(m => m.name === p.codespace)?.display ?? (p.codespace || 'Machine type')}</span>
+                    <Icon name="chevron" size={11} />
+                  </button>
+                ))}
             </>
           )}
           {canName && (
@@ -792,8 +831,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               <input className="nw-chip-input" value={p.name ?? ''} placeholder={prompting && p.prompt?.trim() ? 'name: from the prompt' : 'name'} aria-label="Name" spellCheck={false} onChange={e => set({ name: e.target.value })} />
             </label>
           )}
-          {(modelRow || canRace) && (
-            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race" onClick={toggle}>
+          {(modelRow || canRace || canSkip) && (
+            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race; the setup script" onClick={toggle}>
               <span>More{more && <span className="muted"> · {more}</span>}</span>
               <Icon name={adv ? 'chevronUp' : 'chevron'} size={11} />
             </button>
@@ -808,12 +847,13 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               images={images}
               onImages={setImages}
               save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+              saveFile={(data, name) => api.call<string>('fileSave', { data, name })}
               dictate={bridge?.dictate}
               dictationSettings={bridge?.dictationSettings}
               onSubmit={submit}
               onBusy={setSaving}
               rows={8}
-              placeholder="Message the agent: paste or drop screenshots"
+              placeholder="Message the agent: paste or drop screenshots and files"
               lead={lead || <span />}
               tools={fast}
               send={send}
@@ -833,7 +873,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           )}
         </div>
         {tpl && prompting && <div className="template-preview muted small">{filled || ' '}</div>}
-        {adv && (modelRow || canRace) && (
+        {adv && (modelRow || canRace || canSkip) && (
           <div className="nw-card nw-more">
             {modelRow && (
               <label className="nw-line">
@@ -857,6 +897,15 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                   ))}
                 </div>
                 <span className="muted small">the same prompt to each, a worktree each; Compare keeps the best</span>
+              </div>
+            )}
+            {canSkip && (
+              <div className="nw-line">
+                <span>Setup</span>
+                <Switch on={!!p.noSetup} onChange={noSetup => set({ noSetup })}>
+                  Skip the setup script
+                </Switch>
+                <span className="muted small">the files .worktreeinclude names are still copied; Run ▾ runs it later</span>
               </div>
             )}
           </div>
@@ -1122,7 +1171,7 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
   )
 }
 
-export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; run: () => void }
+export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void } // mark: before the hint (its project's)
 
 // fuzzy: the query's characters in order; contiguous runs and word starts score higher
 export function fuzzy(q: string, s: string): number {
@@ -1198,7 +1247,10 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
           <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''}`} onMouseMove={() => setI(n)} onClick={() => pick(x)}>
             <span className="pg">{x.icon ? <Icon name={x.icon} /> : x.glyph && <Glyph s={x.glyph} />}</span>
             <span className="pl">{x.label}</span>
-            <span className="ph muted">{x.hint}</span>
+            <span className="ph muted">
+              {x.mark}
+              {x.hint}
+            </span>
           </div>
         ))}
         {!list.length && <div className="muted pad">Nothing matches.</div>}

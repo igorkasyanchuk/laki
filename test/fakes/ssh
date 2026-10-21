@@ -1,12 +1,13 @@
 #!/bin/bash
 # fake ssh: every host is this machine. A command runs in sh with a host's env (none of the Mac's LAKI_ vars);
-# -M keeps a pretend ControlMaster (its pid in the -S file); -O check/exit/forward/cancel ask it. Host "nohost" refuses.
-ctl= op= master=
+# -F: its config, logged (cfg); -M keeps a pretend ControlMaster (its pid in the -S file); -O check/exit/forward/cancel ask it. Host "nohost" refuses.
+ctl= op= master= cfg=
 while [ $# -gt 0 ]; do
   case $1 in
     -S) ctl=$2; shift 2 ;;
     -O) op=$2; shift 2 ;;
-    -o|-L|-R|-p|-i|-l|-F|-J|-W|-E|-b|-c|-D|-e|-m|-Q|-w) shift 2 ;;
+    -F) cfg=$2; shift 2 ;;
+    -o|-L|-R|-p|-i|-l|-J|-W|-E|-b|-c|-D|-e|-m|-Q|-w) shift 2 ;;
     -M) master=1; shift ;;
     -*) shift ;;
     *) break ;;
@@ -14,7 +15,7 @@ while [ $# -gt 0 ]; do
 done
 host=$1
 shift
-printf '{"bin":"ssh","host":"%s","op":"%s","master":"%s"}\n' "$host" "$op" "$master" >> "${FAKE_LOG:-/dev/null}"
+printf '{"bin":"ssh","host":"%s","op":"%s","master":"%s","cfg":"%s"}\n' "$host" "$op" "$master" "$cfg" >> "${FAKE_LOG:-/dev/null}"
 if [ "$host" = nohost ]; then echo "ssh: connect to host nohost port 22: Connection refused" >&2; exit 255; fi
 if [ -n "$op" ]; then
   pid=$(cat "$ctl" 2>/dev/null)

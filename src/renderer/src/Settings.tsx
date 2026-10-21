@@ -3,20 +3,21 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SimCheck, type SideStyle, type SimDev, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { type Account, ACCOUNT_AGENTS, type AccountAgent, type AccountView, type AchievementsKept, actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, aiOn, type AiSettings, type AiTotals, ANSWER_WHY, answerOk, COMPACT_DAYS, type Doctor, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, IMAGE_DAYS, isAccountAgent, type Memory, MEMORY_MAX, type MergeMethod, MODELS, type NotifyKind, permInArgs, PERMS, placesOf, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRMarks, type ProcUse, type ProjectLook, REMOTE_TRIES, type Resources, type SideLook, type SideStyle, type SimCheck, type SimDev, SLEEP_AFTER, specsOn, type StudioChat, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, webhookUrl, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
-import { ICONS } from '../../shared/icons'
+import { emojiOf, ICONS } from '../../shared/icons'
 import { StarterPicker } from './UiKit'
-import { exportable, importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
+import { exportable, importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor, USAGE_AT } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
+import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, iconItems, iconWords, type IconName, keep, keyLabel, keyRec, load, ON, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { PICKER_KEY } from './Picker'
+import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { QR } from './Tunnel'
 import { mostRoom, USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
@@ -98,6 +99,7 @@ const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: 
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
 const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
+const CTX_LOOKS: [string, string][] = [['line', 'A line under its tab'], ['ring', 'A ring on its tab'], ['status', 'The status bar only'], ['off', 'Off']] // the context meter's
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
@@ -128,6 +130,8 @@ export type AppSettings = Paint & {
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   timers?: boolean // a turn's time on its tab and row (unset: off)
+  contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
+  costs?: boolean // what each chat used, tokens and ≈ API price, and today's (unset: on)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: on)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
@@ -141,6 +145,7 @@ export type AppSettings = Paint & {
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
@@ -185,17 +190,19 @@ export type AppSettings = Paint & {
   widgetLogs?: boolean // every extension keeps a log (each one's own Keep a log otherwise)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
+  keys?: Record<string, string> // Settings › Keys: App's own actions' keys over shared/keys.ts KEYS ('': none)
   hotkeyOn?: boolean // the global hotkey (unset: on)
   hotkey?: string // its keys (unset: HOTKEY; '': none)
   shotAsk?: boolean // Screenshot to Laki AI (off unless true)
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
-  specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
-  workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
+  specs?: boolean // Specs & Brainstorms (Specs.tsx), on unless false
+  workflows?: boolean // Workflows (Workflows.tsx), on unless false
   birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
   todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
+  cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
@@ -210,7 +217,7 @@ export type AppSettings = Paint & {
   sideStyle?: SideStyle // the sidebar's rows
   memory?: Memory[] // Global memory: the user's rules for every project's agents
   memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, off unless on (daemon/memory.ts)
-  imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
+  imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
 }
 
@@ -591,7 +598,7 @@ function AiSection({ api, ai, glow, onGlow, presets, onChange, imageDays, onImag
           </Switch>
         </div>
       </Group>
-      <Group title="Pasted images" hint="Screenshots you paste into Laki AI's chats and into new workspaces' prompts, kept in Laki's images folder: the chat shows them as thumbnails, a click shows one big. Older ones go">
+      <Group title="Pasted images" hint="Screenshots you paste into Laki AI's chats and into new workspaces' prompts, and files you attach to a prompt, kept in Laki's folder: the chat shows them as thumbnails, a click shows one big. Older ones go">
         <label>
           Keep pasted images (days)
           <input type="number" min={1} max={3650} placeholder={String(IMAGE_DAYS)} value={imageDays || ''} onChange={e => onImageDays(e.target.value ? Math.max(1, Math.min(3650, Math.round(Number(e.target.value)) || 1)) : 0)} />
@@ -627,6 +634,7 @@ const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
   ['waiting', 'Waiting for you', 'A permission prompt, or CI that keeps failing'],
   ['done', 'Finished', 'The end of a turn, with its last words'],
   ['limit', 'Usage limit', 'An agent hit its plan limit'],
+  ['usage', 'Plan limit nearly used', "Claude's or Codex's 5-hour or weekly limit reaching the share below, once a reset, while Laki is open"],
 ]
 const SOUNDS = ['Basso', 'Blow', 'Bottle', 'Frog', 'Funk', 'Glass', 'Hero', 'Morse', 'Ping', 'Pop', 'Purr', 'Sosumi', 'Submarine', 'Tink']
 
@@ -809,7 +817,7 @@ function FolderField({ value, placeholder, label, onChange }: { value?: string; 
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[] }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Shell (a command)']]
@@ -824,8 +832,8 @@ const ACTION_EG: Record<RunAction['target'], string> = {
 }
 // a preset's args, for example
 const ARGS_EG: Record<Agent, string> = {
-  claude: '--permission-mode acceptEdits',
-  codex: '--full-auto',
+  claude: '--add-dir ../shared', // a permission mode: its own picker
+  codex: '--search',
   gemini: '--approval-mode auto_edit',
   grok: '--permission-mode acceptEdits',
   opencode: '--agent build',
@@ -990,7 +998,7 @@ export function ProjectSection(p: {
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
-  onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
+  onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
 }) {
   const [name, setName] = useState(p.project.name)
   const [notes, setNotes] = useState(p.project.notes ?? '')
@@ -1024,8 +1032,12 @@ export function ProjectSection(p: {
   }, [name, c, notes])
   useEffect(() => () => void unsaved.current?.(), [])
   const badMails = parseMails(c.expose ?? '').filter(m => !MAIL_OK.test(m))
+  const [menu, openMenu] = useMenu()
+  // the project ⋯'s Color and Icon…, as they are now (the view's)
+  const lookMenu = (e: MouseEvent) => openMenu(e, [{ colors: TAB_COLORS, value: p.project.color, pick: color => p.onSave({ config: c, color }) }, null, ...iconItems(p.project.icon, icon => p.onSave({ config: c, icon: icon ?? '' }))])
   return (
     <>
+      {menu}
       <div className="set-title">
         <h2>{p.project.name}</h2>
         <div className="muted small mono">
@@ -1037,6 +1049,14 @@ export function ProjectSection(p: {
           <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
         </Group>
       )}
+      <Group title="Color and icon" hint="Its mark before its name in the sidebar, menus, the palette and the window's title (an emoji there); the color also on its workspaces' bar where they have none of their own, rail pins and the bubbles">
+        <div className="button-row">
+          <button type="button" aria-haspopup="menu" onClick={lookMenu}>
+            <ProjectMark p={p.project} or={p.project.git ? 'fork' : 'folder'} size={14} /> {[p.project.color, p.project.icon && (emojiOf(p.project.icon) ?? iconWords(p.project.icon))].filter(Boolean).join(' · ') || 'None yet'}
+            <Icon name="chevron" size={11} />
+          </button>
+        </div>
+      </Group>
       {p.onMemory && (
         <Group title="Memory" hint="What Claude and Codex get at every start in this project: yours, and what agents learned. Settings › Global memory goes with it">
           <div className="button-row">
@@ -1119,6 +1139,7 @@ const FIND: [string, string, string?][] = [
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
+  ['general', 'Plan limit nearly used', 'usage 5-hour weekly session quota notify 90% threshold claude codex'],
   ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],
   ['notes', 'Release notes', "what's new changelog version changes added recently"],
   ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],
@@ -1128,7 +1149,7 @@ const FIND: [string, string, string?][] = [
   ['ai', "Laki's skill", 'tools prs notes memory shells actions templates ask options remove'],
   ['ai', 'Show costs ($)', 'hide cost money dollars price spend'],
   ['ai', 'Your instructions', 'custom context system prompt my own rules'],
-  ['ai', 'Keep pasted images (days)', 'images screenshots storage retention delete older clean thumbnails 30'],
+  ['ai', 'Keep pasted images (days)', 'images screenshots files attached storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Fun button', 'meme reddit smiley break joke'],
@@ -1139,6 +1160,8 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
+  ['appearance', 'Tokens and cost', 'tokens cost price dollars spend usage today api estimate money'],
   ['general', 'Environment', 'env variables'],
   ['general', 'Move to another Mac', 'export import backup file'],
   ['appearance', 'Interface font', 'ui type'],
@@ -1179,7 +1202,7 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'New tabs open as a split', 'pane panel nested inside tab beside'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
   ['open', 'Custom command', 'editor'],
-  ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort presets'],
+  ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
   ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
@@ -1209,9 +1232,11 @@ const FIND: [string, string, string?][] = [
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
-  ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
-  ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
+  ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
+  ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
+  ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Screenshot to Laki AI', 'global hotkey screenshot region area capture dictation voice mic ask ai menu bar tray'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
@@ -1221,6 +1246,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
   ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
+  ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
   ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
@@ -1242,6 +1268,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
+  { id: 'keys', label: 'Keys', icon: 'keyboard', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
   { id: 'achievements', label: 'Achievements', icon: 'trophy', group: 'Laki' },
   { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
@@ -2481,8 +2508,8 @@ type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: b
 export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s: RailHas) => boolean }[] = [
   { key: 'board', label: 'Board', icon: 'board' },
   { key: 'schedules', label: 'Schedule', icon: 'clock' },
-  { key: 'specs', label: 'Specs', icon: 'spec', when: s => s.specs === true },
-  { key: 'workflows', label: 'Flows', icon: 'flow', when: s => s.workflows === true },
+  { key: 'specs', label: 'Specs', icon: 'spec', when: s => specsOn(s) },
+  { key: 'workflows', label: 'Flows', icon: 'flow', when: s => flowsOn(s) },
   { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
   { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
   { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList === true },
@@ -2729,10 +2756,43 @@ function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v
   return (
     <span className="key-field">
       <button type="button" className={rec ? 'on' : ''} onClick={() => setRec(r => !r)} data-tip={rec ? 'Press the keys: ⌘, ⌃ or ⌥ with a key. Esc cancels, ⌫ leaves none' : 'Click, then press the keys'}>
-        {rec ? 'Press the keys…' : value ? <kbd>{value}</kbd> : 'None'}
+        {rec ? 'Press the keys…' : value ? <kbd>{keyShow(value)}</kbd> : 'None'}
       </button>
-      {value !== def && !rec && <IconButton icon="restore" title={`Back to ${def}`} onClick={() => onSet(def)} />}
+      {value !== def && !rec && <IconButton icon="restore" title={`Back to ${keyShow(def)}`} onClick={() => onSet(def)} />}
     </span>
+  )
+}
+
+// Settings › Keys: App's own actions (shared/keys.ts KEYS), each recorded over its default (settings.keys: only the
+// ones changed); others: [keys, name] the clash check counts too (the global hotkeys, the picker)
+function KeysSection({ over, others, onChange }: { over?: Record<string, string>; others: [string, string][]; onChange: (keys: Record<string, string>) => void }) {
+  const m = keyMap(over)
+  const set = (id: KeyId, k: string) => onChange(Object.fromEntries(KEYS.map(x => [x.id, x.id === id ? k : m[x.id]] as const).filter(([i, v]) => v !== KEYS.find(x => x.id === i)!.key)))
+  return (
+    <>
+      <h2>Keys</h2>
+      <p className="muted small">The keys of Laki's own actions: Record, then press new ones (⌘, ⌥ or ⌃ with a key, so typing in a terminal is never taken; ⌫ leaves none). The others (⌘1…⌘9, ⌘↑ ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N, text size) stay; Help lists them all, and the menu bar shows these as you set them.</p>
+      <Group
+        title="Laki's keys"
+        act={
+          <button type="button" disabled={KEYS.every(x => m[x.id] === x.key)} onClick={() => onChange({})}>
+            <Icon name="restore" /> Reset all
+          </button>
+        }
+      >
+        <div className="setting-box">
+          {KEYS.map(x => {
+            const c = keyClash(x.id, m, others)
+            return (
+              <div className="switch-row" key={x.id}>
+                <KeyField value={m[x.id]} def={x.key} onSet={k => set(x.id, k)} />
+                <Says title={x.label} hint={c && <span className="warn-soft">{keyShow(m[x.id])} is also {c}: one of them won't get it</span>} />
+              </div>
+            )
+          })}
+        </div>
+      </Group>
+    </>
   )
 }
 
@@ -2821,7 +2881,7 @@ export function SettingsPage(p: {
   onClose: () => void
   projects?: ProjectInfo[]
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
-  onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
+  onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
@@ -3095,7 +3155,7 @@ export function SettingsPage(p: {
           {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Project settings</div>}
           {!findQ.trim() && p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => openSec(`project:${x.id}`)} data-tip={x.path}>
-              <Icon name={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
+              <ProjectMark p={x} or={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} size={14} /> <span>{x.name}</span>
             </button>
           ))}
         </nav>
@@ -3245,6 +3305,18 @@ export function SettingsPage(p: {
                         <Says title={title} hint={hint} />
                       </Switch>
                     ))}
+                    {s.notifyOn?.usage !== false && (
+                      <label className="switch-row sub">
+                        <select value={s.usageAt ?? USAGE_AT} onChange={e => set({ usageAt: Number(e.target.value) })}>
+                          {[75, 90, 95].map(x => (
+                            <option key={x} value={x}>
+                              {x}%
+                            </option>
+                          ))}
+                        </select>
+                        <Says title="Plan limit at" hint="How much of a limit is used when it tells you" />
+                      </label>
+                    )}
                     <label className="switch-row sub">
                       <select value={s.notifySound ?? ''} onChange={e => set({ notifySound: e.target.value })}>
                         <option value="">Default</option>
@@ -3365,16 +3437,16 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.birdView !== false} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
                 </Switch>
+                <Switch className="switch-row" on={specsOn(s)} onChange={v => set({ specs: v })}>
+                  <Says title="Specs & Brainstorms" hint="Write a project's requirements like a Notion page (checklists, images, diagrams) and brainstorm ideas with Laki AI (options, a mind map, diagrams, clickable prototypes). Each is a folder outside the repo with a README.md any agent can read. Shows the rail's Specs and a project's Specs tab" />
+                </Switch>
+                <Switch className="switch-row" on={flowsOn(s)} onChange={v => set({ workflows: v })}>
+                  <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
+                </Switch>
               </div>
               </Group>
               <Group title="Experimental" hint="New things to try: they may change, or go">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.specs === true} onChange={v => set({ specs: v })}>
-                  <Says title="Specs & Brainstorms" hint="Write a project's requirements like a Notion page (checklists, images, diagrams) and brainstorm ideas with Laki AI (options, a mind map, diagrams, clickable prototypes). Each is a folder outside the repo with a README.md any agent can read. Shows the rail's Specs and a project's Specs tab" />
-                </Switch>
-                <Switch className="switch-row" on={s.workflows === true} onChange={v => set({ workflows: v })}>
-                  <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
-                </Switch>
                 <Switch className="switch-row" on={s.calendar === true} onChange={v => set({ calendar: v })}>
                   <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
                 </Switch>
@@ -3383,6 +3455,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
                   <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.cloud === true} onChange={v => set({ cloud: v })}>
+                  <Says title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it" />
                 </Switch>
               </div>
               </Group>
@@ -3539,6 +3614,19 @@ export function SettingsPage(p: {
                     <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
                   </Switch>
                 ))}
+                <label className="switch-row">
+                  <select value={s.contextMeter === false ? 'off' : s.contextMeter === 'ring' || s.contextMeter === 'status' ? s.contextMeter : 'line'} onChange={e => set({ contextMeter: e.target.value === 'off' ? false : (e.target.value as 'line' | 'ring' | 'status') })}>
+                    {CTX_LOOKS.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <Says title="Context meter" hint="How full each Claude Code and Codex chat's context is, amber past 70%, red past 90%, so you /compact or start fresh in time: a bar in the status bar, and on its tab a line along its bottom edge or a ring" />
+                </label>
+                <Switch className="switch-row" on={s.costs !== false} onChange={v => set({ costs: v })}>
+                  <Says title="Tokens and cost" hint="What each Claude Code and Codex chat used, on its tab's tooltip, and today's in the plan limits' popup: tokens, and ≈ what they'd cost at API prices (an estimate; your plan bills its own way)" />
+                </Switch>
               </div>
               </Group>
               <Group title="Pull request marks" hint="On a workspace whose open PR is approved, or one you looked at: in the sidebar, at a glance">
@@ -3926,6 +4014,17 @@ export function SettingsPage(p: {
             />
           )}
           {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
+          {sec === 'keys' && (
+            <KeysSection
+              over={s.keys}
+              others={[
+                ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),
+                ...(s.shotAsk === true && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
+                ...(s.pickerKey !== '' ? ([[s.pickerKey ?? PICKER_KEY, 'Pick an element (development mode)']] as [string, string][]) : []),
+              ]}
+              onChange={keys => set({ keys })}
+            />
+          )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (
@@ -4035,7 +4134,7 @@ export function SettingsPage(p: {
             <>
               <h2>Agents & profiles</h2>
               <p className="muted small">
-                An agent is a CLI Laki starts (Claude Code, Codex…); a profile is how it starts: its model, effort, account, flags and env. Each profile
+                An agent is a CLI Laki starts (Claude Code, Codex…); a profile is how it starts: its model, effort, permission and fast mode, account, flags and env. Each profile
                 that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use (their tabs still start). Flags go
                 after the command, before the prompt, through the shell (so the variables work); env goes on top of the project's.
               </p>
@@ -4050,7 +4149,7 @@ export function SettingsPage(p: {
                         <div className="row preset-head">
                           <Switch on={!pr.off} onChange={on => setPreset(i, { off: on ? undefined : true })} tip={pr.off ? `${pr.name}: off, not in the pickers` : `${pr.name}: on`} />
                           <input className="mono" value={pr.name} placeholder="name" aria-label="Profile name" onChange={e => setPreset(i, { name: e.target.value.replace(/\s+/g, '-') })} />
-                          <select value={pr.agent} aria-label="Agent" onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'], model: undefined, effort: undefined, account: undefined })}>
+                          <select value={pr.agent} aria-label="Agent" onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'], model: undefined, effort: undefined, perm: undefined, fast: undefined, account: undefined })}>
                             {AGENTS.map(a => (
                               <option key={a} value={a}>
                                 {AGENT_NAMES[a]}
@@ -4080,6 +4179,16 @@ export function SettingsPage(p: {
                                 ))}
                               </select>
                             )}
+                            {PERMS[pr.agent] && (
+                              <select value={permInArgs(pr.agent, pr.args) ? '' : (pr.perm ?? '')} aria-label="Permission mode" disabled={permInArgs(pr.agent, pr.args)} data-tip={permInArgs(pr.agent, pr.args) ? 'Its flags set it' : 'How freely it acts (a workspace may pick another)'} onChange={e => setPreset(i, { perm: e.target.value || undefined })}>
+                                <option value="">{permInArgs(pr.agent, pr.args) ? 'mode: its flags’' : 'mode: ask first'}</option>
+                                {PERMS[pr.agent]!.map(([id, label]) => (
+                                  <option key={id} value={id}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                             {isAccountAgent(pr.agent) && (
                               <select value={pr.account ?? ''} aria-label="Account" onChange={e => setPreset(i, { account: e.target.value || undefined })}>
                                 <option value="">account: the default</option>
@@ -4102,6 +4211,11 @@ export function SettingsPage(p: {
                         )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
                         <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
+                        {pr.agent !== 'command' && FAST[pr.agent] && (
+                          <Switch className="switch-row" on={!!pr.fast} onChange={on => setPreset(i, { fast: on || undefined })}>
+                            <Says title="Fast mode" hint="Quicker answers, at a higher price (a workspace may turn it off)" />
+                          </Switch>
+                        )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
                           <Switch className="switch-row" on={pr.laki !== false} onChange={on => setPreset(i, { laki: on ? undefined : false })}>
                             <Says title="Tell it about Laki" hint="A note at each start: it runs in Laki, can name its workspace, attach a PR, start another workspace, and keep files for you in $LAKI_STORAGE_FOLDER" />

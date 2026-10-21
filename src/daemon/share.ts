@@ -4,6 +4,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { markdownHtml } from '../shared/markdown.ts'
+import { costOf } from '../shared/types.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
 
@@ -74,6 +75,65 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
     }
   }
   return out
+}
+
+// what a chat used, from its transcript read on (core.ts' meters; onto m, what its earlier lines said): used, what its
+// context holds now (claude: the last answer's prompt, its cache's too; codex: its last token_count's) of max (codex's
+// window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) and their
+// cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day)
+type Spent = { tokens: number; cost: number; day: string }
+export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; msg?: string; was?: Spent; total?: Record<string, number> } // msg, was: claude's last message and what it counted; total: codex's last running totals
+export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
+export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
+export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {
+  const day = dayOf(now)
+  if (m.day !== day) (m.day = day), (m.today = { tokens: 0, cost: 0 }) // a new day
+  const add = (s: Spent, by = 1) => {
+    m.tokens += by * s.tokens
+    m.cost += by * s.cost
+    if (s.day === day) (m.today.tokens += by * s.tokens), (m.today.cost += by * s.cost)
+  }
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"')) continue // most lines: not parsed
+    let j: any
+    try {
+      j = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const at = dayOf(Date.parse(j.timestamp) || now)
+    if (agent === 'claude') {
+      const u = j.type === 'assistant' && j.message?.usage
+      if (!u || j.message.model === '<synthetic>') continue // claude's own notes: no call
+      const n = { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 }
+      const cost = costOf(j.message.model, n)
+      if (cost !== undefined) m.priced = true
+      // an answer is a line per block, each with its usage so far: the last one counts (ponytail: a subagent's lines in
+      // between count it twice)
+      if (m.was && j.message.id && j.message.id === m.msg) add(m.was, -1)
+      m.msg = j.message.id
+      add((m.was = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at }))
+      if (!j.isSidechain) m.used = n.input + n.write + n.read // a subagent's is a context of its own
+    } else {
+      const p = j.payload
+      if (j.type === 'turn_context' && p?.model) m.model = p.model
+      const i = j.type === 'event_msg' && p?.type === 'token_count' && p.info
+      if (!i) continue
+      if (i.model_context_window) m.max = i.model_context_window
+      if (i.last_token_usage) m.used = i.last_token_usage.total_tokens ?? 0
+      const all = i.total_token_usage
+      if (!all) continue
+      // its running totals: what grew since the last (smaller: counted anew)
+      const was = m.total && (all.total_tokens ?? 0) >= (m.total.total_tokens ?? 0) ? m.total : {}
+      const d = (k: string) => (all[k] ?? 0) - (was[k] ?? 0)
+      m.total = all
+      if (!d('total_tokens')) continue // a rate limit's update: the same totals
+      const cost = costOf(m.model, { input: d('input_tokens') - d('cached_input_tokens'), output: d('output_tokens'), read: d('cached_input_tokens') }) // its input has the cached in it
+      if (cost !== undefined) m.priced = true
+      add({ tokens: d('total_tokens'), cost: cost ?? 0, day: at })
+    }
+  }
+  return m
 }
 
 // L9: token-shaped strings masked in what a share shows (its page and Markdown): API keys (sk-…, GitHub's, Slack's, AWS's

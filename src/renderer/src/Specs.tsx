@@ -1,4 +1,4 @@
-// Specs & Brainstorms (experimental: Settings › General; the rail's Specs, a project's Specs tab, ⌘K): a project's
+// Specs & Brainstorms (off only by Settings › General › Pages; the rail's Specs, a project's Specs tab, ⌘K): a project's
 // requirements written like a Notion page (SpecEditor: BlockNote, specdrop's diagrams), and brainstorms Laki AI
 // explores into the same folder: ideas.md (mermaid diagrams and mind maps), prototype-*.html (each in a sandboxed
 // frame the daemon serves), *.diagram.json. Each is a folder outside the repo (daemon/plans.ts); a spec's Start opens
@@ -100,7 +100,6 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       {level === 'templates' && <b className="crumb here">Templates</b>}
       {sel && <span className="crumb-sep">›</span>}
       {sel && <b className="crumb here">{selTitle || 'Untitled'}</b>}
-      <span className="wf-beta">experimental</span>
     </nav>
   )
   const row = (p: Plan) => (

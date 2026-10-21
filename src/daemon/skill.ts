@@ -114,7 +114,7 @@ user's extensions may give you tools:
 \`laki widget tools\` lists them and when to use them, \`laki widget tool <id> <action> '<json>'\` runs one in your
 workspace (Laki may ask the user first; denied: don't try again unasked).
 
-Specs and brainstorms (when the user turned them on: Settings › General › Experimental) are the user's own pages,
+Specs and brainstorms (on unless the user turned them off: Settings › General › Pages) are the user's own pages,
 folders outside the repo, each with a README.md: a spec says what to build, a brainstorm what to explore. A prompt that
 names one (\`Spec: <path>/README.md\`) means: read it and the files beside it first, then do what it says. Over MCP
 (\`laki mcp\`): \`laki_plans\` lists them, \`laki_plan_read\` reads one, \`laki_plan_new\` writes a new one for the user,
@@ -126,7 +126,7 @@ general and lasting about the project (an approach that works or doesn't, a gotc
 it), \`laki memory add . "<a line or two>"\` keeps it for later sessions (not task notes, progress or secrets); a
 learned one that's wrong: \`laki memory rm . <id>\`. MCP: \`laki_memory\`, \`laki_remember\`.
 
-Workflows (when the user turned them on: Settings › General › Experimental) are graphs of blocks Laki runs for a task,
+Workflows (on unless the user turned them off: Settings › General › Pages) are graphs of blocks Laki runs for a task,
 each run in a workspace of its own: agent blocks (a prompt, or one of the user's agent actions with \`use: <its slug>\`, which \`laki_workflows\` lists), run
 (a shell command), ask (the user picks), choice (if/else by what a block said), case (if/elsif/else: branches tested in order, else last), action (open a PR, approve, merge, dev server,
 archive: asks the user first), wait (its PR's checks), save (text, a file of the workspace, or a link into the
@@ -141,7 +141,7 @@ writes one, the whole file (its description has the format and every block); to 
 \`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
 user reads and saves it in Laki; a project's that came with the repo (or changed since) starts for you only once the user
 allows it there. A run block's \`{{…}}\` go in as environment variables: write them bare or in double quotes, never in
-single quotes. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`) set how freely it acts;
+single quotes. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`, then its profile's) set how freely it acts;
 \`when done: keep\` keeps a run's worktree (unset: archived once it's done and clean). The CLI: \`laki flow ls\`,
 \`laki flow run <workflow> <project> <task>\` (\`--ws .\`: in this workspace, no new worktree), \`laki flow again <run>
 [--from <block>]\`, and \`laki flow check [file.md… | folder]\` after you write one (no daemon; exit 1 on a problem).

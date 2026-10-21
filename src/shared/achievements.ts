@@ -13,7 +13,7 @@ export type AchGroup = (typeof ACH_GROUPS)[number]
 export type Achievement = { id: string; group: AchGroup; title: string; how: string; icon: IconName; go?: string; rpc?: string; ok?: (p: any) => boolean; page?: string; up?: (v: View) => number | string }
 
 const count = (v: View, f: (p: View['projects'][number]) => number) => v.projects.reduce((n, p) => n + f(p), 0)
-const EXPERIMENTAL = ['specs', 'workflows', 'calendar', 'notes', 'todoList'] as const // Settings › General › Experimental
+const EXPERIMENTAL = ['calendar', 'notes', 'todoList'] as const // Settings › General › Experimental
 const splits = (l: unknown): number => (l && typeof l === 'object' && 'dir' in l ? 1 + splits((l as any).a) + splits((l as any).b) : 0)
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -64,14 +64,14 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'simTab', group: 'Power user', title: 'Visit the Simulators', how: "Settings › Simulators or the side panel's Simulator: your iOS Simulators and Android emulators", icon: 'tablet', go: 'section:simulator' },
   { id: 'simulator', group: 'Power user', title: 'Tap your app in the Simulator', how: "The side panel's Simulator: a booted iOS Simulator or Android emulator, live; a click taps, a drag swipes", icon: 'phone', go: 'panel:device', rpc: 'sim', ok: p => p.op === 'tap' || p.op === 'swipe' },
   { id: 'phone', group: 'Power user', title: 'Open Laki on your phone', how: 'Remote access: a link signed in by email, a PIN or Tailscale', icon: 'smartphone', go: 'section:remote', rpc: 'remoteStart' },
+  { id: 'workflows', group: 'Power user', title: 'Run a workflow', how: 'Blocks Laki runs for a task: agents, commands, your answers', icon: 'flow', go: 'workflows', rpc: 'flowStart' },
+  { id: 'specs', group: 'Power user', title: 'Write a spec', how: 'Requirements to hand an agent, or a brainstorm with Laki AI', icon: 'spec', go: 'specs', rpc: 'planNew' },
 
   { id: 'ai', group: 'Extensions & AI', title: 'Ask Laki AI', how: 'Laki AI starts, checks and steers your agents for you', icon: 'ai', go: 'ai', rpc: 'aiAsk' },
   { id: 'extension', group: 'Extensions & AI', title: 'Turn on an extension', how: 'Small live pages in the sidebar or on My Desk: your PRs, your links, or one you make', icon: 'panel', go: 'section:widgets', rpc: 'widgetSet', ok: p => p.on === true },
   { id: 'desk', group: 'Extensions & AI', title: 'Open My Desk', how: 'Your extensions as tiles on a page of their own', icon: 'desk', go: 'desk', page: 'desk' },
 
   { id: 'experimental', group: 'Experimental', title: 'Try something new', how: 'Settings › General › Experimental: turn one on', icon: 'flask', go: 'section:general:Experimental', up: v => EXPERIMENTAL.filter(k => v.settings[k] === true).length },
-  { id: 'workflows', group: 'Experimental', title: 'Run a workflow', how: 'Blocks Laki runs for a task: agents, commands, your answers', icon: 'flow', go: 'workflows', rpc: 'flowStart' },
-  { id: 'specs', group: 'Experimental', title: 'Write a spec', how: 'Requirements to hand an agent, or a brainstorm with Laki AI', icon: 'spec', go: 'specs', rpc: 'planNew' },
   { id: 'notes', group: 'Experimental', title: 'Take a note', how: 'Notes: yours, for any project', icon: 'note', go: 'notes', rpc: 'noteNew' },
   { id: 'todos', group: 'Experimental', title: 'Keep a to-do list', how: 'To-dos: one checklist of your own, headings and to-dos under others', icon: 'listChecks', go: 'todos', rpc: 'todoListSave' },
   { id: 'calendar', group: 'Experimental', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },

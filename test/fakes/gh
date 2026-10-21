@@ -9,7 +9,28 @@ case "$*" in
     exit 0 ;;
   "pr checkout "*) b=$(f checkout) || exit 1; a="$*"; case "$a" in *" --branch "*) b=${a##* --branch }; esac; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
 esac
+case "$1" in
+  codespace) # cloud workspaces: each one's state in $FAKE_GH/cs-<name>; create clones its cwd (the project) into $LAKI_CS_ROOT/<repo>
+    c= r= b= p=; for a in "$@"; do case $p in -c) c=$a ;; -R) r=$a ;; -b) b=$a ;; esac; p=$a; done
+    mkdir -p "$FAKE_GH"
+    case $2 in
+      create) [ -f "$FAKE_GH/cs-fail" ] && { cat "$FAKE_GH/cs-fail" >&2; exit 1; }
+        c="fake-${r##*/}-$$"; git clone -q -b "$b" "$PWD" "$LAKI_CS_ROOT/${r##*/}" >/dev/null 2>&1 || exit 1; echo Available > "$FAKE_GH/cs-$c"; echo "$c" ;;
+      view) [ -f "$FAKE_GH/cs-$c" ] || { echo 'HTTP 404: Not Found (https://api.github.com/user/codespaces/'"$c"')' >&2; exit 1; }; printf '{"state":"%s"}\n' "$(cat "$FAKE_GH/cs-$c")" ;;
+      ssh) printf 'Host cs.%s.main\n\tUser codespace\n\tProxyCommand gh cs ssh -c %s --stdio -- -i ~/.ssh/codespaces.auto\n\tUserKnownHostsFile=/dev/null\n\tStrictHostKeyChecking no\n\tLogLevel quiet\n\tControlMaster auto\n\tIdentityFile ~/.ssh/codespaces.auto\n' "$c" "$c" ;;
+      stop) echo Shutdown > "$FAKE_GH/cs-$c" ;;
+      delete) rm -f "$FAKE_GH/cs-$c" ;;
+      list) sep=; printf '['; for f in "$FAKE_GH"/cs-fake-*; do [ -f "$f" ] || continue; printf '%s{"name":"%s","state":"%s"}' "$sep" "${f##*/cs-}" "$(cat "$f")"; sep=,; done; echo ']' ;;
+      *) exit 1 ;;
+    esac
+    exit 0 ;;
+esac
 case "$1 $2" in
+  "api -X") # a codespace started: POST user/codespaces/<name>/start
+    n=${4#user/codespaces/}; n=${n%/start}; [ -f "$FAKE_GH/cs-$n" ] || exit 1; echo Available > "$FAKE_GH/cs-$n"; echo '{}' ;;
+  "api repos/"*"/codespaces/machines") # $FAKE_GH/cs-noscope: gh's words for a token without the codespace scope
+    [ -f "$FAKE_GH/cs-noscope" ] && { echo 'gh: This API operation needs the "codespace" scope. To request it, run:  gh auth refresh -h github.com -s codespace' >&2; exit 1; }
+    echo '{"total_count":2,"machines":[{"name":"basicLinux32gb","display_name":"2 cores, 8 GB RAM, 32 GB storage"},{"name":"standardLinux32gb","display_name":"4 cores, 16 GB RAM, 32 GB storage"}]}' ;;
   "pr list") # the widgets' (widgets/): $FAKE_GH/prlist.json, --jq applied with the real jq
     j=; au=; p=; for a in "$@"; do [ "$p" = --jq ] && j=$a; [ "$p" = --author ] && au=$a; p=$a; done
     out=$(f prlist.json || echo '[]')

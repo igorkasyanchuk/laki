@@ -173,6 +173,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .rail-sep { flex: none; width: 32px; height: 1px; margin: 6px 0; background: color-mix(in srgb, var(--fg) 22%, transparent); }
 .rail-mark { font: 700 12px/1 var(--ui-font); letter-spacing: 0.02em; }
 .rail-pin .rail-icon { color: var(--tab-c, inherit); } /* initials or a terminal's or browser's icon in its color */
+.rail-pin .p-mark { position: absolute; left: -3px; bottom: -3px; } /* its project's icon or emoji */
 .rail-pin .rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 /* the sidebar's filter, under its head */
 .side-find { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 2px 8px 8px; }
@@ -338,12 +339,13 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .project-head .ib { opacity: 0; }
 .project-head:hover .ib, .project-head .ib:focus-visible { opacity: 1; }
 /* a row: inset and rounded, so hover and the selection read as one item each; the selected one gets a short bar at its
-   left in its color or the accent (--ws-bar), a workspace's color (--tab-c, set inline) that bar dimmer and a tint; one
-   that needs you (.needs: waiting, or done unseen) has its name in bold */
-.ws { --ws-bar: color-mix(in srgb, var(--tab-c, transparent) 70%, transparent); display: flex; align-items: center; gap: 6px; height: var(--ws-h, 28px); margin: 1px 6px 1px 4px; padding: 0 8px 0 10px; border-radius: min(var(--radius), 10px); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
+   left in its color or the accent (--ws-bar), a workspace's color (--tab-c, set inline) that bar dimmer and a tint, its
+   project's (--proj-c) the bar alone where it has none of its own; one that needs you (.needs: waiting, or done unseen)
+   has its name in bold */
+.ws { --ws-bar: color-mix(in srgb, var(--tab-c, var(--proj-c, transparent)) 70%, transparent); display: flex; align-items: center; gap: 6px; height: var(--ws-h, 28px); margin: 1px 6px 1px 4px; padding: 0 8px 0 10px; border-radius: min(var(--radius), 10px); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
-.ws.sel { --ws-bar: var(--tab-c, var(--accent)); background-color: var(--sel); }
+.ws.sel { --ws-bar: var(--tab-c, var(--proj-c, var(--accent))); background-color: var(--sel); }
 .ws.needs .ws-name { font-weight: 600; }
 .ws-new { color: var(--muted); }
 .ws-new:hover { color: var(--fg); }
@@ -517,6 +519,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .status .sb-flow-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status .sb-flow[data-status='running'] .sb-flow-icon { color: var(--running); animation: sb-spin 2.4s linear infinite; }
 .status .sb-flow[data-status='waiting'] .sb-flow-icon { color: var(--waiting); }
+.status .sb-flow[data-status='failed'] .sb-flow-icon { color: var(--error); }
 @keyframes sb-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .status .sb-flow-icon { animation: none !important; } }
 .status .pr.pr-attach:hover { color: var(--accent-ink); }
@@ -763,6 +766,10 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .palette-item.sel { background: var(--sel); }
 .palette-item .pg { width: 16px; }
 .palette-item .pl { white-space: nowrap; }
+/* a project's mark (ui.tsx ProjectMark): its icon in its color, an emoji with a line in it; an accent, never the text's color */
+.p-mark { display: inline-flex; flex: none; line-height: 1; color: var(--tab-c, inherit); }
+.p-mark.emoji.tinted { box-shadow: inset 0 -2px 0 var(--tab-c); }
+.palette-item .ph .p-mark { margin-right: 6px; vertical-align: -2px; }
 .palette-item .ph { flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .toast { position: fixed; bottom: 36px; right: 16px; background: var(--panel); border: 1px solid var(--error); color: var(--fg); padding: 8px 12px; border-radius: var(--radius); max-width: 480px; z-index: 20; white-space: pre-wrap; }
 .xterm .xterm-viewport { background: transparent !important; } /* .term-wrap paints --term-bg, padding included: a see-through one twice would make the padding a lighter frame */
@@ -815,6 +822,12 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .prompt-image { position: relative; width: 64px; height: 48px; border: 1px solid var(--line); border-radius: var(--rs, 5px); overflow: hidden; background: var(--bg); }
 .prompt-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .prompt-image button { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; padding: 0; border: none; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 11px; line-height: 16px; }
+.prompt-file { display: inline-flex; align-items: center; gap: 5px; max-width: 260px; height: 28px; padding: 0 4px 0 8px; border: 1px solid var(--line); border-radius: var(--rs, 5px); background: var(--bg); color: var(--fg); font-size: 12px; }
+.prompt-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-file .muted { flex: none; font-size: 11px; }
+.prompt-file button { flex: none; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--muted); font-size: 13px; line-height: 18px; }
+.prompt-file button:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
+.prompt-images .prompt-file { align-self: center; }
 .prompt-tools { display: flex; align-items: center; gap: 4px; }
 .form .prompt-tools label.ib { flex-direction: row; cursor: pointer; }
 
@@ -1106,6 +1119,9 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-comment + .sp-comment { border-top: 1px solid var(--line); }
 .sp-comment-by { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .sp-comment-by .avatar { vertical-align: 0; }
+.sp-sugg { display: flex; flex-direction: column; gap: 6px; }
+.sp-sugg .sp-diff { border: 1px solid var(--line); border-radius: var(--rs, 6px); padding: 2px 0; }
+.sp-sugg button:not(.link) { height: 24px; padding: 0 10px; }
 .sp-count { font-weight: 600; font-size: 11px; padding: 0 6px; border-radius: 9px; color: var(--accent-fg); background: var(--accent); }
 .sp-resolved { display: flex; flex-direction: column; gap: 6px; }
 .sp-resolved > summary { font-size: 12px; color: var(--muted); cursor: pointer; width: max-content; border-radius: var(--rs, 4px); }
@@ -1679,6 +1695,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-run.live:hover { background: var(--hover); }
 .sched-more { align-self: flex-start; }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
+.ws-cs { align-items: center; gap: 3px; font-size: 10px; } .ws-cs.bad { color: var(--error); opacity: 1; } /* a cloud workspace's state, unless it's on */
 .ws-ext { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: 9ch; overflow: hidden; white-space: nowrap; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; } /* an extension's mark (place row) */
 .ws-ext.bad { color: var(--error); }
 /* a workspace's PR (Settings › Appearance): open, draft (gray), merged (purple), closed (red); an open one's failing checks: .ci, a red mark beside it */
@@ -1946,6 +1963,12 @@ button.board-name:hover { background: none; }
 .md .mermaid { margin: 0 0 12px; overflow-x: auto; text-align: center; }
 .md .mermaid svg { max-width: 100%; height: auto; }
 /* an agent's estimate of its task (laki progress) on its tab: the number over a bar that fills */
+.tab:has(> .tab-ctx) { position: relative; }
+.tab > .usage-ring { flex: none; } /* contextMeter 'ring': the status bar's ring on its tab */
+.tab-ctx { position: absolute; left: 0; bottom: 0; height: 2px; pointer-events: none; } /* the context meter on a tab (App's tabList): a line along its bottom edge, as long as its context is full */
+.tab-ctx { background: color-mix(in srgb, var(--accent) 70%, transparent); } /* amber and red: look.css' .usage-bar's */
+.status .sb-ctx { display: inline-flex; align-items: center; gap: 5px; flex: none; font-variant-numeric: tabular-nums; }
+.status .sb-ctx .usage-bar { width: 34px; height: 4px; }
 .tab-pct { flex: none; padding: 0 5px; border-radius: 8px; font: 600 10px/15px var(--mono); color: var(--fg); background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent) var(--p), color-mix(in srgb, var(--line) 70%, transparent) var(--p)); font-variant-numeric: tabular-nums; }
 /* the sidebar's styles (Settings › Appearance › The sidebar): compact, a short line; extended and cards, a second line
    (branch, state, progress, PR, diff); cards, a box each with the agent's last answer */
