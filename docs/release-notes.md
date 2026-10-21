@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An extension that's off (Laki AI's new ones, in the studio's preview) can't open links, copy or show dialogs from its
+  page until you turn it on.
 - Extensions: a secret setting's value is masked (••••) in an extension's error and its Runs, not only in its log.
 - Settings' Export no longer carries remote access's and tunnels' emails or workflows' variables, and Import keeps this
   Mac's. The worktrees folder Laki makes is yours alone (0700).

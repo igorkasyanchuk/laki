@@ -80,6 +80,8 @@ const NO_WS = uiHtml({ type: 'empty', icon: 'folder', text: 'Select a workspace'
 // says confirm), a copy, a toast or dialog, a fetch, the full view. Done when the action is
 function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: WidgetApi): Promise<unknown> | void {
   const { laki, url, action, arg, label, confirm, text } = m
+  // an off one's page (a preview, the studio's): no link, copy or dialog of its own, as no command (do, run: refused)
+  if (!w.on && (laki === 'open' || laki === 'copy' || laki === 'say')) return void api.say(w.id, { toast: `${w.name} is off: turn it on first` }, wsOf(w))
   if (laki === 'open' && typeof url === 'string' && OPEN.test(url)) return api.open(url)
   if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? ''), wsOf(w)))
   if (laki === 'copy' && typeof text === 'string') return api.copy(text)
