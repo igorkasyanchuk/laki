@@ -111,6 +111,7 @@ class Api {
   private seq = 0
   private waiting = new Map<number, { res: (v: any) => void; rej: (e: Error) => void }>()
   private listeners = new Set<(m: Msg) => void>()
+  private calls = new Set<(method: string, params: any) => void>() // each call that went well (App's achievements)
   connected = false
 
   private fails = 0 // connects in a row that never opened
@@ -172,7 +173,7 @@ class Api {
     const id = ++this.seq
     return new Promise((res, rej) => {
       if (this.ws?.readyState !== WebSocket.OPEN) return rej(new Error('not connected'))
-      this.waiting.set(id, { res, rej })
+      this.waiting.set(id, { res: r => (res(r), this.calls.forEach(f => f(method, params))), rej })
       this.ws.send(JSON.stringify({ id, method, params }))
     })
   }
@@ -185,6 +186,11 @@ class Api {
   on(f: (m: Msg) => void) {
     this.listeners.add(f)
     return () => void this.listeners.delete(f)
+  }
+
+  onCall(f: (method: string, params: any) => void) {
+    this.calls.add(f)
+    return () => void this.calls.delete(f)
   }
 
   private emit(m: Msg) {

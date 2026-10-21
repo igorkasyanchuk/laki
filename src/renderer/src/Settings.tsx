@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -100,6 +100,7 @@ const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
+  achievements?: AchievementsKept // App's own (earn): App's onSave leaves it out, so an unlock while this page is open stays
   favThemes?: string[] // Appearance's starred themes: a group of their own, first
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
   editorCmd?: string
@@ -1214,6 +1215,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
+  ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
@@ -1225,6 +1227,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
+  { id: 'achievements', label: 'Achievements', icon: 'trophy', group: 'Laki' },
   { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
   { id: 'presets', label: 'Agents & profiles', icon: 'agent', group: 'Agents' },
   { id: 'memory', label: 'Global memory', icon: 'bulb', group: 'Agents' },
@@ -1240,6 +1243,33 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
+
+// Achievements (App's, achievements.ts): on or off, how many, the page, the hidden ones back. Not a setting of this
+// page's: App writes settings.achievements itself, so an unlock while Settings is open isn't lost
+export type AchievementsApi = { n: number; of: number; hidden: number; off: boolean; setOff: (off: boolean) => void; unhide: () => void; open: () => void }
+function AchievementsSection({ api }: { api: AchievementsApi }) {
+  return (
+    <>
+      <h2>Achievements</h2>
+      <p className="muted small">One thing to do each, a quick tour of what Laki does. They unlock as you do them; only what you do counts, not what was there before.</p>
+      <Group title="Achievements" act={!api.off && <button onClick={api.open}>Open achievements</button>}>
+        <div className="setting-box">
+          <Switch className="switch-row" on={!api.off} onChange={on => api.setOff(!on)}>
+            <Says title="Show achievements" hint={api.off ? 'Off: no trophy in the status bar, nothing unlocks' : `${api.n} of ${api.of} unlocked: the trophy at the status bar's end, ⌘K › Achievements`} />
+          </Switch>
+          {api.hidden > 0 && (
+            <div className="row">
+              <span className="muted small grow">
+                {api.hidden} hidden: {api.hidden === 1 ? "it doesn't" : "they don't"} count or unlock
+              </span>
+              <button onClick={api.unhide}>Show {api.hidden === 1 ? 'it' : 'them'} again</button>
+            </div>
+          )}
+        </div>
+      </Group>
+    </>
+  )
+}
 
 // Resources: what Laki and each tab use now (the daemon's ps, every 3 s while it's open), and idle agents put to sleep
 // (settings.sleepAfter). macOS counts every process Laki starts as Laki's
@@ -2655,11 +2685,12 @@ export function SettingsPage(p: {
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
   onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
+  achievements?: AchievementsApi // App's: the count, on or off, the page
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
   const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
@@ -3699,6 +3730,7 @@ export function SettingsPage(p: {
             />
           )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
+          {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (
             <>
               <h2>Global memory</h2>

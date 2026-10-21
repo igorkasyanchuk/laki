@@ -2325,3 +2325,27 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-log-line.lv-warn b { color: var(--waiting); }
 .ext-log-line.lv-error { color: var(--error); }
 .tag-soft.log-err { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }
+/* Achievements (Achievements.tsx): groups of cards, a gold badge once unlocked; the status bar's trophy; the unlock toast */
+.page-body > .ach { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.ach > p { margin: 0; }
+.ach-group h3 { display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; font-size: 13px; font-weight: 600; }
+.ach-group h3 .muted { font-weight: 400; font-size: 12px; }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.ach-card { position: relative; display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); min-width: 0; }
+.ach-badge { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--muted); background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.ach-card.got { border-color: color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); }
+.ach-card.got .ach-badge { color: var(--tc-yellow); background: color-mix(in srgb, var(--tc-yellow) 16%, transparent); }
+.ach-what { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding-right: 14px; }
+.ach-what b { font-weight: 600; }
+.ach-when { display: inline-flex; align-items: center; gap: 4px; color: var(--done); margin-top: 2px; }
+.ach-go, .ach-show { margin-top: 4px; padding: 2px 9px; font-size: 12px; }
+.ach-show { align-self: center; margin: 0; }
+.ach-hide.ib { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; opacity: 0; }
+.ach-card:hover .ach-hide, .ach-hide:focus-visible { opacity: 1; }
+.status .sb-trophy { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 2px; border: none; background: none; color: inherit; line-height: 20px; }
+.status .sb-trophy:hover, .status .sb-trophy.on { color: var(--fg); background: none; }
+.ach-toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 31; /* over a page (30) */ display: flex; align-items: center; gap: 10px; max-width: min(480px, calc(100vw - 32px)); padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); border-radius: 999px; background: var(--panel); color: var(--fg); font: inherit; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); cursor: pointer; animation: ach-in 0.25s ease-out; }
+.ach-toast > svg { flex: none; color: var(--tc-yellow); }
+.ach-toast > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes ach-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .ach-toast { animation: none; } }

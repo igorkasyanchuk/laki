@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Achievements: forty small things to do, one action each, to get to know Laki. The trophy at the status bar's end
+  counts them and opens the list (⌘K and Settings › Achievements too); each has *Show me*, unlocks with a small toast as
+  you do it, and can be hidden, or all of them turned off.
 - A workspace or tab an agent made (`laki new`, `laki run`, `laki ship`, MCP, Laki AI, a workflow run it started), and
   an agent's ship and archive, are the agent's events too: a workflow that runs commands doesn't start on their
   `workspace.new`, `tab.new`, `ship.done` or `workspace.archived`.

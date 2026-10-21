@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -16,6 +16,8 @@ import { VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
+import { AchievementsPage } from './Achievements'
+import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { UiKitPage } from './UiKit'
 import { Glyph as ExtGlyph, imagesVia, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
@@ -166,7 +168,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -188,11 +190,11 @@ const studioKey = (s: { studio: string; key?: string }) => s.key ?? (s.studio ||
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 type Place = { d: Dialog; ws: string | null }
 const HISTORY_MAX = 25
-const PAGES = new Set(['settings', 'help', 'board', 'bird', 'ai', 'calendar', 'desk', 'schedules'])
+const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'schedules'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'studio', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
 // the Extension page's way back, in words
-const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', calendar: 'Calendar', board: 'Board', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
+const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', calendar: 'Calendar', board: 'Board', achievements: 'Achievements', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
 const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 // a tab's color: its own, else its agent's ('none' turns that off)
@@ -683,7 +685,10 @@ export function App() {
     setTimers(l => [...l, { id, end: Date.now() + m.ms, ms: m.ms, then: 'notify', ...then, ...(m.note && { note: m.note }) }])
     return { id, rings: new Date(Date.now() + m.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
   }
-  const addTimer = (ms: number, more: Partial<Timer> = {}) => setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify', ...more }])
+  const addTimer = (ms: number, more: Partial<Timer> = {}) => {
+    if (more.then !== 'remind') earn(more.then === 'send' ? 'later' : 'timer')
+    setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify', ...more }])
+  }
   const setTimer = (id: string, f: (t: Timer) => Timer | null) => setTimers(l => l.map(t => (t.id === id ? f(t) : t)).filter((t): t is Timer => !!t)) // null: gone
   const pause = (id: string) => setTimer(id, x => (x.left === undefined ? { ...x, left: Math.max(1000, x.end - Date.now()) } : { ...x, end: Date.now() + x.left, left: undefined })) // or go on
   const restart = (id: string, ms: number) => setTimer(id, x => ({ ...x, end: Date.now() + ms, ms, left: undefined })) // a new length, running
@@ -1066,6 +1071,7 @@ export function App() {
     else if (l?.to === 'extension') view.widgets?.some(w => w.id === l.id) ? setDialog({ extension: l.id, back: { section: 'widgets' }, ...(l.inspect && { tab: 'data' as const }) }) : toast(`No extension ${l.id}`)
     else if (l?.to === 'help') setDialog('help')
     else if (l?.to === 'board') setDialog('board')
+    else if (l?.to === 'achievements') setDialog('achievements')
     else if (l?.to === 'ai') setDialog('ai')
     else if (l?.to === 'about') setDialog('about')
     else if (l?.to === 'onboard') (setOnboard(o => ({ ...o, off: false })), setDialog('onboard'))
@@ -1080,7 +1086,7 @@ export function App() {
   // the workspace whose per-workspace extensions show (scope workspace: Widgets.tsx inWs), and fetch: none under a page
   // over every workspace (Board, Schedule, the AI page…), nor a terminal's, a browser's or one on an SSH host; the Desk's
   // tiles: the one selected last (laki.ws), named on each
-  const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'calendar' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
+  const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'achievements' || dialog === 'calendar' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
   const wsHere = !covered && ws && !ws.archived && !ws.host && !project?.kind ? ws.id : null
   useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse, ws: wsHere })), [tab?.id, visible.join(), wsHere])
 
@@ -1361,8 +1367,8 @@ export function App() {
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
-    comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
-    toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),
+    comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
+    toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => (earn('comment'), toast('Sent to the agent'))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
@@ -1456,6 +1462,43 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
+  // Achievements (achievements.ts): each earned once, as you do it, into settings.achievements (got: when); earned
+  // keeps them here too, so two at once don't write over each other. Off: none earned, no trophy, no toast
+  // ponytail: the whole object is written, so two windows earning in the same instant can lose one; a daemon method if it matters
+  const achKept: AchievementsKept = settings.achievements ?? {}
+  const achRef = useRef(achKept)
+  achRef.current = achKept
+  const earned = useRef<Record<string, number>>({})
+  const [unlocked, setUnlocked] = useState<string[]>([]) // the unlock toast's, newest last
+  const unlockTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const unlockAt = useRef(0)
+  const achSet = (o: AchievementsKept) => api.call('settingsSet', { achievements: { ...achRef.current, ...o, got: { ...achRef.current.got, ...earned.current } } })
+  const earn = (id: string) => {
+    const a = achRef.current
+    if (!viewRef.current || a.off || a.got?.[id] || earned.current[id]) return // no view yet: its settings unknown, written over
+    earned.current[id] = Date.now()
+    achSet({}).catch(() => delete earned.current[id])
+    if (a.hidden?.includes(id)) return
+    const fresh = Date.now() - unlockAt.current > 1500 // one action's unlocks together, not the last toast's too
+    unlockAt.current = Date.now()
+    setUnlocked(u => (fresh ? [id] : [...u, id]))
+    clearTimeout(unlockTimer.current)
+    unlockTimer.current = setTimeout(() => setUnlocked([]), 6000)
+  }
+  const earnRef = useRef(earn)
+  earnRef.current = earn
+  useEffect(() => api.onCall((method, params) => earnedBy(method, params).forEach(id => earnRef.current(id))), [])
+  // the view's numbers and values that moved since the last view (the first: where they start, nothing earned)
+  const ups = useRef<Record<string, number | string>>(undefined)
+  useEffect(() => {
+    if (!view) return
+    const now = upsOf(view)
+    if (ups.current) wentUp(ups.current, now).forEach(earn)
+    ups.current = now
+  }, [view])
+  useEffect(() => void (dialog && pageEarns(typeof dialog === 'string' ? dialog : settingsOf(dialog) ? 'settings' : Object.keys(dialog)[0]).forEach(earn)), [dialog])
+  useEffect(() => void (find && earn('filter')), [!!find])
+  useEffect(() => void (panelShown && panelTab === 'changes' && ws && earn('changes')), [panelShown && panelTab === 'changes' && !!ws])
   // the extension studio's chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
   // studio, again a moment after an ai event
   const [studioChats, setStudioChats] = useState<StudioChat[]>([])
@@ -2228,6 +2271,7 @@ export function App() {
   const newTabActions = newTabIn(ws)
   // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), in the sidebar's order, around
   const nextNeed = () => {
+    earn('jump')
     const tabs = order.flatMap(w => view?.tabs.filter(t => t.workspace === w.id && needsYou(t)) ?? [])
     const need = [...tabs.filter(t => t.status === 'waiting'), ...tabs.filter(t => t.status !== 'waiting')]
     if (!need.length) return toast('Nothing needs you')
@@ -2300,6 +2344,7 @@ export function App() {
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
+    if (!achKept.off) a({ label: 'Achievements: what to try next', icon: 'trophy', run: () => setDialog('achievements') })
     if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
     if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
     // Run workflow: each one, in the selected workspace (none, or one it can't run in: the Run sheet asks)
@@ -2763,6 +2808,30 @@ export function App() {
   const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
   const BOARD_TIP = 'Board: every workspace by where it is, and to-dos'
+  // an achievement's Show me (achievements.ts' go): where it's done; a page that's off, where it's turned on
+  const achGo = (go: string) => {
+    const [k, arg, spot] = go.split(':')
+    const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, desk: !deskOn, ai: !aiOn(settings) }
+    setDialog(null)
+    if (off[k]) setDialog(k === 'ai' ? { section: 'ai' } : { section: 'general', spot: k === 'desk' ? 'Pages' : 'Experimental' })
+    else if (k === 'project') void openProject()
+    else if (k === 'new') view.projects.some(p => !p.kind) ? newWs() : void openProject()
+    else if (k === 'shells' || k === 'browsers') void quickNew(k)
+    else if (k === 'section') setDialog({ section: arg, ...(spot && { spot }) })
+    else if (k === 'workflows') setDialog({ workflows: '' })
+    else if (k === 'specs') setDialog({ specs: '' })
+    else if (k === 'notes') setDialog({ note: '' })
+    else if (k === 'panel' || k === 'newtab' || k === 'rename' || k === 'ship') {
+      if (!ws || ws.browser !== undefined) toast('Select a workspace first, then try it there')
+      else if (k === 'panel') showPanel(arg as PanelTab)
+      else if (k === 'rename') setDialog({ renameWs: ws.id })
+      else if (k === 'ship') ws.kind === 'worktree' ? setDialog('ship') : toast('Ship needs a worktree: start a workspace first')
+      else setTimeout(() => document.querySelector<HTMLElement>('.newtab-btn')?.click(), 50) // its menu, where it is
+    } else setDialog(k as Dialog) // a page: help, palette, board, schedules, timer, ai, desk
+  }
+  const achHidden = achKept.hidden ?? []
+  const achAll = ACHIEVEMENTS.filter(a => !achHidden.includes(a.id))
+  const achN = achAll.filter(a => achKept.got?.[a.id] || earned.current[a.id]).length // earned: before the settings say so
   // each kind's tabs that need you (the Dock's rule) and whether one works, for its rail button
   const kinds = rail ? new Map(live.map(w => [w.id, kindOf(w)])) : null
   const railSays = (k: RailKind) => {
@@ -2844,7 +2913,7 @@ export function App() {
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const ownWidgets = shownWidgets.filter(w => !w.project || w.project === ws?.project) // a repo's (.laki/extensions): only while a workspace of its project is selected
   const deskWidgets = shownWidgets.map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
-  const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
+  const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   // back and forward's buttons: the rail's top, else the sidebar's head; a right click lists where each goes
   const placeName = (p: Place) => {
@@ -3299,11 +3368,12 @@ export function App() {
             apps={apps}
             onClose={() => setDialog(null)}
             onSection={id => setSeenSecs(l => (l.includes(id) ? l : [...l, id]))}
-            onSave={s => call('settingsSet', s).catch(() => {})}
+            onSave={({ achievements: _, ...s }) => call('settingsSet', s).catch(() => {})} // achievements: App's own (earn), never this page's copy from when it opened
             projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             onMemory={id => setDialog({ project: id, tab: 'memory' })}
+            achievements={{ n: achN, of: achAll.length, hidden: achHidden.length, off: !!achKept.off, setOff: off => void achSet({ off }).catch(fail), unhide: () => void achSet({ hidden: [] }).catch(fail), open: () => setDialog('achievements') }}
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
             accounts={layoutsOn ? accountsApi : undefined}
@@ -3507,6 +3577,17 @@ export function App() {
             view={view}
             onClose={() => setDialog(null)}
             api={{ screen: tab => api.call<string>('screen', { target: tab, lines: 40 }) /* no toast: a tab closed meanwhile */, open: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })), needs: needsYou }}
+          />
+        )}
+        {dialog === 'achievements' && (
+          <AchievementsPage
+            kept={{ ...achKept, got: { ...achKept.got, ...earned.current } }}
+            onClose={() => setDialog(null)}
+            api={{
+              go: achGo,
+              hide: (id, hide) => void achSet({ hidden: hide ? [...achHidden, id] : achHidden.filter(x => x !== id) }).catch(fail),
+              off: () => void achSet({ off: true }).then(() => (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
+            }}
           />
         )}
         {dialog === 'board' && (
@@ -3754,6 +3835,12 @@ export function App() {
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
+          {!achKept.off && (
+            <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
+              <Icon name="trophy" size={11} />
+              {achN}/{achAll.length}
+            </button>
+          )}
         </div>
         )}
         {aiFab && (
@@ -3776,6 +3863,16 @@ export function App() {
       <AskHost />
       <VoiceBar />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
+      {unlocked.length > 0 && (
+        <button className="ach-toast" role="status" onClick={() => (setUnlocked([]), setDialog('achievements'))}>
+          <Icon name="trophy" size={14} />
+          <span>
+            Unlocked: <b>{ACHIEVEMENTS.find(a => a.id === unlocked.at(-1))?.title}</b>
+            {unlocked.length > 1 && ` and ${unlocked.length - 1} more`}
+          </span>
+          <span className="muted small">{achN}/{achAll.length}</span>
+        </button>
+      )}
       {note && (
         <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''}`} role="status">
           {note.ok && <Icon name="check" size={14} />}

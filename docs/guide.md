@@ -1169,6 +1169,16 @@ and terminals, as a card under its workspace with its screen as it is now (read 
 *All*, *Working* or *Needs you* (a red dot on those). A click opens that session. The cards stand in columns, each as
 tall as its screen, and each workspace is tinted with its color (its group's, else one of its own).
 
+### Achievements
+
+Forty small things to do, one action each: a quick tour of Laki, grouped by area (Getting started, Agents, Git & PRs,
+Workspaces, Power user, Extensions & AI, Experimental), each group with its progress. The trophy at the status bar's end
+shows how many you have (*6/40*); a click, ⌘K › *Achievements* or `laki://achievements` opens the list. Each says what
+to do and has *Show me*, which takes you where it's done. One unlocks as you do it, with a small toast; only what you do
+from now on counts, not what was there before. A card's ✕ hides one you don't need (*Hidden* brings it back), and *Turn
+off* (or Settings › Achievements) hides them all: no trophy, nothing unlocks. They're kept with Laki's settings, and
+Reset the interface keeps them.
+
 ### Calendar (experimental)
 
 Turn it on in Settings › General › *Experimental*; the rail's Calendar (⌘K too) opens it, a page to stay on (Esc
@@ -1725,6 +1735,7 @@ OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local
 | `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
 | `laki://board` | the Board |
+| `laki://achievements` | Achievements |
 | `laki://help` | Help |
 | `laki://about` | About (the version, when it was built, and the website) |
 | `laki://onboard` | Get started, the first steps (also the Help menu's *Get Started Again…*) |
