@@ -5,7 +5,7 @@ import type { AchievementsKept } from '../../shared/types'
 import { ACH_GROUPS, ACHIEVEMENTS } from '../../shared/achievements'
 import { Icon, IconButton, Page } from './ui'
 
-export type AchApi = { go: (go: string) => void; hide: (id: string, hidden: boolean) => void; off: () => void }
+export type AchApi = { go: (go: string) => void; hide: (id: string, hidden: boolean) => void; off: (off: boolean) => void } // a link opens the page while they're off: Turn on
 
 const day = (ms: number) => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric', ...(new Date(ms).getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) })
 
@@ -31,7 +31,11 @@ export function AchievementsPage({ kept, api, onClose }: { kept: AchievementsKep
       tools={
         <>
           {hidden.length > 0 && <IconButton icon="eye" title={hiddenToo ? 'Back to the list' : `Show the ${hidden.length} you hid`} label={hiddenToo ? 'Back' : `Hidden (${hidden.length})`} on={hiddenToo} onClick={() => setHiddenToo(h => !h)} />}
-          <IconButton icon="power" title="Turn achievements off: no trophy, no unlocks (Settings › Achievements turns them back on)" label="Turn off" onClick={api.off} />
+          {kept.off ? (
+            <IconButton icon="power" title="Turn achievements on: the trophy, and unlocks as you do them" label="Turn on" onClick={() => api.off(false)} />
+          ) : (
+            <IconButton icon="power" title="Turn achievements off: no trophy, no unlocks (Settings › Achievements turns them back on)" label="Turn off" onClick={() => api.off(true)} />
+          )}
         </>
       }
       onClose={onClose}

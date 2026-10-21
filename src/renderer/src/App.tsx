@@ -3587,7 +3587,7 @@ export function App() {
             api={{
               go: achGo,
               hide: (id, hide) => (h => void achSet({ hidden: hide ? [...h, id] : h.filter(x => x !== id) }).catch(fail))(achRef.current.hidden ?? []),
-              off: () => void achSet({ off: true }).then(() => (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
+              off: off => void achSet({ off }).then(() => off && (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
             }}
           />
         )}
