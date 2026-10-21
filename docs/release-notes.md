@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A page that keeps knocking on Laki's daemon without its key no longer fills daemon.log: the first refusal is logged,
+  then a count once a minute.
 - A tunnel, shared tab or remote access link left running by a daemon that crashed is stopped as Laki's daemon starts
   again.
 - A link behind words in a terminal (Claude Code's) opens on ⌘-click only, and hovering any link shows where it goes.

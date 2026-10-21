@@ -331,6 +331,18 @@ test('a tunnel a killed daemon left running is stopped as the next daemon starts
   assert.ok(!existsSync(kids) || JSON.parse(readFileSync(kids, 'utf8')).length === 0)
 })
 
+test('refused WebSockets: the first logged, the rest counted, not a line each (L15)', async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  for (let i = 0; i < 100; i++) {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=nope`)
+    await new Promise(r => (ws.once('error', r), ws.once('open', r)))
+  }
+  await rig.rpc('ping')
+  const lines = rig.out.split('\n').filter(l => l.includes('refused websocket'))
+  assert.ok(lines.length >= 1 && lines.length <= 2, lines.join('\n'))
+})
+
 test('the Host a request names: the daemon\'s own address, or remote access\'s while it runs; another (DNS rebinding) is turned away', async t => {
   const rig = await fresh(t)
   const { port, token } = rig.info()

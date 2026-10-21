@@ -2152,7 +2152,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 - **Never write** `~/.claude/settings.json` or `~/.codex/*`. Agents get settings and notify through
   flags only.
 - **The daemon only listens on 127.0.0.1**, behind the token and the Origin check. Keep both on any new
-  endpoint. Remote access reaches it through cloudflared on this Mac, for one email (or, asked for with a typed
+  endpoint. A refused WebSocket is logged once per address and Origin, then counted once a minute (`refusedWs`, L15). Remote access reaches it through cloudflared on this Mac, for one email (or, asked for with a typed
   confirm, anyone with the link), with a token and an origin of its own that end with it; only the page's static files skip the checks.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **`asar` is off**, because node-pty's helper must be a real file. The packaged daemon runs on Electron's node.

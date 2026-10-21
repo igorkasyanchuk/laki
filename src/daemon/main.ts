@@ -478,12 +478,26 @@ const server = createServer(async (req, res) => {
   }
 })
 
+// L15: a refused WebSocket logged once per address and Origin, then how many more once a minute: a page that retries
+// for good doesn't fill daemon.log. ponytail: daemon.log still rotates only as a daemon starts (conn.ts)
+const refused = new Map<string, number>() // the ones since the last minute's line
+let refusedTick: NodeJS.Timeout | undefined
+function refusedWs(who: string) {
+  const n = refused.get(who)
+  if (n === undefined) log('refused websocket', who)
+  refused.set(who, (n ?? -1) + 1)
+  refusedTick ??= setInterval(() => {
+    for (const [k, more] of refused) more ? (log(`refused websocket ${k}: ${more} more in the last minute`), refused.set(k, 0)) : refused.delete(k)
+    if (!refused.size) clearInterval(refusedTick), (refusedTick = undefined)
+  }, 60000).unref()
+}
+
 const wss = new WebSocketServer({ noServer: true, maxPayload: 32 << 20 }) // a pasted 20 MB image, in base64
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
   if (url.pathname !== '/ws' || !hostOk(req.headers.host) || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'), req.headers.origin)) {
-    log('refused websocket', req.headers.origin ?? '(no origin)')
+    refusedWs(`${req.socket.remoteAddress ?? '?'} ${req.headers.origin ?? '(no origin)'}`)
     socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n')
     return
   }
