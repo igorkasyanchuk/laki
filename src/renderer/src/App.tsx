@@ -2855,9 +2855,10 @@ export function App() {
   // an achievement's Show me (achievements.ts' go): where it's done; a page that's off, where it's turned on
   const achGo = (go: string) => {
     const [k, arg, spot] = go.split(':')
-    const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, desk: !deskOn, ai: !aiOn(settings) }
+    const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, todos: !todosOn, desk: !deskOn, ai: !aiOn(settings), device: !(view.projects.find(p => p.id === ws?.project)?.config?.simulator ?? settings.simulator === true) }
+    const at = k === 'panel' ? arg : k // the Simulator tab: off unless Settings › Simulators (or the project's own) turns it on
     setDialog(null)
-    if (off[k]) setDialog(k === 'ai' ? { section: 'ai' } : { section: 'general', spot: k === 'desk' ? 'Pages' : 'Experimental' })
+    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: at === 'desk' ? 'Pages' : 'Experimental' })
     else if (k === 'project') void openProject()
     else if (k === 'new') view.projects.some(p => !p.kind) ? newWs() : void openProject()
     else if (k === 'shells' || k === 'browsers') void quickNew(k)
@@ -2871,7 +2872,7 @@ export function App() {
       else if (k === 'rename') setDialog({ renameWs: ws.id })
       else if (k === 'ship') ws.kind === 'worktree' ? setDialog('ship') : toast('Ship needs a worktree: start a workspace first')
       else setTimeout(() => document.querySelector<HTMLElement>('.newtab-btn')?.click(), 50) // its menu, where it is
-    } else setDialog(k as Dialog) // a page: help, palette, board, schedules, timer, ai, desk
+    } else setDialog(k as Dialog) // a page: help, palette, board, schedules, timer, ai, desk, todos
   }
   const achHidden = achKept.hidden ?? []
   const achAll = ACHIEVEMENTS.filter(a => !achHidden.includes(a.id))

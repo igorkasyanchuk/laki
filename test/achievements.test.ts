@@ -1,13 +1,13 @@
-// Achievements (shared/achievements.ts): 40 to start, each one action; what earns each: a call, a page, the view moving
+// Achievements (shared/achievements.ts): 42 to start, each one action; what earns each: a call, a page, the view moving
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { ACH_GROUPS, ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../src/shared/achievements.ts'
 import { ICONS } from '../src/shared/icons.ts'
 import type { View } from '../src/shared/types.ts'
 
-test('achievements: 40, unique, grouped, each with a way to earn it', () => {
-  assert.equal(ACHIEVEMENTS.length, 40)
-  assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, 40)
+test('achievements: 42, unique, grouped, each with a way to earn it', () => {
+  assert.equal(ACHIEVEMENTS.length, 42)
+  assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, 42)
   for (const a of ACHIEVEMENTS) {
     assert.ok(ACH_GROUPS.includes(a.group), a.id)
     assert.ok(a.icon in ICONS, `${a.id}: icon ${a.icon}`)
@@ -31,6 +31,8 @@ test('achievements: a call earns by its method and params', () => {
   assert.deepEqual(earnedBy('scheduleSet', { id: 's1', on: false }), []) // a change, not a new one
   assert.deepEqual(earnedBy('widgetSet', { id: 'x', on: true }), ['extension'])
   assert.deepEqual(earnedBy('settingsSet', { theme: 'x' }), []) // the view's move earns that one
+  assert.deepEqual(earnedBy('sim', { op: 'tap' }), ['simulator'])
+  assert.deepEqual(earnedBy('sim', { op: 'frame' }), []) // the panel drawing it isn't you
   assert.deepEqual(earnedBy('screen', {}), [])
   assert.deepEqual(pageEarns('board'), ['board'])
   assert.deepEqual(pageEarns('about'), [])

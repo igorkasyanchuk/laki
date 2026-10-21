@@ -1190,9 +1190,9 @@ tall as its screen, and each workspace is tinted with its color (its group's, el
 
 ### Achievements
 
-Forty small things to do, one action each: a quick tour of Laki, grouped by area (Getting started, Agents, Git & PRs,
+42 small things to do, one action each: a quick tour of Laki, grouped by area (Getting started, Agents, Git & PRs,
 Workspaces, Power user, Extensions & AI, Experimental), each group with its progress. The trophy at the status bar's end
-shows how many you have (*6/40*); a click, ⌘K › *Achievements* or `laki://achievements` opens the list. Each says what
+shows how many you have (*6/42*); a click, ⌘K › *Achievements* or `laki://achievements` opens the list. Each says what
 to do and has *Show me*, which takes you where it's done. One unlocks as you do it, with a small toast; only what you do
 from now on counts, not what was there before. A card's ✕ hides one you don't need (*Hidden* brings it back), and *Turn
 off* (or Settings › Achievements) hides them all: no trophy, nothing unlocks. They're kept with Laki's settings, and

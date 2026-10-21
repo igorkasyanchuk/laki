@@ -52,6 +52,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'schedule', group: 'Power user', title: 'Schedule a prompt', how: 'An agent on a prompt every weekday at 9am, or once tomorrow', icon: 'calendarPlus', go: 'schedules', rpc: 'scheduleSet', ok: p => !p.id },
   { id: 'timer', group: 'Power user', title: 'Start a timer', how: "The sidebar foot's Timer: a break, a pomodoro, a reminder", icon: 'timer', go: 'timer' },
   { id: 'tunnel', group: 'Power user', title: 'Expose to the world', how: "The globe beside a port in the status bar: a public link to your dev server", icon: 'share', rpc: 'tunnelStart' },
+  { id: 'simulator', group: 'Power user', title: 'Tap your app in the Simulator', how: "The side panel's Simulator: a booted iOS Simulator or Android emulator, live; a click taps, a drag swipes", icon: 'phone', go: 'panel:device', rpc: 'sim', ok: p => p.op === 'tap' || p.op === 'swipe' },
   { id: 'phone', group: 'Power user', title: 'Open Laki on your phone', how: 'Remote access: a link signed in by email, a PIN or Tailscale', icon: 'smartphone', go: 'section:remote', rpc: 'remoteStart' },
 
   { id: 'ai', group: 'Extensions & AI', title: 'Ask Laki AI', how: 'Laki AI starts, checks and steers your agents for you', icon: 'ai', go: 'ai', rpc: 'aiAsk' },
@@ -61,6 +62,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'workflows', group: 'Experimental', title: 'Run a workflow', how: 'Blocks Laki runs for a task: agents, commands, your answers', icon: 'flow', go: 'workflows', rpc: 'flowStart' },
   { id: 'specs', group: 'Experimental', title: 'Write a spec', how: 'Requirements to hand an agent, or a brainstorm with Laki AI', icon: 'spec', go: 'specs', rpc: 'planNew' },
   { id: 'notes', group: 'Experimental', title: 'Take a note', how: 'Notes: yours, for any project', icon: 'note', go: 'notes', rpc: 'noteNew' },
+  { id: 'todos', group: 'Experimental', title: 'Keep a to-do list', how: 'To-dos: one checklist of your own, headings and to-dos under others', icon: 'listChecks', go: 'todos', rpc: 'todoListSave' },
   { id: 'calendar', group: 'Experimental', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },
 ]
 

@@ -2086,7 +2086,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
   show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.
 - **`Achievements.tsx`** (dialog `'achievements'`: the status bar's trophy at its end, `.sb-trophy`, ⌘K,
-  Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 40 (`ACHIEVEMENTS`, in
+  Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 42 (`ACHIEVEMENTS`, in
   `ACH_GROUPS`), each with its `how` and `go` (App's `achGo`: a page, Settings' section, the right panel's tab; an
   experimental page that's off: where it's turned on). App's `earn` unlocks one once, only for what's done from now on: a
   call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`), a page opened (`pageEarns`), a number or value
@@ -2194,7 +2194,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
-| `src/shared/achievements.ts` | the 40 achievements: their groups, words, where each is done, and what earns each (a call, a page, the view) |
+| `src/shared/achievements.ts` | the achievements (42): their groups, words, where each is done, and what earns each (a call, a page, the view) |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |

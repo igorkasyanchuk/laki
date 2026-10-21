@@ -4,7 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
-- Achievements: forty small things to do, one action each, to get to know Laki. The trophy at the status bar's end
+- Achievements: 42 small things to do, one action each, to get to know Laki. The trophy at the status bar's end
   counts them and opens the list (⌘K and Settings › Achievements too); each has *Show me*, unlocks with a small toast as
   you do it, and can be hidden, or all of them turned off.
 - Settings › General › *Menu bar icon* shows or hides Laki's mark in the menu bar (it was under Appearance), and the
