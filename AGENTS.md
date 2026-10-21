@@ -1260,8 +1260,9 @@ and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT
 like `widgetDirs`), `devRoots` first in `widgetRoots` (a dev copy shadows the installed one of its id, sharing its
 store), linking turns its widgets on and fetches them (`dev`, why `linked`). An agent's link (N10, `agentCaller`):
 `settings.widgetDevAgent` (`SETTINGS_KEPT`; only `widgetDev` writes it: `settingsSet` `own`), its widgets off and an
-`Entry`'s `agentDev`, trusted as a repo's (`guarded`: on only with `seen`, `trusted`/`files`, `untrust` as they change,
-`repoBad`; one that shadows an installed one that's on goes off at its scan, never inheriting it; the view's `agentDev`,
+`Entry`'s `agentDev` (the nearest linked folder's: yours inside an agent's stays yours), trusted as a repo's (`guarded`: on
+only with `seen`, `trusted`/`files` over every file of its folder (no git listing, whose .gitignore it writes; hidden ones
+and node_modules too), `untrust` as they change, `repoBad`; one that shadows an installed one that's on goes off at its scan, never inheriting it; the view's `agentDev`,
 App's `repoSheet`); your own link of it makes it yours again. `watchDev` (from `scanWidgets`):
 `fs.watch` recursive per root (a one-file root: its folder, for its name: a save by rename ends a file's watch), 300 ms debounce, `devChanged`: `scanWidgets` again, then each of its widgets fetched
 (reason `dev`, why: the files). `scanWidgets` keeps the entry it had (`before`) when a dev widget's `manifestOf` or

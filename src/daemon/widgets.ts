@@ -433,7 +433,8 @@ export function scanWidgets() {
       }
       if (typeof m === 'string') continue
       const { data, ...s } = moveSecrets(id, m)
-      const agentDev = isDev && !project && agentRoots().some(r => under(pathOf({ d, file }), r))
+      const own = dev.filter(r => under(pathOf({ d, file }), r)).sort((a, b) => b.length - a.length)[0] // the nearest linked folder decides: yours inside an agent's stays yours
+      const agentDev = !!own && !project && agentRoots().includes(own)
       const e: Entry = { id, dir: d, file, ...(project && { project }), ...(agentDev && { agentDev }), builtin: !project && !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s, inst: new Map(), fixtures: file ? [] : fixtureNames(d).map(n => n.slice(0, -5)) }
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
@@ -1831,7 +1832,7 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
     top = realpathSync(d)
   } catch {}
   let listed: string[] | undefined
-  try {
+  if (w.project) try { // an agent's folder: never git's listing, whose .gitignore it writes
     // ponytail: a sync git per run (trusted), as the walk was; cache by the index's and the folder's mtimes if it shows
     listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
   } catch {}
@@ -1867,7 +1868,9 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
       es = readdirSync(join(d, rel), { withFileTypes: true })
     } catch {}
     const subs: string[] = []
-    for (const x of es.filter(x => !x.name.startsWith('.') && x.name !== 'node_modules' && x.name !== '__pycache__')) {
+    // an agent's folder: its hidden files and node_modules too (code it could hide there). ponytail: __pycache__ left
+    // out (python rewrites it as it runs), and one with node_modules past REPO_MAX can't be trusted: your own link can
+    for (const x of es.filter(x => (w.agentDev ? x.name !== '.git' : !x.name.startsWith('.') && x.name !== 'node_modules') && x.name !== '__pycache__')) {
       if (bad) return
       const n = rel ? `${rel}/${x.name}` : x.name
       let dir = x.isDirectory()
@@ -2527,7 +2530,7 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
   const mine = [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder))
   for (const w of mine)
     if (onOf(w) === agent && !(guarded(w) && !agent)) { // a repo's stays off until you look (widgetWhat)
-      writeStore(w.id, { ...readStore(w.id), on: !agent })
+      writeStore(w.id, { ...readStore(w.id), on: !agent, ...(!agent && { changed: undefined }) })
       w.s = { ...w.s, on: !agent }
       if (agent) ungrant(w.id), stopAgents(w.id)
     }

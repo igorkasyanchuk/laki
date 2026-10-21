@@ -4035,7 +4035,7 @@ const agentTab = (from?: { ws?: unknown; tab?: unknown }) => {
 }
 export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
-export const asking = (id: string) => rtOf(id).status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
+export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
 // that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs
 export const callerAgent = (from?: { ws?: unknown; tab?: unknown }) => (t => t && (t.preset ?? shellAgents.get(t.id)?.agent ?? 'agent'))(agentTab(from))
 // an agent an RPC says it is (MCP's, Laki AI's): it may add one, never take one off

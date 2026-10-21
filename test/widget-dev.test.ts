@@ -2,7 +2,7 @@
 // watched (a change fetches again; a broken file keeps the last good version), runs with their reason and stderr,
 // sample data by hand, masked settings, unlinking
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -200,6 +200,18 @@ test("an agent's extensions: new and restored off; a folder it links trusted as 
   w = await until(() => find(rig, 'probe').then(w => !w.on && w), 'off as it changed')
   assert.equal(w.changed, true)
   assert.match((await rig.rpc('widgetRun', { id: 'probe' })).error, /is in a folder an agent linked/)
+  assert.ok(!existsSync(ran))
+  // in a git repo whose .gitignore it writes: its files are still all of its folder's
+  execFileSync('git', ['init', '-q'], { cwd: code })
+  writeFileSync(join(code, '.gitignore'), 'lib.sh\n')
+  writeFileSync(join(code, 'probe', 'lib.sh'), 'true\n')
+  writeFileSync(join(code, 'probe', 'fetch.sh'), `. ./lib.sh; touch "${ran}"; echo '{}'\n`)
+  const look = await until(() => rig.rpc('widgetWhat', { id: 'probe' }).then(x => x.text.includes('lib.sh') && x), 'the ignored file shown')
+  await rig.rpc('widgetSet', { id: 'probe', on: true, seen: look.hash })
+  await until(() => existsSync(ran), 'on once looked at')
+  rmSync(ran)
+  writeFileSync(join(code, 'probe', 'lib.sh'), 'echo changed >&2\n')
+  await until(() => find(rig, 'probe').then(w => !w.on), 'off as its ignored file changed')
   assert.ok(!existsSync(ran))
   // you link it: yours again, as dev mode always was
   await rig.rpc('widgetDev', { folder: code })
