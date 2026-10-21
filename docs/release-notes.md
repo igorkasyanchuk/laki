@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: an agent's event (`laki widget emit` in its tab, Laki AI's) only makes extensions fetch again; it no
+  longer runs their actions.
 - Workflows: one an agent wrote runs only from its editor's *Start* until you save it: not on a schedule, an event,
   Run again or the CLI. Deleting it and Undo keep it marked.
 - A failing check in Info and Review has **Log**: the end of its failed steps, so you see why CI is red before you

@@ -1420,7 +1420,7 @@ const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
 const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
 const SENT_MAX = 50
-type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number }
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number; agent?: string }
 type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
@@ -1452,13 +1452,20 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
     // its workspace's only; as one is archived or removed, that one's too (its action runs on what it was, keeps nothing)
     const going = (name === 'workspace.archived' || name === 'workspace.removed') && !!x && instOk({ ...x, archived: false })
     if (scoped(w) && !(x && (instOk(x) || going))) continue
+    // an agent's event (its emit, or one an extension made while fetching for one) only fetches: an action is a command
+    // the user never asked for
+    if (o.from?.agent && h !== 'refresh') {
+      wLog(w, `event ${name} from ${o.from.agent}: action ${h} not run (an agent's event only fetches)`, 'warn')
+      ;(rec.refused ??= []).push(`${w.id}: ${h} not run, an agent's event only fetches`)
+      continue
+    }
     const q = queues.get(w.id) ?? []
     const at = scoped(w) ? x!.id : undefined
     if (h === 'refresh' && q.some(j => j.h === 'refresh' && j.ws === at && !j.gone)) {
       wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
       continue
     }
-    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops })
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops, agent: o.from?.agent })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`, 'warn')
     queues.set(w.id, q)
     rec.widgets.push(w.id)
@@ -1533,7 +1540,7 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
 // an event of your own (laki widget emit, MCP's laki_extension_emit): custom.<name> with data (64 KB at most), from an
 // extension's command (its LAKI_WIDGET), an agent's tab or you; hops: the event being handled when it was made (its
 // handler's LAKI_EVENT_HOPS), one more here
-export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; from?: { widget?: unknown; tab?: unknown; ws?: unknown }; hops?: unknown; ai?: unknown }) {
+export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; from?: { widget?: unknown; tab?: unknown; ws?: unknown }; hops?: unknown; ai?: unknown; agent?: unknown }) {
   const raw = String(o.name ?? '').trim()
   const name = raw.startsWith('custom.') ? raw : `custom.${raw}`
   if (!CUSTOM_EVENT.test(name)) throw new Error(`${raw || '(none)'}: an event's name is letters, digits, . _ - (custom.<name>, 41 at most)`)
@@ -1542,7 +1549,8 @@ export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; fr
   const ws = typeof o.ws === 'string' && o.ws ? state.workspaces.find(x => x.id === o.ws || x.name === o.ws) : undefined
   if (o.ws && !ws) throw new Error(`no workspace ${o.ws}`)
   const t = typeof o.from?.tab === 'string' ? state.tabs.find(x => x.id === o.from!.tab) : undefined
-  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : undefined // Laki AI's counts as an agent's
+  // Laki AI's counts as an agent's, and so does one an extension makes handling an agent's event (its LAKI_EVENT_AGENT)
+  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : typeof o.agent === 'string' && o.agent ? o.agent.slice(0, 40) : undefined
   const widget = typeof o.from?.widget === 'string' && widgets.has(o.from.widget) ? o.from.widget : undefined
   const from: From = { ...(widget && { widget }), ...(t && { tab: { id: t.id, name: t.name } }), ...(agent && { agent }) }
   const hops = o.hops === undefined || o.hops === '' ? 0 : (Number(o.hops) || 0) + 1
@@ -1572,7 +1580,7 @@ async function handle(id: string, j: Job) {
   if (!w || !onOf(w)) return
   const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
   writeFileSync(file, j.json, { mode: 0o600 })
-  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops) }, stdin: j.json, gone: j.gone }
+  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops), ...(j.agent && { LAKI_EVENT_AGENT: j.agent }) }, stdin: j.json, gone: j.gone }
   try {
     if (j.h === 'refresh' && j.gone) wLog(w, `event ${j.name}: not fetched: ${j.gone.name} is gone, nothing to keep (an action runs on it)`)
     else if (j.h === 'refresh') {

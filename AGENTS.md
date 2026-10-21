@@ -1250,7 +1250,9 @@ tab's `onExit` after a `scanPRs` (`ship.done`: `ok`, `exit`, `pr`), workflow.ts 
 `restoreAll`'s), `scanPorts` (`port.open`: a port not in the last scan's, `rootTab` its tab; a tab `restoredAt` in its
 first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP's `laki_extension_emit`): `custom.<name>`
 (`CUSTOM_EVENT`), `data` (`EVENT_MAX`), `from` (`widget`: the CLI's `LAKI_WIDGET`; `tab`; `agent`: `agentCaller`'s, or
-`ai` Laki AI's), `hops` (the handler's `LAKI_EVENT_HOPS` + 1, past `HOPS_MAX` 3 dropped and logged); `handlerOf`:
+`ai` Laki AI's), `hops` (the handler's `LAKI_EVENT_HOPS` + 1, past `HOPS_MAX` 3 dropped and logged), `agent` (the handler's
+`LAKI_EVENT_AGENT`: an emit made handling an agent's event is the agent's); an event `from.agent` queues only `refresh`
+handlers (an action's is `refused`, a warn line); `handlerOf`:
 `on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
 `refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the

@@ -595,7 +595,7 @@ async function main() {
         } catch {
           throw new Error(`not JSON: ${text.trim().slice(0, 80)}`)
         }
-        const r = await rpc('widgetEmit', { name: id, data, ws: ws ?? process.env.LAKI_WORKSPACE, from: { ...caller(), widget: process.env.LAKI_WIDGET }, hops: process.env.LAKI_EVENT_HOPS })
+        const r = await rpc('widgetEmit', { name: id, data, ws: ws ?? process.env.LAKI_WORKSPACE, from: { ...caller(), widget: process.env.LAKI_WIDGET }, hops: process.env.LAKI_EVENT_HOPS, agent: process.env.LAKI_EVENT_AGENT })
         return out(r, r.ok ? `${r.event}: ${[...r.widgets, ...r.flows.map((f: string) => `workflow ${f}`)].join(', ') || 'nothing answers it'}` : `✗ ${r.dropped}`)
       }
       if (sub === 'events') {

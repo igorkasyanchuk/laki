@@ -909,7 +909,7 @@ Extensions can answer what happens (`"on": { "turn.done": "an action" }` in widg
 asking something, a PR's checks failing or passing, a merge, a new or archived workspace, a scheduled run, the app
 opening, a ship, a workflow's end, a usage limit, a new tab, a port starting to listen): the action gets the event as
 JSON on stdin. Your own events go out with `laki widget emit deploy.done '{"sha": "abc"}'` (`custom.deploy.done`, or
-`custom.*` for all of them), and `laki widget events` lists what was sent lately and what each reached. One can **stream** (`"stream": true`: its command runs all along,
+`custom.*` for all of them; an agent's runs no action, only a fetch), and `laki widget events` lists what was sent lately and what each reached. One can **stream** (`"stream": true`: its command runs all along,
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
