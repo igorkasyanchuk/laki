@@ -882,7 +882,7 @@ with it fixed (dialog `start`, `FlowStartAt`); StartRun's own *Workspace* for a 
 now; its `vars`, `visits`, `tabs` and `resume` copied; `first`, the block `begin` enters, a visit; the worktree's
 `ws.flow` moves to it), both `of` the old run, said in the first log line: RunView's *Run again*, a block's right
 click *Run from here*, the index row's ⋯, `laki flow again <run> [--from <block>]`. `flowRm` moves the file to
-`<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at); `flowTrash` lists
+`<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at, byAgent); `flowTrash` lists
 them newest first, `flowRestore` (`trash`) puts one back where it was (refused when a file of its id is there now),
 `flowTrashTidy` (hourly and at start) drops them past 30 days or 20, and with each its history unless its file is back or another of it is still there. `flowSave` keeps the file it replaces first
 (`keepOld`: `<data>/workflow-history/yours-<id>` or `project-<project>-<id>`, `<ms>.md`, not when it's the same text,
@@ -986,7 +986,9 @@ as Laki started), and `agent()` sends that chat, when its tab is live with the s
 restarted while you were on this step. Finish it, then stop.*: no new turn) instead of its prompt, else (no chat then,
 a new one since, its tab gone) the whole prompt; either way the mark goes and the log says which; with workflows off it waits for `flowTick`
 to see them on, and only runs started before the daemon (`boot`) come back. Agents (MCP's `laki_workflow_write`, `by:
-'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` `by: 'agent'` refuses those.
+'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` refuses those unless
+`editor` (StartRun's, the app's; never with `by: 'agent'`): schedules, events, Run again, Run from here, the CLI and MCP
+can't; `flowRm` keeps the mark in `trash.json` (`byAgent`), `flowRestore` puts it back.
 `broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
 message with `ev` as an event, though it has an `id`: the run's). A tab an agent block sends a
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the

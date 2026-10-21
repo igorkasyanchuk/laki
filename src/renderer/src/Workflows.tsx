@@ -753,7 +753,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
           <b>{wf.name}</b>
           <span className="wf-src">{item.source === 'yours' ? 'yours' : `${projects.find(p => p.id === item.project)?.name ?? item.project} · .laki/workflows/${item.id}.md`}</span>
           {wf.desc && <span className="wf-desc">{wf.desc}</span>}
-          {item.byAgent && <span className="wf-agent">An agent wrote it: read it, then Save it, before agents may run it</span>}
+          {item.byAgent && <span className="wf-agent">An agent wrote it: read it, then Save it. Until then only Start here runs it (no schedule, event or agent)</span>}
         </div>
         <span className="grow" />
         <div className="seg">
@@ -765,7 +765,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
             Discard
           </button>
         )}
-        <button className="btn" disabled={!dirty && !item.byAgent} onClick={save} data-tip={item.byAgent ? 'An agent wrote it: saving it here says you read it, and lets agents run it' : '⌘S'}>{dirty || item.byAgent ? 'Save' : 'Saved'}</button>
+        <button className="btn" disabled={!dirty && !item.byAgent} onClick={save} data-tip={item.byAgent ? 'An agent wrote it: saving it here says you read it, and lets schedules, events and agents run it' : '⌘S'}>{dirty || item.byAgent ? 'Save' : 'Saved'}</button>
         {runs.length > 0 && (
           <button className="btn" onClick={() => onOpenRun(runs[0].id)} data-tip={runs.map(r => `${r.task || r.name}: ${STATUS_WORDS[r.status]}`).join('\n')}>
             <span className="wf-dot" /> {runs.length} running
@@ -1881,7 +1881,7 @@ function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }
   const go = () => {
     setBusy(true)
     setErr('')
-    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
+    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
     )

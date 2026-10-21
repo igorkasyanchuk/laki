@@ -139,8 +139,9 @@ export function flowRm(o: Ref) {
   mkdirSync(t, { recursive: true })
   const name = parse(readFileSync(f.path, 'utf8'), o.id).workflow.name
   move(f.path, join(t, 'workflow.md'))
-  writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at } satisfies Trashed))
-  markAgent(agentKey(o.source ?? 'yours', o.id, f.project), false)
+  const k = agentKey(o.source ?? 'yours', o.id, f.project)
+  writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...(byAgent(k) && { byAgent: true }) } satisfies Trashed))
+  markAgent(k, false)
   flowFiles.at = Date.now()
   changed()
   return { ok: true, trash: basename(t) }
@@ -149,7 +150,7 @@ export function flowRm(o: Ref) {
 // ---------- the trash: <data>/workflow-trash/<id>-<ms>/ (workflow.md; trash.json says what and from where), kept
 // TRASH_DAYS, the newest TRASH_MAX. History: each save keeps the file as it was, <data>/workflow-history/<yours-<id> or
 // project-<project>-<id>>/<ms>.md, the last HISTORY
-type Trashed = { id: string; source: WorkflowSource; project?: string; name: string; path: string; at: number }
+type Trashed = { id: string; source: WorkflowSource; project?: string; name: string; path: string; at: number; byAgent?: boolean }
 const TRASH_DAYS = 30
 const TRASH_MAX = 20
 const HISTORY = 20
@@ -188,6 +189,7 @@ export function flowRestore(o: { trash: string }) {
   mkdirSync(dirname(m.path), { recursive: true })
   move(join(trashDir(), n, 'workflow.md'), m.path)
   rmSync(join(trashDir(), n), { recursive: true, force: true })
+  markAgent(agentKey(m.source, m.id, m.project), !!m.byAgent) // an agent's stays its own
   flowFiles.at = Date.now()
   changed()
   return item(readFileSync(m.path, 'utf8'), m.id, m.source, m.project, m.path)
@@ -335,7 +337,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
 
 // Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
 // task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
@@ -361,7 +363,9 @@ export async function flowStart(o: Start) {
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
-  if (o.by === 'agent' && wf.byAgent) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from Laki's Workflows, once they've read and saved it`)
+  // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
+  // not a schedule, an event, Run again, Run from here, the CLI or MCP
+  if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)

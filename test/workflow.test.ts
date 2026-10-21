@@ -1757,3 +1757,32 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   assert.deepEqual(r.flows, [])
   assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
 })
+
+test('a workflow an agent wrote runs only from its editor in the app: a schedule, Run again and the CLI are refused; Delete then Undo keeps the mark', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const text = '# Nightly\nruns in: main\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n'
+  await rig.rpc('flowSave', { id: 'nightly', text })
+  const s = await rig.rpc('scheduleSet', { project: p.id, workflow: 'nightly', prompt: 'the inbox', when: 'every day at 9am' })
+  const ran = await rig.rpc('flowStart', { workflow: 'nightly', project: p.id, task: 'x' })
+  await until(async () => ((await rig.rpc('flowGet', { id: ran.id })).status === 'done' ? 'done' : ''), 'first run done')
+  // an agent writes over it: the schedule's run, Run again and the CLI are refused
+  await rig.rpc('flowSave', { id: 'nightly', text: text.replace('Nightly', 'Nightly (agent)'), by: 'agent' })
+  const r = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(r.ok, false)
+  assert.match(r.what, /an agent wrote Nightly \(agent\): the user runs it first, from its editor/)
+  await assert.rejects(rig.rpc('flowStart', { again: ran.id }), /an agent wrote/)
+  assert.match((await rig.cli('flow', 'run', 'nightly', p.id, 'x')).err, /an agent wrote/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'nightly', project: p.id, task: 'x', by: 'agent', editor: true }), /an agent wrote/)
+  // its editor's Start runs it
+  assert.ok((await rig.rpc('flowStart', { workflow: 'nightly', project: p.id, task: 'x', editor: true })).id)
+  // Delete, then Undo: still the agent's
+  const del = await rig.rpc('flowRm', { id: 'nightly' })
+  await rig.rpc('flowRestore', { trash: del.trash })
+  assert.equal((await rig.rpc('flowList', {})).find((w: any) => w.id === 'nightly').byAgent, true)
+  assert.equal((await rig.rpc('scheduleRun', { id: s.id })).ok, false)
+  // saved by the user: the schedule runs it
+  await rig.rpc('flowSave', { id: 'nightly', text })
+  assert.equal((await rig.rpc('scheduleRun', { id: s.id })).ok, true)
+})

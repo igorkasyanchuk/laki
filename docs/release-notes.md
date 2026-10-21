@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: one an agent wrote runs only from its editor's *Start* until you save it: not on a schedule, an event,
+  Run again or the CLI. Deleting it and Undo keep it marked.
 - A failing check in Info and Review has **Log**: the end of its failed steps, so you see why CI is red before you
   decide who fixes it. *Send to the agent* sends that check alone, *Copy*, *Open on GitHub*.
 - **Laki AI, Voice, My Desk, Bird view and Laki AI's glow are no longer experimental**: on by default. Turn one off in
