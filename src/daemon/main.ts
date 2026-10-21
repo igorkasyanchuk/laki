@@ -93,6 +93,7 @@ const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN?.split(',').
 const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
 const { same } = core
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
+// ponytail: any program of the same user can read daemon.json's token: a Keychain item or a peer check if that matters
 const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (same(t, token) || (!!o && o === core.remoteOrigin() && same(t, core.remoteToken())))
 // the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route

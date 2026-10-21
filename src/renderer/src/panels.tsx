@@ -440,6 +440,9 @@ export function About({ onClose }: { onClose: () => void }) {
         <a href={SITE} onClick={e => (e.preventDefault(), openExternal(SITE))}>
           {SITE.replace('https://', '')}
         </a>
+        <a className="small" href={`${REPO}/blob/main/SECURITY.md`} onClick={e => (e.preventDefault(), openExternal(`${REPO}/blob/main/SECURITY.md`))}>
+          Security: reporting a vulnerability
+        </a>
       </div>
     </Modal>
   )
