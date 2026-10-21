@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { ntfyReplies, pushRequest, pushText, replies } from '../src/daemon/push.ts'
+import { ntfyReplies, pushRequest, pushText, replies, tapSig } from '../src/daemon/push.ts'
 import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
@@ -155,13 +155,13 @@ test('phone taps: nothing to ask without a chat or reply topic; ntfy messages si
     if (req.url!.startsWith('/down')) return void res.writeHead(500).end()
     if (req.url!.startsWith('/botE/')) return void res.writeHead(200).end('{"ok":false}')
     if (req.url!.includes('getUpdates')) return void res.writeHead(200).end(JSON.stringify({ result: [{ update_id: 3, callback_query: { id: 'q', message: { chat: { id: 42 } } } }] }))
-    const lines = [{ event: 'open', id: 'o' }, { event: 'message', id: 'm1', message: '00112233aabbccdd:3' }, { event: 'message', id: 'm2', message: 42 }, { event: 'keepalive', id: 'k' }]
+    const lines = [{ event: 'open', id: 'o' }, { event: 'message', id: 'm1', message: `00112233aabbccdd:3:${tapSig('k', '00112233aabbccdd', 3)}` }, { event: 'message', id: 'm1b', message: '00112233aabbccdd:2' }, { event: 'message', id: 'm2', message: 42 }, { event: 'keepalive', id: 'k' }]
     res.writeHead(200).end(['', ...lines.map(l => JSON.stringify(l)), ''].join('\n'))
   })
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
   t.after(() => void server.close())
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  assert.deepEqual(await replies({ format: 'ntfy', url: `${base}/mine?auth=XYZ`, replyTopic: 'xyz' }, 'c0'), { taps: [{ nonce: '00112233aabbccdd', n: 3 }], cursor: 'm2' })
+  assert.deepEqual(await replies({ format: 'ntfy', url: `${base}/mine?auth=XYZ`, replyTopic: 'xyz' }, 'c0', 'k'), { taps: [{ nonce: '00112233aabbccdd', n: 3 }], cursor: 'm2' }) // the unsigned one: no tap
   assert.equal(asked[0], '/mine-xyz/json?poll=1&since=c0&auth=XYZ')
   assert.deepEqual(await replies({ format: 'telegram', url: `${base}/botT/sendMessage?chat_id=42` }, ''), { taps: [], cursor: '4' }, 'a query without data is no tap')
   assert.deepEqual(await replies({ format: 'telegram', url: `${base}/botE/sendMessage?chat_id=42` }, '7'), { taps: [], cursor: '7' }, 'no result: nothing moves')
