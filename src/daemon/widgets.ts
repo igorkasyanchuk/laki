@@ -431,7 +431,7 @@ export function scanWidgets() {
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
-      if (project && e.s.on && (e.s.trusted !== dirHash(e, true) || repoBad(e))) untrust(e) // changed in the repo since you turned it on
+      if (project && e.s.on && (rf => e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)(e.file ? undefined : repoFiles(e.dir))) untrust(e) // changed in the repo since you turned it on
     }
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
@@ -973,7 +973,8 @@ const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
 // a repo's extension runs only as you said yes to it: its files changed since (a pull, before the watch's scan) turn it
 // off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
 function trusted(w: Entry) {
-  if (!w.project || (w.s.trusted === dirHash(w) && !repoBad(w))) return
+  const rf = w.project && !w.file ? repoFiles(w.dir) : undefined // one walk for both
+  if (!w.project || (w.s.trusted === dirHash(w, false, rf?.names) && !rf?.bad)) return
   if (w.s.on) untrust(w)
   throw new Error(`${w.m.name || w.id} changed in ${projName(w)}'s repo: off until you look`)
 }
@@ -1834,8 +1835,8 @@ function repoFiles(d: string): { names: string[]; bad?: string } {
 function repoBad(w: Entry) {
   return w.project && !w.file ? repoFiles(w.dir).bad : undefined
 }
-function dirHash(w: Entry, fresh = false) {
-  const names = (w.file ? [w.file] : w.project ? repoFiles(w.dir).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+function dirHash(w: Entry, fresh = false, known?: string[]) {
+  const names = (known ? [...known] : w.file ? [w.file] : w.project ? repoFiles(w.dir).names : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {

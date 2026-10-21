@@ -68,14 +68,15 @@ export async function ensureDaemon(env: Record<string, string> = {}): Promise<Da
   throw new Error(`daemon didn't start; see ${logPath}`)
 }
 
-// a response's text, at most max bytes read: past it the rest is let go (body.cancel()), the connection with it. cut:
-// it had more
-export async function readCapped(r: Response, max: number): Promise<{ text: string; cut: boolean }> {
+// a response's text (and bytes), at most max bytes read: past it the rest is let go (body.cancel()), the connection
+// with it. cut: it had more
+export async function readCapped(r: Response, max: number): Promise<{ text: string; buf: Buffer; cut: boolean }> {
   const parts: Buffer[] = []
   let size = 0
   for await (const b of r.body ?? []) {
     parts.push(Buffer.from(b))
     if ((size += b.length) > max) break // for await's break cancels the stream
   }
-  return { text: Buffer.concat(parts).subarray(0, max).toString('utf8'), cut: size > max }
+  const buf = Buffer.concat(parts).subarray(0, max)
+  return { text: buf.toString('utf8'), buf, cut: size > max }
 }

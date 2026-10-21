@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
+import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { refreshSkills, skills, skillSet } from './skill.ts'
@@ -144,8 +145,8 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
     const type = r.headers.get('content-type') ?? ''
     if (!r.ok || !IMG.test(type) || !r.url.startsWith('https:')) return no(502, 'not a picture')
     if (Number(r.headers.get('content-length')) > 10 << 20) return no(413, 'over 10 MB')
-    const body = Buffer.from(await r.arrayBuffer())
-    if (body.length > 10 << 20) return no(413, 'over 10 MB')
+    const { buf: body, cut } = await readCapped(r, 10 << 20)
+    if (cut) return no(413, 'over 10 MB')
     res.writeHead(200, { 'content-type': type, 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'", 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' })
     res.end(body)
   } catch {

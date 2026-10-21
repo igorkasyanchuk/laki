@@ -691,20 +691,30 @@ export function allocPort() {
 
 // the project's .laki.json, from its own folder only: never a worktree's, whose branch (a PR's checkout, a fork's, an
 // agent's commit) could bring its own setup, teardown, run, env, copy or ports (a host's: read there, readHostCfg)
-function fileCfg(p: Project): ProjectConfig {
-  if (p.host) return hostCfg.get(`${p.host}:${p.path}`) ?? {}
+// views ask per workspace: read and hashed again only when its size or time moves (cfgRead)
+const cfgSeen = new Map<string, { sig: string; c: ProjectConfig; h: string }>()
+function cfgRead(p: Project): { c: ProjectConfig; h: string } {
+  if (p.host) return (c => ({ c, h: cfgHash(c) }))(hostCfg.get(`${p.host}:${p.path}`) ?? {})
+  const f = join(p.path, '.laki.json')
+  const st = statSync(f, { throwIfNoEntry: false })
+  const sig = st ? `${st.mtimeMs}:${st.size}` : ''
+  const had = cfgSeen.get(f)
+  if (had?.sig === sig) return had
+  let c: ProjectConfig = {}
   try {
-    const c = JSON.parse(readFileSync(join(p.path, '.laki.json'), 'utf8'))
-    return c && typeof c === 'object' && !Array.isArray(c) ? c : {}
-  } catch {
-    return {}
-  }
+    const j = JSON.parse(readFileSync(f, 'utf8'))
+    if (j && typeof j === 'object' && !Array.isArray(j)) c = j
+  } catch {}
+  const r = { sig, c, h: cfgHash(c) }
+  cfgSeen.set(f, r)
+  return r
 }
+const fileCfg = (p: Project) => cfgRead(p).c
 // its trust (projectTrust, the app's sheet): the hash of what it says. One you haven't trusted as it is gives its port
 // names only: none of its setup, teardown, run, scripts, env, copy or expose. Projects from before this were trusted
 // as they were (load)
 const cfgHash = (c: ProjectConfig) => createHash('sha256').update(JSON.stringify(c)).digest('hex')
-export const cfgWait = (p: Project) => (c => (Object.keys(c).some(k => k !== 'ports') && cfgHash(c) !== p.trusted ? cfgHash(c) : undefined))(fileCfg(p))
+export const cfgWait = (p: Project) => (({ c, h }) => (Object.keys(c).some(k => k !== 'ports') && h !== p.trusted ? h : undefined))(cfgRead(p))
 // env a .laki.json never sets, trusted or not: they change how programs start (a shell's rc, node, the linker, an
 // agent's endpoint or its folder); each refused once in daemon.log
 const ENV_BAD = /^(ZDOTDIR|BASH_ENV|ENV|NODE_OPTIONS|PATH|DYLD_.*|LD_.*|.*_BASE_URL|CLAUDE_CONFIG_DIR|CODEX_HOME)$/
@@ -722,8 +732,8 @@ const envOk = (p: Project, env: unknown) =>
 // the app's config wins field by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
-  const raw = proj ? fileCfg(proj) : {}
-  const file: ProjectConfig = proj && cfgHash(raw) === proj.trusted ? { ...raw, env: envOk(proj, raw.env) } : { ports: raw.ports }
+  const { c: raw, h } = proj ? cfgRead(proj) : { c: {} as ProjectConfig, h: '' }
+  const file: ProjectConfig = proj && h === proj.trusted ? { ...raw, env: envOk(proj, raw.env) } : { ports: raw.ports }
   const { env, actions: _, templates: __, ...cmds } = proj?.config ?? {} // actions, templates: the renderer's (Run ▾, a new workspace's prompt)
   const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => typeof v === 'string' && v.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
@@ -2977,7 +2987,9 @@ const writeKids = () => {
   }
 }
 const lstart = (pid: number) => run('ps', ['-o', 'lstart=,command=', '-p', String(pid)]).then(r => r.stdout.trim(), () => '')
-export async function reapChildren() {
+let reaping: Promise<void> = Promise.resolve() // remoteStart waits for it: a tailscale off must come before a new serve
+export const reapChildren = () => (reaping = reap())
+async function reap() {
   let old: Kid[] = []
   try {
     old = JSON.parse(readFileSync(kidsFile(), 'utf8'))
@@ -3292,6 +3304,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   if (open && (!hours || hours > 24)) throw new Error('without an email, 24 hours at most: anyone with the link gets in')
   if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
+  await reaping.catch(() => {})
   const { bin, peers } = ts ? await tsReady() : (await cfReady(!!mail), { bin: '', peers: 0 })
   if (remote) return remoteView() // started meanwhile
   const target = `http://127.0.0.1:${daemonPort}`
