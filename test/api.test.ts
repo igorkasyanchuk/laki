@@ -365,13 +365,16 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   // the project's default for the popup: its .laki.json, its own setting over that (trimmed; blank: the file's)
   const expose = async () => (await rig.rpc('cloudflared', { ws: ws.id })).expose
   assert.equal(await expose(), undefined)
-  writeFileSync(join(ws.path, '.laki.json'), JSON.stringify({ expose: '*@file.dev' }))
+  // a worktree's own .laki.json never counts (its branch could bring its own setup, env, ports): the main checkout's
+  writeFileSync(join(ws.path, '.laki.json'), JSON.stringify({ expose: '*@branch.dev', setup: 'touch pwned' }))
+  assert.equal(await expose(), undefined)
+  writeFileSync(join(rig.repo, '.laki.json'), JSON.stringify({ expose: '*@file.dev' }))
   assert.equal(await expose(), '*@file.dev')
   await rig.rpc('projectSet', { id: p.id, config: { expose: ' me@x.dev, *@team.dev ' } })
   assert.equal(await expose(), 'me@x.dev, *@team.dev')
   await rig.rpc('projectSet', { id: p.id, config: { expose: ' ' } })
   assert.equal(await expose(), '*@file.dev')
-  rmSync(join(ws.path, '.laki.json'))
+  rmSync(join(rig.repo, '.laki.json'))
   assert.equal(await expose(), undefined)
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: ['nope'] }), /not an email address or \*@domain: nope/)
   for (const m of ['me*@x.dev', '*@*.x.dev', 'a@b.dev,c@d.dev', '*@localhost'])

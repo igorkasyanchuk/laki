@@ -684,27 +684,16 @@ export function allocPort() {
   return port
 }
 
-// .laki.json from the workspace (as checked out), else from the project root (works before it's committed); a fork's
-// PR's never (its setup would run a stranger's code): the root's. The project's own config (set in the app) wins field
-// by field
+// the project's .laki.json, from its own folder only: never a worktree's, whose branch (a PR's checkout, a fork's, an
+// agent's commit) could bring its own setup, teardown, run, env, copy or ports; the app's config wins field by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
   let file: ProjectConfig = {}
-  for (const d of [ws.fork ? undefined : ws.path, proj?.path]) {
-    if (!d) continue
-    if (ws.host) {
-      const c = hostCfg.get(`${ws.host}:${d}`) // read there (readHostCfg): views ask often
-      if (c) {
-        file = c
-        break
-      }
-      continue
-    }
+  if (proj && ws.host) file = hostCfg.get(`${ws.host}:${proj.path}`) ?? {} // read there (readHostCfg): views ask often
+  else if (proj)
     try {
-      file = JSON.parse(readFileSync(join(d, '.laki.json'), 'utf8'))
-      break
+      file = JSON.parse(readFileSync(join(proj.path, '.laki.json'), 'utf8'))
     } catch {}
-  }
   const { env, actions: _, templates: __, ...cmds } = proj?.config ?? {} // actions, templates: the renderer's (Run ▾, a new workspace's prompt)
   const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => typeof v === 'string' && v.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
@@ -1136,13 +1125,11 @@ async function readHostCfg(at: At) {
     hostCfg.set(`${at.host}:${at.path}`, null)
   }
 }
-// a host workspace's: its folder's and its project's (fresh: again, else only those not read yet)
-const readHostCfgs = (ws: Workspace, fresh = true) =>
-  Promise.all(
-    [...new Set([ws.path, state.projects.find(p => p.id === ws.project)?.path ?? ws.path])]
-      .filter(path => fresh || !hostCfg.has(`${ws.host}:${path}`))
-      .map(path => readHostCfg({ host: ws.host, path })),
-  )
+// a host workspace's: its project's, never its own folder's (projectConfig; fresh: again, else only when not read yet)
+const readHostCfgs = async (ws: Workspace, fresh = true) => {
+  const path = state.projects.find(p => p.id === ws.project)?.path
+  if (path && (fresh || !hostCfg.has(`${ws.host}:${path}`))) await readHostCfg({ host: ws.host, path })
+}
 
 // ---------- tabs
 
@@ -2606,10 +2593,10 @@ function unrelate(w: Workspace, url: string) {
 // its branch is on a remote (pushed, or gh pr checkout's): a local look before asking GitHub for the branch's PR
 const onRemote = (w: Workspace) => git(w, 'for-each-ref', '--count=1', '--format=%(refname)', `refs/remotes/*/${w.branch}`).then(Boolean, () => false)
 
-// a host's worktree at each PR scan: its branch (git there; syncBranches reads a HEAD file here) and its .laki.json.
-// ponytail: a minute behind, not 5 s; a host's local workspace never moves
+// a host's worktree at each PR scan: its branch (git there; syncBranches reads a HEAD file here) and its project's
+// .laki.json. ponytail: a minute behind, not 5 s; a host's local workspace never moves
 async function hostSync(ws: Workspace) {
-  const [b] = await Promise.all([git(ws, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => ''), readHostCfg(ws)])
+  const [b] = await Promise.all([git(ws, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => ''), readHostCfgs(ws)])
   if (!b || b === ws.branch) return
   moveBranch(ws, b)
   save()

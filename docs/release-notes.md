@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's `.laki.json` comes from the project's own folder only, never a workspace's branch: a PR's checkout or a
+  fork can't bring its own setup, env or scripts.
 - An extension that's off (Laki AI's new ones, in the studio's preview) can't open links, copy or show dialogs from its
   page until you turn it on.
 - Extensions: a secret setting's value is masked (••••) in an extension's error and its Runs, not only in its log.

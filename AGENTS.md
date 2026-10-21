@@ -196,7 +196,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   workspace's: the issue's text names any) goes to `related` (`relate`: once, any case, the newest last, 20 at most) and, unnamed, is `pr-<n>-<slug>` (gh failing: `pr-<n>`); the renderer sends no
   template name for one. The base is the PR's, the name
   `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch, and a
-  fork's `fork` (kept by `wsFork`): `projectConfig` reads the repo's `.laki.json`, never the fork's (its setup would run);
+  fork's `fork` (kept by `wsFork`);
   a base with no local branch is `origin/<base>`;
 - `settings.syncBase` (Settings › Git & worktrees; unset or '': off): `synced` before `worktree add` (not a PR's):
   `origin`, `git fetch origin <base>`, then the worktree off `origin/<base>` (`--no-track`: a push never goes to the
@@ -496,7 +496,8 @@ A project is a git repository (its top level) or any other folder (`git: false`:
 no branches, diff, PRs or ship). New worktrees go to `worktreesOf` (the folders it makes 0700, a folder you had as it is): the project's `config.worktrees` (the app's only; relative: to the repo),
 else `settings.worktrees` (`~` is home) with a folder per project, else `<data>/worktrees/<project>`; a host's stay in
 `~/.laki-host`. Made ones keep their path. `config` (setup, run, teardown, expose), set in the app, wins field by field over
-the repo's `.laki.json` (`projectConfig`).
+the repo's `.laki.json` (`projectConfig`: the project's own folder only, never a worktree's, so a branch, a PR's checkout
+or a fork can't swap in its own setup, teardown, run, env, copy or ports).
 
 ### SSH hosts
 
@@ -523,7 +524,7 @@ A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: 
   payload holds whole files). Nothing listens on the host, and nothing there reaches the daemon.
 - `forward`: each live workspace's `$PORT` (`ssh -O forward -L port:localhost:port`) when the host connects and in
   `wsNew`/`wsRestore`; cancelled in `teardown`.
-- `.laki.json` there: `hostCfg` (null: none), read by `readHostCfg`/`readHostCfgs` (project add, `wsNew`, `wsRestore`,
+- `.laki.json` there: `hostCfg` (null: none), the project's folder's, read by `readHostCfg`/`readHostCfgs` (project add, `wsNew`, `wsRestore`,
   a tab's start when not read yet, each PR scan: `hostSync`, which also follows the branch); `projectConfig` reads the
   cache. `wsArchive` needs the host up (teardown there would fail quietly); `diff` gets new files' diffs in one call.
 - `toHost` copies the images a prompt or `send` names (`<data>/images/…`) to the host and rewrites their paths

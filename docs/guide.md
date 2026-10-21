@@ -1570,7 +1570,8 @@ tab). Saved as you type:
   (above, in *PRs*). Saved in the app only.
 
 These are saved in the app. A field left empty falls back to a `.laki.json` in the repo, which a team can
-commit. The page shows that file's values as placeholders:
+commit. Laki reads it from the project's own folder (the main checkout), never from a workspace's worktree: a branch,
+a PR's checkout or a fork can't bring setup, env or scripts of its own. The page shows that file's values as placeholders:
 
 ```json
 { "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "expose": "*@team.com", "env": { "NODE_ENV": "development" }, "copy": [".env*", "config/master.key"], "ports": { "3000": "web", "5432": "db" } }
