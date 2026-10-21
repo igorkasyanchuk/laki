@@ -49,8 +49,9 @@ const usable = (p: Project) => !p.kind && !p.host // ponytail: not an SSH host's
 
 function item(text: string, id: string, source: WorkflowSource, project?: string, path?: string): WorkflowItem {
   const { workflow, problems } = parse(text, id)
-  const untrusted = source === 'project' && state.flowTrust?.[agentKey(source, id, project)] !== textHash(text)
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(agentKey(source, id, project)) && { byAgent: true }), ...(untrusted && { untrusted: true }) }
+  const was = source === 'project' ? state.flowTrust?.[agentKey(source, id, project)] : undefined
+  const untrusted = source === 'project' && was !== textHash(text)
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(agentKey(source, id, project)) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }) }) }
 }
 // a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
 // the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
@@ -387,7 +388,7 @@ export async function flowStart(o: Start) {
   // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
-  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't trusted as it is yet: open it in Laki's Workflows, read it, then Save or Trust it`)
+  if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't trusted as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)
@@ -1353,14 +1354,22 @@ eventHooks.flows = (name, payload, wsId, agent) => {
   if (state.settings?.workflows !== true) return out
   if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on) } // ponytail: the files read again every 10 s, not at each event
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
-  for (const wf of listening.list) {
+  for (let wf of listening.list) {
     if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue
     if (wf.source === 'project' && wf.project !== ws?.project) continue // a project's own: its events only
     const no = (why: string) => (out.refused.push(`${wf.id}: ${why}`), log(`workflow ${wf.id} on ${name}: not started: ${why}`))
+    if (wf.source === 'project') { // the repo's file as it is now (a pull or an agent's edit since the list was read): its trust too
+      try {
+        wf = flowFind({ id: wf.id, source: 'project', project: wf.project })
+      } catch {
+        continue // gone
+      }
+      if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue
+    }
     if (!ws) { no('the event has no workspace, so no project'); continue }
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
-    if (wf.untrusted) { no("from the repo, not trusted as it is: open it in Workflows, then Save or Trust it"); continue }
+    if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's workflow says which event it starts on and that it changed since you allowed it, and only you can
+  allow it: an agent can't.
 - The app window loads pictures only from GitHub's avatars: an extension's https pictures come through Laki's daemon,
   and Settings › Appearance › GitHub pictures turns the avatars off too.
 - A page that keeps knocking on Laki's daemon without its key no longer fills daemon.log: the first refusal is logged,

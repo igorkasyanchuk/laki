@@ -252,7 +252,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                           <span className="tag">{WHERE_TAGS[w.where]}</span>
                           <span className="tag">{w.blocks.length} blocks</span>
                           {w.byAgent && <span className="tag warn">by an agent</span>}
-                          {w.untrusted && !w.byAgent && <span className="tag warn">not trusted</span>}
+                          {w.untrusted && !w.byAgent && <span className="tag warn">{w.changed ? 'changed' : 'not allowed'}</span>}
                           {drafts.has(keyOf(w)) && <span className="tag warn">unsaved changes</span>}
                         </span>
                       </button>
@@ -664,10 +664,10 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
     else if (e.key === 'Escape' && picked.length) e.preventDefault(), setMany([]), setPick(null)
   }
   const save = () => api.call<WorkflowItem>('flowSave', { id: item.id, source: item.source, project: item.project, text }).then(onSaved, e => api.toast((e as Error).message))
-  // a repo's (.laki/workflows) not trusted as it is: the file, then Trust (or Save it here: you've read it)
+  // a repo's (.laki/workflows) not allowed as it is: the file, then Allow (or Save it here: you've read it)
   const trust = async () => {
-    const say = `Events, schedules and agents start it only once you trust it as it is (an edit asks again). Its commands, webhooks and agents run on this Mac.\n\n${item.text}`
-    if ((await choose(`Trust ${item.name}?`, say, [{ label: 'Not now' }, { label: 'Trust this workflow', primary: true }])) === 1) api.call<WorkflowItem>('flowTrust', { id: item.id, project: item.project, text: item.text }).then(onSaved, e => api.toast((e as Error).message))
+    const say = `Events, schedules and agents start it only once you allow it as it is (an edit asks again). Its commands, webhooks and agents run on this Mac.\n\n${item.text}`
+    if ((await choose(`Allow ${item.name}?`, say, [{ label: 'Not now' }, { label: 'Allow this workflow', primary: true }])) === 1) api.call<WorkflowItem>('flowTrust', { id: item.id, project: item.project, text: item.text }).then(onSaved, e => api.toast((e as Error).message))
   }
   // ⌘S saves
   const saveRef = useRef(save)
@@ -762,7 +762,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
           {item.byAgent && <span className="wf-agent">An agent wrote it: read it, then Save it. Until then only Start here runs it (no schedule, event or agent)</span>}
           {item.untrusted && !item.byAgent && (
             <span className="wf-agent">
-              From this repo, not trusted yet: only Start here runs it (no schedule, event or agent). <button className="link" onClick={trust}>Trust it…</button>
+              {item.changed ? 'Changed since you allowed it' : 'From this repo'}: {wf.on ? <>starts on <code>{wf.on}</code> once you allow it</> : 'only Start here runs it until you allow it'} (no schedule, event or agent before). <button className="link" onClick={trust}>Allow…</button>
             </span>
           )}
         </div>
@@ -1902,7 +1902,7 @@ function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }
       <form className="modal wf-start" onSubmit={e => (e.preventDefault(), go())} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), onClose())}>
         <b>Run {item.name}</b>
         <span className="wf-hint">{fix ? `Runs in ${fix.name ?? fix.id}, the workspace you picked` : WHERES[item.where]} · {SESSIONS[item.session]}</span>
-        {item.untrusted && <span className="wf-agent">From this repo, not trusted yet: read it before you run it.</span>}
+        {item.untrusted && <span className="wf-agent">From this repo, {item.changed ? 'changed since you allowed it' : 'not allowed yet'}: read it before you run it.</span>}
         <label className="wf-field">
           <span>Project</span>
           <select value={project} onChange={e => (setProject(e.target.value), setWs(''))} disabled={item.source === 'project' || !!fix}>

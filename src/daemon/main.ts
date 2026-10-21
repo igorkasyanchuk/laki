@@ -401,7 +401,10 @@ const api: Record<string, Handler> = {
   },
   flowList: p => flowList(p), // workflows (experimental): workflow.ts
   flowSave: ({ caller, ...p }) => flowSave(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's tab: marked, never trusted
-  flowTrust: p => flowTrust(p), // the editor's Trust: a project's workflow as the sheet showed it
+  flowTrust: ({ caller, ...p }) => { // the editor's Allow: a project's workflow as the sheet showed it; never an agent's (it'd let its own file run)
+    if (core.agentCaller(caller)) throw new Error("an agent can't trust a workflow: it's the user's (ask them)")
+    return flowTrust(p)
+  },
   flowRm: p => flowRm(p), // the app's Delete: to the trash, a toast's Undo is flowRestore
   flowRestore: p => flowRestore(p),
   flowTrash: () => flowTrash(), // laki flow trash
@@ -430,7 +433,7 @@ const remoteNo = (method: string, p: any) =>
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall'])
-const CALLER = new Set(['tabNew', 'wsNew', 'flowSave', 'flowStart'])
+const CALLER = new Set(['tabNew', 'wsNew', 'flowSave', 'flowStart', 'flowTrust'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client with no Origin: its socket
 async function whoCalls(sock: Socket, method: string, p: any) {

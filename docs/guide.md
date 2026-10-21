@@ -1091,8 +1091,10 @@ step, it writes the workflow, you read it and *Save*.
 
 None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
 `.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). A
-project's workflow that came with the repo (git brought it, or it changed since) is *not trusted*: events, schedules
-and agents don't start it until you Save it in its editor or *Trust it…* (which shows the file); an edit asks again.
+project's workflow that came with the repo (git brought it, or it changed since) is *not allowed*: events, schedules
+and agents don't start it until you Save it in its editor or *Allow…* it (which shows the file). Its banner says the
+event it starts on (*starts on `tab.new` once you allow it*), and that it changed when a pull or an agent's edit did;
+an edit asks again, and an agent can't allow one.
 Your own Start runs it, saying it's from the repo. *With
 Laki AI…*: say what it should do; its chat asks you a few questions first (what starts it, its steps, where it routes,
 how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it; so does the

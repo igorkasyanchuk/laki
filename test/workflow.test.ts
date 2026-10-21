@@ -1803,7 +1803,7 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   assert.equal((await item()).untrusted, true)
   const started = async () => ((await rig.rpc('state')).flows ?? []).filter((r: any) => r.workflow === 'onnew').length
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
-  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'workspace.new' && e.refused?.includes('onnew: from the repo, not trusted as it is: open it in Workflows, then Save or Trust it')), 'refused, said in laki widget events')
+  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'workspace.new' && e.refused?.includes('onnew: from the repo, not allowed as it is: open it in Workflows, then Allow or Save it')), 'refused, said in laki widget events')
   assert.equal(await started(), 0)
   // a schedule's and an agent's start: refused; the app's own Start: runs it
   await assert.rejects(rig.rpc('flowStart', { workflow: 'onnew', source: 'project', project: p.id, trigger: 'schedule x' }), /isn't trusted as it is yet/)
@@ -1819,9 +1819,16 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   // an edit: not trusted again
   writeFileSync(file, text.replace('echo hi', 'echo changed'))
   assert.equal((await item()).untrusted, true)
+  assert.equal((await item()).changed, true)
   await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
-  await sleep(1500)
+  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.refused?.includes('onnew: from the repo, changed since you allowed it: open it in Workflows, then Allow or Save it')), 'refused as changed')
+  await sleep(1000)
   assert.equal(await started(), 2)
+  // an agent can't allow it (its own edit would run): refused, still not trusted
+  const ag = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'four' })
+  const at = await until(() => rig.tab(ag.id), 'its agent tab')
+  await assert.rejects(rig.rpc('flowTrust', { id: 'onnew', project: p.id, text: (await item()).text, caller: { ws: ag.id, tab: at.id } }), /an agent can't trust a workflow/)
+  assert.equal((await item()).untrusted, true)
   // saved in the editor: you read it, trusted
   await rig.rpc('flowSave', { id: 'onnew', source: 'project', project: p.id, text: text.replace('echo hi', 'echo saved') })
   assert.equal((await item()).untrusted, undefined)
