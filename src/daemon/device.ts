@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { DEVICE_OPS, SIM_OPS } from '../shared/types.ts'
-import { imageSave, onPath } from './core.ts'
+import { imageSave } from './core.ts'
 
 const run = promisify(execFile)
 const said = (e: unknown) => String((e as { stderr?: string }).stderr || (e as Error).message || e).trim().split('\n').slice(-3).join(' ')
@@ -52,6 +52,13 @@ async function shot(cmd: string, args: (file: string) => string[], fail: (e: unk
 }
 
 const simctl = (args: string[]) => run('xcrun', ['simctl', ...args], { timeout: 30000 })
+// a simulator's screen in points: its own env, its pixels over its scale (idb's describe-all names no app on iOS 27's
+// home screen, and needs idb)
+async function simPoints(udid: string) {
+  const [w, h, s] = await Promise.all(['WIDTH', 'HEIGHT', 'SCALE'].map(async k => Number((await simctl(['getenv', udid, `SIMULATOR_MAINSCREEN_${k}`])).stdout)))
+  if (!(w > 0 && h > 0 && s > 0)) throw new Error("simctl didn't say the screen's size")
+  return { width: w / s, height: h / s }
+}
 async function booted(): Promise<{ udid: string; name: string }> {
   const r = await simctl(['list', 'devices', 'booted', '-j']).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)} (Xcode, and xcode-select pointing at it)`)))
   const d = Object.values(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>).flat().find(x => x.state === 'Booted')
@@ -88,9 +95,8 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
   }
   const sim = await booted()
   if (op === 'shot') {
-    // with idb, the screen's size in points (its accessibility tree's first element, the app): taps go by the picture
-    const size = onPath('idb') ? async () => (JSON.parse(await idb('describe-all', sim.udid)) as { frame?: { width: number; height: number } }[])[0]?.frame : undefined
-    const s = await shot('xcrun', f => ['simctl', 'io', sim.udid, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, size)
+    // at the screen's size in points: taps go by the picture
+    const s = await shot('xcrun', f => ['simctl', 'io', sim.udid, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, () => simPoints(sim.udid))
     return { path: s.path, simulator: sim.name, ...(s.points && { note: "the picture's pixels are points: tap where you see it" }) }
   }
   if (op === 'tap') await idb('tap', sim.udid, num(p.x, 'x'), num(p.y, 'y'))
@@ -112,7 +118,7 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
 // The side panel's Simulator (SidePanel.tsx' DeviceTab): a booted iOS Simulator's or an Android emulator's (or a phone
 // on adb's) screen, a frame at a time, and taps, swipes, typing and buttons into it. iOS: simctl's screenshot and idb's
 // hands (as above); Android: adb's screencap and input. A device is ios:<udid> or android:<serial>; a spot comes as a
-// fraction of the picture, made points (iOS: describe-all's screen, kept per device) or pixels (Android: the last
+// fraction of the picture, made points (iOS: simPoints, kept per device) or pixels (Android: the last
 // frame's). On a Mac sips makes each frame a JPEG at most FRAME_MAX tall; elsewhere it goes as it came
 // ponytail: a frame per call (the panel asks for the next as one comes, ~3 a second) and input at 0.3-0.6 s a call, a
 // drag one swipe at its release; a stream (serve-sim, idb or axe video-stream, scrcpy's server) and live touches next
@@ -165,17 +171,13 @@ export async function sim(p: { op: string; device?: string; x?: unknown; y?: unk
     return { devices, why }
   }
   const d = deviceOf(p.device)
-  // a simulator's screen in points (describe-all's first frame, the app's), kept: taps go by it, and a shot's picture
+  // a simulator's screen in points, kept: taps go by it, and a shot's picture
   const points = async () => {
     let pts = iosPts.get(d.key)
-    if (!pts) {
-      const f = (JSON.parse(await idb('describe-all', d.id)) as { frame?: { width: number; height: number } }[])[0]?.frame
-      if (!f?.width || !f.height) throw new Error("idb didn't say the screen's size")
-      iosPts.set(d.key, (pts = { width: f.width, height: f.height }))
-    }
+    if (!pts) iosPts.set(d.key, (pts = await simPoints(d.id)))
     return pts
   }
-  if (op === 'shot' && d.os === 'ios') return { path: (await shot('xcrun', f => ['simctl', 'io', d.id, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, onPath('idb') ? points : undefined)).path } // in points, as laki screen's
+  if (op === 'shot' && d.os === 'ios') return { path: (await shot('xcrun', f => ['simctl', 'io', d.id, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, points)).path } // in points, as laki screen's
   if (op === 'frame' || op === 'shot') {
     const tmp = mkdtempSync(join(tmpdir(), 'laki-sim-'))
     try {

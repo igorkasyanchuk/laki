@@ -130,7 +130,7 @@ test("Run ▾'s scripts: a tab each, named as it, replaced when run again; Enter
   await until(async () => (await rig.tab(ws.id, 'lint'))?.status === 'exited', 'lint ended')
 })
 
-test("laki screen: the booted simulator's screenshot (in points with idb), tap, swipe, type, describe; refusals", async t => {
+test("laki screen: the booted simulator's screenshot (in points), tap, swipe, type, describe; refusals", async t => {
   const rig = await fresh(t)
   const bin = join(rig.home, 'bin')
   await assert.rejects(rig.rpc('device', { op: 'zoom' }), /screen: zoom\? one of shot, windows, tap, swipe, type, describe/)
@@ -140,6 +140,7 @@ test("laki screen: the booted simulator's screenshot (in points with idb), tap, 
 echo "xcrun $*" >> "$HOME/dev.log"
 [ "$3" = devices ] && { [ -f "$HOME/no-sim" ] && echo '{"devices":{}}' || echo '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-0":[{"udid":"U-1","name":"iPhone 17","state":"Booted"}]}}'; exit 0; }
 [ "$2" = io ] && { echo '${PNG}' | base64 -d > "$5"; exit 0; }
+[ "$2" = getenv ] && case "$4" in *WIDTH) echo 6 ;; *HEIGHT) echo 9 ;; *SCALE) echo 3.000000 ;; esac && exit 0
 exit 1
 `,
   )
@@ -168,7 +169,7 @@ exit 0
   const log = readFileSync(join(rig.home, 'dev.log'), 'utf8')
   for (const l of ['idb ui tap --udid U-1 -- 10 20', 'idb ui swipe --udid U-1 -- 1 2 3 4', 'idb ui text --udid U-1 -- -n hello', 'idb ui describe-all --udid U-1 --json'])
     assert.ok(log.includes(`${l}\n`), `${l} in\n${log}`)
-  // with idb, the picture at its size in points (sips: macOS's)
+  // the picture at its size in points, simctl's screen over its scale (sips: macOS's)
   const pts = await rig.rpc('device', { op: 'shot' })
   assert.match(pts.note ?? '', /pixels are points/)
   if (process.platform === 'darwin') {
@@ -194,6 +195,7 @@ test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and
 echo "xcrun $*" >> "$HOME/sim.log"
 [ "$3" = devices ] && { echo '{"devices":{"iOS-26":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}]}}'; exit 0; }
 [ "$2" = io ] && { echo '${PNG}' | base64 -d > "$6"; exit 0; }
+[ "$2" = getenv ] && case "$4" in *WIDTH) echo 1170 ;; *HEIGHT) echo 2532 ;; *SCALE) echo 3.000000 ;; esac && exit 0
 exit 1
 `,
   )
@@ -201,7 +203,6 @@ exit 1
     join(bin, 'idb'),
     `#!/bin/sh
 echo "idb $*" >> "$HOME/sim.log"
-[ "$2" = describe-all ] && echo '[{"AXLabel":"App","frame":{"x":0,"y":0,"width":390,"height":844}}]'
 exit 0
 `,
   )
@@ -243,7 +244,7 @@ exit 0
   await rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'home' })
   await rig.rpc('sim', { op: 'type', device: 'ios:U-1', text: '-n hi' })
   await assert.rejects(rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'back' }), /on iOS, one of home, lock/)
-  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'idb ui describe-all --udid U-1 --json', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi']) assert.ok(log().includes(l), `${l} in\n${log()}`)
+  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'xcrun simctl getenv U-1 SIMULATOR_MAINSCREEN_SCALE', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi']) assert.ok(log().includes(l), `${l} in\n${log()}`)
 })
 
 test('archived workspaces deleted after settings.archivedDays (their branch kept); copy ignored and untracked files into new worktrees', async t => {

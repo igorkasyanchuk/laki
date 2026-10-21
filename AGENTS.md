@@ -329,14 +329,14 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones, `ios:<udid>` / `android:<serial>`; `why`: what
   keeps a kind out), `frame` (simctl's JPEG or adb's `screencap -p`, through `sips` to a JPEG at most `FRAME_MAX` tall on
   a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden), `shot` (`imageSave`'s path, for
-  the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by idb's `describe-all`,
+  the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by `simPoints` (simctl's `getenv` `SIMULATOR_MAINSCREEN_*`: pixels over scale; idb's `describe-all` names no app on iOS 27's home screen),
   `iosPts`, Android pixels by the last frame's PNG header, `droidPx`), `type` (adb's `input text` single-quoted for the
   device's sh, spaces `%s`), `key` (`IOS_KEYS`, `DROID_KEYS`: back and apps Android's); an iOS `shot` in points, as laki screen's. ponytail: frames polled, a drag one swipe;
   a stream (serve-sim, idb/axe video-stream, scrcpy) next;
 - `device` (`daemon/device.ts`; the CLI's `laki screen <op>`, MCP's `laki_device`; `DEVICE_OPS`): shot (the booted
   simulator, `xcrun simctl io <udid> screenshot`, or `app`'s frontmost window: CoreGraphics' window list through JXA
   (`osascript -l JavaScript`), `screencapture -x -o -l <id>`), scaled by `sips` to its size in points (an app window's
-  bounds; the simulator's from idb's `describe-all`, else at most `SHOT_MAX` across), saved by `imageSave`, its path
+  bounds; the simulator's from `simPoints`, else at most `SHOT_MAX` across), saved by `imageSave`, its path
   back; windows; tap, swipe, type, describe through `idb ui … --udid <booted> --` (on PATH: the user's install, as
   cloudflared; Settings › Agent skill says, `doctor`'s `idb`);
 - clean-up: `archivedTidy` (hourly and at start: archived workspaces past `settings.archivedDays` dropped as `wsRm`
