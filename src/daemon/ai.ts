@@ -751,21 +751,22 @@ async function codex(o: Opts) {
 // a removal the AI asked about, or an extension to turn on, done here when the user picks Yes (the AI itself never does)
 export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct; chat?: string }) {
   const t = asking(p.chat) // the chat whose ask is at work
-  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }) } : undefined
+  if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
-  const text = act ? (on ? turnOn(act, on.text) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
   if (options.length < 2) throw new Error('2 to 6 options')
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -795,7 +796,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   m.ask.picked = pick
   say(t, 'user', pick)
   const on = act.kind === 'widget'
-  if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : `Kept ${act.label}.`), { kept: true }
+  if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : act.kind === 'run' ? 'Not run.' : `Kept ${act.label}.`), { kept: true }
   // only what they were shown: its files may have changed since (an agent's write, a save, a source set). Then the
   // question again, as it reads now
   const now = on ? widgetWhat(act.id) : undefined
@@ -811,6 +812,11 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
       say(t, 'ai', `Turned on ${act.label}.`)
       return { on: true }
     }
+    if (act.kind === 'run') {
+      await runAct(act, rpc)
+      say(t, 'ai', `Ran it in ${act.label}.`)
+      return { ran: true }
+    }
     await remove(act, rpc)
     say(t, 'ai', `Removed ${act.label}.`)
     return { removed: true }
@@ -820,6 +826,21 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   }
 }
 const turnOn = (a: AiAct, what: string) => `Turn on ${a.label}? ${what}`
+// a command in a shell (laki_run, laki_shell's run): shown as it will run, in a fence longer than any it has
+const RUN_MAX = 4000
+function runIn(a: AiAct) {
+  const fence = '`'.repeat(Math.max(3, ...[...(a.text ?? '').matchAll(/`+/g)].map(m => m[0].length + 1)))
+  const ws = state.workspaces.find(w => w.id === state.tabs.find(x => x.id === a.id)?.workspace)
+  return `Run this in ${a.label}${ws ? ` (${ws.name ?? ws.id})` : ''}?\n\n${fence}sh\n${a.text}\n${fence}`
+}
+// the user's Yes: the shell checked again (still at its prompt), the line cleared (⌃E ⌃U), the command and Enter
+async function runAct(a: AiAct, rpc: Rpc) {
+  const t = (await rpc<View>('state')).tabs.find(x => x.id === a.id)
+  if (!t || t.kind !== 'shell' || t.status === 'exited') throw new Error('that shell is gone')
+  if (t.status === 'running' || t.runs) throw new Error(`${t.name} is running something now: not run`)
+  await rpc('input', { tab: t.id, data: '\x05\x15' })
+  await rpc('send', { target: t.id, text: a.text })
+}
 // what a removal would take, in words, from Laki's own state
 function whatOf(a: AiAct) {
   const cut = (t: string) => `“${t.length > 80 ? `${t.slice(0, 79)}…` : t}”`
@@ -827,8 +848,8 @@ function whatOf(a: AiAct) {
     const x = state.schedules?.find(x => x.id === a.id)
     return x && `the scheduled task ${cut(x.name || x.prompt)}`
   }
-  if (a.kind === 'tab') {
-    const x = state.tabs.find(x => x.id === a.id)
+  if (a.kind === 'tab' || a.kind === 'run') {
+    const x = state.tabs.find(x => x.id === a.id && (a.kind === 'tab' || x.kind === 'shell'))
     return x && `the tab ${cut(x.name)}`
   }
   if (a.kind === 'todo') {

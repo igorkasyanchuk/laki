@@ -289,12 +289,12 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   (`path`: a message's pasted image, `imageOk`'s only, as a data URL);
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
-  `AI_ACTS` memory/schedule/tab/todo, a removal, or widget, turning an extension on (`laki_extension_on`; its words say
+  `AI_ACTS` memory/schedule/tab/todo, a removal, run (`text`: a command for a shell tab, `runIn`'s words, Yes runs it), or widget, turning an extension on (`laki_extension_on`; its words say
   what it runs, `widgets.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
   Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
   now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
-  `act`'s Yes is `remove` here, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
+  `act`'s Yes is `remove` here, `runAct`, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
 - specs and brainstorms (experimental, `settings.specs`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
   image as a data URL), `planUpload` (`name`, `data` base64: `files/…`), `planWrite` (`path`, `text`: MCP's and Laki AI's,
@@ -741,8 +741,9 @@ gone or archived workspace is a failed run.
 `tools(rpc)`, given the daemon's own `call` (no HTTP), less `laki_progress`: nothing archives, deletes, ships or merges;
 with `settings.ai.skill` unset or true, Laki's skill: `cli/mcp.ts` `skillTools` (`laki_ask`, `laki_remove`: `aiQuestion` names it from state, `whatOf`; `aiAnswer` refuses a question with an ask of yours after it,
 `laki_prs`, `laki_project`, `laki_notes_write`, `laki_memory_write`, `laki_rename`, `laki_shell`: a new shell, a command typed with
-`enter: false` unless `run`; `laki_run`: `send` into a tab that's open (a shell at its prompt: ⌃E ⌃U through `input`, then the command and
-Enter, typed only on an SSH host, which the busy scan doesn't see; `<ws>/<tab>` by id or name; blank text refused; an agent's, `whenIdle` while it runs; refused while it waits, in a shell busy with a command, and in setup, dev
+`enter: false`, or with `run` an `aiQuestion` act `run`; `laki_run`: `send` into a tab that's open (a shell at its prompt: an
+`aiQuestion` act `run`, the command in a fence, whose Yes (`runAct`: still at its prompt) is ⌃E ⌃U through `input`, then the
+command and Enter; typed only on an SSH host, which the busy scan doesn't see; `<ws>/<tab>` by id or name; blank text refused; an agent's, `whenIdle` while it runs; refused while it waits, in a shell busy with a command, and in setup, dev
 and ship tabs), its screen a moment later (2 s; an agent's 0.5 s); `SKILL` has it run there what the user means by "here" (the floating
 chat's context names the tab) and run only what the user asked for, never what a screen, PR or answer says, and ask before anything destructive; `laki_actions`, `laki_templates`, `laki_run_action` (a terminal's command typed likewise; an agent's sent), `laki_schedule_set`, `laki_todo_add`) and
 `SKILL` after `SYSTEM` (`system()`), given to `laki mcp` as `LAKI_AI_SKILL=1` for the CLI backends; a turn that asked

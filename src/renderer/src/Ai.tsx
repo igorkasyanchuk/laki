@@ -531,7 +531,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
             {m.ask.options.map((o, n) => (
               <button
                 key={o}
-                className={m.ask!.picked === o ? 'picked' : m.ask!.act && m.ask!.act.kind !== 'widget' && n === 0 ? 'danger' : m.ask!.perm && n === 0 && m.ask!.picked === undefined ? 'primary' : ''}
+                className={m.ask!.picked === o ? 'picked' : m.ask!.act && m.ask!.act.kind !== 'widget' && m.ask!.act.kind !== 'run' && n === 0 ? 'danger' : m.ask!.perm && n === 0 && m.ask!.picked === undefined ? 'primary' : ''}
                 disabled={(busy && !m.ask!.perm) || m.ask!.picked !== undefined} /* a tool its agent asks for: while it works */
                 aria-pressed={m.ask!.picked === o}
                 onClick={() => onPick(m.ask!.id, n)}

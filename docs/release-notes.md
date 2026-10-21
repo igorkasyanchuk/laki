@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Laki AI shows you a command before it runs in a shell, with *Yes, run it* / *No*: it no longer runs one on its own.
+  Typed for you (Enter yours) and messages to agents need no Yes.
 - An agent's `laki new` and `laki tab` (and MCP's) can't start a command of its own (`--cmd`, a command preset): only
   an agent or a shell. Yours still can.
 - Extensions: an agent's event (`laki widget emit` in its tab, Laki AI's) only makes extensions fetch again; it no

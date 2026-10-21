@@ -496,7 +496,8 @@ closing one is a question you answer, as below), your actions (*start the review
 this screenshot, a workspace each*; a terminal's command is typed, for you to run) and prompt templates for new
 workspaces. When it isn't sure, it asks with a few options as buttons: a click answers, and it goes on (until you ask
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
-through such a question: *Yes, remove…* is yours to press, and Laki does it. Ask it for an extension
+through such a question: *Yes, remove…* is yours to press, and Laki does it. A command for a shell too: it shows you
+the command and the tab, and *Yes, run it* runs it there. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
 so you look and turn it on in Settings › Extensions (*by Laki AI* on its row), or it asks you in the chat, with what it
 runs, and *Yes, turn it on* does it; the chat on an extension's page has it rewrite one of yours the same way. It

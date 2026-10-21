@@ -472,8 +472,8 @@ export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: 
 // tool (claude's permission prompt, ai.ts' aiPermission), answered while it works: AI_PERM's options
 export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct; perm?: boolean }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
-export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget'] as const // widget: turning an extension on, the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string } // hash: an extension's files as asked about (widgets.ts filesHash): a Yes needs them still
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); the rest a removal
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgets.ts filesHash): a Yes needs them still; text: run's command
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
