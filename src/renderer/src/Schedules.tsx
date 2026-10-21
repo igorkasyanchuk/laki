@@ -3,7 +3,7 @@
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
-import type { WorkflowItem, WorkflowSource } from '../../shared/workflow'
+import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
 import { ask, Icon, IconButton, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
@@ -29,7 +29,7 @@ export const soon = (t: number, now = Date.now()) => {
   const d = Math.round(m / 60 / 24)
   return m < 1 ? 'now' : m < 60 ? `in ${m} min` : h < 24 ? `in ${h} h` : d === 1 ? 'in a day' : `in ${d} days`
 }
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: WorkflowSource; widget?: string; action?: string } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument)
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument)
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -158,7 +158,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       [
         { head: 'Agent' },
         ...(agents.includes(form.preset) ? agents : [...agents, form.preset]).map(a => ({ label: a, icon: 'agent', hint: !form.workflow && !form.widget && form.preset === a ? ON : undefined, run: () => set({ preset: a, workflow: undefined, source: undefined, widget: undefined, action: undefined }) }) as MenuItem), // its own, if switched off since
-        ...(runnable.length ? [null, { head: 'Workflow' }, ...runnable.map(w => ({ label: w.name, sub: w.source === 'project' ? 'the project’s' : 'yours', icon: 'flow', hint: form.workflow === w.id ? ON : undefined, run: () => set({ workflow: w.id, source: w.source, widget: undefined, action: undefined }) }) as MenuItem)] : []),
+        ...(runnable.length ? [null, { head: 'Workflow' }, ...runnable.map(w => ({ label: w.name, sub: w.source === 'project' ? 'the project’s' : 'yours', icon: 'flow', hint: form.workflow === w.id ? ON : undefined, run: () => set({ workflow: w.id, source: w.source === 'project' ? 'project' : 'yours', widget: undefined, action: undefined }) }) as MenuItem)] : []),
         ...(exts.length ? [null, { head: 'Extension' }, ...exts.map(x => ({ label: x.name, sub: x.on ? undefined : 'off: runs once it’s on', icon: 'panel', hint: form.widget === x.id ? ON : undefined, items: [...(x.every !== undefined ? [{ label: 'Fetch it', sub: 'its data, now', icon: 'refresh', hint: form.widget === x.id && !form.action ? ON : undefined, run: () => pickExt(x.id) } as MenuItem] : []), ...(x.actions ?? []).map(a => ({ label: a, sub: 'one of its actions', icon: 'run', hint: form.widget === x.id && form.action === a ? ON : undefined, run: () => pickExt(x.id, a) }) as MenuItem)] }) as MenuItem)] : []),
       ],
       'right',

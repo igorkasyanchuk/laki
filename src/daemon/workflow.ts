@@ -9,6 +9,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { agentVars, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
@@ -41,9 +42,13 @@ export const on = () => {
   if (!flowsOn(state.settings)) throw new Error('Workflows are off: turn them on in Settings › General › Pages')
 }
 
-// ---------- workflows: yours (<data>/workflows), a project's (.laki/workflows in its folder); none come with Laki
+// ---------- workflows: yours (<data>/workflows), a project's (.laki/workflows in its folder), and the templates that
+// come with Laki (the repo's workflows/, next to out/ when built: read only, never run, Use this… copies one)
 
 const yoursDir = () => join(dir, 'workflows')
+const here = dirname(fileURLToPath(import.meta.url))
+const BUILTIN = [join(here, '../../workflows'), join(here, '../workflows')].find(d => existsSync(d))
+const template = (name: string) => new Error(`${name} is a template: Use this… in Workflows copies it, then run or change the copy`)
 const projectDir = (p: Project) => join(p.path, '.laki', 'workflows')
 const usable = (p: Project) => !p.kind && !p.host // ponytail: not an SSH host's repo (its files are there)
 
@@ -125,6 +130,7 @@ export function flowList(o: { project?: string } = {}): WorkflowItem[] {
   return [
     ...readDir(yoursDir(), 'yours'),
     ...state.projects.filter(p => usable(p) && (!only || p.id === only)).flatMap(p => readDir(projectDir(p), 'project', p.id)),
+    ...(BUILTIN ? readDir(BUILTIN, 'builtin') : []),
   ]
 }
 
@@ -132,6 +138,7 @@ type Ref = { id: string; source?: WorkflowSource; project?: string }
 // a file's folder: yours, or the project's (its id checked: never a path)
 function fileOf(o: Ref) {
   if (!ID.test(String(o.id ?? ''))) throw new Error(`${o.id}? a workflow's id: letters, digits, - _`)
+  if (o.source === 'builtin') throw template(o.id)
   if (o.source === 'project') {
     const p = findProject(String(o.project ?? ''))
     if (!usable(p)) throw new Error(`${p.name} can't keep workflows (Terminals, Browsers and SSH hosts can't)`)
@@ -148,6 +155,11 @@ export function flowFind(o: Ref): WorkflowItem {
     const all = flowList(o.project ? { project: o.project } : {})
     const hit = all.find(w => w.id === o.id && w.source === 'project') ?? all.find(w => w.id === o.id)
     if (!hit) throw new Error(`no workflow ${o.id}`)
+    return hit
+  }
+  if (o.source === 'builtin') {
+    const hit = ID.test(String(o.id ?? '')) && BUILTIN ? readDir(BUILTIN, 'builtin').find(w => w.id === o.id) : undefined
+    if (!hit) throw new Error(`no template ${o.id}`)
     return hit
   }
   const f = fileOf(o)
@@ -407,6 +419,7 @@ export async function flowStart(o: Start) {
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
+  if (wf.source === 'builtin') throw template(wf.name)
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
   // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
@@ -1444,7 +1457,7 @@ let listening: { at: number; files: number; list: WorkflowItem[] } | undefined
 eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
   const out = { flows: [] as string[], refused: [] as string[] }
   if (!flowsOn(state.settings)) return out
-  if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on) } // ponytail: the files read again every 10 s, not at each event
+  if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on && w.source !== 'builtin') } // ponytail: the files read again every 10 s, not at each event
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
   for (let wf of listening.list) {
     if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname, join } from 'node:path'
@@ -157,13 +157,14 @@ end: failed
 test('workflow runs: on unless turned off, a worktree each, agents, commands, choices, asks, saves, a dry run’s actions', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  assert.deepEqual(await rig.rpc('flowList', {}), [], 'a fresh state: on with no setting, none come with Laki')
+  const own = async () => (await rig.rpc('flowList', {})).filter((w: any) => w.source !== 'builtin') // the templates aside
+  assert.deepEqual(await own(), [], 'a fresh state: on with no setting, only the templates')
   assert.equal(typeof (await rig.rpc('state')).flowFiles, 'number', 'the view has them')
   await rig.rpc('settingsSet', { workflows: false })
   await assert.rejects(rig.rpc('flowList', {}), /Workflows are off: turn them on in Settings › General › Pages/)
   assert.equal((await rig.rpc('state')).flowFiles, undefined)
   await rig.rpc('settingsSet', { workflows: true })
-  assert.deepEqual(await rig.rpc('flowList', {}), [])
+  assert.deepEqual(await own(), [])
 
   // yours, and a project's (in its repo); a built-in is read-only; a run refuses one with problems
   await rig.rpc('flowSave', { id: 'test', text: FLOW })
@@ -172,7 +173,7 @@ test('workflow runs: on unless turned off, a worktree each, agents, commands, ch
   const list = await rig.rpc('flowList', { project: p.id })
   assert.deepEqual(list.find((w: any) => w.id === 'broken').problems, ['Start: next goes to nowhere, which isn\'t a block'])
   assert.equal(list.find((w: any) => w.id === 'broken').path, join(p.path, '.laki', 'workflows', 'broken.md'))
-  await assert.rejects(rig.rpc('flowSave', { id: 'x', source: 'builtin', text: 'x' }), /builtin\? a workflow is yours or a project's/)
+  await assert.rejects(rig.rpc('flowSave', { id: 'x', source: 'builtin', text: 'x' }), /x is a template: Use this…/)
   await assert.rejects(rig.rpc('flowSave', { id: '../x', text: 'x' }), /a workflow's id/)
   await assert.rejects(rig.rpc('flowStart', { workflow: 'broken', project: p.id, task: 'x' }), /Broken can't run: Start: next goes to nowhere/)
   await assert.rejects(rig.rpc('flowStart', { workflow: 'test', source: 'yours', project: p.id }), /a task/)
@@ -266,7 +267,7 @@ test('workflow runs: a block past its max asks you, Try again or Stop; at once; 
 
   // the CLI
   const ls = await rig.cli('flow')
-  assert.match(ls.out, /^fails  yours  Fails$/m)
+  assert.match(ls.out, /^fails  yours  Fails  2 runs, 0% ok$/m) // its stats
   assert.match(ls.out, new RegExp(`^${ok.id}  done  Agents: x$`, 'm'))
   assert.match((await rig.cli('flow', 'show', run.id)).out, /^Fails: x  stopped\n\nStart → next: started$/m)
 })
@@ -2065,6 +2066,70 @@ test('workflow stats: runs tallied; 5 failed runs in a row that started by thems
   // deleted: its tally goes
   await rig.rpc('flowRm', { id: 'flaky' })
   await until(() => !JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).flowStats?.['yours::flaky'], 'its stats gone')
+})
+
+test('templates (workflows/): each checks; listed last, never untrusted; save, delete, history, start and schedule refuse them; an event they name starts nothing; Use this copies one that listens', async t => {
+  const dir = join(dirname(new URL(import.meta.url).pathname), '../workflows')
+  const files = readdirSync(dir).filter(f => f.endsWith('.md'))
+  assert.equal(files.length, 6)
+  for (const f of files) {
+    const { workflow, problems } = parse(readFileSync(join(dir, f), 'utf8'), f.slice(0, -3))
+    assert.deepEqual([...problems, ...check(workflow)], [], f)
+    assert.ok(workflow.blocks.length >= 4 && workflow.blocks.length <= 8, `${f}: 4 to 8 blocks`)
+    assert.ok(!workflow.blocks.some(b => b.kind === 'llm' || b.kind === 'decide'), `${f}: no AI blocks`)
+  }
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = (head: string, state: string) => writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state, url: 'https://github.com/o/r/pull/7', title: 'Fix it', headRefOid: head, statusCheckRollup: [] }))
+  pr('aaa', 'OPEN')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const list = await rig.rpc('flowList')
+  const tpl = list.filter((w: any) => w.source === 'builtin')
+  assert.deepEqual(tpl.map((w: any) => w.id).sort(), ['feature-to-pr', 'fix-ci', 'nightly-deps', 'release-notes', 'review-pr', 'triage-issue'])
+  assert.equal(list.at(-1).source, 'builtin', 'listed last')
+  assert.ok(tpl.every((w: any) => !w.untrusted && !w.problems.length))
+  await assert.rejects(rig.rpc('flowSave', { id: 'fix-ci', source: 'builtin', text: '# x' }), /fix-ci is a template: Use this…/)
+  await assert.rejects(rig.rpc('flowRm', { id: 'fix-ci', source: 'builtin' }), /template/)
+  await assert.rejects(rig.rpc('flowHistory', { id: 'fix-ci', source: 'builtin' }), /template/)
+  await assert.rejects(rig.rpc('flowTrust', { id: 'fix-ci', source: 'builtin', project: p.id, text: '' }), /no workflow fix-ci/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'triage-issue', source: 'builtin', project: p.id, inputs: { issue: '1' }, editor: true }), /Triage an issue is a template/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'triage-issue', project: p.id, inputs: { issue: '1' } }), /template/, 'no source: found as a template, still refused')
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, workflow: 'nightly-deps', prompt: 'bump', when: 'every day at 2am' }), /Nightly dependency bumps is a template/)
+  assert.equal(tpl.find((w: any) => w.id === 'release-notes').on, 'pr.merged')
+
+  // pr.merged, which release-notes names: no run
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const st = (s: string) => until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr?.state === s, s)
+  await st('OPEN')
+  await sleep(1200) // the first scan only notes it
+  pr('aaa', 'MERGED')
+  await st('MERGED')
+  await sleep(1500)
+  assert.deepEqual((await rig.rpc('state')).flows ?? [], [], 'a template never starts')
+
+  // Use this: a copy of yours, as the app's sheet makes it (flowSave), listens from then on
+  const t0 = tpl.find((w: any) => w.id === 'release-notes')
+  const mine = await rig.rpc('flowSave', { id: 'release-notes', text: t0.text })
+  assert.equal(mine.source, 'yours')
+  assert.equal(mine.on, 'pr.merged')
+  pr('bbb', 'OPEN')
+  await st('OPEN')
+  await sleep(1200)
+  pr('bbb', 'MERGED')
+  const run = await until(async () => (await rig.rpc('state')).flows?.find((r: any) => r.workflow === 'release-notes'), 'the copy starts on pr.merged')
+  assert.equal(run.source, 'yours')
+  await rig.rpc('flowStop', { id: run.id })
+  // without events: no on:, and it still checks; a project's copy is trusted (you read it on its sheet)
+  const off = parse(toFile({ ...t0, on: undefined, when: undefined }), 'fix-ci').workflow
+  assert.equal(off.on, undefined)
+  assert.deepEqual(check(off), [])
+  const fix = tpl.find((w: any) => w.id === 'fix-ci')
+  const copy = await rig.rpc('flowSave', { id: 'fix-ci', source: 'project', project: p.id, text: fix.text })
+  assert.equal(copy.untrusted, undefined)
+  assert.deepEqual(copy.when, ['event.pr.draft equals "false"'])
+  const cli = await rig.cli('flow', 'check', dir)
+  assert.equal(cli.code, 0, cli.out + cli.err)
 })
 
 test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {

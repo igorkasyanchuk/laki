@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: six templates come with Laki (fix CI, review a PR, feature to PR, triage an issue, nightly dependency
+  bumps, release notes), under *Start from a template*; *Use this…* copies one into yours or a project's.
 - Workflows: each row shows its runs, success rate, median time and AI cost; one that starts by itself and fails 5
   times in a row pauses, with *Turn on again* (`laki flow on`).
 - Workflows: a repo's workflow that isn't allowed yet (or changed since) tells you the first time an event or its

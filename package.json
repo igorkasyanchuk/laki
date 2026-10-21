@@ -66,6 +66,7 @@
     "files": [
       "out/**/*",
       "widgets/**/*",
+      "workflows/**/*",
       "package.json"
     ],
     "asar": false,

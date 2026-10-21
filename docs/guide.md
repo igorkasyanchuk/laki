@@ -1176,7 +1176,17 @@ the same name. Laki AI works on the Workflows page too: in a workflow, ✦ (or t
 chat button) opens its chat with the workflow in every ask (the file, your unsaved changes): ask it to add or change a
 step, it writes the workflow, you read it and *Save*.
 
-None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
+Six templates come with Laki, under *Start from a template* (the page's main content until you have a workflow of your
+own; *New workflow* ▾ › *From a template…* too): *Fix CI* (on `pr.checks.failed`, not on drafts: an agent fixes, pushes
+and waits for CI, three tries, then it's yours), *Review a PR* (an agent in plan mode reviews the workspace's PR; you
+approve it or post the review as a comment), *Feature to PR* (plan, you approve, build, tests with two retries, a PR, its
+checks), *Triage an issue* (`inputs: issue:number`: what it is, how big, where to start, saved to Artifacts), *Nightly
+dependency bumps* (bump, test, a PR: schedule it) and *Release notes* (on `pr.merged`, saved to Artifacts). A template
+opens read only on the canvas; *Use this…* copies it into yours or a project's (its id `-2` when taken), and from then
+on the copy is yours: change it, run it, and its `on:` starts it (untick *Start on events* to leave that line out). A
+template never runs, starts on an event or a schedule, or saves itself; `laki flow ls` lists them as `template`.
+
+*New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
 `.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). A
 project's workflow that came with the repo (git brought it, or it changed since) is *not allowed*: events, schedules
 and agents don't start it until you Save it in its editor or *Allow…* it (which shows the file). Its banner says the

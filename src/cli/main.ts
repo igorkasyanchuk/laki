@@ -441,7 +441,7 @@ async function main() {
         const list: WorkflowItem[] = await rpc('flowList', {})
         const runs: FlowView[] = (await rpc('state')).flows ?? []
         return out({ workflows: list.map(({ text, blocks, ...w }) => w), runs }, [
-          ...list.map(w => `${w.id}  ${w.source === 'project' ? `${w.project}'s` : w.source}  ${w.name}${w.stats ? `  ${w.stats.runs} runs${w.stats.ok !== undefined ? `, ${Math.round(w.stats.ok * 100)}% ok` : ''}` : ''}${w.stats?.paused ? `  paused: ${w.stats.paused.why}` : ''}${w.problems.length ? `  ⚠ ${w.problems[0]}` : ''}`),
+          ...list.map(w => `${w.id}  ${w.source === 'project' ? `${w.project}'s` : w.source === 'builtin' ? 'template' : w.source}  ${w.name}${w.stats ? `  ${w.stats.runs} runs${w.stats.ok !== undefined ? `, ${Math.round(w.stats.ok * 100)}% ok` : ''}` : ''}${w.stats?.paused ? `  paused: ${w.stats.paused.why}` : ''}${w.problems.length ? `  ⚠ ${w.problems[0]}` : ''}`),
           ...(runs.length ? ['', ...runs.map(r => `${r.id}  ${status(r)}  ${r.name}: ${r.task}`)] : []),
         ].join('\n'))
       }

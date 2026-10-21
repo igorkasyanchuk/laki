@@ -85,6 +85,9 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
     setMaking(false)
   }
   const flows = [...(view.flows ?? [])].sort((a, b) => Number(ended(a)) - Number(ended(b)) || b.started - a.started)
+  const mine = list?.filter(w => w.source !== 'builtin') ?? null
+  const templates = list?.filter(w => w.source === 'builtin') ?? []
+  const [using, setUsing] = useState<WorkflowItem | null>(null) // a template's Use this… sheet
   const pname = (id?: string) => projects.find(p => p.id === id)?.name ?? id ?? ''
   const cur = at.kind === 'wf' ? list?.find(w => same(at.sel, w)) : undefined
   const run = at.kind === 'run' ? flows.find(r => r.id === at.id) : undefined
@@ -118,6 +121,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
           ...projects.filter(p => !p.host).map((p): MenuItem => ({ label: p.name, sub: 'In its repo: .laki/workflows', icon: 'fork', run: () => create({ source: 'project', project: p.id }) })),
         ],
       },
+      ...(templates.length ? [{ label: 'From a template…', sub: 'One that comes with Laki, to copy and change', icon: 'flow', items: [{ head: 'Templates' }, ...templates.map((t): MenuItem => ({ label: t.name, sub: t.desc, icon: 'flow', run: () => setAt({ kind: 'wf', sel: t }) }))] } as MenuItem] : []),
       ...(api.ai ? [{ label: 'With Laki AI…', sub: 'Say what it should do: it asks a few questions, then writes it', icon: 'ai', run: () => setMaking(true) } as MenuItem] : []),
     ])
   const wfMenu = (e: React.MouseEvent, w: WorkflowItem) =>
@@ -200,11 +204,11 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               <IconButton icon="x" title="Don't open it" onClick={() => setAwaiting(null)} />
             </div>
           )}
-          {(list?.length || flows.length) > 0 && (
+          {(mine?.length || flows.length) > 0 && (
             <div className="sched-stats">
               <div>
-                <b>{list?.length ?? '—'}</b>
-                <span>{list?.length === 1 ? 'workflow' : 'workflows'}</span>
+                <b>{mine?.length ?? '—'}</b>
+                <span>{mine?.length === 1 ? 'workflow' : 'workflows'}</span>
               </div>
               <div>
                 <b>{going.length}</b>
@@ -227,16 +231,38 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
             </div>
           )}
 
+          {templates.length > 0 && (
+            <section>
+              <div className="sched-head">
+                <h3>Start from a template</h3>
+                {!mine?.length && <span className="muted small">No workflows yet: open one, then Use this… makes it yours</span>}
+              </div>
+              <div className={`wf-templates${mine?.length ? '' : ' big'}`}>
+                {templates.map(t => (
+                  <button key={t.id} type="button" className="wf-template" onClick={() => setAt({ kind: 'wf', sel: t })}>
+                    <b>{t.name}</b>
+                    <span className="muted small">{t.desc}</span>
+                    <span className="wf-strip" aria-label={t.blocks.map(b => BLOCK_NAMES[b.kind]).join(', ')}>
+                      {t.blocks.map(b => (
+                        <i key={b.id} data-tip={`${BLOCK_NAMES[b.kind]}: ${blockName(b)}`} style={{ ['--kc' as string]: `var(--tc-${KIND_COLOR[b.kind]})` }} />
+                      ))}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section>
             <div className="sched-head">
               <h3>Workflows</h3>
-              {!!list?.length && <span className="muted small">{list.length}</span>}
+              {!!mine?.length && <span className="muted small">{mine.length}</span>}
             </div>
-            {list === null ? (
+            {mine === null ? (
               <p className="muted small">Loading…</p>
-            ) : list.length ? (
+            ) : mine.length ? (
               <div className="sched-list">
-                {list.map(w => {
+                {mine.map(w => {
                   const n = going.filter(r => runOf(r, w)).length
                   return (
                     <div key={`${w.source}/${w.project}/${w.id}`} className="sched-row">
@@ -275,7 +301,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                 <Icon name="flow" size={18} />
                 <span>
                   <b>No workflows yet</b>
-                  <span className="muted small">Like “plan, ask me, build, test, review, open a PR”. New workflow makes one; Laki AI and your agents can write one too.</span>
+                  <span className="muted small">Like “plan, ask me, build, test, review, open a PR”. New workflow makes one, or start from a template; Laki AI and your agents can write one too.</span>
                 </span>
               </div>
             )}
@@ -347,12 +373,14 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               onOpenRun={id => setAt({ kind: 'run', id })}
               onCopy={() => create(intoOf(cur), cur)}
               onTurnOn={() => turnOn(cur)}
+              onUse={() => setUsing(cur)}
             />
           ) : (
             <div className="wf-empty">{list === null ? 'Loading…' : 'That workflow is gone.'}</div>
           )}
         </div>
       )}
+      {using && <UseTemplate item={using} projects={projects} list={list ?? []} api={api} onClose={() => setUsing(null)} onMade={w => (setUsing(null), refresh(), setAt({ kind: 'wf', sel: w }))} />}
       {starting && <StartRun item={starting} projects={projects} presets={presets} workspaces={view.workspaces} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
       {menu}
     </Page>
@@ -628,7 +656,8 @@ function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, on
 
 // ---------- the editor: canvas and inspector, or the file
 
-function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy, onTurnOn }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void }) {
+function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy, onTurnOn, onUse }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void; onTurnOn: () => void; onUse: () => void }) {
+  const ro = item.source === 'builtin' // a template: looked at here, changed in a copy (Use this…)
   const [text, setText] = useState(drafts.get(keyOf(item)) ?? item.text)
   const [mode, setMode] = useState<'canvas' | 'file'>('canvas')
   const [pick, setPick] = useState<string | null>(null)
@@ -646,7 +675,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
   const seen = useRef(item.text)
   // ⌘Z: the file before each change on the canvas or in the inspector, a Discard or a file taken from disk (the last 50)
   const past = useRef<string[]>([])
-  const replace = (next: string) => next !== text && ((past.current = [...past.current.slice(-49), text]), setText(next))
+  const replace = (next: string) => !ro && next !== text && ((past.current = [...past.current.slice(-49), text]), setText(next))
   useEffect(() => {
     if (item.text === seen.current) return
     const was = seen.current
@@ -667,6 +696,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
   }
   // blocks out (never the start): the picked one, or the ones picked together
   const remove = (ids: string[]) => {
+    if (ro) return
     const out = ids.filter(id => wf.blocks.some(b => b.id === id && b.kind !== 'start'))
     if (!out.length) return
     edit(w => out.forEach(id => dropBlock(w, id)))
@@ -682,7 +712,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
     else if (e.metaKey && e.key === 'a') e.preventDefault(), setMany(wf.blocks.map(b => b.id)), setPick(null)
     else if (e.key === 'Escape' && picked.length) e.preventDefault(), setMany([]), setPick(null)
   }
-  const save = () => api.call<WorkflowItem>('flowSave', { id: item.id, source: item.source, project: item.project, text }).then(onSaved, e => api.toast((e as Error).message))
+  const save = () => ro ? undefined : api.call<WorkflowItem>('flowSave', { id: item.id, source: item.source, project: item.project, text }).then(onSaved, e => api.toast((e as Error).message))
   // a repo's (.laki/workflows) not allowed as it is: the file, then Allow (or Save it here: you've read it)
   const trust = async () => {
     const say = `Events, schedules and agents start it only once you allow it as it is (an edit asks again). Its commands, webhooks and agents run on this Mac.\n\n${item.text}`
@@ -776,8 +806,9 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
       <div className="wf-head">
         <div className="wf-title">
           <b>{wf.name}</b>
-          <span className="wf-src">{item.source === 'yours' ? 'yours' : `${projects.find(p => p.id === item.project)?.name ?? item.project} · .laki/workflows/${item.id}.md`}</span>
+          <span className="wf-src">{item.source === 'yours' ? 'yours' : ro ? 'a template that comes with Laki' : `${projects.find(p => p.id === item.project)?.name ?? item.project} · .laki/workflows/${item.id}.md`}</span>
           {wf.desc && <span className="wf-desc">{wf.desc}</span>}
+          {ro && <span className="wf-agent">A template: Use this… copies it into yours or a project's, where you change it and run it{wf.on ? <>; the copy starts on <code>{wf.on}</code></> : ''}</span>}
           {item.byAgent && <span className="wf-agent">An agent wrote it: read it, then Save it. Until then only Start here runs it (no schedule, event or agent)</span>}
           {item.untrusted && !item.byAgent && (
             <span className="wf-agent">
@@ -790,6 +821,12 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
           <button className={mode === 'canvas' ? 'on' : ''} onClick={() => setMode('canvas')}>Blocks</button>
           <button className={mode === 'file' ? 'on' : ''} onClick={() => setMode('file')}>File</button>
         </div>
+        {ro ? (
+          <button className="btn primary" onClick={onUse} data-tip="A copy of it, yours or a project's: change it and run it there">
+            Use this…
+          </button>
+        ) : (
+          <>
         {dirty && (
           <button className="btn" onClick={() => replace(item.text)} data-tip="Back to the saved file (⌘Z: your changes again)">
             Discard
@@ -817,9 +854,11 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         <button className="btn primary" disabled={problems.length > 0 || dirty} onClick={onRun} data-tip={problems[0] ?? (dirty ? 'Save it first' : 'Start a run')}>
           <Icon name="run" size={12} /> Run
         </button>
+          </>
+        )}
       </div>
       <div className="wf-bar">
-        {where}
+        <fieldset className="wf-ro" disabled={ro}>{where}</fieldset>
         {problems.length > 0 && (
           <span className="wf-problems" data-tip={problems.join('\n')}>
             {problems.length === 1 ? problems[0] : `${problems[0]} · ${problems.length - 1} more`}
@@ -828,7 +867,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
       </div>
       {mode === 'canvas' ? (
         <div className="wf-split">
-          <Palette wf={wf} actions={actions} presets={presets} full={wf.blocks.length >= MAX_BLOCKS} pick={pick} onAdd={(k, more) => addBlock(k, more)} toast={api.toast} edit={edit} api={api} />
+          {!ro && <Palette wf={wf} actions={actions} presets={presets} full={wf.blocks.length >= MAX_BLOCKS} pick={pick} onAdd={(k, more) => addBlock(k, more)} toast={api.toast} edit={edit} api={api} />}
           <Canvas wf={wf} sel={pick} many={many} onPick={setPick} onMany={setMany} onKey={onKey} onMove={moves => edit(w => moves.forEach(([id, at]) => (b => b && (b.at = at))(w.blocks.find(b => b.id === id))))} onMenu={(e, id) => openMenu(e, blockActions(id))} onDrop={(k, more, at) => addBlock(k, more, pick, at)} doomed={doomed} />
           {many.length > 1 ? (
             <div className="wf-insp">
@@ -844,12 +883,14 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
               <p className="wf-hint">⌘Z brings back what you deleted; Discard goes back to the saved file.</p>
             </div>
           ) : (
-            <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} stats={item.stats} onTurnOn={onTurnOn} />
+            <fieldset className="wf-ro" disabled={ro}>
+              <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} stats={item.stats} onTurnOn={onTurnOn} />
+            </fieldset>
           )}
         </div>
       ) : (
         <div className="wf-file">
-          <FileEdit text={text} onText={setText} />
+          <FileEdit text={text} onText={ro ? () => {} : setText} />
           <details className="wf-format">
             <summary>The format</summary>
             <Markdown src={FORMAT_HELP} />
@@ -1912,6 +1953,54 @@ function TestBlock({ b, api, project, own }: { b: Block; api: WorkflowsApi; proj
         </div>
       )}
     </details>
+  )
+}
+
+// a template copied: yours (the default) or a project's, its id free there (-2…), as the user's own file (a project's
+// trusted: you read it here); unticked Start on events drops its on: and only when: lines
+function UseTemplate({ item, projects, list, api, onClose, onMade }: { item: WorkflowItem; projects: Project[]; list: WorkflowItem[]; api: WorkflowsApi; onClose: () => void; onMade: (w: WorkflowItem) => void }) {
+  const [into, setInto] = useState('') // '': yours, else a project's id
+  const [events, setEvents] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const source = into ? 'project' : 'yours'
+  const go = () => {
+    const taken = new Set(list.filter(w => w.source === source && (w.project ?? '') === into).map(w => w.id))
+    let id = item.id
+    for (let n = 2; taken.has(id); n++) id = `${item.id}-${n}`
+    const text = item.on && !events ? toFile({ ...item, on: undefined, when: undefined }) : item.text
+    setBusy(true)
+    api.call<WorkflowItem>('flowSave', { id, source, ...(into && { project: into }), text }).then(onMade, e => (setBusy(false), setErr((e as Error).message)))
+  }
+  return (
+    <div className="overlay" onPointerDown={e => e.target === e.currentTarget && !busy && onClose()}>
+      <form className="modal wf-start" onSubmit={e => (e.preventDefault(), go())} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), onClose())}>
+        <b>Use {item.name}</b>
+        <span className="wf-hint">A copy of it, yours to change and run; the template stays as it is.</span>
+        <label className="wf-field">
+          <span>Where it lives</span>
+          <select autoFocus value={into} onChange={e => setInto(e.target.value)}>
+            <option value="">Yours: in Laki, for any project</option>
+            {projects.filter(p => !p.host && !p.kind).map(p => (
+              <option key={p.id} value={p.id}>{p.name}: in its repo, .laki/workflows</option>
+            ))}
+          </select>
+        </label>
+        {item.on && (
+          <>
+            <Switch className="switch-row" on={events} onChange={setEvents}>
+              Start on events
+            </Switch>
+            <span className="wf-hint">{events ? <>It starts on <code>{item.on}</code> once it's saved{item.when?.length ? ', only when its tests hold' : ''}.</> : 'Without its on: line: you run it, or schedule it.'}</span>
+          </>
+        )}
+        {err && <span className="wf-err">{err}</span>}
+        <div className="wf-start-foot">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={busy}>{busy ? 'Copying…' : 'Use this'}</button>
+        </div>
+      </form>
+    </div>
   )
 }
 

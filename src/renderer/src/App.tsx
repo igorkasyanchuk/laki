@@ -2291,7 +2291,7 @@ export function App() {
   }, [!!view, !dialog])
   // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on)
   const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
-  useEffect(() => void (flowsOn ? call<WorkflowItem[]>('flowList', {}).then(setFlowItems, () => {}) : setFlowItems([])), [flowsOn, view?.flowFiles])
+  useEffect(() => void (flowsOn ? call<WorkflowItem[]>('flowList', {}).then(l => setFlowItems(l.filter(f => f.source !== 'builtin')), () => {}) : setFlowItems([])), [flowsOn, view?.flowFiles])
   // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
   useEffect(() => {
     const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined

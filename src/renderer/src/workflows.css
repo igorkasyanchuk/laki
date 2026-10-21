@@ -243,3 +243,14 @@
 .wf-hist-row.on { background: var(--sel, var(--hover)); }
 .wf-hist-text { margin: 0; padding: 8px 10px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 8px); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: break-word; }
 .narrow .wf-hist { grid-template-columns: 1fr; height: auto; }
+
+/* templates (win 6): a card each, its blocks as a strip of their kinds' colors; a read-only one's fields */
+.wf-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.wf-templates.big { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.wf-template { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); color: var(--fg); cursor: pointer; }
+.wf-template:hover { border-color: var(--accent); }
+.wf-templates.big .wf-template { padding: 16px 18px; min-height: 120px; }
+.wf-template .small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wf-strip { display: flex; gap: 3px; margin-top: auto; padding-top: 4px; }
+.wf-strip i { width: 14px; height: 6px; border-radius: 3px; background: var(--kc); }
+.wf-ro { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }

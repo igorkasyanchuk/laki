@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`. A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`; a workflow's `source` `builtin` (the templates). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -988,7 +988,11 @@ no way out, a loop with no `max` and no ask: Tarjan's; a case's `caseProblems`),
 key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's label is its test, `[var] contains|matches|equals
 "text"` or `else`, last and needed; `holds`, shared with the daemon's `valueOf`: the first that holds is the exit; the daemon's `held` runs `matches` under
 `node:vm`'s 200 ms, as `js`), `MAX_BLOCKS` (100: past it `check` says so), `WORKFLOW_FORMAT` (MCP's words), `FlowRun` and `flowView` (the view's light copy). `daemon/workflow.ts`: the
-sources (none come with Laki: yours `<data>/workflows/<id>.md`, a project's `.laki/workflows/<id>.md`; not a host's), and the
+sources (yours `<data>/workflows/<id>.md`, a project's `.laki/workflows/<id>.md`, not a host's; and `builtin`, the templates
+in the repo's `workflows/` (packaged, `build.files`; `BUILTIN` found like widgets.ts'), listed last: `fileOf` refuses them,
+so `flowSave`, `flowRm`, `flowHistory`/`flowRevert` do, `flowStart` and `scheduleSet` too, the listener's list leaves them out,
+never `untrusted`; the index's *Start from a template* cards, the read-only editor's *Use this…*: `UseTemplate`, a
+`flowSave` copy, its `on:` dropped when *Start on events* is off; App's `flowItems` leave them out), and the
 engine. A run (`state.flows`: live ones and the last 100 ended) copies its workflow (`flow`: pinned), makes its
 workspace (`wsNew` `preset: 'none'`: a worktree named by the task, its `flow` the run's id; or `local`, the folder's
 own) unless it was given one: `flowStart` `ws` (id or name; `project` then the workspace's; `picked`: live, not a
