@@ -2040,7 +2040,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
   the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
-  renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, in one `save`) or gives it
+  renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, under the tiles there, in one `save`) or gives it
   an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
   `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*), a
   head dropped on a tab moves the tile there (`moveTo`: no cell, so under the tiles there), a tile's ⋯ › *Move to tab*
@@ -2048,12 +2048,12 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `deskLayout`: the one dragged or resized first, then the placed ones top to bottom, each pushed down past any it
   overlaps, then the unplaced as CSS grid's sparse flow would, under the placed ones: a gap left stays; Desk's `at` pins
   the tab's tiles where they are before one moves, so a tab never arranged keeps its flow); the head's pointer drag
-  (`move`, 4 px, `track`: capture, Esc, blur, edge scroll; none on a phone's one column, `.narrow`) to the cell under it,
+  (`move`, 4 px, `track`: capture, blur, edge scroll, Esc back where it was; none on a phone's one column, `.narrow`) to the cell under it,
   onto a `[data-desk-tab]`: that tab; every tile of the tab saved in its cell after (`keep`, through `ends`: the tiles
   as they are at the drag's end); rendered in the saved order, placed by `grid-column`/`grid-row`, `order` for a phone's
   one column; the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
   release, a cancel and a release the page never got (outside the window, over its title bar: Chromium drops the
-  capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept); a tile shows the full view when there is
+  capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept; on a phone, its height only); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
   `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskBuild`, a `Modal`: `PromptInput` with `files`, text files

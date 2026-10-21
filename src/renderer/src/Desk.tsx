@@ -99,12 +99,12 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     if (n && n !== tabList.find(t => t.id === id)?.name) saveTabs(tabList.map(t => (t.id === id ? { ...t, name: n } : t)))
   }
   const setIcon = (id: string, icon?: string) => saveTabs(tabList.map(t => (t.id === id ? { ...t, icon } : t))) // none: undefined, which JSON leaves out
-  // a tab gone: its tiles to the first of the others
+  // a tab gone: its tiles to the first of the others, under the tiles there (their cells were another tab's)
   const removeTab = (id: string) => {
     const tabs = tabList.filter(t => t.id !== id)
     if (!tabs.length) return
     save(
-      tiles.map(t => (tabOf(t) === id ? { ...t, tab: tabs[0].id } : t)),
+      tiles.map(t => (tabOf(t) === id ? { id: t.id, w: t.w, h: t.h, tab: tabs[0].id } : t)),
       tabs,
     )
     if (tab === id) show(tabs[0].id)
@@ -151,10 +151,10 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   ends.current = { keep, moveTo }
   // a drag of a tile's head or corner until it ends, every way once: the capture goes with a release, a cancel, and a
   // release the page never got (outside the window, over its title bar or a frame: Chromium drops the capture at the
-  // next move, with no pointerup); the window's blur and Esc too, which keep where it got to. Near the page's top or
+  // next move, with no pointerup); the window's blur too, which keeps where it got to; Esc (done's cancel). Near the page's top or
   // bottom edge it scrolls, a scroll meanwhile counts; the grid keeps its height meanwhile: a bottom tile shrinking
   // would shorten the page, which scrolls it up under the pointer, which shrinks it again
-  const track = (e: ReactPointerEvent, el: HTMLElement, step: (at: { x: number; y: number }) => void, done: () => void) => {
+  const track = (e: ReactPointerEvent, el: HTMLElement, step: (at: { x: number; y: number }) => void, done: (cancel: boolean) => void) => {
     const handle = e.currentTarget as HTMLElement
     const id = e.pointerId
     handle.setPointerCapture(id) // the pointer stays its own over a widget's frame and outside the window
@@ -185,8 +185,8 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       if (handle.hasPointerCapture(id)) handle.releasePointerCapture(id)
       sizing.current = undefined
     })
-    const end = () => (off(), done())
-    const key = (k: KeyboardEvent) => k.key === 'Escape' && (k.preventDefault(), k.stopPropagation(), end())
+    const end = () => (off(), done(false))
+    const key = (k: KeyboardEvent) => k.key === 'Escape' && (k.preventDefault(), k.stopPropagation(), off(), done(true))
     handle.addEventListener('pointermove', move)
     handle.addEventListener('lostpointercapture', end)
     window.addEventListener('blur', end)
@@ -194,7 +194,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     page?.addEventListener('scroll', again)
   }
   // the corner: the size from where the pointer is over the tile as it is now, not from how far it moved; up to the
-  // grid's right edge
+  // grid's right edge. Esc keeps the size it has, as a release would. A phone's one column (.narrow): its height only
   const resize = (e: ReactPointerEvent, t: DeskTile & { x: number; y: number }) => {
     e.preventDefault()
     const el = grid.current
@@ -203,13 +203,14 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     const cell = cellW(el)
     const box = tile.getBoundingClientRect()
     const [dx, dy] = [box.right - e.clientX, box.bottom - e.clientY] // where on its corner it was taken
+    const tall = !!el.closest('.narrow') // no columns to widen it across
     let now: DeskTile = t
     track(
       e,
       el,
       at => {
         const r = tile.getBoundingClientRect()
-        const [w, h] = [clamp(Math.round((at.x + dx - r.left + GAP) / (cell + GAP)), 2, DESK_COLS - t.x), clamp(Math.round((at.y + dy - r.top + GAP) / (DESK_ROW + GAP)), 2, 30)]
+        const [w, h] = [tall ? t.w : clamp(Math.round((at.x + dx - r.left + GAP) / (cell + GAP)), 2, DESK_COLS - t.x), clamp(Math.round((at.y + dy - r.top + GAP) / (DESK_ROW + GAP)), 2, 30)]
         if (w !== now.w || h !== now.h) setLive((now = { ...t, w, h })) // a scroll's every event: only a new size draws
       },
       () => (now !== t && ends.current.keep(now), setLive(null)),
@@ -217,7 +218,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     setLive(t)
   }
   // the head: the tile to the cell under the pointer (where on it it was taken kept), the ones in its way moved down as
-  // it goes; onto a tab of the bar: to that tab. Under 4px it's a click
+  // it goes; onto a tab of the bar: to that tab; Esc: back where it was. Under 4px it's a click
   const move = (e: ReactPointerEvent, t: DeskTile & { x: number; y: number }) => {
     const el = grid.current
     // a phone's one column (.narrow) has no cells to put it in: the tiles keep the desktop's
@@ -243,7 +244,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         const [x, y] = [clamp(Math.round((at.x - ox - r.left) / (cell + GAP)), 0, DESK_COLS - t.w), Math.max(0, Math.round((at.y - oy - r.top) / (DESK_ROW + GAP)))]
         if (x !== now.x || y !== now.y) setLive((now = { ...t, x, y }))
       },
-      () => (to ? ends.current.moveTo(t.id, to) : now !== t && ends.current.keep(now), setLive(null), setDrag(null), setOver(null)),
+      cancel => (cancel ? undefined : to ? ends.current.moveTo(t.id, to) : now !== t && ends.current.keep(now), setLive(null), setDrag(null), setOver(null)), // Esc: back where it was
     )
   }
   const addable = widgets.filter(w => !here.includes(w))

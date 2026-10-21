@@ -216,7 +216,7 @@ exit 0
     `#!/bin/sh
 echo "adb $*" >> "$HOME/sim.log"
 case "$*" in
-  "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\n' ;;
+  "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\nZX1  unauthorized usb:1-1 transport_id:2\\n' ;;
   *"exec-out screencap -p") cat "$HOME/screen.png" ;;
 esac
 exit 0
@@ -224,6 +224,7 @@ exit 0
   )
   const l = await rig.rpc('sim', { op: 'list' })
   assert.deepEqual(l.devices, [...(ios ? [{ id: 'ios:U-1', name: 'iPhone 17', os: 'ios' }] : []), { id: 'android:emulator-5554', name: 'sdk gphone64 arm64', os: 'android' }], 'booted ones, ready ones')
+  assert.match(l.why.join('\n'), /ZX1 waits for you to allow USB debugging/, 'a phone that asks: said')
   const droid = 'android:emulator-5554'
   await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 }), /no frame of it yet/)
   assert.match((await rig.rpc('sim', { op: 'frame', device: droid })).frame, /^data:image\/(png|jpeg);base64,/)

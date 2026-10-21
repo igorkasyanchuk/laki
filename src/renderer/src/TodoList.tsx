@@ -10,8 +10,8 @@ import { Page } from './ui'
 export type TodoListApi = { call<T = any>(method: string, params?: object): Promise<T> }
 type List = { blocks: unknown[]; md: string; at: number }
 const FIRST = [{ type: 'checkListItem' }] // a new list: a to-do to write in
-// how many are done: its Markdown's checkboxes (specmd.ts writes "- [x] ")
-export const doneOf = (md: string) => ({ all: (md.match(/^\s*- \[[ x]\] /gm) ?? []).length, done: (md.match(/^\s*- \[x\] /gm) ?? []).length })
+// how many are done: its Markdown's checkboxes (specmd.ts writes "- [x] "), an empty one (a new list's) not counted
+export const doneOf = (md: string) => ({ all: (md.match(/^\s*- \[[ x]\] +\S/gm) ?? []).length, done: (md.match(/^\s*- \[x\] +\S/gm) ?? []).length })
 
 export default function TodoListPage({ api, onClose }: { api: TodoListApi; onClose: () => void }) {
   const [list, setList] = useState<List | null>(null)

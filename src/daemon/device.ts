@@ -65,9 +65,13 @@ async function simPoints(udid: string) {
   simPts.set(udid, pts)
   return pts
 }
+// every booted simulator (laki screen takes the first, the panel lists them all)
+async function bootedSims(): Promise<{ udid: string; name: string }[]> {
+  const r = await simctl(['list', 'devices', 'booted', '-j']).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)} (it needs Xcode, xcode-select pointing at it, and its license accepted)`)))
+  return Object.values(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>).flat().filter(x => x.state === 'Booted')
+}
 async function booted(): Promise<{ udid: string; name: string }> {
-  const r = await simctl(['list', 'devices', 'booted', '-j']).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)} (Xcode, and xcode-select pointing at it)`)))
-  const d = Object.values(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>).flat().find(x => x.state === 'Booted')
+  const d = (await bootedSims())[0]
   if (!d) throw new Error('no iOS Simulator is booted: open Simulator, or xcrun simctl boot <device>')
   return d
 }
@@ -157,22 +161,18 @@ export async function sim(p: { op: string; device?: string; x?: unknown; y?: unk
   if (!SIM_OPS.includes(op)) throw new Error(`sim: ${p.op}? one of ${SIM_OPS.join(', ')}`)
   if (op === 'list') {
     const devices: { id: string; name: string; os: 'ios' | 'android' }[] = []
-    const why: string[] = [] // what keeps one kind from being listed
-    if (process.platform === 'darwin')
-      try {
-        const r = await simctl(['list', 'devices', 'booted', '-j'])
-        for (const d of Object.values(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>).flat()) if (d.state === 'Booted') devices.push({ id: `ios:${d.udid}`, name: d.name, os: 'ios' })
-      } catch (e) {
-        why.push(`iOS: xcrun simctl: ${said(e)} (it needs Xcode, xcode-select pointing at it, and its license accepted)`)
+    const why: string[] = [] // what keeps one kind (or one phone) from being listed
+    // both at once: adb's first call starts its server, a second or two
+    const [ios, droid] = await Promise.allSettled([process.platform === 'darwin' ? bootedSims() : Promise.resolve([]), adb(null, ['devices', '-l'])])
+    if (ios.status === 'fulfilled') for (const d of ios.value) devices.push({ id: `ios:${d.udid}`, name: d.name, os: 'ios' })
+    else why.push(`iOS: ${(ios.reason as Error).message}`)
+    if (droid.status === 'rejected') why.push(`Android: ${(droid.reason as Error).message}`)
+    else
+      for (const l of String(droid.value.stdout).split('\n').slice(1)) {
+        const m = /^(\S+)\s+(device|unauthorized)\b(.*)$/.exec(l.trim())
+        if (m?.[2] === 'unauthorized') why.push(`Android: ${m[1]} waits for you to allow USB debugging on it`)
+        else if (m) devices.push({ id: `android:${m[1]}`, name: /model:(\S+)/.exec(m[3])?.[1]?.replace(/_/g, ' ') ?? m[1], os: 'android' })
       }
-    try {
-      for (const l of String((await adb(null, ['devices', '-l'])).stdout).split('\n').slice(1)) {
-        const m = /^(\S+)\s+device\b(.*)$/.exec(l.trim())
-        if (m) devices.push({ id: `android:${m[1]}`, name: /model:(\S+)/.exec(m[2])?.[1]?.replace(/_/g, ' ') ?? m[1], os: 'android' })
-      }
-    } catch (e) {
-      why.push(`Android: ${(e as Error).message}`)
-    }
     return { devices, why }
   }
   const d = deviceOf(p.device)

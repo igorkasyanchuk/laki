@@ -724,7 +724,7 @@ export function SidePanel(p: {
 
 // Simulator: a booted iOS Simulator or an Android emulator (or a phone on adb) in the panel, a frame after another while
 // it shows (the daemon's sim; one asked for as the last comes, not while the window is hidden). A click is a tap, a drag
-// a swipe, the box types (Enter: it, then Return), the buttons press Home, Back, Lock…; the camera puts a screenshot's
+// a swipe, the box types (Enter sends it; on an empty box, Return), the buttons press Home, Back, Lock…; the camera puts a screenshot's
 // path into the agent's prompt. iOS input needs idb, as laki screen's
 // ponytail: a few frames a second and a third of a second for a tap; a stream with live touches is the next step
 type SimDevice = { id: string; name: string; os: 'ios' | 'android' }
@@ -738,13 +738,7 @@ const SIM_KEY_WORDS: [key: string, label: string, icon: IconName, android?: bool
 ]
 function DeviceTab({ api }: { api: PanelApi }) {
   const [list, setList] = useState<{ devices: SimDevice[]; why: string[] } | null>(null)
-  const [pick, setPick] = useState(() => {
-    try {
-      return localStorage.getItem(SIM_PICK) ?? ''
-    } catch {
-      return ''
-    }
-  })
+  const [pick, setPick] = useState(() => localStore(SIM_PICK) ?? '')
   const [frame, setFrame] = useState('')
   const [err, setErr] = useState('') // the frames'
   const [said, setSaid] = useState('') // input's: a frame coming doesn't clear it
@@ -777,12 +771,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
     void next()
     return () => ((on = false), clearTimeout(t))
   }, [dev?.id])
-  const choose = (id: string) => {
-    setPick(id)
-    try {
-      localStorage.setItem(SIM_PICK, id)
-    } catch {}
-  }
+  const choose = (id: string) => (setPick(id), localStore(SIM_PICK, id))
   const send = (p: { op: string; [k: string]: unknown }) => {
     if (!dev) return Promise.resolve(false)
     setBusy(true)
