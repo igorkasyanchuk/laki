@@ -762,7 +762,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
           {item.byAgent && <span className="wf-agent">An agent wrote it: read it, then Save it. Until then only Start here runs it (no schedule, event or agent)</span>}
           {item.untrusted && !item.byAgent && (
             <span className="wf-agent">
-              {item.changed ? 'Changed since you allowed it' : 'From this repo'}: {wf.on ? <>starts on <code>{wf.on}</code> once you allow it</> : 'only Start here runs it until you allow it'} (no schedule, event or agent before). <button className="link" onClick={trust}>Allow…</button>
+              {item.changed ? 'Changed since you allowed it' : 'From this repo'}: {wf.on ? <>starts on <code>{wf.on}</code> {item.changed && 'again '}once you allow it; until then only Start here runs it</> : 'only Start here runs it (no schedule, event or agent) until you allow it'}. <button className="link" onClick={trust}>Allow…</button>
             </span>
           )}
         </div>
