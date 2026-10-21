@@ -1717,7 +1717,7 @@ OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local
 | link | opens |
 |---|---|
 | `laki://ws/<id>[?tab=<tab>]` | a workspace, or one of its tabs (a tab's *Copy link*) |
-| `laki://new?project=<id>&prompt=…&preset=…&name=…` | the new-workspace page, filled in |
+| `laki://new?project=<id>&prompt=…&name=…` | the new-workspace page, filled in (never the agent: yours to pick; the page says the prompt came from a link) |
 | `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
 | `laki://board` | the Board |

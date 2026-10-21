@@ -409,7 +409,7 @@ export function App() {
   const [picking, setPicking] = useState(false) // development mode's element picker (Picker.tsx)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
-  const [newInit, setNewInit] = useState<Partial<NewWsParams>>() // a laki://new link's prompt, preset, name
+  const [newInit, setNewInit] = useState<Partial<NewWsParams> & { linked?: boolean }>() // a laki://new link's prompt and name (linked: the page says so)
   const [newImages, setNewImages] = useState<Shot[]>([]) // the menu bar's screenshots, in the new workspace's prompt
   const [link, setLink] = useState<string>() // a laki:// link, routed once the view is in
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
@@ -1053,10 +1053,9 @@ export function App() {
       }
     } else if (l?.to === 'new') {
       if (!view.projects.length) return toast('Add a project first (⌘O)')
-      const presets = [...view.presets.filter(p => !p.off).map(p => p.name), 'shell', 'none']
       if (l.project && !proj(l.project)) toast(`No project ${l.project}: pick one`)
       setNewFor(proj(l.project))
-      setNewInit({ prompt: l.prompt, name: l.name, ...(l.preset && presets.includes(l.preset) && { preset: l.preset }) })
+      setNewInit({ prompt: l.prompt, name: l.name, ...(l.prompt && { linked: true }) })
       setDialog('new')
     } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
     else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')

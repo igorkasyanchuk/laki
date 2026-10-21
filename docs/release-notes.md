@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A laki://new link fills in only the prompt and the name, never the agent, and the page says the prompt came from a
+  link.
 - Opening files is more careful: an HTML file from a terminal link or the Files menu is shown in Finder (an HTML
   artifact opens in the browser through Laki's sandboxed page), Xcode projects and playgrounds are shown, not opened,
   and Open in › its default app shows a .command, an app or an executable in Finder instead of running it.

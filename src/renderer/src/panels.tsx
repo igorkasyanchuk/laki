@@ -472,11 +472,11 @@ const MODEL_SAYS: Record<string, [string, string, 'good' | 'warn' | undefined]> 
   haiku: ['For quick questions: the fastest', '$', 'good'],
 }
 
-// initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
+// initial: a laki://new link's prompt and name (linked: the page says it came from a link, while it's that prompt); project and initial win over the last choices; images: the menu
 // bar's screenshots
 const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
-export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; inserts?: ComponentProps<typeof PromptInput>['inserts']; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams> & { linked?: boolean }; images?: Shot[]; inserts?: ComponentProps<typeof PromptInput>['inserts']; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
   // draft goes, prompt and all, and the page starts empty there
@@ -504,7 +504,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       fast: same ? last.fast : undefined,
       base: '',
       ...(d && { ...d, project: proj, preset, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...(!there && { place: undefined, base: '' }) }),
-      ...initial,
+      ...(initial && (({ linked: _, ...x }) => x)(initial)),
       ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
   })
@@ -869,6 +869,11 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
             </span>
             <span className="nw-bar" />
           </div>
+        )}
+        {initial?.linked && p.prompt === initial.prompt && !busy && (
+          <p className="warn-soft small nw-linked" role="note">
+            Filled in from a link: read it before you start. The agent runs it in this project as you.
+          </p>
         )}
         <div className="nw-foot">
           <span className="muted">⌘⏎ creates · esc closes{dirty && !busy ? ', the draft stays' : ''}</span>

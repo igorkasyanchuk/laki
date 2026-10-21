@@ -2,7 +2,7 @@
 // tasks, the board, the AI page, Settings, Help, About and Get started (the app menu's). They select and fill in, never start anything: a link from anywhere can't run an agent.
 export type Link =
   | { to: 'ws'; ws: string; tab?: string }
-  | { to: 'new'; project?: string; prompt?: string; preset?: string; name?: string }
+  | { to: 'new'; project?: string; prompt?: string; name?: string } // never a preset (L12): the agent and its mode are yours to pick
   | { to: 'schedules'; project?: string }
   | { to: 'settings'; section?: string }
   | { to: 'extension'; id: string; inspect?: boolean } // laki://settings/widgets/<id>[/inspect]: its page, or its inspector
@@ -36,7 +36,7 @@ export function parseLink(url: string): Link | null {
     case 'ws':
       return arg ? { to: 'ws', ws: arg, tab: q('tab') } : null
     case 'new':
-      return { to: 'new', project: q('project'), prompt: q('prompt'), preset: q('preset'), name: q('name') }
+      return { to: 'new', project: q('project'), prompt: q('prompt'), name: q('name') }
     case 'schedules':
       return { to: 'schedules', project: arg ?? q('project') }
     case 'settings':
