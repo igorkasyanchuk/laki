@@ -37,7 +37,7 @@ Out of scope:
 - malware already running as your user: it can read `daemon.json`. Laki shouldn't hand it new privacy grants
   (camera, screen, Accessibility), though;
 - an agent doing what its own permission mode allows;
-- a repo's `.laki.json` and extensions after you trust them.
+- a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
 
 ## Known limits
 
@@ -46,6 +46,8 @@ Out of scope:
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
 - Remote access with no email or PIN (*anyone with the link*) is only as safe as the link: 24 hours at most, and the
   link works once.
+- An extension's https picture comes through the daemon from a public site, judged by its name: a name that resolves
+  to this Mac or your network still goes (`ponytail:` in `src/daemon/main.ts`).
 
 ## No telemetry
 

@@ -18,11 +18,11 @@ import { refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
-import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
+import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
-import { device } from './device.ts'
+import { device, sim } from './device.ts'
 
 const { dir } = core
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -302,6 +302,7 @@ const api: Record<string, Handler> = {
   prViewed: p => core.prViewed(p),
   run: p => core.runDev(p.ws, p.script, core.callerAgent(p.caller)), // an agent's: its tab.new the agent's
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
+  sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage, usageWho()),
   accounts: () => accountViews(),
@@ -388,6 +389,8 @@ const api: Record<string, Handler> = {
   noteRm: p => noteRm(p),
   noteUpload: p => noteUpload(p),
   noteFile: p => noteFile(p),
+  todoListGet: () => todoListGet(), // To-dos (experimental): notes.ts
+  todoListSave: p => todoListSave(p),
   planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),

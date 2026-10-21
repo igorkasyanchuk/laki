@@ -1,12 +1,12 @@
 // Desk (experimental, settings.desk; the rail's Desk, ⌘K): the extensions placed there (a place like the sidebar, and
 // any number of places at once) as tiles on a page of their own, each with its full view when it has one: an overview
-// of what's going on. Drag a tile's head to move it (onto a tab: to that tab), its corner to resize it; the order, sizes
-// and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with AI's dialog
+// of what's going on. Drag a tile's head to put it in any cell of the grid (gaps stay; one in its way moves down; onto a
+// tab: to that tab), its corner to resize it; the cells, sizes and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with AI's dialog
 // (DeskBuild: what it should show, screenshots, files) opens the extension studio on it: Laki AI asks, then writes one
 // placed here, a tile with its sample data, off until you turn it on. App.tsx passes a DeskApi.
-import { type DragEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { ICONS, type IconName } from '../../shared/icons'
-import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
+import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, deskLayout, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
 import { type Img, PromptInput, useDraft } from './PromptInput'
@@ -40,9 +40,9 @@ const tabNow = () => {
 export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs = [], api, onClose }: { widgets: WidgetView[]; wsName?: string; tiles?: DeskTile[]; tabs?: DeskTab[]; api: DeskApi; onClose: () => void }) {
   const [menu, openMenu] = useMenu()
   const grid = useRef<HTMLDivElement>(null)
-  const [live, setLive] = useState<DeskTile | null>(null) // the tile being resized, as it is under the pointer
-  const [drag, setDrag] = useState<string | null>(null)
-  const sizing = useRef<() => void>(undefined) // a resize's listeners off: closed mid-drag too
+  const [live, setLive] = useState<DeskTile | null>(null) // the tile being moved or resized, as it is under the pointer
+  const [drag, setDrag] = useState<string | null>(null) // the tile being moved
+  const sizing = useRef<() => void>(undefined) // a move's or resize's listeners off: closed mid-drag too
   useEffect(() => () => sizing.current?.(), [])
   // what was just saved, shown until the settings come back with it: no snapping back to the old size or order meanwhile
   const [pending, setPending] = useState<DeskTile[] | null>(null)
@@ -72,7 +72,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   // one placed here since (Settings, Laki AI's Build): kept on the tab shown, where you'd look for it
   const fresh = here.filter(w => !mine.some(t => t.id === w.id)).map(w => w.id)
   useEffect(() => void (fresh.length && save(tiles.map(t => (fresh.includes(t.id) ? { ...t, tab } : t)))), [fresh.join()])
-  const tidy = (t: DeskTile[]) => [...t, ...mine.filter(s => !t.some(x => x.id === s.id))].map(({ id, w, h, tab }) => ({ id, w, h, ...(tab && { tab }) })) // one off for now keeps its size and tab
+  const tidy = (t: DeskTile[]) => [...t, ...mine.filter(s => !t.some(x => x.id === s.id))].map(({ id, w, h, tab, x, y }) => ({ id, w, h, ...(tab && { tab }), ...(x !== undefined && y !== undefined && { x, y }) })) // one off for now keeps its size, cell and tab
   const save = (t: DeskTile[], tabs?: DeskTab[]) => {
     const all = tidy(t)
     setPending(all)
@@ -99,12 +99,12 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     if (n && n !== tabList.find(t => t.id === id)?.name) saveTabs(tabList.map(t => (t.id === id ? { ...t, name: n } : t)))
   }
   const setIcon = (id: string, icon?: string) => saveTabs(tabList.map(t => (t.id === id ? { ...t, icon } : t))) // none: undefined, which JSON leaves out
-  // a tab gone: its tiles to the first of the others
+  // a tab gone: its tiles to the first of the others, under the tiles there (their cells were another tab's)
   const removeTab = (id: string) => {
     const tabs = tabList.filter(t => t.id !== id)
     if (!tabs.length) return
     save(
-      tiles.map(t => (tabOf(t) === id ? { ...t, tab: tabs[0].id } : t)),
+      tiles.map(t => (tabOf(t) === id ? { id: t.id, w: t.w, h: t.h, tab: tabs[0].id } : t)),
       tabs,
     )
     if (tab === id) show(tabs[0].id)
@@ -118,11 +118,11 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     // a tile with no tab is the first tab's: pinned where it is, so it doesn't follow another tab moved first
     save([...tiles, ...mine.filter(s => !tiles.some(t => t.id === s.id))].map(t => ({ ...t, tab: tabOf(t) })), tabs)
   }
-  // a tile to another tab: last there
+  // a tile to another tab: under the tiles there
   const moveTo = (id: string, to: string, tabs?: DeskTab[]) => {
     const t = tiles.find(x => x.id === id)
     if (!t) return
-    save([...tiles.filter(x => x.id !== id), { ...t, tab: to }], tabs)
+    save([...tiles.filter(x => x.id !== id), { id, w: t.w, h: t.h, tab: to }], tabs)
   }
   const tabMenu = (e: React.MouseEvent, t: DeskTab) =>
     openMenu(e, [
@@ -138,31 +138,32 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       null,
       ...(tabList.length > 1 ? [{ label: `Remove the tab (its tiles go to ${tabList.find(x => x.id !== t.id)!.name})`, icon: 'x', run: () => removeTab(t.id) } as MenuItem] : []),
     ])
-  const resize = (e: ReactPointerEvent, t: DeskTile) => {
-    e.preventDefault()
-    const el = grid.current
-    if (!el || e.button !== 0) return
+  // where this tab's tiles are, each in its cell (one not placed yet: where the grid's flow had it, under the placed
+  // ones); with one moved or resized (at): the others pinned where they are first, then it where the pointer has it
+  const base = deskLayout(shown)
+  const at = (t: DeskTile) => deskLayout(base.map(x => (x.id === t.id ? t : x)), t.id)
+  const laid = live ? at(live) : base
+  const cellW = (el: HTMLElement) => (el.clientWidth - GAP * (DESK_COLS - 1)) / DESK_COLS
+  // after a move or a resize: every tile of the tab saved in its cell, so the ones it pushed down stay there
+  const keep = (t: DeskTile) => (to => save(tiles.map(x => to.find(y => y.id === x.id) ?? x)))(at(t))
+  // a drag's end saves with the tiles as they are then (a view that came meanwhile: Laki AI placed one, another window)
+  const ends = useRef({ keep, moveTo })
+  ends.current = { keep, moveTo }
+  // a drag of a tile's head or corner until it ends, every way once: the capture goes with a release, a cancel, and a
+  // release the page never got (outside the window, over its title bar or a frame: Chromium drops the capture at the
+  // next move, with no pointerup); the window's blur too, which keeps where it got to; Esc (done's cancel). Near the page's top or
+  // bottom edge it scrolls, a scroll meanwhile counts; the grid keeps its height meanwhile: a bottom tile shrinking
+  // would shorten the page, which scrolls it up under the pointer, which shrinks it again
+  const track = (e: ReactPointerEvent, el: HTMLElement, step: (at: { x: number; y: number }) => void, done: (cancel: boolean) => void) => {
     const handle = e.currentTarget as HTMLElement
-    const tile = handle.parentElement!
     const id = e.pointerId
     handle.setPointerCapture(id) // the pointer stays its own over a widget's frame and outside the window
-    const cell = (el.clientWidth - GAP * (DESK_COLS - 1)) / DESK_COLS
-    const box = tile.getBoundingClientRect()
-    const [dx, dy] = [box.right - e.clientX, box.bottom - e.clientY] // where on its corner it was taken
-    // the size from where the pointer is over the tile as it is now (a scroll meanwhile counts), not from how far it
-    // moved; the grid keeps its height meanwhile: a bottom tile shrinking would shorten the page, which scrolls it up
-    // under the pointer, which shrinks it again
     const page = (p => { for (; p; p = p.parentElement) if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p })(el.parentElement) ?? undefined
     el.style.minHeight = `${el.offsetHeight}px`
-    let now = t
+    el.style.setProperty('--cw', `${cellW(el) + GAP}px`) // the grid's dots while it moves
     let at = { x: e.clientX, y: e.clientY }
     let raf = 0
-    const size = () => {
-      const r = tile.getBoundingClientRect()
-      const [w, h] = [clamp(Math.round((at.x + dx - r.left + GAP) / (cell + GAP)), 2, DESK_COLS), clamp(Math.round((at.y + dy - r.top + GAP) / (DESK_ROW + GAP)), 2, 30)]
-      if (w !== now.w || h !== now.h) setLive((now = { ...t, w, h })) // a scroll's every event: only a new size draws
-    }
-    // near the page's top or bottom edge: it scrolls, so a tile grows past what's in sight
+    const again = () => step(at)
     const edge = () => {
       raf = 0
       const b = page?.getBoundingClientRect()
@@ -171,42 +172,80 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       page.scrollTop += v
       raf = requestAnimationFrame(edge)
     }
-    const move = (m: PointerEvent) => ((at = { x: m.clientX, y: m.clientY }), size(), raf || (raf = requestAnimationFrame(edge)))
+    const move = (m: PointerEvent) => ((at = { x: m.clientX, y: m.clientY }), step(at), raf || (raf = requestAnimationFrame(edge)))
     const off = (sizing.current = () => {
       handle.removeEventListener('pointermove', move)
       handle.removeEventListener('lostpointercapture', end)
       window.removeEventListener('blur', end)
       window.removeEventListener('keydown', key, true)
-      page?.removeEventListener('scroll', size)
+      page?.removeEventListener('scroll', again)
       cancelAnimationFrame(raf)
       el.style.minHeight = ''
+      el.style.removeProperty('--cw')
       if (handle.hasPointerCapture(id)) handle.releasePointerCapture(id)
       sizing.current = undefined
     })
-    // every way it ends, once: the capture goes with a release, a cancel, and a release the page never got (outside
-    // the window, over its title bar or a frame: Chromium drops the capture at the next move, with no pointerup); the
-    // window's blur and Esc too. The size it has is kept
-    const end = () => {
-      off()
-      if (now.w !== t.w || now.h !== t.h) save(tiles.map(x => (x.id === t.id ? now : x)))
-      setLive(null)
-    }
-    const key = (k: KeyboardEvent) => k.key === 'Escape' && (k.preventDefault(), k.stopPropagation(), end())
+    const end = () => (off(), done(false))
+    const key = (k: KeyboardEvent) => k.key === 'Escape' && (k.preventDefault(), k.stopPropagation(), off(), done(true))
     handle.addEventListener('pointermove', move)
     handle.addEventListener('lostpointercapture', end)
     window.addEventListener('blur', end)
     window.addEventListener('keydown', key, true)
-    page?.addEventListener('scroll', size)
+    page?.addEventListener('scroll', again)
+  }
+  // the corner: the size from where the pointer is over the tile as it is now, not from how far it moved; up to the
+  // grid's right edge. Esc keeps the size it has, as a release would. A phone's one column (.narrow): its height only
+  const resize = (e: ReactPointerEvent, t: DeskTile & { x: number; y: number }) => {
+    e.preventDefault()
+    const el = grid.current
+    if (!el || e.button !== 0) return
+    const tile = (e.currentTarget as HTMLElement).parentElement!
+    const cell = cellW(el)
+    const box = tile.getBoundingClientRect()
+    const [dx, dy] = [box.right - e.clientX, box.bottom - e.clientY] // where on its corner it was taken
+    const tall = !!el.closest('.narrow') // no columns to widen it across
+    let now: DeskTile = t
+    track(
+      e,
+      el,
+      at => {
+        const r = tile.getBoundingClientRect()
+        const [w, h] = [tall ? t.w : clamp(Math.round((at.x + dx - r.left + GAP) / (cell + GAP)), 2, DESK_COLS - t.x), clamp(Math.round((at.y + dy - r.top + GAP) / (DESK_ROW + GAP)), 2, 30)]
+        if (w !== now.w || h !== now.h) setLive((now = { ...t, w, h })) // a scroll's every event: only a new size draws
+      },
+      () => (now !== t && ends.current.keep(now), setLive(null)),
+    )
     setLive(t)
   }
-  const drop = (e: DragEvent, target: string) => {
+  // the head: the tile to the cell under the pointer (where on it it was taken kept), the ones in its way moved down as
+  // it goes; onto a tab of the bar: to that tab; Esc: back where it was. Under 4px it's a click
+  const move = (e: ReactPointerEvent, t: DeskTile & { x: number; y: number }) => {
+    const el = grid.current
+    // a phone's one column (.narrow) has no cells to put it in: the tiles keep the desktop's
+    if (!el || e.button !== 0 || el.closest('.narrow') || (e.target as HTMLElement).closest('button')) return
     e.preventDefault()
-    if (!drag || drag === target) return setDrag(null)
-    const moved = { ...tiles.find(t => t.id === drag)!, tab: tabOf(tiles.find(t => t.id === target)!) }
-    const rest = tiles.filter(t => t.id !== drag)
-    rest.splice(rest.findIndex(t => t.id === target), 0, moved) // before the one it's dropped on
-    save(rest)
-    setDrag(null)
+    const cell = cellW(el)
+    const g = el.getBoundingClientRect()
+    const [ox, oy] = [e.clientX - g.left - t.x * (cell + GAP), e.clientY - g.top - t.y * (DESK_ROW + GAP)]
+    const [sx, sy] = [e.clientX, e.clientY]
+    let now: DeskTile = t
+    let to: string | null = null
+    let going = false
+    track(
+      e,
+      el,
+      at => {
+        if (!going && Math.hypot(at.x - sx, at.y - sy) < 4) return
+        if (!going) (going = true), setDrag(t.id), setLive(t)
+        const over = document.elementFromPoint(at.x, at.y)?.closest<HTMLElement>('[data-desk-tab]')?.dataset.deskTab
+        setOver((to = over && over !== tab ? over : null))
+        if (to) return // where it was on this tab stays shown
+        const r = el.getBoundingClientRect()
+        const [x, y] = [clamp(Math.round((at.x - ox - r.left) / (cell + GAP)), 0, DESK_COLS - t.w), Math.max(0, Math.round((at.y - oy - r.top) / (DESK_ROW + GAP)))]
+        if (x !== now.x || y !== now.y) setLive((now = { ...t, x, y }))
+      },
+      cancel => (cancel ? undefined : to ? ends.current.moveTo(t.id, to) : now !== t && ends.current.keep(now), setLive(null), setDrag(null), setOver(null)), // Esc: back where it was
+    )
   }
   const addable = widgets.filter(w => !here.includes(w))
   const addMenu = (e: React.MouseEvent) =>
@@ -272,9 +311,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
                 onClick={() => show(t.id)}
                 onDoubleClick={() => setNaming(t.id)}
                 onContextMenu={e => (e.preventDefault(), tabMenu(e, t))}
-                onDragOver={e => drag && tabOf(tiles.find(x => x.id === drag)!) !== t.id && (e.preventDefault(), setOver(t.id))}
-                onDragLeave={() => setOver(o => (o === t.id ? null : o))}
-                onDrop={e => (e.preventDefault(), setOver(null), drag && moveTo(drag, t.id), setDrag(null))}
+                data-desk-tab={t.id}
               >
                 {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden>{t.icon}</span>}
                 {t.name}
@@ -314,13 +351,14 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
           </div>
         </div>
       ) : (
-        <div ref={grid} role="tabpanel" className={`desk-grid ${live ? 'sizing' : ''} ${drag ? 'moving' : ''}`}>
+        <div ref={grid} role="tabpanel" className={`desk-grid ${live && !drag ? 'sizing' : ''} ${drag ? 'moving' : ''}`}>
+          {/* in the order saved, whatever the cells: a frame moved in the page loads again */}
           {shown.map(t => {
             const w = here.find(x => x.id === t.id)!
-            const s = live?.id === t.id ? live : t
+            const s = laid.find(x => x.id === t.id)!
             return (
-              <div key={t.id} className={`desk-tile ${drag === t.id ? 'dragging' : ''} ${live?.id === t.id ? 'sizing' : ''} ${w.on ? '' : 'off'}`} style={{ gridColumn: `span ${s.w}`, gridRow: `span ${s.h}` }} onDragOver={e => drag && e.preventDefault()} onDrop={e => drop(e, t.id)}>
-                <div className="desk-head" draggable onDragStart={e => (e.dataTransfer.setData('text/plain', t.id), (e.dataTransfer.effectAllowed = 'move'), setDrag(t.id))} onDragEnd={() => (setDrag(null), setOver(null))} data-tip="Drag to move it">
+              <div key={t.id} className={`desk-tile ${drag === t.id ? 'dragging' : ''} ${live?.id === t.id && !drag ? 'sizing' : ''} ${w.on ? '' : 'off'}`} style={{ gridColumn: `${s.x + 1} / span ${s.w}`, gridRow: `${s.y + 1} / span ${s.h}`, order: s.y * DESK_COLS + s.x, '--h': s.h } as CSSProperties}>
+                <div className="desk-head" onPointerDown={e => move(e, s)} data-tip={drag ? undefined : 'Drag to put it anywhere on the grid'}>
                   <b>{w.name}</b>
                   {w.scope === 'workspace' && <span className="small muted" data-tip="Per workspace: the one you selected last">{wsName ?? 'no workspace'}</span>}
                   <span className={`small ${w.error && !w.running && w.on ? 'warn' : 'muted'}`}>{w.on ? status(w) : w.sample ? 'off · made-up data' : 'off'}</span>
@@ -338,7 +376,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
                     </button>
                   </div>
                 )}
-                <span className="desk-size" onPointerDown={e => resize(e, t)} data-tip={`${s.w}×${s.h}: drag to resize`} />
+                <span className="desk-size" onPointerDown={e => resize(e, s)} data-tip={`${s.w}×${s.h}: drag to resize`} />
                 {live?.id === t.id && <span className="desk-dims">{s.w} × {s.h}</span>}
               </div>
             )

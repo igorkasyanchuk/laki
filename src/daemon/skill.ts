@@ -139,7 +139,9 @@ popup (a window over Laki with HTML or Markdown: a result to read) and end (\`no
 Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
 writes one, the whole file (its description has the format and every block); to change one, take its file from
 \`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
-user reads and saves it in Laki. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`) set how freely it acts;
+user reads and saves it in Laki; a project's that came with the repo (or changed since) starts for you only once the user
+allows it there. A run block's \`{{…}}\` go in as environment variables: write them bare or in double quotes, never in
+single quotes. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`) set how freely it acts;
 \`when done: keep\` keeps a run's worktree (unset: archived once it's done and clean). The CLI: \`laki flow ls\`,
 \`laki flow run <workflow> <project> <task>\` (\`--ws .\`: in this workspace, no new worktree), \`laki flow again <run>
 [--from <block>]\`, and \`laki flow check [file.md… | folder]\` after you write one (no daemon; exit 1 on a problem).
@@ -209,8 +211,13 @@ more than 30 minutes late is skipped and logged as missed).
 
 ## Rules
 
-- Ask the user before \`rm\`, \`archive\`, \`ship\` or \`stop\`: they end agents, delete worktrees or push.
-- Schedule a task only when the user asks for one: it starts agents later, unattended. Say when it first runs.
+- Ask the user before \`rm\`, \`archive\`, \`ship\` or \`stop\`: they end agents, delete worktrees or push. An
+  extension's gate may hold \`ship\` or \`archive\`: it prints why and exits 1; fix what it says or tell the user
+  (\`--force\` is theirs, refused in your tab).
+- Schedule a task only when the user asks for one: it starts agents later, unattended. One you add is saved off: say
+  they turn it on in Scheduled tasks (\`on\` and \`run\` are theirs), and when it would first run.
+- From your tab, \`laki new\` and \`laki tab\` start an agent or a shell, never a command (\`--cmd\`, a command
+  preset): the user starts commands. \`send\` or \`screen\` on a tab of another workspace asks the user in the app first.
 - \`<ws>\` is a workspace id; \`<ws>/<tab>\` picks a tab (by default the agent's).
 - Don't type into a busy agent unless asked: use \`send --when-idle\`.
 - The CLI talks to the Laki daemon over localhost. In a sandbox that blocks that, ask to run it outside.

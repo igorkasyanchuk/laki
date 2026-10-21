@@ -118,7 +118,8 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`). A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`); 101: To-dos
+(`todoListGet`/`todoListSave`), the side panel's Simulator (`sim`, `check`; settings' `simulator`); 102: a project's `simulator`, kept by `projectSet`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -324,10 +325,25 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
   App's `runScript`, Deploy after `ask`);
+- `sim` (`daemon/device.ts`, `SIM_OPS`; the side panel's Simulator, SidePanel.tsx `DeviceTab`): `list` (booted iOS
+  Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones (an emulator named by its AVD, `emu avd name`: the name then OK, within 5 s, else its model), `ios:<udid>` / `android:<serial>`; `why`: what
+  keeps a kind out), `frame` (simctl's JPEG or adb's `screencap -p`, through `sips` to a JPEG at most `FRAME_MAX` tall on
+  a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden: `visibilitychange` starts them again), `shot` (`imageSave`'s path, for
+  the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by `simPoints` (simctl's `getenv` `SIMULATOR_MAINSCREEN_*`: pixels over scale; idb's `describe-all` names no app on iOS 27's home screen),
+  `iosPts`, Android pixels by the last frame's PNG header, `droidPx`), `type` (adb's `input text` single-quoted for the
+  device's sh, spaces `%s`), `key` (`IOS_KEYS`, `DROID_KEYS`: back and apps Android's); an iOS `shot` in points, as laki screen's;
+  `check` (Settings › Simulators, `SimSection`: `SimCheck`s, each `ok`, `says`, a `fix` command (a `›` menu path: no
+  Copy) and `warn` (works without it, or none running): iOS `xcode` (`xcode-select -p` an app's, not the Command Line
+  Tools), `simctl` (`list runtimes`: the license), `runtime`, `booted`, `idb` (and `idb_companion`); Android `adb`,
+  `emulator` (`-list-avds`), `device` (`droidDevices`, shared with `list`)). adb and the emulator are `sdkTool`'s: PATH,
+  else `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, Android Studio's folder. The tab shows with `settings.simulator` (off
+  unless true; SidePanel's `sim`), a project's `config.simulator` over it (the app's only, kept by `projectSet`; ProjectSection's
+  *Simulator* select, `global.simulator` for its words), its empty state's *What's needed…* is `PanelApi.setup`. ponytail: frames polled, a drag one swipe;
+  a stream (serve-sim, idb/axe video-stream, scrcpy) next;
 - `device` (`daemon/device.ts`; the CLI's `laki screen <op>`, MCP's `laki_device`; `DEVICE_OPS`): shot (the booted
   simulator, `xcrun simctl io <udid> screenshot`, or `app`'s frontmost window: CoreGraphics' window list through JXA
   (`osascript -l JavaScript`), `screencapture -x -o -l <id>`), scaled by `sips` to its size in points (an app window's
-  bounds; the simulator's from idb's `describe-all`, else at most `SHOT_MAX` across), saved by `imageSave`, its path
+  bounds; the simulator's from `simPoints`, else at most `SHOT_MAX` across), saved by `imageSave`, its path
   back; windows; tap, swipe, type, describe through `idb ui … --udid <booted> --` (on PATH: the user's install, as
   cloudflared; Settings › Agent skill says, `doctor`'s `idb`);
 - clean-up: `archivedTidy` (hourly and at start: archived workspaces past `settings.archivedDays` dropped as `wsRm`
@@ -881,7 +897,10 @@ at each ask) and its files' names into the instructions. Tested in `test/plans.t
 ### Notes
 
 Experimental (`settings.notes`, Settings › General › *Experimental*; off: no rail button or ⌘K item, and every `note*`
-method refuses). `daemon/notes.ts`: one list for every project, `<data>/notes/<id>.json` (`Note`: title, `color` of
+method refuses). To-dos (`settings.todoList`, likewise; `todoList*` refuse off): one checklist, `<data>/todo-list.json`
+(`TodoList`: BlockNote's `blocks`, `md`, `at`), the renderer's `TodoList.tsx` (App's `lazy`, dialog `'todos'`, the
+rail's To-dos, `RAIL_MORE`'s first, ⌘K): `SpecEditor`, a new list one `checkListItem`, saved 600 ms after a change and
+as it unmounts, no files; the head's *n of m done* from its Markdown (`doneOf`). `daemon/notes.ts`: one list for every project, `<data>/notes/<id>.json` (`Note`: title, `color` of
 `TAB_COLORS`, `pinned`, BlockNote's `blocks`, `md`: their Markdown, `created`, `at`), pasted files in `<data>/notes/<id>/`
 (`noteUpload`: `files/<name>`, `-2` when taken; `noteFile`: an image as a data URL). `noteList` (`q`: every word in its
 title or `md`) gives `NoteItem`s, pinned first, then `at` (a title or text change; a pin or a color doesn't), each a
@@ -1663,6 +1682,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.aiFloatAt`: where the floating Laki AI chat was dragged (App's `AiFloat`: `right` and `bottom` in px, held
       8px inside the main area as it changes size; a double-click on its head drops it and the size); `laki.aiFloatSize`:
       its size, from its edges and corners (`.ai-grip`s; the window clips, so they reach past the round corners).
+    - `laki.aiDock`: the chat button minimized into the status bar (App's `dock`: `fly` down, `DOCK_MS`; `.sb-ai`, sticky at
+      the bar's end; its right click, or ⌘K where no status bar shows it, floats it again).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.aiDrafts`: Laki AI's composers' unsent text and images (paths, shown again through `aiImage`), by chat:
       PromptInput.tsx `useDraft` (the AI page, floating chat and AI window share `ai:<chat>`; the studio's `widget:<id>`,
@@ -1687,7 +1708,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
-    with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`) and the screenshots; `settings.menuBar === false` destroys it). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
+    with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`), the screenshots and *Open Laki* (the global hotkey as its `accelerator`, `registerAccelerator: false`; the `hotkey` IPC builds the menu again); `settings.menuBar === false` destroys it: Settings › General › *Menu bar icon*). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
@@ -1719,6 +1740,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     ahead dropped; `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
+  - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
+    menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab,
+    then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks `wsArchive` with
     `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is). Deleting a
@@ -1905,7 +1929,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
   `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files and https: scripts, styles, fonts and pictures,
   no `connect-src`; 50 MB a file), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
-  *Open in the browser*, *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
+  *Open in the browser* (App's `inBrowser`, the gallery's and the right click's too), *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
   its right click has *Open* (the viewer) and *Open in the browser*.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it (`any`: any
@@ -2025,14 +2049,20 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
   the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
-  renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, in one `save`) or gives it
+  renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, under the tiles there, in one `save`) or gives it
   an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
   `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*), a
-  head dropped on a tab moves the tile there (`moveTo`: last), a tile's ⋯ › *Move to tab* too (or *A new tab*); Add
-  puts one on the tab shown; *Fetch* only that tab's. A head dragged onto another tile puts it
-  before it (HTML5 drag), the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
+  head dropped on a tab moves the tile there (`moveTo`: no cell, so under the tiles there), a tile's ⋯ › *Move to tab*
+  too (or *A new tab*); Add puts one on the tab shown; *Fetch* only that tab's. Cells: a tile's `x`, `y` (`shared/types.ts`
+  `deskLayout`: the one dragged or resized first, then the placed ones top to bottom, each pushed down past any it
+  overlaps, then the unplaced as CSS grid's sparse flow would, under the placed ones: a gap left stays; Desk's `at` pins
+  the tab's tiles where they are before one moves, so a tab never arranged keeps its flow); the head's pointer drag
+  (`move`, 4 px, `track`: capture, blur, edge scroll, Esc back where it was; none on a phone's one column, `.narrow`) to the cell under it,
+  onto a `[data-desk-tab]`: that tab; every tile of the tab saved in its cell after (`keep`, through `ends`: the tiles
+  as they are at the drag's end); rendered in the saved order, placed by `grid-column`/`grid-row`, `order` for a phone's
+  one column; the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
   release, a cancel and a release the page never got (outside the window, over its title bar: Chromium drops the
-  capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept); a tile shows the full view when there is
+  capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept; on a phone, its height only); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
   `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskBuild`, a `Modal`: `PromptInput` with `files`, text files

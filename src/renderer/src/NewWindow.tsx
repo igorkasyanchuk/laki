@@ -46,6 +46,7 @@ export function TabWindow() {
   useEffect(() => void (view && !t && window.close()), [view, t]) // closed in the app (or gone): the window goes too
   // on screen here: no ● while you look. No tab: the app's pane keeps the keyboard's
   useEffect(() => (id ? reportView(() => ({ tab: null, tabs: [id] })) : undefined), [id])
+  useEffect(() => void (t && (document.title = `${t.name}${ws ? ` · ${ws.name || ws.id}` : ''} — Laki`)), [t?.name, ws?.name])
   if (!view || !t) return null
   const s = view.settings
   const zoom = Number(load<Record<string, unknown> | null>('laki.zoom', {})?.[t.id]) || 0 // the tab's ⌘± in the app (App's sizeOf)

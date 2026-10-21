@@ -63,7 +63,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     GIT_COMMITTER_NAME: 't',
     GIT_COMMITTER_EMAIL: 't@t',
   }
-  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'CODEX_HOME') delete env[k]
+  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'CODEX_HOME' || k.startsWith('ANDROID_')) delete env[k] // ANDROID_HOME: the Simulator's adb, never this Mac's
   Object.assign(env, o.env)
   mkdirSync(join(home, 'bin'))
   execFileSync('git', ['init', '-q', '-b', 'main', repo], { env })

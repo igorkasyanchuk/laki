@@ -3,7 +3,7 @@
 Run Claude Code, Codex, Gemini, Grok, OpenCode or any command side by side on macOS, each task in its own git
 worktree. Agents keep running when the window is closed.
 
-- **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts and your `.env` copied in;
+- **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
@@ -40,14 +40,16 @@ worktree archived when it's done, each agent block's permission mode, a deleted 
 - **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar
   (<img src="docs/icons/pr-open.svg" width="13" alt="GitHub's mark"> its state,
   <img src="docs/icons/approved.svg" width="13" alt="✓"> approved, <img src="docs/icons/approved-you.svg" width="13" alt="✓✓"> by you
-  too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
+  too, 👀 you commented), sent to the agent if you like; a failing check's log a click away; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (one column or two side by side; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
-  drive a browser of their own on it (`laki browser`).
+  drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
+  this Mac has): a booted iOS Simulator, an Android emulator or a phone live in the panel, a click to tap, a drag to
+  swipe, a screenshot into the agent's prompt.
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
@@ -57,8 +59,8 @@ worktree archived when it's done, each agent block's permission mode, a deleted 
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
-  anyone with the link, if you type *confirm* (a red warning says what that risks); or through Tailscale, for your
-  tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet.
+  anyone with the link, if you type *confirm* (a red warning says what that risks; 24 hours at most); or through Tailscale, for your
+  tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet. Its link opens once, in one tab.
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([docs/headless.md](docs/headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
@@ -68,7 +70,7 @@ worktree archived when it's done, each agent block's permission mode, a deleted 
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: six Dock icons to pick from; 100 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
-- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your
+- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often, or any you make with Laki AI on the extension's own page, an agent's
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and in the sidebar's foot (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if

@@ -3,9 +3,10 @@
 // Stand-ins go in the test's own $HOME/bin (first on PATH).
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, lstatSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import type { SimCheck } from '../src/shared/types.ts'
 import { connect, fresh, type Rig, until } from './helpers.ts'
 
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
@@ -130,7 +131,7 @@ test("Run ▾'s scripts: a tab each, named as it, replaced when run again; Enter
   await until(async () => (await rig.tab(ws.id, 'lint'))?.status === 'exited', 'lint ended')
 })
 
-test("laki screen: the booted simulator's screenshot (in points with idb), tap, swipe, type, describe; refusals", async t => {
+test("laki screen: the booted simulator's screenshot (in points), tap, swipe, type, describe; refusals", async t => {
   const rig = await fresh(t)
   const bin = join(rig.home, 'bin')
   await assert.rejects(rig.rpc('device', { op: 'zoom' }), /screen: zoom\? one of shot, windows, tap, swipe, type, describe/)
@@ -140,6 +141,7 @@ test("laki screen: the booted simulator's screenshot (in points with idb), tap, 
 echo "xcrun $*" >> "$HOME/dev.log"
 [ "$3" = devices ] && { [ -f "$HOME/no-sim" ] && echo '{"devices":{}}' || echo '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-0":[{"udid":"U-1","name":"iPhone 17","state":"Booted"}]}}'; exit 0; }
 [ "$2" = io ] && { echo '${PNG}' | base64 -d > "$5"; exit 0; }
+[ "$2" = getenv ] && case "$4" in *WIDTH) echo 6 ;; *HEIGHT) echo 9 ;; *SCALE) echo 3.000000 ;; esac && exit 0
 exit 1
 `,
   )
@@ -168,7 +170,7 @@ exit 0
   const log = readFileSync(join(rig.home, 'dev.log'), 'utf8')
   for (const l of ['idb ui tap --udid U-1 -- 10 20', 'idb ui swipe --udid U-1 -- 1 2 3 4', 'idb ui text --udid U-1 -- -n hello', 'idb ui describe-all --udid U-1 --json'])
     assert.ok(log.includes(`${l}\n`), `${l} in\n${log}`)
-  // with idb, the picture at its size in points (sips: macOS's)
+  // the picture at its size in points, simctl's screen over its scale (sips: macOS's)
   const pts = await rig.rpc('device', { op: 'shot' })
   assert.match(pts.note ?? '', /pixels are points/)
   if (process.platform === 'darwin') {
@@ -179,6 +181,102 @@ exit 0
   assert.equal((await rig.cli('screen', 'tap', '5', '6')).out.trim(), 'ok')
   assert.match((await rig.cli('screen', 'shot')).out, /\/images\/\d+-\w+\.png/)
   assert.match((await rig.cli('screen', 'nope')).err, /no workspace|not found|no tab/i)
+})
+
+test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals; Settings › Simulators\' checks', async t => {
+  const rig = await fresh(t)
+  const bin = join(rig.home, 'bin')
+  const log = () => readFileSync(join(rig.home, 'sim.log'), 'utf8')
+  await assert.rejects(rig.rpc('sim', { op: 'zoom' }), /sim: zoom\? one of list, frame/)
+  assert.match((await rig.rpc('sim', { op: 'list' })).why.join('\n'), /Android: adb isn't on PATH/, 'none: why')
+  // a project's own Simulator switch: kept as a boolean, over Settings' (the renderer's); anything else unset
+  const pj = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.equal((await rig.rpc('projectSet', { id: pj.id, config: { simulator: false } })).config.simulator, false, "a project's own off")
+  assert.equal((await rig.rpc('projectSet', { id: pj.id, config: { simulator: 'yes' } })).config.simulator, undefined, 'not a boolean: as Settings say')
+  const ios = process.platform === 'darwin' // simctl: macOS's
+  script(
+    join(bin, 'xcrun'),
+    `#!/bin/sh
+echo "xcrun $*" >> "$HOME/sim.log"
+[ "$3" = devices ] && { echo '{"devices":{"iOS-26":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}]}}'; exit 0; }
+[ "$3" = runtimes ] && { echo '{"runtimes":[{"name":"iOS 26.0","platform":"iOS","isAvailable":true},{"name":"watchOS 12.0","platform":"watchOS","isAvailable":true}]}'; exit 0; }
+[ "$2" = io ] && { echo '${PNG}' | base64 -d > "$6"; exit 0; }
+[ "$2" = getenv ] && case "$4" in *WIDTH) echo 1170 ;; *HEIGHT) echo 2532 ;; *SCALE) echo 3.000000 ;; esac && exit 0
+exit 1
+`,
+  )
+  script(
+    join(bin, 'idb'),
+    `#!/bin/sh
+echo "idb $*" >> "$HOME/sim.log"
+exit 0
+`,
+  )
+  script(join(bin, 'idb_companion'), '#!/bin/sh\n')
+  script(join(bin, 'xcode-select'), '#!/bin/sh\necho /Applications/Xcode.app/Contents/Developer\n')
+  // adb and the emulator where Android Studio puts them, not on PATH
+  const sdk = join(rig.home, process.platform === 'darwin' ? 'Library/Android/sdk' : 'Android/Sdk')
+  mkdirSync(join(sdk, 'platform-tools'), { recursive: true })
+  mkdirSync(join(sdk, 'emulator'), { recursive: true })
+  script(join(sdk, 'emulator/emulator'), '#!/bin/sh\necho "INFO    | Storing crashdata"\necho Pixel_9\n')
+  // a screen of 1080 by 2400 pixels (its header's; sips may not read the rest: it goes as it came)
+  const png = Buffer.from(PNG, 'base64')
+  png.writeUInt32BE(1080, 16)
+  png.writeUInt32BE(2400, 20)
+  writeFileSync(join(rig.home, 'screen.png'), png)
+  script(
+    join(sdk, 'platform-tools/adb'),
+    `#!/bin/sh
+echo "adb $*" >> "$HOME/sim.log"
+case "$*" in
+  "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\nZX1  unauthorized usb:1-1 transport_id:2\\n' ;;
+  *"exec-out screencap -p") cat "$HOME/screen.png" ;;
+  "-s emulator-5554 emu avd name") if [ -f "$HOME/avd-ko" ]; then printf 'KO: unknown command\\r\\n'; else printf 'Pixel_9\\r\\nOK\\r\\n'; fi ;;
+esac
+exit 0
+`,
+  )
+  const l = await rig.rpc('sim', { op: 'list' })
+  assert.deepEqual(l.devices, [...(ios ? [{ id: 'ios:U-1', name: 'iPhone 17', os: 'ios' }] : []), { id: 'android:emulator-5554', name: 'Pixel 9', os: 'android' }], 'booted ones, ready ones; an emulator by its AVD')
+  assert.match(l.why.join('\n'), /ZX1 waits for you to allow USB debugging/, 'a phone that asks: said')
+  writeFileSync(join(rig.home, 'avd-ko'), '')
+  assert.equal((await rig.rpc('sim', { op: 'list' })).devices.at(-1).name, 'sdk gphone64 arm64', "a console that doesn't answer OK: its model")
+  rmSync(join(rig.home, 'avd-ko'))
+  const checks = async () => (await rig.rpc('sim', { op: 'check' })).checks as SimCheck[]
+  let c = await checks()
+  const by = (id: string) => c.find(x => x.id === id)!
+  assert.ok(by('adb').ok && by('adb').says.endsWith('platform-tools/adb'), "adb found in Android Studio's SDK")
+  assert.deepEqual([by('emulator').ok, by('emulator').says], [true, 'Pixel_9'], "its AVDs, the emulator's own lines left out")
+  assert.deepEqual([by('device').ok, by('device').says], [true, 'Pixel 9; ZX1 waits for you to allow USB debugging on it'])
+  if (ios) {
+    assert.deepEqual(c.filter(x => x.os === 'ios').map(x => [x.id, x.ok]), [['xcode', true], ['simctl', true], ['runtime', true], ['booted', true], ['idb', true]])
+    assert.equal(by('runtime').says, 'iOS 26.0', 'iOS runtimes only')
+    script(join(bin, 'xcode-select'), '#!/bin/sh\necho /Library/Developer/CommandLineTools\n')
+    c = await checks()
+    assert.deepEqual(c.filter(x => x.os === 'ios').map(x => x.id), ['xcode'], 'no Xcode: nothing after it')
+    assert.ok(!by('xcode').ok && !by('xcode').warn && /xcode-select -s/.test(by('xcode').fix!), 'the Command Line Tools alone: Xcode and the switch to it')
+  }
+  const droid = 'android:emulator-5554'
+  await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 }), /no frame of it yet/)
+  assert.match((await rig.rpc('sim', { op: 'frame', device: droid })).frame, /^data:image\/(png|jpeg);base64,/)
+  await rig.rpc('sim', { op: 'tap', device: droid, x: 0.5, y: 0.5 })
+  await rig.rpc('sim', { op: 'swipe', device: droid, x: 0, y: 0, x2: 1, y2: 1 })
+  await rig.rpc('sim', { op: 'type', device: droid, text: "it's a test" })
+  await rig.rpc('sim', { op: 'key', device: droid, key: 'back' })
+  for (const l of ['adb -s emulator-5554 shell input tap 540 1200', 'adb -s emulator-5554 shell input swipe 0 0 1079 2399 300', "adb -s emulator-5554 shell input text 'it'\\''s%sa%stest'", 'adb -s emulator-5554 shell input keyevent KEYCODE_BACK'])
+    assert.ok(log().includes(`${l}\n`), `${l} in\n${log()}`)
+  await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 2, y: 0 }), /x: a fraction of the picture/)
+  await assert.rejects(rig.rpc('sim', { op: 'key', device: droid, key: 'nope' }), /key: one of home, back/)
+  await assert.rejects(rig.rpc('sim', { op: 'frame', device: 'ios:U 1; rm' }), /which device\?/)
+  const shot = await rig.rpc('sim', { op: 'shot', device: droid })
+  assert.ok(shot.path.startsWith(join(rig.data, 'images')) && existsSync(shot.path), 'a screenshot for a prompt, in images/')
+  if (!ios) return
+  assert.match((await rig.rpc('sim', { op: 'frame', device: 'ios:U-1' })).frame, /^data:image\/jpeg;base64,/)
+  await rig.rpc('sim', { op: 'tap', device: 'ios:U-1', x: 0.5, y: 0.25 })
+  await rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'home' })
+  await rig.rpc('sim', { op: 'type', device: 'ios:U-1', text: '-n hi' })
+  await assert.rejects(rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'back' }), /on iOS, one of home, lock/)
+  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'xcrun simctl getenv U-1 SIMULATOR_MAINSCREEN_SCALE', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi']) assert.ok(log().includes(l), `${l} in\n${log()}`)
 })
 
 test('archived workspaces deleted after settings.archivedDays (their branch kept); copy ignored and untracked files into new worktrees', async t => {

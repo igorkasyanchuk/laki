@@ -246,7 +246,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       const settings = typeof a.settings === 'string' ? JSON.parse(a.settings) : a.settings // some models send the object as JSON text
       const w: WidgetView = await rpc('widgetSet', { id: a.id, place: places, size, every: a.every, view: a.view, hide: a.hide, config: settings, from: { ws: from, tab: from ? process.env.LAKI_TAB : undefined }, agent: true })
       const desk = placesOf(w).includes('desk') && (await rpc<View>('state')).settings?.desk === false
-      const off = [!w.on && `it's off: the user turns it on`, desk && 'the Desk is off: Settings › General › Experimental turns it on'].filter(Boolean)
+      const off = [!w.on && `it's off: the user turns it on`, desk && 'My Desk is off: Settings › General › Pages turns it on'].filter(Boolean)
       return { id: w.id, on: w.on, places: placesOf(w), size: w.size.join('x'), every: w.every, view: w.full ? w.view : undefined, hide: w.hide, ...(off.length ? { note: off.join('; ') } : {}) }
     },
   },
@@ -645,7 +645,7 @@ export function extNames<T extends { id: string; action: string }>(ts: T[]): Map
 }
 const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools', { ws: process.env.LAKI_WORKSPACE }).catch(() => []) : []) // an extension's permission server: none
 
-// light what it looked at (Settings › General › Experimental › Laki AI's glow)
+// light what it looked at (Settings › AI › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']
 // chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once)
 export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)

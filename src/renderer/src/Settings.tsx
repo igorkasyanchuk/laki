@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SimCheck, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -192,6 +192,8 @@ export type AppSettings = Paint & {
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
+  todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
+  simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
@@ -782,7 +784,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
 
 const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
@@ -981,7 +983,7 @@ export function ProjectSection(p: {
   file?: (id: string) => Promise<ProjectConfig>
   rename?: boolean
   script?: keyof Scripts
-  global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with this project's
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean } // Settings' own, which go with this project's (simulator: its switch, which this project's may override)
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
@@ -1071,6 +1073,13 @@ export function ProjectSection(p: {
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </Group>
+      <Group title="Simulator" hint="The side panel's Simulator tab in this project's workspaces: as Settings › Simulators says, or on or off here alone">
+        <select value={c.simulator === undefined ? '' : c.simulator ? 'on' : 'off'} aria-label="Simulator tab" onChange={e => setC(y => ({ ...y, simulator: e.target.value ? e.target.value === 'on' : undefined }))}>
+          <option value="">As in Settings ({p.global?.simulator ? 'on' : 'off'})</option>
+          <option value="on">On in this project</option>
+          <option value="off">Off in this project</option>
+        </select>
+      </Group>
       <Group title="Expose to the world" hint="Who can open a tunnel: the popup starts from it every time; emails and *@domains, or empty for anyone with the link">
         <input value={c.expose ?? ''} aria-label="Expose to the world" placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
         {badMails.length > 0 && <span className="field-err">Not an address or *@domain: {badMails.join(', ')}</span>}
@@ -1119,7 +1128,6 @@ const FIND: [string, string, string?][] = [
   ['ai', 'Keep pasted images (days)', 'images screenshots storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
-  ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
   ['appearance', 'Fun button', 'meme reddit smiley break joke'],
   ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
@@ -1199,6 +1207,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
@@ -1206,6 +1215,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
+  ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
   ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
@@ -1215,6 +1225,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
+  ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
@@ -1241,6 +1252,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
   { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
+  { id: 'simulator', label: 'Simulators', icon: 'phone', group: 'Connect' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
 
@@ -1284,6 +1296,59 @@ export type ResourcesApi = {
   stopOther?: (key: string) => Promise<unknown> // end one the daemon runs: Laki AI's ask, a tunnel, remote access
   widgetName: (id: string) => string
 }
+// Simulators: the side panel's Simulator tab (settings.simulator), and what an iOS Simulator or an Android emulator needs
+// on this Mac (the daemon's sim check), each one missing with its fix to copy
+function SimSection({ check, on, onOn }: { check: () => Promise<SimCheck[]>; on: boolean; onOn: (v: boolean) => void }) {
+  const [checks, setChecks] = useState<SimCheck[] | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(true)
+  const [copied, setCopied] = useState('') // the check whose fix was just copied
+  const run = () => (setBusy(true), check().then(c => (setChecks(c), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  useEffect(() => void run(), [])
+  const again = (
+    <button type="button" disabled={busy} onClick={run}>
+      {busy ? 'Checking…' : 'Check again'}
+    </button>
+  )
+  const list = (os: SimCheck['os']) =>
+    checks?.filter(c => c.os === os).map(c => (
+      <div key={c.id} className="sim-check" data-state={c.ok ? 'ok' : c.warn ? 'warn' : 'bad'}>
+        <Icon name={c.ok ? 'checkCircle' : c.warn ? 'alertCircle' : 'xCircle'} />
+        <div>
+          <div>
+            {c.label} <span className="muted">· {c.says}</span>
+          </div>
+          {c.fix && (
+            <div className="tunnel-code sim-fix">
+              <code>{c.fix}</code>
+              {!c.fix.includes('›') && <IconButton icon={copied === c.id ? 'check' : 'copy'} title={copied === c.id ? 'Copied' : 'Copy'} onClick={() => navigator.clipboard.writeText(c.fix!).then(() => (setCopied(c.id), setTimeout(() => setCopied(''), 2000)), e => setErr(String(e?.message ?? e)))} />}
+            </div>
+          )}
+        </div>
+      </div>
+    ))
+  return (
+    <>
+      <h2>Simulators</h2>
+      <p className="muted small">An iPhone in the iOS Simulator or an Android emulator (or a phone on USB) in the side panel: its screen live, your clicks as taps, a screenshot into the prompt for the agent.</p>
+      <Group title="Side panel">
+        <div className="setting-box">
+          <Switch className="switch-row" on={on} onChange={onOn}>
+            <Says title="Simulator tab" hint="The side panel's Simulator: the booted simulators and adb's devices, one picked. Laki starts none: boot one in Simulator or Android Studio. A project's settings can turn it on or off just there" />
+          </Switch>
+        </div>
+      </Group>
+      {err && <p className="warn small">{err}</p>}
+      <Group title="iOS" hint="Xcode's Simulator, on a Mac. idb adds taps, swipes and typing; without it the screen still shows" act={again}>
+        {list('ios') ?? (busy && <p className="muted small">Checking…</p>)}
+      </Group>
+      <Group title="Android" hint="adb from Android Studio's SDK (Laki finds it there, no PATH needed), and an emulator or a phone with USB debugging on">
+        {list('android') ?? (busy && <p className="muted small">Checking…</p>)}
+      </Group>
+    </>
+  )
+}
+
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
 const KIND: Record<string, string> = { main: 'Laki: the app (windows, menus, notifications)', renderer: 'a window: what it draws and runs', 'gpu-process': 'GPU: drawing every window and the bubbles', network: 'network', audio: 'audio', storage: 'storage', daemon: 'the daemon: sessions, hooks, scans, the API' }
 // the last 5 minutes of the totals, a sample every 3 s while the page is open (kept while the app runs): the graph
@@ -2325,7 +2390,7 @@ export function StudioSessions({ api, skip }: { api: WidgetsApi; skip?: string }
 
 // the rail's buttons after Projects (Settings › Appearance › Rail, Slack's way: which show, in what order; the rest
 // go into its ⋯ More): key, words, icon; when: what has it there at all. AI stays at the rail's foot
-type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: boolean; calendar?: boolean; railShells?: boolean; railBrowsers?: boolean; ai?: { on?: boolean } }
+type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: boolean; todoList?: boolean; calendar?: boolean; railShells?: boolean; railBrowsers?: boolean; ai?: { on?: boolean } }
 export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s: RailHas) => boolean }[] = [
   { key: 'board', label: 'Board', icon: 'board' },
   { key: 'schedules', label: 'Schedule', icon: 'clock' },
@@ -2333,6 +2398,7 @@ export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s
   { key: 'workflows', label: 'Flows', icon: 'flow', when: s => s.workflows === true },
   { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
   { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
+  { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList === true },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar === true },
   { key: 'shells', label: 'Terminal', icon: 'terminal', when: s => s.railShells !== false },
   { key: 'browsers', label: 'Browser', icon: 'globe', when: s => s.railBrowsers !== false },
@@ -2677,6 +2743,7 @@ export function SettingsPage(p: {
   remote?: RemoteApi
   widgets?: WidgetsApi
   resources?: ResourcesApi
+  simulator?: () => Promise<SimCheck[]> // Simulators' checks: the daemon's sim check
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
@@ -2952,7 +3019,7 @@ export function SettingsPage(p: {
               file={p.projectFile}
               rename={p.renameProjects}
               script={p.script}
-              global={{ actions: s.actions, templates: s.templates }}
+              global={{ actions: s.actions, templates: s.templates, simulator: s.simulator === true }}
               taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
@@ -3042,6 +3109,15 @@ export function SettingsPage(p: {
                 </select>
               </label>
               </Group>
+              {bridge?.badge && (
+                <Group title="Menu bar">
+                  <div className="setting-box">
+                    <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
+                      <Says title="Menu bar icon" hint="Laki's mark in the menu bar (the tray) with the count of agents that need you, as the Dock's badge; its menu lists them, new workspaces, screenshots and Open Laki with its hotkey" />
+                    </Switch>
+                  </div>
+                </Group>
+              )}
               {bridge?.hotkey && (
                 <Group title="Global hotkey">
                   <HotkeyField on={s.hotkeyOn !== false} keys={s.hotkey ?? HOTKEY} set={set} />
@@ -3195,6 +3271,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
                   <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
                 </Switch>
+                <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
+                  <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
+                </Switch>
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
@@ -3320,9 +3399,6 @@ export function SettingsPage(p: {
               <div className="setting-box">
                 <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
                   <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
-                </Switch>
-                <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
-                  <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
                 </Switch>
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
@@ -3729,6 +3805,7 @@ export function SettingsPage(p: {
               set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
           )}
+          {sec === 'simulator' && p.simulator && <SimSection check={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (

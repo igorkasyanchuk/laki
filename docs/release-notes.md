@@ -7,6 +7,24 @@ version it builds, with the date. -->
 - Achievements: forty small things to do, one action each, to get to know Laki. The trophy at the status bar's end
   counts them and opens the list (⌘K and Settings › Achievements too); each has *Show me*, unlocks with a small toast as
   you do it, and can be hidden, or all of them turned off.
+- Settings › General › *Menu bar icon* shows or hides Laki's mark in the menu bar (it was under Appearance), and the
+  mark's *Open Laki* shows the global hotkey.
+- The window's title says where you are: the page (*Settings — Laki*) or the workspace and tab (*fix-login · claude —
+  Laki*), so a screen share's picker, the Window menu and a browser's tab (remote access) name it.
+- My Desk: drag a tile anywhere on the grid; gaps stay where you leave them and a tile in the way moves down (Esc
+  puts it back).
+- To-dos (experimental, Settings › General): one checklist of your own, Notion's way: headings, to-dos under others,
+  dragged into order. The rail's To-dos, or in its ⋯ More.
+- The chat button at the bottom right minimizes into the status bar (the – on its corner, or its right click), so it
+  covers nothing; it stays there until its right click floats it again.
+- The side panel's Simulator: a booted iOS Simulator, an Android emulator or a phone on adb live in the panel; click
+  to tap, drag to swipe, type, Home, Back, Lock, and a screenshot into the agent's prompt. Taps and typing on iOS need
+  idb; a phone that waits for you to allow USB debugging is named. Off until Settings › Simulators turns it on (a project's
+  settings can turn it on or off there alone), which also checks what iOS and Android need on this Mac (Xcode, its license, an iOS runtime, idb; adb, an emulator, a
+  device) and gives the command for each missing one; adb and the emulator are found in Android Studio's SDK, no PATH
+  needed.
+- `laki screen shot` draws the simulator's screen in points without idb too (simctl says its size), so a spot in the
+  picture is where to tap, iOS 27's home screen too.
 - A workspace or tab an agent made (`laki new`, `laki run`, `laki ship`, MCP, Laki AI, a workflow run it started), and
   an agent's ship and archive, are the agent's events too: a workflow that runs commands doesn't start on their
   `workspace.new`, `tab.new`, `ship.done` or `workspace.archived`.
@@ -17,11 +35,12 @@ version it builds, with the date. -->
 - An extension's gate that says no and exits 1 now holds the ship, merge or archive, and `laki archive` prints why
   a gate held it and exits 1, like `laki ship`.
 - A workflow that starts on a new workspace or a new tab no longer starts itself again from its own run's
-  worktree.
+  workspace (its worktree, or the project's folder for a local run).
 - A repo's workflow says which event it starts on and that it changed since you allowed it, and only you can
   allow it: an agent can't.
-- The app window loads pictures only from GitHub's avatars: an extension's https pictures come through Laki's daemon,
-  and Settings › Appearance › GitHub pictures turns the avatars off too.
+- The app window loads pictures only from GitHub's avatars: an extension's https pictures come through Laki's daemon
+  (a public site's only, never this Mac's or your network's), and Settings › Appearance › GitHub pictures turns the
+  avatars off too.
 - A page that keeps knocking on Laki's daemon without its key no longer fills daemon.log: the first refusal is logged,
   then a count once a minute.
 - A tunnel, shared tab or remote access link left running by a daemon that crashed is stopped as Laki's daemon starts
@@ -29,9 +48,9 @@ version it builds, with the date. -->
 - A link behind words in a terminal (Claude Code's) opens on ⌘-click only, and hovering any link shows where it goes.
 - A laki://new link fills in only the prompt and the name, never the agent, and the page says the prompt came from a
   link.
-- Opening files is more careful: an HTML file from a terminal link or the Files menu is shown in Finder (an HTML
-  artifact opens in the browser through Laki's sandboxed page), Xcode projects and playgrounds are shown, not opened,
-  and Open in › its default app shows a .command, an app or an executable in Finder instead of running it.
+- Opening files is more careful: an HTML file from a terminal link or a kept `file:///` link is shown in Finder (an
+  HTML artifact opens in the browser through Laki's sandboxed page), Xcode projects and playgrounds are shown, not
+  opened, and Open in › its default app shows a .command, an app or an executable in Finder instead of running it.
 - A shared tab masks what looks like a token or a key (sk-…, ghp_…, a Bearer token, a JWT, ?token= in a URL) and shows
   pictures as links, and its popover says commands and output are shared as they are.
 - Phone pushes can send only who needs you (Settings › Phone pushes › What it sends): no question, choices or command
@@ -60,7 +79,7 @@ version it builds, with the date. -->
 - An agent's prompt reaches it through an environment variable, never quoted into a shell line: a prompt can't break
   out under fish. Variables typed into a fish shell tab are quoted fish's way.
 - Workflows: a project's workflow that came with the repo (or changed since) starts on an event, a schedule or an
-  agent's ask only once you Save it in its editor or *Trust it…*. Your own Start still runs it. A repo workflow you
+  agent's ask only once you Save it in its editor or *Allow…* it. Your own Start still runs it. A repo workflow you
   used before this version: save it once.
 - A repo's `.laki.json` runs nothing until you trust it: the status bar says *.laki.json waits for you*, a click shows
   the file and *Trust this repo's .laki.json*, and an edit to it waits again. Projects you had before this version are
@@ -76,12 +95,17 @@ version it builds, with the date. -->
 - Turning on an extension shows its `widget.json` as it is on disk now, even one changed a moment before.
 - A repo's extension: its turn-on sheet lists every file it's trusted as and the scripts it runs; one with a link out
   of its folder, or past 2,000 files, can't be turned on, and a link to a folder inside it is checked like the folder.
+  Linked with `laki widget dev` (or a Settings folder), it stays the repo's: off until you look.
 - Laki AI shows you a command before it runs in a shell, with *Yes, run it* / *No*: it no longer runs one on its own.
   Typed for you (Enter yours) and messages to agents need no Yes.
 - An agent's `laki new` and `laki tab` (and MCP's) can't start a command of its own (`--cmd`, a command preset): only
   an agent or a shell. Yours still can.
-- Extensions: an agent's event (`laki widget emit` in its tab, Laki AI's) only makes extensions fetch again; it no
-  longer runs their actions.
+- Extensions: an agent's event (`laki widget emit` in its tab, Laki AI's) runs an extension's action only once you
+  allow it in the app (*Always in <workspace>* keeps it, with *Revoke* in its Settings card); a fetch isn't asked.
+- The *Pull main* starter's `claude -p` may run only the git commands a merge takes (fetch, merge, status, diff, log,
+  add, commit): no push, reset or clean.
+- Workflows: an AI call or AI decision block (and memory's compaction) gives up after 5 minutes, and a *matches* test
+  that runs past 200 ms stops the run on its block, saying why, instead of holding up Laki's daemon.
 - Workflows: one an agent wrote runs only from its editor's *Start* until you save it: not on a schedule, an event,
   Run again or the CLI. Deleting it and Undo keep it marked.
 - A failing check in Info and Review has **Log**: the end of its failed steps, so you see why CI is red before you

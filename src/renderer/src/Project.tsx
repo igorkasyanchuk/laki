@@ -24,7 +24,7 @@ export type ProjectApi = {
   save(o: { notes?: string; memory?: Memory[] }): Promise<unknown>
   saveSettings(o: { name?: string; config: ProjectConfig; notes?: string }): unknown
   file(id: string): Promise<ProjectConfig>
-  global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with the project's
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean } // Settings' own, which go with the project's
   onGlobal(sec: 'actions' | 'templates'): void
   schedules(): void // the Scheduled tasks page, at this project: making and changing them is there
   setSchedule(id: string, on: boolean): Promise<unknown>

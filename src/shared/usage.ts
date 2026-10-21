@@ -50,7 +50,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget logs <id> [-n 100] [-f] [--level error] [--ws <ws>] [--json]  its log (when it keeps one): -f follows it
   laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off
   laki widget emit <name> [json | -] [--ws <ws>]  an event of your own, custom.<name>: extensions and workflows on it run
-  laki widget events                          the last 50 events, and what each reached
+  laki widget events                          the last 50 events, and what each reached (or why not)
   laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]
         where it shows, its size, how often it fetches, its full view, what it hides, its settings
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data
@@ -71,7 +71,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
   laki serve --tailscale [--pin | --funnel] | --cloudflare --mail <you@x.com> | --cloudflare --pin | --cloudflare --open --hours <n ≤ 24>  [--hours n]
-                                              headless: the daemon and remote access, until stopped (docs/headless.md)
+                                              headless: the daemon and remote access, until stopped (docs/headless.md);
+                                              its link opens once, its PIN prints on a terminal only (else laki remote)
   laki remote [stop]                          remote access's link and PIN now | stop it
   --json prints machine-readable output`
 
@@ -87,7 +88,8 @@ script: projects (id, path), workspaces (id, branch, path, port, pr, tabs: a | b
   new: `Makes a workspace: a git worktree on a new branch (or the folder itself with --local), set up by the project's setup
 script, with the agent started on the prompt. Prints the new workspace's id. In a Laki tab, . is this tab's project.
 Write the prompt as for a colleague who hasn't seen this conversation: the goal, where to look, how to tell it's done.
-From an agent's tab: an agent or a shell, no --cmd and no command preset.
+From an agent's tab: an agent or a shell, no --cmd and no command preset. A repo's .laki.json (its setup, env, scripts)
+waits until the user trusts it in the app: the workspace is made, its setup runs then.
 
   laki new . --prompt "Add CSV export to the reports page; npm test passes"
   laki new shop --preset codex --name csv-export --prompt "…"
@@ -98,12 +100,13 @@ From an agent's tab: an agent or a shell, no --cmd and no command preset.
   send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or
 number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). While the agent asks
 something (status waiting: a permission prompt), the text would answer it: leave those to the user, or --when-idle.
+From an agent's tab, a tab in another workspace: the user is asked in the app first.
 
   laki send a1b2 "Now add tests for it"
   laki send a1b2/codex --when-idle "Rebase on main when you're done"`,
   screen: `Prints the bottom of a tab's screen (30 lines unless --lines): what the agent shows now, its question too.
 laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and apps' windows instead (shot prints a
-PNG's path: read it).
+PNG's path: read it). From an agent's tab, a tab in another workspace: the user is asked in the app first.
 
   laki screen a1b2 --lines 80
   laki screen shot                              the booted simulator
@@ -144,7 +147,7 @@ prints the page's text. In a tab, <ws> is its own.
 
   laki archive a1b2`,
   run: `Starts the project's run script (a dev server, on $PORT) in a tab of its own, or test, lint, format or deploy
-(the project's scripts) in theirs.
+(the project's scripts) in theirs. A repo's .laki.json runs nothing until the user trusts it in the app: it says so.
 
   laki run a1b2
   laki run a1b2 test`,
@@ -153,7 +156,7 @@ prints the page's text. In a tab, <ws> is its own.
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
 late is skipped). --where: new (a worktree each run), folder, folder-new, or a workspace id (its agent gets it).
-{{DD-MM-YY}} in the name or prompt is the run's date.
+{{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
 
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
@@ -165,7 +168,9 @@ this workspace.
   flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
 have (--ws; . is this tab's, the project then its). --dry says what a PR, approve or merge would do instead of doing it.
 --set gives one of its Start's inputs (inputs: in the file), again for each; the ones without a default are needed.
-check reads workflow files as Laki would and names each problem (a repo's hook or CI: it needs no daemon).
+check reads workflow files as Laki would and names each problem (a repo's hook or CI: it needs no daemon). One an agent
+wrote runs only from its editor in Laki until the user saves it there; a repo's (.laki/workflows) starts for an agent, an
+event or a schedule only once the user allows it as it is. answer is the user's (refused in an agent's tab).
 
   laki flow ls
   laki flow run review-pr shop "Review PR #118" --dry

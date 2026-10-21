@@ -398,7 +398,7 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   // where it shows, its size, every and a setting: no OK needed; it says it's off, and the Desk too
   const r = await tool('laki_extension_set')({ id: 'my-prs', places: ['desk', 'side'], size: '2x1', every: 7, settings: { author: 'bob' } })
   assert.deepEqual([r.places, r.size, r.every, r.on], [['desk', 'side'], '2x1', 7, false])
-  assert.match(r.note, /it's off: the user turns it on; the Desk is off/)
+  assert.match(r.note, /it's off: the user turns it on; My Desk is off/)
   const ls = (await tool('laki_extensions')({})).find((w: any) => w.id === 'my-prs')
   assert.deepEqual([ls.places, ls.settings.find((x: any) => x.key === 'author').value], [['desk', 'side'], 'bob'])
   await assert.rejects(tool('laki_extension_set')({ id: 'my-prs', size: 'big' }), /a size: across x down/)
