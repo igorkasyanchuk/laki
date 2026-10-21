@@ -1583,10 +1583,11 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .status .sb-ai.on { background: var(--accent); color: var(--accent-fg); }
 .status .sb-ai.landed { animation: sb-ai-in 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes sb-ai-in { from { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); } }
+.main:has(.sim-type) > .ai-fab-wrap { bottom: 76px; } /* over the Simulator's typing row, not on its Return; first: the strip and a page win */
+.main:has(.sim-type) > .ai-float { bottom: 126px; height: min(620px, calc(100% - 152px)); } /* above the button, as at 34px */
 .main:has(> .artifacts) > .ai-fab-wrap { bottom: 184px; } /* over the Artifacts strip, not on it */
 .main:has(> .artifacts) > .ai-float { bottom: 234px; height: min(620px, calc(100% - 260px)); }
 .main:has(> .settings-page) > .ai-fab-wrap { bottom: 16px; } /* a page covers the status bar (and the strip) */
-.main:has(.sim-type) > .ai-fab-wrap { bottom: 76px; } /* over the Simulator's typing row, not on its Return */
 .ai-float { position: absolute; right: 16px; bottom: 84px; z-index: 41; width: min(440px, calc(100% - 32px)); height: min(620px, calc(100% - 110px)); display: flex; border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--line)); border-radius: calc(var(--rs, 12px) + 4px); overflow: hidden; box-shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.18); background: var(--panel); transform-origin: 100% 100%; animation: ai-pop 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ai-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } } /* out of the button below it */
 html.away .ai-float { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */

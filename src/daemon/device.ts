@@ -142,8 +142,8 @@ const sdkTool = (rel: string) => {
   return roots.map(r => r && join(r, rel)).find(f => f && existsSync(f)) || undefined
 }
 const NO_ADB = "adb isn't on PATH nor in Android Studio's SDK: install Android Studio (or brew install android-platform-tools)"
-const adb = (serial: string | null, args: string[]) =>
-  run(sdkTool('platform-tools/adb') ?? 'adb', [...(serial ? ['-s', serial] : []), ...args], { timeout: 30000, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
+const adb = (serial: string | null, args: string[], timeout = 30000) =>
+  run(sdkTool('platform-tools/adb') ?? 'adb', [...(serial ? ['-s', serial] : []), ...args], { timeout, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
     Promise.reject(new Error((e as { code?: string }).code === 'ENOENT' ? NO_ADB : `adb: ${said({ stderr: String((e as { stderr?: Buffer }).stderr ?? ''), message: (e as Error).message })}`)),
   )
 // adb's devices: the ready ones, and the ones that wait for you (USB debugging not allowed yet on the phone)
@@ -155,11 +155,16 @@ async function droidDevices() {
     if (m?.[2] === 'unauthorized') asks.push(m[1])
     else if (m) ready.push({ serial: m[1], name: /model:(\S+)/.exec(m[3])?.[1]?.replace(/_/g, ' ') ?? m[1] })
   }
-  // an emulator by its virtual device (Pixel 10 API 37), not its model (sdk gphone64 arm64); its first line, then OK
+  // an emulator by its virtual device (Pixel 10 API 37), not its model (sdk gphone64 arm64): the console's answer is
+  // the name, then OK; anything else (KO, a console that wants its auth token) keeps the model. 5 s: a wedged console
+  // would hold the list
   await Promise.all(
     ready
       .filter(d => /^emulator-\d+$/.test(d.serial))
-      .map(d => adb(d.serial, ['emu', 'avd', 'name']).then(r => void ((n => n && n !== 'OK' && (d.name = n.replace(/_/g, ' ')))(String(r.stdout).split(/\r?\n/)[0].trim())), () => {})),
+      .map(async d => {
+        const lines = String((await adb(d.serial, ['emu', 'avd', 'name'], 5000).catch(() => ({ stdout: '' }))).stdout).split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+        if (lines.length === 2 && lines[1] === 'OK' && lines[0] !== 'OK') d.name = lines[0].replace(/_/g, ' ')
+      }),
   )
   return { ready, asks }
 }

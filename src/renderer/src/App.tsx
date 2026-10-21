@@ -2325,6 +2325,7 @@ export function App() {
     for (const { w, m } of extMenus('palette', ws)) a({ label: `${w.name}: ${m.title}`, icon: 'panel', hint: m.key ? keyText(m.key) : 'extension', run: () => void extRun(w, m, hereCtx()) })
     a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: '⌘⇧⏎', run: () => toggleFull() })
     if (aiOn(settings)) a({ label: 'Ask Laki AI later…', icon: 'timer', run: () => sendLater('ai') })
+    if (aiOn(settings) && settings.ai?.float !== false && aiDock) a({ label: 'Float the Laki AI button again', icon: 'popOut', run: () => dock(false) }) // minimized: where no status bar shows it too
     if (ws?.storage) a({ label: gallery === ws.id ? 'Hide artifacts' : 'Show artifacts', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts })
     for (const race of new Set(live.flatMap(w => (w.race ? [w.race] : [])))) {
       const w = live.find(w => w.race === race)!
@@ -2405,7 +2406,7 @@ export function App() {
       for (const x of accountsOf(agent))
         if ((settings.accountUse?.[agent] ?? HOME_ACCOUNT) !== x.id) a({ label: `Switch ${AGENT_NAMES[agent]} to ${x.name}`, icon: 'agent', hint: 'new sessions', run: () => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: x.id } }).then(() => toast(`New ${AGENT_NAMES[agent]} sessions start on ${x.name}`, undefined, undefined, true), () => {}) })
     return items
-  }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length, find, gallery, full])
+  }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length, find, gallery, full, aiDock])
 
   const pinning = pinAsk && !connected
   if (!view)
