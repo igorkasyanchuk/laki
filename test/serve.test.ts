@@ -42,11 +42,12 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   assert.deepEqual([on.url, on.via, on.mail, on.open, on.until, on.peers, on.funnel], [url, 'tailscale', '', undefined, undefined, 1, false]) // no email, never "open"; the other device online
   assert.match(on.link, /^https:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64}$/)
   assert.match(readFileSync(join(rig.home, 'ts.log'), 'utf8'), new RegExp(`serve --https=443 http://127\\.0\\.0\\.1:${port}\n`))
-  const key = on.link.split('?token=')[1]
-  const ping = (origin: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${key}`, origin }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
+  const key = on.link.split('?token=')[1] // good once, for the page's own token
+  const own = (await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: key }) }).then(r => r.json())).token
+  const ping = (origin: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${own}`, origin }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   assert.equal(await ping(url), 200)
   assert.equal(await ping('https://evil.ts.net'), 403)
-  const c = await connect(rig, url, key)
+  const c = await connect(rig, url, own)
   assert.equal(await c.call('ping'), 'pong')
   c.close()
 
@@ -55,8 +56,9 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   assert.match(r.out, /box\.tail1234\.ts\.net\/\?token=.*\nyour tailnet's devices only\nuntil stopped/)
   const s = await rig.cli('serve', '--tailscale')
   assert.equal(s.code, 0, s.err)
-  assert.match(s.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64}\n[^]*in the daemon already running here/)
+  assert.match(s.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64} \(opened already: a link works once[^\n]*\n[^]*in the daemon already running here/)
   assert.match((await rig.cli('serve')).err, /how do you get in\? laki serve --tailscale/)
+  assert.match((await rig.cli('serve', '--cloudflare', '--open')).err, /--open lets in anyone with the link: give it --hours \(24 at most\)/)
 
   assert.equal((await rig.cli('remote', 'stop')).out.trim(), 'stopped')
   await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').includes('stopped'), 'tailscale serve stopped')
@@ -70,6 +72,9 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   assert.deepEqual([f.funnel, f.peers, typeof f.pin], [true, 0, 'string'])
   assert.match(readFileSync(join(rig.home, 'ts.log'), 'utf8'), new RegExp(`funnel --https=443 http://127\\.0\\.0\\.1:${port}\n`))
   assert.match((await rig.cli('remote')).out, /on the internet \(Tailscale Funnel\)\nPIN \d{6}/)
+  const logged = (await rig.cli('serve', '--tailscale', '--pin')).out // not a terminal (a service's log): no PIN in it
+  assert.match(logged, /PIN: see Settings › Remote access, or laki remote/)
+  assert.doesNotMatch(logged, /PIN \d{6}/)
   await rig.rpc('remoteStop')
   const lone = await rig.rpc('remoteStart', { hours: 1, via: 'tailscale' })
   assert.equal(lone.peers, 0)
@@ -84,7 +89,7 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   const alone = await rig.cli('serve', '--tailscale')
   delete rig.env.LAKI_HEADLESS_PARENT
   assert.equal(alone.code, 0, alone.err)
-  assert.match(alone.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64}\n[^]*laki: Laki --headless ended: stopping/)
+  assert.match(alone.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64} \(it works once, in one tab\)\n[^]*laki: Laki --headless ended: stopping/)
   await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').match(/stopped/g)?.length === 4, 'its tailscale serve went with it')
 })
 

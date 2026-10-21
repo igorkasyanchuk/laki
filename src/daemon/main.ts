@@ -378,9 +378,18 @@ const api: Record<string, Handler> = {
   shutdown: () => void setTimeout(shutdown, 50),
 }
 
-async function call(method: string, params: any, c?: core.Conn) {
+// remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
+const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin'])
+const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env)$/ // settings it may send back unchanged (Settings saves them all), not change
+const remoteNo = (method: string, p: any) =>
+  REMOTE_NO.has(method) ||
+  (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
+  (method === 'settingsSet' && Object.keys(p ?? {}).some(k => REMOTE_KEYS.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k])))
+
+async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote) {
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
+  if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   return await h(params ?? {}, c)
 }
 
@@ -425,7 +434,7 @@ const server = createServer(async (req, res) => {
   }
   try {
     const { method, params } = JSON.parse(body)
-    reply(200, { result: (await call(method, params)) ?? null })
+    reply(200, { result: (await call(method, params, undefined, !!req.headers.origin && req.headers.origin === core.remoteOrigin())) ?? null })
   } catch (e) {
     reply(200, { error: (e as Error).message })
   }
@@ -443,6 +452,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   wss.handleUpgrade(req, socket, head, ws => {
     const c: core.Conn = {
       id: ++clientSeq,
+      remote: !!req.headers.origin && req.headers.origin === core.remoteOrigin(),
       send: msg => {
         if (ws.readyState !== ws.OPEN) return
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and

@@ -1480,7 +1480,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number }
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number }
 export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
@@ -1499,13 +1499,15 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
   const [sure, setSure] = useState('') // no email: confirm, typed
   const r = api.state
   const open = !pin && !ts && !mail.trim()
+  const shown = open ? REMOTE_HOURS.filter(h => h && h <= 24) : REMOTE_HOURS // without an email, 24 hours at most (the daemon's rule)
+  const forHours = shown.includes(hours) ? hours : 24
   const ok = pin || ts || (open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim()))
   const fail = (e: unknown) => setErr(String((e as Error).message ?? e))
   const start = async () => {
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(hours, mail.trim(), open, pin, ts ? 'tailscale' : undefined, ts && funnel).then(() => setSure(''), fail) // the next start without an email asks again
+    await api.start(forHours, mail.trim(), open, pin, ts ? 'tailscale' : undefined, ts && funnel).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -1517,7 +1519,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
         This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
         its own (without an email, that key is the only lock). With a PIN instead, there's no Cloudflare sign-in: the page asks for a PIN Laki shows
-        here, and a wrong one (twice, unless you pick otherwise) stops remote access. It stops after the time you pick (or never: Forever), when you
+        here, and a wrong one (twice, unless you pick otherwise) stops remote access. The link opens once, in one tab. It stops after the time you pick (or never: Forever; without an email, 24 hours at most), when you
         stop it, or with the daemon, and a stopped link never works again. With Tailscale, tailscale serve publishes it on this Mac's name in your
         tailnet instead: only your tailnet's devices reach it, with the link's key.
       </p>
@@ -1529,8 +1531,11 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
             <div className="tunnel-code">
               <code>{r.link}</code>
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
-              {!r.via && <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />}
+              {!r.via && !r.used && <IconButton icon="link" title="Open (here: the link opens once)" onClick={() => api.open(r.link!)} />}
             </div>
+            <p className={r.used ? 'warn-soft small' : 'muted small'}>
+              {r.used ? 'Opened: the link works once, in one tab, and that tab stays in. For another device, stop remote access and start it again.' : 'The link opens once, in one tab: the page keeps its own key after that.'}
+            </p>
             {r.via === 'tailscale' && (
               <p className={r.peers === 0 && !r.funnel ? 'warn-soft small' : 'muted small'}>
                 {r.peers === 0 && !r.funnel ? 'No other device is on your tailnet right now, and this Mac can’t open its own Tailscale link (macOS keeps its tailnet address to itself). Put Tailscale on your phone or another computer, sign in with the same account, then open the link there.' : `Open it on ${r.funnel ? 'any device' : 'another device in your tailnet'}: this Mac can’t open its own Tailscale link. The first visit can take a few seconds (its HTTPS certificate).`}
@@ -1647,8 +1652,8 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
           <div className="field">
             <span>For</span>
             <div className="seg" role="radiogroup" aria-label="For how long">
-              {REMOTE_HOURS.map(h => (
-                <button key={h} type="button" role="radio" aria-checked={h === hours} className={h === hours ? 'on' : ''} onClick={() => setHours(h)}>
+              {shown.map(h => (
+                <button key={h} type="button" role="radio" aria-checked={h === forHours} className={h === forHours ? 'on' : ''} onClick={() => setHours(h)}>
                   {h ? `${h}h` : 'Forever'}
                 </button>
               ))}

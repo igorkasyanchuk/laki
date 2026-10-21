@@ -535,7 +535,7 @@ export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); peers: the tailnet's other devices online as it started
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const IMAGE_DAYS = 30 // days a pasted image is kept (<data>/images: Laki AI's chats, prompts) unless Settings › AI says otherwise

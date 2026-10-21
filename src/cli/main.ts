@@ -131,9 +131,10 @@ function kit(type?: string) {
 const glyph: Record<string, string> = { running: '◐', waiting: '◆', idle: '○', exited: '✖' }
 
 // remote access in words: its link, who gets in, until when
-const remoteText = (r?: Remote) =>
+// pin: false (a log, not a terminal): where to see the PIN instead
+const remoteText = (r?: Remote, pin = true) =>
   !r ? 'remote access is off: laki serve, or Settings › Remote access' : !r.link ? 'remote access is starting…' :
-  [r.link, r.via && (r.funnel ? 'on the internet (Tailscale Funnel)' : `your tailnet's devices only${r.peers === 0 ? ": none online but this machine, which can't open its own link" : ''}`), r.pin ? `PIN ${r.pin} (${r.tries} wrong tries stop it)` : !r.via && (r.mail ? `only ${r.mail} (Cloudflare's code)` : 'anyone with the link'), r.until ? `until ${new Date(r.until).toLocaleString()}` : 'until stopped'].filter(Boolean).join('\n')
+  [r.used ? `${r.link} (opened already: a link works once; laki serve again for a new one)` : `${r.link} (it works once, in one tab)`, r.via && (r.funnel ? 'on the internet (Tailscale Funnel)' : `your tailnet's devices only${r.peers === 0 ? ": none online but this machine, which can't open its own link" : ''}`), r.pin ? (pin ? `PIN ${r.pin} (${r.tries} wrong tries stop it)` : 'PIN: see Settings › Remote access, or laki remote') : !r.via && (r.mail ? `only ${r.mail} (Cloudflare's code)` : 'anyone with the link'), r.until ? `until ${new Date(r.until).toLocaleString()}` : 'until stopped'].filter(Boolean).join('\n')
 
 // laki serve: headless, a server without the app (Linux too, or the AppImage's --headless): the daemon in this process
 // (or the one running), with remote access through tailscale or cloudflared for the browser, until stopped (Ctrl-C,
@@ -145,6 +146,7 @@ async function serve(a: string[]) {
   const via = has('tailscale') ? 'tailscale' : 'cloudflare'
   const o = { via, hours: Number(val('hours') ?? 0), pin: has('pin') || has('funnel'), mail: val('mail'), open: has('open'), funnel: has('funnel') } // funnel: the internet, so a PIN always
   if (via === 'cloudflare' && !o.pin && !o.mail && !o.open) throw new Error('how do you get in? laki serve --tailscale [--pin | --funnel] | --cloudflare --mail you@example.com | --cloudflare --pin  [--hours n]')
+  if (via === 'cloudflare' && o.open && !o.pin && !o.mail && !val('hours')) throw new Error('--open lets in anyone with the link: give it --hours (24 at most)')
   // started by Laki --headless, which waits on this process (not passed on to the daemon's agents)
   const parent = Number(process.env.LAKI_HEADLESS_PARENT)
   delete process.env.LAKI_HEADLESS_PARENT
@@ -160,7 +162,7 @@ async function serve(a: string[]) {
     if (!running) await rpc('shutdown').catch(() => {})
     throw e
   }
-  console.log(`laki: remote access\n${remoteText(r)}`)
+  console.log(`laki: remote access\n${remoteText(r, !!process.stdout.isTTY)}`) // a service's log: no PIN in it
   if (running) return console.log('(in the daemon already running here: laki remote shows it again)')
   const stop = (why: string) => {
     clearInterval(watch)

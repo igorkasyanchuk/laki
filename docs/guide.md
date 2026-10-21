@@ -436,12 +436,17 @@ email address only, unless you leave the email out on purpose (below).
   to the world*.
 - cloudflared publishes the daemon at a random `https://….trycloudflare.com` link; the daemon serves the app's
   page there. Cloudflare asks for that email and sends it a one-time code, and the link also carries a key of
-  its own (`?token=…`: it survives Cloudflare's sign-in, which drops anything after `#`).
+  its own (`?token=…`: it survives Cloudflare's sign-in, which drops anything after `#`). The link opens once, in
+  one tab: the page swaps its key for one of its own (a reload keeps it), and Settings says *Opened*. For another
+  device, stop it and start it again.
+- From the browser it can do what you'd do at the Mac but these: start remote access, install the `laki` command, add
+  or sign in accounts, set Laki AI's key or the agent skill, turn an extension on (or its network or source), change
+  the remote access, phone push, preset, env or extension-folder settings, or quit Laki's daemon. Do those at the Mac.
 - Without an email (a real risk): leave the field empty, and a red box says what it means: no Cloudflare
   sign-in, the link alone opens a shell on this Mac as you, and a link in a chat, a screenshot or a browser's history
   is enough. Type *confirm* to start it (*Start without an email*), and every start asks again. While it runs, the
   page says *Anyone with this link gets in* and the status bar's badge turns red: *Remote: open to anyone with the
-  link*. The link's key still has to be right; pick a short time and stop it when you're done.
+  link*. The link's key still has to be right; 24 hours at most (no Forever), and stop it when you're done.
 - With a PIN instead (*Sign in with* › *PIN (Laki)*; the email stays the default): no Cloudflare sign-in and no
   email. Each start makes a new 6-digit PIN, shown big beside the QR code; the page asks for it before it opens
   Laki (the link's key alone gets nothing else). A wrong PIN counts down: after 2 (or what you pick: 1, 2, 3, 5 or 10)

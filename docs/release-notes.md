@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Remote access's link opens once, in one tab (the page keeps a key of its own), and from the browser it can't start
+  remote access again, install the laki command, change phone pushes, presets, env or extension folders, sign in
+  accounts, turn an extension on or quit the daemon. Without an email it runs 24 hours at most; laki serve
+  --cloudflare --open needs --hours, and laki serve keeps the PIN out of a service's log.
 - Answer from the phone signs each ntfy tap, so a made-up tap is ignored, and needs a topic only you can read (your
   own ntfy server, or ntfy.sh with ?auth=). Where it was on with a plain ntfy.sh topic, the upgrade turns it off and
   Settings says why.

@@ -18,7 +18,7 @@ own Node, before any window. It prints the link:
 
 ```
 laki: remote access
-https://box.tail1234.ts.net/?token=4f1c…
+https://box.tail1234.ts.net/?token=4f1c… (it works once, in one tab)
 your tailnet's devices only
 until stopped
 ```
@@ -36,12 +36,16 @@ Pick one:
 | | Who reaches it | Needs |
 |---|---|---|
 | `--tailscale` | devices in your tailnet, with the link | Tailscale on the server, connected (`tailscale up`); HTTPS on for the tailnet |
-| `--tailscale --pin` | the same, plus a 6-digit PIN the server prints | the same |
+| `--tailscale --pin` | the same, plus a 6-digit PIN (printed on a terminal; in a service's log, `laki remote` shows it) | the same |
 | `--tailscale --funnel` | anyone on the internet with the link and the PIN (Tailscale Funnel; a PIN always) | the same, and Funnel on for the tailnet (its policy's `funnel` attribute) |
 | `--cloudflare --mail you@example.com` | that email only, after a one-time code from Cloudflare | `cloudflared` 2026.9.3+ |
 | `--cloudflare --pin` | anyone with the link and the PIN (2 wrong PINs stop it) | `cloudflared` |
 
-`--hours n` (1, 2, 4, 8, 12, 24, 48 or 72) stops it after that long; the default is until stopped.
+`--hours n` (1, 2, 4, 8, 12, 24, 48 or 72) stops it after that long; the default is until stopped. `--cloudflare --open`
+(anyone with the link) needs `--hours`, 24 at most.
+
+The link opens once, in one tab: the page swaps its key for one of its own, and the link is dead after. For another
+device, start it again (`laki remote stop`, then `laki serve`; a service restarts it).
 
 ### Tailscale
 
@@ -68,7 +72,9 @@ Cloudflare account needed). Install `cloudflared` from Cloudflare's packages.
 Whoever gets in has a shell on that machine as the user Laki runs as: their files, keys and agents.
 
 - The daemon listens on 127.0.0.1 only. Nothing reaches it but the tunnel (cloudflared or tailscale serve) on the same
-  machine, and the tunnel needs the link's token, which is random, new at each start and dead once stopped.
+  machine, and the tunnel needs the link's token, which is random, new at each start, good once and dead once stopped.
+- From the browser, Laki won't start remote access again, install its command, change the phone pushes, presets, env
+  or extension folders, sign in accounts, turn an extension on or shut down: do those on the machine itself.
 - Prefer `--tailscale` (only your devices) or `--cloudflare --mail` (only your email). `--cloudflare --pin` is the
   link and a PIN, nothing else.
 - Run it as an ordinary user of its own, never root. Its data is in `~/.laki` (0700).

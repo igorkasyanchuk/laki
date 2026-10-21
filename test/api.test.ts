@@ -472,24 +472,42 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual((await rig.rpc('state')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
-  // its token, from its page's origin; no other origin
+  // the link's key, once, from its page's origin: the page's own token for it, then the link is dead (L3)
   const key = on.link.split('?token=')[1]
   const ping = (token: string, origin?: string) =>
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
-  assert.equal(await ping(key, url), 200)
-  assert.equal(await ping(key, 'https://evil.example'), 403)
-  assert.equal(await ping(key), 401) // no Origin: not its page
-  await assert.rejects(connect(rig, undefined, key))
-  const c = await connect(rig, url, key)
+  const pinAt = (body: object, origin = url) => fetch(`${at}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
+  assert.equal(await ping(key, url), 401) // the link's key isn't a token
+  assert.equal((await fetch(`${at}/pin`, { method: 'POST', headers: { origin: 'https://evil.example' }, body: JSON.stringify({ token: key }) })).status, 403)
+  const own = await pinAt({ token: key })
+  assert.equal(own.need, false)
+  assert.match(own.token, /^[0-9a-f]{64}$/)
+  assert.deepEqual(await pinAt({ token: key }), { need: false }) // once: a second tab or device gets nothing
+  assert.equal((await rig.rpc('state')).remote.used, true)
+  const tok = own.token
+  assert.equal(await ping(key, url), 401)
+  assert.equal(await ping(tok, url), 200)
+  assert.equal(await ping(tok, 'https://evil.example'), 403)
+  assert.equal(await ping(tok), 401) // no Origin: not its page
+  await assert.rejects(connect(rig, undefined, tok))
+  const c = await connect(rig, url, tok)
   assert.equal(await c.call('ping'), 'pong')
+  // a phone has what it needs, not what outlives its session or opens Laki wider (M4)
+  const far = (method: string, params = {}) =>
+    fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
+  for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }]] as const)
+    assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
+  await assert.rejects(c.call('shutdown'), /not over remote access/)
+  assert.equal((await far('settingsSet', { remoteMail: 'me@x.dev', notify: false })).result.notify, false) // Settings sends them all back: unchanged is fine
+  assert.equal(await rig.rpc('ping'), 'pong') // still up
   c.close()
-  await assert.rejects(connect(rig, 'https://evil.example', key))
+  await assert.rejects(connect(rig, 'https://evil.example', tok))
 
   // stopped: the token and the origin go with it
   await rig.rpc('remoteStop')
   await until(() => stops() === 1, 'cloudflared stopped')
   assert.equal((await rig.rpc('state')).remote, undefined)
-  assert.equal(await ping(key), 401)
+  assert.equal(await ping(tok, url), 403)
   assert.equal(await ping(rig.info().token, url), 403)
 
   // past its time; a new start has a new token
@@ -512,11 +530,12 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   // no email: only asked for (open), cloudflared with no --allowed-mail, the token still the lock, the saved email kept
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: '' }), /the email that may open it/)
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: '', open: 'yes' }), /the email that may open it/)
+  for (const hours of [0, 48]) await assert.rejects(rig.rpc('remoteStart', { hours, mail: '', open: true }), /without an email, 24 hours at most/)
   const pub = await rig.rpc('remoteStart', { hours: 1, mail: '', open: true })
   assert.deepEqual([pub.mail, pub.open], ['', true])
   assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port}\n`))
   assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
-  assert.equal(await ping(pub.link.split('?token=')[1], url), 200)
+  assert.equal(await ping((await pinAt({ token: pub.link.split('?token=')[1] })).token, url), 200)
   assert.equal(await ping('nope', url), 401)
   await rig.rpc('remoteStop')
   await until(() => stops() === 4, 'cloudflared stopped')
@@ -534,7 +553,6 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.match(pinned.pin, /^\d{6}$/)
   assert.equal(log().split(`cloudflared tunnel --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
   const link = pinned.link.split('?token=')[1]
-  const pinAt = (body: object, origin = url) => fetch(`${at}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
   assert.equal(await ping(link, url), 401) // the link's key alone isn't in
   assert.deepEqual(await pinAt({ token: link }), { need: true, left: 3 })
   assert.deepEqual(await pinAt({ token: 'nope', pin: pinned.pin }), { need: false })
@@ -549,14 +567,25 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.match(got.token, /^[0-9a-f]{64}$/)
   assert.equal(await ping(got.token, url), 200)
   assert.deepEqual(await pinAt({ token: got.token }), { need: false }) // in already
+  // the link is dead now: no PIN on it again, right or wrong
+  assert.deepEqual(await pinAt({ token: link, pin: pinned.pin }), { need: false })
+  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { need: false })
+  assert.equal((await rig.rpc('state')).remote.tries, 2)
+  await rig.rpc('remoteStop')
+  await until(() => stops() === 6, 'cloudflared stopped')
+  assert.equal(await ping(got.token, url), 403)
+  // the last wrong PIN stops it
+  const again2 = await rig.rpc('remoteStart', { hours: 1, pin: true })
+  const link2 = again2.link.split('?token=')[1]
+  const wrong2 = again2.pin === '000000' ? '111111' : '000000'
   const app = await connect(rig)
-  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { error: 'Wrong PIN: 1 more try, then remote access stops' })
-  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { error: 'Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.' })
+  assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 2 more tries, then remote access stops' })
+  assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: 1 more try, then remote access stops' })
+  assert.deepEqual(await pinAt({ token: link2, pin: wrong2 }), { error: 'Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.' })
   assert.match((await until(async () => app.events.find(m => m.ev === 'remote'), 'the app told')).text, /Remote access stopped: a wrong PIN/)
   app.close()
   assert.equal((await rig.rpc('state')).remote, undefined)
-  await until(() => stops() === 6, 'cloudflared stopped')
-  assert.equal(await ping(got.token, url), 403)
+  await until(() => stops() === 7, 'cloudflared stopped')
   assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
 
   // cloudflared failing; stopped while starting

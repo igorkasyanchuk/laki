@@ -96,11 +96,12 @@ async function whyNot(token: string): Promise<string | undefined> {
   }
   const rpc = await fetch('/rpc', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: '{"method":"ping"}' }).catch(() => null)
   if (rpc?.status === 401 || rpc?.status === 403)
-    return 'This link has ended: remote access was stopped or started again. Open the newest link from Laki on your Mac (Settings › Remote access).'
+    return 'This link has ended: a link opens once (in one tab), or remote access was stopped or started again. Open a new link from Laki on your Mac (Settings › Remote access).'
 }
 
-// remote access with Laki's PIN (core.remotePin): does the link's key need one? null: no answer (asked again next time)
-async function pinNeed(token: string): Promise<{ need: boolean; left?: number } | null> {
+// remote access's first ask (core.remotePin): the link's key, good once, for this tab's own token, or a PIN first.
+// null: no answer (asked again next time)
+async function pinNeed(token: string): Promise<{ need: boolean; left?: number; token?: string } | null> {
   const r = await fetch('/pin', { method: 'POST', body: JSON.stringify({ token }) }).catch(() => null)
   return r?.ok ? r.json().catch(() => null) : null
 }
@@ -117,10 +118,11 @@ class Api {
 
   async connect() {
     try {
-      const to = await wsURL()
+      let to = await wsURL()
       if (to.remote && !this.pinned) {
         const p = await pinNeed(to.token)
         if (p?.need) return this.emit({ ev: 'pin', left: p.left }) // the splash asks; pin() connects
+        if (p?.token) keep(p.token), (to = await wsURL()) // the link's key, swapped for this tab's: the link is dead now
         this.pinned = !!p
       }
       const ws = new WebSocket(to.url)

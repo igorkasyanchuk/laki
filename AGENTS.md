@@ -691,16 +691,21 @@ Tested in `test/share.test.ts`.
 `core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*
-typed, in a red box; `view.remote.open`, a red status bar badge: the token is then the only lock), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`). Each start makes a
-`remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
-hash), which the renderer (`api.ts`: no port) uses on the page's own origin, then takes out of the address bar
-(`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
-an earlier history entry, still holds the link). While it runs, `main.ts`
+typed, in a red box; `view.remote.open`, a red status bar badge: the token is then the only lock), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`; open: 24 at most, never 0). Each start makes a
+link key (`token`) and the page's token (`access`, `remoteToken`); `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
+hash), which the renderer (`api.ts`: no port) reads on the page's own origin, takes out of the address bar
+(`pageToken`: `replaceState`; Cloudflare's sign-in page, an earlier history entry, still holds the link) and swaps once
+(`pinNeed`: `POST /pin` `{ token }`, `remotePin` gives `{ need: false, token: access }` and sets `used`, the view's and
+Settings' *Opened*) for the token it connects with, kept in the tab's `sessionStorage` `laki.token` for reconnects: the
+link is dead after (L3). While it runs, `main.ts`
 takes the tunnel's URL as an Origin, and that token only with it (a client with no Origin needs the daemon's own);
-`remoteStop` drops both, so an old link is dead. `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
-`--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings) and an `access` token: the link's token is then good
-for `POST /pin` only (`remotePin`, main.ts: from the tunnel's origin; `{ token }` says `need`, `{ token, pin }` gives
-`access`, which `remoteToken` is); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
+`remoteStop` drops both, so an old link is dead. A client from that Origin (`Conn.remote`, the `/rpc` call's) is
+refused `REMOTE_NO` (`remoteStart`, `cliInstall`, `cliRemove`, `shutdown`, `aiKey`, `skillSet`, `accountAdd`,
+`accountLogin`), `widgetSet` with `on: true`, `net: true` or a `source`, and `settingsSet` changing a `REMOTE_KEYS`
+setting (`remote*`, `webhook`, `widgetDirs`, `widgetDev`, `presets`, `env`; sent back unchanged is fine: Settings saves
+them all) (M4). `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
+`--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings): the link's token (`POST /pin`, `remotePin`, main.ts:
+from the tunnel's origin) then says `need`, and `{ token, pin }` gives `access` (and `used`: a right PIN, once); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
 last stops it and broadcasts `remote` (App: a toast and a notification). The page (`api.ts`) asks `/pin` before its
 first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the access token kept as the tab's token; one solid card, `.pin-*`: Laki's mark, a lock in a ring filling a sixth per digit, green with a check once it's right; *Unlock* always a button, short of six digits it says so). The page (`api.ts` `whyNot`), when its socket won't open twice: a
 `fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from

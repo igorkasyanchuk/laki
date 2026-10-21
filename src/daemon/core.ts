@@ -81,7 +81,7 @@ export const prOf = (ws: string) => prs.get(ws)
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
 // and each turn that stops to ask (a moment after its hook: the menu it draws, askOf's options; none read: none)
 export const turnWaits = new Set<(tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => void>()
-export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
+export type Conn = Client & { remote?: boolean; view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -3217,15 +3217,16 @@ async function shareServe(q: IncomingMessage, r: ServerResponse) {
 // until), on remoteStop, or with the daemon; a new token each time, so a stopped link is dead.
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
-// pin: the PIN; access: the token it gives (token, the link's, is then good for remotePin only); left: wrong tries left
-type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number }
+// token: the link's, good once, for remotePin only (L3): it gives the page access, the token it connects with (pin: with
+// the PIN), and is dead then (used); left: wrong tries left
+type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access: string; used?: boolean; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number }
 let remote: RemoteRun | undefined
 let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
-export const remoteToken = () => (remote?.pin ? remote.access : remote?.token)
+export const remoteToken = () => (remote?.used ? remote.access : undefined)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), ...(remote.used && { used: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
@@ -3241,6 +3242,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   const open = !ts && !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
   const mail = ts || open || pin ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
   if (!ts && !open && !pin && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
+  if (open && (!hours || hours > 24)) throw new Error('without an email, 24 hours at most: anyone with the link gets in')
   if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
   const { bin, peers } = ts ? await tsReady() : (await cfReady(!!mail), { bin: '', peers: 0 })
@@ -3248,8 +3250,8 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   const target = `http://127.0.0.1:${daemonPort}`
   const ended = (why: string) => (log(`remote access ended (${why})`), remoteStop())
   const { cf, url } = ts ? tailscale(bin, target, ended, ['Remote access', 'remote'], funnel) : cloudflare(target, mail ? [mail] : [], ended, ['Remote access', 'remote'])
-  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const, funnel, peers }) }
-  if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), access: randomBytes(32).toString('hex'), left: triesOf() })
+  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), access: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const, funnel, peers }) }
+  if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), left: triesOf() })
   remote = r
   changed()
   try {
@@ -3279,14 +3281,17 @@ export function same(a: string, b: string | undefined) {
   const [x, y] = [Buffer.from(a), Buffer.from(b)]
   return x.length === y.length && timingSafeEqual(x, y)
 }
-// the PIN page (main.ts' POST /pin, from the page's origin): the link's key alone says whether it needs a PIN (need:
-// false, a token that isn't it: email, open, or the PIN's token already); with the PIN, the token the page connects
-// with. A wrong one counts down; the last stops remote access, and the app says so
-export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolean; left?: number } | { token: string } {
+// the page's first ask (main.ts' POST /pin, from the page's origin): the link's key, once, for the token the page
+// connects with (need: false and token; with a PIN: need, then the PIN gives it), after which the link is dead (need:
+// false, no token: a token that isn't the link's, the page's own already, or a link opened before). A wrong PIN counts
+// down; the last stops remote access, and the app says so
+export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolean; left?: number; token?: string } | { token: string } {
   const r = remote
-  if (!r?.pin || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
+  if (!r || r.used || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
+  const use = () => ((r.used = true), changed(), r.access)
+  if (!r.pin) return { need: false, token: use() }
   if (p.pin === undefined) return { need: true, left: r.left }
-  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return { token: r.access! }
+  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return { token: use() }
   r.left = (r.left ?? 1) - 1
   if (r.left > 0) {
     changed()
