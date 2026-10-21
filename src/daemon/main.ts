@@ -165,6 +165,7 @@ const api: Record<string, Handler> = {
   memoryAdd: p => core.memoryAdd(p), // an agent's (auto-memory), or --mine
   memoryRm: p => core.memoryRm(p), // an agent's only
   projectFile: p => core.projectFileConfig(p.id),
+  projectTrust: p => core.projectTrust(p),
   branches: p => core.branches(p.project),
   wsNew: p => core.wsNew(core.byCaller(p)),
   quickNew: p => core.quickNew(p),

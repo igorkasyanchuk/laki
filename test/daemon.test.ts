@@ -43,6 +43,45 @@ test('a new worktree gets the ignored files .worktreeinclude and .laki.json copy
   for (const f of ['sub/.env', '.env.prod', '.env.link']) assert.ok(!existsSync(join(ws.path, f)), f)
 })
 
+test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them; an edit stops them; ZDOTDIR refused; older projects trusted", async t => {
+  const rig = await fresh(t, { config: { setup: 'echo "$FOO-$ZDOTDIR" > env.txt', env: { FOO: 'bar', ZDOTDIR: '/tmp/evil' }, ports: { 3000: 'web' } } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo, untrusted: true })
+  const proj = async () => (await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id)
+  assert.ok((await proj()).cfgWait)
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await sleep(1500)
+  assert.ok(!existsSync(join(a.path, 'env.txt')), "an untrusted file's setup doesn't run")
+  const ws = async (id: string) => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === id)
+  assert.equal((await ws(a.id)).setupWait, true)
+  assert.deepEqual((await ws(a.id)).portNames, { 3000: 'web' }) // names only: those stay
+  // the sheet: its text and hash; a hash it isn't is refused
+  const look = await rig.rpc('projectTrust', { id: p.id })
+  assert.equal(look.trusted, false)
+  assert.match(look.text, /"setup": "echo/)
+  await assert.rejects(rig.rpc('projectTrust', { id: p.id, hash: 'nope' }), /changed since you looked/)
+  await rig.rpc('projectTrust', { id: p.id, hash: look.hash })
+  assert.equal((await proj()).cfgWait, undefined)
+  // trusting runs the setup that waited, with its env, ZDOTDIR refused (and said once)
+  await until(() => existsSync(join(a.path, 'env.txt')), 'the waiting setup runs')
+  assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar-\n')
+  assert.equal((await ws(a.id)).setupWait, undefined)
+  assert.equal(rig.out.split(".laki.json's env ZDOTDIR refused").length, 2) // said once
+  // an edit: untrusted again, a new workspace's setup waits
+  writeFileSync(join(rig.repo, '.laki.json'), JSON.stringify({ setup: 'touch edited' }))
+  assert.ok((await proj()).cfgWait)
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await sleep(1500)
+  assert.ok(!existsSync(join(b.path, 'edited')), "an edited file's setup doesn't run")
+  // a project from before trust (no cfgTrust in state.json): trusted as its file is
+  await rig.stop()
+  const sp = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(sp, 'utf8'))
+  delete st.cfgTrust
+  writeFileSync(sp, JSON.stringify(st))
+  await rig.start()
+  assert.equal((await proj()).cfgWait, undefined)
+})
+
 test('single instance: a second daemon exits', async t => {
   const rig = await fresh(t)
   const pid = JSON.parse(readFileSync(join(rig.data, 'daemon.json'), 'utf8')).pid

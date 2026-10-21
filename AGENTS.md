@@ -112,7 +112,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`. A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -497,7 +497,14 @@ no branches, diff, PRs or ship). New worktrees go to `worktreesOf` (the folders 
 else `settings.worktrees` (`~` is home) with a folder per project, else `<data>/worktrees/<project>`; a host's stay in
 `~/.laki-host`. Made ones keep their path. `config` (setup, run, teardown, expose), set in the app, wins field by field over
 the repo's `.laki.json` (`projectConfig`: the project's own folder only, never a worktree's, so a branch, a PR's checkout
-or a fork can't swap in its own setup, teardown, run, env, copy or ports).
+or a fork can't swap in its own setup, teardown, run, env, copy or ports). Its trust: a project's `trusted` (`cfgHash`,
+sha256 of its JSON); a file that isn't that gives its `ports` only (`cfgWait`, the view's project `cfgWait`: App's
+status bar *.laki.json waits for you* and `cfgSheet`, also after the new-workspace page makes one); `projectTrust` (no
+`hash`: its text and hash; with the shown one: trusted, then each `setupWait` workspace (made meanwhile) gets
+`copyIncludes` and its setup). `ENV_BAD` (`ZDOTDIR`, `BASH_ENV`, `ENV`, `NODE_OPTIONS`, `PATH`, `DYLD_*`, `LD_*`,
+`*_BASE_URL`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`) never comes from the file, trusted or not, each said once in
+daemon.log. `load` trusts projects from before (no `state.cfgTrust`) as their file is (a host's `as-read`: at its first
+read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: true`.
 
 ### SSH hosts
 

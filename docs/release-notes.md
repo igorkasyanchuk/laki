@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's `.laki.json` runs nothing until you trust it: the status bar says *.laki.json waits for you*, a click shows
+  the file and *Trust this repo's .laki.json*, and an edit to it waits again. Projects you had before this version are
+  trusted as their file is now. Env that changes how programs start (`PATH`, `ZDOTDIR`, `NODE_OPTIONS`, `DYLD_*`…)
+  never comes from the file.
 - A repo's `.laki.json` comes from the project's own folder only, never a workspace's branch: a PR's checkout or a
   fork can't bring its own setup, env or scripts.
 - An extension that's off (Laki AI's new ones, in the studio's preview) can't open links, copy or show dialogs from its

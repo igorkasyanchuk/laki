@@ -78,12 +78,12 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     repo,
     env,
     data: env.LAKI_HOME,
+    out: '', // what the daemon said (its daemon.log when detached), every start's
     async start() {
       daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] })
-      let log = ''
-      daemon.stdout!.on('data', d => (log += d))
-      daemon.stderr!.on('data', d => (log += d))
-      await until(() => rig.rpc('ping').then(r => r === 'pong'), `daemon start (${log})`)
+      daemon.stdout!.on('data', d => (rig.out += d))
+      daemon.stderr!.on('data', d => (rig.out += d))
+      await until(() => rig.rpc('ping').then(r => r === 'pong'), `daemon start (${rig.out})`)
     },
     async stop() {
       if (!daemon) return
@@ -103,7 +103,14 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       })
       const b = await res.json()
       if (b.error) throw new Error(b.error)
+      // a test's own .laki.json is trusted as its project comes (H1's tests add with untrusted: true)
+      if (method === 'projectAdd' && !(params as { untrusted?: boolean }).untrusted) await rig.trust(b.result.id)
       return b.result
+    },
+    // its .laki.json trusted as it is now (the app's sheet: projectTrust)
+    async trust(project: string) {
+      const { hash, trusted } = await rig.rpc('projectTrust', { id: project })
+      if (!trusted) await rig.rpc('projectTrust', { id: project, hash })
     },
     // the CLI, from source, against this rig's daemon; stdin: what it reads, then the end
     cli(...args: string[]): Promise<{ code: number; out: string; err: string }> {

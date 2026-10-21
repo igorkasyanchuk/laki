@@ -130,6 +130,9 @@ export function load() {
     else delete state.widgetGrants![ws]
   }
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
+  // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
+  if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
+  state.cfgTrust = true
   slugActions() // actions from before slugs
 }
 
@@ -489,7 +492,7 @@ export function view(): View {
     return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)) }
   })
   return {
-    projects: state.projects,
+    projects: state.projects.map(p => (h => (h ? { ...p, cfgWait: h } : p))(!p.kind && cfgWait(p))),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
@@ -685,15 +688,40 @@ export function allocPort() {
 }
 
 // the project's .laki.json, from its own folder only: never a worktree's, whose branch (a PR's checkout, a fork's, an
-// agent's commit) could bring its own setup, teardown, run, env, copy or ports; the app's config wins field by field
+// agent's commit) could bring its own setup, teardown, run, env, copy or ports (a host's: read there, readHostCfg)
+function fileCfg(p: Project): ProjectConfig {
+  if (p.host) return hostCfg.get(`${p.host}:${p.path}`) ?? {}
+  try {
+    const c = JSON.parse(readFileSync(join(p.path, '.laki.json'), 'utf8'))
+    return c && typeof c === 'object' && !Array.isArray(c) ? c : {}
+  } catch {
+    return {}
+  }
+}
+// its trust (projectTrust, the app's sheet): the hash of what it says. One you haven't trusted as it is gives its port
+// names only: none of its setup, teardown, run, scripts, env, copy or expose. Projects from before this were trusted
+// as they were (load)
+const cfgHash = (c: ProjectConfig) => createHash('sha256').update(JSON.stringify(c)).digest('hex')
+export const cfgWait = (p: Project) => (c => (Object.keys(c).some(k => k !== 'ports') && cfgHash(c) !== p.trusted ? cfgHash(c) : undefined))(fileCfg(p))
+// env a .laki.json never sets, trusted or not: they change how programs start (a shell's rc, node, the linker, an
+// agent's endpoint or its folder); each refused once in daemon.log
+const ENV_BAD = /^(ZDOTDIR|BASH_ENV|ENV|NODE_OPTIONS|PATH|DYLD_.*|LD_.*|.*_BASE_URL|CLAUDE_CONFIG_DIR|CODEX_HOME)$/
+const envSaid = new Set<string>()
+const envOk = (p: Project, env: unknown) =>
+  env && typeof env === 'object'
+    ? Object.fromEntries(
+        Object.entries(env).filter(([k]) => {
+          if (!ENV_BAD.test(k)) return true
+          if (!envSaid.has(`${p.id}:${k}`)) (envSaid.add(`${p.id}:${k}`), log(`${p.name}: .laki.json's env ${k} refused: it changes how programs start`))
+          return false
+        }),
+      )
+    : undefined
+// the app's config wins field by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
-  let file: ProjectConfig = {}
-  if (proj && ws.host) file = hostCfg.get(`${ws.host}:${proj.path}`) ?? {} // read there (readHostCfg): views ask often
-  else if (proj)
-    try {
-      file = JSON.parse(readFileSync(join(proj.path, '.laki.json'), 'utf8'))
-    } catch {}
+  const raw = proj ? fileCfg(proj) : {}
+  const file: ProjectConfig = proj && cfgHash(raw) === proj.trusted ? { ...raw, env: envOk(proj, raw.env) } : { ports: raw.ports }
   const { env, actions: _, templates: __, ...cmds } = proj?.config ?? {} // actions, templates: the renderer's (Run ▾, a new workspace's prompt)
   const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => typeof v === 'string' && v.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
@@ -1124,6 +1152,7 @@ async function readHostCfg(at: At) {
   } catch {
     hostCfg.set(`${at.host}:${at.path}`, null)
   }
+  for (const p of state.projects) if (p.trusted === 'as-read' && p.host === at.host && p.path === at.path) (p.trusted = cfgHash(fileCfg(p)), save()) // from before trust (load)
 }
 // a host workspace's: its project's, never its own folder's (projectConfig; fresh: again, else only when not read yet)
 const readHostCfgs = async (ws: Workspace, fresh = true) => {
@@ -1821,11 +1850,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   forward(ws)
   const cfg = projectConfig(ws)
   step(`${ws.id}: ${ws.kind} at ${ws.path}${ws.branch ? `, branch ${ws.branch}` : ''}, port ${ws.port}`)
-  if (cfg.setup && ws.kind === 'worktree') {
-    step(`setup: ${cfg.setup}`)
-    writeFileSync(setupMarker(ws), String(Date.now()))
-    addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
-  }
+  if (cfg.setup && ws.kind === 'worktree') (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup))
+  else if (ws.kind === 'worktree' && cfgWait(proj)) (ws.setupWait = true), save(), step(`setup: waits for you to trust ${proj.name}'s .laki.json`)
   try {
     if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
@@ -1834,6 +1860,33 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   }
   widgetEvent('workspace.new', { prompt: o.prompt ? o.prompt.slice(0, 2000) : undefined, agent: preset === 'none' ? undefined : preset }, ws.id)
   return ws
+}
+
+function runSetup(ws: Workspace, setup: string) {
+  writeFileSync(setupMarker(ws), String(Date.now()))
+  addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup })
+}
+
+// the app's sheet: no hash, the project's .laki.json as it is now (its text, its hash); with the hash it showed, that
+// trusted, and the workspaces made meanwhile get their copy and setup (setupWait)
+export async function projectTrust(o: { id: string; hash?: string }) {
+  const p = findProject(o.id)
+  if (p.host) await readHostCfg(p)
+  const c = fileCfg(p)
+  const hash = cfgHash(c)
+  if (o.hash === undefined) return { hash, text: JSON.stringify(c, null, 2), trusted: hash === p.trusted }
+  if (o.hash !== hash) throw new Error(`${p.name}'s .laki.json changed since you looked: look at it again`)
+  p.trusted = hash
+  save()
+  changed()
+  for (const ws of state.workspaces.filter(w => w.project === p.id && w.setupWait && !w.archived)) {
+    delete ws.setupWait
+    save()
+    if (!p.host) await copyIncludes(p, ws)
+    const setup = projectConfig(ws).setup
+    if (setup && existsSync(ws.path)) runSetup(ws, setup)
+  }
+  return { hash, trusted: true }
 }
 
 // a real path (realpathSync's) in a real folder, or the folder itself

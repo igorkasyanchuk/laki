@@ -369,6 +369,8 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   writeFileSync(join(ws.path, '.laki.json'), JSON.stringify({ expose: '*@branch.dev', setup: 'touch pwned' }))
   assert.equal(await expose(), undefined)
   writeFileSync(join(rig.repo, '.laki.json'), JSON.stringify({ expose: '*@file.dev' }))
+  assert.equal(await expose(), undefined) // not trusted yet
+  await rig.trust(p.id)
   assert.equal(await expose(), '*@file.dev')
   await rig.rpc('projectSet', { id: p.id, config: { expose: ' me@x.dev, *@team.dev ' } })
   assert.equal(await expose(), 'me@x.dev, *@team.dev')

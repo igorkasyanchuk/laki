@@ -1679,6 +1679,14 @@ export function App() {
     toolShow()
   }
   // a repo's extension turned on: what it runs, the settings it needs, what it can hold; the files hash shown, or none
+  // a repo's .laki.json not trusted as it is (cfgWait): its text, then Trust; meanwhile its setup, scripts and env wait
+  const cfgSheet = async (p: Project) => {
+    const c = await call<{ hash: string; text: string; trusted: boolean }>('projectTrust', { id: p.id }).catch(() => null)
+    if (!c || c.trusted) return
+    const text = `Its setup, teardown, run and other scripts run on this Mac, with its env. Until you trust it, none of them runs (its port names still show), and workspaces made meanwhile get their setup as you trust it.\n\n${c.text}`
+    if ((await choose(`Trust ${p.name}'s .laki.json?`, text, [{ label: 'Not now' }, { label: "Trust this repo's .laki.json", primary: true }])) !== 1) return
+    if (await call('projectTrust', { id: p.id, hash: c.hash }).then(() => true, () => false)) done(`Trusted ${p.name}'s .laki.json`)
+  }
   const repoSheet = async (w: WidgetView) => {
     const what = await call<{ name: string; text: string; hash: string }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e)), null))
     if (!what) return
@@ -3603,6 +3611,7 @@ export function App() {
                 return toast(`${wsName(got[0])}${got.length > 1 ? ` and ${got.length - 1} more` : ''} ready`, () => showNew(got[0].id, ...got.slice(1).map(w => w.id)), 'Open', true)
               }
               showNew(got[0].id, ...got.slice(1).map(w => w.id))
+              ;(pj => pj?.cfgWait && void cfgSheet(pj))(view?.projects.find(x => x.id === got[0].project))
               setDialog(d => (d !== 'new' ? d : p.fan && got[0].race ? { compare: got[0].race } : null))
               setNewFor(undefined)
               setNewInit(undefined)
@@ -3656,6 +3665,16 @@ export function App() {
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </button>
               )}
+              {(pj =>
+                pj?.cfgWait && (
+                  // its repo's .laki.json, not trusted as it is: its setup, scripts and env wait for you
+                  <button className="sb-flow" data-status="waiting" data-tip="This repo's .laki.json isn't trusted yet: its setup, scripts and env wait · click: look at it" onClick={() => cfgSheet(pj)}>
+                    <span className="sb-flow-icon">
+                      <Icon name="shieldAlert" size={11} />
+                    </span>
+                    <span className="sb-flow-name">.laki.json waits for you</span>
+                  </button>
+                ))(view.projects.find(x => x.id === ws.project))}
               {(f =>
                 f && (
                   // the workflow run that made this workspace, or sent the focused tab its last block: a click opens it

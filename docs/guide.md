@@ -1571,7 +1571,11 @@ tab). Saved as you type:
 
 These are saved in the app. A field left empty falls back to a `.laki.json` in the repo, which a team can
 commit. Laki reads it from the project's own folder (the main checkout), never from a workspace's worktree: a branch,
-a PR's checkout or a fork can't bring setup, env or scripts of its own. The page shows that file's values as placeholders:
+a PR's checkout or a fork can't bring setup, env or scripts of its own. A repo's file runs nothing until you trust it:
+the status bar says *.laki.json waits for you*, and a click (or making a workspace there) shows the file with *Trust this
+repo's .laki.json*. Trusted as it is: an edit to it waits for you again, and workspaces made meanwhile get their setup as
+you trust it. Env that changes how programs start (`PATH`, `ZDOTDIR`, `BASH_ENV`, `ENV`, `NODE_OPTIONS`, `DYLD_*`,
+`LD_*`, `*_BASE_URL`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`) never comes from the file. The page shows that file's values as placeholders:
 
 ```json
 { "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "expose": "*@team.com", "env": { "NODE_ENV": "development" }, "copy": [".env*", "config/master.key"], "ports": { "3000": "web", "5432": "db" } }

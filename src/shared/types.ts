@@ -68,6 +68,8 @@ export type Project = {
   memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start
   compacted?: CompactRun // its learned memories' last compaction (daemon/memory.ts): when, how many before and after, why, or what failed
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
+  trusted?: string // its .laki.json as you trusted it (projectTrust: sha256 of its JSON); one that isn't that gives its port names only
+  cfgWait?: string // the view's: its .laki.json's hash while it has more than port names and you haven't trusted it as it is
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
 export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
@@ -104,6 +106,7 @@ export type Workspace = {
   port: number
   created: number
   archived?: boolean
+  setupWait?: boolean // made while its project's .laki.json wasn't trusted: its copy and setup run as you trust it
   archivedAt?: number // when (ms), for settings.archivedDays
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
@@ -541,7 +544,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; cfgTrust?: boolean } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -692,5 +695,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 96
+export const API = 97
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
