@@ -646,11 +646,14 @@ The three switches in the status bar (and *Info*), each on or off per workspace,
 check. Each sends its prompt to the workspace's first running agent (Claude Code, Codex…), queued until its turn ends;
 with no agent running nothing is sent, and the next check tries again.
 - *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs (the last 80
-  lines of up to 3 jobs) go to the agent, asking it to fix, commit and push. Once per commit: its push makes a new
+  lines of up to 3 jobs, fenced and marked as the PR's own output, data and not instructions) go to the agent, asking it
+  to fix, commit and push. On a PR from a fork, turning it on asks first: the logs come from code someone outside the
+  repo wrote. Once per commit: its push makes a new
   commit, and CI runs again. After 3 tries in a row (*Tries in a row*) it stops: the agent's tab shows ◆ waiting and
   you get a notification. A passing run starts the count over; so does turning the switch off and on (which also sends
   the current commit's failure again).
-- *review*: new review comments (unresolved inline threads from people with write access to the repo, and bots) go
+- *review*: new review comments (unresolved inline threads from people with write access to the repo, and the review
+  bots in Settings › Pull requests: GitHub Actions, Copilot's reviewer and CodeRabbit unless you change it) go
   to the agent, asking it to address them and push. Yours count too, but the agent comments as you, so a comment of
   yours made while it works counts as its own and doesn't start another round: comment while it's idle. A thread goes
   again only when someone adds to it.
@@ -1471,7 +1474,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   press would, so it can allow a command. Laki asks Telegram or ntfy for taps every 5 seconds only while a pushed
   question waits (a day at most), and a tap counts only while the same menu is still on screen.
 - *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
-  conflicts* get (3), and the prompts the PR switches send (above, in
+  conflicts* get (3), the review bots whose comments *review* sends (any app can be a bot: others are skipped), and the
+  prompts the PR switches send (above, in
   *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch, `{{pr}}` its PR (a PR link in the prompt, or a prompt of

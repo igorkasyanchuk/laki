@@ -645,12 +645,16 @@ the code, the seconds it ran, its last lines.
   at the next scan: `retry`);
   a failure is `overToYou`. The app asks once as it's turned on. A project's `land` turned off clears its workspaces' `autoLand` (`projectSet`).
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
-  commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most `settings.prTries` in a row
+  commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`: each tail `fenced`, said to be the
+PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's `cross` (`isCrossRepository`): App's
+`setAuto` asks before turning fix CI on), at most `settings.prTries` in a row
   (`PR_TRIES`, 3), then status waiting and a notification (`overToYou`, once, as the count goes over); conflicts on a new head commit →
   `prFix('conflict')` (merge the base in, push), `fix.merge`/`fix.merges`, the same tries (mergeable UNKNOWN, as after a
   push, keeps the count); `wsSet` turning a switch on again gives its tries back at the next scan (`retry`: a scan under way
   would write its copy of `ws.fix` over a reset made then). New review threads → `reviewMessage`
-  (GraphQL `reviewThreads`; `reviewKey` counts yours too, but not the agent's: it comments as you, so yours made while a
+  (GraphQL `reviewThreads`: people with write access, and bots only by `settings.prBots` (`PR_BOTS`: github-actions,
+  copilot-pull-request-reviewer, coderabbitai; Settings › Pull requests' *Review bots*), another bot's skipped and said
+  once per PR in daemon.log; `reviewKey` counts yours too, but not the agent's: it comments as you, so yours made while a
   tab of the workspace was running, `busy`/`agentSaid` from `changed()`, ±`SKEW`, are its, their ids kept as `fix.mine`).
   What was sent is `workspace.fix`.
   Messages go to the first live claude/codex tab with `send({ whenIdle })`. Each starts with `prPrompt`: the

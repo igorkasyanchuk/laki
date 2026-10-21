@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -156,6 +156,7 @@ export type AppSettings = Paint & {
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
+  prBots?: string[] // review bots whose threads go to the agent (unset: PR_BOTS)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
   ai?: AiSettings // Laki AI (Settings › AI)
@@ -3718,6 +3719,9 @@ export function SettingsPage(p: {
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
                 {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
               </div>
+              </Group>
+              <Group title="Review bots" hint="The review switch sends people's comments (the repo's owners, members, collaborators) and these bots' only: any app can be a bot. Others are skipped.">
+                <ChipsInput value={(s.prBots ?? PR_BOTS).join(',')} onChange={v => set({ prBots: v.split(',').map(x => x.trim()).filter(Boolean) })} placeholder="A bot's login, then Enter" />
               </Group>
               <Group title="What the switches send" hint="Each prompt goes first, then the checks' logs or the review threads">
               {PR_KINDS.map(([k, title, after]) => {

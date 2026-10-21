@@ -250,6 +250,7 @@ export function webhookUrl(url?: string) {
 }
 
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
+export const PR_BOTS = ['github-actions', 'copilot-pull-request-reviewer', 'coderabbitai'] // the review bots whose threads go to the agent (settings.prBots); other bots' are skipped
 export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
 
 export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship' | 'script' // script: Run ▾'s test, lint, format or deploy (its name)
@@ -404,6 +405,7 @@ export type Settings = {
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
+  prBots?: string[] // review bots whose threads the review switch sends (unset: PR_BOTS)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
@@ -570,6 +572,7 @@ export type PR = {
   approvedByMe?: boolean // your latest review approves it (someone else's PR)
   commentedByMe?: boolean // you commented on it, or reviewed with comments (someone else's PR)
   conflict?: boolean // merge conflicts with its base branch
+  cross?: boolean // from a fork (isCrossRepository): its code, so its CI's logs, aren't the repo's people's
   ready?: boolean // mergeStateStatus CLEAN (or HAS_HOOKS): GitHub would merge it now; false: blocked, behind, unstable…
   base?: string // its base branch
   additions?: number

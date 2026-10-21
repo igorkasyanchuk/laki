@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Pull requests: *fix CI* sends failing logs fenced and marked as the PR's own output, and asks before turning on for
+  a PR from a fork. *review* sends only the bots in Settings › Pull requests' new *Review bots* (GitHub Actions,
+  Copilot's reviewer, CodeRabbit): any other bot's comments are skipped.
 - Workflows: a Run command's `{{…}}` (a PR's title, an event's field, an agent's answer) go in as environment
   variables, never as text the shell reads. One inside single quotes is now a problem the editor shows.
 - An agent's prompt reaches it through an environment variable, never quoted into a shell line: a prompt can't break

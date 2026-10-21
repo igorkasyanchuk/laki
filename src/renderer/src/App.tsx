@@ -1952,8 +1952,9 @@ export function App() {
       prTries: settings.prTries || PR_TRIES,
     }
   }
-  // merge when green: asked once, as it's turned on
+  // merge when green, and fix CI on a fork's PR: asked as it's turned on
   const setAuto = async (w: WorkspaceView, k: AutoKey, v: boolean) => {
+    if (k === 'autoFix' && v && (w.fork || w.pr?.cross) && !(await ask(`Fix CI on ${w.pr ? `PR #${w.pr.number}` : 'this PR'}, from a fork?`, { text: "Its failing checks' logs go to the agent, and they're output of code someone outside the repo wrote: they can say anything. The agent is told they're data, not instructions; read what it does.", ok: 'Fix CI' }))) return
     if (k === 'autoLand' && v && !(await ask(`Merge ${w.pr ? `PR #${w.pr.number}` : 'the PR'} when it's green?`, { text: `Laki will ${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash'].toLowerCase()} it as you and delete its branch on GitHub, once every check passes, it has no conflicts, isn't a draft, is approved if the repo asks for a review and its agent isn't working.`, ok: 'Merge when green' }))) return
     call('wsSet', { id: w.id, [k]: v }).catch(() => {})
   }
