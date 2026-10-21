@@ -8,7 +8,7 @@
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Agent, FAST, findAction, mergeActions, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, AGENT_TIMEOUT, DONES, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -398,6 +398,18 @@ function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string
   else if (was.current === null) was.current = now
   const p = { ...rest, value: typed !== null && was.current === now ? typed : now, onChange: (e: ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => ((was.current = null), setTyped(e.target.value), onText(e.target.value)), onBlur: () => setTyped(null) }
   return area ? <textarea {...p} /> : <input {...p} />
+}
+
+// a run's use of a limit: a bar when it has one
+function Meter({ label, now, max, say, tip }: { label: string; now: number; max?: number; say: string; tip?: string }) {
+  const p = max ? Math.min(1, now / max) : 0
+  return (
+    <span className="wf-meter" data-tip={tip} data-level={p >= 1 ? 'over' : p >= 0.8 ? 'near' : undefined}>
+      <span className="muted small">{label}</span>
+      <b>{say}</b>
+      {max ? <i style={{ ['--p' as string]: `${Math.round(p * 100)}%` }} /> : null}
+    </span>
+  )
 }
 
 // a workflow's runs at a glance: how many, done of the last 30 days', a done run's median time, what a run spends
@@ -1226,6 +1238,11 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           <span className="wf-hint">{wf.perm === 'bypassPermissions' ? 'Never asks: only you can start it, not an agent' : 'Every agent block’s (claude, codex) unless it says its own. Unattended, one that asks waits for you.'}</span>
         </div>
         <div className="wf-field">
+          <label>Budget</label>
+          <Typed value={wf.budget ? budgetText(wf.budget) : ''} placeholder="none: 60 min, $5" onText={v => edit(w => void (w.budget = (b => (typeof b === 'string' ? w.budget : b))(v.trim() ? budgetOf(v) : undefined)))} />
+          <span className="wf-hint">A run’s working time (not while it waits for you) and its AI calls’ cost; past either it asks: more, or stop.</span>
+        </div>
+        <div className="wf-field">
           <label>When a run is done</label>
           <select value={wf.done ?? ''} onChange={e => edit(w => void (w.done = e.target.value || undefined))}>
             <option value="">{wf.where === 'worktree' ? 'As usual: archive its worktree' : 'As usual: keep the workspace'}</option>
@@ -2051,6 +2068,8 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
   const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
   const never = bypassIn(item, b => presets.find(p => p.name === (b.agent || 'claude'))).map(blockName) // its profile's mode counts too
   // As if on an event (one with on:): the last one heard, or a sample in the workspace picked; what it would get first
+  const [budget, setBudget] = useState(item.budget ? budgetText(item.budget) : '') // this run's, over the file's
+  const badBudget = budget.trim() && typeof budgetOf(budget) === 'string' ? (budgetOf(budget) as string) : ''
   const [ev, setEv] = useState<'' | 'last' | 'sample'>('')
   const [tried, setTried] = useState<Tried | null>(null)
   const [last, setLast] = useState<Tried['last']>()
@@ -2062,11 +2081,11 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
     setBusy(true)
     setErr('')
     if (ev)
-      return void api.call<Tried>('flowEvent', { ...ask(ev), go: true, dry }).then(
+      return void api.call<Tried>('flowEvent', { ...ask(ev), go: true, dry, budget }).then(
         r => onStarted(r.run!),
         e => (setBusy(false), setErr((e as Error).message)),
       )
-    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
+    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, editor: true, budget, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
     )
@@ -2162,6 +2181,11 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
             </label>
           )
         })}
+        <label className="wf-field">
+          <span>Budget</span>
+          <input value={budget} placeholder="none: 60 min, $5" onChange={e => setBudget(e.target.value)} className={badBudget ? 'bad' : ''} />
+          <span className={badBudget ? 'wf-hint wf-bad' : 'wf-hint'}>{badBudget || 'Its working time and AI cost (calls and decisions; agents’ turns aren’t counted); past either it asks you. This run only.'}</span>
+        </label>
         <Switch className="switch-row" on={dry} onChange={setDry}>
           Dry run: opening a PR, approving, merging and archiving are said, not done
         </Switch>
@@ -2169,7 +2193,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || (ev ? !tried?.start : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || !!badBudget || (ev ? !tried?.start : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>
@@ -2246,6 +2270,11 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           </button>
         )}
         <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => onDelete(entry ?? flowView(r))} />
+      </div>
+      <div className="wf-meters">
+        <Meter label="Agent turns" now={r.turns} max={r.flow.turns ?? TURNS} say={`${r.turns} of ${r.flow.turns ?? TURNS}`} />
+        <Meter label="Working time" now={r.spent ?? 0} max={r.budget?.ms} say={`${dur(r.spent ?? 0)}${r.budget?.ms ? ` of ${minutes(r.budget.ms)}` : ''}`} tip="Not while it waits for you, a usage limit or its turn" />
+        <Meter label="AI cost" now={r.cost ?? 0} max={r.budget?.usd} say={`${dollars(r.cost ?? 0)}${r.budget?.usd ? ` of ${dollars(r.budget.usd)}` : ''}`} tip="Its AI calls and decisions; agents’ turns aren’t counted" />
       </div>
       {asking && (
         <div className={`wf-ask ${asking.kind === 'agent-ask' ? 'agent' : ''}`}>

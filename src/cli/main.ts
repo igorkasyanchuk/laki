@@ -18,7 +18,7 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -458,7 +458,7 @@ async function main() {
           if (!id) throw new Error('usage: laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]')
           const file = flags['event-json']
           const payload = typeof file === 'string' ? JSON.parse(file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8')) : undefined
-          const ask = { id, project, ws, ...(typeof flags.event === 'string' && { event: flags.event }), ...(payload && { payload }), caller: caller() }
+          const ask = { id, project, ws, ...(typeof flags.event === 'string' && { event: flags.event }), ...(payload && { payload }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), caller: caller() }
           type Tried = { name: string; from: string; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string }
           const said = (t: Tried) => [`${t.name} (${t.from === 'last' ? 'the last one heard' : t.from === 'given' ? 'yours' : 'a sample'})`, ...Object.entries(t.vars).map(([k, v]) => `  {{${k}}} ${v.length > 120 ? `${v.slice(0, 120)}…` : v}`), ...t.when.map(w => `${w.ok ? '✓' : '✗'} only when: ${w.test}`), t.start ? 'it starts' : `it doesn't start: ${t.why}`].join('\n')
           if (flags.dry) {
@@ -472,7 +472,7 @@ async function main() {
         }
         if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | --event [<name>] [--event-json <file|->]')
         const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
-        const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), caller: caller() }, 180000)
+        const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
       if (sub === 'trash') {

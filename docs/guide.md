@@ -1246,7 +1246,14 @@ an agent block's decision (or *open its session* with the block picked) opens it
 first), after you confirm; its workspace and tabs stay. When a run ends done, the worktree it made is archived once nothing is left uncommitted
 (Restore brings it back, its branch kept), so old runs don't fill the sidebar; one with changes, a failed or stopped
 run's, a dry run's, and a workspace it was given stay, and the run's log says which. `when done: keep` (the workflow's settings,
-*When a run is done*) keeps them all. An ended run's *Run again* (also its row's ⋯, `laki flow
+*When a run is done*) keeps them all.
+
+A budget (its settings' *Budget*, `budget: 60 min, $5` in the head, either part) caps a run's working time (not while
+it waits for you, a usage limit or its turn in the queue) and what its AI calls and decisions cost (agents' turns
+aren't counted). Past either, it asks you, as 30 agent turns do: *Give it 30 min more* (half its budget, this run only;
+the file stays) or *Stop the run*. An agent's turn under way finishes first: it asks at the next block. *Run* takes
+another for that run (`laki flow run … --budget "30 min, $2"`), and a run shows its turns, time and cost against them.
+A dry run says its budget and never stops for it. An ended run's *Run again* (also its row's ⋯, `laki flow
 again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
 the workflow. A block's right click in an ended run, *Run from here* (`--from <block>`), goes on from that block in
 the same workspace with the run's variables, so the agents before it don't run (or cost) again; once its worktree is
@@ -1270,6 +1277,7 @@ laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
 laki flow run fix-ci --event --ws . --dry      # as if on its on: event (the last one, else a sample; --event-json <file|->: yours)
+laki flow run my-flow app "add CSV" --budget "30 min, $2"   # this run's budget: past it, it asks
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
 laki flow on <workflow>                        # turn on again one paused after 5 failed runs in a row
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back

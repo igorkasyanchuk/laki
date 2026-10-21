@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
@@ -395,7 +395,7 @@ function picked(ref: string, project?: string, self?: FlowRun): Workspace {
   return ws
 }
 
-type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string } } // evWs, hops: an event's (its workspace, its hops)
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; agent?: string; editor?: boolean; inputs?: Record<string, string>; event?: Record<string, unknown>; evWs?: string; hops?: number; again?: string; from?: { run: string; block: string }; budget?: string } // evWs, hops: an event's (its workspace, its hops); budget: this run's ('' none), over the file's
 
 // Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
 // task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
@@ -449,6 +449,8 @@ export async function flowStart(o: Start) {
   const start = wf.blocks.find(b => b.kind === 'start')
   if (start?.input === 'task' && !task) throw new Error('what should it work on? (a task)')
   const inputs = inputVals(start?.inputs, Object.fromEntries(Object.entries(o.inputs ?? {}).map(([k, v]) => [k, String(v ?? '')]))) // defaults, checked: {{inputs.NAME}}
+  const budget: Budget | string | undefined = o.budget === undefined ? wf.budget : String(o.budget).trim() ? budgetOf(String(o.budget)) : undefined
+  if (typeof budget === 'string') throw new Error(budget)
   // past at once: queued, behind the others waiting (a slot that frees goes to the oldest: next)
   const atOnce = wf.runs ?? RUNS_AT_ONCE
   const busy = runs().filter(r => going(r) && runOf(r, wf)).length
@@ -458,10 +460,13 @@ export async function flowStart(o: Start) {
   const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
+  if (budget) (r.budget = { ...budget }), (r.flow.budget = { ...budget }) // the run's copy: Give it more raises it by half of this
+  else delete r.flow.budget
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}${old ? (o.from ? ` (from run ${old.id}, at ${blockName(blockOf(r, o.from.block)!)})` : ` (again: run ${old.id})`) : ''}`)
   if (r.dry && never.length) say(r, `dry run: ${never.join(', ')} would run with bypass permissions (never asks)`)
+  if (r.budget) say(r, `budget: ${budgetText(r.budget)}${r.dry ? " (a dry run doesn't stop for it)" : ''}`)
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
     touch()
@@ -510,6 +515,7 @@ function next() {
 
 function enter(r: FlowRun, b: Block, again = false): void {
   if (!live(r)) return
+  if (spend(r)) return budgetAsk(r, b)
   if (!again) {
     const n = (r.visits[b.id] ?? 0) + 1
     if (b.max && n > b.max.n) {
@@ -1242,6 +1248,13 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   }
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
+  if (w.kind === 'stuck' && label.startsWith('Give it ') && r.budget) {
+    // its budget, past: half of its first one more, this run only
+    const base = r.flow.budget ?? r.budget
+    if (label.includes('$')) r.budget.usd = (r.budget.usd ?? 0) + (base.usd ?? 0) / 2
+    else r.budget.ms = (r.budget.ms ?? 0) + (base.ms ?? 0) / 2
+    say(r, `its budget: ${budgetText(r.budget)} now`)
+  }
   if (w.kind === 'stuck' && w.tab) {
     // a stalled agent: checked in on again (its clock on, without the time you took), skipped (its turn stopped first),
     // or tried again (the same; Nudge again too once it isn't working: a nudge would be a prompt of its own)
@@ -1259,6 +1272,28 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   tryAgain(r, b)
   return r
 }
+// its working time (spent): brought up to date at each block, each flowTick and its end, what passed while it was
+// running since the last look. ponytail: a change of status between two looks counts as the later one's (a few seconds)
+function sample(r: FlowRun, now = Date.now()) {
+  const from = r.clock ?? now
+  if (r.status === 'running' && now > from) r.spent = (r.spent ?? 0) + (now - from)
+  r.clock = Math.max(now, from)
+}
+// past its budget (spent, or cost: its AI calls' and decisions'): what's used up; a dry run never stops for it
+function spend(r: FlowRun, now = Date.now()): 'time' | 'money' | undefined {
+  sample(r, now)
+  if (!r.budget || r.dry) return
+  if (r.budget.ms && (r.spent ?? 0) >= r.budget.ms) return 'time'
+  if (r.budget.usd && (r.cost ?? 0) >= r.budget.usd) return 'money'
+}
+// it asks as the turns limit does: Give it more (half the run's first budget, this run only) or Stop the run
+function budgetAsk(r: FlowRun, b: Block) {
+  const over = spend(r)
+  const base = r.flow.budget ?? r.budget ?? {}
+  if (over === 'time') stuck(r, b, `its budget: ${minutes(r.budget!.ms!)} used`, [`Give it ${minutes(base.ms! / 2)} more`, 'Stop the run'])
+  else if (over === 'money') stuck(r, b, `its budget: ${dollars(r.budget!.usd!)} spent on AI calls`, [`Give it ${dollars(base.usd! / 2)} more`, 'Stop the run'])
+}
+
 // stuck's Try again: the block again, its count and the turns given back
 function tryAgain(r: FlowRun, b: Block) {
   if (r.turns >= (r.flow.turns ?? TURNS)) r.turns = 0
@@ -1279,6 +1314,7 @@ function kill0(r: FlowRun) {
 // shows: an end block's popover and window (its words)
 function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, phone?: boolean, shows?: Pick<Block, 'popover' | 'modal' | 'id'>) {
   if (!live(r)) return
+  sample(r)
   kill0(r)
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
   say(r, `${status}: ${why}`)
@@ -1382,6 +1418,11 @@ export function flowTick(now = Date.now()) {
     if (!live(r)) continue
     const b = blockOf(r, r.cur)
     const ws = wsOf(r)
+    // past its budget: it asks now, unless an agent's turn is going (asked as it ends, at the next block)
+    if (b && spend(r, now) && r.status === 'running' && r.wait?.kind !== 'agent') {
+      budgetAsk(r, b)
+      continue
+    }
     if (r.ws && (!ws || ws.archived) && !(b?.kind === 'action' && b.action === 'archive')) {
       finish(r, 'failed', 'its workspace was archived or deleted')
       continue
@@ -1561,7 +1602,7 @@ function sampleOf(name: string): Record<string, unknown> {
 // last real one of its project, unless use: sample; else a sample), its {{event.…}}, each only when: test, whether it
 // would start and why not; go: started the way a real one would be (fromEvent), its trigger "try <name>". A person's
 // start: an untrusted repo workflow runs from the app's sheet (editor), never from the CLI; never a skip or a pause
-export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string }) {
+export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string; budget?: string }) {
   on()
   const wf = flowFind(o)
   if (wf.source === 'builtin') throw template(wf.name)
@@ -1594,7 +1635,7 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   }
   if (!o.go) return res
   if (!h || 'why' in h) throw new Error(res.why)
-  const run = await flowStart({ ...h.start, dry: !!o.dry, ...(o.by && { by: o.by }) })
+  const run = await flowStart({ ...h.start, dry: !!o.dry, ...(o.by && { by: o.by }), ...(o.budget !== undefined && { budget: o.budget }) })
   return { ...res, run: run.id }
 }
 flowHooks.find = o => flowFind(o)

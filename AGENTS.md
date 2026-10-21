@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`; a workflow's `source` `builtin` (the templates); `flowEvent` (a try as if on an event), a workflow item's `events`; a workflow's asks pushed to the phone (core's `flowAsk`, `flowHooks.waitKey` and `answer`). A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`; `flowPause`, a workflow item's `stats`, the `flow` event's `kind: 'paused'`; a workflow's `source` `builtin` (the templates); `flowEvent` (a try as if on an event), a workflow item's `events`; a workflow's asks pushed to the phone (core's `flowAsk`, `flowHooks.waitKey` and `answer`); workflows' `budget:` (`Workflow.budget`, `budgetOf`), `flowStart` `budget`, a run's `budget`, `spent` and `clock`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1174,6 +1174,14 @@ workspace), `ws`: the workspace you picked as its `ws` (`eventWs`)): `from`, `la
 test's `ok`, `start`, `why`; `go` starts it (`dry`), `run` its id. main.ts makes an agent's CLI `by: 'agent'`, `editor`
 false and its `agent`; `flowStart` takes `editor` with `event` past an untrusted one. StartRun's *As if on an event*
 (`Tried`), the CLI's `--event [<name>] [--event-json <file|->]`.
+Budget (`budget: 60 min, $5`, `budgetOf`/`budgetText`, either part; a bad one a parse problem, `check` a bad object):
+`flowStart` `budget` (a string, '' none) over the file's, the run's `budget` and `flow.budget` (its first: *Give it more*
+adds half of it, `flowAnswer`); `spent` is its working time, `sample` (at `enter`, each `flowTick` and `finish`) adding
+what passed while `running` since `clock` (not waiting, paused or queued; ponytail: a few seconds off per change);
+`spend` (none for a dry run) past `budget.ms` or `cost` past `budget.usd`: `budgetAsk`, a stuck with *Give it <half>
+more* and *Stop the run*, at `enter` and in `flowTick` (not while an agent's turn goes: the next block asks). `cost`:
+`Got.cost` (llm, decide) through `sent`. RunView's `Meter`s (turns, time, cost), StartRun's and the settings' Budget;
+the CLI's `--budget`, MCP's `budget`.
 ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host; a resume that fails after
 `RESUMED` went (core drops the chat within `RESUME_FAIL`) is a closed tab, the block's error way.
 

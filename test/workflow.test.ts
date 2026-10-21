@@ -2192,6 +2192,66 @@ test('try it with an event: the last one heard, else a sample; its variables and
   assert.match(dry.out, /^it doesn't start: only when/m)
 })
 
+test('workflow budget: the line reads back, check names a bad one; past its time (not while it waits for you) it asks, Give it more goes on, Stop ends it; a $ cap trips on an AI call; a dry run never stops', async t => {
+  const head = (b: string) => `# B\nruns in: main · budget: ${b}\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n`
+  for (const [b, want, text] of [['60 min, $5', { ms: 3600e3, usd: 5 }, '1h, $5'], ['90 min', { ms: 5400e3 }, '90 min'], ['2h', { ms: 7200e3 }, '2h'], ['$0.50', { usd: 0.5 }, '$0.50'], ['45m, $1', { ms: 2700e3, usd: 1 }, '45 min, $1']] as const) {
+    const { workflow, problems } = parse(head(b))
+    assert.deepEqual([workflow.budget, problems], [want, []], b)
+    assert.match(toFile(workflow), new RegExp(`· budget: ${text.replace('$', '\\$')}$`, 'm'))
+    assert.deepEqual(parse(toFile(workflow)).workflow.budget, want)
+  }
+  assert.deepEqual(parse(head('soon')).problems, ['line 2: budget: soon? a time, dollars or both: budget: 60 min, $5'])
+  assert.deepEqual(parse(head('5, $2')).problems.length, 1)
+  assert.deepEqual(check({ ...parse(head('1h')).workflow, budget: { ms: -1 } }), ['budget: a time, dollars or both, more than 0: budget: 60 min, $5'])
+
+  const srv = createServer(async (q, res) => {
+    for await (const _ of q);
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ model: 'x/fast', choices: [{ message: { content: 'ok' } }], usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.02 } }))
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const rig = await fresh(t, { env: { LAKI_AI_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  await rig.rpc('flowSave', { id: 'slow', text: '# Slow\nruns in: main · budget: 1 min\n\n## start\ninput: task\nnext: q\n\n## q\nask: Go?\n- Yes → work\n- No → e\n\n## work\nrun: sleep 30\ntimeout: 5\nok: e\nfail: e\n\n## e\nend: success\n' })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const run = await rig.rpc('flowStart', { workflow: 'slow', project: p.id, task: 'x' })
+  assert.deepEqual(run.budget, { ms: 60e3 })
+  await until(async () => (await get(run.id)).wait?.kind === 'ask', 'it asks first')
+  let now = Date.now() + 10 * 60e3
+  await rig.rpc('flowTick', { now }) // ten minutes waiting for you: none of it counts
+  assert.ok(((await get(run.id)).spent ?? 0) < 5000)
+  assert.equal((await get(run.id)).wait.kind, 'ask')
+  await rig.rpc('flowAnswer', { id: run.id, n: 0 })
+  await until(async () => (await get(run.id)).cur === 'work', 'at work')
+  await rig.rpc('flowTick', { now: (now += 61e3) })
+  let r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(run.id)), 'past its minute: it asks')
+  assert.equal(r.wait.question, 'its budget: 1 min used')
+  assert.deepEqual(r.wait.options, ['Give it 0.5 min more', 'Stop the run'])
+  await rig.rpc('flowAnswer', { id: run.id, n: 0 })
+  r = await until(async () => (x => x.status === 'running' && x.cur === 'work' && x)(await get(run.id)), 'it goes on')
+  assert.deepEqual(r.budget, { ms: 90e3 })
+  assert.equal(r.flow.budget.ms, 60e3, 'the file’s, as it started')
+  await rig.rpc('flowTick', { now: (now += 31e3) })
+  r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(run.id)), 'past it again')
+  assert.equal(r.wait.question, 'its budget: 1.5 min used')
+  await rig.rpc('flowAnswer', { id: run.id, n: 1 })
+  assert.equal((await until(async () => (x => x.status !== 'waiting' && x)(await get(run.id)), 'stopped')).status, 'stopped')
+
+  // money: an AI call's cost past $0.01, asked at the next block; Run's budget over the file's; a dry run says it, never stops
+  await rig.rpc('flowSave', { id: 'ai', text: '# AI\nruns in: main · budget: $5\n\n## start\ninput: task\nnext: sum\n\n## sum\nllm: x/fast\n> {{task}}\nok: e\n\n## e\nend: success\n' })
+  const ai = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$0.01' })
+  r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(ai.id)), 'past $0.01')
+  assert.deepEqual([r.wait.question, r.wait.options[0], r.cost], ['its budget: $0.01 spent on AI calls', 'Give it $0.01 more', 0.02])
+  await rig.rpc('flowAnswer', { id: ai.id, n: 1 })
+  const dry = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$0.01', dry: true })
+  assert.equal((await until(async () => (x => x.status !== 'running' && x)(await get(dry.id)), 'the dry run ends')).status, 'done')
+  assert.ok((await get(dry.id)).log.some((l: string) => l.includes("budget: $0.01 (a dry run doesn't stop for it)")))
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: 'lots' }), /budget: lots\? a time, dollars or both/)
+  const none = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '' })
+  assert.equal(none.budget, undefined, "'': none for this run")
+})
+
 test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {
   const rig = await fresh(t, { config: { setup: 'echo set up' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

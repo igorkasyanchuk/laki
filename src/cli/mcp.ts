@@ -376,9 +376,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_workflow_run',
     description: 'Start a run of a workflow on a task, in a project: a worktree of its own (or the project folder), or a workspace the user has (ws; runs in: here needs one), its blocks one by one; what it asks goes to the user in Laki. dry: opening a PR, approving, merging and archiving are said, not done.',
-    inputSchema: obj({ workflow: str('its id (laki_workflows)'), project: str('a project id (none with ws: its)'), ws: str("a workspace's id: the run works there, no new worktree"), task: str('what it works on'), dry: { type: 'boolean' }, inputs: { type: 'object', additionalProperties: { type: 'string' }, description: "its Start's inputs by name ({\"issue\": \"1423\"}): the ones without a default are needed" } }, ['workflow', 'task']),
+    inputSchema: obj({ workflow: str('its id (laki_workflows)'), project: str('a project id (none with ws: its)'), ws: str("a workspace's id: the run works there, no new worktree"), task: str('what it works on'), dry: { type: 'boolean' }, inputs: { type: 'object', additionalProperties: { type: 'string' }, description: "its Start's inputs by name ({\"issue\": \"1423\"}): the ones without a default are needed" }, budget: str("this run's budget over the workflow's: its working time and AI calls' cost, past either it asks the user (\"30 min, $2\"; '' none)") }, ['workflow', 'task']),
     run: async a => {
-      const r = await rpc('flowStart', { workflow: a.workflow, project: a.project || undefined, ws: a.ws || undefined, task: a.task, dry: !!a.dry, inputs: a.inputs, by: 'agent', trigger: 'an agent' }, 180000)
+      const r = await rpc('flowStart', { workflow: a.workflow, project: a.project || undefined, ws: a.ws || undefined, task: a.task, dry: !!a.dry, inputs: a.inputs, ...(typeof a.budget === 'string' && { budget: a.budget }), by: 'agent', trigger: 'an agent' }, 180000)
       return { id: r.id, status: r.status, workspace: r.ws }
     },
   },

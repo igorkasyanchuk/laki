@@ -39,7 +39,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
   laki flow [ls]                             workflows and their runs
-  laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs)
+  laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…] [--budget "30 min, $2"]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs; --budget: its working time and AI cost, past either it asks)
   laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]  as if on an event (its on: unless named; the last one heard, else a sample in --ws; --dry: its variables and only when: tests first)
   laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks

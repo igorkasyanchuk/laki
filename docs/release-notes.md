@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a budget, `budget: 60 min, $5` (its settings, or Run's for one run): past its working time or AI cost a
+  run asks, *Give it more* or *Stop*; a run shows its turns, time and cost (`--budget` on `laki flow run`).
 - Phone pushes: a workflow's questions (*Ask you*, a confirm, a stuck block, an unsure decision) reach the phone, and
   *Answer from the phone* puts a button per choice on them.
 - Workflows: *Run* › *As if on an event* tries one with the last event heard or a sample, showing its variables and
