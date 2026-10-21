@@ -440,7 +440,7 @@ function outHint(b: Block) {
 function subOf(b: Block, wf: Workflow) {
   switch (b.kind) {
     case 'start': return b.input === 'task' ? 'a task' : ''
-    case 'agent': return [b.agent || 'claude', b.use, b.model, b.effort, permWords(permOf(wf, b), b.fast)].filter(Boolean).join(' · ')
+    case 'agent': return [b.agent || 'claude', b.use, b.model, b.effort, permWords(permOf(wf, b), b.fast, b.agent || 'claude')].filter(Boolean).join(' · ')
     case 'run': return b.cmd ?? ''
     case 'llm': return [b.model || 'Settings › AI’s model', b.out?.length && `→ ${b.out.join(', ')}`].filter(Boolean).join(' · ')
     case 'webhook': return `${b.method ?? 'POST'} ${(b.url ?? '').replace(/^https?:\/\//, '')}`
