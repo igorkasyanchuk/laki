@@ -18,6 +18,10 @@ export function shortPath(p: string) {
 // what the daemons take: an address, or *@domain for a whole domain (cloudflared's wildcard domains)
 export const MAIL_OK = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/
 
+// a *@domain anyone can get an address at (webmail): "only these emails" then lets in anyone who signs up; its domain
+const WEBMAIL = /^\*@((?:gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|protonmail)\.com|proton\.me|mail\.ru|(?:gmx|yandex)\.[a-z]{2,3}(?:\.[a-z]{2})?)$/i
+export const webmail = (m: string) => WEBMAIL.exec(m.trim())?.[1]?.toLowerCase()
+
 // who a tunnel lets in, as typed: addresses and whole domains (*@team.com; @team.com and team.com say the same)
 export const parseMails = (s: string) =>
   [...new Set(s.split(/[\s,;]+/).filter(Boolean).map(m => (m.includes('@') ? m.replace(/^@/, '*@') : `*@${m}`)))]

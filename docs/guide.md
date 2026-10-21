@@ -404,9 +404,11 @@ the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a 
 **Expose to the world** (the globe next to `$PORT` and each listening port): publishes the port at a random
 `https://….trycloudflare.com` link through Cloudflare Quick Tunnels, with no Cloudflare account. It needs
 `cloudflared` on your PATH (`brew install cloudflared`; the popup says so when it's missing).
-- *Who can open it*: *Anyone with the link* (the default: public, no sign-in), or *Only these emails*:
-  addresses, or a whole domain: `*@gmail.com` (`@gmail.com` or just `gmail.com` say the same). The popup lists
-  who gets in and flags what isn't an address or a domain. A project can set its own default (Settings › the
+- *Who can open it*: *Anyone with the link* (the default: public, no sign-in; what your dev server trusts from
+  localhost, like Vite's `/@fs` files or a debug console, is open to them too), or *Only these emails*: addresses, or
+  a whole domain: `*@yourcompany.com` (`@yourcompany.com` or just `yourcompany.com` say the same). The popup lists
+  who gets in and flags what isn't an address or a domain, and a webmail domain (`*@gmail.com`, Outlook, iCloud,
+  Proton…): anyone can get an address there. A project can set its own default (Settings › the
   project › *Expose to the world*, or `expose` in `.laki.json`): the popup opens with it each time. Cloudflare then emails each visitor a one-time code, and only those
   addresses get in (cloudflared 2026.9.3 or newer: `--allowed-mail`). The list is kept for next time; with
   none yet, it's git's `user.email`.

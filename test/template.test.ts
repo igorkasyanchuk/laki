@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize, wavOf } from '../src/renderer/src/text.ts'
+import { webmail, browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize, wavOf } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -33,6 +33,9 @@ test('short paths for the status bar', () => {
 test('tunnel emails: whole domains by *@, @ or a bare name; what the daemons take', async () => {
   assert.deepEqual(parseMails(' me@x.dev, *@gmail.com;@team.dev  corp.io me@x.dev'), ['me@x.dev', '*@gmail.com', '*@team.dev', '*@corp.io'])
   for (const m of ['me@x.dev', '*@gmail.com', 'a.b+c@sub.team.dev']) assert.ok(MAIL_OK.test(m), m)
+  // a webmail domain: anyone can get an address there (the popup warns)
+  assert.deepEqual(['*@gmail.com', '*@GoogleMail.com', '*@outlook.com', '*@proton.me', '*@gmx.de', '*@gmx.co.uk', '*@yandex.ru', '*@mail.ru', '*@icloud.com', '*@me.com'].map(webmail), ['gmail.com', 'googlemail.com', 'outlook.com', 'proton.me', 'gmx.de', 'gmx.co.uk', 'yandex.ru', 'mail.ru', 'icloud.com', 'me.com'])
+  for (const m of ['me@gmail.com', '*@team.dev', '*@notgmail.com', '*@gmail.com.evil.dev', '*@mail.ru.dev']) assert.equal(webmail(m), undefined, m)
   for (const m of ['me*@x.dev', '*@*.x.dev', '*@localhost', 'a@b.dev,c@d.dev', '@x.dev', 'nope']) assert.ok(!MAIL_OK.test(m), m)
   // the daemon's own check is the same pattern
   const core = (await import('node:fs')).readFileSync(new URL('../src/daemon/core.ts', import.meta.url), 'utf8')

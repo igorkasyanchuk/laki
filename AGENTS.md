@@ -1953,7 +1953,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Shell actions, each item's `tip` its text, cut at `ACTION_TIP`; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon.
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
-  or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
+  or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged, a webmail domain too (`text.ts` `webmail`: anyone can get an address there, a warning line); *Anyone with the link* says localhost-trusting dev tools are reachable. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
   as SVG, also Remote access's. `SharePop`: Share a tab's popover (for how long, `SHARE_FOR`; then the QR code, the
   link, `timeLeft`, Stop sharing).
 - **`Shown.tsx`**: a workflow's Show you window (`ShownDialog`, App's `shown` queue): HTML in a sandboxed `srcDoc`

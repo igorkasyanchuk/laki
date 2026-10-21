@@ -3,7 +3,7 @@
 // with a one-time code). The daemon runs cloudflared; this is the status bar's button and its popup with a QR code.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { qr, qrPath } from './qr'
-import { MAIL_OK, parseMails } from './text'
+import { MAIL_OK, parseMails, webmail } from './text'
 import { Icon, IconButton } from './ui'
 
 export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number } // no url yet: starting; until: when it stops
@@ -78,6 +78,7 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
   const defaults = cf && cf !== 'failed' ? cf.expose || cf.mails?.join(', ') : undefined
   const list = only ? parseMails(mails ?? defaults ?? '') : []
   const bad = list.filter(m => !MAIL_OK.test(m))
+  const open = list.map(webmail).filter(Boolean) // *@gmail.com: anyone can get one
   const start = async () => {
     if (busy) return
     setBusy(true)
@@ -170,11 +171,11 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
             <input type="radio" name="who" checked={only} onChange={() => setOnly(true)} /> Only these emails
           </label>
         </div>
-        {only && <input autoFocus value={mails ?? defaults ?? ''} placeholder="you@example.com, *@gmail.com" onChange={e => setMails(e.target.value)} />}
+        {only && <input autoFocus value={mails ?? defaults ?? ''} placeholder="you@example.com, *@yourcompany.com" onChange={e => setMails(e.target.value)} />}
         {only && list.length > 0 && (
           <div className="tunnel-who">
             {list.map(m => (
-              <span key={m} className={`chip ${bad.includes(m) ? 'bad' : ''}`} data-tip={bad.includes(m) ? 'Not an address or *@domain' : undefined}>
+              <span key={m} className={`chip ${bad.includes(m) || webmail(m) ? 'bad' : ''}`} data-tip={bad.includes(m) ? 'Not an address or *@domain' : webmail(m) ? `Anyone can get a ${webmail(m)} address` : undefined}>
                 {m.startsWith('*@') ? (
                   <>
                     anyone <b>{m.slice(1)}</b>
@@ -186,14 +187,15 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
             ))}
           </div>
         )}
+        {only && open.length > 0 && <p className="warn small">Everyone with {open.map(d => `a ${d}`).join(' or ')} address can open it: name people, or your company's domain.</p>}
         <p className="muted small">
           {only ? (
             <>
-              {cf.expose && 'The project’s default. '}A whole domain: <code>*@gmail.com</code> (or just <code>gmail.com</code>). Cloudflare emails each
+              {cf.expose && 'The project’s default. '}A whole domain: <code>*@yourcompany.com</code> (or just <code>yourcompany.com</code>). Cloudflare emails each
               visitor a one-time code.
             </>
           ) : (
-            'No sign-in: anyone who gets the link can open it.'
+            "No sign-in: anyone who gets the link can open it, and what the server trusts from localhost too (Vite's /@fs files, a debug console)."
           )}
         </p>
         <div className="tunnel-radios" role="radiogroup" aria-label="For how long">
