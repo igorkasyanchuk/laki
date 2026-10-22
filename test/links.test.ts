@@ -21,6 +21,12 @@ test('links: workspaces, tabs, pages; nothing else', () => {
   assert.deepEqual(parseLink('laki://board'), { to: 'board' })
   assert.deepEqual(parseLink('laki://achievements'), { to: 'achievements' })
   assert.deepEqual(parseLink('laki://ai'), { to: 'ai' })
+  // #24: My Desk, the UI kit and its icons, the starter picker (beside an extension's own ids: never laki://settings/widgets/<word>)
+  assert.deepEqual(parseLink('laki://desk'), { to: 'desk' })
+  assert.deepEqual(parseLink('laki://uikit'), { to: 'uikit' })
+  assert.deepEqual(parseLink('laki://uikit/icons'), { to: 'uikit', icons: true })
+  assert.deepEqual(parseLink('laki://starters'), { to: 'starters' })
+  assert.deepEqual(parseLink('laki://settings/widgets/icons'), { to: 'extension', id: 'icons' }) // an extension named icons is still yours
   assert.deepEqual(parseLink('laki://Help'), { to: 'help' }) // the host as typed: a non-special scheme keeps its case
   for (const bad of ['laki://ws', 'laki://rm/x', 'https://ws/x', 'laki:ws/x', 'nonsense', 'laki://ws/%E0%A4%A']) {
     const l = parseLink(bad)

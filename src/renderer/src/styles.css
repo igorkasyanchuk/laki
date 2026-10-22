@@ -1667,6 +1667,8 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-ok.bad { color: var(--error); }
 .sched-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius); color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .sched-row.off .sched-icon { opacity: 0.6; color: var(--muted); background: var(--hover); }
+.sched-icon:has(.widget-dot) { position: relative; } /* an extension that needs a look: its red dot on the corner */
+.sched-icon .widget-dot { top: -2px; right: -2px; }
 .sched-row.off :where(.sched-name, .sched-meta > b) { color: var(--muted); } /* off: muted, still readable (half opacity took its text under 3:1); :where: a hover still lights the name */
 .sched-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 0; border: none; background: none; color: var(--fg); text-align: left; cursor: pointer; }
 .sched-main:hover { background: none; }

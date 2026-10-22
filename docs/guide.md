@@ -875,6 +875,10 @@ mark, its author's picture and the other marks to one size.
 Extensions (also called widgets or plugins: one and the same) are small live pages. The SDK, in one page:
 [extensions.md](extensions.md).
 
+Settings › Extensions lists them: a search finds one by its name, id, place or project, and one that needs a look (its
+last fetch failed, a setting it needs is empty, its log has an error from the last hour) is first in its group, with a
+red dot. ⌘K has *UI kit*, *Icons* and *New extension from a starter…* too.
+
 Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
 *Sidebar foot*, *My Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
 bar left of its buttons, the status bar's right end, a tab of the right panel (⌥⌘B), or a mark on each workspace's row
@@ -1921,6 +1925,10 @@ OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
 | `laki://board` | the Board |
 | `laki://achievements` | Achievements |
+| `laki://desk` | My Desk |
+| `laki://uikit[/icons]` | the extensions' UI kit, or its icons |
+| `laki://starters` | the extension starters to pick from (a pick makes one) |
+| `laki://settings/widgets/<id>[/inspect]` | an extension's page, or its inspector |
 | `laki://help` | Help |
 | `laki://about` | About (the version, when it was built, and the website) |
 | `laki://onboard` | Get started, the first steps (also the Help menu's *Get Started Again…*) |

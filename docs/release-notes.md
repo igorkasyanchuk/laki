@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: Settings › Extensions has a search (name, id, place, project) and lists the ones failing first, with
+  a red dot. ⌘K opens the UI kit, its icons and the starters; `laki://uikit`, `laki://uikit/icons`, `laki://starters`
+  and `laki://desk` link to them.
 - Extensions: the *Insert* menu is in Laki AI's box (its page, the floating chat, the AI window), the new-workspace
   window and Send later's message too, for the workspace and tab it's about.
 - Extensions: a workspace row's mark takes its color from its data's `tone`, a click opens that workspace's full

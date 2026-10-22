@@ -1224,7 +1224,7 @@ templates), and Laki AI's `SYSTEM` has it pick the group that fits. Each workspa
 link until the renderer says `deep-link-ready` (preload's `onDeepLink`; a main-frame navigation resets it), then
 sends `deep-link`. `links.ts` `parseLink` (tested in `test/links.test.ts`), App routes it once the view is in: a
 workspace or tab, the new-workspace page filled in (`initial`: a prompt and a name, never a preset, L12; `linked`: the
-page's *Filled in from a link* while the prompt is the link's), Scheduled tasks, the Board, Settings, Help, About, Get started (`onboard`: the Help menu's *Get Started Again…*). Links select and fill
+page's *Filled in from a link* while the prompt is the link's), Scheduled tasks, the Board, Settings, Help, About, Get started (`onboard`: the Help menu's *Get Started Again…*), My Desk (`desk`), the UI kit (`uikit`, `/icons`: its icon gallery) and the starter picker (`starters`: App's dialog `'starters'`, UiKit.tsx' `StarterPicker`; a pick is `WidgetsApi.make`, its page with nothing behind). Links select and fill
 in; they never create or run anything.
 
 ### Preview
@@ -1313,7 +1313,9 @@ action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` 
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
 two `Group`s, *Yours* (its head's `act`: *New extension*, `WidgetsApi.page('')`) and *Built in*, of Scheduled tasks'
-`.sched-row`s, each with its switch, a click `page(id)`; `WidgetCard`: a head (its switch, name, buttons), then `WcSec`s of `WcRow`s (a title and what it does, its control):
+`.sched-row`s, each with its switch, a click `page(id)`; past 3 a search (`hay`: name, id, places and their words,
+project), the `failing` first in each group (a `devError`, or one that's on with an `error`, a `missing` setting or a
+`logErr` in the hour) with a red `.widget-dot` on its icon, `failWhy` its tip; `WidgetCard`: a head (its switch, name, buttons), then `WcSec`s of `WcRow`s (a title and what it does, its control):
 Where it shows (places as pills, size, full view, the hide switches), Updates (every, network, the last fetch and Fetch
 now), Its settings (`WidgetOptionField` per
 setting, a list's `ChipsInput`), Tools for agents; its folder button is App's Open in menu with `widget`). `Extension.tsx`

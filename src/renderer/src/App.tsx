@@ -19,7 +19,7 @@ import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { AchievementsPage } from './Achievements'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
-import { UiKitPage } from './UiKit'
+import { StarterPicker, UiKitPage } from './UiKit'
 import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
@@ -173,7 +173,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1144,6 +1144,9 @@ export function App() {
     else if (l?.to === 'ai') setDialog('ai')
     else if (l?.to === 'about') setDialog('about')
     else if (l?.to === 'onboard') (setOnboard(o => ({ ...o, off: false })), setDialog('onboard'))
+    else if (l?.to === 'desk') settings.desk !== false ? setDialog('desk') : toast('My Desk is off: Settings › General › Pages')
+    else if (l?.to === 'uikit') setDialog({ uikit: true, ...(l.icons && { icons: true }) })
+    else if (l?.to === 'starters') setDialog('starters')
     else toast(`Laki can't open ${link.slice(0, 80)}`)
   }, [link, view])
 
@@ -1961,7 +1964,7 @@ export function App() {
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
     save: (id, path, text, was, force) => api.call('widgetFileSave', { id, path, text, was, force }),
-    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
+    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog === 'starters' ? null : dialog }), e => toast(String(e?.message ?? e))), // ⌘K's picker: its page, then nothing behind it
     check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
     revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),
     wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
@@ -2527,6 +2530,9 @@ export function App() {
     for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     if (aiOn(settings)) a({ label: 'New extension…: make one with Laki AI in the studio', icon: 'plus', run: () => setDialog({ studio: '' }) })
+    a({ label: 'New extension from a starter…: each one shown on its sample data', icon: 'plus', run: () => setDialog('starters') })
+    a({ label: 'UI kit: the elements an extension is made of, each with its JSON', icon: 'panel', run: () => setDialog({ uikit: true }) })
+    a({ label: 'Icons: every icon an extension can use, by name', icon: 'smile', run: () => setDialog({ uikit: true, icons: true }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
     a({ label: 'Help: keys and commands', icon: 'help', hint: kh('help'), run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
@@ -3680,6 +3686,7 @@ export function App() {
         )}
         {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.back ?? (dialog.logs === 'new' ? { section: 'general' } : null))} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
+        {dialog === 'starters' && <StarterPicker onClose={() => setDialog(null)} onPick={k => (setDialog(null), void extCfg.make!(k))} />}
         {dialog && typeof dialog === 'object' && 'project' in dialog && (p => p && (
           <ProjectPage
             key={p.id}

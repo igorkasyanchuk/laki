@@ -1,5 +1,6 @@
 // laki:// links (macOS opens the app with them): a workspace or tab, the new-workspace page filled in, Scheduled
-// tasks, the board, achievements, the AI page, Settings, Help, About and Get started (the app menu's). They select and fill in, never start anything: a link from anywhere can't run an agent.
+// tasks, the board, achievements, the AI page, My Desk, the UI kit and its icons, the extension starters, Settings, Help,
+// About and Get started (the app menu's). They select and fill in, never start anything: a link from anywhere can't run an agent.
 export type Link =
   | { to: 'ws'; ws: string; tab?: string }
   | { to: 'new'; project?: string; prompt?: string; name?: string } // never a preset (L12): the agent and its mode are yours to pick
@@ -13,6 +14,9 @@ export type Link =
   | { to: 'ai' }
   | { to: 'about' }
   | { to: 'onboard' }
+  | { to: 'desk' }
+  | { to: 'uikit'; icons?: boolean } // laki://uikit[/icons]: the UI kit's page, or its icon gallery
+  | { to: 'starters' } // laki://starters: the starter picker (New extension from a starter…); a pick makes one
 
 const decode = (s: string) => {
   try {
@@ -57,6 +61,12 @@ export function parseLink(url: string): Link | null {
       return { to: 'about' }
     case 'onboard':
       return { to: 'onboard' }
+    case 'desk':
+      return { to: 'desk' }
+    case 'uikit':
+      return { to: 'uikit', ...(arg === 'icons' && { icons: true }) }
+    case 'starters':
+      return { to: 'starters' }
   }
   return null
 }

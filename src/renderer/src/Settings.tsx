@@ -2585,11 +2585,21 @@ function RailField({ s, set }: { s: AppSettings; set: (p: Partial<AppSettings>) 
   )
 }
 
-// the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page
+// what needs a look: its dev copy broke, or one that's on failed its fetch, misses a setting it needs or logged an error in
+// the last hour (Settings' rows: first in their group, a red dot)
+const failing = (w: WidgetView) => !!w.devError || (w.on && (!!w.error || !!w.missing?.length || (!!w.logErr && Date.now() - w.logErr < 3600e3)))
+const failWhy = (w: WidgetView) => w.devError ? `Last good version kept: ${w.devError}` : w.error ? `Its last fetch failed: ${w.error}` : w.missing?.length ? `A setting it needs is empty: ${w.missing.join(', ')}` : 'An error in its log in the last hour'
+
+// the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page. A search
+// (its name, id, places, project) and the ones failing first
 function WidgetList({ api }: { api: WidgetsApi }) {
-  const mine = api.list.filter(w => !w.builtin && !w.project)
-  const theirs = api.list.filter(w => w.builtin)
-  const repos = [...new Set(api.list.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
+  const [q, setQ] = useState('')
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const hay = (w: WidgetView) => [w.name, w.id, w.repo, w.project, ...placesOf(w).flatMap(p => [p, PLACES.find(x => x[0] === p)?.[1] ?? ''])].join(' ').toLowerCase()
+  const shown = api.list.filter(w => words.every(x => hay(w).includes(x))).sort((a, b) => +failing(b) - +failing(a)) // stable: the rest as they were
+  const mine = shown.filter(w => !w.builtin && !w.project)
+  const theirs = shown.filter(w => w.builtin)
+  const repos = [...new Set(shown.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
   const [menu, openMenu] = useMenu()
   const [starters, setStarters] = useState(false)
   // New ▾: Laki AI's page (the studio), or a starter picked from their previews (one that runs at once on sample data,
@@ -2603,6 +2613,8 @@ function WidgetList({ api }: { api: WidgetsApi }) {
     <>
       {menu}
       {starters && api.make && <StarterPicker onClose={() => setStarters(false)} onPick={k => (setStarters(false), void api.make!(k))} />}
+      {api.list.length > 3 && <input type="search" className="theme-find" value={q} placeholder={`Find an extension by name, id, place or project (${api.list.length})`} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && q && (e.stopPropagation(), setQ(''))} />}
+      {words.length > 0 && !shown.length && <p className="muted small">No extension has “{q}” in its name, id, places or project.</p>}
       {!!api.chats?.length && api.studio && (
         <Group title="In the studio" hint="What you're making with Laki AI that isn't saved yet, or that it works on now: a click goes back to the chat">
           <StudioSessions api={api} />
@@ -2617,7 +2629,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
           </button>
         }
       >
-        {mine.length ? list(mine) : <p className="muted small">None yet: New starts one from a starter, or describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
+        {mine.length ? list(mine) : words.length ? <p className="muted small">None of yours matches.</p> : <p className="muted small">None yet: New starts one from a starter, or describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
       </Group>
       {repos.map(p => (ws => (
         <Group key={p} title={`From ${ws[0].repo ?? p}`} hint="Its repo's .laki/extensions: shown only in its workspaces; turning one on shows what it runs first, and a change there turns it off">
@@ -2632,8 +2644,9 @@ function WidgetList({ api }: { api: WidgetsApi }) {
       <div className="sched-list">
         {ws.map(w => (
           <div key={w.id} className={`sched-row ${w.on ? '' : 'off'}`}>
-            <span className="sched-icon">
+            <span className="sched-icon" data-tip={failing(w) ? failWhy(w) : undefined}>
               <Icon name={w.js ? 'code' : 'panel'} />
+              {failing(w) && <span className="widget-dot bad" />}
             </span>
             <button type="button" className="sched-main" data-tip="Open: preview, settings, Laki AI" onClick={() => api.page(w.id)}>
               <span className="sched-name">{w.name}</span>
