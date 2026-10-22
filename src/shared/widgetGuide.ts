@@ -134,7 +134,10 @@ export const widgetFormat = () => `## widget.json
   \`$LAKI_BRANCH\`, \`$LAKI_PATH\`…; an agent's prompt \`{{file.path}}\`, \`{{tab.name}}\`, \`{{workspace.branch}}\`.
   \`insert\`: what it prints (its JSON's \`"insert"\`, else all of it) goes into the prompt: the box it was picked in, else
   the workspace's agent's prompt, unsent. \`view\`: its full view opens after it runs: a file opener prints \`{"data": …}\`
-  about \`$LAKI_FILE\` and shows it.
+  about \`$LAKI_FILE\` and shows it. Its JSON may also say \`"open": "https://…"\` (http(s), mailto or laki://: the app
+  opens it after the run) and \`"files": ["shot.png", "report.md"]\` (10 at most, each inside the workspace, its storage
+  folder or the extension's folder, a relative one from its folder: attached where an insert goes, an image as an image);
+  anything else is dropped and said in its log.
 
 ## Fixtures and the check
 

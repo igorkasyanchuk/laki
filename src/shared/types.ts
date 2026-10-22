@@ -781,6 +781,8 @@ export type WidgetTool = { action: string; description: string; ask: 'always' | 
 export type WidgetMenu = { action: string; title: string; show: string[]; match?: string[]; key?: string; ask?: string; confirm?: string; insert?: boolean; view?: boolean }
 // where an action was picked (widgetAction ctx): a workspace, its tab, a file of it (relative)
 export type WidgetCtx = { ws?: string; tab?: string; file?: string }
+// an action's files (#26: its JSON's files, checked): an image as imageSave's copy (image), else the file itself
+export type ActionFile = { path: string; image?: boolean; size: number }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen
 // a scope workspace extension's instance in a workspace (WidgetView.inst, by its id): its last fetch and its button's words
 export type WidgetInst = { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string }

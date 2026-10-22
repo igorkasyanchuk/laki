@@ -4,13 +4,15 @@
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { FILE_MAX } from '../../shared/types'
+import { type ActionFile, FILE_MAX } from '../../shared/types'
 import { bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { pathText, withPaths } from './text'
 import { Icon, keep, load, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
+// what an extension's action gives a prompt box: its insert at the cursor, its files attached
+export type Inserted = { text: string; files?: ActionFile[] }
 export type Img = { path: string; url?: string; size?: number } // saved file, and a data: URL for an image's thumbnail (none: another file, a chip; size: its bytes)
 
 // a Laki AI composer's unsent text and pasted images, per chat (laki.aiDrafts, by key; images as their paths, shown again
@@ -92,7 +94,7 @@ export function PromptInput(p: {
   send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
   shot?: { n: number; png: string } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on
-  inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
+  inserts?: { label: string; sub?: string; run: () => Promise<Inserted | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
 }) {
@@ -113,6 +115,11 @@ export function PromptInput(p: {
     const [a, b] = el ? [el.selectionStart, el.selectionEnd] : [v.length, v.length]
     p.onChange(v.slice(0, a) + t + v.slice(b))
     requestAnimationFrame(() => el && (el.focus(), el.setSelectionRange(a + t.length, a + t.length)))
+  }
+  // an action's insert, and its files with the box's own: an image (imageSave's copy) with its thumbnail, any other a chip
+  const inserted = (t: Inserted) => {
+    if (t.text) insertText(t.text)
+    if (t.files?.length) void Promise.all(t.files.map(f => (f.image ? api.call<string>('aiImage', { path: f.path }).then(url => ({ path: f.path, url }), () => ({ path: f.path, size: f.size })) : { path: f.path, size: f.size }))).then(x => p.onImages(i => [...i, ...x]))
   }
   const saving = useRef(0)
   const add = async (files: File[]) => {
@@ -246,7 +253,7 @@ export function PromptInput(p: {
         {p.lead}
         {!p.lead && mic}
         {!!p.inserts?.length && (
-          <button type="button" className="ib" aria-label="Insert from an extension" aria-haspopup="menu" data-tip="Insert from an extension" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...p.inserts!.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && insertText(t), er => setErr(String(er?.message ?? er))) }))])}>
+          <button type="button" className="ib" aria-label="Insert from an extension" aria-haspopup="menu" data-tip="Insert from an extension" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...p.inserts!.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && inserted(t), er => setErr(String(er?.message ?? er))) }))])}>
             <Icon name="panel" />
           </button>
         )}

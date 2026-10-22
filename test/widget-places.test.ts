@@ -1,7 +1,7 @@
 // Extensions where you work (Part C): an action's menu fields (title, show, match, key, ask, confirm, insert, view),
 // widgetAction's ctx (a workspace, a tab, a file of it), the panel and row places
 import { strict as assert } from 'node:assert'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { actionMenu, globMatch, manifestCheck, normKey, pressOf } from '../src/shared/widgetSchema.ts'
@@ -87,4 +87,38 @@ test('row: a per-workspace one fetches every live workspace’s instance, not on
   await rig.rpc('widgetSet', { id: 'mark', on: true })
   const w = await until(async () => (x => x?.inst?.[a.id]?.badge && x?.inst?.[b.id]?.badge && x)(await find(rig, 'mark')), 'both rows have a mark')
   assert.deepEqual([w.inst[a.id].badge, w.inst[b.id].badge], ['one', 'two'])
+})
+
+// #26: an action's open (a link the app opens after it) and files (attached where an insert goes), both checked: a
+// javascript: link and a path outside its workspace, storage or folder are dropped and said in its log
+test("an action's open and files come back checked; a javascript: link and a path outside are dropped and logged", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  writeFileSync(join(a.path, 'a.txt'), 'notes')
+  symlinkSync('/etc/hosts', join(a.path, 'out'))
+  const ws = join(a.path, 'a.txt')
+  const say = (o: object) => `cat <<'EOF'\n${JSON.stringify(o)}\nEOF`
+  make(rig, 'outs', {
+    name: 'Outs',
+    actions: {
+      give: { run: say({ open: 'https://example.com/pr/1', files: [ws, 'shot.png', '../../../../etc/passwd', join(a.path, 'out'), 5] }), show: ['palette'] },
+      bad: { run: say({ open: 'javascript:alert(1)', files: 'a.txt' }), show: ['palette'] },
+      link: { run: say({ open: 'laki://settings' }), show: ['palette'] },
+    },
+  })
+  writeFileSync(join(rig.data, 'widgets', 'outs', 'shot.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==', 'base64'))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'outs', on: true, log: true })
+  const r = await rig.rpc('widgetAction', { id: 'outs', action: 'give', ctx: { ws: a.id } })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.open, 'https://example.com/pr/1')
+  assert.deepEqual(r.files.map((f: any) => [f.path.startsWith(join(rig.data, 'images')) ? 'images' : f.path, f.image ?? false, f.size]), [[realpathSync(ws), false, 5], ['images', true, 70]])
+  assert.equal((await rig.rpc('widgetAction', { id: 'outs', action: 'link', ctx: { ws: a.id } })).open, 'laki://settings')
+  const b = await rig.rpc('widgetAction', { id: 'outs', action: 'bad', ctx: { ws: a.id } })
+  assert.deepEqual([b.ok, b.open, b.files], [true, undefined, undefined])
+  const logs = await until(async () => (l => l.some((x: string) => x.includes('open refused')) && l)((await rig.rpc('widgetLogs', { id: 'outs' })).lines.map((x: any) => x.text)), 'said in its log')
+  assert.ok(logs.some((x: string) => x === 'action bad: open refused, not an http(s), mailto or laki:// link: javascript:alert(1)'), logs.join('\n'))
+  assert.ok(logs.some((x: string) => x.includes('action give: files refused') && x.includes('../../../../etc/passwd') && x.includes(join(a.path, 'out')) && x.endsWith(', 5')), logs.join('\n'))
+  assert.ok(logs.some((x: string) => x.includes('action bad: files refused') && x.endsWith('"a.txt"')), logs.join('\n'))
 })

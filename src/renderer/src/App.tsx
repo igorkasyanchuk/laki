@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -13,7 +13,7 @@ import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
-import { VoiceBar, withImages } from './PromptInput'
+import { type Inserted, VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
@@ -37,7 +37,7 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, youtubeEmbed, withPaths } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
@@ -1712,26 +1712,30 @@ export function App() {
   const extMenus = (show: string, x?: WorkspaceView | null, file?: string) => extOn(x).flatMap(w => (w.menus ?? []).filter(m => m.show.includes(show) && (!file || !m.match?.length || m.match.some(g => globMatch(g, file)))).map(m => ({ w, m })))
   const keyText = (k: string) => k.replace('Ctrl+', '⌃').replace('Alt+', '⌥').replace('Shift+', '⇧').replace('Cmd+', '⌘')
   const hereCtx = (): WidgetCtx => (x => ({ ws: x?.id, tab: x && tab?.workspace === x.id ? tab.id : undefined }))(extWs(ws))
-  // a run: its confirm and ask first, then widgetAction with where it was picked (ctx); insert: into the box it was
-  // picked in (into), else the workspace's agent's prompt, else the clipboard; view: its full view after
-  const extRun = async (w: WidgetView, m: WidgetMenu, ctx: WidgetCtx, into?: (text: string) => void) => {
+  // a run: its confirm and ask first, then widgetAction with where it was picked (ctx); insert and files (#26): into the
+  // box it was picked in (into), else the workspace's agent's prompt (files as paths), else the clipboard; open: the link
+  // after (laki://: the router); view: its full view after
+  const extRun = async (w: WidgetView, m: WidgetMenu, ctx: WidgetCtx, into?: (t: Inserted) => void) => {
     if (m.confirm && !(await ask(m.confirm, { text: `${w.name} · ${m.title}`, ok: m.title }))) return
     const arg = m.ask ? await askText(m.ask, { text: `${w.name} · ${m.title}`, ok: m.title }) : ''
     if (arg === null) return
     clearTimeout(noteTimer.current)
     setNote({ text: `${m.title}…`, busy: true })
-    type R = { ok: boolean; out?: string; error?: string; insert?: string } & WidgetSay
+    type R = { ok: boolean; out?: string; error?: string; insert?: string; open?: string; files?: ActionFile[] } & WidgetSay
     const r = await api.call<R>('widgetAction', { id: w.id, action: m.action, arg, ws: w.scope === 'workspace' ? ctx.ws : undefined, ctx }).catch((e): R => ({ ok: false, error: String(e?.message ?? e) }))
     if (!r.ok) return toast(`${m.title} failed: ${r.error}`)
     setNote(null)
-    if (r.insert !== undefined) into ? into(r.insert) : ctx.ws ? await intoAgent(ctx.ws, r.insert).catch(e => toast(String(e.message))) : copy(r.insert)
+    const put = r.insert !== undefined || !!r.files?.length
+    const text = withPaths(r.insert ?? '', (r.files ?? []).map(f => f.path))
+    if (put) into ? into({ text: r.insert ?? '', files: r.files }) : ctx.ws ? await intoAgent(ctx.ws, text).catch(e => toast(String(e.message))) : copy(text)
+    if (r.open) widgetApi.open(r.open)
     if (r.toast || r.modal) widgetApi.say(w.id, r, ctx.ws)
-    else if (r.insert === undefined && !m.view) done(r.out || `${m.title}: done`)
+    else if (!put && !r.open && !m.view) done(r.out || `${m.title}: done`)
     if (m.view) setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
   }
   const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (!extWs(x) ? [] : l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file)) // none in a terminal's, a browser's, a host's or an archived one: ctxOf refuses those
   // the new-workspace page's prompt: an action's text at its cursor
-  const extInserts = () => extMenus('prompt').map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<string | undefined>(res => void extRun(w, m, {}, res).then(() => res(undefined))) }))
+  const extInserts = () => extMenus('prompt').map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<Inserted | undefined>(res => void extRun(w, m, {}, res).then(() => res(undefined))) }))
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   // widgets: the sidebar's grid and a widget's dialog (Widgets.tsx)
   const widgetApi: WidgetApi = {
@@ -1746,8 +1750,8 @@ export function App() {
       const what = label || action
       clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
-      return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
-        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
+      return api.call<{ ok: boolean; out?: string; error?: string; open?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
+        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : (r.open && widgetApi.open(r.open), r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : r.open ? setNote(null) : done(r.out || `${what}: done`))), // #26: its link opened after it
         e => (toast(`${what} failed: ${(e as Error).message}`), false as const), // false: the kit's slider, pick or box goes back
       )
     },

@@ -555,6 +555,19 @@ SSH host's), the tab its own, the file inside it (links followed). A per-workspa
 workspace only. An agent's `laki widget action` gets no ctx (it has its own `$LAKI_WORKSPACE`), and is asked first as
 before.
 
+Besides `insert`, `toast`, `modal` and `data`, an action's JSON can say:
+
+- `"open": "https://…"`: a link the app opens after it runs (http(s), mailto, or a `laki://` link, which the app
+  follows itself). Anything else is dropped and said in its log.
+- `"files": ["report.md", "shot.png"]`: up to 10 files attached where an insert goes (the prompt box it was picked in,
+  as its images and file chips; else the workspace's agent's prompt, as paths). Each must be a file inside the
+  workspace, its storage folder or the extension's own folder (links followed; a relative path is from its folder). An
+  image goes as a copy among your pasted images. Any other path is dropped and said in its log.
+
+```sh
+echo '{"insert": "Why is this red?", "files": ["shot.png"], "open": "https://github.com/acme/shop/actions"}'
+```
+
 ## Its preview with made-up data (`sample`)
 
 Every extension shows how it looks before it ever runs: its page (Settings › Extensions › the extension) has *Live* and

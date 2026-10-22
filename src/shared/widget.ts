@@ -592,6 +592,8 @@ const fits = (v: unknown, max: number) => {
   }
 }
 const STYLES = ['primary', 'danger', 'quiet']
+// a link an extension may open (a button's, an action's open): http(s), mailto or laki://
+export const openOk = (u: unknown): u is string => typeof u === 'string' && /^(https?:|mailto:|laki:\/\/)/i.test(u)
 export function sayOf(x: unknown): WidgetSay | null {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return null
   const o = x as Record<string, unknown>
@@ -600,7 +602,7 @@ export function sayOf(x: unknown): WidgetSay | null {
   const buttons = (Array.isArray(m?.buttons) ? m.buttons : [])
     .filter((b): b is Record<string, unknown> => !!b && typeof b === 'object' && !!text(b.label, 40))
     .slice(0, 6)
-    .map(b => ({ label: text(b.label, 40)!, run: text(b.run, 100), arg: typeof b.arg === 'string' || typeof b.arg === 'number' ? String(b.arg).slice(0, 2000) : undefined, open: [text(b.open, 2000)].find(u => u && /^(https?:|mailto:|laki:\/\/)/i.test(u)), style: STYLES.includes(String(b.style)) ? b.style : b.primary === true ? 'primary' : undefined, close: b.close === false ? false : b.close === 'done' ? 'done' : undefined }))
+    .map(b => ({ label: text(b.label, 40)!, run: text(b.run, 100), arg: typeof b.arg === 'string' || typeof b.arg === 'number' ? String(b.arg).slice(0, 2000) : undefined, open: [text(b.open, 2000)].find(openOk), style: STYLES.includes(String(b.style)) ? b.style : b.primary === true ? 'primary' : undefined, close: b.close === false ? false : b.close === 'done' ? 'done' : undefined }))
   const ui = m && m.ui && typeof m.ui === 'object' && !Array.isArray(m.ui) && typeof (m.ui as Record<string, unknown>).type === 'string' && fits(m.ui, 64_000) ? m.ui : undefined
   const none = Array.isArray(m?.buttons) && !m.buttons.length // [] : no buttons, the ✕ and Esc close it
   const modal = m && (text(m.title, 120) || text(m.text, 2000) || ui)

@@ -1516,9 +1516,13 @@ warned and never taken, a ⌃ one without Alt or ⌘ warned (a terminal's); `men
 (`WidgetCtx`, `ctxOf`: a live `instOk` workspace, a scoped one's own; a tab of it; a file `inside` it) adds `$LAKI_CTX`,
 `$LAKI_FILE`, `$LAKI_TAB`, the workspace's env for a global one (`infoEnv`, no `LAKI_WIDGET_FILE`) and an AI action's
 `{{file.path}}`/`{{tab.name}}`; none from an agent or an event. `insert` (the JSON's, else all of stdout with `insert:
-true`, `INSERT_MAX`) comes back for the prompt. The renderer: App's `extMenus`/`extItems`/`extRun` (confirm (`ask`),
+true`, `INSERT_MAX`) comes back for the prompt; `open` (shared/widget.ts `openOk`, a button's rule) and `files` (#26:
+`filesOut`, `FILES_OUT` 10, each `within` the workspace, its storage or `pathOf(w)` by realpath, relative from its folder;
+an image through `imageSave`; `ActionFile`) with it, neither for an event; what's refused goes to its log. The renderer: App's `extMenus`/`extItems`/`extRun` (confirm (`ask`),
 ask (ui.tsx `askText`, AskHost's `field`), `widgetAction`, then insert: the box's `into` (PromptInput `inserts`, the
-new-workspace page's), else `intoAgent` (the Preview's `toPrompt` too), else the clipboard; `view`: its full view), in
+new-workspace page's: PromptInput's `Inserted`, files as its images and chips, an image's thumbnail by `aiImage`), else
+`intoAgent` (files as paths, `withPaths`; the Preview's `toPrompt` too), else the clipboard; `open`: `widgetApi.open`
+after it, a widget button's too; `view`: its full view), in
 the palette, `wsMenu`, `tabMenu`, `fileMenu` and the capture keys (before `act`, Alt or Ctrl only).
 
 Sources (`test/widget-source.test.ts`): `types.ts` `WIDGET_SOURCES`, `WidgetSource`; widget.json's `source` the

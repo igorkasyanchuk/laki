@@ -9,15 +9,15 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
-import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
+import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, type ActionFile, WIDGET_PLACES } from '../shared/types.ts'
+import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, actionMenu, aiActOf, gateOf, globMatch, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
-import { agentCaller, agentIn, broadcast, callerAgent, inside, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, execGroup, killGroup, own, plainEnv, presets, q, save, settingsSet, state, wsVars } from './core.ts'
+import { agentCaller, agentIn, broadcast, callerAgent, imageSave, inside, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, execGroup, killGroup, own, plainEnv, presets, q, save, settingsSet, state, wsVars } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -1360,7 +1360,30 @@ function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; erro
 // from: who asked (laki widget action's $LAKI_WORKSPACE, $LAKI_TAB): an agent's call (agentCaller) of a tool goes
 // through widgetToolCall, its ask; of any other action, the user is asked each time (no Always)
 // ctx: where the app's user picked it (a menu, the palette, a key, the prompt): never an agent's
-export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string; from?: { ws?: string; tab?: string }; ctx?: WidgetCtx }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string; stdout?: string; insert?: string } & WidgetSay> {
+// #26: an action's files (its JSON's files): FILES_OUT at most, each a file inside its workspace, that workspace's storage
+// folder or its own folder (a one-file one: the file), links followed; a relative one from its folder, where it runs. An
+// image goes as imageSave's copy (the prompt shows it), the rest as their paths. What isn't goes to its log
+const FILES_OUT = 10
+const IMG_EXT = /\.(png|jpe?g|gif|webp)$/i
+function filesOut(w: Entry, raw: unknown, ws: Workspace | undefined, action: string) {
+  const roots = [ws?.path, ws?.storage, pathOf(w)].flatMap(r => (r && existsSync(r) ? [realpathSync(r)] : []))
+  const out: ActionFile[] = []
+  const bad: string[] = Array.isArray(raw) ? [] : [JSON.stringify(raw)]
+  for (const f of Array.isArray(raw) ? raw : [])
+    try {
+      if (typeof f !== 'string' || !f.trim() || out.length >= FILES_OUT) throw 0
+      const real = realpathSync(resolve(w.dir, f))
+      const st = statSync(real)
+      if (!st.isFile() || !roots.some(r => within(r, real))) throw 0
+      const ext = IMG_EXT.exec(real)?.[1].toLowerCase()
+      out.push(ext && st.size <= 20 << 20 ? { path: imageSave({ data: readFileSync(real).toString('base64'), ext }), image: true, size: st.size } : { path: real, size: st.size })
+    } catch {
+      bad.push(typeof f === 'string' ? f : JSON.stringify(f))
+    }
+  if (bad.length) wLog(w, `action ${action}: files refused (${FILES_OUT} at most, each a file inside its workspace, its storage or the extension's folder): ${bad.map(b => String(b).slice(0, 200)).join(', ')}`, 'warn')
+  return out
+}
+export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string; from?: { ws?: string; tab?: string }; ctx?: WidgetCtx }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string; stdout?: string; insert?: string; open?: string; files?: ActionFile[] } & WidgetSay> {
   const w = find(o.id)
   const gone = scoped(w) ? ev?.gone : undefined
   const x = gone ? undefined : wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
@@ -1416,7 +1439,11 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     // into the prompt: its JSON's insert, else (insert: true) all it printed, an agent's words too
     const insert = typeof j?.insert === 'string' ? j.insert : actionMenu(o.action, def)?.insert && !j ? out.trim() : undefined
     const say = (j && sayOf(j)) ?? (ai && insert === undefined && !(j && 'data' in j) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', style: 'primary' as const }] } } : undefined) // an agent's words: a dialog
-    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }) }
+    // #26: a link the app opens after it, and files it attaches where an insert goes
+    const open = typeof j?.open === 'string' ? j.open.trim().slice(0, 2000) : j?.open
+    if (open !== undefined && !openOk(open)) wLog(w, `action ${o.action}: open refused, not an http(s), mailto or laki:// link: ${String(open).slice(0, 200)}`, 'warn')
+    const files = j && 'files' in j && !ev ? filesOut(w, j.files, x ?? state.workspaces.find(v => v.id === ctx?.info.ws?.id), o.action) : undefined
+    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }) }
   } catch (e) {
     const f = e as Failed
     ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)

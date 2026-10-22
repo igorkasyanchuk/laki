@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: an action can print `"open": "https://…"` (opened after it runs; `laki://` links too) and `"files": […]`
+  (attached to the prompt it was picked in, images as images, or given to the agent as paths).
 - An agent's or extension's ask no longer counts as a *Deny* when another dialog or page opens over it: it waits and
   comes back as that closes. Only Esc, Deny, a click outside or its time running out deny it.
 - Laki tells an agent's commands apart better: one that double-forks out of its tab is still its tab's (by its
