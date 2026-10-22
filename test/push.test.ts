@@ -195,26 +195,31 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
   await rig.rpc('settingsSet', { webhook: { url, format: 'json' } }) // waiting on, done off: the defaults
   const say = async (text: string, status: string) => {
     await rig.rpc('input', { tab: tab.id, data: `${text}\r` })
-    await until(async () => (await rig.tab(ws.id)).status === status, status)
-    await sleep(1000) // a push would be in by now (a wait's goes 800 ms later, with its menu)
+    await until(async () => (await rig.tab(ws.id)).status === status, status, 15000) // two hooks, each a node start (the fake waits 3 s for one)
   }
+  const pushed = (n: number) => until(() => got.length >= n, `push ${n}`)
+  const none = () => sleep(1000) // for a push that mustn't come: it would be in by now (a wait's goes 800 ms later, with its menu)
   const events = () => got.map(g => JSON.parse(g.body).event + ':' + JSON.parse(g.body).message)
 
   await say('hi', 'idle')
+  await none()
   assert.deepEqual(events(), []) // done: off
   await say('ask', 'waiting')
+  await pushed(1)
   await rig.rpc('hook', { tab: tab.id, state: 'waiting', payload: { message: 'needs permission' } }) // again: the same wait
-  await sleep(300)
+  await none()
   assert.deepEqual(events(), [`waiting:claude in ${ws.id} is waiting for you\nneeds permission`])
 
   await rig.rpc('settingsSet', { webhook: { url, format: 'json', done: true } })
   await say('hi', 'idle')
+  await pushed(2)
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'answer: hi' } })
-  await sleep(300)
+  await none()
   assert.deepEqual(events().slice(1), [`done:claude in ${ws.id} is done`])
 
   await rig.rpc('tabSet', { id: tab.id, muted: true })
   await say('ask', 'waiting')
+  await none()
   assert.equal(got.length, 2) // muted: nothing
 
   assert.equal(await rig.rpc('webhookTest', { url, format: 'ntfy' }), true)
