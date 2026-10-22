@@ -1672,8 +1672,10 @@ tab too); `by` you, agent (`agentCaller`), auto, workflow. `widgetGates`: every 
 scoped one where `instOk`), `GATE_MAX` 8 together, `gateWait` 30 s (`LAKI_GATE_MS`: tests'), `exec` with stdin and
 `LAKI_EVENT_FILE` `{ gate, ws: wsInfo, pr, stat, by }`, `LAKI_GATE`, `wsEnv`; a run `gate:<step>` in its Runs and log.
 `{"ok": false, "why", "fix"}` is a `GateHeld` whatever its exit code (`said`, for both a run that ended well and one that
-failed: a no that exits 1 is a no); an error, a timeout or no `ok` goes ahead (`wLog` error, a `widget-say`
-toast) unless `by` is auto: then held. The CLI's `laki ship` and `laki archive` (`caller()`, `--force`) print the
+failed: a no that exits 1 is a no); an error, a timeout or no `ok` holds it, `its gate failed: <problem>`, unless `by`
+is you: then it goes ahead (`wLog` error, a `widget-say` toast). A guarded one whose files changed fails so too: in its
+run (`trusted` throws, `Failed.changed`), or off already by the watcher's `untrust` (the store's `changed`: `moved`,
+its gates still count; yours: *changed* in the toast). The CLI's `laki ship` and `laki archive` (`caller()`, `--force`) print the
 reasons and exit 1 (cli `held`). Each hold `gate.held`. Held: `{ held }` back (App's `gated`: *Checking…* while
 `gatesOn`, then `choose` *Not shipped*… with *Do it anyway* (`ask`, then `force`) and *Ask the agent to fix it* (`send`
 `whenIdle`, the fixes) when one has a `fix` and the workspace a live agent tab); `autoPR`: `overToYou` once, `f.land`

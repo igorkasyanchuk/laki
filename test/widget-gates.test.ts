@@ -222,3 +222,54 @@ test('gates: Merge when green held once per head, its error a hold too; again af
   assert.equal((await rig.rpc('state')).workspaces.find((x: any) => x.id === r.ws).archived, undefined, 'not archived')
   assert.match(r.decisions.find((d: any) => d.block === 'go').why, /held by g/)
 })
+
+// #2: a gate that fails (past LAKI_GATE_MS here) let an agent's ship or a workflow's archive through; only yours goes
+// ahead now, with the toast. A repo gate whose files changed fails the same way (off until you look): it holds an agent's
+test("gates: one that fails holds an agent's ship and a workflow's archive; yours goes ahead with a toast; a repo gate changed on disk holds an agent's", async t => {
+  const { rig, remote, p } = await shipRig(t)
+  make(rig, 'slow', { name: 'Slow', actions: { check: { run: 'sleep 5; echo \'{"ok": true}\'', gate: ['ship', 'archive'] } } })
+  await on(rig, 'slow')
+  await rig.rpc('settingsSet', { widgetLogs: true, workflows: true })
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'a' })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
+  const out = join(rig.home, 'agent-out')
+  const agentShip = async () => {
+    writeFileSync(out, '')
+    await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} ship ${ws.id} -m mine > ${out} 2>&1; echo "exit $?" >> ${out}` })
+    return until(() => (s => /exit \d+/.test(s) && s)(readFileSync(out, 'utf8')), 'the agent shipped', 30000) as Promise<string>
+  }
+  const said = await agentShip()
+  assert.match(said, /Not shipped:\n {2}Slow: its gate failed: timed out after 1\.5 s/)
+  assert.match(said, /exit 1/)
+  assert.ok(!pushed(remote, ws.branch), 'nothing pushed')
+  assert.ok((await rig.rpc('widgetLogs', { id: 'slow', level: 'error' })).lines.some((l: any) => /gate check \(ship, by agent\) failed: timed out after 1\.5 s: held/.test(l.text)))
+
+  // yours: goes ahead, said
+  const tabOf = await rig.rpc('ship', { ws: ws.id, message: 'yours' })
+  assert.ok(tabOf.id, JSON.stringify(tabOf))
+  await until(() => app.events.some(e => e.ev === 'widget-say' && e.widget === 'slow' && /Slow's gate failed: timed out after 1\.5 s\. Went ahead/.test(e.toast)), 'a toast')
+  await until(() => pushed(remote, ws.branch), 'pushed', 20000)
+
+  // a workflow's archive: held, its error way
+  await rig.rpc('flowSave', { id: 'a', text: '# A\nruns in: worktree\n\n## start\ninput: task\nnext: go\n\n## go\naction: archive\nask first: no\nok: e\nerror: bad\n\n## e\nend: success\n\n## bad\nend: failed\n' })
+  const run = await rig.rpc('flowStart', { workflow: 'a', project: p.id, task: 'x' })
+  const r = await until(async () => (x => x.status !== 'running' && x.status !== 'queued' && x)(await rig.rpc('flowGet', { id: run.id })), 'the run ended', 20000)
+  assert.equal(r.status, 'failed', JSON.stringify(r.log.slice(-4)))
+  assert.equal(r.vars['steps.go.output'], 'Slow: its gate failed: timed out after 1.5 s')
+  assert.equal((await rig.rpc('state')).workspaces.find((x: any) => x.id === r.ws).archived, undefined, 'not archived')
+
+  // a repo's gate, looked at and on, then changed on disk: it fails as changed, and an agent's ship is held
+  await rig.rpc('widgetSet', { id: 'slow', on: false })
+  const d = join(rig.repo, '.laki', 'extensions', 'rg')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Repo gate', actions: { check: { run: 'echo \'{"ok": true}\'', gate: ['ship'] } } }))
+  await rig.rpc('widgetReload')
+  const id = `${p.id}.rg`
+  await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
+  writeFileSync(join(d, 'check.sh'), 'echo pwned\n')
+  assert.match(await agentShip(), /Not shipped:\n {2}Repo gate: its gate failed: Repo gate changed .*off until you look/)
+})

@@ -259,9 +259,9 @@ that says no holds it, with its reason.
   for the agent, optional). Its exit code doesn't matter: a no that exits 1 holds too.
 - Gates run together, 8 at most for a step, 30 s each, only while the extension is on; a per-workspace one with its
   workspace's instance. A command action only: an agent's action can't be one (each run costs, and it's slow).
-- **An error or no answer within 30 s:** the step goes ahead, and Laki says so (a toast, a line in its log). A gate
-  that should block on its own error prints `ok: false` itself. Merge when green and archive on merge, which nobody
-  watches, are held instead.
+- **An error or no answer within 30 s:** the step is held, *its gate failed*, unless you started it: then it goes
+  ahead, and Laki says so (a toast, a line in its log). An agent's ship, merge or archive, a workflow's, Merge when
+  green and archive on merge are held. A repo's gate whose files changed (off until you look) holds them too.
 - **Held:** the app says *Not shipped* (*Not merged*, *Not archived*), a line per gate, with *Do it anyway* (asked
   first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` and `laki
   archive` print the reasons and exit 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.

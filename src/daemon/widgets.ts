@@ -986,7 +986,7 @@ function envOf(w: Entry, extra: Record<string, string>) {
   return env
 }
 type Ran = { out: string; err: string }
-type Failed = Error & { stderr?: string; stdout?: string; exit?: number }
+type Failed = Error & { stderr?: string; stdout?: string; exit?: number; changed?: boolean } // changed: a guarded one's files moved (trusted)
 // a widget's command, in its folder, as a process group (a timeout ends what it started too): stdout and stderr, or why
 // it failed (with its stderr and exit code). stdin: an event's JSON (a handler's); else nothing to read
 const timeout = () => Number(process.env.LAKI_WIDGET_TIMEOUT_MS) || 120_000 // tests' shorter
@@ -1003,7 +1003,7 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
   try {
     trusted(w)
   } catch (e) {
-    return Promise.reject(Object.assign(e as Error, { stderr: '' }))
+    return Promise.reject(Object.assign(e as Error, { stderr: '', changed: true }))
   }
   return new Promise<Ran>((ok, no) => {
     const t = ms ?? timeout()
@@ -1518,8 +1518,9 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
 // ---------- gates (an action's "gate": ["ship", "merge", "archive"]): before Laki ships, merges or archives a
 // workspace, each gate for that step runs: on, a scope workspace one only in a workspace it has (instOk), GATE_MAX at
 // most, together, gateWait each. stdin and LAKI_EVENT_FILE: { gate, ws, pr, stat, by }, LAKI_GATE the step, the
-// workspace's env. It prints { "ok": false, "why", "fix" } to hold the step. An error or no answer goes ahead, said (a
-// log line, a toast), except for an unattended step (by auto: Merge when green, archive on merge): held
+// workspace's env. It prints { "ok": false, "why", "fix" } to hold the step. An error or no answer (#2: a crash, past
+// gateWait, a repo gate whose files changed) holds it, "its gate failed", unless you started the step: then it goes ahead,
+// said (a log line, a toast). An agent could make its gate fail (its tests hang) to get past it
 const GATE_MAX = 8
 const gateWait = () => Number(process.env.LAKI_GATE_MS) || 30_000 // tests' shorter
 export type GateBy = 'you' | 'agent' | 'auto' | 'workflow'
@@ -1527,11 +1528,22 @@ const gatesOf = (w: Entry, step?: Gate) => Object.entries(w.m.actions ?? {}).fil
 // the gates' extensions as they are now: a hold is tried again once one of them changed (Merge when green)
 export const gatesKey = (ids: string[]) => ids.map(id => (w => (w ? `${id}:${onOf(w)}:${filesHash(w)}` : `${id}:gone`))(widgets.get(id))).join(',')
 export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: { pr: unknown; stat: unknown }): Promise<GateHeld[]> {
-  const all = [...widgets.values()].filter(w => onOf(w) && inProj(w, x) && (!scoped(w) || instOk(x))).flatMap(w => gatesOf(w, step).map(([a]) => ({ w, a })))
-  if (!all.length) return []
+  const here = (w: Entry) => inProj(w, x) && (!scoped(w) || instOk(x))
+  const all = [...widgets.values()].filter(w => onOf(w) && here(w)).flatMap(w => gatesOf(w, step).map(([a]) => ({ w, a })))
+  // a repo's (or an agent's linked) gate that went off as its files changed (untrust: the watcher's scan, a second
+  // later): it fails as changed, so a rewrite never takes its gate away from anyone but you
+  const moved = [...widgets.values()].filter(w => !onOf(w) && guarded(w) && w.s.changed && here(w) && gatesOf(w, step).length)
+  if (!all.length && !moved.length) return []
   for (const { w, a } of all.slice(GATE_MAX)) wLog(w, `gate ${a} (${step}): not run, ${GATE_MAX} gates at most for a step`, 'warn')
   const input = JSON.stringify({ gate: step, ws: wsInfo(x), pr: facts.pr ?? null, stat: facts.stat ?? null, by })
   const held: GateHeld[] = []
+  for (const w of moved) {
+    const name = w.m.name || w.id
+    if (by !== 'you') {
+      wLog(w, `gate (${step}, by ${by}): changed, off until you look: held`, 'error')
+      held.push({ widget: w.id, name, gate: step, why: `its gate failed: ${name} changed ${where(w)}: off until you look`, ...(w.m.icon && { icon: w.m.icon }) })
+    } else broadcast({ ev: 'widget-say', widget: w.id, toast: `${name}'s gate changed (off until you look). Went ahead` })
+  }
   await Promise.all(
     all.slice(0, GATE_MAX).map(async ({ w, a }) => {
       const name = w.m.name || w.id
@@ -1542,6 +1554,7 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
       const reason = `gate:${step}`
       const t0 = Date.now()
       let problem: string | undefined
+      let changed = false
       // what it said: {"ok": …} (all of stdout, else its last line), whatever its exit code: a no that exits 1 is a no
       const said = (out: string) => {
         const j = [out, lastLine(out)].map(t => {
@@ -1565,17 +1578,17 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
       } catch (e) {
         const f = e as Failed
         ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
-        if (!said(f.stdout ?? '')) problem = f.message
+        if (!said(f.stdout ?? '')) (problem = f.message), (changed = !!f.changed)
       } finally {
         rmSync(file, { force: true })
       }
       if (problem === undefined) return
-      if (by === 'auto') {
-        wLog(w, `gate ${a} (${step}) failed: ${problem}: held, nobody is watching`, 'error')
+      if (by !== 'you') {
+        wLog(w, `gate ${a} (${step}, by ${by}) failed: ${problem}: held`, 'error')
         return hold(`its gate failed: ${problem}`)
       }
       wLog(w, `gate ${a} (${step}) failed: ${problem}: went ahead`, 'error')
-      broadcast({ ev: 'widget-say', widget: w.id, toast: `${name}'s gate failed: ${problem.slice(0, 120)}. Went ahead` })
+      broadcast({ ev: 'widget-say', widget: w.id, toast: changed ? `${name}'s gate changed (off until you look). Went ahead` : `${name}'s gate failed: ${problem.slice(0, 120)}. Went ahead` })
     }),
   )
   for (const h of held) widgetEvent('gate.held', { gate: h.gate, widget: h.widget, why: h.why }, x.id)

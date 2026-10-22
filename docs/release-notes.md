@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Gates: one that fails (an error, past its 30 s, a repo's that changed) now holds an agent's ship, merge or archive
+  and a workflow's; only a step you start goes ahead, with a toast.
 - An agent's `laki send` reaches other agents, or a terminal of its own workspace; what it runs there is the agent's
   (no turning extensions on or shipping past a gate as you) until you type there yourself. Another workspace's terminal
   is refused.
