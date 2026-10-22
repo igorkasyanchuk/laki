@@ -889,8 +889,8 @@ Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its
 Links open in the browser; an extension's buttons can run commands its `widget.json` names (*Review in Laki*). Its
 actions can also show up where you work: in ⌘K (*<its name>: <action>*), a workspace's ⋯ and right click, a tab's
 right click, a file's right click in Files (by its kinds of file: *Explain this file*, or an opener that shows the
-file in its full view), a shortcut of its own (with ⌥ or ⌃), and the new-workspace prompt's *Insert* menu (its text at
-the cursor). One may ask you something first, or ask you to confirm; what it prints can go into the prompt (the box,
+file in its full view), a shortcut of its own (with ⌥ or ⌃), and the *Insert* menu wherever you type for an agent: the new-workspace page,
+Laki AI's box and Send later's message (its text at the cursor). One may ask you something first, or ask you to confirm; what it prints can go into the prompt (the box,
 else the workspace's agent's, not sent). While one
 runs, a toast in the bottom right says so (and the button waits); what it prints decides what shows after: a line as
 a toast, or JSON with `toast` and `modal` (a dialog with a title, text and up to 4 buttons, each running another of

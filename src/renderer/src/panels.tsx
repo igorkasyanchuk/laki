@@ -6,8 +6,8 @@ import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
-import { type Img, PromptInput, withImages } from './PromptInput'
-import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
+import { type Img, type Inserted, type Inserts, PromptInput, withImages } from './PromptInput'
+import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
 import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
@@ -479,7 +479,7 @@ const MODEL_SAYS: Record<string, [string, string, 'good' | 'warn' | undefined]> 
 // bar's screenshots
 const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
-export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams> & { linked?: boolean }; images?: Shot[]; inserts?: ComponentProps<typeof PromptInput>['inserts']; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams> & { linked?: boolean }; images?: Shot[]; inserts?: (project: string) => Inserts; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
   // draft goes, prompt and all, and the page starts empty there
@@ -857,7 +857,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               lead={lead || <span />}
               tools={fast}
               send={send}
-              inserts={inserts}
+              inserts={inserts?.(p.project) /* the project picked: its repo's extensions too */}
             />
           ) : (
             <>
@@ -1107,10 +1107,19 @@ export function RemindDialog({ name, onClose, onPick }: { name: string; onClose:
 
 // Send later (the toolbar's ⋯ and clock, a tab's right click, ⌘L, ⌘K, the AI page's clock): a message to one of the
 // workspace's agents, or Laki AI (id 'ai'), at a time; a timer in the sidebar until then (edit: its message, agent and
-// time again). picks: Run ▾'s agent actions, a click puts one's text in
-export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; picks?: { name: string; text: string }[]; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
+// time again). picks: Run ▾'s agent actions, a click puts one's text in; inserts: extensions' actions for the agent
+// picked (its workspace and tab), what one prints goes in at the cursor, its files as paths
+export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; picks?: { name: string; text: string }[]; inserts?: (tab: string) => Inserts; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
   const [to, setTo] = useState(p.agents.some(a => a.id === p.tab) ? p.tab! : (p.agents[0]?.id ?? ''))
   const [text, setText] = useState(p.text ?? '')
+  const [menu, openMenu] = useMenu()
+  const box = useRef<HTMLTextAreaElement>(null)
+  const ins = p.inserts?.(to) ?? []
+  const put = (t: Inserted) => {
+    const add = withPaths(t.text, (t.files ?? []).map(f => f.path))
+    const el = box.current
+    setText(s => (el ? s.slice(0, el.selectionStart) + add + s.slice(el.selectionEnd) : s + add))
+  }
   const [when, setWhen] = useState(() => (p.at ? laterText(p.at) : '')) // an edit: its time again
   const ms = parseLater(when)
   const ok = !!(to && text.trim() && ms)
@@ -1130,8 +1139,16 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
         </label>
         <label>
           Message
-          <textarea rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
+          <textarea ref={box} rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
         </label>
+        {ins.length > 0 && (
+          <div className="remind-quick">
+            <button type="button" aria-haspopup="menu" data-tip="Insert from an extension: what it prints goes in at the cursor" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...ins.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && put(t), () => {}) }))])}>
+              <Icon name="panel" size={12} /> Insert
+            </button>
+          </div>
+        )}
+        {menu}
         {!!p.picks?.length && (
           <div className="remind-quick" aria-label="Your actions">
             {p.picks.map((a, i) => (

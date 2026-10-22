@@ -13,6 +13,7 @@ import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
+export type Inserts = { label: string; sub?: string; run: () => Promise<Inserted | undefined> }[] // a box's Insert menu: extensions' actions (show prompt)
 export type Img = { path: string; url?: string; size?: number } // saved file, and a data: URL for an image's thumbnail (none: another file, a chip; size: its bytes)
 
 // a Laki AI composer's unsent text and pasted images, per chat (laki.aiDrafts, by key; images as their paths, shown again
@@ -94,7 +95,7 @@ export function PromptInput(p: {
   send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
   shot?: { n: number; png: string } // Screenshot to Laki AI's (a PNG, base64): each new one added as a pasted one, and the mic on
-  inserts?: { label: string; sub?: string; run: () => Promise<Inserted | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
+  inserts?: Inserts // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
 }) {
@@ -113,13 +114,17 @@ export function PromptInput(p: {
     const el = box.current
     const v = el?.value ?? p.value // the box as it is now: typed into while the action ran
     const [a, b] = el ? [el.selectionStart, el.selectionEnd] : [v.length, v.length]
+    if (a > 0 && /\S/.test(v[a - 1]) && /^\S/.test(t)) t = ` ${t}` // right after a word: a space, not one long word
     p.onChange(v.slice(0, a) + t + v.slice(b))
     requestAnimationFrame(() => el && (el.focus(), el.setSelectionRange(a + t.length, a + t.length)))
   }
   // an action's insert, and its files with the box's own: an image (imageSave's copy) with its thumbnail, any other a chip
+  // where the box takes them (saveFile), else its path typed (Laki AI's)
   const inserted = (t: Inserted) => {
-    if (t.text) insertText(t.text)
-    if (t.files?.length) void Promise.all(t.files.map(f => (f.image ? api.call<string>('aiImage', { path: f.path }).then(url => ({ path: f.path, url }), () => ({ path: f.path, size: f.size })) : { path: f.path, size: f.size }))).then(x => p.onImages(i => [...i, ...x]))
+    const kept = (t.files ?? []).filter(f => f.image || p.saveFile)
+    const typed = withPaths(t.text, (t.files ?? []).filter(f => !kept.includes(f)).map(f => f.path))
+    if (typed) insertText(typed)
+    if (kept.length) void Promise.all(kept.map(f => (f.image ? api.call<string>('aiImage', { path: f.path }).then(url => ({ path: f.path, url }), () => ({ path: f.path, size: f.size })) : { path: f.path, size: f.size }))).then(x => p.onImages(i => [...i, ...x]))
   }
   const saving = useRef(0)
   const add = async (files: File[]) => {

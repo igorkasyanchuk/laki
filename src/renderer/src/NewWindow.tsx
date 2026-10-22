@@ -4,17 +4,18 @@
 // too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
 import { useEffect, useState } from 'react'
-import type { View, WorkspaceView } from '../../shared/types'
-import { api, bridge, reportView } from './api'
+import type { ActionFile, View, WorkspaceView } from '../../shared/types'
+import { api, bridge, openExternal, reportView } from './api'
 import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
-import { VoiceBar } from './PromptInput'
+import { type Inserts, VoiceBar } from './PromptInput'
 import { NewWorkspace } from './panels'
 import { DeviceTab } from './SidePanel'
 import { FONT_SIZE, termLook } from './Settings'
 import { Term } from './Term'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
-import { AskHost, IconButton, load, Tips } from './ui'
+import { ask, AskHost, askText, IconButton, load, Tips } from './ui'
+import { insertMenus } from './Widgets'
 
 // no glass, no see-through sidebar: the window has no blur behind it
 const paint = (p: Paint) => applyTheme({ ...p, glass: false, sideClear: 0 })
@@ -90,6 +91,24 @@ export function SimWindow() {
   )
 }
 
+// the box's Insert menu in these windows, as the app's (App's extInserts): no workspace here, so the global ones' and,
+// with a project picked, its repo's. Its confirm and ask, then the action; its insert and files into the box, its link
+// opened; a failure is the box's error
+const windowInserts = (view: View, project?: string): Inserts =>
+  insertMenus(view.widgets, undefined, project).map(({ w, m }) => ({
+    label: m.title,
+    sub: w.name,
+    run: async () => {
+      if (m.confirm && !(await ask(m.confirm, { text: `${w.name} · ${m.title}`, ok: m.title }))) return
+      const arg = m.ask ? await askText(m.ask, { text: `${w.name} · ${m.title}`, ok: m.title }) : ''
+      if (arg === null) return
+      const r = await api.call<{ ok: boolean; error?: string; insert?: string; open?: string; files?: ActionFile[] }>('widgetAction', { id: w.id, action: m.action, arg, ctx: {} })
+      if (!r.ok) throw new Error(`${m.title} failed: ${r.error}`)
+      if (r.open) openExternal(r.open)
+      return r.insert !== undefined || r.files?.length ? { text: r.insert ?? '', files: r.files } : undefined
+    },
+  }))
+
 export function AiWindow() {
   const view = useView()
   const [shot, setShot] = useState<{ n: number; png: string }>() // Screenshot to Laki AI's picture, the newest: to the box, the mic on
@@ -97,7 +116,7 @@ export function AiWindow() {
   if (!view) return null
   return (
     <>
-      <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} shot={shot} />
+      <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} shot={shot} inserts={windowInserts(view)} />
       <AskHost />
       <VoiceBar />
       <Tips />
@@ -132,6 +151,7 @@ export function NewWindow() {
         view={{ ...view, projects: view.projects.filter(p => !p.kind) } /* Terminals and Browsers make theirs with + */}
         agent={view.settings.agent}
         initial={ask.prompt ? { prompt: ask.prompt } : undefined}
+        inserts={project => windowInserts(view, project)}
         onClose={() => window.close()}
         onCreate={async p => {
           setErr('')

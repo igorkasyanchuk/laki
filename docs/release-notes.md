@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: the *Insert* menu is in Laki AI's box (its page, the floating chat, the AI window), the new-workspace
+  window and Send later's message too, for the workspace and tab it's about.
 - Extensions: a workspace row's mark takes its color from its data's `tone`, a click opens that workspace's full
   view, and the workspace's card (hover a row) shows its marks.
 - Extensions: a right click on any of them (a cell, a rail or foot button, a My Desk tile) turns it off, moves it

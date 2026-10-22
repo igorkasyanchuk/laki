@@ -9,7 +9,7 @@ import { ago } from './Info'
 import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
-import { type Img, PromptInput, useDraft } from './PromptInput'
+import { type Img, type Inserts, PromptInput, useDraft } from './PromptInput'
 import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
 
 type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
@@ -59,6 +59,7 @@ export function AiPage({
   hello,
   chat,
   shot,
+  inserts,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
@@ -71,6 +72,7 @@ export function AiPage({
   hello?: { title: string; text: string; examples: string[]; placeholder: string } // what an empty chat says, its examples and the box's hint
   chat?: string // a chat of its own (the Extension page's widget:<id>, the studio's too); none: the AI page's
   shot?: { n: number; png: string } // the AI window's Screenshot to Laki AI: each new one into the box, the mic on (PromptInput's)
+  inserts?: Inserts // the box's Insert menu: extensions' actions, for the workspace selected
 }) {
   const c = chat ? { chat } : {}
   const [d, setD] = useState<AiData>()
@@ -219,6 +221,7 @@ export function AiPage({
                   onSubmit={ask}
                   focus={!embed}
                   shot={shot}
+                  inserts={inserts}
                   enter
                   onBusy={setSaving}
                   rows={2}

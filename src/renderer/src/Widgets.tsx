@@ -29,6 +29,10 @@ export type WidgetApi = {
   log?: (id: string, text: string, ws?: string) => void // a JS page's laki.log: its log (widgetLog; nothing while off)
 }
 
+// a box's Insert menu (show prompt): the actions of the ones on; a per-workspace one's only with a workspace (ws), a
+// repo's only for its project
+export const insertMenus = (widgets: WidgetView[] = [], ws?: string, project?: string) => widgets.filter(w => w.on && (w.scope !== 'workspace' || ws) && (!w.project || w.project === project)).flatMap(w => (w.menus ?? []).filter(m => m.show.includes('prompt')).map(m => ({ w, m })))
+
 const LINK = /^(https?:|mailto:)/i
 const OPEN = /^(https?:|mailto:|laki:\/\/)/i
 // webview: the app window has webviewTag (the preview), and one in a Browsers partition may load any site.

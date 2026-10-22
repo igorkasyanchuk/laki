@@ -1521,8 +1521,14 @@ warned and never taken, a ⌃ one without Alt or ⌘ warned (a terminal's); `men
 true`, `INSERT_MAX`) comes back for the prompt; `open` (shared/widget.ts `openOk`, a button's rule) and `files` (#26:
 `filesOut`, `FILES_OUT` 10, each `within` the workspace, its storage or `pathOf(w)` by realpath, relative from its folder;
 an image through `imageSave`; `ActionFile`) with it, neither for an event; what's refused goes to its log. The renderer: App's `extMenus`/`extItems`/`extRun` (confirm (`ask`),
-ask (ui.tsx `askText`, AskHost's `field`), `widgetAction`, then insert: the box's `into` (PromptInput `inserts`, the
-new-workspace page's: PromptInput's `Inserted`, files as its images and chips, an image's thumbnail by `aiImage`), else
+ask (ui.tsx `askText`, AskHost's `field`), `widgetAction`, then insert: the box's `into` (PromptInput `inserts`,
+`Inserts`: App's `extInserts(ctx, project)` over Widgets.tsx' `insertMenus` (on, a per-workspace one's with a workspace,
+a repo's for its project) for the new-workspace page (the project picked: NewWorkspace's `inserts(project)`), Laki AI's
+page and floating chat (`hereCtx`), Send later's box (`SendLaterDialog` `inserts(tab)`: the agent picked, its workspace
+and tab; Laki AI: `hereCtx`; the app's one box that sends to an agent: the old send bar went in 60ad53a); NewWindow.tsx'
+`windowInserts` for the new-workspace and AI windows (no workspace: global ones and the picked project's, its own
+confirm, ask and `widgetAction`); PromptInput's `Inserted`, files as its images and chips (a box without `saveFile`,
+Laki AI's: their paths typed), an image's thumbnail by `aiImage`; right after a word, a space first), else
 `intoAgent` (files as paths, `withPaths`; the Preview's `toPrompt` too), else the clipboard; `open`: `widgetApi.open`
 after it, a widget button's too; `view`: its full view), in
 the palette, `wsMenu`, `tabMenu`, `fileMenu` and the capture keys (before `act`, Alt or Ctrl only).

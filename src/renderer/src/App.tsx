@@ -13,14 +13,14 @@ import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
-import { type Inserted, VoiceBar, withImages } from './PromptInput'
+import { type Inserted, type Inserts, VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { AchievementsPage } from './Achievements'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, imagesVia, inWs, RowMarks, rowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
@@ -1734,8 +1734,14 @@ export function App() {
     if (m.view) setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
   }
   const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (!extWs(x) ? [] : l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file)) // none in a terminal's, a browser's, a host's or an archived one: ctxOf refuses those
-  // the new-workspace page's prompt: an action's text at its cursor
-  const extInserts = () => extMenus('prompt').map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<Inserted | undefined>(res => void extRun(w, m, {}, res).then(() => res(undefined))) }))
+  // a box's Insert menu (the new-workspace page's, Laki AI's, Send later's): an action's text at its cursor, its files
+  // with it. ctx: the workspace and tab it types for (a per-workspace one's there, a repo's of its project); project: the
+  // new-workspace page's pick, before there's a workspace
+  const extInserts = (ctx: WidgetCtx = {}, project?: string): Inserts => {
+    const x = extWs(view?.workspaces.find(w => w.id === ctx.ws))
+    const at: WidgetCtx = x ? { ws: x.id, tab: ctx.tab } : {}
+    return insertMenus(view?.widgets, x?.id, x?.project ?? project).map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<Inserted | undefined>(res => void extRun(w, m, at, res).then(() => res(undefined))) }))
+  }
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   // widgets: the sidebar's grid and a widget's dialog (Widgets.tsx)
   const widgetApi: WidgetApi = {
@@ -3695,7 +3701,7 @@ export function App() {
             }}
           />
         ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} />}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} />}
         {(o =>
           o &&
           specsOn && (
@@ -3846,7 +3852,7 @@ export function App() {
             agent={settings.agent}
             initial={newInit}
             images={newImages}
-            inserts={extInserts()}
+            inserts={project => extInserts({}, project)}
             onClose={() => {
               made.current.page++
               setDialog(null)
@@ -4056,7 +4062,7 @@ export function App() {
           <>
             {aiFloat && (
               <AiFloat>
-                <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} />
+                <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} />
               </AiFloat>
             )}
             {!aiDock && (
@@ -4195,6 +4201,7 @@ export function App() {
             text={old?.text ?? dialog.text}
             at={old?.end}
             picks={picks}
+            inserts={to => (t => extInserts(to === 'ai' ? hereCtx() : { ws: t?.workspace, tab: t?.id }))(view.tabs.find(x => x.id === to))}
             onClose={() => setDialog(dialog.back ?? null)}
             onPick={o => {
               if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))

@@ -543,7 +543,7 @@ a file's right click, a shortcut, or the new-workspace prompt. A command's or an
 | field | what |
 |---|---|
 | `title` | its label (unset: its name in words, `explain-file` is *Explain file*) |
-| `show` | where it's offered: `palette` (⌘K, as *<name>: <title>*), `workspace` (a workspace's ⋯ and right click), `tab` (a tab's right click), `file` (a file's right click in Files), `prompt` (the new-workspace prompt's Insert menu) |
+| `show` | where it's offered: `palette` (⌘K, as *<name>: <title>*), `workspace` (a workspace's ⋯ and right click), `tab` (a tab's right click), `file` (a file's right click in Files), `prompt` (the *Insert* menu of the new-workspace page and window, Laki AI's box (its page, the floating chat, the AI window) and Send later's message) |
 | `match` | with `file`: the files it's for, as globs (`*.ts`, `docs/**/*.md`; one without `/` matches the name); unset: every file |
 | `key` | a shortcut, with Alt (⌘ and ⌘⇧ alone are Laki's, ⌃ alone a terminal's: ⌃C, ⌃E): it runs with the workspace and tab you're in |
 | `ask` | a question first: the answer is its `$WIDGET_ARG` (Cancel: it doesn't run) |
