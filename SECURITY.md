@@ -55,7 +55,8 @@ Out of scope:
 - A repo's extension isn't trusted as its `node_modules/` (its installed packages) or what widget.json's `state`
   names: code it runs from there can change without turning it off.
 - An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
-  phone webhook or extension folders), and ask Laki AI, which acts as you.
+  phone webhook or extension folders, nor a project's scripts, env, trust or memory list), and ask Laki AI, which acts
+  as you.
 - The app is ad-hoc signed, not notarized: macOS asks you to allow it once (Privacy & Security › Open Anyway).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
 - Remote access with no email or PIN (*anyone with the link*) is only as safe as the link: 24 hours at most, and the

@@ -1207,10 +1207,13 @@ tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, 
 `ps`; on Linux `peer.ts`' `procPeer` and `procParent` over /proc; to a live session's PTY, else (#14: a double fork) the tab whose PTY is its terminal, `ps -o tty=`, one call; then a shell tab's `treeAgent`: every process under it by one `ps -Ao`, an agent among them makes it an agent's, with no window too; once per connection, `peerOf`, as
 a method first needs it, a WebSocket's as it opens; `/usr/sbin/lsof` and `/bin/ps` by path: a daemon with no PATH; the
 app's window is Electron's, in no tab; the daemon's own process, `laki serve`'s, is yours) and puts that tab in `from`
-or `caller` over what the env said; a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
+or `caller` over what the env said (`wsNew` and `wsFan`, both `CALLER`: `byCaller`'s `from` is the found agent's workspace,
+else the RPC's if it's a workspace's id, else none; N14: `from: ''` skipped `agentNoCmd`, `cloudCheck` and the agent's
+mark); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `projectTrust`), `projectSet` with `config` or `memory` (N15: what
+runs in every new workspace, and the list every agent starts with; `memoryAdd` is an agent's), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
 its data) (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
@@ -1824,7 +1827,9 @@ daemon outlives it: the stale bar, as before. IPC `update` (state, check, downlo
 the `update` event; preload's `update`, `updateAuto`, `onUpdate` (returns its unsubscribe). The app menu's *Check for
 Updates…* is `laki://settings/general?spot=Updates` (links.ts' settings `spot`) and a check. `scripts/release.sh`
 `upload` writes each Mac zip's `update-mac-<arch>.json` (`feedOf` through `node -e`) before the checksums, only for a
-Developer ID one (its `Laki.app/Contents/MacOS/Laki` through `codesign -dv`: Squirrel.Mac turns an ad-hoc one down). Settings ›
+Developer ID one (its `Laki.app/Contents/MacOS/Laki` through `codesign -dv`: Squirrel.Mac turns an ad-hoc one down). The
+app's Info.plist has `ElectronSquirrelPreventDowngrades` (`build.mac.extendInfo`): Squirrel.Mac refuses a downloaded app
+older than the one running, whatever the release's tag says (an older signed build tagged as new). Settings ›
 General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no channels, no daemon restart.
 
 ### Usage

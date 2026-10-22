@@ -86,6 +86,50 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   await until(() => rig.out.includes("widgetSet refused: couldn't tell who's calling"), 'said in its log')
 })
 
+// N14: a from the RPC says ('' too) never covers the caller found by its process: an agent's new workspace is still an
+// agent's (no command of its own, none that never asks). N15: a project's config, trust and memory list are yours
+test("N14, N15: an agent's from: '' starts nothing that never asks; a project's scripts, trust and memory list aren't an agent's to change", async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }] })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const { port, token } = rig.info()
+  const out = join(rig.home, 'agent-out')
+  const curl = (method: string, params: object) =>
+    `curl -s -H 'Origin: file://' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
+  await rig.rpc('send', {
+    target: `${ws.id}/${tab}`,
+    text: `run ${[
+      curl('wsNew', { project: p.id, preset: 'yolo', name: 'y', from: '' }),
+      curl('wsNew', { project: p.id, cmd: 'echo hi', name: 'c', from: '' }),
+      curl('wsFan', { project: p.id, presets: ['yolo', 'claude'], name: 'r', from: '' }),
+      curl('projectSet', { id: p.id, config: { setup: 'touch pwned' } }),
+      curl('projectSet', { id: p.id, memory: [] }),
+      curl('projectTrust', { id: p.id }),
+      curl('projectSet', { id: p.id, notes: 'from the agent' }),
+    ].join('; ')}; echo done >> ${out}`,
+  })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  const [yolo, cmd, fan, setup, memory, trust, notes] = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
+  assert.match(yolo.error, /an agent can't start an agent that never asks/)
+  assert.match(cmd.error, /an agent can't start a command of its own/)
+  assert.match(fan.error, /an agent can't start an agent that never asks/)
+  assert.equal(setup.error, "an agent can't change a project's scripts, env and settings: it's the user's (ask them)")
+  assert.equal(memory.error, "an agent can't change a project's memory list (laki memory add adds to it): it's the user's (ask them)")
+  assert.equal(trust.error, "an agent can't trust a project's .laki.json: it's the user's (ask them)")
+  assert.equal(notes.error, undefined)
+  const s = await rig.rpc('state')
+  assert.deepEqual(s.workspaces.filter((w: any) => ['y', 'c'].includes(w.name ?? w.id) || (w.name ?? w.id).startsWith('r-')), [])
+  const proj = s.projects.find((x: any) => x.id === p.id)
+  assert.equal(proj.config?.setup, undefined)
+  assert.equal(proj.notes, 'from the agent')
+  // yours, from outside any tab: the same config goes
+  await rig.rpc('projectSet', { id: p.id, config: { setup: 'true' } })
+  assert.equal((await rig.rpc('state')).projects.find((x: any) => x.id === p.id).config.setup, 'true')
+})
+
 // #1: an agent's laki send into a terminal it opened ran as you (the terminal's process isn't an agent's): its own
 // workspace's terminal is now the agent's for what runs there, another workspace's is refused; yours works and gives it back
 test("#1: a command an agent sends into a terminal is the agent's, another workspace's terminal is refused; yours runs as you", async t => {

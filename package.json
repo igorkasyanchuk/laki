@@ -99,7 +99,8 @@
       "identity": "-",
       "hardenedRuntime": false,
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice)."
+        "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice).",
+        "ElectronSquirrelPreventDowngrades": true
       }
     },
     "linux": {

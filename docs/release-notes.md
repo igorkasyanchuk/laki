@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Agents: an agent can't change a project's scripts, env, trust or memory list (it adds to memory with `laki memory
+  add`), and can't start a workspace or a race whose agent never asks, whatever its call says. *Update* never
+  installs a version older than the one running.
 - Updates: Laki checks for a new version at launch and once a day, and tells you once per version. Settings ›
   General › *Updates* shows its notes, *Update* (download, then *Restart to update*; your agents keep running) or
   *Download*, and *Check now*; the app menu has *Check for Updates…*.
