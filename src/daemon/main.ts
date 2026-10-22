@@ -416,12 +416,12 @@ const api: Record<string, Handler> = {
     if (core.agentCaller(caller)) throw new Error("an agent can't pause or turn on a workflow: it's the user's (ask them)")
     return flowPause(p)
   },
-  flowRm: p => flowRm(p), // the app's Delete: to the trash, a toast's Undo is flowRestore
-  flowRestore: p => flowRestore(p),
+  flowRm: ({ caller, ...p }) => flowRm(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // the app's Delete: to the trash, a toast's Undo is flowRestore; an agent's: back as an agent's
+  flowRestore: ({ caller, ...p }) => flowRestore(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // an agent's: marked its own, as its save is
   flowTrash: () => flowTrash(), // laki flow trash
   flowTrashTidy: p => flowTrashTidy(p.now), // tests move the clock
   flowHistory: p => flowHistory(p), // the editor's History…: its versions, or one's text (at)
-  flowRevert: p => flowRevert(p),
+  flowRevert: ({ caller, ...p }) => flowRevert(core.agentCaller(caller) ? { ...p, by: 'agent' } : p), // #14: an agent's is its save: marked, never trusted
   flowStart: ({ caller, ...p }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
   flowEvent: ({ caller, ...p }) => flowEvent(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false, agent: core.callerAgent(caller) } : p), // tried as if on an event: an agent's try is an agent's event
   flowStop: p => flowStop(p),
@@ -447,11 +447,11 @@ const remoteNo = (method: string, p: any) =>
 // access's page (its own token, REMOTE_NO): the app's window is Electron's process, in no tab, so yours (a dev app
 // started from a Laki tab counts as that tab). Looked up once per connection as a method first needs it (a WebSocket's
 // as it opens), never for a hook's; nothing found, or the client gone before the answer (its port may be another
-// process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree (a double fork,
-// launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
+// process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
+// (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact'])
-const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause'])
+const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
 const peerOf = (sock: Socket) => {
@@ -470,9 +470,11 @@ async function whoCalls(sock: Socket, method: string, p: any) {
     log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
     throw new Error(core.WHO)
   }
+  const o = p && typeof p === 'object' ? p : {}
+  const said = FROM.has(method) ? o.from : o.caller // a process in no tab: what its env says (the CLI's caller())
+  await core.treeAgent(tab || core.state.tabs.find(t => t.id === said?.tab)) // #14: a shell tab's agent, whatever runs in front
   if (!tab) return p
   const me = { ws: tab.workspace, tab: tab.id }
-  const o = p && typeof p === 'object' ? p : {}
   return FROM.has(method) ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
 }
 const notAgent = (p: any, what: string) => {

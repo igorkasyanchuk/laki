@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Laki tells an agent's commands apart better: one that double-forks out of its tab is still its tab's (by its
+  terminal), and an agent in a shell tab counts under npx or a wrapper, with no window open. An agent's revert, delete or
+  restore of a workflow leaves it the agent's: not trusted to start on its own until you save it.
 - An agent's `laki widget dev` can't link a folder with the id of an extension you have: it would share its settings
   and secrets. Its other extensions come in off before anything runs.
 - `laki widget restore` from an agent says the extension came back off, as `laki widget new` does.

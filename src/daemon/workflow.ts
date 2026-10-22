@@ -185,7 +185,7 @@ export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem 
 }
 
 // to the trash, a project's too (git may not have it yet): Undo is flowRestore
-export function flowRm(o: Ref) {
+export function flowRm(o: Ref & { by?: 'agent' }) {
   on()
   const f = fileOf(o)
   if (!existsSync(f.path)) throw new Error(`no workflow ${o.id}`)
@@ -195,7 +195,7 @@ export function flowRm(o: Ref) {
   const name = parse(readFileSync(f.path, 'utf8'), o.id).workflow.name
   move(f.path, join(t, 'workflow.md'))
   const k = agentKey(o.source ?? 'yours', o.id, f.project)
-  writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...(byAgent(k) && { byAgent: true }) } satisfies Trashed))
+  writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...((byAgent(k) || o.by === 'agent') && { byAgent: true }) } satisfies Trashed))
   markAgent(k, false)
   if (state.flowStats?.[k]) delete state.flowStats[k], save() // its runs' tally goes with it (a restore starts over)
   lastEvents.delete(k), skipped.delete(k), told.delete(k)
@@ -237,7 +237,7 @@ export function flowTrash() {
   return names.flatMap(n => (m => (m ? [{ trash: n, ...m }] : []))(readJson<Trashed>(join(trashDir(), n, 'trash.json')))).sort((a, b) => b.at - a.at)
 }
 // Undo: back where it was; refused when a workflow of that id is there now
-export function flowRestore(o: { trash: string }) {
+export function flowRestore(o: { trash: string; by?: 'agent' }) {
   on()
   const n = String(o.trash ?? '')
   const m = /^[\w?-]{1,41}-\d+$/.test(n) ? readJson<Trashed>(join(trashDir(), n, 'trash.json')) : undefined
@@ -246,7 +246,7 @@ export function flowRestore(o: { trash: string }) {
   mkdirSync(dirname(m.path), { recursive: true })
   move(join(trashDir(), n, 'workflow.md'), m.path)
   rmSync(join(trashDir(), n), { recursive: true, force: true })
-  markAgent(agentKey(m.source, m.id, m.project), !!m.byAgent) // an agent's stays its own
+  markAgent(agentKey(m.source, m.id, m.project), !!m.byAgent || o.by === 'agent') // an agent's stays its own; what an agent brings back is its own
   flowFiles.at = Date.now()
   changed()
   return item(readFileSync(m.path, 'utf8'), m.id, m.source, m.project, m.path)
@@ -305,10 +305,10 @@ export function flowHistory(o: Ref & { at?: number }) {
   })
 }
 // a version back: written as a save would (the one there now goes to its history first)
-export function flowRevert(o: Ref & { at: number }) {
+export function flowRevert(o: Ref & { at: number; by?: 'agent' }) {
   if (!Number.isFinite(Number(o.at))) throw new Error('which version? (at: flowHistory lists them)')
   const v = flowHistory(o) as { text: string }
-  return flowSave({ id: o.id, source: o.source, project: o.project, text: v.text })
+  return flowSave({ id: o.id, source: o.source, project: o.project, text: v.text, by: o.by }) // an agent's: marked, never trusted
 }
 
 // ---------- runs

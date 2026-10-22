@@ -1010,8 +1010,8 @@ with it fixed (dialog `start`, `FlowStartAt`); StartRun's own *Workspace* for a 
 now; its `vars`, `visits`, `tabs` and `resume` copied; `first`, the block `begin` enters, a visit; the worktree's
 `ws.flow` moves to it), both `of` the old run, said in the first log line: RunView's *Run again*, a block's right
 click *Run from here*, the index row's ⋯, `laki flow again <run> [--from <block>]`. `flowRm` moves the file to
-`<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at, byAgent); `flowTrash` lists
-them newest first, `flowRestore` (`trash`) puts one back where it was (refused when a file of its id is there now),
+`<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at, byAgent: an agent's, or one an agent deleted); `flowTrash` lists
+them newest first, `flowRestore` (`trash`) puts one back where it was (refused when a file of its id is there now; an agent's `caller`: marked its own; `flowRevert`'s and `flowRm`'s too, in `CALLER`),
 `flowTrashTidy` (hourly and at start) drops them past 30 days or 20, and with each its history unless its file is back or another of it is still there. `flowSave` keeps the file it replaces first
 (`keepOld`: `<data>/workflow-history/yours-<id>` or `project-<project>-<id>`, `<ms>.md`, not when it's the same text,
 the last 20); `flowHistory` lists them (`at`, `size`, `first`) or gives one's `text` (`at`), `flowRevert` saves one
@@ -1200,7 +1200,7 @@ run) leaves out settings, projects' config, queued prompts and remote access's l
 tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, for every local client, its Origin or not (`/rpc`'s
 `req.socket`, a WebSocket's `local`; not remote access's page, whose Origin takes only its own token: `tokenOk`) and the
 `FROM` or `CALLER` methods, asks `core.tabOfPeer` (the socket's other end by `lsof -iTCP@127.0.0.1:<port>`, its parents by
-`ps`; on Linux `peer.ts`' `procPeer` and `procParent` over /proc; to a live session's PTY; once per connection, `peerOf`, as
+`ps`; on Linux `peer.ts`' `procPeer` and `procParent` over /proc; to a live session's PTY, else (#14: a double fork) the tab whose PTY is its terminal, `ps -o tty=`, one call; then a shell tab's `treeAgent`: every process under it by one `ps -Ao`, an agent among them makes it an agent's, with no window too; once per connection, `peerOf`, as
 a method first needs it, a WebSocket's as it opens; `/usr/sbin/lsof` and `/bin/ps` by path: a daemon with no PATH; the
 app's window is Electron's, in no tab; the daemon's own process, `laki serve`'s, is yours) and puts that tab in `from`
 or `caller` over what the env said; a process in no tab: the env's (yours, a cron job's); none at all, or the client gone

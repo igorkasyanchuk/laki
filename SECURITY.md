@@ -45,8 +45,9 @@ Out of scope:
 ## Known limits
 
 - Any program running as your user can read the daemon's token (`ponytail:` in `src/daemon/main.ts`), and a process
-  an agent starts that leaves its tab's process tree (a double fork, `launchctl submit`, `open x.command`, a tmux
-  server) counts as yours: per-tab tokens would close that.
+  an agent starts that leaves both its tab's process tree and its terminal (`setsid`, `launchctl submit`,
+  `open x.command`, a tmux server) counts as yours: per-tab tokens would close that. A double fork keeps the tab's
+  terminal, so it's the tab's.
 - Gates (an extension's `gate`) are a team rule, not a sandbox: they hold Laki's ship, merge and archive, but an
   agent with a shell can still run `gh pr merge` or `git push` itself. Its permission mode is what stops that.
 - An agent's `laki send` reaches agents, or a terminal of its own workspace; what runs in that terminal then counts as

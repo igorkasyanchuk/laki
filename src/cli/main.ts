@@ -481,7 +481,7 @@ async function main() {
       }
       if (sub === 'restore') {
         if (!id) throw new Error('usage: laki flow restore <trash-id> (laki flow trash lists them)')
-        const w: WorkflowItem = await rpc('flowRestore', { trash: id })
+        const w: WorkflowItem = await rpc('flowRestore', { trash: id, caller: caller() })
         return out(w, `restored ${w.id}${w.path ? ` in ${w.path}` : ''}`)
       }
       if (sub === 'again') {

@@ -124,6 +124,63 @@ test("#1: a command an agent sends into a terminal is the agent's, another works
   assert.equal(readFileSync(ran, 'utf8'), `${id} on\n`)
 })
 
+// #14: a CLI that double-forks out of its tab (and drops its env) was yours; an agent under a wrapper in a shell tab
+// counted only if the 2 s scan saw it in front, with a window; an agent's flowRevert, rm and restore trusted it as yours
+test("#14: a double fork is its tab's by its terminal; a shell tab's agent under a wrapper, no window, is an agent; an agent's revert, rm and restore of a workflow are its own", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const { id } = await rig.rpc('widgetNew', { kind: 'number', name: 'Probe' })
+  await rig.rpc('widgetSet', { id, on: false })
+  const { hash } = await rig.rpc('widgetWhat', { id })
+  const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
+  const on = `${laki} widget on ${id} --seen ${hash}`
+  const isOn = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === id).on
+  // its Bash tool: ( … & ) with no LAKI_TAB, its parent gone (launchd's)
+  const ran = join(rig.home, 'fork-out')
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ( env -u LAKI_TAB -u LAKI_WORKSPACE ${on} > ${ran} 2>&1 < /dev/null & )` })
+  await until(() => existsSync(ran) && readFileSync(ran, 'utf8').length > 0, 'the fork ran', 60000)
+  assert.match(readFileSync(ran, 'utf8'), /only you can turn an extension on/)
+  assert.equal(await isOn(), false)
+
+  // a shell tab, no window: an agent under a wrapper (sh, then node <…>/claude), the wrapper in front
+  const shell = (await rig.rpc('tabNew', { ws: ws.id })).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${shell}` })).includes('$ '), 'the shell prompt')
+  const bin = join(rig.home, 'w')
+  mkdirSync(bin)
+  const out = join(rig.home, 'wrapped-out')
+  writeFileSync(join(bin, 'claude'), `require('child_process').execSync(${JSON.stringify(`${on} > ${out} 2>&1`)})\n`)
+  writeFileSync(join(bin, 'wrap.sh'), `${process.execPath} ${join(bin, 'claude')}\n`)
+  await rig.rpc('send', { target: `${ws.id}/${shell}`, text: `sh ${join(bin, 'wrap.sh')}` })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 'the wrapped agent ran it', 30000)
+  assert.match(readFileSync(out, 'utf8'), /only you can turn an extension on/)
+  assert.equal(await isOn(), false)
+  // the same in that shell, typed by you with nothing under it: yours
+  rmSync(out)
+  await rig.rpc('send', { target: `${ws.id}/${shell}`, text: `${on} > ${out} 2>&1` })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 'yours ran', 30000)
+  assert.equal(readFileSync(out, 'utf8'), `${id} on\n`)
+
+  // a repo's workflow: v1, then v2, both saved by you (trusted); an agent's revert to v1 is its save: not trusted
+  const caller = { ws: ws.id, tab }
+  const v1 = '# Repo flow\n\n## start\nstart\nnext: end\n\n## end\nend\n'
+  await rig.rpc('flowSave', { id: 'rf', source: 'project', project: p.id, text: v1 })
+  await rig.rpc('flowSave', { id: 'rf', source: 'project', project: p.id, text: v1.replace('Repo flow', 'Repo flow 2') })
+  const [old] = await rig.rpc('flowHistory', { id: 'rf', source: 'project', project: p.id })
+  const back = await rig.rpc('flowRevert', { id: 'rf', source: 'project', project: p.id, at: old.at, caller })
+  assert.deepEqual([back.name, back.untrusted, back.byAgent], ['Repo flow', true, true])
+  // rm and restore: what an agent deletes or brings back is its own
+  await rig.rpc('flowSave', { id: 'rf', source: 'project', project: p.id, text: v1 })
+  const gone = await rig.rpc('flowRm', { id: 'rf', source: 'project', project: p.id, caller })
+  const again = await rig.rpc('flowRestore', { trash: gone.trash })
+  assert.equal(again.byAgent, true, 'an agent deleted it')
+  await rig.rpc('flowSave', { id: 'rf', source: 'project', project: p.id, text: v1 })
+  const mine = await rig.rpc('flowRm', { id: 'rf', source: 'project', project: p.id })
+  assert.equal((await rig.rpc('flowRestore', { trash: mine.trash, caller })).byAgent, true, 'an agent brought it back')
+})
+
 test("M5 on Linux: the caller's process by /proc (its socket's inode among a process's fds), none when no socket matches", async () => {
   const proc = mkdtempSync(join(tmpdir(), 'proc-'))
   mkdirSync(join(proc, 'net'))

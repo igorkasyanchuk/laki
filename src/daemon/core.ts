@@ -4340,7 +4340,26 @@ const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // view's runs); you typing in a shell tab, or outside Laki, aren't. Its workspace, else nothing
 const agentTab = (from?: { ws?: unknown; tab?: unknown }) => {
   const t = typeof from?.tab === 'string' && from.tab ? state.tabs.find(x => x.id === from.tab) : undefined
-  return t && (t.kind === 'agent' || shellAgents.has(t.id) || typedBy.has(t.id)) ? t : undefined
+  return t && (t.kind === 'agent' || shellAgents.has(t.id) || treeAgents.has(t.id) || typedBy.has(t.id)) ? t : undefined
+}
+// #14: a shell tab's agent by every process under it (under npx, a wrapper, in the background), looked at as a call from
+// that tab needs it (main.ts' whoCalls), with no window too: the 2 s scan sees only the program in front, with a window.
+// ponytail: a ps of every process per call from a shell tab; a tmux server's agent isn't under the tab
+const treeAgents = new Map<string, Agent>()
+export async function treeAgent(tab?: Tab) {
+  const s = tab && sessions.get(tab.id)
+  if (!tab || tab.kind !== 'shell' || !s || s.exited) return
+  const { stdout } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,args=']).catch(e => ({ stdout: String(e?.stdout ?? '') }))
+  const kids = new Map<number, { pid: number; args: string }[]>()
+  for (const [pid, rest] of psRows(stdout)) {
+    const [, ppid, args = ''] = /^(\d+)\s*(.*)$/.exec(rest) ?? []
+    kids.set(Number(ppid), [...(kids.get(Number(ppid)) ?? []), { pid, args }])
+  }
+  let agent: Agent | undefined
+  for (const q = [s.pty.pid], seen = new Set(q); q.length && !agent; )
+    for (const k of kids.get(q.shift()!) ?? []) if (!seen.has(k.pid)) (seen.add(k.pid), q.push(k.pid), (agent ||= agentRuns(k.args)))
+  if (agent) treeAgents.set(tab.id, agent)
+  else treeAgents.delete(tab.id)
 }
 // #1: a terminal of its own workspace an agent typed into (main.ts' send and input) runs what it typed: a laki command
 // there is the agent's until you type there yourself (keys with no escape: a terminal's answers to queries and focus or
@@ -4352,7 +4371,7 @@ export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
 export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
 // that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs
-export const callerAgent = (from?: { ws?: unknown; tab?: unknown }) => (t => t && (t.preset ?? shellAgents.get(t.id)?.agent ?? 'agent'))(agentTab(from))
+export const callerAgent = (from?: { ws?: unknown; tab?: unknown }) => (t => t && (t.preset ?? shellAgents.get(t.id)?.agent ?? treeAgents.get(t.id) ?? 'agent'))(agentTab(from))
 // an agent an RPC says it is (MCP's, Laki AI's): it may add one, never take one off
 export const agentIn = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : undefined)
 export const fromAgent = (agent?: string) => (agent ? { from: { agent } } : {}) // an event's from, an agent's
@@ -4389,6 +4408,11 @@ export async function tabOfPeer(port: number, proc = process.platform === 'linux
   const roots = new Map<number, string>()
   for (const [id, s] of sessions) if (!s.exited) roots.set(s.pty.pid, id)
   for (let p = pid, n = 0; p > 1 && n < 100; p = await up(p), n++) if (roots.has(p)) return state.tabs.find(t => t.id === roots.get(p))
+  // #14: one that left its tab's tree (a double fork: launchd's then) keeps its terminal: the tab whose PTY that is. One ps
+  // for it and every tab's own process. ponytail: setsid (a session of its own, no terminal) still escapes
+  const tty = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', [pid, ...roots.keys()].join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
+  const mine = tty.get(pid)
+  if (mine && !/^\?+$/.test(mine)) for (const [p, id] of roots) if (tty.get(p) === mine) return state.tabs.find(t => t.id === id)
 }
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {
