@@ -321,7 +321,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, run (`text`: a command for a shell tab, `runIn`'s words, Yes runs it), or widget, turning an extension on (`laki_extension_on`; its words say
-  what it runs, `widgets.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
+  what it runs, `widgetTrust.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
   Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
   now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
@@ -892,7 +892,7 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   -c developer_instructions=… -c mcp_servers.laki.{command,args,env,tool_timeout_sec}`, `-i` per image; no cost.
 Chats (`Thread`, `thread(id)`): `''` the AI page's (`<data>/ai-chat.json`), `plan:<project>/<kind>/<slug>` a spec's or
 brainstorm's (`shared/plans.ts` `planChat`; `plans.ts` `planOfChat`: its folder's `.chat.json`, which `filesOf` hides and
-`planWrite` refuses), `widget:<id>` the extension studio's (`widgets.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;
+`planWrite` refuses), `widget:<id>` the extension studio's (`widgetFiles.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;
 `aboutWidget`, read at each ask into `t.about`: which one, the studio's rules, `widgetFormat()` with the kit's catalog,
 its files (`FILES_MAX`) and its check without a run), each with its messages, `resume` and `at`; `system(t)` names the spec or brainstorm. One ask per
 chat, `AI_AT_ONCE` at once ("Laki AI works in n chats already"); `aiQuestion` and `aiPermission` go to the chat their
@@ -1217,7 +1217,7 @@ before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `s
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
-its data) (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
+its data) (`crossAsk`: widgetTools.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
 App's dialog and notification; `always`: `crossOk`, in memory). `state` gives each project's `groups` (its seps' names) and `groupTemplates`
 (a group's prompt template by the group's name), and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused
@@ -1654,7 +1654,7 @@ the daemon's `GET /img?k=<imgKey>&u=<https URL>` (main.ts `imgPage`: the view's 
 10 MB, 15 s, redirects one at a time, each `webOk`: https, no localhost, LAN or IP-literal host; its own sandbox CSP), Widgets.tsx `clean` rewriting each https `src` by App's `imagesVia` (none set: dropped;
 `srcset` dropped; a web address stays only on an `a` or `area`); Markdown's pictures are links. The guide tool's `max`: 60,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 
-Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
+Tools for agents (widgetTools.ts; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
 action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).
 `widgetTools` lists the ones that are on (`tool` `<id>.<action>`, the input as a JSON Schema, `agents`: its folder's
 `AGENTS.md`, 4 KB). `widgetToolCall` (`id`, `action`, `input`, `from` `{ ws, tab, agent }`): `toolArgs` checks the input
@@ -1663,7 +1663,7 @@ no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, t
 waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
 `always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and `filesHash`, so an edit, one made while
 Laki was closed too, asks again; the view's from a size-and-time cache, a call's read fresh; grants without `#` dropped at `load`).
-Logs (widgets.ts' logs section, `test/widget-logs.test.ts`): `logOn` (`settings.widgetLogs`, the store's `log` through
+Logs (widgetLogs.ts, `test/widget-logs.test.ts`): `logOn` (`settings.widgetLogs`, the store's `log` through
 `widgetSet` (refused from an agent), or `dev`); `xlog` (`WidgetLogLine`: `n`, `at`, `level` (`LOG_LEVELS`; an info line
 of a run's own text takes its `debug:`… prefix: `leveled`), `src`, `text` (2 KB, `masker`: secrets' and `SECRET`-named
 settings' values of 4 characters or more as ••••), `ws`) into `pending`, `flushLogs` every 500 ms and at
@@ -1675,7 +1675,7 @@ seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS p
 `next`) for Extension.tsx' `Logs` tab (every 2 s, the filters its own, `cfg.log`), `laki widget logs [-n] [-f]`, MCP's
 `laki_extension_logs`, `aboutWidget`'s last 30 warnings. `widgetLogClear`; `widgetLogFile` for `openIn` `log`. `keptOf`
 takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `log` tag).
-`filesHash` (widgets.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
+`filesHash` (widgetTrust.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
 source, its whole manifest as read, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`), after
 reading widget.json again (one the scan hasn't read yet: `scanWidgets` first, so its text is what the hash covers),
 `widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
@@ -1694,7 +1694,7 @@ with a daemon up: `alive`); Laki AI has them as MCP's; `LAKI_NOTE` names them wh
 `manifestCheck` checks each tool and warns at `never` with an outward command; `checkOne` at a missing or long
 `AGENTS.md`. The `tool` starter. Tested in `test/widget-tools.test.ts`.
 
-Gates (widgets.ts' gates section, `test/widget-gates.test.ts`): an object action's `gate` (`GATES`: ship, merge,
+Gates (widgetEvents.ts' gates section, `test/widget-gates.test.ts`): an object action's `gate` (`GATES`: ship, merge,
 archive; `widgetSchema.ts` `gateOf`, a command action's only: `manifestCheck` refuses it on an AI action or an unknown
 step). Core's `gated(step, ws, GateOpts)`, before `ship` (async now: main.ts, workflow.ts, the CLI, App), `prAct`'s
 merge, `autoPR`'s Merge when green and `wsArchive` (after `ifClean`'s dirty check; `archiveMerged`'s and a workflow's
@@ -2440,7 +2440,13 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
-| `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
+| `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page; it re-exports the six below, so `widgets.X` reaches them |
+| `src/daemon/widgetLogs.ts` | an extension's log file: its runs' stderr, Laki's lines, `laki widget log` |
+| `src/daemon/widgetEvents.ts` | events and their handlers, gates before a ship, merge or archive, streams |
+| `src/daemon/widgetTools.ts` | tools for agents, the asks before they run, grants, an AI source's permission asks |
+| `src/daemon/widgetTrust.ts` | what a Yes holds for: `filesHash`, a repo extension's whole folder (`repoFiles`, `dirHash`), `widgetWhat` |
+| `src/daemon/widgetFiles.ts` | an extension's files read and written, the studio's history and undo, Remix, the trash |
+| `src/daemon/widgetDev.ts` | runs, mock data and fixtures, `laki widget dev`'s links, `widgetNew`, the checker |
 | `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page; the meters' `meterOf`: a transcript's context and tokens |
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
