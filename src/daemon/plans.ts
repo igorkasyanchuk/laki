@@ -6,7 +6,8 @@
 // The app's Specs page and a project's Specs tab; MCP's laki_plans, laki_plan_read, laki_plan_new, laki_plan_write.
 // ponytail: a removed project's plans stay in <data>/plans (they're the user's documents); a project added again with
 // the same id finds them
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { PLAN_KINDS, type Plan, type PlanFile, type PlanKind, specsOn } from '../shared/types.ts'
 import { dir, findProject, IMAGES, save, slug, state } from './core.ts'
@@ -59,12 +60,6 @@ function inside(folder: string, rel: string) {
   throw new Error(`${rel}: not a path in the ${basename(folder)} folder`)
 }
 
-// written whole or not at all: a crash mid-write leaves the last good one
-function put(file: string, data: string | Buffer) {
-  mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(`${file}.tmp`, data)
-  renameSync(`${file}.tmp`, file)
-}
 const read = (f: string) => {
   try {
     return readFileSync(f, 'utf8')
@@ -76,12 +71,8 @@ const mtime = (f: string) => statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 
 
 // the editor's doc, if it's there and reads
 function docOf(folder: string): { title?: string; blocks?: unknown[] } | null {
-  try {
-    const d = JSON.parse(readFileSync(join(folder, 'spec.json'), 'utf8'))
-    return d && typeof d === 'object' && Array.isArray(d.blocks) ? d : null
-  } catch {
-    return null
-  }
+  const d = readJson(join(folder, 'spec.json'))
+  return d && typeof d === 'object' && Array.isArray(d.blocks) ? d : null
 }
 const headOf = (md: string | null) => md?.match(/^#\s+(.+)$/m)?.[1].trim()
 
@@ -130,7 +121,7 @@ export function planNew(o: { project: string; kind: PlanKind; title?: string; te
   let s = base
   for (let n = 2; existsSync(folderOf({ ...o, slug: s }, true)); n++) s = `${base}-${n}`
   const folder = folderOf({ ...o, slug: s }, true)
-  put(join(folder, 'README.md'), `# ${title}\n\n${typeof o.text === 'string' && o.text.trim() ? `${o.text.trim()}\n` : ''}`)
+  writeAtomic(join(folder, 'README.md'), `# ${title}\n\n${typeof o.text === 'string' && o.text.trim() ? `${o.text.trim()}\n` : ''}`)
   return planOf(findProject(o.project).id, o.kind, s, folder)
 }
 
@@ -152,8 +143,8 @@ export function planSave(o: Ref & { title?: string; blocks: unknown[]; markdown?
   if (!Array.isArray(o.blocks)) throw new Error('blocks: a list')
   const folder = folderOf(o)
   const title = String(o.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) || o.slug
-  put(join(folder, 'spec.json'), JSON.stringify({ title, blocks: o.blocks }))
-  put(join(folder, 'README.md'), `# ${title}\n\n${String(o.markdown ?? '').trim()}\n`)
+  writeAtomic(join(folder, 'spec.json'), JSON.stringify({ title, blocks: o.blocks }))
+  writeAtomic(join(folder, 'README.md'), `# ${title}\n\n${String(o.markdown ?? '').trim()}\n`)
   return planOf(findProject(o.project).id, o.kind, o.slug, folder)
 }
 
@@ -175,7 +166,7 @@ export function planUpload(o: Ref & { name: string; data: string }) {
   const folder = folderOf(o)
   const name = String(o.name ?? '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+/, '').slice(-80) || 'file'
   const path = `files/${Date.now().toString(36)}-${name}`
-  put(inside(folder, path), Buffer.from(String(o.data ?? ''), 'base64'))
+  writeAtomic(inside(folder, path), Buffer.from(String(o.data ?? ''), 'base64'))
   return { path }
 }
 
@@ -190,7 +181,7 @@ export function planWrite(o: Ref & { path: string; text: string }) {
   if (!WRITABLE.includes(extname(rel).toLowerCase())) throw new Error(`${rel}: only ${WRITABLE.join(' ')} files`)
   const text = String(o.text ?? '')
   if (Buffer.byteLength(text) > MAX_WRITE) throw new Error('over 2 MB')
-  put(abs, text)
+  writeAtomic(abs, text)
   return { path: rel, folder }
 }
 

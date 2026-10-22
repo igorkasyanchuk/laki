@@ -6,7 +6,8 @@
 // To-dos (experimental, settings.todoList; the rail's To-dos, ⌘K): one checklist of the user's, Notion's way (checklist
 // items, headings, nested ones, dragged into order), its blocks and Markdown in <data>/todo-list.json; no files (TodoList.tsx).
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { basename, extname, join } from 'node:path'
 import { dir, state } from './core.ts'
 
@@ -38,10 +39,7 @@ function read(id: unknown): Note {
   }
 }
 function write(n: Note) {
-  mkdirSync(home, { recursive: true })
-  const f = fileOf(n.id)
-  writeFileSync(`${f}.tmp`, JSON.stringify(n), { mode: 0o600 })
-  renameSync(`${f}.tmp`, f)
+  writeAtomic(fileOf(n.id), JSON.stringify(n), 0o600)
 }
 // its text in a line: Markdown's marks out (headings, lists, checkboxes, quotes, emphasis, links' URLs, images)
 const plain = (md: string) =>
@@ -64,13 +62,7 @@ export function noteList(p: { q?: string } = {}) {
     names = readdirSync(home).filter(f => f.endsWith('.json'))
   } catch {}
   const words = String(p.q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
-  const all: Note[] = names.flatMap(f => {
-    try {
-      return [JSON.parse(readFileSync(join(home, f), 'utf8'))]
-    } catch {
-      return []
-    }
-  })
+  const all: Note[] = names.flatMap(f => readJson<Note>(join(home, f)) ?? [])
   return all
     .filter(n => !words.length || (t => words.every(w => t.includes(w)))(`${n.title}\n${n.md ?? ''}`.toLowerCase()))
     .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at - a.at)
@@ -156,8 +148,7 @@ export function todoListSave(p: { blocks?: unknown[]; md?: string }) {
   if (!Array.isArray(p.blocks)) throw new Error('blocks: a list')
   if (JSON.stringify(p.blocks).length + String(p.md ?? '').length > MAX_NOTE) throw new Error('too long for the list')
   const l: TodoList = { blocks: p.blocks, md: String(p.md ?? ''), at: Date.now() }
-  writeFileSync(`${listFile}.tmp`, JSON.stringify(l), { mode: 0o600 })
-  renameSync(`${listFile}.tmp`, listFile)
+  writeAtomic(listFile, JSON.stringify(l), 0o600)
   return { at: l.at }
 }
 const exists = (f: string) => {

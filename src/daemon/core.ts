@@ -10,7 +10,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
-import { dataDir } from '../shared/conn.ts'
+import { dataDir, readJson, writeAtomic } from '../shared/conn.ts'
 import { actionSlug, againOnEnter, type Agent, AGENT_NAMES, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Check, type Doctor, EFFORTS, FAST, FILE_MAX, fillTemplate, fillVars, type FixWhat, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, jobOf, type Link, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, MERGE_METHODS, type MergeMethod, neverAsks, permArgs, permInArgs, PERMS, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRFix, prIn, type PRLabel, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, refsIn, type Reminder, REMINDERS_MAX, type Remote, REMOTE, REMOTE_TRIES, type Resources, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Schedule, type ScheduleRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type Stat, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type Today, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { emojiOf, isIconName } from '../shared/icons.ts'
@@ -712,10 +712,8 @@ function cfgRead(p: Project): { c: ProjectConfig; h: string } {
   const had = cfgSeen.get(f)
   if (had?.sig === sig) return had
   let c: ProjectConfig = {}
-  try {
-    const j = JSON.parse(readFileSync(f, 'utf8'))
-    if (j && typeof j === 'object' && !Array.isArray(j)) c = j
-  } catch {}
+  const j = readJson(f)
+  if (j && typeof j === 'object' && !Array.isArray(j)) c = j
   const r = { sig, c, h: cfgHash(c) }
   cfgSeen.set(f, r)
   return r
@@ -754,11 +752,7 @@ export function projectConfig(ws: Workspace): ProjectConfig {
 export async function projectFileConfig(ref: string): Promise<ProjectConfig> {
   const p = findProject(ref)
   if (p.host) return (await readHostCfg(p), hostCfg.get(`${p.host}:${p.path}`) ?? {})
-  try {
-    return JSON.parse(readFileSync(join(p.path, '.laki.json'), 'utf8'))
-  } catch {
-    return {}
-  }
+  return readJson(join(p.path, '.laki.json')) ?? {}
 }
 
 // a project's prompt templates as kept: a name and a text each
@@ -2508,10 +2502,7 @@ export function keepShells() {
 export function rerun(pid: number, args: string): { cmd: string; run?: boolean } {
   const agent = agentRuns(args)
   if (agent === 'claude') {
-    let id: unknown
-    try {
-      id = JSON.parse(readFileSync(join(homedir(), '.claude', 'sessions', `${pid}.json`), 'utf8')).sessionId // claude's own, read only
-    } catch {}
+    const id: unknown = readJson(join(homedir(), '.claude', 'sessions', `${pid}.json`))?.sessionId // claude's own, read only
     return { cmd: typeof id === 'string' && /^[\w-]+$/.test(id) ? `claude --resume ${id}` : 'claude --continue', run: true }
   }
   if (agent === 'codex') return { cmd: 'codex resume --last', run: true } // its newest chat in this folder
@@ -3201,12 +3192,8 @@ const lstart = (pid: number) => run('ps', ['-o', 'lstart=,command=', '-p', Strin
 let reaping: Promise<void> = Promise.resolve() // remoteStart waits for it: a tailscale off must come before a new serve
 export const reapChildren = () => (reaping = reap())
 async function reap() {
-  let old: Kid[] = []
-  try {
-    old = JSON.parse(readFileSync(kidsFile(), 'utf8'))
-  } catch {
-    return
-  }
+  const old = readJson<Kid[]>(kidsFile())
+  if (old === undefined) return
   rmSync(kidsFile(), { force: true })
   for (const k of Array.isArray(old) ? old : []) {
     if (!Number.isInteger(k?.pid) || typeof k.start !== 'string' || typeof k.bin !== 'string') continue
@@ -3391,10 +3378,7 @@ const todayPath = join(dir, 'usage-today.json')
 let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
 function spentNow() {
   const day = dayOf(Date.now())
-  if (!spent)
-    try {
-      spent = JSON.parse(readFileSync(todayPath, 'utf8'))
-    } catch {}
+  if (!spent) spent = readJson(todayPath)
   if (spent?.day !== day || typeof spent.chats !== 'object') spent = { day, chats: {} }
   return spent
 }
@@ -3409,8 +3393,7 @@ function meterRead(tab: Tab, look = false) { // look: a turn's end, its transcri
   const s = spentNow()
   if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
     s.chats[tab.resumeId!] = { ws: tab.workspace, tokens: r.m.today.tokens, cost: r.m.today.cost }
-    writeFileSync(`${todayPath}.tmp`, JSON.stringify(s))
-    renameSync(`${todayPath}.tmp`, todayPath)
+    writeAtomic(todayPath, JSON.stringify(s))
   }
   return true
 }

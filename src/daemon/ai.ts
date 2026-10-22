@@ -8,6 +8,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
 import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
@@ -193,10 +194,7 @@ function thread(id = ''): Thread {
   const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : planOfChat(id).file // a spec's gone, or off: that says so, each time
   const known = threads.get(id)
   if (known) return known
-  let j: any = {}
-  try {
-    j = JSON.parse(readFileSync(file, 'utf8'))
-  } catch {}
+  const j: any = readJson(file) ?? {}
   const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
   for (const m of t.chat) if (m.ask?.perm && m.ask.picked === undefined) m.ask.picked = 'Not answered' // its agent ended with the daemon
   if (id && !t.ended && t.chat.length && Date.now() - t.at > PLAN_CHAT_IDLE) t.ended = t.at + PLAN_CHAT_IDLE // ran out while the daemon wasn't looking
@@ -299,10 +297,7 @@ export function studioChats(): StudioChat[] {
     .flatMap(({ id, at }) => {
       const chat = `widget:${id}`
       let msgs = threads.get(chat)?.chat // the one in memory, else its file read, not kept (thread() would hold each)
-      if (!msgs)
-        try {
-          msgs = JSON.parse(readFileSync(join(d, `${chat}.chat.json`), 'utf8')).chat
-        } catch {}
+      if (!msgs) msgs = readJson(join(d, `${chat}.chat.json`))?.chat
       const first = Array.isArray(msgs) ? msgs.find(m => m.role === 'user') : undefined
       return first ? [{ id, title: String(first.text ?? '').trim().split('\n')[0].slice(0, 100) || 'An image', at: threads.get(chat)?.at ?? at, busy: busy.has(chat) }] : []
     })

@@ -7,7 +7,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
@@ -16,7 +16,7 @@ import { ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, mi
 import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
-import { readCapped } from '../shared/conn.ts'
+import { move, readCapped, readJson } from '../shared/conn.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -213,21 +213,6 @@ const TRASH_MAX = 20
 const HISTORY = 20
 const trashDir = () => join(dir, 'workflow-trash')
 const histOf = (o: Ref) => join(dir, 'workflow-history', o.source === 'project' ? `project-${o.project}-${o.id}` : `yours-${o.id}`)
-// renamed, or copied then removed across volumes (EXDEV)
-function move(from: string, to: string) {
-  try {
-    renameSync(from, to)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-    cpSync(from, to)
-    rmSync(from, { force: true })
-  }
-}
-const readJson = <T>(p: string): T | undefined => {
-  try {
-    return JSON.parse(readFileSync(p, 'utf8'))
-  } catch {}
-}
 export function flowTrash() {
   on()
   let names: string[] = []

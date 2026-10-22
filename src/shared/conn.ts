@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,4 +79,33 @@ export async function readCapped(r: Response, max: number): Promise<{ text: stri
   }
   const buf = Buffer.concat(parts).subarray(0, max)
   return { text: buf.toString('utf8'), buf, cut: size > max }
+}
+
+// a JSON file's value, or undefined when it's missing or doesn't parse
+export function readJson<T = any>(p: string): T | undefined {
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'))
+  } catch {
+    return undefined
+  }
+}
+
+// written whole or not at all (a temp file, then a rename): a crash mid-write leaves the last good one. mode: the
+// file's, also on a temp file an earlier crash left (a mode only counts for a new file)
+export function writeAtomic(p: string, data: string | Buffer, mode?: number) {
+  mkdirSync(dirname(p), { recursive: true })
+  writeFileSync(`${p}.tmp`, data, mode === undefined ? undefined : { mode })
+  if (mode !== undefined) chmodSync(`${p}.tmp`, mode)
+  renameSync(`${p}.tmp`, p)
+}
+
+// a file or folder renamed, or copied then removed across volumes (EXDEV)
+export function move(from: string, to: string) {
+  try {
+    renameSync(from, to)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
+    cpSync(from, to, { recursive: true, verbatimSymlinks: true })
+    rmSync(from, { recursive: true, force: true })
+  }
 }

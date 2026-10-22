@@ -5,7 +5,8 @@
 // item).
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { readJson } from '../shared/conn.ts'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { type Account, ACCOUNT_AGENTS, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Tab } from '../shared/types.ts'
@@ -110,15 +111,8 @@ export function accountRm(p: { id: string }) {
 
 // ---------- who each signs in as
 
-const json = (p: string) => {
-  try {
-    return JSON.parse(readFileSync(p, 'utf8'))
-  } catch {
-    return undefined
-  }
-}
 // the agent's own .claude.json: in CLAUDE_CONFIG_DIR when the daemon has one, else ~/.claude.json
-const ownClaude = () => json(process.env.CLAUDE_CONFIG_DIR ? join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : join(homedir(), '.claude.json'))
+const ownClaude = () => readJson(process.env.CLAUDE_CONFIG_DIR ? join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : join(homedir(), '.claude.json'))
 // a JWT's payload (Codex's id_token): its email and plan, nothing checked (it's the agent's own file)
 const jwt = (t: unknown) => {
   try {
@@ -138,12 +132,12 @@ export async function accountView(agent: AccountAgent, id: string): Promise<Acco
   const d = a?.dir ?? homeDir(agent)
   const base = { id, agent, name: a?.name ?? 'Default', dir: d, default: accountUsed(agent) === id }
   if (agent === 'codex') {
-    const auth = json(join(d, 'auth.json'))
+    const auth = readJson(join(d, 'auth.json'))
     const claims = jwt(auth?.tokens?.id_token)
     const plan = claims?.['https://api.openai.com/auth']?.chatgpt_plan_type
     return { ...base, email: typeof claims?.email === 'string' ? claims.email : undefined, plan: typeof plan === 'string' ? plan : undefined, signedIn: !!(auth?.tokens?.access_token || auth?.OPENAI_API_KEY) }
   }
-  const cfg = a ? json(join(d, '.claude.json')) : ownClaude()
+  const cfg = a ? readJson(join(d, '.claude.json')) : ownClaude()
   const cred = await claudeCred(a?.dir).catch(() => undefined)
   return { ...base, email: typeof cfg?.oauthAccount?.emailAddress === 'string' ? cfg.oauthAccount.emailAddress : undefined, plan: cred?.subscriptionType || undefined, signedIn: !!cred }
 }

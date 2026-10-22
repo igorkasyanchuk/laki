@@ -5,6 +5,7 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { appendFileSync, chmodSync, cpSync, type Dirent, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, type Stats, symlinkSync, unlinkSync, watch, writeFileSync } from 'node:fs'
+import { move, readJson, writeAtomic } from '../shared/conn.ts'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -144,20 +145,10 @@ const realOf = (d: string) => {
 }
 const repoOf = (root: string) => repoRoots().find(r => under(root, r.root) || under(realOf(root), realOf(r.root)))?.project
 
-function readJson<T>(p: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(p, 'utf8'))
-  } catch {
-    return undefined
-  }
-}
 const readStore = (id: string): Store => readJson<Store>(storePath(id)) ?? {}
 function writeStore(id: string, s: Store) {
   masks.delete(id) // its settings may have changed: masked anew
-  const p = storePath(id)
-  mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(`${p}.tmp`, JSON.stringify(s))
-  renameSync(`${p}.tmp`, p)
+  writeAtomic(storePath(id), JSON.stringify(s))
 }
 
 // a secret setting's value (widget.json's "type": "secret"): <data>/widget-secrets.json, 0600, { [id]: { [key]: value } },
@@ -174,21 +165,14 @@ function setSecrets(id: string, f: (s: Record<string, string>) => void) {
   f(s)
   if (Object.keys(s).length) all[id] = s
   else delete all[id]
-  const p = secretsPath()
-  mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(`${p}.tmp`, JSON.stringify(all), { mode: 0o600 })
-  chmodSync(`${p}.tmp`, 0o600) // a mode only counts for a new file
-  renameSync(`${p}.tmp`, p)
+  writeAtomic(secretsPath(), JSON.stringify(all), 0o600)
 }
 
 const instDir = (id: string) => join(dir, 'widget-data', id, 'ws')
 const instPath = (id: string, ws: string) => join(instDir(id), `${ws}.json`)
 const readInst = (id: string, ws: string): Inst => readJson<Inst>(instPath(id, ws)) ?? {}
 function writeInst(id: string, ws: string, s: Inst) {
-  const p = instPath(id, ws)
-  mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(`${p}.tmp`, JSON.stringify(s))
-  renameSync(`${p}.tmp`, p)
+  writeAtomic(instPath(id, ws), JSON.stringify(s))
 }
 const keyOf = (id: string, ws?: string) => (ws ? `${id}@${ws}` : id) // running, again and runs: an instance's own
 const scoped = (w: Entry) => w.m.scope === 'workspace'
@@ -2505,16 +2489,6 @@ const keptOf = (id: string): [string, string][] => [
   [logPath(id), 'log'], // its log (flushLogs first)
   [`${logPath(id)}.1`, 'log.1'],
 ]
-// renamed, or copied then removed across volumes (EXDEV)
-function move(from: string, to: string) {
-  try {
-    renameSync(from, to)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-    cpSync(from, to, { recursive: true, verbatimSymlinks: true })
-    rmSync(from, { recursive: true, force: true })
-  }
-}
 export function widgetTrash() {
   let names: string[] = []
   try {
