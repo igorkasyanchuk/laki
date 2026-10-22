@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a kit button's `do: new` can set the agent's `model`, `effort`, `perm` (auto, acceptEdits, plan) and
+  `fast`, named in the app's ask. One that would never ask first is an error in the check, and the app refuses it.
 - The Pull main starter fetches the base branch itself (once per repo every 15 minutes), so its badge sees new
   commits without anyone fetching; a failed fetch says so in its tip.
 - Extensions: an action can print `"open": "https://…"` (opened after it runs; `laki://` links too) and `"files": […]`

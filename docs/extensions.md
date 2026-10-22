@@ -363,7 +363,7 @@ several series, a pie and a donut), `unit`, `min`, `max`, `height`, `label`.
 
 | `do` | with | what |
 |---|---|---|
-| `new` | `prompt`, `project` (a name; none: the selected workspace's), `agent` (a profile or agent; none: your default) | a new workspace whose agent starts on the prompt |
+| `new` | `prompt`, `project` (a name; none: the selected workspace's), `agent` (a profile or agent; none: your default), `model`, `effort`, `perm` (`auto`, `acceptEdits` or `plan`), `fast` | a new workspace whose agent starts on the prompt, as the new-workspace page would start it; never an agent that doesn't ask first (`bypassPermissions`, codex's `acceptEdits`, a profile set so): the check errors and the app refuses |
 | `send` | `prompt` | to the selected workspace's agent (a per-workspace extension: its own), after its turn |
 | `ai` | `prompt` | to Laki AI (on) |
 | `terminal` | `command` | a new terminal that runs it |
@@ -371,7 +371,8 @@ several series, a pie and a donut), `unit`, `min`, `max`, `height`, `label`.
 
 ```json
 { "type": "toolbar", "items": [
-  { "icon": "agent", "label": "Fix it", "do": "new", "prompt": "Fix the failing test in {{suite}}" },
+  { "icon": "agent", "label": "Fix it", "do": "new", "prompt": "Fix the failing test in {{suite}}", "perm": "acceptEdits", "fast": true },
+  { "icon": "eye", "label": "Review", "do": "new", "prompt": "Review this branch", "perm": "plan", "effort": "high" },
   { "icon": "ai", "label": "Ask Laki AI", "do": "ai", "prompt": "What changed in {{repo}} today?" },
   { "icon": "terminal", "label": "Logs", "do": "terminal", "command": "tail -f log/development.log" } ] }
 ```

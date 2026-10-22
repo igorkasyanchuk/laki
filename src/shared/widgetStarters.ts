@@ -69,7 +69,8 @@ const LAUNCH = {
       type: 'grid',
       columns: 2,
       children: [
-        { type: 'button', label: 'Fix a flaky test', icon: 'agent', do: 'new', project: '{{config.project}}', prompt: 'Find and fix the flakiest test in this repo' },
+        { type: 'button', label: 'Fix a flaky test', icon: 'agent', do: 'new', project: '{{config.project}}', prompt: 'Find and fix the flakiest test in this repo', perm: 'acceptEdits', fast: true },
+        { type: 'button', label: 'Review this branch', icon: 'eye', do: 'new', project: '{{config.project}}', prompt: 'Review the changes on this branch against main: what would you flag?', perm: 'plan', effort: 'high' },
         { type: 'button', label: 'Ask the agent', icon: 'run', do: 'send', prompt: 'Run the tests and tell me what fails' },
         { type: 'button', label: 'Ask Laki AI', icon: 'ai', do: 'ai', prompt: 'Which of my workspaces need me now?' },
         { type: 'button', label: 'Disk usage', icon: 'terminal', do: 'terminal', command: 'df -h /' },

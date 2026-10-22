@@ -712,6 +712,42 @@
           ],
           "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
         },
+        "model": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its model (opus, sonnet, gpt-5…); none: the profile’s"
+        },
+        "effort": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its effort (low, medium, high…); none: the profile’s"
+        },
+        "perm": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "acceptEdits",
+                "plan"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)"
+        },
+        "fast": {
+          "type": "boolean",
+          "description": "With do new: fast mode (claude’s, codex’s)"
+        },
         "confirm": {
           "type": [
             "string",
@@ -2649,6 +2685,42 @@
             "boolean"
           ],
           "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
+        },
+        "model": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its model (opus, sonnet, gpt-5…); none: the profile’s"
+        },
+        "effort": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its effort (low, medium, high…); none: the profile’s"
+        },
+        "perm": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "acceptEdits",
+                "plan"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)"
+        },
+        "fast": {
+          "type": "boolean",
+          "description": "With do new: fast mode (claude’s, codex’s)"
         },
         "confirm": {
           "type": [
@@ -9346,6 +9418,42 @@
           ],
           "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
         },
+        "model": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its model (opus, sonnet, gpt-5…); none: the profile’s"
+        },
+        "effort": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its effort (low, medium, high…); none: the profile’s"
+        },
+        "perm": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "acceptEdits",
+                "plan"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)"
+        },
+        "fast": {
+          "type": "boolean",
+          "description": "With do new: fast mode (claude’s, codex’s)"
+        },
         "confirm": {
           "type": [
             "string",
@@ -9562,6 +9670,42 @@
             "boolean"
           ],
           "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
+        },
+        "model": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its model (opus, sonnet, gpt-5…); none: the profile’s"
+        },
+        "effort": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its effort (low, medium, high…); none: the profile’s"
+        },
+        "perm": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "acceptEdits",
+                "plan"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)"
+        },
+        "fast": {
+          "type": "boolean",
+          "description": "With do new: fast mode (claude’s, codex’s)"
         },
         "confirm": {
           "type": [
@@ -10145,6 +10289,42 @@
             "boolean"
           ],
           "description": "With do new: a project by name or id"
+        },
+        "model": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its model (opus, sonnet, gpt-5…); none: the profile’s"
+        },
+        "effort": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: its effort (low, medium, high…); none: the profile’s"
+        },
+        "perm": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "acceptEdits",
+                "plan"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)"
+        },
+        "fast": {
+          "type": "boolean",
+          "description": "With do new: fast mode (claude’s, codex’s)"
         },
         "confirm": {
           "type": [

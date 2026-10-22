@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
+import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -1826,8 +1826,15 @@ export function App() {
       const p = want ? view?.projects.find(x => x.id.toLowerCase() === want || x.name.toLowerCase() === want) : view?.projects.find(x => x.id === here?.project)
       if (!p || p.kind) return toast(want ? `${w.name}: no project ${c.project}` : `${w.name}: select a workspace of the project to start it in`)
       const agent = String(c.agent ?? '').trim()
-      if (!(await ask(`Start a new workspace in ${p.name}?`, { text: `${by}${agent ? `, with ${agent}` : ''}: ${shown(prompt)}`, ok: 'Start' }))) return
-      const made = await call<WorkspaceView>('wsNew', { project: p.id, prompt, place: 'top', ...(agent && { preset: agent }), ...(p.git === false && { local: true, another: true, name: nameOf(prompt) }) }).catch(() => null)
+      // #30: its model, effort, mode and fast mode (wsNew checks them); never an agent that doesn't ask, by the mode it
+      // asks for or its profile's own
+      const pr = view?.presets.find(x => x.name === (agent || settings.agent)) ?? view?.presets.find(x => x.agent !== 'command')
+      const kind = pr?.agent ?? (agent || 'claude')
+      const [model, effort, perm] = [c.model, c.effort, c.perm].map(x => String(x ?? '').trim() || undefined)
+      if (neverAsks(kind, perm ?? pr?.perm, pr?.args)) return toast(`${w.name}: an extension never starts an agent that doesn't ask first${perm ? ` (${perm})` : ` (${pr?.name}'s mode)`}`)
+      const how = [model, effort && `${effort} effort`, perm && (PERMS[kind as Agent]?.find(x => x[0] === perm)?.[1] ?? perm), c.fast && 'fast mode'].filter(Boolean).join(', ')
+      if (!(await ask(`Start a new workspace in ${p.name}?`, { text: `${by}${agent ? `, with ${agent}` : ''}${how ? ` (${how})` : ''}: ${shown(prompt)}`, ok: 'Start' }))) return
+      const made = await call<WorkspaceView>('wsNew', { project: p.id, prompt, place: 'top', ...(agent && { preset: agent }), ...(model && { model }), ...(effort && { effort }), ...(perm && { perm }), ...(c.fast && { fast: true }), ...(p.git === false && { local: true, another: true, name: nameOf(prompt) }) }).catch(() => null)
       if (made) (showNew(made.id), setDialog(null))
       return !!made
     }

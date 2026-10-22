@@ -4,6 +4,7 @@
 // (widgetGuide.ts), Settings' gallery and the starters (UI_SAMPLES). The daemon renders a widget's ui for the app
 // (widgetRender), the app for a JS page (laki.ui, laki.mount); uiBehave (widget.ts) makes its clicks work.
 import { ICONS as ICON_WORDS, iconSvg, type IconName, isIconName } from './icons.ts'
+import { neverAsks } from './types.ts'
 import { markdownHtml } from './markdown.ts'
 import { ago, date, esc, fill, num, spark, truthy, UI_CSS, valueAt } from './widget.ts'
 
@@ -40,6 +41,8 @@ export const COLORS = ['blue', 'green', 'red', 'orange', 'yellow', 'purple', 'pi
 // what a button may ask Laki to do (the app asks you first, showing what): a new workspace whose agent starts on a
 // prompt, a prompt to the workspace's agent or to Laki AI, a command in a new terminal, a page in a Laki browser tab
 export const DO = ['new', 'send', 'ai', 'terminal', 'browse'] as const
+// #30: the modes a do new may ask for: never bypassPermissions (nor a profile or agent that never asks: neverAsks)
+export const DO_PERMS = ['auto', 'acceptEdits', 'plan'] as const
 export const CHARTS = ['line', 'area', 'bars', 'stacked', 'hbars', 'pie', 'donut', 'scatter'] as const
 const GAP = ['sm', 'md', 'lg'] as const
 
@@ -69,6 +72,10 @@ export const BUTTON = {
   url: p('text', 'With do browse: the page (http or https)'),
   agent: p('text', 'With do new: an agent or a profile of yours (claude, codex…); none: your default'),
   project: p('text', 'With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s'),
+  model: p('text', 'With do new: its model (opus, sonnet, gpt-5…); none: the profile’s'),
+  effort: p('text', 'With do new: its effort (low, medium, high…); none: the profile’s'),
+  perm: p(DO_PERMS, 'With do new: how freely it acts: auto, acceptEdits or plan; none: the profile’s. Never one that doesn’t ask (bypassPermissions)'),
+  fast: p('bool', 'With do new: fast mode (claude’s, codex’s)'),
   confirm: p('text', 'A question the app asks first'),
 } as const
 const COLOR = p('text', 'A color: a tone (good, bad…), one of Laki’s palette (blue, green, red, orange, yellow, purple, pink, teal, lime, brown, gray) or a hex (d73a4a)')
@@ -237,7 +244,7 @@ export const UI = {
   popover: { group: 'Buttons', blurb: 'A button that opens a small panel of elements: details, a form, more numbers. hover: a hover card.', props: { label: p('text', 'Its button’s words'), icon: p('icon', 'Its button’s icon'), style: p(['primary', 'quiet', 'danger'] as const, 'primary, quiet or danger; none: plain'), title: p('text', 'The panel’s title'), text: p('text', 'Its words'), children: p('children', 'Its elements'), hover: p('bool', 'Opens as the pointer rests on it too'), align: p(['start', 'end'] as const, 'The panel under its start (the default) or its end') } },
   form: { group: 'Inputs', blurb: 'Fields and a button that runs an action with them.', props: { fields: p('items', 'Its fields: [{ "id", "type": "text" | "number" | "bool" | "choice" | "textarea", "label", "hint", "default", "choices" }]'), submit: p('button', 'Its button: { "label", "run", "confirm" }; the action gets the fields as JSON in $WIDGET_ARG') } },
   input: { group: 'Inputs', blurb: 'A box to type in and a button (or Enter): runs an action with the words. Add a to-do, look something up.', props: { placeholder: p('text', 'What the empty box says'), value: p('text', 'What it starts with'), label: p('text', 'Its button’s words (Add)'), icon: p('icon', 'Its button’s icon'), run: p('text', 'One of widget.json’s actions, run with what’s typed as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first'), clear: p('bool', 'Empty the box once sent: on by default') } },
-  textarea: { group: 'Inputs', blurb: 'A box for a few lines and a button (or ⌘ Enter): runs an action with them, or sends them to an agent or Laki AI.', props: { placeholder: p('text', 'What the empty box says'), value: p('text', 'What it starts with'), label: p('text', 'Its button’s words (Send)'), icon: p('icon', 'Its button’s icon'), rows: p('number', 'Lines tall, 2-12 (3)'), run: p('text', 'One of widget.json’s actions, run with what’s typed as $WIDGET_ARG'), do: p(['new', 'send', 'ai'] as const, 'Or a Laki command with what’s typed as its prompt: new (a workspace), send (to the workspace’s agent) or ai (Laki AI); the app asks first'), agent: p('text', 'With do new: an agent or a profile of yours'), project: p('text', 'With do new: a project by name or id'), confirm: p('text', 'A question the app asks first'), clear: p('bool', 'Empty the box once sent: on by default') } },
+  textarea: { group: 'Inputs', blurb: 'A box for a few lines and a button (or ⌘ Enter): runs an action with them, or sends them to an agent or Laki AI.', props: { placeholder: p('text', 'What the empty box says'), value: p('text', 'What it starts with'), label: p('text', 'Its button’s words (Send)'), icon: p('icon', 'Its button’s icon'), rows: p('number', 'Lines tall, 2-12 (3)'), run: p('text', 'One of widget.json’s actions, run with what’s typed as $WIDGET_ARG'), do: p(['new', 'send', 'ai'] as const, 'Or a Laki command with what’s typed as its prompt: new (a workspace), send (to the workspace’s agent) or ai (Laki AI); the app asks first'), agent: p('text', 'With do new: an agent or a profile of yours'), project: p('text', 'With do new: a project by name or id'), model: BUTTON.model, effort: BUTTON.effort, perm: BUTTON.perm, fast: BUTTON.fast, confirm: p('text', 'A question the app asks first'), clear: p('bool', 'Empty the box once sent: on by default') } },
   select: { group: 'Inputs', blurb: 'A pick from a long list: runs an action with it. A branch, a region, a model.', props: { options: p('items', 'The options: words, or [{ "value", "label" }]'), value: p('text', 'The one picked now'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
   combobox: { group: 'Inputs', blurb: 'A box that suggests from a list as you type, or takes any words: runs an action with them. A branch, a package, a user.', props: { options: p('path', 'The suggestions: a field with them (branches), or a list: words, or [{ "value", "label" }]'), value: p('text', 'What it starts with'), placeholder: p('text', 'What the empty box says'), label: p('text', 'Its button’s words (Go)'), icon: p('icon', 'Its button’s icon'), run: p('text', 'One of widget.json’s actions, run with what’s typed or picked as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
   datepicker: { group: 'Inputs', blurb: 'A date, a time or a month to pick: runs an action with it. A release date, a freeze, a report’s day.', props: { value: p('text', 'The one picked now: 2026-10-24, 2026-10-24T15:00, 15:00 or 2026-10'), kind: p(['date', 'datetime', 'time', 'month'] as const, 'date (the default), datetime, time or month'), min: p('text', 'The earliest'), max: p('text', 'The latest'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with what’s picked (as value shows it) as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
@@ -375,12 +382,13 @@ const filterBox = (e: El, s: S) => (s.full && e.filter === true ? '<input class=
 const empty = (e: El, s: S, rows: number) => (rows ? '' : `<div class="k-empty small">${h(e.empty ?? 'Nothing here', s)}</div>`)
 
 // a Laki command a button asks for (the app shows it and asks first): its words filled in
-export type UiDo = { do: (typeof DO)[number]; prompt?: string; command?: string; url?: string; agent?: string; project?: string }
+export type UiDo = { do: (typeof DO)[number]; prompt?: string; command?: string; url?: string; agent?: string; project?: string; model?: string; effort?: string; perm?: string; fast?: boolean }
 const doOf = (b: El, s: S): UiDo | undefined => {
   const w = txt(b.do, s).trim()
   if (!(DO as readonly string[]).includes(w)) return undefined
-  const c: Record<string, string> = { do: w }
-  for (const k of ['prompt', 'command', 'url', 'agent', 'project']) if (b[k] !== undefined) c[k] = txt(b[k], s)
+  const c: Record<string, string | boolean> = { do: w }
+  for (const k of ['prompt', 'command', 'url', 'agent', 'project', 'model', 'effort', 'perm']) if (b[k] !== undefined) c[k] = txt(b[k], s)
+  if (b.fast !== undefined) c.fast = b.fast === true || txt(b.fast, s).trim() === 'true'
   return c as UiDo
 }
 // what a click on a button does, as its attributes: run (+ arg), do, open, refresh, full or copy, then confirm ('': none)
@@ -1456,7 +1464,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
   // what's typed is the arg, or a do's prompt (uiBehave's data-input); ⌘ Enter sends
   textarea: (e, s) => {
     const run = e.run !== undefined ? txt(e.run, s) : ''
-    const d = !run && ['new', 'send', 'ai'].includes(txt(e.do, s).trim()) ? doOf({ do: e.do, agent: e.agent, project: e.project }, s) : undefined
+    const d = !run && ['new', 'send', 'ai'].includes(txt(e.do, s).trim()) ? doOf({ do: e.do, agent: e.agent, project: e.project, model: e.model, effort: e.effort, perm: e.perm, fast: e.fast }, s) : undefined
     const label = e.label !== undefined ? txt(e.label, s) : e.icon !== undefined ? '' : 'Send'
     const ph = txt(e.placeholder, s)
     if (s.line) return `<button type="button"${at({ tip: e.tip }, s, 'k-btn sm')} data-laki="full">${e.icon !== undefined ? icon(e.icon, s, 12) : ''}<span>${esc(ph || label)}</span></button>`
@@ -1731,6 +1739,11 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
       if (!(DO as readonly string[]).includes(b.do)) say('error', where, `do: one of ${DO.join(', ')}${mean(b.do, DO)}`)
       else if (b[NEEDS[b.do]] === undefined) say('warn', where, `do ${b.do} without ${NEEDS[b.do]}: the app has nothing to ${b.do === 'browse' ? 'open' : b.do === 'terminal' ? 'run' : 'send'}`)
       if (b.run !== undefined) say('warn', where, 'both run and do: run wins')
+      // #30: never an agent that doesn't ask (by its mode, or codex's acceptEdits: approvals off)
+      const perm = typeof b.perm === 'string' && !b.perm.includes('{{') ? b.perm : undefined
+      const agent = typeof b.agent === 'string' && !b.agent.includes('{{') ? b.agent.trim() || 'claude' : 'claude'
+      if (b.do === 'new' && perm && neverAsks(agent, perm)) say('error', where, `perm ${perm}${agent !== 'claude' ? ` for ${agent}` : ''}: an extension never starts an agent that doesn't ask first`)
+      if (b.do !== 'new' && ['model', 'effort', 'perm', 'fast'].some(k => b[k] !== undefined)) say('warn', where, `model, effort, perm and fast go with do new only`)
     }
   }
   const walk = (el: unknown, where: string, scopes: Scope[] | null) => {

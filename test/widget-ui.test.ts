@@ -411,6 +411,22 @@ test('UI kit: the new elements, and buttons that ask Laki to do things', () => {
   assert.match(probs.map(p => `${p.level}: ${p.text}`).join('\n'), /warn: do terminal without command[\s\S]*error: do: one of new, send, ai, terminal, browse[\s\S]*error: runs nope/)
 })
 
+// #30: do new carries the agent's options (model, effort, mode, fast), and never asks for one that doesn't ask
+test('UI kit: do new takes model, effort, perm and fast; a mode that never asks is an error', () => {
+  const h = (e: object) => uiHtml(e, { data: {} })
+  const b = h({ type: 'button', label: 'Review', do: 'new', prompt: 'Review it', agent: 'claude', model: 'opus', effort: 'high', perm: 'plan', fast: true })
+  const cmd = JSON.parse(/data-do="([^"]*)"/.exec(b)![1].replace(/&quot;/g, '"').replace(/&amp;/g, '&'))
+  assert.deepEqual(cmd, { do: 'new', prompt: 'Review it', agent: 'claude', model: 'opus', effort: 'high', perm: 'plan', fast: true })
+  const t = h({ type: 'textarea', do: 'new', perm: 'acceptEdits', fast: true })
+  assert.match(t, /data-do="[^"]*&quot;perm&quot;:&quot;acceptEdits&quot;,&quot;fast&quot;:true/)
+  const said = (e: object) => uiCheck(e).map(p => `${p.level}: ${p.where}: ${p.text}`)
+  assert.deepEqual(said({ type: 'stack', children: [{ type: 'button', label: 'a', do: 'new', prompt: 'p', model: 'opus', effort: 'high', perm: 'plan', fast: true }, { type: 'textarea', do: 'new', perm: 'auto' }] }), [])
+  const bad = said({ type: 'stack', children: [{ type: 'button', label: 'a', do: 'new', prompt: 'p', perm: 'bypassPermissions' }, { type: 'button', label: 'b', do: 'new', prompt: 'p', agent: 'codex', perm: 'acceptEdits' }, { type: 'button', label: 'c', do: 'send', prompt: 'p', fast: true }] }).join('\n')
+  assert.match(bad, /error: [^\n]*perm bypassPermissions: an extension never starts an agent that doesn't ask first/)
+  assert.match(bad, /error: [^\n]*perm acceptEdits for codex: an extension never starts an agent that doesn't ask first/, "codex's acceptEdits turns its approvals off")
+  assert.match(bad, /warn: [^\n]*model, effort, perm and fast go with do new only/)
+})
+
 test('UI kit: a filter matches a row by its words, not its buttons’', () => {
   const listeners: Record<string, (e: any) => void> = {}
   uiBehave({ addEventListener: (t: string, f: any) => (listeners[t] = f), removeEventListener: () => {} }, () => {})

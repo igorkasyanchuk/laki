@@ -38,7 +38,7 @@ test('starters: each kind made through the CLI is on, checks out with its fetch,
   // the launcher: buttons only, no data; each asks Laki for something
   assert.equal((await rig.cli('widget', 'new', 'My launcher', '--kind', 'launcher')).code, 0)
   const launch = await rig.rpc('widgetRender', { id: 'my-launcher', sample: true })
-  assert.equal(launch.match(/data-do=/g)?.length, 5)
+  assert.equal(launch.match(/data-do=/g)?.length, 6)
   assert.doesNotMatch((await rig.cli('widget', 'check', 'my-launcher')).out, /✗/)
   const files = (await rig.rpc('widgetFiles', { id: 'my-list' })).files
   assert.deepEqual(Object.keys(files).sort(), ['README.md', 'fetch.sh', 'fixtures/empty.json', 'fixtures/green.json', 'fixtures/many.json', 'fixtures/one.json', 'fixtures/sample.json', 'widget.json'])

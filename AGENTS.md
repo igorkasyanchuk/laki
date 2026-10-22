@@ -1581,9 +1581,10 @@ Laki commands (`widgetUi.ts` `DO`, a button's `do`, `doOf`: `data-do`, its JSON 
 'do', cmd, label }`, a JS page's `laki.do`): Widgets.tsx' `act` hands it to `WidgetApi.do`, App's `widgetDo`: `browse`
 (`quickNew('browsers', url)`, no question), `terminal` (`ask` danger, `quickNew` shells, then `send` to `<ws>/1` 1.5 s
 later), `ai` (`aiAsk`, the AI page or the floating chat), `send` (`send` `agent` `whenIdle` to `w.here` or the selected
-workspace), `new` (`wsNew` in `project` by id or name, else the workspace's project; `preset: agent`; a `git: false`
+workspace), `new` (`wsNew` in `project` by id or name, else the workspace's project; `preset: agent`; `model`, `effort`, `perm`
+(`DO_PERMS`), `fast`, named in its ask (#30); refused when `neverAsks` by its `perm` or its profile's; a `git: false`
 one's `another`), each but browse after `ask` with the words in quotes. `uiCheck` (`NEEDS`) warns at one without its
-field, errors at an unknown `do`.
+field, errors at an unknown `do` and at a `do: new` whose `perm` `neverAsks` (its `agent`, else claude).
 
 Colors and charts: `colorCss` (a tone's var, the palette's `var(--tc-<name>, <fallback>)` (`TC`), a hex), `hue` over
 a template, `at`'s `color` (a style `color`); Widgets.tsx' `VARS` pass `--tc-*` to a JS page. `chart`: `CHARTS`, pie and
