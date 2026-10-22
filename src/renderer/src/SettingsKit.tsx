@@ -1,6 +1,5 @@
 // Settings' own building blocks: a setting's title and hint, a titled card of settings (Group), a section's scope note.
 // Settings.tsx re-exports it.
-
 import { type ReactNode } from 'react'
 
 // a switch row's text: what it is, and under it a line on what it does

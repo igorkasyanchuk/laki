@@ -1,6 +1,5 @@
 // Settings › Extensions: the list, each one's card (where it shows, updates, its settings, its tools) and the studio's
 // sessions. Settings.tsx re-exports it.
-
 import { placesOf, type StudioChat, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { ICONS } from '../../shared/icons'

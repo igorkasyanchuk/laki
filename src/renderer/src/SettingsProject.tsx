@@ -1,14 +1,17 @@
 // a project's settings (its scripts, env, folders, templates, actions), and the fields Settings' global sections share
 // with it. Settings.tsx re-exports it.
-
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
 import { Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
 import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
-import { EXAMPLE_TEMPLATE } from './Settings'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
+
+const EXAMPLE_TEMPLATE: Template = {
+  name: 'fix',
+  text: 'Fix this in {{project}}: {{prompt}}\n\nFind the cause first. Write a test that fails before the fix and passes after it, run the tests, then sum up what changed.',
+}
 
 const SCRIPTS = [
   { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $LAKI_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$LAKI_PROJECT_PATH/.env" .env' },

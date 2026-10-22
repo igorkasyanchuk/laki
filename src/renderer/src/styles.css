@@ -401,7 +401,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .settings-main { flex: 1; overflow-y: auto; padding: 22px 28px 48px; max-width: 720px; gap: 16px; }
 .settings-main h2 { margin: 0; font-size: 18px; color: var(--fg); }
 .settings-main p { margin: 0; }
-/* a settings page's blocks (Settings.tsx Group): each a card with its title, apart from the next */
+/* a settings page's blocks (SettingsKit.tsx Group): each a card with its title, apart from the next */
 .set-title { display: flex; flex-direction: column; gap: 4px; }
 .set-group { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: calc(var(--radius) + 4px); background: var(--panel); }
 .set-head { display: flex; flex-direction: column; gap: 3px; }

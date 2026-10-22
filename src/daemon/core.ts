@@ -146,7 +146,7 @@ export function load() {
   state.reminders ??= []
   state.flows ??= []
   for (const [ws, g] of Object.entries(state.widgetGrants ?? {})) {
-    const keep = g.filter(k => k.includes('#')) // an Always from before its hash (widgets.ts grantKey): asked again, once
+    const keep = g.filter(k => k.includes('#')) // an Always from before its hash (widgetTools.ts grantKey): asked again, once
     if (keep.length) state.widgetGrants![ws] = keep
     else delete state.widgetGrants![ws]
   }
@@ -2752,7 +2752,7 @@ export function runDev(ref: string, script?: string, agent?: string) { // agent:
   return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript, agent) : replaceTab(ws.id, 'dev', cmd, undefined, undefined, agent)
 }
 
-// gates (widgets.ts widgetGates) before a ship, a merge or an archive: { held } when one says no. force does it anyway:
+// gates (widgetEvents.ts widgetGates) before a ship, a merge or an archive: { held } when one says no. force does it anyway:
 // yours only, an agent's is refused (agentCaller); by: who does it (an agent's tab says agent itself); agent: an agent's
 // run's (workflow.ts' r.by), its events the agent's as an agent's tab's are
 export type GateOpts = { force?: boolean; by?: GateBy; from?: { ws?: unknown; tab?: unknown }; agent?: string } & Cause

@@ -1,5 +1,6 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The daemon keeps
-// the settings.
+// the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
+// SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
@@ -200,11 +201,6 @@ export type AppSettings = Paint & {
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
-
-export const EXAMPLE_TEMPLATE: Template = {
-  name: 'fix',
-  text: 'Fix this in {{project}}: {{prompt}}\n\nFind the cause first. Write a test that fails before the fix and passes after it, run the tests, then sum up what changed.',
-}
 
 // the PR switches' prompts (Settings › Pull requests): the status bar's names
 const ARCHIVED_DAYS: [number, string][] = [[0, 'Never'], [1, 'After a day'], [3, 'After 3 days'], [7, 'After a week'], [14, 'After 2 weeks'], [30, 'After a month']]

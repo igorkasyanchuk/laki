@@ -1,5 +1,4 @@
 // Settings' connect sections: phone pushes, remote access and the simulators. Settings.tsx re-exports it.
-
 import { ANSWER_WHY, answerOk, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
 import { Fragment, useEffect, useState } from 'react'
 import { Group, Says } from './SettingsKit'

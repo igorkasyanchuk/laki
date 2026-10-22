@@ -1,7 +1,7 @@
 // widget.json in one table (MANIFEST): from it the JSON Schema (WIDGET_SCHEMA, written to docs/widget.schema.json by
 // scripts/widget-schema.ts; editors autocomplete and validate a widget.json that names it in "$schema"), laki.d.ts
 // (LAKI_DTS: window.laki and the UI kit's elements, for a JS page), and manifestCheck, the checker's widget.json part
-// (widgetCheck in daemon/widgets.ts adds the files, the ui against data, the fixtures and a fetch). The ui elements'
+// (widgetCheck in daemon/widgetDev.ts adds the files, the ui against data, the fixtures and a fetch). The ui elements'
 // words are the UI kit's own (widgetUi.ts UI), so the schema, the types, the guide and the gallery say the same.
 import { CUSTOM_EVENT, eventOk, type Gate, GATES, REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
 import { BUTTON, COMMON, type Kind, near, type Prop, UI, UI_TYPES, type UiProblem } from './widgetUi.ts'

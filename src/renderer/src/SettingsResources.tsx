@@ -1,6 +1,5 @@
 // Settings › Resources: Laki and each tab by memory and CPU, with their processes, and when idle agents sleep.
 // Settings.tsx re-exports it.
-
 import { type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Icon } from './ui'

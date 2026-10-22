@@ -182,7 +182,7 @@ export type Workspace = {
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
 // merge conflicts were sent, how many times in a row
-export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number; land?: string; held?: string } // mine: the agent's comments (it comments as you); land: the head commit merge when green tried; held: its gates' extensions as they were when they held it (widgets.ts gatesKey): changed, it's tried again
+export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number; land?: string; held?: string } // mine: the agent's comments (it comments as you); land: the head commit merge when green tried; held: its gates' extensions as they were when they held it (widgetEvents.ts gatesKey): changed, it's tried again
 export type FixWhat = 'ci' | 'review' | 'conflict'
 
 // what fix CI, review and fix conflicts (and the info panel's send buttons) tell the agent; settings.prPrompts
@@ -524,7 +524,7 @@ export type Settings = {
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetAgent?: string // Settings › Extensions' agent: the claude or codex preset an AI source runs (unset: the first claude one)
-  widgetLogs?: boolean // Settings › Extensions' Keep logs for every extension (widgets.ts' logs; unset: only those with their own Keep a log)
+  widgetLogs?: boolean // Settings › Extensions' Keep logs for every extension (widgetLogs.ts; unset: only those with their own Keep a log)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
   voice?: VoiceSettings // Settings › Voice: how the mic and hold Fn turn speech into text
@@ -568,7 +568,7 @@ export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: 
 export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct; perm?: boolean }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
 export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgets.ts filesHash): a Yes needs them still; text: run's command
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
@@ -748,7 +748,7 @@ export type WidgetRun = { at: number; ms: number; reason: string; why?: string; 
 export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtures: string[]; devError?: string; mock?: string; data?: string; big?: boolean; stream?: WidgetStream } // data: its last data's JSON, when asked (big: over 256 KB, not given)
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
-// what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgets.ts widgetEvent)
+// what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgetEvents.ts widgetEvent)
 export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held'] as const
 // gates (an action's "gate"): the steps an extension can hold; a hold: who held it and why
 export const GATES = ['ship', 'merge', 'archive'] as const
@@ -770,7 +770,7 @@ export type WidgetSource = { kind: (typeof WIDGET_SOURCES)[number]; text?: strin
 export const AI_SOURCE_EVERY = 60 // minutes between an AI source's runs unless set; 15 at least: each one costs
 // what the user hid of an extension (its switches): its refresh buttons, when it was fetched
 export type WidgetHide = { refresh?: boolean; at?: boolean }
-// a line of an extension's log (widgets.ts' logs): src laki (Laki's own), fetch, action:<name>, stream, tool:<name>, push,
+// a line of an extension's log (widgetLogs.ts): src laki (Laki's own), fetch, action:<name>, stream, tool:<name>, push,
 // cli (laki widget log), page (a JS page's laki.log); n: its place in the log, the cursor widgetLogs reads from
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 export type LogLevel = (typeof LOG_LEVELS)[number]

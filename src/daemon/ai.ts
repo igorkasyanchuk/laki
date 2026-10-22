@@ -528,7 +528,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const s = state.settings?.ai ?? {}
   const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
   // perm: that extension's id: claude asks you for a tool it may not use unasked in the app, not in a hook's (laki mcp's
-  // laki_permission beside the user's own servers: widgets.ts widgetPermission)
+  // laki_permission beside the user's own servers: widgetTools.ts widgetPermission)
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
   if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text // ponytail: no onCall (an extension's agent is claude or codex)
   const pre = o.preset ?? presetOf(backend)
