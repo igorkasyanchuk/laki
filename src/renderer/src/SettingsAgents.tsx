@@ -1,5 +1,5 @@
-// Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, and the agent skill with each agent's
-// accounts. Settings.tsx re-exports it.
+// Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
+// accounts in Agents & profiles. Settings.tsx re-exports it.
 import { type Account, type AccountAgent, type AccountView, AGENT_NAMES, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceSettings } from '../../shared/types'
 import { useEffect, useState } from 'react'
 import { bridge } from './api'
