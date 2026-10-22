@@ -796,6 +796,8 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
     if (o.net === true || o.source !== undefined || o.ai || o.allow !== undefined || o.log !== undefined) throw new Error(`only you can change ${o.net === true ? 'its network access' : o.ai ? 'who edits it' : o.allow !== undefined ? 'the tools its agent may use' : o.log !== undefined ? 'whether it keeps a log' : 'its source'} (Settings › Extensions)`)
     const secret = Object.keys(o.config ?? {}).find(k => optionsOf(w).some(x => x.key === k && x.type === 'secret'))
     if (secret) throw new Error(`${secret} is a secret: only you set it (Settings › Extensions)`)
+    const steers = Object.keys(o.config ?? {}).find(k => steering(w).has(k))
+    if (steers) throw new Error(`${steers} fills in its source or an AI action's prompt: only you change it (Settings › Extensions)`)
   }
   // seen: the files hash of what the user was shown (the studio's Turn on): on only while it's still that
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
@@ -2107,6 +2109,9 @@ export async function widgetPermission(p: { ext?: unknown; tool?: unknown; input
 }
 const TOOL_NAME = /^\w[\w.-]{0,199}$/ // claude's: Bash, WebFetch, mcp__claude_ai_Slack__slack_read_channel
 // the tools an AI source's or action's agent may use unasked: widget.json's (or the source's) and the ones allowed since
+// #8: the settings its source (an AI prompt, a file's path, a URL) and its AI actions' prompts read ({{config.x}}): an
+// agent changing one would steer what runs with your allowed tools, or what's read
+const steering = (w: Entry) => new Set([...JSON.stringify([sourceOf(w), Object.values(w.m.actions ?? {}).map(a => aiActOf(a))]).matchAll(/\{\{[^}]*?\bconfig\.([A-Za-z_]\w*)/g)].map(m => m[1]))
 const allowedOf = (w: Entry, tools?: string) => [tools, ...(allowOf(w) ?? [])].filter(Boolean).join(',') || undefined
 // #6: an Always is for the prompts it was given under: a hash of the AI source's prompt and tools and each AI action's
 // (allowFor); once they change (widgetSet source, widget.json read again at a scan) its tools go, asked again

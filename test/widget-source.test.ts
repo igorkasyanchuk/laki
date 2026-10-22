@@ -323,3 +323,32 @@ test("#6: an ask for an extension with no run is refused, no dialog; after its s
   await rig.rpc('widgetReload')
   assert.equal((await find(rig, 'slack')).allowed, undefined)
 })
+
+// #8: an agent could steer an AI source's prompt (run with your allowed tools), a file's path, a URL or an AI action's
+// prompt through the settings they read ({{config.x}}): those are yours; a setting nothing reads still changes
+test("#8: an agent's change to a setting a source or an AI action's prompt reads is refused; one nothing reads goes", async t => {
+  const rig = await fresh(t)
+  const dir = join(rig.data, 'widgets', 'sum')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({
+    name: 'Sum',
+    config: { channel: { type: 'text', default: 'eng' }, path: 'notes.md', topic: 'x', label: 'Summary' },
+    source: { kind: 'ai', prompt: 'Summarize #{{config.channel}}', tools: 'mcp__slack' },
+    actions: { ask: { ai: 'What about {{#if config.topic}}{{config.topic}}{{/if}}?' } },
+    sample: { text: 'x' },
+    ui: { type: 'text', value: '{{config.label}}: {{text}}' },
+  }))
+  await rig.rpc('widgetReload')
+  for (const k of ['channel', 'topic'])
+    await assert.rejects(rig.rpc('widgetSet', { id: 'sum', config: { [k]: 'secrets' }, agent: true }), new RegExp(`${k} fills in its source or an AI action's prompt: only you change it`))
+  await rig.rpc('widgetSet', { id: 'sum', config: { label: 'Today' }, agent: true })
+  assert.equal((await find(rig, 'sum')).config.label, 'Today')
+  // a file source's path, a URL's address
+  await rig.rpc('widgetSet', { id: 'sum', source: { kind: 'file', path: '{{config.path}}' } })
+  await assert.rejects(rig.rpc('widgetSet', { id: 'sum', config: { path: '/etc/passwd' }, agent: true }), /path fills in its source/)
+  await rig.rpc('widgetSet', { id: 'sum', source: { kind: 'url', url: 'https://example.com/{{config.path}}' } })
+  await assert.rejects(rig.rpc('widgetSet', { id: 'sum', config: { path: 'x' }, agent: true }), /path fills in its source/)
+  // yours: any
+  await rig.rpc('widgetSet', { id: 'sum', config: { channel: 'general', path: 'b.md' } })
+  assert.deepEqual([(await find(rig, 'sum')).config.channel, (await find(rig, 'sum')).config.path], ['general', 'b.md'])
+})

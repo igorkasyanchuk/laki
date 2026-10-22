@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: an agent can't change a setting an extension's source or AI prompt reads (`{{config.x}}`): it would
+  steer what runs with your tools. Plain settings still change.
 - Extensions: an AI extension's *Always* covers the prompt it was given for; a changed prompt asks again. An ask in an
   extension's name while none of its runs is going is refused.
 - Workflows: what a run does itself (its archive when it's done, its ship, its tabs) never starts it again, and counts

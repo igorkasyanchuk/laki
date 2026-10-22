@@ -89,6 +89,8 @@ Each setting is a default or `{ "type", "label", "hint", "default", "choices", "
 `"required": true` is one it can't do without (My PRs' *Repo*): while it's empty its cell says *Set Repo*, and turning
 it on opens its page at that field. Its fetch should still fail with a line that says where (`Set Repo in Settings ›
 Extensions › My PRs`).
+An agent (`laki widget set`, MCP's `laki_extension_set`) changes plain settings, never a secret nor one its source or an AI
+action's prompt reads (`{{config.x}}`): those steer what it runs with your tools.
 
 #### Secrets
 
