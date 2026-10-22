@@ -281,7 +281,7 @@ const api: Record<string, Handler> = {
   aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
-  send: async p => (await crossAsk(p, 'send'), core.send(p)),
+  send: async p => (agentSend(p), await crossAsk(p, 'send'), core.send(p)),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),
   diff: p => core.diff(p.ws),
@@ -336,7 +336,7 @@ const api: Record<string, Handler> = {
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
-  input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), core.input(p.tab, p.data, c)),
+  input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
@@ -490,6 +490,22 @@ function agentNo(method: string, p: any) {
 // M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
 // from that workspace into that one, until Laki restarts). ponytail: kept in memory
 const crossOk = new Set<string>()
+// #1: an agent's send goes to agents (agent: true, as MCP's laki_send), or into a terminal of its own workspace, which is
+// then the agent's (core.agentTyped): what it runs there isn't yours. Another workspace's terminal is refused before any
+// ask. Yours gives it back
+function agentSend(p: any) {
+  const tab = core.resolveTarget(String(p.target ?? ''))
+  const by = core.agentCaller(p.from)
+  if (!by) core.youTyped(tab.id, String(p.text ?? ''))
+  else if (core.tracked(tab)) p.agent = true
+  else if (tab.workspace !== by) throw new Error(`${tab.name} isn't an agent, and it's in another workspace: an agent's messages go to agents only (ask the user to run it there)`)
+  else core.agentTyped(tab.id)
+}
+// keys: an agent's into a terminal of its own workspace make it the agent's (as a send does); yours give it back
+function typed(p: any, tab: string, data: string) {
+  if (core.agentCaller(p.from)) core.agentTyped(tab)
+  else core.youTyped(tab, data)
+}
 // keys (input) ask as a send does, a terminal attached to as a screen read
 async function crossAsk(p: any, kind: 'send' | 'screen', target = p.target, text = p.text) {
   const by = core.agentCaller(p.from)

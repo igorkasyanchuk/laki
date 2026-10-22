@@ -7,6 +7,7 @@ import { connect as net } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { procParent, procPeer } from '../src/daemon/peer.ts'
 import { connect, fresh, until } from './helpers.ts'
 
@@ -83,6 +84,44 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   await new Promise(ok => setTimeout(ok, 300))
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true, 'nothing done')
   await until(() => rig.out.includes("widgetSet refused: couldn't tell who's calling"), 'said in its log')
+})
+
+// #1: an agent's laki send into a terminal it opened ran as you (the terminal's process isn't an agent's): its own
+// workspace's terminal is now the agent's for what runs there, another workspace's is refused; yours works and gives it back
+test("#1: a command an agent sends into a terminal is the agent's, another workspace's terminal is refused; yours runs as you", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const { id } = await rig.rpc('widgetNew', { kind: 'number', name: 'Probe' })
+  await rig.rpc('widgetSet', { id, on: false })
+  const { hash } = await rig.rpc('widgetWhat', { id })
+  const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
+  const out = join(rig.home, 'agent-out')
+  const agent = async (cmd: string) => {
+    rmSync(out, { force: true })
+    await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${cmd} > ${out} 2>&1; echo done >> ${out}` })
+    await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+    return readFileSync(out, 'utf8')
+  }
+  await agent(`${laki} tab ${ws.id} --preset shell`)
+  const shell = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id && x.kind === 'shell'), 'its terminal')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${shell}` })).includes('$ '), 'the shell prompt')
+  const ran = join(rig.home, 'shell-out')
+  assert.match(await agent(`${laki} send ${ws.id}/${shell} '${laki} widget on ${id} --seen ${hash} > ${ran} 2>&1'`), /sent/)
+  await until(() => existsSync(ran) && readFileSync(ran, 'utf8').length > 0, 'the terminal ran it', 30000)
+  assert.match(readFileSync(ran, 'utf8'), /only you can turn an extension on/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, false)
+  // another workspace's terminal: refused, nobody asked
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'other' })
+  const there = (await rig.rpc('tabNew', { ws: other.id })).id
+  assert.match(await agent(`${laki} send ${other.id}/${there} 'echo hi'`), /another workspace: an agent's messages go to agents only \(ask the user to run it there\)/)
+  // yours, into the same terminal: you again
+  rmSync(ran)
+  await rig.rpc('send', { target: `${ws.id}/${shell}`, text: `${laki} widget on ${id} --seen ${hash} > ${ran} 2>&1` })
+  await until(() => existsSync(ran) && readFileSync(ran, 'utf8').length > 0, 'the terminal ran yours', 30000)
+  assert.equal(readFileSync(ran, 'utf8'), `${id} on\n`)
 })
 
 test("M5 on Linux: the caller's process by /proc (its socket's inode among a process's fds), none when no socket matches", async () => {

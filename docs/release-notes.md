@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's `laki send` reaches other agents, or a terminal of its own workspace; what it runs there is the agent's
+  (no turning extensions on or shipping past a gate as you) until you type there yourself. Another workspace's terminal
+  is refused.
 - Workflows: a budget, `budget: 60 min, $5` (its settings, or Run's for one run): past its working time or AI cost a
   run asks, *Give it more* or *Stop*; a run shows its turns, time and cost (`--budget` on `laki flow run`).
 - Phone pushes: a workflow's questions (*Ask you*, a confirm, a stuck block, an unsure decision) reach the phone, and

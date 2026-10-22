@@ -2700,7 +2700,7 @@ function textFor(tab: Tab, text: string): string | Promise<string> {
 export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean; vars?: boolean }) {
   const tab = resolveTarget(p.target)
   if (p.vars) p = { ...p, text: varsIn(tab, p.text) } // an action's: its {{branch}}… now, queued or not
-  if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: messages go to agents only`)
+  if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: an agent's messages go to agents only (ask the user to run it there)`)
   if (p.agent && !p.whenIdle && rtOf(tab.id).status === 'waiting') throw new Error(`${tab.name} is asking the user something: only they answer it (or send with when_idle)`)
   if (p.enter === false && asleep.has(tab.id)) throw new Error(`${tab.name} is asleep: look at it to wake it, then send again`)
   const woke = wake(tab.id) // running until it's up: what's sent waits for that (below)
@@ -4339,8 +4339,14 @@ const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // view's runs); you typing in a shell tab, or outside Laki, aren't. Its workspace, else nothing
 const agentTab = (from?: { ws?: unknown; tab?: unknown }) => {
   const t = typeof from?.tab === 'string' && from.tab ? state.tabs.find(x => x.id === from.tab) : undefined
-  return t && (t.kind === 'agent' || shellAgents.has(t.id)) ? t : undefined
+  return t && (t.kind === 'agent' || shellAgents.has(t.id) || typedBy.has(t.id)) ? t : undefined
 }
+// #1: a terminal of its own workspace an agent typed into (main.ts' send and input) runs what it typed: a laki command
+// there is the agent's until you type there yourself (keys with no escape: a terminal's answers to queries and focus or
+// mouse reports start with one). ponytail: in memory; a restart forgets it
+const typedBy = new Set<string>()
+export const agentTyped = (tab: string) => typedBy.add(tab)
+export const youTyped = (tab: string, data: string) => !data.includes('\x1b') && typedBy.delete(tab)
 export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
 export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'

@@ -192,7 +192,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   workspace's first, with a prompt, is `<agent>: <taskTitle(prompt)>` (`shared/types.ts`: its first words, no URLs, paths,
   flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit and
   gemini's BeforeAgent `prompt`, codex's first notify `input-messages`, never a bare /command; MCP's `laki_new_tab` takes
-  a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something), `queueClear`;
+  a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
+  (main.ts `agentSend`): to an agent's tab (`agent: true`), or a terminal of its own workspace, which is then the agent's
+  (`agentCaller`, core's `agentTyped`; its keys through `input` too) until you send or type there (`youTyped`: keys with
+  no escape), another workspace's terminal refused before any ask), `queueClear`;
   `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below; `label`: refused unless choice `n` still says that), `unread` (its ● again: `done`, until a look clears it);
 - a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
   another, named `<name>-<preset>`, sharing a random `race` id (the sidebar's flag; the renderer's `Compare.tsx`);

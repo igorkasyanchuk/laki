@@ -269,6 +269,8 @@ that says no holds it, with its reason.
   changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
   way, the reasons as `{{steps.<id>.output}}`. Each hold sends `gate.held`.
 - Not gated: deleting a workspace, and archived workspaces' clean-up.
+- A gate is a team rule, not a sandbox: it holds what goes through Laki. An agent with a shell can still run `gh pr
+  merge` or `git push` itself; its own permission mode is what stops that.
 
 ## Tools for agents (an action's `tool`)
 
