@@ -3,7 +3,7 @@
 // prompts, its answers, its tool calls a line each; anything else (a shell, gemini…): the terminal's text.
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { markdownHtml } from '../shared/markdown.ts'
+import { esc, markdownHtml } from '../shared/markdown.ts'
 import { costOf } from '../shared/types.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
@@ -158,7 +158,6 @@ export function shareMd(title: string, agent: string, said: Said[]) {
 
 // ---------- the page: everything escaped here (markdown.ts' tree holds no HTML); links http(s) and mailto only
 
-const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 // what was said as the page's main part (the page swaps it as it changes)
 export function shareBody(agent: string, said: Said[]) {
   if (!said.length) return '<p class="empty">Nothing here yet.</p>'

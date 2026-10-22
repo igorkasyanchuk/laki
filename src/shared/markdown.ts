@@ -157,7 +157,7 @@ export function inline(s: string): Inline[] {
 
 // ---------- as HTML text (a shared tab's page, the UI kit's markdown element): every string escaped (the tree holds no
 // HTML); links http(s) and mailto only
-const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
+export const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 const url = (u: string) => (/^(https?:|mailto:)/i.test(u) ? esc(u) : '')
 const TAG = { b: 'strong', i: 'em', s: 's' } as const
 function inl(xs: Inline[]): string {
