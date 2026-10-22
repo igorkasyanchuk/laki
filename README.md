@@ -111,6 +111,9 @@ open dist/mac-arm64/Laki.app      # Intel: dist/mac; or copy it to /Applications
 npm link                          # optional: the laki CLI (or Settings › General › Developer › Install the laki command)
 ```
 
+Working on Laki: `npm test` runs every test (a few minutes), `npm run test:one -- test/pr.test.ts` only the files named;
+[AGENTS.md](AGENTS.md) says how the code works.
+
 Linux and Windows (WSL 2), a preview: `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker
 and tests it there (`ARCH=x64` for Intel/AMD); [the guide](docs/guide.md#linux-and-windows-through-wsl) says how to run it.
 

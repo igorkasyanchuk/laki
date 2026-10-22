@@ -18,6 +18,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
+    "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",
     "pack": "electron-vite build && electron-builder --dir --publish never",
     "dmg": "npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg --publish never -c.directories.output=dist/release",
     "pack:x64": "npm i --no-save --force @lydell/node-pty-darwin-x64@$(node -p \"require('./node_modules/@lydell/node-pty/package.json').version\") && electron-vite build && electron-builder --dir --x64 --publish never",

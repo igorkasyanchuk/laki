@@ -704,6 +704,17 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
+  // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
+  // it, so a test run killed midway leaves none behind
+  const parent = Number(process.env.LAKI_TEST_PARENT)
+  if (parent)
+    every(2000, () => {
+      try {
+        process.kill(parent, 0)
+      } catch {
+        shutdown() // ESRCH: gone; EPERM: its pid is another user's process now
+      }
+    })
 })
 
 function shutdown() {

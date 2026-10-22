@@ -250,7 +250,7 @@ test('events: a new tab, a port newly listening (once), a ship, a usage limit; l
   const port = Number((await until(async () => (await rig.screen(dev.id)).match(/listening (\d+)/), 'dev server up'))![1])
   const opened = await until(() => kept(rig, 'all').find(e => e.event === 'port.open'), 'port.open', 12000)
   assert.deepEqual([opened.port, opened.ws.id, typeof opened.pid, opened.command], [port, ws.id, 'number', 'node'])
-  await sleep(5600) // another scan
+  await sleep(1500) // more scans (the rig's every 300 ms)
   assert.equal(kept(rig, 'all').filter(e => e.event === 'port.open').length, 1, 'once per appearance')
 
   // ship.done: its exit and the PR

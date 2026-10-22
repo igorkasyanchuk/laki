@@ -210,7 +210,8 @@ test('development mode: a workspace log of PR scans, what the switches did and w
   await until(async () => (await rig.rpc('state')).workspaces[0].fix?.pr === 4, 'a scan')
   assert.equal(await lines(), '', 'off: nothing kept')
   await rig.rpc('settingsSet', { devMode: true })
-  await until(async () => /review: not sent: .* has no running agent/.test(await lines()), 'a scan logged', 15000)
+  // a whole scan: one under way as dev mode came on logs only its last lines
+  await until(async () => /PR #4 OPEN[^]*review: not sent: .* has no running agent/.test(await lines()), 'a scan logged', 15000)
   const l = await lines()
   assert.match(l, /PR #4 OPEN, head abcdef1: checks fail \(1 failing: lint, 0 running, 0 passing\), conflicts no/)
   assert.match(l, /fix CI: not sent \(try 1 of 3\): .* has no running agent/)
