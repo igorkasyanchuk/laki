@@ -664,8 +664,8 @@ async function main() {
       }
       if (sub === 'restore') {
         if (!id) throw new Error('usage: laki widget restore <trash-id> (laki widget trash lists them)')
-        const w: WidgetView = await rpc('widgetRestore', { trash: id, from: caller() })
-        return out(w, `restored ${w.id}${w.dir ? ` in ${w.dir}` : ''}${w.on ? ', on' : ''}`)
+        const w: WidgetView & { note?: string } = await rpc('widgetRestore', { trash: id, from: caller() })
+        return out(w, `restored ${w.id}${w.dir ? ` in ${w.dir}` : ''}${w.on ? ', on' : ''}${w.note ? `\n${w.note}` : ''}`)
       }
       if (sub === 'remix') {
         if (!id) throw new Error('usage: laki widget remix <id> [new-id]')

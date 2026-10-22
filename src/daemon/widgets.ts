@@ -2502,13 +2502,14 @@ export function widgetRestore(o: { trash: string; from?: { ws?: string; tab?: st
   for (const [to, from] of keptOf(m.id)) if (statOf(join(t, from))) mkdirSync(dirname(to), { recursive: true }), move(join(t, from), to)
   const sec = readJson<Record<string, string>>(join(t, 'secrets.json'))
   if (sec) setSecrets(m.id, s => Object.assign(s, sec))
-  if (agentCaller(o.from)) writeStore(m.id, { ...readStore(m.id), on: false }), ungrant(m.id)
+  const agent = !!agentCaller(o.from)
+  if (agent) writeStore(m.id, { ...readStore(m.id), on: false }), ungrant(m.id)
   rmSync(t, { recursive: true, force: true })
   hist.delete(m.id)
   lastN.delete(m.id) // its log's n read again from its file
   scanWidgets()
   wLog(m, `restored from the trash: ${m.from}`)
-  return widgetsView().find(w => w.id === m.id) ?? { id: m.id }
+  return { ...(widgetsView().find(w => w.id === m.id) ?? { id: m.id }), ...(agent && { note: 'restored off: only the user turns it on (Settings › Extensions)' }) }
 }
 // at start and hourly: past TRASH_DAYS, and past the newest TRASH_MAX, gone for good
 export function widgetTrashTidy(now = Date.now()) {

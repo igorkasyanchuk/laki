@@ -168,7 +168,8 @@ test("an agent's extensions: new and restored off; a folder it links trusted as 
   // restore: an agent's comes back off
   await rig.rpc('widgetRm', { id: mine.id })
   const [gone] = await rig.rpc('widgetTrash')
-  assert.equal((await rig.rpc('widgetRestore', { trash: gone.trash, from })).on, false)
+  const back = await rig.rpc('widgetRestore', { trash: gone.trash, from })
+  assert.deepEqual([back.on, back.note], [false, 'restored off: only the user turns it on (Settings › Extensions)'])
 
   // an installed one, on; the agent links a folder of its own, then adds one of that id there
   const inst = join(rig.data, 'widgets', 'probe')

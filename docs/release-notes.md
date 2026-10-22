@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- `laki widget restore` from an agent says the extension came back off, as `laki widget new` does.
 - Extensions: an agent can't change a setting an extension's source or AI prompt reads (`{{config.x}}`): it would
   steer what runs with your tools. Plain settings still change.
 - Extensions: an AI extension's *Always* covers the prompt it was given for; a changed prompt asks again. An ask in an
