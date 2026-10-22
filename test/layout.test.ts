@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { skillTools, state, tools } from '../src/cli/mcp.ts'
+import { skillTools, state, tools } from '../src/shared/tools.ts'
 import { describe, groupsOf, keep, move, place, resize, tabsOf } from '../src/shared/layout.ts'
 import { fresh, until } from './helpers.ts'
 

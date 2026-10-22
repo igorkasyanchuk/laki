@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { aiRpc, type Rpc, skillTools, tools } from '../src/cli/mcp.ts'
+import { aiRpc, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
 import { aiTotals } from '../src/shared/types.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 

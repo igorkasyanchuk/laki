@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { bytes, dur, num, pageOf, pct, render, uiBehave } from '../src/shared/widget.ts'
 import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
-import { tools } from '../src/cli/mcp.ts'
+import { tools } from '../src/shared/tools.ts'
 import { fresh, until } from './helpers.ts'
 
 const at = Date.parse('2026-10-17T10:00:00Z')

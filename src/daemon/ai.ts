@@ -1,5 +1,5 @@
 // Laki's own AI (Settings › AI, the AI page, `laki ai`): optional, and only when asked. A conversation that works
-// Laki with the MCP server's tools (cli/mcp.ts: none archives, deletes, ships or merges), run by OpenRouter (its key in
+// Laki with the MCP server's tools (shared/tools.ts: none archives, deletes, ships or merges), run by OpenRouter (its key in
 // <data>/ai-key, 0600) or by an agent's CLI in the background: claude -p or codex exec, each given `laki mcp`. Every ask
 // is logged with its tokens and cost in <data>/ai-calls.jsonl; the conversation is <data>/ai-chat.json. A spec or brainstorm
 // has a chat of its own (the Specs page's side panel), kept in its folder (.chat.json), which ends after PLAN_CHAT_IDLE
@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
-import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
+import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
 import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
