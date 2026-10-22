@@ -134,8 +134,9 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 5. **Verify**: `codesign --verify --deep --strict`; signed, also `spctl -a` (Gatekeeper's "Notarized Developer ID")
    and `stapler validate`.
 6. **Smoke tests**: [scripts/pack-smoke.sh](../scripts/pack-smoke.sh) against each app, the Intel one under Rosetta.
-7. **Linux**: [scripts/linux.sh](../scripts/linux.sh) for arm64 and x64: an AppImage, its smoke test under Xvfb, and
-   the test suite on this Mac's own architecture.
+7. **Linux**: [scripts/linux.sh](../scripts/linux.sh) for arm64 and x64: an AppImage (AppImage's static runtime,
+   `build.toolsets.appimage`: it starts with no libfuse2 or `libz.so`), its smoke test under Xvfb, and the test suite on
+   this Mac's own architecture.
 8. **Commit and tag**: `Release <v>` (only `package.json`, `package-lock.json`, the notes) and the tag `v<v>`, here only.
 9. **Upload**: `SHA256SUMS.txt`, then a draft `v<v>` on the releases repo with the files above and this version's notes.
 10. **Publish** (`scripts/release.sh publish`, yours to run): the tag, the release live, then the tap: `Casks/laki.rb`

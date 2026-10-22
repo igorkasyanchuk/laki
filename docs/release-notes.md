@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Linux: the AppImage starts on a plain Ubuntu, arm64 too: no libfuse2 or zlib1g-dev to install first.
 - Laki runs on Electron 45 (Chromium 156, Node 24.22). Mermaid 12 lays out flowcharts, state, class and ER diagrams
   with ELK; one that says `layout: dagre` keeps the old look.
 - Agents: an agent can't change a project's scripts, env, trust or memory list (it adds to memory with `laki memory

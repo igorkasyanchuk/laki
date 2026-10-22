@@ -158,14 +158,15 @@ pack:linux`: `…-x86_64.AppImage`), then runs the tests and a smoke test agains
 Windows in WSL 2 (its Ubuntu; WSLg shows the window):
 
 ```bash
-sudo apt install libnss3 libasound2t64 libfuse2t64 wslu xdg-utils   # wslu: WSL only, links open in Windows' browser
-chmod +x Laki-*-x86_64.AppImage && ./Laki-*-x86_64.AppImage
+sudo apt install libnss3 libasound2t64 fuse3 wslu xdg-utils   # wslu: WSL only, links open in Windows' browser
+chmod +x Laki-*.AppImage && ./Laki-*.AppImage
 ```
 
 In WSL, add `export BROWSER=wslview` to `~/.bashrc` for those links. Everything runs in Linux there: install your agents
 and `gh` in WSL and sign in there, and keep projects in its own folders (`~/…`, not `/mnt/c`: git is slow across that
 boundary). On a desktop Ubuntu 24.04+, if it stops on the SUID sandbox helper (AppArmor), start it with `--no-sandbox`.
-On arm64 the AppImage's starter also wants `libz.so` (`sudo apt install zlib1g-dev`).
+The AppImage's starter is static: no libfuse2 or zlib1g-dev to install (a plain Ubuntu 24.04 arm64 runs it), and with
+no FUSE at all `--appimage-extract-and-run` runs it.
 
 On a server with no screen, `./Laki-*.AppImage --headless --tailscale` runs Laki for a browser instead of a window:
 [headless.md](headless.md).
