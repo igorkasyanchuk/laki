@@ -1208,13 +1208,13 @@ tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, 
 a method first needs it, a WebSocket's as it opens; `/usr/sbin/lsof` and `/bin/ps` by path: a daemon with no PATH; the
 app's window is Electron's, in no tab; the daemon's own process, `laki serve`'s, is yours) and puts that tab in `from`
 or `caller` over what the env said (`wsNew` and `wsFan`, both `CALLER`: `byCaller`'s `from` is the found agent's workspace,
-else the RPC's if it's a workspace's id, else none; N14: `from: ''` skipped `agentNoCmd`, `cloudCheck` and the agent's
-mark); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
+else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: `from: ''` skipped `agentNoCmd`, `cloudCheck`
+and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
 `answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
-with; an agent adds learned ones, `by` its found tab; `wsFan` checks each preset's `agentNoCmd` before any worktree), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
+with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
 its data) (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;

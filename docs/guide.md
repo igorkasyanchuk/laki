@@ -257,7 +257,7 @@ selected workspace's PR is in the status bar.
   full).
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
-  laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours
+  laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours (not in an agent's tab)
   laki memory rm . <id>                   # a learned one (yours you delete in the app)
   ```
 - ＋ on a project creates a new workspace in it.

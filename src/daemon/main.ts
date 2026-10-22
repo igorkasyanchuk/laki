@@ -223,9 +223,10 @@ const api: Record<string, Handler> = {
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
   tabNew: ({ caller, from, run: _run, hops: _hops, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's
-    if (from || core.agentCaller(caller)) core.agentNoCmd(p) // an agent's: no command of its own
+    const by = core.agentCaller(caller) ?? core.saidFrom(from) // as wsNew's (byCaller)
+    if (by) core.agentNoCmd(p) // an agent's: no command of its own
     // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
-    const t = core.addTab(p.ws, { ...p, agent: core.callerAgent(caller) ?? (from ? 'agent' : core.agentIn(p.agent)) })
+    const t = core.addTab(p.ws, { ...p, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
     return t
   },

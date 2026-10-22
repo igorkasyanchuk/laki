@@ -1963,7 +1963,8 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 // the CLI's laki new: from, the workspace of the agent that ran it (agentCaller); yours in a shell isn't one
 // N14: the caller main.ts found by its process wins over what the RPC says; a from it says (MCP's $LAKI_WORKSPACE) is
 // kept only as a non-blank string ('' would skip every agent check: agentNoCmd, cloudCheck, the agent's mark)
-export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? ((typeof o.from === 'string' && o.from.trim()) || undefined), agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
+export const saidFrom = (v: unknown) => (typeof v === 'string' && v.trim()) || undefined
+export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? saidFrom(o.from), agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {

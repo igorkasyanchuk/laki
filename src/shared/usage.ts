@@ -17,7 +17,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
   laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
-  laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours)
+  laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours, not in an agent's tab)
   laki memory rm <project>|. <id>             forget one agents learned
   laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar, experimental): in 2h, tomorrow at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
