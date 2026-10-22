@@ -4,14 +4,16 @@ One command builds Laki for macOS (Apple silicon and Intel) and Linux (arm64 and
 build, and uploads them as a draft release on the public releases repo,
 [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases) (`build.publish` in `package.json`).
 Nothing goes live until you publish the draft. It costs nothing but the Apple Developer Program. People download it
-from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest).
+from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest), or with Homebrew:
+`brew install --cask igorkasyanchuk/laki/laki` (the tap, [igorkasyanchuk/homebrew-laki](https://github.com/igorkasyanchuk/homebrew-laki),
+follows each publish).
 
 Each time, after Once below (`## Next` written in the notes, Laki.app quit, Docker running, from the main checkout on a
 clean, up-to-date `main`):
 
 ```bash
 npm run release                          # the next minor version: 0.24.0 → 0.25.0, as a draft
-scripts/release.sh publish 0.25.0        # after reading the draft: it goes live
+scripts/release.sh publish 0.25.0        # after reading the draft: it goes live, and the Homebrew tap with it
 git push                                 # the release commit
 ```
 
@@ -66,7 +68,10 @@ The app doesn't check for updates yet; the feeds are there so the first version 
    source stays private): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases), made. Its
    README is what visitors read: the download link (`/releases/latest`) and what Laki needs. Another one:
    `gh repo create <owner>/<repo> --public --add-readme`, and `build.publish` in `package.json`.
-4. **Tools**: an Apple silicon Mac (it builds Intel too, and runs it under Rosetta); `gh auth login`; Docker Desktop running (the Linux builds); Rosetta for the Intel smoke test
+4. **The Homebrew tap**, public, the releases repo's owner's `homebrew-laki` (`TAP` in the script; Homebrew reads
+   `<owner>/laki` as `github.com/<owner>/homebrew-laki`): [igorkasyanchuk/homebrew-laki](https://github.com/igorkasyanchuk/homebrew-laki),
+   made, a README only until the first publish writes `Casks/laki.rb`.
+5. **Tools**: an Apple silicon Mac (it builds Intel too, and runs it under Rosetta); `gh auth login`; Docker Desktop running (the Linux builds); Rosetta for the Intel smoke test
    (`softwareupdate --install-rosetta --agree-to-license`).
 
 No Developer ID yet? `npm run release -- --adhoc` signs as `npm run dmg` does: the release works, but a download
@@ -101,9 +106,10 @@ version's notes.
    double-click.
 5. Publish it, then push `main` (the release commit is on it):
    ```bash
-   scripts/release.sh publish 0.18.0       # pushes the tag v0.18.0, the draft goes live
+   scripts/release.sh publish 0.18.0       # pushes the tag v0.18.0, the draft goes live, the tap's cask follows
    git push
    ```
+   `brew update && brew upgrade --cask laki` (or `brew install --cask igorkasyanchuk/laki/laki`) then gets it.
 
 A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the slow part. Leave `package.json`,
 `package-lock.json` and the release notes alone meanwhile: a run that fails puts all three back as they were.
@@ -126,6 +132,10 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
    the test suite on this Mac's own architecture.
 8. **Commit and tag**: `Release <v>` (only `package.json`, `package-lock.json`, the notes) and the tag `v<v>`, here only.
 9. **Upload**: `SHA256SUMS.txt`, then a draft `v<v>` on the releases repo with the files above and this version's notes.
+10. **Publish** (`scripts/release.sh publish`, yours to run): the tag, the release live, then the tap: `Casks/laki.rb`
+    written through GitHub's API from the release's `SHA256SUMS.txt`, both Macs or, with `--skip=mac-x64`, Apple
+    silicon only (`depends_on arch: :arm64`). A pre-release leaves the tap be. `zap` leaves `~/.laki`: worktrees with
+    work not committed live there.
 
 ## Options
 
@@ -136,12 +146,15 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 | `--adhoc` | no Developer ID: ad-hoc signed, not notarized |
 | `--any-branch` | release from a branch other than `main` |
 | `scripts/release.sh upload <v>` | upload `dist/release/<v>` to its draft again (`--clobber`), e.g. after a failed upload |
-| `scripts/release.sh publish <v>` | push the tag `v<v>`; the draft goes live and, unless it's a pre-release, *latest* |
+| `scripts/release.sh publish <v>` | push the tag `v<v>`; the draft goes live and, unless it's a pre-release, *latest* and the tap's cask |
+| `scripts/release.sh tap <v>` | the tap's cask to a published `v<v>` again, e.g. after a failed bump |
+| `scripts/release.sh cask <v> <SHA256SUMS.txt>` | print the cask it would write (`test/release.test.ts`) |
 
 ## When something fails
 
 - **Before the commit** (checks, a build, a smoke test): the version and notes are back as they were. Fix it, run again.
 - **The upload**: the commit, the tag and the builds are kept. `scripts/release.sh upload <v>`.
+- **The tap**: the release is live anyway. `scripts/release.sh tap <v>`.
 - **Notarization rejected**: `xcrun notarytool history --keychain-profile laki-notary`, then
   `xcrun notarytool log <id> --keychain-profile laki-notary` says which file and why.
 - **A draft you don't want**: `gh release delete v<v> -R igorkasyanchuk/laki-releases --yes`, then `git tag -d v<v>`
@@ -153,5 +166,6 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 
 - The app checking for updates (electron-updater reading the feeds above), and its daemon restarting itself once
   agents are idle.
-- A Homebrew tap, bumped from `SHA256SUMS.txt`.
+- Homebrew's own `homebrew/cask` (`brew install --cask laki`): it takes notable apps only
+  ([Acceptable Casks](https://docs.brew.sh/Acceptable-Casks)); the tap until then.
 - Windows.

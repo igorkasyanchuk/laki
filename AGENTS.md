@@ -46,7 +46,9 @@ npm run dev                       # Electron + renderer dev server on :5199
 - Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release);
   `scripts/release.sh` (`npm run release`, `docs/manual-release.md`) does all of it for macOS arm64/x64 and Linux
   arm64/x64 (Docker), signed and notarized when a Developer ID is in the Keychain (`--adhoc` otherwise), into
-  `dist/release/<v>`, then a draft on `build.publish`'s repo (`upload`, `publish` subcommands). Run it only when the user asks: it uploads.
+  `dist/release/<v>`, then a draft on `build.publish`'s repo (`upload`, `publish` subcommands); `publish` also writes the
+  Homebrew tap's `Casks/laki.rb` (`TAP`, `<owner>/homebrew-laki`, through GitHub's contents API; `tap`, `cask`
+  subcommands; `test/release.test.ts`). Run it only when the user asks: it uploads.
 - Release notes: `docs/release-notes.md`, Settings › Release notes (with `devMode` only, its ⌘K item too; `?raw`, comments stripped). Each user-visible
   addition gets a line under `## Next` (add that heading above the newest version when it isn't there); `npm run dmg`
   stamps it as the version it builds and the date (`scripts/notes.ts`).

@@ -106,7 +106,11 @@ changing it: [AGENTS.md](../AGENTS.md).
 
 Download the dmg for your Mac (Apple silicon or Intel) from
 [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest): it's signed and notarized, so
-a double-click opens it. Drag Laki to Applications.
+a double-click opens it. Drag Laki to Applications. Or with Homebrew:
+
+```bash
+brew install --cask igorkasyanchuk/laki/laki    # brew upgrade --cask laki: each new version
+```
 
 To build it yourself, you need:
 
