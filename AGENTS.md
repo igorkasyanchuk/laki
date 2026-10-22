@@ -1400,7 +1400,7 @@ while shown; Env; Files: `widgetFiles`' texts, editable (`FileView`: ⌘S, Esc, 
 `ExtensionPage`'s, asked before it's lost) through `widgetFileSave` (`path` one of `widgetFiles`' names, `was`: refused
 as "changed since you opened it" unless `force`; JSON parsed first; never a built-in (Remix it), a link or a file over
 64 KB; the studio's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
-widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then Settings.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell, *Edit with Laki AI* (yours), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a built-in's, a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
+widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then SettingsExtensions.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell, *Edit with Laki AI* (yours), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a built-in's, a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
 (links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`
@@ -2232,9 +2232,9 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `{ project, tab? }`: its ⋯ › Settings opens that tab, else the last one, `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
   an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory
   (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
-  agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
+  agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (SettingsProject.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
-- **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size times `settings.pageZoom`
+- **`Settings.tsx`**: the settings page (⌘,; its sections' parts in `SettingsKit.tsx` (`Says`, `Group`, `Scope`), `SettingsAgents.tsx` (AI, Voice, the skill and accounts), `SettingsProject.tsx` (a project's section and the fields the global ones share), `SettingsConnect.tsx` (phone pushes, remote access, simulators), `SettingsResources.tsx` and `SettingsExtensions.tsx`, which it re-exports), autosaved, zoomed by the terminal font size times `settings.pageZoom`
   (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
   preview cancels that); the nav's sections under a head each (`SECTIONS` `group`: Laki, Agents, Connect); each section's settings in
   `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or a new one); `VarChips` under a
