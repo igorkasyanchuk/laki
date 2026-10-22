@@ -778,6 +778,7 @@ test('the view goes out only when it changed: tool calls that keep a tab running
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
   const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.tab(ws.id)).resumeId, 'its SessionStart') // its own hook, else it goes out below
   const app = await connect(rig)
   t.after(() => app.close())
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PreToolUse' } })

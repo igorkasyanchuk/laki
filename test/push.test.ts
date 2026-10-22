@@ -193,9 +193,14 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
   const tab = await rig.tab(ws.id)
   await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
   await rig.rpc('settingsSet', { webhook: { url, format: 'json' } }) // waiting on, done off: the defaults
+  // until this turn's own words are on screen and the status says so: the tab is idle before a 'hi' starts, and a line
+  // typed while the last turn goes on lands in it (its Stop after this one's wait)
   const say = async (text: string, status: string) => {
+    const mark = text === 'ask' ? 'allow? (y/n)' : `answer: ${text}`
+    const seen = async () => (await rig.screen(tab.id)).split(mark).length
+    const was = await seen()
     await rig.rpc('input', { tab: tab.id, data: `${text}\r` })
-    await until(async () => (await rig.tab(ws.id)).status === status, status, 15000) // two hooks, each a node start (the fake waits 3 s for one)
+    await until(async () => (await seen()) > was && (await rig.tab(ws.id)).status === status, status, 15000) // two hooks, each a node start (the fake waits 3 s for one)
   }
   const pushed = (n: number) => until(() => got.length >= n, `push ${n}`)
   const none = () => sleep(1000) // for a push that mustn't come: it would be in by now (a wait's goes 800 ms later, with its menu)

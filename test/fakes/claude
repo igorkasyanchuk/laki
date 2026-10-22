@@ -58,8 +58,9 @@ if (args[0] === '-p') {
 }
 const settings = JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8'))
 const hook = (ev, payload) => {
-  const cmd = settings.hooks[ev][0].hooks[0].command
-  try { execSync(cmd, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: 3000 }) } catch {}
+  const h = settings.hooks[ev][0].hooks[0]
+  // as long as its settings say, as the real one waits (a hook 3-5 s on a busy machine: killed, its state lost)
+  try { execSync(h.command, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: (h.timeout ?? 60) * 1000 }) } catch {}
 }
 const ri = args.indexOf('--resume')
 const session = ri >= 0 && !args.includes('--fork-session') ? args[ri + 1] : 'sess-' + Math.random().toString(36).slice(2, 8)
