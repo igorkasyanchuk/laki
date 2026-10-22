@@ -268,7 +268,7 @@ const wsName = (w: { id: string; name?: string }) => w.name || w.id
 // fills a sixth per digit, the PIN in six boxes over one input (paste, one-time-code autofill), sent as the sixth digit
 // is typed; a wrong one shakes them, a right one turns the ring green with a check while the socket opens. Unlock is
 // always a button: short of six digits it says so
-const PIN_LEN = 6 // core.ts' remote PIN
+const PIN_LEN = 6 // remote.ts' PIN
 function PinForm({ left }: { left?: number }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')

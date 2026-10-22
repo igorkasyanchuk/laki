@@ -46,7 +46,7 @@ export const neverAsks = (agent?: string, perm?: string, args?: string) => {
 // fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
 export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
 // API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a
-// transcript's model (claude's message.model, codex's turn_context) prices a tab's tokens (core.ts' meters).
+// transcript's model (claude's message.model, codex's turn_context) prices a tab's tokens (meters.ts).
 // ponytail: dated 2026-10, edited by hand; a long prompt's higher rate, 1-hour cache writes, fast mode and batch left
 // out; a model not here: tokens only
 export const PRICES: [RegExp, [input: number, output: number, write: number, read: number]][] = [
@@ -706,7 +706,7 @@ export type PR = {
 export type Ask = { options: { n: number; label: string }[]; at: number }
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: core.ts' meters)
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -803,7 +803,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
 export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today } // built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
-// today's tokens and ≈ cost at API prices (core.ts' meters, <data>/usage-today.json), the workspaces that used most first
+// today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
 // specs and brainstorms (settings.specs, specsOn; daemon/plans.ts): a folder each, outside the repo. files: how

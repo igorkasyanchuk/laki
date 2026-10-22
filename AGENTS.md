@@ -477,7 +477,7 @@ again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't 
 
 ### Sleep
 
-`core.ts` `sleepTick`: an idle claude or codex tab (`sleepy`: `cantSleep` says nothing, no attached client, idle
+`resources.ts` `sleepTick`: an idle claude or codex tab (`sleepy`: `cantSleep` says nothing, no attached client, idle
 `settings.sleepAfter` minutes (unset: `SLEEP_AFTER`, 480; 0: never) by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
 listening ports (`procs`) in its tree) is put to sleep: `asleep` (in memory) and `Session.end`, which SIGHUPs the job
 (SIGKILL 5 s later if it's still there) but keeps the screen, the clients and a note instead of the exit line; `onExit`
@@ -574,7 +574,7 @@ read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: tru
 ### SSH hosts
 
 A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: a `~/.ssh/config` name or
-`user@host`; `hostProjectAdd`) is a folder on that machine; its workspaces copy `host`. `core.ts`' SSH hosts section:
+`user@host`; `hostProjectAdd`) is a folder on that machine; its workspaces copy `host`. `hosts.ts`' SSH hosts section:
 
 - One connection per host (`hostUp`, `connect`): a ControlMaster the daemon spawns (`-M -N`, socket at
   `<data>/ssh/<hash>`, `BatchMode`: keys or agent, no prompts; a failure stands 10 s), then `$HOME` and the login
@@ -610,7 +610,7 @@ A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: 
   ssh line): `<data>/ssh/codespaces/*` first (ssh takes an option's first value: a `Host *` of yours never wins over a
   codespace's own; they name only `laki-cs-*`), then `Include ~/.ssh/config`, `/etc/ssh/ssh_config` (-F reads neither),
   so plain hosts read as before.
-- Cloud workspaces (experimental, `settings.cloud`; `core.ts`' section, `daemon/codespace.ts`: gh on this Mac): a
+- Cloud workspaces (experimental, `settings.cloud`; `hosts.ts`' cloud section, `daemon/codespace.ts`: gh on this Mac): a
   workspace of a local GitHub project (`origin`, `ghRepo`) with a host of its own, `codespace` its codespace's name ('' while
   made), `csState` (gh's word; `Creating`, `Failed` with `csError`). `wsNew` `codespace` (a machine type, '': the repo's
   first; `cloudCheck`: the setting, not an agent's (`from`: GitHub bills it), not a host's or a folder's, not Local, a
@@ -760,7 +760,7 @@ PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's 
 
 ### Tunnels
 
-Expose to the world (`core.ts` `tunnelStart`): `cloudflared tunnel --url http://localhost:<port>
+Expose to the world (`remote.ts` `tunnelStart`): `cloudflared tunnel --url http://localhost:<port>
 [--allowed-mail=<m>…]`, a Cloudflare Quick Tunnel; the URL is the first `https://<name>.trycloudflare.com` in its
 output that isn't `login.`. No emails: public, anyone with the link (the popup's default). Emails need
 cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels live in the daemon's memory (`tunnels`, in `WorkspaceView.tunnels`): stopped by
@@ -769,7 +769,7 @@ Every `publisher` child (cloudflared, tailscale serve or funnel) is in `<data>/c
 binary, tailscale's `off` args) while it runs; `reapChildren`, as a daemon starts, SIGTERMs those still running with the
 same start time and command (a crash or a kill -9 left them) and turns a tailscale one off (L14). One per workspace and port.
 
-Shared tabs (`core.ts` `shareStart`, `daemon/share.ts`; the app's *Share live view…*, *Shared live view* once on): a tab as a view-only page at `<tunnel>/s/<uuid>`. The pages
+Shared tabs (`remote.ts` `shareStart`, `daemon/share.ts`; the app's *Share live view…*, *Shared live view* once on): a tab as a view-only page at `<tunnel>/s/<uuid>`. The pages
 have their own `node:http` server on 127.0.0.1 (`shareServe`: `/s/<id>`, `.md` (`?download`), `.json?v=`; anything
 else 404), so the one tunnel (`cloudflare`, no mails, Resources' `share`) never reaches the daemon's API; both start
 with the first share and stop with the last (`stopShares`: a tab, a workspace's teardown, a closed tab, Resources,
@@ -787,7 +787,7 @@ Tested in `test/share.test.ts`.
 
 ### Remote access
 
-`core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
+`remote.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*
 typed, in a red box; `view.remote.open`, a red status bar badge: the token is then the only lock), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`; open: 24 at most, never 0). Each start makes a
@@ -834,7 +834,7 @@ Docker: `scripts/linux.sh`'s image without Xvfb). It passes `LAKI_HEADLESS_PAREN
 
 ### Scheduled tasks
 
-`core.ts` `scheduleSet`, `scheduleTick` (every 30 s), `runSchedule`; the rule comes from `shared/when.ts` `parseWhen`
+`schedule.ts` `scheduleSet`, `scheduleTick` (every 30 s), `runSchedule`; the rule comes from `shared/when.ts` `parseWhen`
 (a line of English to days of the week and minutes after midnight, in the Mac's time zone; `once` for
 `once`/`tomorrow`), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
 dates (only braces of date tokens, any of them in any order; `MM` right after an hour is the minutes) in the name and
@@ -1781,7 +1781,7 @@ below it at the last reading (`limitsSeen`; none, as the app opens: past it coun
 the agent has several; a toast, and a notification unless the window has the focus or `notify` is false. ponytail: only
 while the app is open with the ring on screen (not a Browsers page); the daemon doesn't watch usage itself.
 
-Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
+Phone pushes are the daemon's (`push.ts`, `phone.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
 `format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
 later with `askOf`'s choices as lines (JSON: `options`; `webhook.detail` `titles`: `pushRequest` drops the question,
@@ -1847,7 +1847,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 
 ### Meters
 
-A claude or codex tab's context and what its chat used (`core.ts` `meterTick`, every 10 s, `LAKI_METER_MS`: tests'; and
+A claude or codex tab's context and what its chat used (`meters.ts` `meterTick`, every 10 s, `LAKI_METER_MS`: tests'; and
 1 s after a turn's end; both settings off: the tick reads none; an archived workspace's tabs skipped): each tab's transcript read on by `tailOf` (a `MeterRun` per tab:
 its file, `pos`; another chat's file, a /clear: none until this one's), parsed by `share.ts` `meterOf` (only lines that
 name `"usage"`, `token_count` or `turn_context`). Claude: an answer's lines share a `message.id`, the last one's usage
@@ -2427,7 +2427,16 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES` |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), shotKey and onAiShot (Screenshot to Laki AI's keys; the AI window's picture), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
-| `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
+| `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, run, ship, archive/fork, view; it re-exports the modules below, so `core.X` reaches them (main.ts' `api`), and none of them reads a value of core's as it loads (core loads after them) |
+| `src/daemon/hosts.ts` | SSH hosts (one ssh connection per host, `exec`/`sshIn` there, a tab's ssh) and cloud workspaces |
+| `src/daemon/pr.ts` | branches followed, PR scans, `autoPR` and the PR switches' messages, merge when green, the side panel's PR calls |
+| `src/daemon/files.ts` | the diff against the base and its size, Changes' revert and redo, the side panel's files |
+| `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
+| `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
+| `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links kept as `.url` files |
+| `src/daemon/meters.ts` | transcripts read as they grow: the context and usage meters, today's spend |
+| `src/daemon/phone.ts` | phone pushes and the taps that answer them |
+| `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
@@ -2466,7 +2475,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/device.ts` | laki screen's device ops: the iOS Simulator's and apps' windows' screenshots (in points), the simulator's taps, swipes, typing and elements through idb |
 | `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall; a list: no
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
-| `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
+| `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc`; the daemon's `readJson`, `writeAtomic` (a temp file, then a rename) and `move` (across volumes too) |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |
 | `src/shared/keys.ts` | Settings › Keys: `KEYS` (the rebindable actions, their defaults), `keyLabel`, `keyMap`, `keyFor`, `keyClash` (another action, `others`, `FIXED`, ⌃ alone), `keyShow`; App's, main's menu's, Help's |

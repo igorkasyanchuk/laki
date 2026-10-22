@@ -1,4 +1,4 @@
-// Shared tabs (core.ts' shareStart, daemon/share.ts): a tab as a read-only page at a quick tunnel's /s/<uuid>, an agent's
+// Shared tabs (remote.ts' shareStart, daemon/share.ts): a tab as a read-only page at a quick tunnel's /s/<uuid>, an agent's
 // chat from its transcript (claude's, codex's) or the terminal's text; kept up to date; its own server, never the API.
 import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'

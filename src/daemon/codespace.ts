@@ -1,4 +1,4 @@
-// GitHub Codespaces through gh on this Mac (cloud workspaces, core.ts' section of that name): make, wait, start, stop,
+// GitHub Codespaces through gh on this Mac (cloud workspaces, hosts.ts' section of that name): make, wait, start, stop,
 // delete, list, the machine types. Each one's ssh Host entry (gh codespace ssh --config, under Laki's own name for it)
 // is a file in <data>/ssh/codespaces, which <data>/ssh/config includes before your own ~/.ssh/config: Laki's ssh calls
 // take -F with it once it's there (sshF), so plain hosts read as they did

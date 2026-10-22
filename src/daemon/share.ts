@@ -1,4 +1,4 @@
-// A shared tab (core.ts' shareStart, the app's Share live view): a view-only page anyone with its link opens, kept up to date. Here: what it
+// A shared tab (remote.ts' shareStart, the app's Share live view): a view-only page anyone with its link opens, kept up to date. Here: what it
 // shows, as Markdown (Copy, Download) and as the page. An agent's chat from its transcript (claude's, codex's): your
 // prompts, its answers, its tool calls a line each; anything else (a shell, gemini…): the terminal's text.
 import { existsSync, readdirSync } from 'node:fs'
@@ -77,7 +77,7 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
   return out
 }
 
-// what a chat used, from its transcript read on (core.ts' meters; onto m, what its earlier lines said): used, what its
+// what a chat used, from its transcript read on (meters.ts; onto m, what its earlier lines said): used, what its
 // context holds now (claude: the last answer's prompt, its cache's too; codex: its last token_count's) of max (codex's
 // window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) and their
 // cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day)

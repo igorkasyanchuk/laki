@@ -1487,7 +1487,7 @@ export function flowResume() {
 
 export const flowStopAll = () => [...new Set([...procs.keys(), ...calls.keys()])].forEach(id => kill0({ id } as FlowRun)) // shutdown
 
-// a scheduled task's workflow (core.ts' runSchedule): its run, through this file
+// a scheduled task's workflow (schedule.ts' runSchedule): its run, through this file
 flowHooks.start = o => flowStart(o)
 
 // on: <event>: the event starts a run of each workflow that waits for it, in the event's workspace's project (a

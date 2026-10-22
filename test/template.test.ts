@@ -46,8 +46,8 @@ test('tunnel emails: whole domains by *@, @ or a bare name; what the daemons tak
   for (const m of ['me@gmail.com', '*@team.dev', '*@notgmail.com', '*@gmail.com.evil.dev', '*@mail.ru.dev']) assert.equal(webmail(m), undefined, m)
   for (const m of ['me*@x.dev', '*@*.x.dev', '*@localhost', 'a@b.dev,c@d.dev', '@x.dev', 'nope']) assert.ok(!MAIL_OK.test(m), m)
   // the daemon's own check is the same pattern
-  const core = (await import('node:fs')).readFileSync(new URL('../src/daemon/core.ts', import.meta.url), 'utf8')
-  assert.ok(core.includes(`const MAIL = /${MAIL_OK.source}/`), 'core.ts MAIL differs from text.ts MAIL_OK')
+  const remote = (await import('node:fs')).readFileSync(new URL('../src/daemon/remote.ts', import.meta.url), 'utf8')
+  assert.ok(remote.includes(`const MAIL = /${MAIL_OK.source}/`), 'remote.ts MAIL differs from text.ts MAIL_OK')
 })
 
 test('themes: unique ids, and every look has rules in look.css', async () => {

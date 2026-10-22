@@ -1,4 +1,4 @@
-// The meters (core.ts' meterTick, share.ts' meterOf): each claude and codex tab's context, from its transcript read on as
+// The meters (meters.ts' meterTick, share.ts' meterOf): each claude and codex tab's context, from its transcript read on as
 // it grows, and what its chat used, tokens and ≈ cost by shared/types.ts' PRICES; today's kept in usage-today.json.
 import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
