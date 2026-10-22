@@ -311,7 +311,8 @@ its input; `run` is its command, as a plain action's string is:
   Laki AI calls them too. A per-workspace one runs in the caller's workspace. Only extensions that are on have tools.
 - An agent can't go around the ask: `laki widget action` run in an agent's tab goes through the tool's ask (any other
   action asks you each time, no *Always*), `laki widget on` from one is refused (only you turn an extension on), and
-  `laki widget dev` from one links the folder but leaves its extensions off.
+  `laki widget dev` from one links the folder but leaves its extensions off, and is refused when the folder has the id of
+  one you have (it would share its settings and secrets).
 - Each call is a run (reason `tool:<action>`, who called it and how it was allowed) in its page's Runs.
 
 The *A tool for agents* starter (`laki widget new Notes --kind tool`) is one: an `add` tool that keeps notes you see.

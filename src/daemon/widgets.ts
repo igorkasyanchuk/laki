@@ -2602,6 +2602,12 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
   if (!o.folder || !found.length) throw new Error(`${folder} has no widget.json, nor folders with one`)
   const bad = found.map(x => [pathOf(x), x.file ? oneFile(x.d, x.file) : manifestOf(x.d)] as const).filter(([, m]) => typeof m === 'string')
   const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you look at them, then off again as they change (N10; one that shadows an installed one too: they share its store); yours makes it yours again
+  if (agent) {
+    // over one you have installed it would share its store and secrets: refused; the others off before the scan, so none starts
+    const yours = found.map(x => widgets.get(idOf(x))).find(w => w && !w.dev)
+    if (yours) throw new Error(`${folder} has ${yours.id}: it would cover your ${yours.m.name || yours.id} (its settings and secrets). Pick another id`)
+    for (const x of found) if (statOf(storePath(idOf(x)))) writeStore(idOf(x), { ...readStore(idOf(x)), on: false })
+  }
   const marks = agentRoots().filter(r => r !== folder)
   settingsSet({ widgetDev: [...new Set([...devRoots(), folder])], widgetDevAgent: agent ? [...marks, folder] : marks }, true) // scans: its widgets first, watched
   const mine = [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder))

@@ -226,3 +226,38 @@ test("an agent's extensions: new and restored off; a folder it links trusted as 
   for (const sub of ['ls', 'kit', 'check', 'what', 'logs']) assert.ok(head.includes(` widget ${sub}:*)`), sub)
   for (const sub of ['new', 'dev', 'set', 'on', 'push', 'action', 'tool', 'restore']) assert.ok(!head.includes(` widget ${sub}:*)`), sub)
 })
+
+// #10: an agent's link of a folder with the id of one you have on, a stream, started its command with your secrets as the
+// rescan ran, before widgetDev turned it off: refused now; a new id's store is written off before the scan, so none starts
+test("#10: an agent's dev link over an installed id is refused, nothing starts; a new id's comes in off, nothing run", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const from = { ws: ws.id, tab: ((await until(() => rig.tab(ws.id), 'its agent')) as any).id }
+  const app = await rig.connect() // a window shown: streams start only then
+  t.after(() => app.close())
+  await app.call('view', { tab: null, focused: true, shown: true })
+  const inst = join(rig.data, 'widgets', 'feed')
+  mkdirSync(inst, { recursive: true })
+  writeFileSync(join(inst, 'widget.json'), JSON.stringify({ name: 'Feed', fetch: 'echo {}' }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'feed', on: true })
+  const ran = join(rig.home, 'ran')
+  const code = join(rig.home, 'agent-code')
+  for (const id of ['feed', 'other']) {
+    mkdirSync(join(code, id), { recursive: true })
+    writeFileSync(join(code, id, 'widget.json'), JSON.stringify({ name: `Agent ${id}`, stream: true, fetch: `touch "${ran}-${id}"; echo '{}'; sleep 30` }))
+  }
+  await assert.rejects(rig.rpc('widgetDev', { folder: code, from }), /has feed: it would cover your Feed \(its settings and secrets\)/)
+  await sleep(600)
+  assert.deepEqual([existsSync(`${ran}-feed`), existsSync(`${ran}-other`)], [false, false])
+  assert.equal((await find(rig, 'feed')).name, 'Feed')
+  assert.deepEqual((await rig.rpc('widgetDev', { list: true })).links, [])
+  // without it: a new id, whose store says on (one you had once), comes in off
+  rmSync(join(code, 'feed'), { recursive: true })
+  writeFileSync(join(rig.data, 'widget-data', 'other.json'), JSON.stringify({ on: true }))
+  const r = await rig.rpc('widgetDev', { folder: code, from })
+  assert.match(r.note, /linked, off/)
+  await sleep(600)
+  assert.deepEqual([(await find(rig, 'other')).on, existsSync(`${ran}-other`)], [false, false])
+})

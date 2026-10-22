@@ -1363,7 +1363,7 @@ as JSON (the icon element, a button, the rail); the CLI's `laki widget kit icons
 Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widgetRuns` every 500 ms, a line per new run
 and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT`; `settingsSet` rescans as it changes,
 like `widgetDirs`), `devRoots` first in `widgetRoots` (a dev copy shadows the installed one of its id, sharing its
-store), linking turns its widgets on and fetches them (`dev`, why `linked`). An agent's link (N10, `agentCaller`):
+store), linking turns its widgets on and fetches them (`dev`, why `linked`). An agent's link (N10, `agentCaller`; a folder with an id you have installed outside dev refused, *it would cover your …*, its other ids' stores written off before the scan):
 `settings.widgetDevAgent` (`SETTINGS_KEPT`; only `widgetDev` writes it: `settingsSet` `own`), its widgets off and an
 `Entry`'s `agentDev` (the nearest linked folder's: yours inside an agent's stays yours), trusted as a repo's (`guarded`: on
 only with `seen`, `trusted`/`files` over every file of its folder (no git listing, whose .gitignore it writes; hidden ones

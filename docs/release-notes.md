@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's `laki widget dev` can't link a folder with the id of an extension you have: it would share its settings
+  and secrets. Its other extensions come in off before anything runs.
 - `laki widget restore` from an agent says the extension came back off, as `laki widget new` does.
 - Extensions: an agent can't change a setting an extension's source or AI prompt reads (`{{config.x}}`): it would
   steer what runs with your tools. Plain settings still change.
