@@ -3,11 +3,16 @@
 One command builds Laki for macOS (Apple silicon and Intel) and Linux (arm64 and x64), tests and smoke-tests each
 build, and uploads them as a draft release on the public releases repo,
 [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases) (`build.publish` in `package.json`).
-Nothing goes live until you publish the draft. It costs nothing but the Apple Developer Program.
+Nothing goes live until you publish the draft. It costs nothing but the Apple Developer Program. People download it
+from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest).
+
+Each time, after Once below (`## Next` written in the notes, Laki.app quit, Docker running, from the main checkout on a
+clean, up-to-date `main`):
 
 ```bash
-npm run release                          # the next minor version: 0.17.0 → 0.18.0
-scripts/release.sh publish 0.18.0        # after reading the draft: it goes live
+npm run release                          # the next minor version: 0.24.0 → 0.25.0, as a draft
+scripts/release.sh publish 0.25.0        # after reading the draft: it goes live
+git push                                 # the release commit
 ```
 
 [docs/release.md](release.md) is the checklist behind it; `npm run dmg` still makes a quick local dmg, ad-hoc, uploaded
@@ -57,10 +62,10 @@ The app doesn't check for updates yet; the feeds are there so the first version 
    ```
    Check with `xcrun notarytool history --keychain-profile laki-notary` (*No submission history* is fine).
    Another profile name: `APPLE_KEYCHAIN_PROFILE=<name> npm run release`.
-3. **The releases repo**, public (an updater can't read a private repo's releases without a token inside the app):
-   ```bash
-   gh repo create igorkasyanchuk/laki-releases --public --add-readme --description "Laki's releases"
-   ```
+3. **The releases repo**, public (an updater can't read a private repo's releases without a token inside the app; the
+   source stays private): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases), made. Its
+   README is what visitors read: the download link (`/releases/latest`) and what Laki needs. Another one:
+   `gh repo create <owner>/<repo> --public --add-readme`, and `build.publish` in `package.json`.
 4. **Tools**: an Apple silicon Mac (it builds Intel too, and runs it under Rosetta); `gh auth login`; Docker Desktop running (the Linux builds); Rosetta for the Intel smoke test
    (`softwareupdate --install-rosetta --agree-to-license`).
 
@@ -85,7 +90,8 @@ version's notes.
    it: it becomes the version's heading, the GitHub release's text and Settings › Release notes.
 2. Quit Laki.app (⌘Q). Its daemon and your agents keep running; the smoke test opens the packaged app, and a running
    Laki holds the single-instance lock.
-3. Run it on a clean, up-to-date `main`:
+3. Start Docker Desktop (the Linux builds; or `--skip=linux-arm64,linux-x64`). Run it from the main checkout on a
+   clean, up-to-date `main`:
    ```bash
    npm run release                         # minor
    npm run release -- patch                # or major, or a version: 1.0.0

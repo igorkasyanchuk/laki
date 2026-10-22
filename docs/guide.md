@@ -104,7 +104,11 @@ changing it: [AGENTS.md](../AGENTS.md).
 
 ## Install
 
-You need:
+Download the dmg for your Mac (Apple silicon or Intel) from
+[the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest): it's signed and notarized, so
+a double-click opens it. Drag Laki to Applications.
+
+To build it yourself, you need:
 
 - macOS on Apple silicon or Intel
 - Node 22.6+ (23 recommended) and npm
@@ -126,7 +130,7 @@ Intel. Open it from there, or copy it to /Applications:
 open "dist/mac-arm64/Laki.app"   # Intel: dist/mac/Laki.app
 ```
 
-A downloaded copy (a dmg sent over Slack, mail, a browser) is quarantined: the first open says Apple could not
+A copy of such a build sent elsewhere (a dmg over Slack, mail, a browser) is quarantined: the first open says Apple could not
 verify Laki. Click Done, then System Settings › Privacy & Security › *Open Anyway* (once). Or in Terminal:
 
 ```bash
@@ -2019,7 +2023,7 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 
 ## Known limits
 
-- **Build**: ad-hoc signed, not notarized (the first open of a download needs *Open Anyway*), one architecture per build (no universal app), no auto-update. The app is ~290 MB and uses ~500 MB of memory.
+- **Build**: a release is signed and notarized; one built here is ad-hoc signed, not notarized (the first open of a copy sent elsewhere needs *Open Anyway*); one architecture per build (no universal app), no auto-update. The app is ~290 MB and uses ~500 MB of memory.
 - **Startup**: when the daemon starts, every tab of every workspace starts (agents resume). After a reboot that can mean many agents at once.
 - **Daemon**: if it dies, its terminals end. Agents come back resumed. Shells start fresh, without what ran in them (a stop brings that back too, see Updating).
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).

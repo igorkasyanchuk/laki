@@ -53,8 +53,9 @@ npm run dev                       # Electron + renderer dev server on :5199
 - Signing: the app is ad-hoc signed (`build.mac.identity: "-"`, `hardenedRuntime: false`), not notarized. Keep it:
   with `identity: null` (unsigned) a downloaded dmg (Slack, mail, a browser) says *"Laki" is damaged* on other Macs;
   ad-hoc, it says Apple could not verify it, and System Settings › Privacy & Security › *Open Anyway* opens it.
-  `codesign --verify --deep --strict` on the built app must pass. A plain double-click everywhere needs a Developer ID
-  and notarization.
+  `codesign --verify --deep --strict` on the built app must pass. `npm run release` overrides it with the Developer ID
+  in the Keychain (`Igor Kasyanchuk (VV2UN2324U)`), the hardened runtime and notarization (`laki-notary`): what goes to
+  `igorkasyanchuk/laki-releases`, a plain double-click everywhere.
 - Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, so another
   program can't run its code as Laki (and borrow its privacy grants); `runAsNode` stays (the daemon, the CLI, hooks, MCP,
   widget scripts and `--headless` run through `ELECTRON_RUN_AS_NODE`), and the asar ones (asar is off). Cookie encryption
