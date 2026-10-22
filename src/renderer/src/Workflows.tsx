@@ -1201,7 +1201,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           <Typed list="wf-events" placeholder="only when you start it (or an event: pr.merged, custom.deploy…)" value={wf.on ?? ''} onText={v => edit(w => void (w.on = v.trim() || undefined))} />
           <datalist id="wf-events">{[...WIDGET_EVENTS, 'custom.*'].map(e => <option key={e} value={e} />)}</datalist>
         </div>
-        {wf.on && (
+        {(!!wf.on || !!wf.when?.length) && ( // tests left without on: still show, to remove (check says so)
           <div className="wf-field">
             <label>Only when</label>
             {(wf.when ?? []).map((t, i) => (
@@ -2089,13 +2089,13 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
   const [last, setLast] = useState<Tried['last']>()
   const evWs = ev === 'sample' ? fixed || ws : ''
   const ask = (use: 'last' | 'sample') => ({ id: item.id, source: item.source, project, use, ...(evWs && { ws: evWs }), editor: true })
-  useEffect(() => void (item.on && api.call<Tried>('flowEvent', { id: item.id, source: item.source, project, use: 'sample' }).then(t => setLast(t.last), () => {})), [])
+  useEffect(() => void (item.on && api.call<Tried>('flowEvent', { id: item.id, source: item.source, project, use: 'sample' }).then(t => (setLast(t.last), !t.last && setEv(e => (e === 'last' ? '' : e))), () => {})), [project]) // the project's last one
   useEffect(() => void (ev ? api.call<Tried>('flowEvent', ask(ev)).then(t => (setTried(t), setErr('')), e => (setTried(null), setErr((e as Error).message))) : setTried(null)), [ev, evWs, project])
   const go = () => {
     setBusy(true)
     setErr('')
     if (ev)
-      return void api.call<Tried>('flowEvent', { ...ask(ev), go: true, dry, budget }).then(
+      return void api.call<Tried>('flowEvent', { ...ask(ev), go: true, dry, budget, ...(inputs.length && { inputs: vals }) }).then(
         r => onStarted(r.run!),
         e => (setBusy(false), setErr((e as Error).message)),
       )
@@ -2207,7 +2207,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || !!badBudget || (ev ? !tried?.start : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || !!badBudget || (ev ? !tried?.start || missing : (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws))}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>

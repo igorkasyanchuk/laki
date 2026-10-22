@@ -1104,7 +1104,7 @@ written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default a
 `inputs.x` not declared): `flowStart` `inputs` through `inputVals` (defaults, a needed one, a number, a choice; a name it
 doesn't have refused) into `r.vars['inputs.<name>']` (an optional one not given: ''), `flowVars` lists them; StartRun a
 field each (a branch's from `branches`), the CLI's repeated `--set name=value` (`sets`), MCP's `laki_workflow_run`
-`inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks), and a `runs in: here` one. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+`inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks), and a `runs in: here` one. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan; only one asked for after the block was entered, `looked`: the scan before may miss the push its block before made), a failure on a head
 already reported waits for a new one; on a fail `waitTick` sets `output` and `head`, then (`logging`: one per run, no
 tick meanwhile) core's `ciLogs` (prFix's loop: each failing check's `## name` and link, `failedLog` of the first 3 with
 a job, `fenced` and said to be untrusted; the scan's check `url` is its detailsUrl, so no `gh pr checks`) into
@@ -1162,7 +1162,7 @@ field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete* (no as
 the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
 entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts`.
-Events (`eventHooks.flows`, after the setting): `heard` keeps each project's newest payload of each event, `lastEvents`
+Events (`eventHooks.flows`, after the setting): `heard` keeps each project's newest payload of each event (`HEARD_MAX` 200, the oldest go), `lastEvents`
 each workflow's last `FLOW_HEARD` (5) outcomes (`FlowHeard`: at, event, ws, run or why; the item's `events`, its settings'
 *Last 5 events*), in memory (`note`, and `refused`'s skip, bump `flowFiles.heard`: the view's `flowHeard`, the page's). `fromEvent(wf, name, payload, ws, o)`, one path for a real
 event and a try: the project's file read again, no workspace, problems, `byAgent` and `untrusted` (both unless `editor`;
@@ -1171,7 +1171,7 @@ live run per workspace, `here`'s live workspace; its start (`trigger` `event <na
 `agent`) or why. `flowEvent` (`event`, else its `on:`, `custom.*`'s `custom.test`; `payload` (an object, 64 KB), else
 the last one heard (`use: 'sample'` skips it), else `sampleOf` (`SAMPLE_EVENTS`, core's fields on a made-up PR and
 workspace), `ws`: the workspace you picked as its `ws` (`eventWs`)): `from`, `last`, `payload`, `vars`, each `when`
-test's `ok`, `start`, `why`; `go` starts it (`dry`), `run` its id. main.ts makes an agent's CLI `by: 'agent'`, `editor`
+test's `ok`, `start`, `why`; `go` starts it (`dry`, `inputs`: its Start's, as Run's sheet and `--set` give them), `run` its id. main.ts makes an agent's CLI `by: 'agent'`, `editor`
 false and its `agent`; `flowStart` takes `editor` with `event` past an untrusted one. StartRun's *As if on an event*
 (`Tried`), the CLI's `--event [<name>] [--event-json <file|->]`.
 Budget (`budget: 60 min, $5`, `budgetOf`/`budgetText`, either part; a bad one a parse problem, `check` a bad object):

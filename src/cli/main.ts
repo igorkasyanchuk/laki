@@ -453,12 +453,13 @@ async function main() {
         if (flags.ws === '.' && !ws) throw new Error("--ws .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace")
         const named = !ws || ((await rpc('state')) as View).projects.some(p => p.id === words[0] || p.name === words[0])
         const [project, ...task] = named ? words : [undefined, ...words]
+        const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), '']))) // --set: its Start's inputs
         if (flags.event || flags['event-json']) {
           // as if on an event: its name (else its on:), the payload from a file or stdin (else the last one heard, else a sample)
           if (!id) throw new Error('usage: laki flow run <workflow> [project] --event [<name>] [--event-json <file|->] [--ws <ws|.>] [--dry]')
           const file = flags['event-json']
           const payload = typeof file === 'string' ? JSON.parse(file === '-' ? readFileSync(0, 'utf8') : readFileSync(file, 'utf8')) : undefined
-          const ask = { id, project, ws, ...(typeof flags.event === 'string' && { event: flags.event }), ...(payload && { payload }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), caller: caller() }
+          const ask = { id, project, ws, ...(typeof flags.event === 'string' && { event: flags.event }), ...(payload && { payload }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), ...(sets.length && { inputs }), caller: caller() }
           type Tried = { name: string; from: string; vars: Record<string, string>; when: { test: string; ok: boolean }[]; start: boolean; why?: string; run?: string }
           const said = (t: Tried) => [`${t.name} (${t.from === 'last' ? 'the last one heard' : t.from === 'given' ? 'yours' : 'a sample'})`, ...Object.entries(t.vars).map(([k, v]) => `  {{${k}}} ${v.length > 120 ? `${v.slice(0, 120)}…` : v}`), ...t.when.map(w => `${w.ok ? '✓' : '✗'} only when: ${w.test}`), t.start ? 'it starts' : `it doesn't start: ${t.why}`].join('\n')
           if (flags.dry) {
@@ -471,7 +472,6 @@ async function main() {
           return out(r, `${r.run}  on ${r.name}`)
         }
         if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | --event [<name>] [--event-json <file|->]')
-        const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
         const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }), ...(typeof flags.budget === 'string' && { budget: flags.budget }), caller: caller() }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }

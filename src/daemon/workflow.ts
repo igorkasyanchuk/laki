@@ -463,7 +463,7 @@ export async function flowStart(o: Start) {
   const ahead = runs().filter(r => r.status === 'queued' && runOf(r, wf)).length
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
-  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, ...flow } = wf
+  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, stats: _t, events: _e, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
   if (budget) (r.budget = { ...budget }), (r.flow.budget = { ...budget }) // the run's copy: Give it more raises it by half of this
@@ -623,8 +623,7 @@ async function work(r: FlowRun, b: Block) {
     case 'wait':
       r.wait = { kind: 'wait' }
       touch()
-      void scanPRs() // its state now, not at the minute's scan
-      return waitTick(r, b, Date.now())
+      return waitTick(r, b, Date.now()) // it asks for a scan: its state now, not at the minute's
     case 'save':
       return keep(r, b, vars)
     case 'extension':
@@ -1178,11 +1177,22 @@ async function act(r: FlowRun, b: Block) {
 // sends them), one fetch per run at a time (logging): no tick reads the checks meanwhile. ponytail: up to 3 logs of 30 s
 // each, so the fail way can be 90 s behind the scan
 const logging = new Set<string>()
+// it decides only on a scan asked for after it was entered (looked: when that scan was asked, by run): the one before
+// may not have the push its block before just made, and would fail it again on the old commit (fix CI's loop)
+const looked = new Map<string, number>()
+const looking = new Set<string>()
 function waitTick(r: FlowRun, b: Block, now: number) {
   const ws = wsOf(r)
   if (r.dry) return leave(r, b, 'pass', 'dry run: taken as passed')
   if (logging.has(r.id)) return
   if (now - (r.at ?? now) > (b.timeout ?? WAIT_TIMEOUT) * 60000) return leave(r, b, 'fail', `nothing after ${b.timeout ?? WAIT_TIMEOUT} min`)
+  if ((looked.get(r.id) ?? 0) < (r.at ?? 0)) {
+    if (looking.has(r.id)) return
+    looking.add(r.id)
+    const asked = Date.now()
+    const done = () => (looking.delete(r.id), looked.set(r.id, asked), live(r) && r.cur === b.id && r.wait?.kind === 'wait' && r.status === 'running' && waitTick(r, b, Date.now()))
+    return void scanPRs().then(done, done)
+  }
   const pr = ws && prOf(ws.id)
   if (!pr) return
   const seen = r.vars[`steps.${b.id}.head`]
@@ -1314,6 +1324,7 @@ function tryAgain(r: FlowRun, b: Block) {
 
 function kill0(r: FlowRun) {
   quiet.delete(r.id)
+  looked.delete(r.id)
   const c = procs.get(r.id)
   procs.delete(r.id)
   if (c) kill(c)
@@ -1547,6 +1558,7 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
 // heard since Laki started (ponytail: in memory, a restart forgets them): the newest payload of each event per project
 // (flowEvent's "the last one"), and each workflow's last FLOW_HEARD outcomes (its settings' Last events)
 const FLOW_HEARD = 5
+const HEARD_MAX = 200 // custom.<name> takes any name (an agent's emit too): past this, the oldest go
 const heard = new Map<string, { at: number; payload: Record<string, unknown> }>()
 const lastEvents = new Map<string, FlowHeard[]>()
 function note(wf: WorkflowItem, e: FlowHeard, again = false) { // again: one already noted, its run or why since
@@ -1560,7 +1572,10 @@ eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
   const out = { flows: [] as string[], refused: [] as string[] }
   if (!flowsOn(state.settings)) return out
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
-  heard.set(`${ws?.project ?? ''}:${name}`, { at: Date.now(), payload })
+  const k = `${ws?.project ?? ''}:${name}`
+  heard.delete(k) // the newest last
+  heard.set(k, { at: Date.now(), payload })
+  if (heard.size > HEARD_MAX) heard.delete(heard.keys().next().value!)
   if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on && w.source !== 'builtin') } // ponytail: the files read again every 10 s, not at each event
   for (const w of listening.list) {
     if (!onIt(w.on, name)) continue
@@ -1616,7 +1631,7 @@ function sampleOf(name: string): Record<string, unknown> {
 // last real one of its project, unless use: sample; else a sample), its {{event.…}}, each only when: test, whether it
 // would start and why not; go: started the way a real one would be (fromEvent), its trigger "try <name>". A person's
 // start: an untrusted repo workflow runs from the app's sheet (editor), never from the CLI; never a skip or a pause
-export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string; budget?: string }) {
+export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string; budget?: string; inputs?: Record<string, string> }) {
   on()
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   const wf = flowFind({ id: o.id, source: o.source, project: pick?.project ?? o.project }) // the workspace's project's first, as flowStart
@@ -1651,7 +1666,7 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   }
   if (!o.go) return res
   if (!h || 'why' in h) throw new Error(res.why)
-  const run = await flowStart({ ...h.start, dry: !!o.dry, ...(o.by && { by: o.by }), ...(o.budget !== undefined && { budget: o.budget }) })
+  const run = await flowStart({ ...h.start, dry: !!o.dry, ...(o.by && { by: o.by }), ...(o.budget !== undefined && { budget: o.budget }), ...(o.inputs && { inputs: o.inputs }) }) // its Start's inputs, as Run's sheet has them
   return { ...res, run: run.id }
 }
 flowHooks.find = o => flowFind(o)

@@ -1684,6 +1684,19 @@ test('workflow failures: a wait on real PR checks (fail with their names, not tw
   }, 'pass')
   assert.deepEqual(r.decisions.map((d: any) => `${d.block}:${d.exit}`), ['start:next', 'wait:fail', 'fix:ok', 'wait:pass'])
 
+  // the block before pushed (a new head, pending): the wait reads a scan made after it, not the failing one before
+  writeFileSync(join(gh, 'next.json'), JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'h3', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'IN_PROGRESS', conclusion: '' }] }))
+  pr('h1', 'FAILURE')
+  await rig.rpc('flowSave', { id: 'push', text: '# Push\nruns in: worktree · session: new\n\n## start\ninput: task\nnext: pre\n\n## pre\nrun: sleep 1.5\nok: push\nfail: bad\n\n## push\nrun: cp "$FAKE_GH/next.json" "$FAKE_GH/pr.json"\nok: wait\nfail: bad\n\n## wait\nwait: checks\npass: ok\nfail: bad\n\n## ok\nend: success\n\n## bad\nend: failed\n' })
+  const pushed = await rig.rpc('flowStart', { workflow: 'push', project: p.id, task: 'ci' })
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === pushed.ws)?.pr?.head === 'h1', 'the failing head scanned first')
+  await until(async () => (await get(pushed.id)).cur === 'wait', 'at the wait')
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === pushed.ws)?.pr?.head === 'h3', 'its scan has the push')
+  for (let i = 0; i < 3; i++) await rig.rpc('flowTick', {}), await sleep(100)
+  r = await get(pushed.id)
+  assert.deepEqual([r.status, r.cur, r.decisions.map((d: any) => `${d.block}:${d.exit}`)], ['running', 'wait', ['start:next', 'pre:ok', 'push:ok']], 'not failed on h1')
+  await rig.rpc('flowStop', { id: pushed.id })
+
   // an agent block whose tab is closed: its error way at the next tick
   await rig.rpc('flowSave', { id: 'agent', text: AGENT('claude', 'slow {{task}}') })
   const a = await rig.rpc('flowStart', { workflow: 'agent', project: p.id, task: 'x' })
