@@ -1537,7 +1537,9 @@ preset's model, effort, env and account with the user's own config (claude `-p -
 <tools>` (and the store's `allow`: `allowedOf`), no `--tools ''`, and `--mcp-config` with `laki_ask` beside the user's
 servers (`mcpWith`: `laki mcp` with `LAKI_PERM_EXT`, which lists only `laki_permission`) as `--permission-prompt-tool`:
 `aiPermission` with `ext` is `widgetPermission`, a `toolAsk` with `perm` (App's dialog and notification: Allow once,
-*Always for <name>*, Deny; `answered`, `LAKI_TOOL_WAIT`), Always into the store's `allow` (the view's `allowed`,
+*Always for <name>*, Deny; `answered`, `LAKI_TOOL_WAIT`; #6: refused with no `agents` run of it going, no ask), Always
+into the store's `allow` with `allowFor` (`aiKey`: the AI source's and AI actions' prompts and tools; `allowOf` drops
+`allow` once it differs: a `source` set, a scan of an edited widget.json) (the view's `allowed`,
 `WidgetCard`'s *Its agent may use*, Revoke: `widgetSet` `allow`, never an agent's); no window, no answer or a deny: it
 goes on without it; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
 in `ai-calls.jsonl` (`extension <id>: …`); `aiSystem` tells it to change nothing and answer in `sample`'s shape; the last

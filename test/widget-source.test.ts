@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { fresh, sleep, until } from './helpers.ts'
 
 const find = async (rig: any, id: string) => ((await rig.rpc('state')).widgets ?? []).find((w: any) => w.id === id)
 
@@ -289,4 +289,37 @@ test('AI actions answer in a dialog, a toast or new data; notify posts what its 
   await until(() => n() === was + 1, 'said again')
   const check = await rig.cli('widget', 'check', 'acts', '--no-run')
   assert.doesNotMatch(check.out, /✗|actions\./)
+})
+
+// #6: an ask in an extension's name came from anyone (LAKI_PERM_EXT=<id> laki mcp): refused unless one of its agent runs
+// is going, no dialog; and an Always was for good, whatever its prompt says since: its tools go when the prompt changes
+test("#6: an ask for an extension with no run is refused, no dialog; after its source's prompt changes, its allowed tools are empty", async t => {
+  const rig = await fresh(t, { env: { LAKI_TOOL_WAIT: '3000' } })
+  const dir = join(rig.data, 'widgets', 'slack')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Slack', source: { kind: 'ai', prompt: 'slackread #eng', tools: 'mcp__slack' }, sample: { text: 'x' }, ui: { type: 'text', value: '{{text}}|{{tools}}' } }))
+  await rig.rpc('widgetReload')
+  const app = await rig.connect()
+  await assert.rejects(rig.rpc('aiPermission', { ext: 'slack', tool: 'Bash', input: { command: 'id' } }), /Slack has no agent running now: only its own run asks for a tool/)
+  await sleep(300)
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 0, 'nobody asked')
+
+  // its own run asks; Always keeps it
+  await rig.rpc('widgetSet', { id: 'slack', on: true })
+  const q = await until(() => app.events.find((e: any) => e.ev === 'toolAsk'), 'its run asks')
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'always' })
+  await until(async () => !(await find(rig, 'slack')).running, 'done')
+  assert.deepEqual((await find(rig, 'slack')).allowed, ['mcp__claude_ai_Slack__slack_read_channel'])
+  // the same prompt again (a rescan): kept; another prompt: gone, asked again
+  await rig.rpc('widgetReload')
+  assert.deepEqual((await find(rig, 'slack')).allowed, ['mcp__claude_ai_Slack__slack_read_channel'])
+  await rig.rpc('widgetSet', { id: 'slack', on: false })
+  await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'slackread #secrets', tools: 'mcp__slack' } })
+  assert.equal((await find(rig, 'slack')).allowed, undefined)
+  // and widget.json's prompt edited, read at a scan
+  await rig.rpc('widgetSet', { id: 'slack', source: null, allow: ['mcp__claude_ai_Slack__slack_read_channel'] })
+  assert.deepEqual((await find(rig, 'slack')).allowed, ['mcp__claude_ai_Slack__slack_read_channel'])
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Slack', source: { kind: 'ai', prompt: 'slackread #hr', tools: 'mcp__slack' }, sample: { text: 'x' }, ui: { type: 'text', value: '{{text}}' } }))
+  await rig.rpc('widgetReload')
+  assert.equal((await find(rig, 'slack')).allowed, undefined)
 })

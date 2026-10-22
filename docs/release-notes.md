@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: an AI extension's *Always* covers the prompt it was given for; a changed prompt asks again. An ask in an
+  extension's name while none of its runs is going is refused.
 - Workflows: what a run does itself (its archive when it's done, its ship, its tabs) never starts it again, and counts
   as a hop: an `on: workspace.archived` workflow no longer restarts on its own archive.
 - A repo's extension is trusted as every file in its folder now, a submodule's and ignored ones too, so a pull or an

@@ -32,7 +32,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[] } // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // allowFor: aiKey as allow was given // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; agentDev?: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on); agentDev: one an agent linked (settings.widgetDevAgent): trusted as a repo's
@@ -441,6 +441,7 @@ export function scanWidgets() {
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
+      allowOf(e) // #6: its prompts changed: its allowed tools go
       const rf = guarded(e) && e.s.on && !e.file ? repoFiles(e) : undefined
       if (guarded(e) && e.s.on && (e.s.trusted !== dirHash(e, true, rf?.names) || rf?.bad)) untrust(e, rf?.names) // changed since you turned it on; an agent's that shadows one on: never its on
     }
@@ -832,10 +833,12 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
     if (src?.kind === 'url' && src.url && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) throw new Error('a URL: http or https')
     s.source = src
     if (src) s.mock = undefined // its own data from now on, not sample data
+    if (s.allow && s.allowFor !== aiKey(w.m, src ?? sourceOk(w.m.source) ?? { kind: 'fetch' })) (s.allow = undefined), (s.allowFor = undefined), wLog(w, 'its prompt changed: the tools its agent was allowed go (asked again)', 'warn') // #6
   }
   if (o.allow !== undefined) {
     if (!Array.isArray(o.allow) || o.allow.some(t => typeof t !== 'string' || !TOOL_NAME.test(t))) throw new Error('allow: tool names')
     s.allow = o.allow.length ? [...new Set(o.allow)] : undefined
+    s.allowFor = s.allow && aiKey(w.m, s.source ?? sourceOk(w.m.source) ?? { kind: 'fetch' })
   }
   if (o.config) {
     const opts = new Map(optionsOf(w).map(x => [x.key, x]))
@@ -2077,17 +2080,24 @@ export const widgetAsks = (c: { send: (m: unknown) => void }) => asks.forEach(m 
 // mcp's laki_permission, LAKI_PERM_EXT): asked in the app as a tool call is (toolAsk with perm) and as a notification.
 // Always: that tool unasked in its runs from now on (the store's allow; its page lists them, Revoke). Nobody there, no
 // answer or a deny: it goes on without it
+// #6: only while one of its agent runs is going (agentRun): anyone could run LAKI_PERM_EXT=<id> laki mcp and ask in its
+// name. ponytail: a run's own ask isn't told from another's made meanwhile; a token per run would
 export async function widgetPermission(p: { ext?: unknown; tool?: unknown; input?: unknown }): Promise<{ allow: boolean; message?: string }> {
   const w = find(String(p.ext ?? ''))
   const tool = String(p.tool ?? '')
   if (!TOOL_NAME.test(tool)) throw new Error('a tool’s name') // it goes into --allowedTools: never an option, nor two names
-  if (readStore(w.id).allow?.includes(tool)) return { allow: true }
+  if (!agents.get(w.id)?.size) {
+    wLog(w, `an ask for ${tool} in its name refused: no agent of its is running`, 'warn')
+    throw new Error(`${w.m.name || w.id} has no agent running now: only its own run asks for a tool`)
+  }
+  if (allowOf(w)?.includes(tool)) return { allow: true }
   if (!clients.size) return { allow: false, message: "Laki's window isn't open, so nobody could allow it: do without it, and say so." }
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), widget: w.id, name: w.m.name || w.id, perm: tool, input: p.input ?? {}, ask: 'first' })
   wLog(w, `its agent asked for ${tool}: ${how === 'none' ? 'no answer' : how}`)
   if (how === 'always') {
     const s = readStore(w.id)
-    s.allow = [...new Set([...(s.allow ?? []), tool])]
+    s.allow = [...new Set([...(allowOf(w) ?? []), tool])]
+    s.allowFor = aiKey(w.m, sourceOf(w))
     writeStore(w.id, s)
     const cur = widgets.get(w.id)
     if (cur) cur.s = { ...cur.s, allow: s.allow }
@@ -2097,7 +2107,19 @@ export async function widgetPermission(p: { ext?: unknown; tool?: unknown; input
 }
 const TOOL_NAME = /^\w[\w.-]{0,199}$/ // claude's: Bash, WebFetch, mcp__claude_ai_Slack__slack_read_channel
 // the tools an AI source's or action's agent may use unasked: widget.json's (or the source's) and the ones allowed since
-const allowedOf = (w: Entry, tools?: string) => [tools, ...(readStore(w.id).allow ?? [])].filter(Boolean).join(',') || undefined
+const allowedOf = (w: Entry, tools?: string) => [tools, ...(allowOf(w) ?? [])].filter(Boolean).join(',') || undefined
+// #6: an Always is for the prompts it was given under: a hash of the AI source's prompt and tools and each AI action's
+// (allowFor); once they change (widgetSet source, widget.json read again at a scan) its tools go, asked again
+const aiKey = (m: Manifest, src: WidgetSource) => createHash('sha256').update(JSON.stringify([src.kind === 'ai' ? [src.prompt, src.tools ?? ''] : null, Object.entries(m.actions ?? {}).flatMap(([k, a]) => (x => (x ? [[k, x.prompt, x.tools ?? '']] : []))(aiActOf(a)))])).digest('hex').slice(0, 16)
+function allowOf(w: Entry) {
+  const s = readStore(w.id)
+  if (!s.allow || s.allowFor === aiKey(w.m, sourceOf(w))) return s.allow
+  delete s.allow
+  delete s.allowFor
+  writeStore(w.id, s)
+  w.s = { ...w.s, allow: undefined, allowFor: undefined }
+  wLog(w, 'its prompts changed: the tools its agent was allowed go (asked again)', 'warn')
+}
 // the app's answer (its dialog, a notification's button): once, always, or deny
 export function widgetToolAnswer(o: { req: string; allow: string }) {
   const f = asking.get(String(o.req))

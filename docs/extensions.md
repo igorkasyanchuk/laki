@@ -67,7 +67,9 @@ effort, account and env; `"profile"` names another) with your own config, so you
 in #eng on Slack since yesterday: decisions, questions for me, links"*, with `"tools": "mcp__slack"`, is a summary to
 read over coffee. Claude may use the tools named in `tools` unasked (comma-separated: `mcp__slack, WebFetch,
 Bash(gh pr list:*)`); for any other, Laki asks you (a dialog and a notification): *Allow once*, *Always* (its page
-lists them, with Revoke) or *Deny*, and it goes on without it. A server's tools are `mcp__<server>` as claude names it:
+lists them, with Revoke) or *Deny*, and it goes on without it. *Always* holds for the prompts it was given under: a
+change to the source's or an AI action's prompt or tools takes those tools back. An ask in its name with no run of its
+agent going is refused, never shown. A server's tools are `mcp__<server>` as claude names it:
 a claude.ai connector's are `mcp__claude_ai_<Name>` (`mcp__claude_ai_Slack`). Codex runs in its read-only sandbox. Its prompt may name settings and the
 workspace, like a path. The agent is told to change nothing and to end its answer with the data as a json block in the
 shape of `sample` (no sample: `{ "text" }` in Markdown, for a `markdown` element); its last json block is the data, an
