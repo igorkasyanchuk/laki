@@ -476,22 +476,28 @@ function untrust(e: Entry, names?: string[]) {
   wLog(e, `its files changed ${e.project ? `in ${projName(e)}'s .laki/extensions` : 'in the folder an agent linked'}${which}: off until you look`, 'warn')
   broadcast({ ev: 'widget-say', widget: e.id, notify: `${e.project ? `from ${projName(e)} changed` : 'changed in the folder an agent linked'}${which}: off until you look` }) // App: a toast and a notification, its name first
 }
-// each project's .laki/extensions watched (recursive), a second after the last change read again (scanWidgets: a
-// changed one goes off). ponytail: a folder made after the scan is read at the next one (a project added, a reload)
-const repoWatchers = new Map<string, FSWatcher>()
+// each project's .laki watched (recursive; while it's missing, the project's folder, flat), a second after a change
+// under extensions/ read again (scanWidgets: a changed one goes off, a branch without it drops them, one back reads
+// them). Not .laki/extensions itself: macOS's watch of a folder git removes says nothing, nor when it comes back
+const repoWatchers = new Map<string, { w: FSWatcher; at: string }>()
+const repoSpot = (r: string) => [dirname(r), dirname(dirname(r))].find(d => existsSync(d))
 function watchRepos() {
   const roots = repoRoots().map(r => r.root)
-  for (const [r, w] of repoWatchers) if (!roots.includes(r) || !existsSync(r)) (w.close(), repoWatchers.delete(r)) // gone (a branch without it): watched again once a scan finds it
+  for (const [r, x] of repoWatchers) if (!roots.includes(r) || x.at !== repoSpot(r)) (x.w.close(), repoWatchers.delete(r)) // gone, or .laki came or went: watched again where it is now
   for (const r of roots) {
-    if (repoWatchers.has(r) || !existsSync(r)) continue
+    const at = repoSpot(r)
+    if (repoWatchers.has(r) || !at) continue
+    const flat = at !== dirname(r)
     let timer: NodeJS.Timeout | undefined
     try {
-      const w = watch(r, { recursive: true }, () => {
+      const w = watch(at, { recursive: !flat }, (_, f) => {
+        const n = String(f ?? '')
+        if (n && n !== '.laki' && (flat || n.split(/[\\/]/)[0] !== 'extensions')) return // its workflows, the project's other files
         clearTimeout(timer)
-        timer = setTimeout(() => repoWatchers.has(r) && scanWidgets(), 1000)
+        timer = setTimeout(() => repoWatchers.get(r)?.w === w && scanWidgets(), 1000)
       })
-      w.on('error', () => (w.close(), repoWatchers.delete(r)))
-      repoWatchers.set(r, w)
+      w.on('error', () => (w.close(), repoWatchers.get(r)?.w === w && repoWatchers.delete(r)))
+      repoWatchers.set(r, { w, at })
     } catch {}
   }
 }
@@ -534,7 +540,7 @@ function devChanged(root: string, why: string) {
 }
 // at shutdown, and in tests
 export function widgetsStop() {
-  for (const w of [...watchers.values(), ...repoWatchers.values()]) w.close()
+  for (const w of [...watchers.values(), ...[...repoWatchers.values()].map(x => x.w)]) w.close()
   watchers.clear()
   repoWatchers.clear()
   for (const id of [...streams.keys()]) stopStream(id)
@@ -1530,8 +1536,8 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent, hops)
   if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
   if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
-  let json = JSON.stringify({ ...head, ...extra })
-  if (json.length > EVENT_MAX) json = JSON.stringify({ ...head, cut: true }) // ponytail: past 64 KB its own fields all go
+  const fields = JSON.stringify(extra)
+  const json = fields.length > EVENT_MAX ? JSON.stringify({ ...head, cut: true }) : JSON.stringify({ ...head, ...extra }) // ponytail: fields past 64 KB all go (the head's own room on top: an emit just under it arrives whole)
   for (const w of widgets.values()) {
     const h = handlerOf(w, name)
     if (!h || !onOf(w) || w.id === o.from?.widget) continue // never its own emits
@@ -1641,7 +1647,7 @@ export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; fr
   const name = raw.startsWith('custom.') ? raw : `custom.${raw}`
   if (!CUSTOM_EVENT.test(name)) throw new Error(`${raw || '(none)'}: an event's name is letters, digits, . _ - (custom.<name>, 41 at most)`)
   const data = o.data === undefined ? {} : o.data
-  if (JSON.stringify(data).length > EVENT_MAX) throw new Error(`its data is over ${EVENT_MAX >> 10} KB`)
+  if (JSON.stringify({ data }).length > EVENT_MAX) throw new Error(`its data is over ${EVENT_MAX >> 10} KB`) // as widgetEvent measures it
   const ws = typeof o.ws === 'string' && o.ws ? state.workspaces.find(x => x.id === o.ws || x.name === o.ws) : undefined
   if (o.ws && !ws) throw new Error(`no workspace ${o.ws}`)
   const t = typeof o.from?.tab === 'string' ? state.tabs.find(x => x.id === o.from!.tab) : undefined
@@ -2405,7 +2411,7 @@ export function widgetUndo(o: { id: string; after?: number }) {
 export function widgetRemix(o: { id: string; newId?: string }) {
   const w = find(String(o.id))
   if (w.file) throw new Error(`${w.m.name || w.id} is one file: copy ${w.file} and rename it`)
-  const id = o.newId === undefined ? freeId(`${w.project ? w.id.slice(w.project.length + 1) : w.id}-copy`) : String(o.newId) // a repo's: yours now, under its own name
+  const id = o.newId === undefined ? freeId(`${(w.project ? w.id.slice(w.project.length + 1) : w.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '') || 'extension'}-copy`) : String(o.newId) // a repo's: yours now, under its own name (a folder's My_Ext.v2: my-ext-v2)
   if (!ID.test(id)) throw new Error('an id: lowercase letters, digits and dashes')
   const d = join(widgetHome(), id)
   if (widgets.has(id) || statOf(d)) throw new Error(`${id} is taken`)

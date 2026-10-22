@@ -55,6 +55,7 @@ export type WsInfo = {
   mergeTries?: number // and its merge conflicts
   prScan: number // minutes between PR checks (Settings › Pull requests)
   prTries: number // failing CI or conflicts go to the agent this many times in a row
+  checking?: boolean // its Merge's gates run: Checking… on the button
   tunnels?: Tunnel[] // ports exposed to the world
   related?: string[] // other GitHub PRs and issues it's about (not its PR): its prompt's, a PR its own replaced
   from?: { id: string; name: string } // the workspace whose agent started it
@@ -386,8 +387,8 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
           <div className="pr-acts">
             {merge && (
               <span className={`split ${blocked ? '' : 'green'}`}>
-                <button className="merge" onClick={() => onAct('merge', method)} data-tip={`${MERGE_WORDS[method]}, after a confirm${blocked ? ` · ${blocked}` : ''}`}>
-                  <Icon name="pr" /> Merge
+                <button className="merge" disabled={w.checking} onClick={() => onAct('merge', method)} data-tip={`${MERGE_WORDS[method]}, after a confirm${blocked ? ` · ${blocked}` : ''}`}>
+                  {w.checking ? <span className="btn-spin" /> : <Icon name="pr" />} {w.checking ? 'Checking…' : 'Merge'}
                 </button>
                 <button
                   className="merge caret"

@@ -118,3 +118,14 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   assert.ok(!existsSync(join(rig.data, 'widget-data', `${copy}.history`)))
   assert.deepEqual((await rig.rpc('aiState', { chat: `widget:${copy}` })).chat, [], 'forgotten')
 })
+
+test("#34.7: Remix of a repo's folder named with capitals, _ or .: the copy's id slugged", async t => {
+  const rig = await fresh(t)
+  const d = join(rig.repo, '.laki', 'extensions', 'My_Ext.v2')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Mine', fetch: 'echo {}' }))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const { id } = await rig.rpc('widgetRemix', { id: `${p.id}.My_Ext.v2` })
+  assert.equal(id, 'my-ext-v2-copy')
+  assert.ok(existsSync(join(rig.data, 'widgets', id, 'widget.json')))
+})

@@ -611,6 +611,8 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .ask-check input { width: auto; flex: none; margin: 0; }
 .ask-field { display: block; margin-top: 8px; }
 .ask-field input { width: 100%; }
+.ask-field textarea { width: 100%; resize: vertical; font: inherit; font-size: 12px; }
+.ask-facts dt .icon-svg { margin-right: 5px; vertical-align: -2px; }
 .ask-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .ask-buttons button { min-width: 84px; padding: 5px 14px; }
 .ask-buttons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

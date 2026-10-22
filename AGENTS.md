@@ -1480,7 +1480,7 @@ an `only when:` test that doesn't hold (`whenFails`: `Workflow.when`, each a Cas
 `matches` stops at 200 ms; a repo's file's as it is at each event), and a live (or queued) run of it whose `evWs` (`Start.evWs`:
 the event's workspace; a worktree run's `ws` is its own) is the event's. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
-`EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
+`EVENT_MAX` (64 KB, the fields alone, so `widgetEmit`'s data as `{ data }` up to it arrives whole) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a
 time: `handle` writes `LAKI_EVENT_FILE` (tmpdir, 0600, removed after) and runs `widgetRun` (refresh) or `widgetAction`
 with `Ev` (`LAKI_EVENT`, the file, the JSON on stdin: `exec`'s `stdin`, ended at once otherwise) and reason
@@ -1699,9 +1699,11 @@ failed: a no that exits 1 is a no); an error, a timeout or no `ok` holds it, `it
 is you: then it goes ahead (`wLog` error, a `widget-say` toast). A guarded one whose files changed fails so too: in its
 run (`trusted` throws, `Failed.changed`), or off already by the watcher's `untrust` (the store's `changed`: `moved`,
 its gates still count; yours: *changed* in the toast). The CLI's `laki ship` and `laki archive` (`caller()`, `--force`) print the
-reasons and exit 1 (cli `held`). Each hold `gate.held`. Held: `{ held }` back (App's `gated`: *Checking…* while
-`gatesOn`, then `choose` *Not shipped*… with *Do it anyway* (`ask`, then `force`) and *Ask the agent to fix it* (`send`
-`whenIdle`, the fixes) when one has a `fix` and the workspace a live agent tab); `autoPR`: `overToYou` once, `f.land`
+reasons and exit 1 (cli `held`). Each hold `gate.held`. Held: `{ held }` back (App's `gated`: *Checking…* on the
+button while `gatesOn` (`checking`: Ship's `Prompt` `busy`, Merge's `WsInfo.checking`; an archive's row, `busyWith`), then
+`choose` *Not shipped*… (each hold a `Fact` with its icon) with *Do it anyway* (`ask`, then `force`) and *Ask the agent to
+fix it* (the fixes in `askText` `multi`, a text box, to change first; ⌘⏎ sends; `send` `whenIdle`) when one has a `fix`
+and the workspace a live agent tab); `autoPR`: `overToYou` once, `f.land`
 the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when that changes; `archiveMerged`: logged,
 `autoArchived` kept; a workflow's block: its error way, `steps.<id>.output` the reasons. The view's `gates` (Settings'
 *Can hold*), `widgetWhat`'s text.
@@ -1709,7 +1711,7 @@ the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when 
 Repo extensions (`test/widget-repo.test.ts`): `repoRoots` (each project not `kind` nor `host`: `<path>/.laki/extensions`,
 its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scanWidgets` (a dev or `widgetDirs` root
 under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` leaves them off), each an `Entry` with `project`
-and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
+and the id `<project>.<id>`; `watchRepos` (`fs.watch` of the project's `.laki`, recursive, a change under `extensions/`; while `.laki` is missing, the project's folder, flat: a branch without it and back reads them again (macOS says nothing to a watch of `.laki/extensions` itself as git removes it); 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
 `trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles` (#4): every file under the folder (`git
@@ -1749,7 +1751,7 @@ the actions' commands, a JS page's `net`): `widgetRun` `once` (an off one, Laki 
 `node_modules` or `.git`, `KEPT`, which Undo leaves where they are), the view's `history`
 (Laki's folder's only); `widgetUndo` (`after`: the first taken after then, a turn's *Undo to here*; none: the newest)
 puts it back, drops it and newer, off; `gone` when it was the first. A user's own written in its `aiMay` hour keeps
-`aiMay` (a write, a check, a fix). `widgetRemix` (`newId`, else `<id>-copy`, `freeId`): the folder copied (a linked one's
+`aiMay` (a write, a check, a fix). `widgetRemix` (`newId`, else `<id>-copy` slugged (a repo folder's `My_Ext.v2`: `my-ext-v2-copy`), `freeId`): the folder copied (a linked one's
 target, `realpathSync`; no `.git`, `node_modules`; not a one-file one), its name `(copy)`, the store `{ on: false, aiMay }`:
 yours (no secrets: they're by id). `widgetRm` (refused while it or an instance fetches; main.ts' `aiForget` once it's gone) moves the history and
 the chat to the trash with it. Tested in `test/widget-studio.test.ts`.

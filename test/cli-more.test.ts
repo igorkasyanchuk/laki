@@ -432,3 +432,20 @@ test('daemon start from the CLI: a big log is rotated first, a lock it cannot re
   assert.equal(again.code, 0, again.err)
   assert.equal(readFileSync(lock, 'utf8'), String(rig.info().pid))
 })
+
+test('#34.5: laki widget log: -n, -f and the other options only before the message; its own words are its own', async t => {
+  const rig = await fresh(t)
+  const d = join(rig.data, 'widgets', 'y')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Y', fetch: 'echo {}' }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'y', on: true, log: true })
+  for (const words of [['tail', '-n', '5', 'and', '-f', 'done'], ['the', '--level', 'is', 'high', '--', 'ok']]) {
+    const c = await rig.cli('widget', 'log', 'y', ...words)
+    assert.equal(c.code, 0, c.err)
+  }
+  const c = await rig.cli('widget', 'log', 'y', '--level', 'warn', 'disk', 'full')
+  assert.equal(c.code, 0, c.err)
+  const lines = (await rig.rpc('widgetLogs', { id: 'y', src: 'cli' })).lines.map((l: any) => `${l.level} ${l.text}`)
+  assert.deepEqual(lines, ['info tail -n 5 and -f done', 'info the --level is high -- ok', 'warn disk full'])
+})

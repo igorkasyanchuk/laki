@@ -334,3 +334,23 @@ test("#4: a submodule moved or an ignored file it sources rewritten turns it off
   await settle()
   assert.deepEqual([(await find(`${pp.id}.z`)).on, (await find(`${pp.id}.y`)).on], [true, false])
 })
+
+test("#34.4: a branch without .laki/extensions and back: its extensions go, then come back without a reload", async t => {
+  const rig = await fresh(t)
+  const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
+  ext(rig.repo, 'w', { name: 'W', fetch: `echo '{"n": 1}'` })
+  git('add', '-A')
+  git('commit', '-qm', 'extensions')
+  git('checkout', '-qb', 'bare')
+  git('rm', '-rq', '.laki')
+  git('commit', '-qm', 'none')
+  git('checkout', '-q', 'main')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const has = async () => (await rig.rpc('state')).widgets.some((w: any) => w.id === `${p.id}.w`)
+  assert.ok(await has())
+  await new Promise(r => setTimeout(r, 500)) // the watch starts a moment after
+  git('checkout', '-q', 'bare')
+  await until(async () => !(await has()), "gone on the bare branch")
+  git('checkout', '-q', 'main')
+  await until(has, "back on main")
+})

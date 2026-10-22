@@ -267,8 +267,9 @@ that says no holds it, with its reason.
 - **An error or no answer within 30 s:** the step is held, *its gate failed*, unless you started it: then it goes
   ahead, and Laki says so (a toast, a line in its log). An agent's ship, merge or archive, a workflow's, Merge when
   green and archive on merge are held. A repo's gate whose files changed (off until you look) holds them too.
-- **Held:** the app says *Not shipped* (*Not merged*, *Not archived*), a line per gate, with *Do it anyway* (asked
-  first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` and `laki
+- **Held:** while gates run, the Ship or Merge button says *Checking…* (an archive's row too). Then the app says *Not
+  shipped* (*Not merged*, *Not archived*), a line per gate with its icon, with *Do it anyway* (asked first) and, when a
+  gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it* (the fix in a box to change first). `laki ship` and `laki
   archive` print the reasons and exit 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.
 - Merge when green held: over to you once per head commit, tried again after a push or once the gate's extension
   changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
@@ -769,7 +770,7 @@ Off by default. Settings › Extensions › *Keep logs for every extension*, or 
 - a stream's lines that aren't JSON, and its stderr;
 - an AI source's or AI action's run: the profile, its prompt's start, seconds, cost and the answer's size;
 - lines you add: `laki widget log <id> [--level warn] [--ws <id>] <text…>` (hooks, cron; it exits 0 and writes nothing
-  while the log is off) and a JS page's `laki.log(...)`.
+  while the log is off; options go before the text: after it, `-n` or `--level` are words of it) and a JS page's `laki.log(...)`.
 
 Every secret's value, and every setting's whose name says token, secret, key or password, is `••••` before a line is
 written, and wherever what its command printed to stderr shows: its error, Runs, `laki widget dev`. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]

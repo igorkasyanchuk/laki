@@ -4,6 +4,11 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a gate's *Checking…* is on the Ship and Merge buttons (an archive's row says it), the held dialog
+  shows each extension's icon, and *Ask the agent to fix it* shows the fix to change before it's sent.
+- Extensions: a project's `.laki/extensions` is read again after a branch without it and back; `laki widget log`
+  keeps `-n`, `-f` and `--level` after the text as words; an emit just under 64 KB arrives whole; Remix of a repo
+  folder named with capitals, `_` or `.` works.
 - Extensions: a file opener's view opens as a tab beside the file's preview, and file actions show on an
   artifact's right click too, with the artifact's path.
 - Extensions: Settings › Extensions has a search (name, id, place, project) and lists the ones failing first, with

@@ -25,12 +25,13 @@ let textOnly = false
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
   const k = a.replace(/^-+/, '')
+  if (['widget', 'widgets'].includes(args[0]) && args[1] === 'log' && args.length > 3) textOnly = true // laki widget log's message: options only before it, then its words are its own
   if (!textOnly && a === '--') textOnly = true
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
-  else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
+  else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
 }

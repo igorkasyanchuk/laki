@@ -51,7 +51,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget what <id>                       what turning it on runs, and its files' hash
   laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
   laki widget logs <id> [-n 100] [-f] [--level error] [--ws <ws>] [--json]  its log (when it keeps one): -f follows it
-  laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off
+  laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off; options before the text only
   laki widget emit <name> [json | -] [--ws <ws>]  an event of your own, custom.<name>: extensions and workflows on it run
   laki widget events                          the last 50 events, and what each reached (or why not)
   laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]

@@ -984,7 +984,7 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
 }
 
 // pick: a select under the field (a group's default template), its value given with the text ('' none)
-export function Prompt({ title, hint, placeholder, initial = '', pick, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; pick?: { label: string; none: string; options: string[]; value?: string }; onClose: () => void; onSubmit: (v: string, picked: string) => Promise<void> }) {
+export function Prompt({ title, hint, placeholder, initial = '', pick, busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; pick?: { label: string; none: string; options: string[]; value?: string }; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string) => Promise<void> }) {
   const [v, setV] = useState(initial)
   const [picked, setPicked] = useState(pick?.value ?? '')
   return (
@@ -993,7 +993,7 @@ export function Prompt({ title, hint, placeholder, initial = '', pick, onClose, 
         className="form"
         onSubmit={e => {
           e.preventDefault()
-          if (v.trim()) onSubmit(v.trim(), picked).catch(() => {})
+          if (v.trim() && !busy) onSubmit(v.trim(), picked).catch(() => {})
         }}
       >
         <input value={v} autoFocus placeholder={placeholder} onFocus={e => e.target.select()} onChange={e => setV(e.target.value)} />
@@ -1016,8 +1016,14 @@ export function Prompt({ title, hint, placeholder, initial = '', pick, onClose, 
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={!v.trim()}>
-            OK
+          <button type="submit" className="primary" disabled={!v.trim() || !!busy}>
+            {busy ? (
+              <>
+                <span className="btn-spin" /> {busy}
+              </>
+            ) : (
+              'OK'
+            )}
           </button>
         </div>
       </form>

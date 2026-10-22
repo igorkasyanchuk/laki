@@ -43,7 +43,7 @@ import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type Tunne
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
 import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
-import { emojiOf, isIconName } from '../../shared/icons'
+import { emojiOf } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -1239,6 +1239,7 @@ export function App() {
   }
 
   // while f runs, the rows of ids say what's happening (archiving, deleting: a worktree takes a moment to go)
+  const [checking, setChecking] = useState<string>() // `<step>:<ws>`: its gates run (gated)
   const busyWith = async <T,>(ids: string[], what: string, f: () => Promise<T>) => {
     setGoing(g => ({ ...g, ...Object.fromEntries(ids.map(id => [id, what])) }))
     try {
@@ -1272,19 +1273,25 @@ export function App() {
     if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
-  // an extension's gates on a ship, a merge or an archive: Checking… while they run; a hold says what held it, then
-  // Do it anyway (asked first) or the agent's fix. f(force) makes the call; undefined: failed (the toast says), or not done
+  // an extension's gates on a ship, a merge or an archive: Checking… on its button while they run (checking: the step and
+  // workspace; an archive's row says it, busyWith); a hold says what held it, each by its icon, then Do it anyway (asked
+  // first) or the agent's fix, shown to change first. f(force) makes the call; undefined: failed (the toast says), or not done
   const gatesOn = (step: Gate, w?: WorkspaceView) => (view?.widgets ?? []).some(x => x.on && x.gates?.includes(step) && (!x.project || x.project === w?.project)) // a repo's: its project's only
   const gated = async <T,>(w: WorkspaceView, step: Gate, f: (force?: boolean) => Promise<T>): Promise<T | undefined> => {
-    if (gatesOn(step, w)) toast('Checking…')
-    const r = await f()
+    const key = `${step}:${w.id}`
+    const on = gatesOn(step, w)
+    if (on) setChecking(key)
+    const r = await f().finally(() => on && setChecking(c => (c === key ? undefined : c)))
     const held = (r as { held?: GateHeld[] } | null | undefined)?.held
     if (!held) return r
     const fix = held.flatMap(h => (h.fix ? [h.fix] : [])).join('\n\n')
     const agent = !!fix && (view?.tabs ?? []).some(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')
     const words = { ship: 'shipped', merge: 'merged', archive: 'archived' }[step]
-    const n = await choose(`Not ${words}`, held.map(h => `${h.icon && !isIconName(h.icon) ? `${h.icon} ` : ''}${h.name}: ${h.why}`).join('\n'), [{ label: 'Cancel' }, ...(agent ? [{ label: 'Ask the agent to fix it', primary: true }] : []), { label: 'Do it anyway', danger: true }])
-    if (agent && n === 1) return void call('send', { target: w.id, text: fix, whenIdle: true }).then(() => toast('Sent to the agent'), () => {})
+    const n = await choose(`Not ${words}`, undefined, [{ label: 'Cancel' }, ...(agent ? [{ label: 'Ask the agent to fix it', primary: true }] : []), { label: 'Do it anyway', danger: true }], undefined, undefined, held.map(h => ({ icon: h.icon, label: h.name, value: h.why })))
+    if (agent && n === 1) {
+      const text = await askText('Ask the agent to fix it', { text: `To ${wsName(w)}'s agent, once it's free. Change it as you like.`, value: fix, multi: true, ok: 'Send' })
+      return void (text?.trim() && call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent'), () => {}))
+    }
     if (n !== (agent ? 2 : 1)) return
     if (!(await ask(`${{ ship: 'Ship', merge: 'Merge', archive: 'Archive' }[step]} ${wsName(w)} anyway?`, { text: `Past what ${held.map(h => h.name).join(', ')} said.`, ok: 'Do it anyway', danger: true }))) return
     return f(true)
@@ -2156,6 +2163,7 @@ export function App() {
     const from = live(w.from)
     return {
       ...w,
+      checking: checking === `merge:${w.id}`,
       from: from && { id: from.id, name: wsName(from) },
       started: view?.workspaces.filter(x => x.from === w.id && !x.archived).map(x => ({ id: x.id, name: wsName(x) })),
       allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
@@ -4151,6 +4159,7 @@ export function App() {
       {dialog === 'ship' && ws && (
         <Prompt
           title={`Ship ${ws.id}`}
+          busy={checking === `ship:${ws.id}` ? 'Checking…' : undefined}
           hint={`git add -A, commit, git push -u origin ${ws.branch}, gh pr create --fill — in a ship tab`}
           placeholder="Commit message"
           onClose={() => setDialog(null)}

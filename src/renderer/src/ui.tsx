@@ -81,8 +81,8 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 // buttons (a widget's modal), the index picked, -1 for none; check: a checkbox under the text, its on as it was left.
 type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
-type Field = { value: string; placeholder?: string }
-export type Fact = { label: string; value: string } // a line of ask's facts, under its text
+type Field = { value: string; placeholder?: string; multi?: boolean } // multi: a text box (Enter a new line, ⌘⏎ OK)
+export type Fact = { label: string; value: string; icon?: string } // a line of ask's facts, under its text; icon: a name (Icon) or an emoji
 type Asking = { title: string; text?: string; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: string; danger?: boolean } = {}) =>
@@ -91,11 +91,11 @@ export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: stri
   )
 // one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
 let early: Asking[] = []
-export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, buttons, check, done, tag }))
+export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string, facts?: Fact[]) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, facts, buttons, check, done, tag }))
 // a line typed in the app's own dialog (an extension action's ask): the text, or null for Cancel, Esc or outside
-export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string } = {}) =>
+export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string; value?: string; multi?: boolean } = {}) =>
   new Promise<string | null>(done => {
-    const field: Field = { value: '', placeholder: o.placeholder }
+    const field: Field = { value: o.value ?? '', placeholder: o.placeholder, multi: o.multi }
     if (!asker) return done(null)
     asker({ title, text: o.text, field, buttons: [{ label: o.ok ?? 'OK', primary: true }, { label: 'Cancel' }], done: i => done(i === 0 ? field.value : null) })
   })
@@ -128,9 +128,11 @@ export function AskHost() {
   }
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
+    const area = !!document.activeElement?.matches('.ask-field textarea')
+    if (cur.current && area && (e.metaKey || e.ctrlKey) && e.key === 'Enter') return (e.preventDefault(), e.stopImmediatePropagation(), close(cur.current.a.buttons.findIndex(b => b.primary))) // ⌘⏎ in its text box: OK
     if (!cur.current || e.metaKey || e.ctrlKey || e.altKey) return
     e.stopImmediatePropagation() // the keys are its: not App's, nor the page's under it (its Esc)
-    if (document.activeElement?.matches('.ask-field input') && !['Escape', 'Enter', 'Tab'].includes(e.key)) return // typing in it
+    if (document.activeElement?.matches('.ask-field input, .ask-field textarea') && !['Escape', ...(area ? [] : ['Enter']), 'Tab'].includes(e.key)) return // typing in it (a text box's Enter: a new line)
     e.preventDefault()
     const btns = [...(box.current?.querySelectorAll('button') ?? [])]
     const at = btns.indexOf(document.activeElement as HTMLButtonElement)
@@ -139,7 +141,7 @@ export function AskHost() {
     else if (e.key === ' ' && document.activeElement?.matches('.ask-check input')) (document.activeElement as HTMLInputElement).click()
     else if (e.key === 'Enter') close(at >= 0 ? at : cur.current.a.buttons.findIndex(b => b.primary))
     else if (e.key === 'Tab') {
-      const all = [...(box.current?.querySelectorAll<HTMLElement>('.ask-field input, .ask-check input, button') ?? [])] // the checkbox too (Space toggles it)
+      const all = [...(box.current?.querySelectorAll<HTMLElement>('.ask-field input, .ask-field textarea, .ask-check input, button') ?? [])] // the checkbox too (Space toggles it)
       const i = all.indexOf(document.activeElement as HTMLElement)
       all[(i + (e.shiftKey ? all.length - 1 : 1)) % all.length]?.focus()
     } else if (['ArrowLeft', 'ArrowRight'].includes(e.key)) btns[(at + (e.key === 'ArrowLeft' ? n - 1 : 1)) % n]?.focus()
@@ -161,7 +163,7 @@ export function AskHost() {
       window.removeEventListener('keydown', f, true)
     }
   }, [])
-  useEffect(() => box.current?.querySelector<HTMLElement>('.ask-field input, button.primary')?.focus(), [a])
+  useEffect(() => box.current?.querySelector<HTMLElement>('.ask-field input, .ask-field textarea, button.primary')?.focus(), [a])
   if (!a) return null
   return (
     <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(-1)}>
@@ -172,7 +174,10 @@ export function AskHost() {
           <dl className="ask-facts">
             {a.facts.map(f => (
               <div key={f.label}>
-                <dt>{f.label}</dt>
+                <dt>
+                  {f.icon && (isIconName(f.icon) ? <Icon name={f.icon} /> : `${f.icon} `)}
+                  {f.label}
+                </dt>
                 <dd>{f.value}</dd>
               </div>
             ))}
@@ -180,7 +185,11 @@ export function AskHost() {
         )}
         {a.field && (
           <label className="ask-field">
-            <input defaultValue={a.field.value} placeholder={a.field.placeholder} spellCheck={false} onChange={e => (a.field!.value = e.target.value)} />
+            {a.field.multi ? (
+              <textarea defaultValue={a.field.value} placeholder={a.field.placeholder} rows={6} onChange={e => (a.field!.value = e.target.value)} />
+            ) : (
+              <input defaultValue={a.field.value} placeholder={a.field.placeholder} spellCheck={false} onChange={e => (a.field!.value = e.target.value)} />
+            )}
           </label>
         )}
         {a.check && (

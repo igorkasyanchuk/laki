@@ -309,6 +309,10 @@ test('events of your own: emit reaches others not itself, custom.*, workspace, t
   // names and sizes
   for (const bad of ['Deploy', '-x', 'a b', 'x'.repeat(42)]) await assert.rejects(rig.rpc('widgetEmit', { name: bad }), /an event's name is letters/)
   await assert.rejects(rig.rpc('widgetEmit', { name: 'big', data: { s: 'x'.repeat(70000) } }), /its data is over 64 KB/)
+  const s = 'x'.repeat((64 << 10) - 20) // #34.6: just under 64 KB arrives whole, not cut for the event's own fields
+  await rig.rpc('widgetEmit', { name: 'near', data: { s }, ws: ws.id })
+  const near = await until(() => kept(rig, 'any').find(e => e.event === 'custom.near'), 'just under 64 KB arrives')
+  assert.deepEqual([near.cut, near.data?.s?.length], [undefined, s.length])
 
   // a loop: each emit made while handling one is a hop more; past 3, dropped (and said in its log)
   await rig.rpc('widgetSet', { id: 'self', on: false })
