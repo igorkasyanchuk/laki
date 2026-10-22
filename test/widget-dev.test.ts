@@ -182,6 +182,7 @@ test("an agent's extensions: new and restored off; a folder it links trusted as 
   writeFileSync(join(code, 'helper', 'widget.json'), JSON.stringify({ name: 'Helper', fetch: 'echo {}' }))
   const r = await rig.rpc('widgetDev', { folder: code, from })
   assert.match(r.note, /linked, off/)
+  await sleep(500) // the watch starts a moment after (FSEvents): a folder made before it is never seen
   const ran = join(rig.home, 'ran')
   mkdirSync(join(code, 'probe'))
   writeFileSync(join(code, 'probe', 'fetch.sh'), `touch "${ran}"; echo '{}'\n`)
