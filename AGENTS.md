@@ -521,7 +521,8 @@ Other modules add commands through `pluginFiles` (core can't import them): skill
 `/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command, only you start
 it (`disable-model-invocation`), and only `READ_ONLY`'s `laki widget` subcommands allowed unasked (N10: new, dev, set,
 on and the rest ask in Claude's own prompt). Its hooks run `laki hook <state>`, using an absolute
-node/Electron path and the CLI's path, and map to states:
+node/Electron path and `hook.js` (`src/cli/hook.ts`, core's `hookArgv`: conn.ts only, so a tool call's hook doesn't load the
+whole CLI; `laki hook` through the CLI imports it), and map to states:
 
 | hook | state |
 |---|---|
@@ -2438,7 +2439,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |
 | `src/shared/keys.ts` | Settings › Keys: `KEYS` (the rebindable actions, their defaults), `keyLabel`, `keyMap`, `keyFor`, `keyClash` (another action, `others`, `FIXED`, ⌃ alone), `keyShow`; App's, main's menu's, Help's |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
-| `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
+| `src/cli/main.ts` | the `laki` CLI (`laki hook` is `src/cli/hook.ts`, its own build entry); `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |

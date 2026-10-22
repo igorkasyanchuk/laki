@@ -8,11 +8,11 @@ const BUILT = JSON.stringify(new Date().toISOString())
 
 export default defineConfig({
   main: {
-    // the Electron main process, the daemon (run as node) and the CLI, side by side in out/main
+    // the Electron main process, the daemon (run as node), the CLI and agents' hook (hook.js), side by side in out/main
     define: { __BUILT__: BUILT },
     build: {
       rollupOptions: {
-        input: { index: resolve('src/main/index.ts'), daemon: resolve('src/daemon/main.ts'), cli: resolve('src/cli/main.ts') },
+        input: { index: resolve('src/main/index.ts'), daemon: resolve('src/daemon/main.ts'), cli: resolve('src/cli/main.ts'), hook: resolve('src/cli/hook.ts') },
       },
     },
   },

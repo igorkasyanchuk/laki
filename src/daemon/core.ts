@@ -163,12 +163,15 @@ export const cliArgv = [process.execPath, ...process.execArgv.filter(a => a.star
 export const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : []
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/ // what an env var's name may be (settings, projects, a host's script)
-const hookCmd = (st: string) => [...cliEnv, ...cliArgv.map(q), 'hook', st].join(' ')
+// `laki hook` as its own script (cli/hook.ts: conn.ts only, 2-3x quicker to start than the whole CLI), else the CLI's
+const hookPath = [join(here, 'hook.js'), join(here, '../cli/hook.ts'), cliPath].find(p => existsSync(p))!
+const hookArgv = [...cliArgv.slice(0, -1), hookPath]
+const hookCmd = (st: string) => [...cliEnv, ...hookArgv.map(q), 'hook', st].join(' ')
 
 // where an agent's hook files are, and the command its hooks run (`<argv> hook <state>`): this Mac's `laki hook`, or
 // an SSH host's script (hostHooks)
 type Hooks = { dir: string; argv: string[]; cmd: (st: string) => string }
-const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...cliArgv], cmd: hookCmd }
+const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv], cmd: hookCmd }
 
 // how an agent's hooks reach `laki hook`: claude's settings file, gemini's, opencode's plugin (by their path in h.dir)
 function hookFiles(h: Hooks): Record<string, string> {

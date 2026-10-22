@@ -1,5 +1,5 @@
-// laki: the command line for the daemon. `laki hook <state>` is what agents' hooks run: it never fails or
-// blocks the agent for more than a second.
+// laki: the command line for the daemon. `laki hook <state>` is hook.ts: it never fails or blocks the agent for more
+// than a second.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -37,26 +37,6 @@ for (let i = 0; i < argv.length; i++) {
 }
 const json = !!flags.json
 const out = (v: unknown, text?: string) => console.log(json || text === undefined ? JSON.stringify(v, null, 2) : text)
-
-async function hook(state: string, extra?: string) {
-  setTimeout(() => process.exit(0), 1000) // never hold the agent up
-  const tab = process.env.LAKI_TAB
-  if (!tab) process.exit(0)
-  let payload: unknown = {}
-  try {
-    if (extra) payload = JSON.parse(extra)
-    else if (!process.stdin.isTTY) {
-      const text = await new Promise<string>(r => {
-        let s = ''
-        process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
-        setTimeout(() => r(s), 400)
-      })
-      if (text.trim()) payload = JSON.parse(text)
-    }
-  } catch {}
-  await rpc('hook', { tab, state, payload }, 700).catch(() => {})
-  process.exit(0)
-}
 
 // laki flow check [file.md… | folder]: each workflow file read and checked as Laki does (parse, then check), with no
 // daemon, so a repo's hook or CI can run it; none given: ./.laki/workflows, a folder its *.md. Exit 1 on any problem.
@@ -205,7 +185,7 @@ async function main() {
   if (cmd !== 'hook' && help(cmd, rest)) return
   switch (cmd) {
     case 'hook':
-      return hook(rest[0], rest[1])
+      return import('./hook.ts') // runs as it loads (agents' hooks run it directly: hookArgv)
     case 'daemon':
       return import(pathToFileURL(daemonScript()).href)
     case 'open': {
