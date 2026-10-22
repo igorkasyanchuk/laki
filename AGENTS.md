@@ -1390,7 +1390,7 @@ while shown; Env; Files: `widgetFiles`' texts, editable (`FileView`: ⌘S, Esc, 
 `ExtensionPage`'s, asked before it's lost) through `widgetFileSave` (`path` one of `widgetFiles`' names, `was`: refused
 as "changed since you opened it" unless `force`; JSON parsed first; never a built-in (Remix it), a link or a file over
 64 KB; the studio's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
-widget's right click (`WidgetApi.menu`, App's: Fetch now, Inspect, Its page) and `laki://settings/widgets/<id>[/inspect]`
+widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then Settings.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell, *Edit with Laki AI* (yours), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a built-in's, a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
 (links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`

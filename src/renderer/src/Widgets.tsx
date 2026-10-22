@@ -11,7 +11,7 @@ import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, type SayModal, sayOf, uiBehave, WIDGET_CSS, type WidgetButton, type WidgetSay } from '../../shared/widget'
 import { DO, type UiDo, uiHtml } from '../../shared/widgetUi'
 import { daemonBase } from './api'
-import { ask, escapes, Icon, IconButton, isIconName } from './ui'
+import { ask, escapes, Icon, IconButton, isIconName, type MenuItem } from './ui'
 
 export type WidgetApi = {
   render: (id: string, full: boolean, sample?: boolean | string, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data (a name: fixtures/<name>.json's); cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
@@ -24,7 +24,8 @@ export type WidgetApi = {
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
   do: (w: WidgetView, cmd: UiDo, label?: string) => Promise<unknown> | void // a Laki command (a button's do, laki.do): said and asked first; true once done
   settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
-  menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page, Logs
+  menu?: (w: WidgetView, e: MouseEvent) => void // its right click: items' in a menu
+  items?: (w: WidgetView) => MenuItem[] // what its right click has anywhere: Fetch now, Inspect, Logs, Edit, on or off, places, size, the studio, Remix, Delete (the Desk's tiles add their own)
   log?: (id: string, text: string, ws?: string) => void // a JS page's laki.log: its log (widgetLog; nothing while off)
 }
 
@@ -212,7 +213,7 @@ export function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
 // a button widget in a cell (the sidebar's grid, a bar): its icon, label and badge across the cell
 export function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
   return (
-    <button className="widget-button" data-widget={w.id} data-view="button" onClick={() => click(w, api)}>
+    <button className="widget-button" data-widget={w.id} data-view="button" onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
       <Glyph w={w} />
       <span className="widget-button-label">{w.label ?? w.name}</span>
       {w.badge && <span className="widget-badge">{w.badge}</span>}
@@ -227,7 +228,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
-      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
         <span className="rail-icon">
           <Glyph w={w} size={18} />
           {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
@@ -235,7 +236,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
         {words && <span className="rail-label">{w.label ?? w.name}</span>}
       </button>
     ) : (
-      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
         <Glyph w={w} />
         {words && <span className="ib-label">{w.label ?? w.name}</span>}
         {w.badge && <span className="widget-badge">{w.badge}</span>}

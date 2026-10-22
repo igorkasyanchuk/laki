@@ -7,7 +7,7 @@ import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
+import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
@@ -1768,14 +1768,15 @@ export function App() {
     },
     do: (w, c, label) => widgetDo(w, c, label),
     settings: (id, key) => setDialog(id ? { extension: id, back: dialog, ...(key && { edit: key }) } : { section: 'widgets' }),
-    menu: (w, e) =>
-      openMenu(e, [
-        { head: w.name },
-        ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
-        { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
-        { label: 'Logs', icon: 'file' as const, sub: w.log ? 'what it did, its runs and stderr' : 'off: Keep a log turns it on', run: () => setDialog({ extension: w.id, back: dialog, tab: 'logs' }) },
-        { label: 'Edit', icon: 'settings' as const, sub: 'its place, settings and Laki AI', run: () => setDialog({ extension: w.id, back: dialog }) },
-      ]),
+    menu: (w, e) => openMenu(e, [{ head: w.name }, ...widgetApi.items!(w)]),
+    items: w => [
+      ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
+      { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
+      { label: 'Logs', icon: 'file' as const, sub: w.log ? 'what it did, its runs and stderr' : 'off: Keep a log turns it on', run: () => setDialog({ extension: w.id, back: dialog, tab: 'logs' }) },
+      { label: 'Edit', icon: 'settings' as const, sub: 'its place, settings and Laki AI', run: () => setDialog({ extension: w.id, back: dialog }) },
+      null,
+      ...extMenuItems(w, extCfg),
+    ],
     log: (id, text, ws) => void api.call('widgetLog', { id, text, ws, src: 'page' }).catch(() => {}),
   }
   widgetSay.current = widgetApi.say

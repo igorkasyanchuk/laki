@@ -250,11 +250,11 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       ...(api.build ? [{ label: 'Build one with Laki AI…', icon: 'ai', run: () => setBuilding(true) } as MenuItem] : []),
       { label: 'Extensions in Settings…', icon: 'settings', run: () => api.settings() },
     ])
+  // its own items, then what every extension's right click has (api.items: Fetch now and Edit among them)
   const tileMenu = (e: React.MouseEvent, w: WidgetView) =>
     openMenu(e, [
-      ...(w.on && w.every !== undefined && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh', run: () => void api.run(w.id, w.here ?? undefined).catch(() => {}) } as MenuItem] : []),
+      ...(api.items ? [] : [...(w.on && w.every !== undefined && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh', run: () => void api.run(w.id, w.here ?? undefined).catch(() => {}) } as MenuItem] : []), { label: 'Edit', icon: 'settings', run: () => api.settings(w.id) } as MenuItem]),
       ...(w.full ? [{ label: 'Open its full view', icon: 'expand', run: () => api.full(w.id) } as MenuItem] : []),
-      { label: 'Edit', icon: 'settings', run: () => api.settings(w.id) },
       {
         label: 'Move to tab',
         icon: 'arrowRight',
@@ -266,6 +266,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       null,
       // its only place: off, and the sidebar's when it's on again (one Laki AI made shows here while it's off)
       { label: 'Take it off My Desk', icon: 'x', run: () => void (placesOf(w).length > 1 ? api.place(w.id, placesOf(w).filter(p => p !== 'desk')) : api.place(w.id, ['side'], false)).catch(() => {}) },
+      ...(api.items ? [null, ...api.items(w)] : []),
     ])
   return (
     <Page
@@ -354,7 +355,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
             const s = laid.find(x => x.id === t.id)!
             return (
               <div key={t.id} className={`desk-tile ${drag === t.id ? 'dragging' : ''} ${live?.id === t.id && !drag ? 'sizing' : ''} ${w.on ? '' : 'off'}`} style={{ gridColumn: `${s.x + 1} / span ${s.w}`, gridRow: `${s.y + 1} / span ${s.h}`, order: s.y * DESK_COLS + s.x, '--h': s.h } as CSSProperties}>
-                <div className="desk-head" onPointerDown={e => move(e, s)} data-tip={drag ? undefined : 'Drag to put it anywhere on the grid'}>
+                <div className="desk-head" onPointerDown={e => move(e, s)} onContextMenu={e => tileMenu(e, w)} data-tip={drag ? undefined : 'Drag to put it anywhere on the grid'}>
                   <b>{w.name}</b>
                   {w.scope === 'workspace' && <span className="small muted" data-tip="Per workspace: the one you selected last">{wsName ?? 'no workspace'}</span>}
                   <span className={`small ${w.error && !w.running && w.on ? 'warn' : 'muted'}`}>{w.on ? status(w) : w.sample ? 'off · made-up data' : 'off'}</span>

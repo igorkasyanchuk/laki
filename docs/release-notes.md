@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a right click on any of them (a cell, a rail or foot button, a My Desk tile) turns it off, moves it
+  (*Show in ›*), sizes it, opens it in the studio, remixes or deletes it (with Undo).
 - Extensions: a kit button's `do: new` can set the agent's `model`, `effort`, `perm` (auto, acceptEdits, plan) and
   `fast`, named in the app's ask. One that would never ask first is an error in the check, and the app refuses it.
 - The Pull main starter fetches the base branch itself (once per repo every 15 minutes), so its badge sees new

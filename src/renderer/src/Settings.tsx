@@ -15,7 +15,7 @@ import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, iconItems, iconWords, type IconName, keep, keyLabel, keyRec, load, ON, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
+import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, iconItems, iconWords, type IconName, keep, keyLabel, keyRec, load, type MenuItem, ON, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { PICKER_KEY } from './Picker'
 import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { QR } from './Tunnel'
@@ -2284,6 +2284,25 @@ const WcRow = ({ title, hint, children }: { title: ReactNode; hint?: ReactNode; 
   </div>
 )
 const BARS: WidgetPlace[] = ['side', 'top', 'status']
+
+// every extension's right click (a cell, a rail or foot button, a Desk tile's head; App's widgetApi.menu, Desk's
+// tileMenu), after its own items: on or off, its places and size as its card has them, the studio, Remix, Delete
+export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
+  const places = placesOf(w)
+  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
+  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(places.includes(v) ? places.filter(x => x !== v) : [...places, v])
+  const size = w.size.join('x')
+  return [
+    { label: w.on ? 'Turn off' : 'Turn on', icon: 'power', sub: w.on ? 'nothing of it runs until you turn it on' : undefined, run: () => void api.set(w.id, { on: !w.on }) },
+    { label: 'Show in', icon: 'layout', items: offered.map(([v, n, tip]) => ({ label: n, sub: tip, ...(places.includes(v) && { hint: ON }), run: () => flip(v) })) },
+    ...(places.some(p => BARS.includes(p)) && !w.button ? [{ label: 'Size', icon: 'grid', items: SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d] }) })) } as MenuItem] : []),
+    null,
+    ...(api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` ? [{ label: 'Edit with Laki AI', icon: 'ai', sub: 'the studio', run: () => api.studio!(w.id) } as MenuItem] : []),
+    ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),
+    // a repo's goes with its repo, a dev link's is your folder: neither to the trash from here
+    ...(api.rm && !w.builtin && !w.project && !w.dev ? [{ label: 'Delete…', icon: 'trash', danger: true, sub: 'to the trash: Undo brings it back', run: () => void api.rm!(w.id) } as MenuItem] : []),
+  ]
+}
 
 export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only

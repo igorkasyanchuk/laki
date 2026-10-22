@@ -927,6 +927,10 @@ Every extension, yours too, starts off: turn it on in Settings › Extensions. T
 
 My PRs takes *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
 
+A **right click** on any extension (a sidebar cell, a rail or sidebar-foot button, a My Desk tile's head) has the same
+menu: Fetch now, Inspect, Logs, Edit, turn it on or off, *Show in ›* (its places, ticked), *Size ›* for a cell, *Edit
+with Laki AI* (one of yours), *Remix* and *Delete…* (to the trash, with Undo; not one that comes with Laki or a repo).
+
 Each extension has a **page of its own**: a click on its row in Settings › Extensions (or ⚙ in its full view, *Edit*
 on a My Desk tile or in its right click). It shows how it looks where it sits, and its full view, either live or with **made-up data**
 (*Sample*: what its `widget.json` gives as `sample`, so you see it before it ever runs; every one with a fetch has
