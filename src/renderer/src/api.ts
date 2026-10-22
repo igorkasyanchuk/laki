@@ -2,6 +2,8 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+import type { UpdateState } from '../../shared/update'
+
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
 export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
@@ -27,6 +29,9 @@ type Bridge = {
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
+  update?(op: 'state' | 'check' | 'download' | 'install'): Promise<UpdateState | null> // main's update.ts
+  updateAuto?(on: boolean): void // Settings' Check for updates: at launch, then daily
+  onUpdate?(cb: (s: UpdateState) => void): () => void // its state as it changes; the function stops listening
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)
   floating?(): Promise<string[]> // the tabs floated out

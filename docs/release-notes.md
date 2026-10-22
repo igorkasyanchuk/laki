@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Updates: Laki checks for a new version at launch and once a day, and tells you once per version. Settings ›
+  General › *Updates* shows its notes, *Update* (download, then *Restart to update*; your agents keep running) or
+  *Download*, and *Check now*; the app menu has *Check for Updates…*.
 - Extensions: a gate's *Checking…* is on the Ship and Merge buttons (an archive's row says it), the held dialog
   shows each extension's icon, and *Ask the agent to fix it* shows the fix to change before it's sent.
 - Extensions: a project's `.laki/extensions` is read again after a branch without it and back; `laki widget log`

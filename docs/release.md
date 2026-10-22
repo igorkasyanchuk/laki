@@ -1,6 +1,6 @@
 # Releasing Laki
 
-The build is ad-hoc signed (`mac.identity: "-"`; unsigned, a download reads as "damaged"), not notarized, one architecture per build, with no auto-update (see the guide's limits).
+A build here (`npm run pack`, `npm run dmg`) is ad-hoc signed (`mac.identity: "-"`; unsigned, a download reads as "damaged"), not notarized, one architecture per build; its Update is a link to the release's page, since only a signed app replaces itself (see the guide's limits).
 
 `npm run release` runs these steps for every platform, signed and notarized with your Developer ID, and uploads a
 draft to the public releases repo: [manual-release.md](manual-release.md).

@@ -5,7 +5,7 @@ export type Link =
   | { to: 'ws'; ws: string; tab?: string }
   | { to: 'new'; project?: string; prompt?: string; name?: string } // never a preset (L12): the agent and its mode are yours to pick
   | { to: 'schedules'; project?: string }
-  | { to: 'settings'; section?: string }
+  | { to: 'settings'; section?: string; spot?: string } // spot: a group's title, lit (the app menu's Check for Updates…)
   | { to: 'extension'; id: string; inspect?: boolean } // laki://settings/widgets/<id>[/inspect]: its page, or its inspector
   | { to: 'studio'; id: string } // laki://settings/widgets/new, laki://settings/widgets/<id>/studio: the extension studio ('': a new one)
   | { to: 'help' }
@@ -48,7 +48,7 @@ export function parseLink(url: string): Link | null {
       if (arg === 'widgets' && parts[1] === 'new' && !parts[2]) return { to: 'studio', id: '' }
       if (arg === 'widgets' && parts[1] && parts[2] === 'studio') return { to: 'studio', id: parts[1] }
       if (arg === 'widgets' && parts[1]) return { to: 'extension', id: parts[1], ...(parts[2] === 'inspect' && { inspect: true }) }
-      return { to: 'settings', section: arg ?? q('section') }
+      return { to: 'settings', section: arg ?? q('section'), ...(q('spot') && { spot: q('spot') }) }
     case 'help':
       return { to: 'help' }
     case 'board':

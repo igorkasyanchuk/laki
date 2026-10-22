@@ -104,7 +104,22 @@ changing it: [AGENTS.md](../AGENTS.md).
 
 ## Install
 
-You need:
+Download the dmg for your Mac (Apple silicon or Intel) from
+[the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest): it's signed and notarized, so
+a double-click opens it. Drag Laki to Applications. Or with Homebrew:
+
+```bash
+brew install --cask igorkasyanchuk/laki/laki    # Laki.app in /Applications
+brew upgrade --cask laki                        # a new version (quit Laki first)
+brew uninstall --cask laki                      # --zap also removes its settings; ~/.laki stays
+```
+
+The tap is [igorkasyanchuk/homebrew-laki](https://github.com/igorkasyanchuk/homebrew-laki); each release updates it.
+Homebrew installs the app only: the `laki` command comes from Settings › General › *Developer* › *Install the laki
+command*. `~/.laki` holds
+your workspaces' worktrees and Laki's state, so no uninstall removes it: delete it yourself once nothing in it matters.
+
+To build it yourself, you need:
 
 - macOS on Apple silicon or Intel
 - Node 22.6+ (23 recommended) and npm
@@ -126,7 +141,7 @@ Intel. Open it from there, or copy it to /Applications:
 open "dist/mac-arm64/Laki.app"   # Intel: dist/mac/Laki.app
 ```
 
-A downloaded copy (a dmg sent over Slack, mail, a browser) is quarantined: the first open says Apple could not
+A copy of such a build sent elsewhere (a dmg over Slack, mail, a browser) is quarantined: the first open says Apple could not
 verify Laki. Click Done, then System Settings › Privacy & Security › *Open Anyway* (once). Or in Terminal:
 
 ```bash
@@ -2004,7 +2019,18 @@ sidebar for (youtube-nocookie.com).
 
 ## Updating
 
-After pulling or changing the code, rebuild (`npm run pack`) and reopen the app. The running daemon stays the
+Laki checks for a new version at launch and once a day (Settings › General › *Updates*, where *Check for updates*
+turns it off; the app menu's *Check for Updates…* asks now). A new version says so once, in a toast; nothing
+downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
+signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
+your own: the release's page). Pre-releases are never offered.
+
+By hand: quit it (⌘Q: the daemon and your agents keep running), then either `brew upgrade --cask laki` or download
+the new dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and replace
+the app in /Applications. Your projects, workspaces and settings stay. Built from source: after pulling or changing
+the code, rebuild (`npm run pack`) and reopen the app.
+
+Either way, the running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
 come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`).
@@ -2032,7 +2058,7 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 
 ## Known limits
 
-- **Build**: ad-hoc signed, not notarized (the first open of a download needs *Open Anyway*), one architecture per build (no universal app), no auto-update. The app is ~290 MB and uses ~500 MB of memory.
+- **Build**: a release is signed and notarized; one built here is ad-hoc signed, not notarized (the first open of a copy sent elsewhere needs *Open Anyway*); one architecture per build (no universal app); an update replaces the app only when it's a signed download (Settings › General › Updates), else it's a download link. The app is ~290 MB and uses ~500 MB of memory.
 - **Startup**: when the daemon starts, every tab of every workspace starts (agents resume). After a reboot that can mean many agents at once.
 - **Daemon**: if it dies, its terminals end. Agents come back resumed. Shells start fresh, without what ran in them (a stop brings that back too, see Updating).
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).

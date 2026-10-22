@@ -521,6 +521,7 @@ export type Settings = {
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
   shotAsk?: boolean // Screenshot to Laki AI: a global hotkey and a menu bar item, a part of the screen to the AI window with the mic on (off unless true; needs Laki AI)
   shotKey?: string // its keys (unset: ui.tsx SHOT_KEY; '': none, the menu bar's item only)
+  updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetAgent?: string // Settings › Extensions' agent: the claude or codex preset an AI source runs (unset: the first claude one)
   widgetLogs?: boolean // Settings › Extensions' Keep logs for every extension (widgets.ts' logs; unset: only those with their own Keep a log)

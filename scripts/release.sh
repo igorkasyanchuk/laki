@@ -5,11 +5,14 @@
 # until `publish`.
 #   scripts/release.sh [minor|patch|major|<x.y.z>] [--no-upload] [--adhoc] [--skip=mac-x64,linux-x64,…] [--any-branch]
 #   scripts/release.sh upload <x.y.z>     upload dist/release/<x.y.z> to its draft (again, after a failed upload)
-#   scripts/release.sh publish <x.y.z>    push the tag, and the draft goes live
+#   scripts/release.sh publish <x.y.z>    push the tag, and the draft goes live, then the Homebrew tap follows it
+#   scripts/release.sh tap <x.y.z>        the tap's cask to a published release (again, after a failed bump)
+#   scripts/release.sh cask <x.y.z> <SHA256SUMS.txt>   print that cask
 set -eo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 REPO=$(node -p "const p = [].concat(require('./package.json').build.publish)[0]; p.owner + '/' + p.repo")
+TAP=${REPO%%/*}/homebrew-laki # brew install --cask <owner>/laki/laki
 PROFILE=${APPLE_KEYCHAIN_PROFILE:-laki-notary}
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
@@ -28,18 +31,31 @@ rel() {
 
 # what a release holds, besides SHA256SUMS.txt: the downloads and the updaters' feeds (latest-mac.yml…)
 files() { (cd "dist/release/$1" && shopt -s nullglob && printf '%s\n' Laki-"$1"-*.dmg Laki-"$1"-*.zip Laki-"$1"-*.AppImage \
-  *.blockmap *-mac.yml *-linux*.yml); }
+  *.blockmap *-mac.yml *-linux*.yml update-mac-*.json); }
 
 upload() {
-  local v=$1 dir=dist/release/$1 f notes
+  local v=$1 dir=dist/release/$1 f notes a bin
   [ -d "$dir" ] || die "no $dir: build it first"
-  f=$(files "$v")
-  [ -n "$f" ] || die "nothing to upload in $dir"
-  (cd "$dir" && shasum -a 256 $f > SHA256SUMS.txt)
-  f="$f SHA256SUMS.txt"
+  [ -n "$(files "$v")" ] || die "nothing to upload in $dir"
   notes=$(mktemp) # this version's section of docs/release-notes.md (scripts/notes.ts stamped it "## <v> · <date>")
   awk -v h="## $v" 'index($0, h " ") == 1 || $0 == h { on = 1; next } on && /^## / { exit } on' docs/release-notes.md > "$notes"
   [ -s "$notes" ] || echo "Laki $v" > "$notes"
+  for a in arm64 x64; do # the app's Update (src/main/update.ts): Squirrel.Mac's feed for each Mac's zip
+    rm -f "$dir/update-mac-$a.json"
+    [ -f "$dir/Laki-$v-$a.zip" ] || continue
+    # only a Developer ID build: Squirrel.Mac turns down an ad-hoc one for a signed install (its Download stays)
+    bin=$(mktemp)
+    unzip -p "$dir/Laki-$v-$a.zip" Laki.app/Contents/MacOS/Laki > "$bin" || true
+    case $(codesign -dv --verbose=2 "$bin" 2>&1) in # no pipe into grep -q: pipefail and SIGPIPE
+      *'Authority=Developer ID Application:'*) rm -f "$bin" ;;
+      *) rm -f "$bin"; echo "Laki-$v-$a.zip isn't Developer ID signed: no update feed for it" >&2; continue ;;
+    esac
+    node --experimental-strip-types --no-warnings -e 'import("./src/shared/update.ts").then(m => { const [v, a, repo, notes] = process.argv.slice(1); console.log(m.feedOf(v, a, require("fs").readFileSync(notes, "utf8").trim(), new Date().toISOString(), repo)) })' \
+      "$v" "$a" "$REPO" "$notes" > "$dir/update-mac-$a.json"
+  done
+  f=$(files "$v")
+  (cd "$dir" && shasum -a 256 $f > SHA256SUMS.txt)
+  f="$f SHA256SUMS.txt"
   local s
   s=$(rel "$v")
   case $s in
@@ -75,10 +91,64 @@ publish() {
   esac
   echo "Live: $(gh release view "v$v" -R "$REPO" --json url -q .url)"
   echo "Push $(git branch --show-current) when you're ready: the release commit is on it."
+  tap "$v"
+}
+
+# the tap's Casks/laki.rb for version $1 from its SHA256SUMS.txt ($2): both Macs, or Apple silicon only (--skip=mac-x64).
+# zap leaves ~/.laki: worktrees with work not committed live there
+cask() {
+  local v=$1 arm x64 arch sha dmg dep
+  arm=$(awk -v f="Laki-$v-arm64.dmg" '$2 == f { print $1 }' "$2")
+  x64=$(awk -v f="Laki-$v-x64.dmg" '$2 == f { print $1 }' "$2")
+  [ -n "$arm" ] || return 1
+  if [ -n "$x64" ]; then
+    arch=$'  arch arm: "arm64", intel: "x64"\n\n' dmg='#{arch}' dep=
+    sha="sha256 arm:   \"$arm\",
+         intel: \"$x64\""
+  else
+    arch= sha="sha256 \"$arm\"" dmg=arm64 dep=$'  depends_on arch: :arm64\n'
+  fi
+  cat << EOF
+cask "laki" do
+${arch}  version "$v"
+  $sha
+
+  url "https://github.com/$REPO/releases/download/v#{version}/Laki-#{version}-$dmg.dmg"
+  name "Laki"
+  desc "Runs coding agents side by side, each task in its own git worktree"
+  homepage "https://github.com/$REPO"
+
+${dep}  depends_on :macos
+
+  app "Laki.app"
+
+  zap trash: [
+    "~/Library/Application Support/Laki",
+    "~/Library/Preferences/dev.laki.app.plist",
+    "~/Library/Saved Application State/dev.laki.app.savedState",
+  ]
+end
+EOF
+}
+
+# a published release into the tap: its cask written through GitHub's API (no clone); a pre-release leaves it be
+tap() {
+  local v=$1 sums file sha
+  case $v in *-*) echo "v$v is a pre-release: the tap stays as it is"; return ;; esac
+  [ "$(rel "$v")" = published ] || die "v$v isn't published on $REPO: the tap stays as it is"
+  sums=$(mktemp) file=$(mktemp)
+  gh release download "v$v" -R "$REPO" -p SHA256SUMS.txt -O "$sums" --clobber
+  cask "$v" "$sums" > "$file" || die "no Laki-$v-arm64.dmg in v$v's SHA256SUMS.txt: the tap stays as it is"
+  sha=$(gh api "repos/$TAP/contents/Casks/laki.rb" -q .sha 2> /dev/null) || sha= # none yet: the first one
+  gh api -X PUT "repos/$TAP/contents/Casks/laki.rb" -f message="laki $v" -f content="$(base64 < "$file")" \
+    ${sha:+-f "sha=$sha"} > /dev/null || die "$TAP's cask wasn't written: scripts/release.sh tap $v"
+  rm -f "$sums" "$file"
+  echo "Tap: brew install --cask ${TAP%%/*}/laki/laki ($v)"
 }
 
 case $1 in
-  upload | publish) [ -n "$2" ] || die "usage: scripts/release.sh $1 <version>"; "$1" "${2#v}"; exit ;;
+  upload | publish | tap) [ -n "$2" ] || die "usage: scripts/release.sh $1 <version>"; "$1" "${2#v}"; exit ;;
+  cask) [ -f "$3" ] || die "usage: scripts/release.sh cask <version> <SHA256SUMS.txt>"; cask "${2#v}" "$3" || die "no Laki-${2#v}-arm64.dmg in $3"; exit ;;
 esac
 
 BUMP=minor UPLOAD=1 ADHOC=0 SKIP= ANY=0
