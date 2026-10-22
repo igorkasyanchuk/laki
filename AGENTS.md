@@ -1664,7 +1664,7 @@ ask each time (`ask: 'always'`: no Always); `widgetSet` `on: true` from one is r
 them off (and guarded: `agentDev`), `widgetNew` and `widgetRestore` from one make them off, `widgetCheck` from one runs no off one. ponytail: the same user can read daemon.json's token. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
 `tool:<action>` with who and how), its stdout back (`TOOL_OUT`, 16 KB). Grants go with the extension off, its commands
 changed (`cmdsOf` at scan) or a workspace gone; `widgetGrantRm` is Settings' Revoke. App's `toolAsk`: `choose` (Allow
-once, *Always in <ws>* for first, Deny; Esc and a newer dialog: deny) and a notification with the same actions
+once, *Always in <ws>* for first, Deny; Esc, outside or its time running out: deny; a newer ask covers it and it comes back, a page or dialog opened over it (`AWAY`, App's effect on `dialog`) puts it back in line until that closes) and a notification with the same actions
 (main's `tool` action calls `widgetToolAnswer`); `toolDone` closes the dialog (`unchoose`). The CLI's `laki widget
 tools|tool`; MCP's `laki_extension_tools`, `laki_extension_call` and an `ext_<id>_<action>` tool per one (listed only
 with a daemon up: `alive`); Laki AI has them as MCP's; `LAKI_NOTE` names them while one is on (`TOOLS_NOTE`).
@@ -2179,7 +2179,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   project's), `ProjectMark`,
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
-  `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
+  `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it (`stopImmediatePropagation`: not the page's Esc too), Esc or outside is no; a newer one covers it, `waiting`, and it comes back as that closes; `unchoose(tag, i)` closes one on screen or waiting).
 - **`Project.tsx`**: a project's page (a click on its name in the sidebar, its ⋯ › *Open project page*; dialog
   `{ project, tab? }`: its ⋯ › Settings opens that tab, else the last one, `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
   an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory

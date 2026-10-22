@@ -75,7 +75,8 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 }
 
 // ask: a yes/no question in the app's own dialog (confirm() is the OS's sheet), true on OK. AskHost, mounted once
-// in App, shows it; a newer question answers the one before with no. Esc or a click outside: no; Enter: the focused
+// in App, shows it; a newer question covers the one before, which waits, first in line, and comes back as the newer one
+// closes (#18: a covered tool ask was a deny). Esc or a click outside: no; Enter: the focused
 // button (OK at first); its keys never reach what's under it, ⌘ shortcuts aside. choose: the same dialog with any
 // buttons (a widget's modal), the index picked, -1 for none; check: a checkbox under the text, its on as it was left.
 type Choice = { label: string; primary?: boolean; danger?: boolean }
@@ -98,27 +99,37 @@ export const askText = (title: string, o: { text?: string; ok?: string; placehol
     if (!asker) return done(null)
     asker({ title, text: o.text, field, buttons: [{ label: o.ok ?? 'OK', primary: true }, { label: 'Cancel' }], done: i => done(i === 0 ? field.value : null) })
   })
-// unchoose: closes the dialog choose showed with that tag, as none (-1): answered elsewhere (a tool's notification)
-let closer: ((tag: string) => void) | null = null
-export const unchoose = (tag: string) => ((early = early.filter(x => (x.tag === tag ? (x.done(-1), false) : true))), closer?.(tag))
+// unchoose: closes the dialog choose showed with that tag, waiting or on screen, as none (-1: answered elsewhere, a
+// tool's notification) or as i (App's AWAY: a page opened over it)
+let closer: ((tag: string, i: number) => void) | null = null
+export const unchoose = (tag: string, i = -1) => ((early = early.filter(x => (x.tag === tag ? (x.done(i), false) : true))), closer?.(tag, i))
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
   const [on, setOn] = useState(false) // check's
   const cur = useRef<{ a: Asking; back: Element | null } | null>(null)
+  const waiting = useRef<Asking[]>([]) // ones a newer ask covered, the last covered first
   const box = useRef<HTMLDivElement>(null)
+  const show = (next: Asking, back: Element | null) => {
+    cur.current = { a: next, back }
+    setOn(!!next.check?.on)
+    setA(next)
+  }
   const close = (i: number) => {
     const c = cur.current
     if (!c) return
     cur.current = null
     setA(null)
     c.a.done(i)
-    if (c.back instanceof HTMLElement) c.back.focus() // the terminal it came from
+    const w = waiting.current.shift()
+    const at = document.activeElement
+    if (w) show(w, c.back) // the one it covered, back
+    else if (c.back instanceof HTMLElement && (!at || at === document.body || box.current?.contains(at))) c.back.focus() // the terminal it came from, unless a page that opened over it has the keyboard
   }
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
     if (!cur.current || e.metaKey || e.ctrlKey || e.altKey) return
-    e.stopPropagation()
+    e.stopImmediatePropagation() // the keys are its: not App's, nor the page's under it (its Esc)
     if (document.activeElement?.matches('.ask-field input') && !['Escape', 'Enter', 'Tab'].includes(e.key)) return // typing in it
     e.preventDefault()
     const btns = [...(box.current?.querySelectorAll('button') ?? [])]
@@ -135,12 +146,13 @@ export function AskHost() {
   }
   useEffect(() => {
     asker = next => {
-      cur.current?.a.done(-1)
-      cur.current = { a: next, back: cur.current?.back ?? document.activeElement }
-      setOn(!!next.check?.on)
-      setA(next)
+      if (cur.current) waiting.current.unshift(cur.current.a)
+      show(next, cur.current?.back ?? document.activeElement)
     }
-    closer = t => void (cur.current?.a.tag === t && close(-1))
+    closer = (t, i) => {
+      waiting.current = waiting.current.filter(x => (x.tag === t ? (x.done(i), false) : true))
+      if (cur.current?.a.tag === t) close(i)
+    }
     early.splice(0).forEach(asker)
     const f = (e: KeyboardEvent) => onKey.current(e)
     window.addEventListener('keydown', f, true) // before the terminal and the page under it

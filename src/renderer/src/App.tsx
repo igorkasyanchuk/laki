@@ -159,6 +159,7 @@ const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search
 type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'deny' }[]; answer: (allow: string) => void }
 const toolLine = new Line<ToolAsk>()
 let toolOn: string | undefined
+const AWAY = -2 // #18: a page or dialog opened over the ask on screen: it waits, first in line, and comes back as that closes
 function toolShow() {
   const t = toolLine.first
   if (!t || toolOn === t.req) return
@@ -166,7 +167,8 @@ function toolShow() {
   toolOn = t.req
   void choose(t.title, t.text, t.picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' })), undefined, t.req).then(i => {
     toolOn = undefined
-    // Esc or outside denies the one on screen only; one answered elsewhere (toolDone) or moved back: just the next
+    if (i === AWAY) return // App's effect on its dialog shows it again
+    // Esc, Deny or outside denies the one on screen only; one answered elsewhere (toolDone) or moved back: just the next
     if (toolLine.first === t) toolLine.drop(t.req), t.answer(t.picks[i]?.allow ?? 'deny')
     toolShow()
   })
@@ -424,6 +426,12 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [picking, setPicking] = useState(false) // development mode's element picker (Picker.tsx)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
+  // #18: a page or dialog opened over an extension's or agent's ask puts it back in line (not a deny: its Esc would have
+  // been the page's); it shows again as that closes. One that comes while a page is open shows over it
+  useEffect(() => {
+    if (dialog && toolOn) unchoose(toolOn, AWAY)
+    else if (!dialog) toolShow()
+  }, [dialog])
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [newInit, setNewInit] = useState<Partial<NewWsParams> & { linked?: boolean }>() // a laki://new link's prompt and name (linked: the page says so)
   const [newImages, setNewImages] = useState<Shot[]>([]) // the menu bar's screenshots, in the new workspace's prompt

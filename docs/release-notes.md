@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's or extension's ask no longer counts as a *Deny* when another dialog or page opens over it: it waits and
+  comes back as that closes. Only Esc, Deny, a click outside or its time running out deny it.
 - Laki tells an agent's commands apart better: one that double-forks out of its tab is still its tab's (by its
   terminal), and an agent in a shell tab counts under npx or a wrapper, with no window open. An agent's revert, delete or
   restore of a workflow leaves it the agent's: not trusted to start on its own until you save it.
