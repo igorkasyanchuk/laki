@@ -102,7 +102,7 @@ Download the dmg for your Mac from [the latest release](https://github.com/igork
 brew install --cask igorkasyanchuk/laki/laki    # then: brew upgrade --cask laki
 ```
 
-Or build it (Node 22.6+, git):
+Or build it (Node 22.12+, git):
 
 ```bash
 git clone https://github.com/igorkasyanchuk/laki && cd laki

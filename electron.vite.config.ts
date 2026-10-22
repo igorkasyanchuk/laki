@@ -11,14 +11,14 @@ export default defineConfig({
     // the Electron main process, the daemon (run as node), the CLI and agents' hook (hook.js), side by side in out/main
     define: { __BUILT__: BUILT },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: resolve('src/main/index.ts'), daemon: resolve('src/daemon/main.ts'), cli: resolve('src/cli/main.ts'), hook: resolve('src/cli/hook.ts') },
       },
     },
   },
   preload: {
     // sandboxed preloads must be CommonJS
-    build: { rollupOptions: { input: { index: resolve('src/preload/index.ts') }, output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
+    build: { rolldownOptions: { input: { index: resolve('src/preload/index.ts') }, output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {
     root: 'src/renderer',
@@ -33,6 +33,6 @@ export default defineConfig({
     ],
     define: { __BUILT__: BUILT }, // About's build time (the dev server's: its start), and the stale daemon's check
     server: { port: 5199, strictPort: true, host: '127.0.0.1' },
-    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles
+    build: { rolldownOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles
   },
 })

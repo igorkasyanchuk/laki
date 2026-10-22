@@ -122,7 +122,7 @@ your workspaces' worktrees and Laki's state, so no uninstall removes it: delete 
 To build it yourself, you need:
 
 - macOS on Apple silicon or Intel
-- Node 22.6+ (23 recommended) and npm
+- Node 22.12+ (23 recommended) and npm
 - git
 
 Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PATH: `claude`, `codex`, `gemini`,

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Laki runs on Electron 45 (Chromium 156, Node 24.22). Mermaid 12 lays out flowcharts, state, class and ER diagrams
+  with ELK; one that says `layout: dagre` keeps the old look.
 - Agents: an agent can't change a project's scripts, env, trust or memory list (it adds to memory with `laki memory
   add`), and can't start a workspace or a race whose agent never asks, whatever its call says. *Update* never
   installs a version older than the one running.
