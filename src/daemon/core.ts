@@ -1,7 +1,8 @@
 // The daemon's model: projects, workspaces (git worktrees), tabs (PTY sessions), agent status from hooks and
 // the follow-up queue. One process owns it all; clients get `View`s pushed on every change. Its other parts are
 // modules that import it and that it re-exports: hosts, pr, files, remote, resources, artifacts, meters, phone,
-// schedule (none of them reads one of core's values as it loads: core loads after them).
+// schedule. None of the modules in this cycle reads another's const or let as it loads (test/load-order.test.ts);
+// the data folder is dir.ts', out of it.
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { chmod, copyFile, rm, symlink } from 'node:fs/promises'
@@ -11,11 +12,12 @@ import { homedir, userInfo } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { dataDir, readJson } from '../shared/conn.ts'
+import { readJson } from '../shared/conn.ts'
 import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Sep, type Settings, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
+import { dir } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accounts, loginCmd } from './accounts.ts'
 import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
@@ -31,6 +33,7 @@ import { inside, scanStats, stats } from './files.ts'
 import { flowFiles, REMINDERS_DONE, RUNS_SHOWN } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
+export { dir }
 export * from './hosts.ts'
 export * from './pr.ts'
 export * from './artifacts.ts'
@@ -43,7 +46,6 @@ export * from './schedule.ts'
 
 export const run = promisify(execFile)
 
-export const dir = dataDir()
 const statePath = join(dir, 'state.json')
 export const runDir = join(dir, 'run')
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'

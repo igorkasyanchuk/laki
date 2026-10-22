@@ -3,10 +3,10 @@
 
 import { closeSync, openSync, readSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { dataDir, readJson, writeAtomic } from '../shared/conn.ts'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { type Tab, type TabView, type Today } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
-import { changed, presetOf, state } from './core.ts'
+import { changed, dir, presetOf, state } from './core.ts'
 import { dayOf, type Meter, meterNew, meterOf, transcriptOf } from './share.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
@@ -48,7 +48,7 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
 // and a restart reading each chat anew counts it once (the more of the two)
 type MeterRun = Tail & { m: Meter }
 const meters = new Map<string, MeterRun>()
-const todayPath = join(dataDir(), 'usage-today.json') // dataDir(), not core's dir: meters.ts loads before core does
+const todayPath = join(dir, 'usage-today.json')
 let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
 function spentNow() {
   const day = dayOf(Date.now())

@@ -62,7 +62,7 @@ export function noteList(p: { q?: string } = {}) {
     names = readdirSync(home).filter(f => f.endsWith('.json'))
   } catch {}
   const words = String(p.q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
-  const all: Note[] = names.flatMap(f => readJson<Note>(join(home, f)) ?? [])
+  const all: Note[] = names.flatMap(f => (n => (n ? [n] : []))(readJson<Note>(join(home, f))))
   return all
     .filter(n => !words.length || (t => words.every(w => t.includes(w)))(`${n.title}\n${n.md ?? ''}`.toLowerCase()))
     .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at - a.at)
