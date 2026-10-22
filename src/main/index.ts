@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import type { View } from '../shared/types.ts'
+import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
 // environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
@@ -321,6 +322,15 @@ ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label
 // Screenshot to Laki AI's keys ('' none); false: it's off (no menu bar item either)
 ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label !== false), bindKey('shot', shotOn ? label : '', shotAsk)))
 app.on('will-quit', () => globalShortcut.unregisterAll())
+
+// updates (./update.ts): its state to the app window as it changes. Installing quits for good: quitAndInstall emits
+// autoUpdater's before-quit-for-update, not app's before-quit, ahead of closing the windows, whose close would only hide them
+const updates = updater(s => win?.webContents.send('update', s))
+autoUpdater.on('before-quit-for-update', () => (quitting = true))
+ipcMain.handle('update', (e, op: unknown) =>
+  !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : updates.state(),
+)
+ipcMain.on('update-auto', (e, on: unknown) => from(e) && updates.auto(on === true)) // Settings' Check for updates
 
 ipcMain.handle('conn', async e => {
   if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
@@ -1143,6 +1153,7 @@ const appMenu = () => Menu.setApplicationMenu(
       label: app.name,
       submenu: [
         { label: `About ${app.name}`, click: () => openLink('laki://about') }, // the renderer's: with the website
+        { label: 'Check for Updates…', click: () => (openLink('laki://settings/general?spot=Updates'), void updates.check()) },
         { type: 'separator' },
         bound('Settings…', 'settings'),
         { type: 'separator' },

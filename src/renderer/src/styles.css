@@ -1563,6 +1563,9 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .cli-row { align-items: center; }
 .cli-links { display: flex; gap: 14px; margin-top: 3px; }
 .cli-links a { color: var(--accent-ink); }
+/* Settings › General › Updates: the newest release's notes, scrolled past a few lines */
+.update-notes { max-height: 220px; overflow: auto; margin: 2px 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--rs, 8px); font-size: 12.5px; }
+.update-notes > a { color: var(--accent-ink); }
 /* the app's pane of a floated tab: where it went, and the way back */
 .floated { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--muted); text-align: center; }
 .floated .row { gap: 8px; }

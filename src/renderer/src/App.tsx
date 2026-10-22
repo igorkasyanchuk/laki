@@ -1127,7 +1127,7 @@ export function App() {
       setNewInit({ prompt: l.prompt, name: l.name, ...(l.prompt && { linked: true }) })
       setDialog('new')
     } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
-    else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')
+    else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section, ...(l.spot && { spot: l.spot }) } : 'settings')
     else if (l?.to === 'studio') aiOn(settings) ? setDialog({ studio: l.id, back: { section: 'widgets' } }) : setDialog(l.id ? { extension: l.id, back: { section: 'widgets' } } : { section: 'ai' })
     else if (l?.to === 'extension') view.widgets?.some(w => w.id === l.id) ? setDialog({ extension: l.id, back: { section: 'widgets' }, ...(l.inspect && { tab: 'data' as const }) }) : toast(`No extension ${l.id}`)
     else if (l?.to === 'help') setDialog('help')
@@ -1621,6 +1621,10 @@ export function App() {
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
   const shotKey = !view ? null : settings.shotAsk === true && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey)), [shotKey])
+  const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
+  useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto)), [updateAuto])
+  // a version a scheduled check found, once each (main's update.json): its notes and Download are in Settings
+  useEffect(() => bridge?.onUpdate?.(s => void (s.found && s.latest && toast(`Laki ${s.latest.version} is out`, () => setDialog({ section: 'general', spot: 'Updates' }), "See what's new"))), [])
   // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
   const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)

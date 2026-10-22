@@ -24,6 +24,14 @@ contextBridge.exposeInMainWorld('laki', {
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
   keys: (over: Record<string, string>) => ipcRenderer.send('keys', over), // Settings › Keys' over shared/keys.ts' defaults: the menu shows them
   shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label), // Screenshot to Laki AI's ('' none; false: it's off)
+  // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
+  update: (op: 'state' | 'check' | 'download' | 'install'): Promise<object | null> => ipcRenderer.invoke('update', op),
+  updateAuto: (on: boolean) => ipcRenderer.send('update-auto', on),
+  onUpdate: (cb: (s: object) => void) => {
+    const f = (_e: unknown, s: object) => cb(s)
+    ipcRenderer.on('update', f)
+    return () => void ipcRenderer.removeListener('update', f)
+  },
   // the AI window's: Screenshot to Laki AI's picture (a PNG, base64), for its box
   onAiShot: (cb: (png: string) => void) => {
     ipcRenderer.on('ai-shot', (_e, png: string) => cb(png))

@@ -25,13 +25,19 @@ nowhere.
 | file | for |
 |---|---|
 | `Laki-<v>-arm64.dmg`, `Laki-<v>-x64.dmg` | downloads for Apple silicon and Intel Macs |
-| `Laki-<v>-arm64.zip`, `Laki-<v>-x64.zip`, `latest-mac.yml` | the macOS updater's feed (Squirrel.Mac takes the zip) |
-| `Laki-<v>-arm64.AppImage`, `Laki-<v>-x86_64.AppImage` | Linux downloads, and their own updates |
-| `latest-linux.yml`, `latest-linux-arm64.yml` | the Linux updater's feed |
-| `*.blockmap` | differential updates: only the changed blocks download |
+| `Laki-<v>-arm64.zip`, `Laki-<v>-x64.zip` | what the app's *Update* downloads (Squirrel.Mac takes the zip) |
+| `update-mac-arm64.json`, `update-mac-x64.json` | the app's update feed per Mac (`src/shared/update.ts` `feedOf`): this version's zip |
+| `latest-mac.yml` | electron-updater's feed, unused by the app |
+| `Laki-<v>-arm64.AppImage`, `Laki-<v>-x86_64.AppImage` | Linux downloads |
+| `latest-linux.yml`, `latest-linux-arm64.yml` | electron-updater's Linux feeds, unused by the app |
+| `*.blockmap` | electron-updater's differential updates, unused by the app (Squirrel.Mac takes the whole zip) |
 | `SHA256SUMS.txt` | checksums of everything above |
 
-The app doesn't check for updates yet; the feeds are there so the first version that does finds them.
+The app (`src/main/update.ts`) asks GitHub for the repo's latest release at launch and daily, compares its tag with
+its own version, and, when you click *Update*, downloads through Electron's autoUpdater from that release's
+`update-mac-<arch>.json`. Only a Developer ID signed app replaces itself; an ad-hoc one links to the release's page.
+`upload` writes a feed only for a Developer ID signed zip (Squirrel.Mac turns an ad-hoc build down), so an `--adhoc`
+release, like one published before these feeds existed, is offered as *Download* only.
 
 ## Once
 
@@ -164,8 +170,8 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 
 ## Not yet
 
-- The app checking for updates (electron-updater reading the feeds above), and its daemon restarting itself once
-  agents are idle.
+- The daemon restarting itself after an update once agents are idle (the yellow bar asks you); the AppImage updating
+  itself (Linux gets *Download*).
 - Homebrew's own `homebrew/cask` (`brew install --cask laki`): it takes notable apps only
   ([Acceptable Casks](https://docs.brew.sh/Acceptable-Casks)); the tap until then.
 - Windows.

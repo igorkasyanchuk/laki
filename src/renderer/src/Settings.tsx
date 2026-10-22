@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { type Account, ACCOUNT_AGENTS, type AccountAgent, type AccountView, type AchievementsKept, actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, aiOn, type AiSettings, type AiTotals, ANSWER_WHY, answerOk, COMPACT_DAYS, type Doctor, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, IMAGE_DAYS, isAccountAgent, type Memory, MEMORY_MAX, type MergeMethod, MODELS, type NotifyKind, permInArgs, PERMS, placesOf, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRMarks, type ProcUse, type ProjectLook, REMOTE_TRIES, type Resources, type SideLook, type SideStyle, type SimCheck, type SimDev, SLEEP_AFTER, specsOn, type StudioChat, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, webhookUrl, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
+import { RELEASES_URL, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -195,6 +196,7 @@ export type AppSettings = Paint & {
   hotkey?: string // its keys (unset: HOTKEY; '': none)
   shotAsk?: boolean // Screenshot to Laki AI (off unless true)
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
+  updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   specs?: boolean // Specs & Brainstorms (Specs.tsx), on unless false
   workflows?: boolean // Workflows (Workflows.tsx), on unless false
   birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
@@ -1235,6 +1237,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
+  ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
   ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
   ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
@@ -2819,6 +2822,67 @@ function HotkeyField(p: { on: boolean; keys: string; def: string; title: string;
   )
 }
 
+// main's update.ts: this version, the newest release (its notes), and the one next step: Download (a signed Mac:
+// here, then Restart to update; elsewhere the release's page), or Check now
+function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }) {
+  const [u, setU] = useState<UpdateState | null>(null)
+  const [, tick] = useState(0) // "checked … ago" moves on while the page stays open
+  useEffect(() => {
+    void bridge!.update!('state').then(setU)
+    const t = setInterval(() => tick(n => n + 1), 60_000)
+    const off = bridge!.onUpdate!(setU)
+    return () => (clearInterval(t), off())
+  }, [])
+  if (!u) return null
+  const run = (op: 'check' | 'download' | 'install') =>
+    void bridge!.update!(op).then(setU, (e: Error) => setU(x => x && { ...x, status: 'error', error: e.message }))
+  const l = u.latest
+  const page = () => openExternal(l?.url ?? RELEASES_URL)
+  const here = !!l && u.install && l.feed // Laki replaces itself; else the release's page
+  const says =
+    u.status === 'checking' ? 'Checking…'
+    : u.status === 'downloading' ? `Downloading ${l?.version}…`
+    : u.status === 'ready' ? `${l?.version} is downloaded: restart to finish. Your agents keep running.`
+    : u.status === 'error' ? u.error
+    : l ? `Laki ${l.version} is out`
+    : u.checked ? `Up to date · checked ${ago(u.checked)}`
+    : 'Not checked yet'
+  return (
+    <div className="setting-box">
+      <div className="row">
+        <Says title={`Laki ${u.version}`} hint={says} />
+        <span className="grow" />
+        {u.status === 'ready' ? (
+          <button type="button" className="primary" onClick={() => run('install')}>
+            Restart to update
+          </button>
+        ) : l && u.status !== 'downloading' && u.status !== 'checking' ? (
+          <button type="button" className="primary" onClick={() => (here ? run('download') : page())}>
+            {here ? `Update to ${l.version}` : 'Download'}
+          </button>
+        ) : null}
+        <button type="button" disabled={u.status === 'checking' || u.status === 'downloading' || u.status === 'ready'} onClick={() => run('check')}>
+          Check now
+        </button>
+      </div>
+      {l && u.status !== 'ready' && (
+        <div className="update-notes">
+          {l.notes && <Markdown src={l.notes} />}
+          <a href={l.url} onClick={e => (e.preventDefault(), page())}>
+            Release page ↗
+          </a>
+        </div>
+      )}
+      <Switch className="switch-row" on={on} onChange={onOn}>
+        <Says title="Check for updates" hint="At launch and once a day Laki asks GitHub for its newest release, and tells you once per version. Nothing downloads until you click Update." />
+      </Switch>
+      <p className="muted small">
+        After an update the yellow bar offers to restart Laki's daemon when you're ready. <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>All releases ↗</a>
+      </p>
+    </div>
+  )
+}
+
 const CLI_DOCS = 'https://github.com/igorkasyanchuk/laki/blob/main/docs/guide.md#cli' // panels.tsx' REPO
 // the laki command for any shell (core.ts cliInstall): a launcher in Homebrew's bin, /usr/local/bin or ~/.local/bin
 export type CliState = { path?: string; current: boolean; onPath: boolean; other?: string; to: string }
@@ -3257,6 +3321,11 @@ export function SettingsPage(p: {
                 </select>
               </label>
               </Group>
+              {bridge?.update && (
+                <Group title="Updates">
+                  <UpdatesField on={s.updateCheck !== false} onOn={updateCheck => set({ updateCheck })} />
+                </Group>
+              )}
               {bridge?.badge && (
                 <Group title="Menu bar">
                   <div className="setting-box">

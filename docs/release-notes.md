@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Updates: Laki checks for a new version at launch and once a day, and tells you once per version. Settings ›
+  General › *Updates* shows its notes, *Update* (download, then *Restart to update*; your agents keep running) or
+  *Download*, and *Check now*; the app menu has *Check for Updates…*.
+
 - Workflows: a budget, `budget: 60 min, $5` (its settings, or Run's for one run): past its working time or AI cost a
   run asks, *Give it more* or *Stop*; a run shows its turns, time and cost (`--budget` on `laki flow run`).
 - Phone pushes: a workflow's questions (*Ask you*, a confirm, a stuck block, an unsure decision) reach the phone, and

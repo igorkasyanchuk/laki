@@ -1771,6 +1771,27 @@ whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD`
 PR (`autoArchived`: an Undo stays). It broadcasts `archived`, which App toasts with Undo (`wsRestore`); a merged PR's
 row says *merged* while the setting is on.
 
+### Updates
+
+`src/main/update.ts` (main) and `src/shared/update.ts` (pure, tested in `test/update.test.ts`): `updater` checks
+`api.github.com/repos/<RELEASES>/releases/latest` (`RELEASES`: package.json's `build.publish`, the test holds them
+equal; pre-releases and drafts never answer) through `net.fetch`, `newer` than `app.getVersion()`: `available`
+with `releaseOf`'s notes, page and `feed` (the release has `update-mac-<arch>.json`); a 404 (none published) is up to
+date. Only Settings' auto checks (`updateCheck`, on unless false: App's `updateAuto` once settings come, `auto`: 10 s
+after the first, then `UPDATE_EVERY`, a day) announce a version, once (`found`, userData's `update.json` `told`: App's
+toast, *See what's new*). Nothing downloads until `download` (Settings' *Update to x.y*), only with `install`
+(packaged, macOS, `codesign -dv` says Developer ID) and the feed: Electron's `autoUpdater` (Squirrel.Mac, `serverType:
+'json'`, that version's feed, `feedOf`: its zip), `ready` on `update-downloaded`, then `install` is `quitAndInstall`
+(main sets `quitting` on autoUpdater's `before-quit-for-update`: the window's close would only hide it). A check has
+30 s (`AbortSignal.timeout`) and sets `checking` before any await, so a second one meanwhile returns its state; `auto`
+the same again (a window's reload) keeps the day's timer. Else *Download* is the release's page. The
+daemon outlives it: the stale bar, as before. IPC `update` (state, check, download, install; `from(e)`), `update-auto`,
+the `update` event; preload's `update`, `updateAuto`, `onUpdate` (returns its unsubscribe). The app menu's *Check for
+Updates…* is `laki://settings/general?spot=Updates` (links.ts' settings `spot`) and a check. `scripts/release.sh`
+`upload` writes each Mac zip's `update-mac-<arch>.json` (`feedOf` through `node -e`) before the checksums, only for a
+Developer ID one (its `Laki.app/Contents/MacOS/Laki` through `codesign -dv`: Squirrel.Mac turns an ad-hoc one down). Settings ›
+General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no channels, no daemon restart.
+
 ### Usage
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`): `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
@@ -2361,6 +2382,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | file | what |
 |---|---|
 | `src/main/index.ts` | Electron main (every IPC handler checks its sender: `fromApp`, the token's; `from(e, …pages)`: the app window, else only the pages named, `new`, `ai`, `tab` by `?window=`, `voice` the bubbles'; the bubbles', the editor's and a floated tab's own by their window): single instance, starts the daemon, window (where it was left: `window.json` in userData, `winAt`, bounds, maximized, full screen; else maximized; hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running; File, Edit, View and Go list the renderer's ⌘ keys: `key()`, `registerAccelerator: false`, a click sends `browser-key`; Settings › Keys' through `bound()`, its keys from `keysNow`, the `keys` IPC's (`from(e)`: the app window; `keyMap` checks them; `appMenu` builds it again), a click sends its id; a Browsers page's `before-input-event` takes `newTab`/`closeTab`'s keys by `keyFor`), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m` (the bubbles hidden meanwhile: `shooting`), then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card, menu and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
+| `src/main/update.ts` | the app's updates: GitHub's latest release, Squirrel.Mac's download and install (Updates, above) |
+| `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES` |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), shotKey and onAiShot (Screenshot to Laki AI's keys; the AI window's picture), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |

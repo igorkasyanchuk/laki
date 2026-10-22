@@ -31,18 +31,31 @@ rel() {
 
 # what a release holds, besides SHA256SUMS.txt: the downloads and the updaters' feeds (latest-mac.yml…)
 files() { (cd "dist/release/$1" && shopt -s nullglob && printf '%s\n' Laki-"$1"-*.dmg Laki-"$1"-*.zip Laki-"$1"-*.AppImage \
-  *.blockmap *-mac.yml *-linux*.yml); }
+  *.blockmap *-mac.yml *-linux*.yml update-mac-*.json); }
 
 upload() {
-  local v=$1 dir=dist/release/$1 f notes
+  local v=$1 dir=dist/release/$1 f notes a bin
   [ -d "$dir" ] || die "no $dir: build it first"
-  f=$(files "$v")
-  [ -n "$f" ] || die "nothing to upload in $dir"
-  (cd "$dir" && shasum -a 256 $f > SHA256SUMS.txt)
-  f="$f SHA256SUMS.txt"
+  [ -n "$(files "$v")" ] || die "nothing to upload in $dir"
   notes=$(mktemp) # this version's section of docs/release-notes.md (scripts/notes.ts stamped it "## <v> · <date>")
   awk -v h="## $v" 'index($0, h " ") == 1 || $0 == h { on = 1; next } on && /^## / { exit } on' docs/release-notes.md > "$notes"
   [ -s "$notes" ] || echo "Laki $v" > "$notes"
+  for a in arm64 x64; do # the app's Update (src/main/update.ts): Squirrel.Mac's feed for each Mac's zip
+    rm -f "$dir/update-mac-$a.json"
+    [ -f "$dir/Laki-$v-$a.zip" ] || continue
+    # only a Developer ID build: Squirrel.Mac turns down an ad-hoc one for a signed install (its Download stays)
+    bin=$(mktemp)
+    unzip -p "$dir/Laki-$v-$a.zip" Laki.app/Contents/MacOS/Laki > "$bin" || true
+    case $(codesign -dv --verbose=2 "$bin" 2>&1) in # no pipe into grep -q: pipefail and SIGPIPE
+      *'Authority=Developer ID Application:'*) rm -f "$bin" ;;
+      *) rm -f "$bin"; echo "Laki-$v-$a.zip isn't Developer ID signed: no update feed for it" >&2; continue ;;
+    esac
+    node --experimental-strip-types --no-warnings -e 'import("./src/shared/update.ts").then(m => { const [v, a, repo, notes] = process.argv.slice(1); console.log(m.feedOf(v, a, require("fs").readFileSync(notes, "utf8").trim(), new Date().toISOString(), repo)) })' \
+      "$v" "$a" "$REPO" "$notes" > "$dir/update-mac-$a.json"
+  done
+  f=$(files "$v")
+  (cd "$dir" && shasum -a 256 $f > SHA256SUMS.txt)
+  f="$f SHA256SUMS.txt"
   local s
   s=$(rel "$v")
   case $s in
