@@ -1466,7 +1466,10 @@ no answer or Deny: not run, a warn line), a `refresh` unasked; an agent's run (`
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
 event's workspace's project (`runs in: here`: that workspace, `ws`), a project's own in its project only; refused: no workspace, problems, `byAgent`,
 `untrusted`, past `HOPS_MAX` (its 5th argument, `hops`: widgetEvent's, checked here too; a run keeps it as `r.hops`, and
-`finish`'s `flow.ended` is `hops + 1`, so A's end starting B and B's starting A stops there), an
+`finish`'s `flow.ended` is `hops + 1`, so A's end starting B and B's starting A stops there; #5: so is every other event a
+run causes, with its `run` (core's `Cause`, workflow.ts' `cause`: `wsNew` `hops`, `addTab`, `replaceTab`, `ship`'s and
+`wsArchive`'s `GateOpts`: its `workspace.new`, `tab.new`, `ship.done`, `workspace.archived`, `tidy`'s archive too; never an
+RPC's: `byCaller` and `tabNew` drop them), so an `on: workspace.archived` run archiving its own worktree is its own), an
 agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run (`r.ws`, or the worktree's
 `ws.flow`: `wsNew` `flow`, set in `makeWs` before its `workspace.new` and its setup tab's `tab.new`; never an RPC's, `byCaller`),
 an `only when:` test that doesn't hold (`whenFails`: `Workflow.when`, each a Case branch on `eventVars`, through `held`, so a

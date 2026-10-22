@@ -1089,7 +1089,8 @@ branch's test on the event's fields, and every one must hold, e.g. `event.pr.dra
 `event.ws.branch matches "^(feat|fix)/"`. While a run an event started is going (or waiting its turn), another event
 from the same workspace starts none, so a burst of `turn.done` or a second failed CI is one run, even when each run
 gets a worktree of its own. A chain (one workflow's `flow.ended` starting another, whose end starts the first) stops
-after three hops.
+after three hops, and what a run does itself (its workspace, tabs, ship, archive, the archive when it's done) never starts
+it again.
 
 To try one without breaking CI, *Run* › *As if on an event*: *the last one* (the newest of that event Laki heard in
 the project since it started) or *a sample* (its fields made up, in the workspace you pick). The sheet shows the

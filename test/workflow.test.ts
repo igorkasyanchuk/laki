@@ -1884,6 +1884,36 @@ test("#3: an agent's event starts no agent that never asks, by its mode or its f
   assert.equal(app.events.filter(m => m.ev === 'toolAsk').length, 2)
 })
 
+// #5: a run's own archive (when done: archive) restarted it for good (on: workspace.archived): the events a run causes
+// carry its run and one hop more; and two workflows on each other's flow.ended stop after HOPS_MAX hops, said
+test("#5: an on: workspace.archived worktree workflow started once runs once; A and B on each other's flow.ended stop after three hops", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const body = '\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n'
+  await rig.rpc('flowSave', { id: 'loop', text: `# Loop\nruns in: worktree · on: workspace.archived${body}` })
+  await rig.rpc('flowStart', { workflow: 'loop', project: p.id, task: 'go' })
+  await until(async () => (await rig.rpc('state')).workspaces.some((w: any) => w.archived), 'its worktree archived', 20000)
+  await sleep(3000)
+  const s = await rig.rpc('state')
+  assert.equal(s.flows.filter((f: any) => f.workflow === 'loop').length, 1, 'one run')
+  assert.equal(s.workspaces.filter((w: any) => w.kind === 'worktree').length, 1)
+  const ev = (await rig.rpc('widgetEvents')).find((e: any) => e.event === 'workspace.archived')
+  assert.deepEqual([ev.hops, ev.refused], [1, ['loop: its own run sent it']])
+
+  // A on B's flow.ended, B on A's: started once, they stop after HOPS_MAX (3) hops, the refusal listed
+  await rig.rpc('flowSave', { id: 'a', text: `# A\nruns in: main · on: flow.ended${body}` })
+  await rig.rpc('flowSave', { id: 'b', text: `# B\nruns in: main · on: flow.ended${body}` })
+  await rig.rpc('flowSave', { id: 'kick', text: `# Kick\nruns in: main${body}` })
+  await rig.rpc('flowStart', { workflow: 'kick', project: p.id, task: 'go' })
+  await until(async () => (await rig.rpc('widgetEvents')).some((e: any) => e.event === 'flow.ended' && e.refused?.some((r: string) => /4 hops: a loop of events\? dropped/.test(r))), 'the chain refused', 20000)
+  await sleep(2000)
+  const n = (await rig.rpc('state')).flows.filter((f: any) => f.workflow === 'a' || f.workflow === 'b').length
+  assert.ok(n > 0 && n <= 6, `${n} runs of A and B`)
+  await sleep(2000)
+  assert.equal((await rig.rpc('state')).flows.filter((f: any) => f.workflow === 'a' || f.workflow === 'b').length, n, 'no more')
+})
+
 test('only when: tests on the event filter its runs; one live run per workspace an event came from; a chain of events stops at HOPS_MAX', async t => {
   // the file: only when: lines after the head, read back; check names what's wrong
   const head = 'runs in: here · on: pr.checks.failed\nonly when: event.pr.draft equals "false"\nonly when: event.ws.branch matches "^(feat|fix)/ · x"'

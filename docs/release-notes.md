@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: what a run does itself (its archive when it's done, its ship, its tabs) never starts it again, and counts
+  as a hop: an `on: workspace.archived` workflow no longer restarts on its own archive.
 - A repo's extension is trusted as every file in its folder now, a submodule's and ignored ones too, so a pull or an
   agent that changes code it runs turns it off; widget.json's `"state": ["last.txt", "cache/"]` names what it writes there.
 - An agent's event never starts a workflow whose agent never asks by its flags either (codex's `-a never`, its
