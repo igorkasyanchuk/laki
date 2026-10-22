@@ -28,15 +28,34 @@ The app doesn't check for updates yet; the feeds are there so the first version 
 
 ## Once
 
-1. **A Developer ID.** Join the [Apple Developer Program](https://developer.apple.com/programs/enroll/) ($99 a year),
-   then in Xcode › Settings › Accounts › *Manage Certificates…* › + › *Developer ID Application*. It goes into your
-   login Keychain; check with `security find-identity -v -p codesigning`.
-2. **Notarization credentials**, kept in the Keychain as the profile `laki-notary`. With an App Store Connect API key
-   (App Store Connect › Users and Access › Integrations › Team Keys, Developer access; download the `.p8`):
+1. **A Developer ID.** Join the [Apple Developer Program](https://developer.apple.com/programs/enroll/) ($99 a year;
+   as yourself, approved in a day or two; as a company, a [D-U-N-S number](https://developer.apple.com/enroll/duns-lookup/)
+   first, a week or more. Pick once: an update must be signed by the same team), then in Xcode › Settings › Accounts ›
+   *Manage Certificates…* › + › *Developer ID Application*, or on the
+   [certificates page](https://developer.apple.com/account/resources/certificates/list) (G2 Sub-CA) with a request from
+   Keychain Access › Certificate Assistant. Only the account holder can make one. Not *Developer ID Installer* (a
+   `.pkg`'s) nor *Apple Distribution* (the Mac App Store's). It goes into your login Keychain; check with
+   `security find-identity -v -p codesigning`: `Developer ID Application: <name> (<team id>)`. Laki's is
+   `Igor Kasyanchuk (VV2UN2324U)`. Listed only without `-v`, as not trusted: Apple's *Developer ID - G2* intermediate is
+   missing ([apple.com/certificateauthority](https://www.apple.com/certificateauthority/)).
+
+   Back it up: Keychain Access › My Certificates, its right click › *Export*, a `.p12` with a password, into a password
+   manager (not a synced folder). It holds the private key; without it, another Mac can't sign as you. Check one:
+   `openssl pkcs12 -in laki.p12 -info -noout -legacy` shows a `Certificate bag` and a `Shrouded Keybag` (OpenSSL 3 needs
+   `-legacy` for the Keychain's RC2; a wrong password says `Mac verify error`).
+2. **Notarization credentials**, kept in the Keychain as the profile `laki-notary`. With your Apple ID, at once: an
+   app-specific password from [account.apple.com](https://account.apple.com) › Sign-In and Security ›
+   App-Specific Passwords, then
+   ```bash
+   xcrun notarytool store-credentials laki-notary --apple-id <your Apple ID> --team-id VV2UN2324U
+   ```
+   (it asks for the password: none in the shell's history). Or with an App Store Connect API key, once the account
+   holder's *Request Access* under [Users and Access › Integrations](https://appstoreconnect.apple.com/access/integrations/api)
+   is granted: Team Keys › +, Developer access, the `.p8` (it downloads once):
    ```bash
    xcrun notarytool store-credentials laki-notary --key ~/keys/AuthKey_ABC123.p8 --key-id ABC123 --issuer <issuer-id>
    ```
-   Or with your Apple ID and an app-specific password: `--apple-id you@example.com --team-id <team> --password <app-specific>`.
+   Check with `xcrun notarytool history --keychain-profile laki-notary` (*No submission history* is fine).
    Another profile name: `APPLE_KEYCHAIN_PROFILE=<name> npm run release`.
 3. **The releases repo**, public (an updater can't read a private repo's releases without a token inside the app):
    ```bash
@@ -47,6 +66,18 @@ The app doesn't check for updates yet; the feeds are there so the first version 
 
 No Developer ID yet? `npm run release -- --adhoc` signs as `npm run dmg` does: the release works, but a download
 opens only through System Settings › Privacy & Security › *Open Anyway*, and it can never update itself.
+
+## The first signed one
+
+Rehearse it: `npm run release -- --no-upload --skip=mac-x64,linux-arm64,linux-x64` signs, notarizes and smoke-tests the
+Apple silicon app into `dist/release/<v>`, then puts the version back (no repo needed). A new team's first notarization
+can take hours. Send the dmg to another Mac (AirDrop or a download, so it's quarantined) and open it: a plain
+double-click, no warning. The hardened runtime is new to these, so try each: the daemon and CLI, a terminal, an agent's
+hooks and notifications, the mic (dictation, Voice), screenshots (Screen Recording), `laki://` links, *Install the laki
+command*.
+
+The Developer ID gives the app a new identity: macOS asks once more for the mic and Screen Recording. Say so in that
+version's notes.
 
 ## Each release
 
