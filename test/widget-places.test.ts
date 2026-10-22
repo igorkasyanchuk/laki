@@ -89,6 +89,23 @@ test('row: a per-workspace one fetches every live workspace’s instance, not on
   assert.deepEqual([w.inst[a.id].badge, w.inst[b.id].badge], ['one', 'two'])
 })
 
+// #22: a row mark's tone is its instance data's own `tone`, one of the kit's; any other word is none
+test("#22: a row mark takes its tone from its instance's data, only a kit tone", async t => {
+  const rig = await fresh(t)
+  make(rig, 'tone', { name: 'Tone', scope: 'workspace', place: 'row', badge: '{{n}}', fetch: 'n="$LAKI_WORKSPACE_NAME"; [ "$n" = one ] && t=bad || t=loud; printf \'{"n": "%s", "tone": "%s"}\' "$n" "$t"', sample: { n: 'x' } })
+  await rig.rpc('widgetReload')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'two' })
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  await app.call('view', { tab: null, focused: true, shown: true, ws: a.id })
+  await rig.rpc('widgetSet', { id: 'tone', on: true })
+  const w = await until(async () => (x => x?.inst?.[a.id]?.badge && x?.inst?.[b.id]?.badge && x)(await find(rig, 'tone')), 'both rows have a mark')
+  assert.equal(w.inst[a.id].tone, 'bad')
+  assert.equal(w.inst[b.id].tone, undefined, 'loud is no tone of the kit')
+})
+
 // #26: an action's open (a link the app opens after it) and files (attached where an insert goes), both checked: a
 // javascript: link and a path outside its workspace, storage or folder are dropped and said in its log
 test("an action's open and files come back checked; a javascript: link and a path outside are dropped and logged", async t => {

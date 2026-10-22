@@ -1697,7 +1697,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
 .ws-cs { align-items: center; gap: 3px; font-size: 10px; } .ws-cs.bad { color: var(--error); opacity: 1; } /* a cloud workspace's state, unless it's on */
 .ws-ext { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: 9ch; overflow: hidden; white-space: nowrap; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; } /* an extension's mark (place row) */
-.ws-ext.bad { color: var(--error); }
+.ws-ext.bad, .ws-ext.t-bad { color: var(--error); } .ws-ext.t-good { color: var(--done); } .ws-ext.t-warn { color: var(--waiting); } .ws-ext.t-accent { color: var(--accent-ink, var(--accent)); } /* its data's tone */
 /* a workspace's PR (Settings › Appearance): open, draft (gray), merged (purple), closed (red); an open one's failing checks: .ci, a red mark beside it */
 .ws-pr { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--done); }
 .avatar { flex: none; border-radius: 50%; vertical-align: -3px; background: var(--hover); }

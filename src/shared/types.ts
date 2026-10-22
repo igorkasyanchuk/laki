@@ -785,7 +785,7 @@ export type WidgetCtx = { ws?: string; tab?: string; file?: string }
 export type ActionFile = { path: string; image?: boolean; size: number }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen
 // a scope workspace extension's instance in a workspace (WidgetView.inst, by its id): its last fetch and its button's words
-export type WidgetInst = { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string }
+export type WidgetInst = { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string; tone?: 'good' | 'bad' | 'warn' | 'accent' | 'muted' } // tone: its data's own (a row mark's color)
 export type WidgetSize = 's' | 'm' | 'l'
 // where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's
 // right end), the rail (a button among its icons; without the rail, the sidebar's foot), the sidebar's foot (a button

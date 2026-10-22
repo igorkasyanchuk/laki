@@ -507,15 +507,18 @@ the daemon either way.
 | `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
 | `desk` | a tile on the Desk page, sized there | its full view, else its preview |
 | `panel` | a tab of the right panel (⌥⌘B), after Info, Files, Changes, Review and Preview | its full view, else its preview, the panel's width |
-| `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover |
+| `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover, colored by its data's `tone` |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
 *Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk / Right panel / Workspace rows*, one or several). For the
 bars, design it ½ high: a number and a word, a few links.
 
 A `row` extension is fetched for every live workspace, not only the one on screen (4 at a time; the rest at the next
-ticks): keep its fetch cheap and its `every` long. A click on its mark runs its `click` action in that workspace, else
-selects the workspace. A `panel` one per workspace shows the workspace the panel is for.
+ticks): keep its fetch cheap and its `every` long. Its data's own `tone` colors the mark: one of the kit's tones,
+`good`, `bad`, `warn`, `accent` or `muted` (`{"n": 3, "tone": "bad"}`: a red 3; any other word, none). A click on its
+mark runs its `click` action in that workspace, else selects the workspace and opens its full view (with none, it only
+selects it). Hovering a row shows its marks in the workspace's card too. A `panel` one per workspace shows the workspace
+the panel is for.
 
 ## Actions where you work (`show`, `key`)
 

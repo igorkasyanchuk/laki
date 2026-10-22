@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, type ActionFile, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
-import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
+import { reservedIn, type Tone, TONES, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, actionMenu, aiActOf, gateOf, globMatch, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
@@ -34,7 +34,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
 type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // allowFor: aiKey as allow was given // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
-type Face = { label?: string; badge?: string; tip?: string }
+type Face = { label?: string; badge?: string; tip?: string; tone?: Tone } // tone: its data's own `tone`, one of the kit's (a row mark's color)
 type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; agentDev?: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on); agentDev: one an agent linked (settings.widgetDevAgent): trusted as a repo's
 // scope workspace: an instance per live workspace, its data in <data>/widget-data/<id>/ws/<wsId>.json (the settings stay
 // the store's, shared); in memory its last fetch and its button's words
@@ -564,7 +564,8 @@ function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> =
     }
   }
   if (one !== undefined) return fill(one, 300) // a notify's text
-  return { label: fill(w.m.label, 40), badge: fill(w.m.badge, 6), tip: fill(w.m.tip, 300) }
+  const tone = (ctx as { tone?: unknown }).tone
+  return { label: fill(w.m.label, 40), badge: fill(w.m.badge, 6), tip: fill(w.m.tip, 300), ...((TONES as readonly unknown[]).includes(tone) && { tone: tone as Tone }) }
 }
 // an icon: a name of the app's (the renderer knows which), or a character or two (an emoji, 👨‍👩‍👧 one too)
 const graphemes = new Intl.Segmenter()
@@ -692,7 +693,7 @@ export const widgetsView = (): WidgetView[] =>
 // a scope workspace one's instances in the view: each live workspace's that has fetched (or fetches now), its last fetch
 // and its button's words
 function instView(w: Entry) {
-  const out: Record<string, { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string }> = {}
+  const out: Record<string, { at?: number; error?: string; running?: boolean; mock?: string } & Face> = {}
   for (const x of state.workspaces) {
     const m = w.inst.get(x.id)
     const run = running.has(keyOf(w.id, x.id))

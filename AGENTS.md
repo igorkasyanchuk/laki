@@ -1510,7 +1510,7 @@ renderer: tool asks wait in a `Line` (text.ts; `toolShow`, a notification's clic
 instances (`covered` leaves it out; `DeskPage` `wsName`).
 
 Where you work (Part C; `test/widget-places.test.ts`): `WIDGET_PLACES` adds `panel` (SidePanel's `ext` tabs, `PanelTab`
-`ext:<id>`, Widgets.tsx' `WidgetPanel`) and `row` (`RowMarks` on App's `wsRow`, an instance's `badge` else `label`; scope
+`ext:<id>`, Widgets.tsx' `WidgetPanel`) and `row` (`RowMarks` on App's `wsRow` and `peekCard`, `rowMarks`' filter, an instance's `badge` else `label`, its data's `tone` (`faceOf`: a kit `TONES` word, the face's `tone`) as `t-<tone>`; a click: `click`, else `WidgetApi.full(id, ws)`, the workspace selected and its full view; scope
 workspace only: `manifestCheck` and `widgetSet` refuse a global one; `shownIn` fetches every `instOk` workspace's while
 a window is shown, `AT_ONCE` at a time). An object action's `MENU` fields (widgetSchema.ts: `ACTION_SHOWS` palette,
 workspace, tab, file, prompt; `match` globs, `globMatch`; `key`, `normKey`/`pressOf`, Alt or Ctrl in it, a plain ⌘ one

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a workspace row's mark takes its color from its data's `tone`, a click opens that workspace's full
+  view, and the workspace's card (hover a row) shows its marks.
 - Extensions: a right click on any of them (a cell, a rail or foot button, a My Desk tile) turns it off, moves it
   (*Show in ›*), sizes it, opens it in the studio, remixes or deletes it (with Undo).
 - Extensions: a kit button's `do: new` can set the agent's `model`, `effort`, `perm` (auto, acceptEdits, plan) and

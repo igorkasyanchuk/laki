@@ -18,7 +18,7 @@ export type WidgetApi = {
   run: (id: string, ws?: string) => Promise<unknown>
   open: (url: string) => void // http(s), mailto, laki://
   copy: (text: string) => void
-  full: (id: string) => void
+  full: (id: string, ws?: string) => void // ws: that workspace's instance (a row mark's: it's selected)
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
   action: (id: string, action: string, arg: string, label?: string, ws?: string) => Promise<false | void> // a button's data-run: one of widget.json's actions, done when it is (false: it failed)
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
@@ -280,16 +280,19 @@ export function WidgetPanel({ w, api }: { w: WidgetView; api: WidgetApi }) {
   )
 }
 
-// place row: a per-workspace one's mark on each workspace's row, its instance's badge (else label) and tip; a click
-// runs its click action there, else goes on to the row (it selects the workspace)
+// place row: a per-workspace one's mark on each workspace's row (and its peek card), its instance's badge (else label),
+// tip and its data's tone; a click runs its click action there, else opens that workspace's full view, else goes on to
+// the row (it selects the workspace)
+export const rowMarks = (widgets: WidgetView[], ws: string) => widgets.filter(w => w.on && w.scope === 'workspace' && placesOf(w).includes('row') && (w.inst?.[ws]?.badge || w.inst?.[ws]?.label))
 export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: string; api: WidgetApi }) {
-  const on = widgets.filter(w => w.on && w.scope === 'workspace' && placesOf(w).includes('row') && (w.inst?.[ws]?.badge || w.inst?.[ws]?.label))
+  const on = rowMarks(widgets, ws)
   return (
     <>
       {on.map(w => {
         const i = w.inst![ws]
+        const go = w.click ? () => void api.action(w.id, w.click!, '', w.name, ws).catch(() => {}) : w.full ? () => api.full(w.id, ws) : undefined
         return (
-          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : ''}`} data-tip={`${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={w.click ? e => (e.stopPropagation(), void api.action(w.id, w.click!, '', w.name, ws).catch(() => {})) : undefined}>
+          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={`${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={go && (e => (e.stopPropagation(), go()))}>
             <Glyph w={w} size={10} />
             {i.badge || i.label}
           </span>

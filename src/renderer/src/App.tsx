@@ -20,7 +20,7 @@ import { BoardPage } from './Board'
 import { AchievementsPage } from './Achievements'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, imagesVia, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { Glyph as ExtGlyph, imagesVia, inWs, RowMarks, rowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
@@ -1743,7 +1743,7 @@ export function App() {
     run: (id, ws) => call('widgetRun', { id, ws }),
     open: url => (/^laki:\/\//i.test(url) ? setLink(url) : openExternal(url)),
     copy: text => void copy(text),
-    full: id => setDialog({ widget: id, back: dialog }),
+    full: (id, at) => (at && setWsId(at), setDialog({ widget: id, back: dialog })), // at: a row mark's workspace, selected first: its instance shows
     close: () => setDialog(d => (d && typeof d === 'object' && 'widget' in d ? (d.back ?? null) : d)), // the full view's (Esc in its frame), not a page's
 
     action: (id, action, arg, label, ws) => {
@@ -2835,6 +2835,7 @@ export function App() {
             {m}
           </div>
         ))}
+        {(xs => xs.length > 0 && <div className="wp-line wp-ext"><RowMarks widgets={xs} ws={w.id} api={{ ...widgetApi, full: (id, at) => (setPeek(null), widgetApi.full(id, at)) }} /></div>)(rowMarks((view.widgets ?? []).filter(x => !x.project || x.project === w.project), w.id))}
         <div className="wp-acts">
           <button onClick={() => (setPeek(null), setWsId(w.id), setDialog(null))}>Open</button>
           {pr && <button onClick={() => openExternal(pr.url)}>PR #{pr.number} on GitHub</button>}
