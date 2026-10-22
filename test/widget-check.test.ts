@@ -2,14 +2,14 @@
 // one-file extensions (prs.5m.sh) and fixtures through widgetWrite
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { manifestCheck, WIDGET_SCHEMA } from '../src/shared/widgetSchema.ts'
 import { STARTER_KINDS } from '../src/shared/widgetStarters.ts'
 import { reservedIn, UI_EXAMPLES, UI_SAMPLES, UI_TYPES, uiCheck } from '../src/shared/widgetUi.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, sleep, until } from './helpers.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const find = async (rig: any, id: string) => ((await rig.rpc('state')).widgets ?? []).find((w: any) => w.id === id)
@@ -99,6 +99,45 @@ test('the Pull main starter: per workspace, a button; git merges the base in, co
   await until(() => rig.tab(b.id), 'its agent')
   assert.match((await pull(b.id)).toast ?? '', /^(Asked the agent to merge main|The agent merges main after its turn)$/)
   await until(async () => (await rig.screen(b.id)).includes('Bring the latest of main'), 'the prompt typed into the agent')
+})
+
+// #29: its badge counted against whatever origin/<base> was at the last fetch anyone made: Up to date for days. It
+// fetches the base itself now (once per repo every 15 minutes: a mark in its .git, 20 s at most), and says when it can't
+test('the Pull main starter fetches the base itself: a commit pushed to origin shows in its badge, a failed fetch in its tip', async t => {
+  const rig = await fresh(t)
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env: rig.env, encoding: 'utf8' }).trim()
+  const bare = join(rig.env.HOME, 'origin.git')
+  git(rig.env.HOME, 'init', '-q', '--bare', '-b', 'main', bare)
+  git(rig.repo, 'remote', 'add', 'origin', bare)
+  git(rig.repo, 'push', '-q', 'origin', 'main')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  assert.match((await rig.cli('widget', 'new', 'Pull main', '--kind', 'pullmain')).out, /made pull-main in /)
+  const face = async () => (await find(rig, 'pull-main')).inst?.[a.id]
+  await rig.rpc('widgetRun', { id: 'pull-main', ws: a.id })
+  await until(async () => (await face())?.tip?.startsWith('Up to date with main'), 'up to date at first')
+  // someone else pushes to main; nobody fetches by hand
+  const other = join(rig.env.HOME, 'other')
+  git(rig.env.HOME, 'clone', '-q', bare, other)
+  writeFileSync(join(other, 'new.txt'), 'theirs')
+  git(other, 'add', '-A')
+  git(other, 'commit', '-qm', 'theirs')
+  git(other, 'push', '-q', 'origin', 'main')
+  const mark = join(rig.repo, '.git', 'laki-fetched-main') // the repo's, for every worktree
+  assert.equal(readFileSync(mark, 'utf8'), '', 'its first fetch: it worked')
+  await rig.rpc('widgetRun', { id: 'pull-main', ws: a.id })
+  await sleep(300)
+  assert.equal((await face())?.badge, undefined, 'fetched a moment ago: not again')
+  rmSync(mark) // as if 15 minutes ago
+  await rig.rpc('widgetRun', { id: 'pull-main', ws: a.id })
+  await until(async () => (await face())?.badge === '1', 'its badge: 1 new on origin')
+  // origin gone: as before, and its tip says so
+  git(rig.repo, 'remote', 'set-url', 'origin', join(rig.env.HOME, 'gone.git'))
+  rmSync(mark)
+  await rig.rpc('widgetRun', { id: 'pull-main', ws: a.id })
+  const f = await until(async () => (x => x?.tip?.startsWith("Couldn't fetch main") && x)(await face()), 'said in its tip')
+  assert.equal(f.badge, '1')
+  assert.match(f.tip, /^Couldn't fetch main: as of the last fetch · 1 new on main · a click merges it in/)
 })
 
 test('the Context starter: its three menus, each told where you are; check passes', async t => {

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The Pull main starter fetches the base branch itself (once per repo every 15 minutes), so its badge sees new
+  commits without anyone fetching; a failed fetch says so in its tip.
 - Extensions: an action can print `"open": "https://…"` (opened after it runs; `laki://` links too) and `"files": […]`
   (attached to the prompt it was picked in, images as images, or given to the agent as paths).
 - An agent's or extension's ask no longer counts as a *Deny* when another dialog or page opens over it: it waits and

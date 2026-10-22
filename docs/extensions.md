@@ -644,7 +644,9 @@ with the next steps, and `"$schema"`, so VS Code and Cursor complete and check i
 ### Pull main
 
 `laki widget new "Pull main" --kind pullmain` is a template to copy: a button in the status bar, one per workspace, its
-badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the branch doesn't yet. A click runs
+badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the branch doesn't yet. Its fetch fetches
+the base from origin itself, once per repo every 15 minutes and 20 seconds at most (a `laki-fetched-<base>` mark in the
+repo's `.git`); one that fails counts as of the last and says so in its tip. A click runs
 `pull.sh`, its *How* setting the way:
 
 | how | what |

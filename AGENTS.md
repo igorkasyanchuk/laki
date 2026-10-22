@@ -1432,7 +1432,9 @@ host's) is the view's `ws` and `Widgets.tsx` `inWs` (an instance over the widget
 `NO_WS`, dimmed `.no-ws`); `WidgetApi`'s render, run, action and say and `WidgetsApi`'s run, runs, mock and check take
 `ws` (`w.here`); `ExtensionPage`'s `spots` and `here`, the inspector's picker (`.ext-ws`); Settings' row says *per
 workspace*. The `workspace` starter (*This branch*). The `pullmain` starter (*Pull main*): a status bar button per
-workspace (no `ui`: a button), its badge the base's commits not in the branch (`fetch.sh`, local refs), its `pull`
+workspace (no `ui`: a button), its badge the base's commits not in the branch (`fetch.sh`: `git fetch origin <base>` once per repo every 15 minutes,
+20 s at most, its mark `laki-fetched-<base>` in the common git dir (FETCH_HEAD is per worktree), a failure said in its
+`tip`), its `pull`
 action by `how`: `agent` (`laki send <ws> --when-idle`: an action picks by its setting, which the kit's `do: send`
 can't), `git` (fetch, merge; conflicts to `claude -p`), `ai` (`claude -p`); `claude -p` runs in the background (an
 action has 2 minutes), its last line pushed back as `last` (`laki widget push --merge`), which `notify` says; tested in

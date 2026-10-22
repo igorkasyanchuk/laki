@@ -262,7 +262,7 @@ one short line each. Never put secrets in a note.
           icon: 'gitMerge',
           label: 'Pull {{#if base}}{{base}}{{else}}main{{/if}}',
           badge: '{{#if behind}}{{behind}}{{/if}}',
-          tip: '{{#if behind}}{{behind}} new on {{base}}{{else}}Up to date with {{base}}{{/if}} as of the last fetch · a click merges it in ({{config.how}})',
+          tip: '{{#if said}}{{said}} · {{/if}}{{#if behind}}{{behind}} new on {{base}}{{else}}Up to date with {{base}}{{/if}} · a click merges it in ({{config.how}})',
           every: 5,
           fetch: 'sh fetch.sh',
           click: 'pull',
@@ -275,14 +275,24 @@ one short line each. Never put secrets in a note.
           sample: at,
         }),
         'fetch.sh': `#!/bin/sh
-# What this prints (JSON) is the button's data: how many commits of the base branch this one doesn't have yet, as of
-# the last git fetch (no network: it runs every few minutes). Per workspace: $LAKI_PATH and $LAKI_BASE are its.
+# What this prints (JSON) is the button's data: how many commits of the base branch this one doesn't have yet. It
+# fetches the base from origin when this repo last did 15 minutes ago or more (a mark in its .git, shared by its
+# worktrees: once per repo; FETCH_HEAD is each worktree's own), 20 s at most. Per workspace: $LAKI_PATH and $LAKI_BASE.
 base=\${WIDGET_BRANCH:-\${LAKI_BASE:-main}}
 base=\${base#origin/}
 cd "$LAKI_PATH" || exit 1
+mark="$(git rev-parse --git-common-dir)/laki-fetched-$(printf %s "$base" | tr -c 'A-Za-z0-9._-' _)" # empty: it worked
+if git remote get-url origin >/dev/null 2>&1 && [ -z "$(find "$mark" -mmin -15 2>/dev/null)" ]; then
+  git fetch -q origin "$base" >/dev/null 2>&1 & f=$!
+  ( sleep 20; kill $f ) >/dev/null 2>&1 & k=$! # macOS has no timeout
+  if wait $f; then : >"$mark"; else echo failed >"$mark"; fi
+  kill $k 2>/dev/null
+fi
+said=
+[ -s "$mark" ] && said="Couldn't fetch $base: as of the last fetch"
 up=$base
 git rev-parse -q --verify "origin/$base" >/dev/null && up=origin/$base
-printf '{"behind": %s, "base": "%s"}\\n' "$(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0)" "$(printf %s "$base" | tr -d '"\\\\')"
+printf '{"behind": %s, "base": "%s", "said": "%s"}\\n' "$(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0)" "$(printf %s "$base" | tr -d '"\\\\')" "$(printf %s "$said" | tr -d '"\\\\')"
 `,
         'pull.sh': `#!/bin/sh
 # Pull main: the button's action. It brings the latest of the base branch (origin's) into this workspace's branch.
