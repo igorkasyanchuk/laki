@@ -20,7 +20,7 @@ import { BoardPage } from './Board'
 import { AchievementsPage } from './Achievements'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { StarterPicker, UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
@@ -258,9 +258,10 @@ const RAIL: [RailKind, string, IconName][] = [['projects', 'Projects', 'fork'], 
 const RAIL_FIT = 7
 const RAIL_MORE = ['todos', 'calendar', 'workflows', 'specs', 'board']
 let requests = 0
-// a file open in the app (the preview's tabs): its workspace, path and line; an artifact's is read-only
-type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean }
-const fileKey = (f: { path: string; storage?: boolean }) => `${f.storage ? 'artifact:' : ''}${f.path}`
+// a file open in the app (the preview's tabs): its workspace, path and line; an artifact's is read-only; ext: a file
+// opener's full view (an extension's action with view, on this file) in its place
+type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean; ext?: string }
+const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`
 const wsName = (w: { id: string; name?: string }) => w.name || w.id
 // remote access's page, with Laki's PIN: the code shown in Settings › Remote access on the Mac (api.pin); a wrong one
 // counts down, the last stops remote access. One solid card (styles.css' .pin-*): Laki's mark, a lock in a ring that
@@ -1503,6 +1504,7 @@ export function App() {
       ...(bridge?.copyFile ? [{ label: 'Copy', icon: 'copy', key: 'c', sub: PICTURE.test(path) ? 'The picture' : 'The file: paste it in Finder, Slack or mail', run: () => void bridge!.copyFile!(full).then(k => (k === 'missing' ? toast(`${path} is gone`) : done(k === 'image' ? 'Picture copied' : 'File copied')), fail) } as MenuItem] : []),
       ...(PLAIN.test(path) ? [{ label: 'Copy text', icon: 'copy', key: 't', run: () => void api.call<FileContent>('fileRead', { ws: w.id, path, storage: true }).then(c => (c.text === undefined ? toast(`${path} isn't text`) : c.cut ? toast(`${path} is too big to copy as text: Copy puts the file itself there`) : copy(c.text)), fail) } as MenuItem] : []),
       { label: 'Copy path', icon: 'copy', key: 'p', run: () => copy(full) },
+      ...extItems('file', w, { ws: w.id, file: path, storage: true }, path), // its file actions, on the artifact
     ]
   }
   // an artifact's folder in Finder ('': the storage folder): open-path would open a document in its app
@@ -1734,7 +1736,8 @@ export function App() {
     if (r.open) widgetApi.open(r.open)
     if (r.toast || r.modal) widgetApi.say(w.id, r, ctx.ws)
     else if (!put && !r.open && !m.view) done(r.out || `${m.title}: done`)
-    if (m.view) setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
+    // a file opener's: its full view as a tab beside the file's in the preview, else a dialog
+    if (m.view) ctx.file && ctx.ws && w.full ? openFile({ ws: ctx.ws, path: ctx.file, ext: w.id, ...(ctx.storage && { storage: true }) }) : setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
   }
   const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (!extWs(x) ? [] : l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file)) // none in a terminal's, a browser's, a host's or an archived one: ctxOf refuses those
   // a box's Insert menu (the new-workspace page's, Laki AI's, Send later's): an action's text at its cursor, its files
@@ -3454,8 +3457,8 @@ export function App() {
               {wsFiles.length > 1 && (
                 <div className="pv-tabs" role="tablist" aria-label="Open files">
                   {wsFiles.map(f => (
-                    <div key={fileKey(f)} role="tab" aria-selected={f === previewed} className={`pv-tab ${f === previewed ? 'on' : ''}`} data-tip={f.storage ? `Artifacts › ${f.path}` : f.path} onClick={() => setShownFile(m => ({ ...m, [ws.id]: fileKey(f) }))} onAuxClick={e => e.button === 1 && void closeFile(f)}>
-                      <Icon name="file" size={12} />
+                    <div key={fileKey(f)} role="tab" aria-selected={f === previewed} className={`pv-tab ${f === previewed ? 'on' : ''}`} data-tip={`${f.ext ? `${view.widgets?.find(x => x.id === f.ext)?.name ?? f.ext} · ` : ''}${f.storage ? `Artifacts › ${f.path}` : f.path}`} onClick={() => setShownFile(m => ({ ...m, [ws.id]: fileKey(f) }))} onAuxClick={e => e.button === 1 && void closeFile(f)}>
+                      {(x => (x ? <ExtGlyph w={x} size={12} /> : <Icon name="file" size={12} />))(f.ext && view.widgets?.find(x => x.id === f.ext))}
                       <span className="pv-tab-name">{f.path.split('/').pop()}</span>
                       {edited(f.edit) && <span className="pv-dirty" aria-label="unsaved" />}
                       <IconButton icon="x" title="Close" className="pv-tab-x" onClick={e => (e.stopPropagation(), void closeFile(f))} />
@@ -3463,6 +3466,23 @@ export function App() {
                   ))}
                 </div>
               )}
+            {previewed.ext ? (
+              // a file opener's full view, its data what its action on this file kept
+              // ponytail: one data per extension (per workspace): two files' tabs of one opener show the last one run
+              (w => (
+                <div className="preview">
+                  <div className="pv-head">
+                    {w ? <ExtGlyph w={w} /> : <Icon name="panel" />}
+                    <span className="pv-path" data-tip={previewed.path}>
+                      {w?.name ?? previewed.ext} <span className="muted">{previewed.path}</span>
+                    </span>
+                    {w && <span className="muted small pv-wide">{extStatus(w)}</span>}
+                    <IconButton icon="x" title="Close (⌘W)" onClick={closePreview} />
+                  </div>
+                  <div className="pv-body pv-ext">{w ? <WidgetBody w={w} full api={widgetApi} /> : <div className="muted small pad">That extension is gone (or off).</div>}</div>
+                </div>
+              ))((x => (x?.on ? inWs(x, ws.id) : undefined))(view.widgets?.find(x => x.id === previewed.ext)))
+            ) : (
             <FilePreview
               key={previewed.n}
               path={previewed.path}
@@ -3476,6 +3496,7 @@ export function App() {
               onEdit={edit => setOpenFiles(l => l.map(x => (x.ws === previewed.ws && fileKey(x) === fileKey(previewed) ? { ...x, edit } : x)))}
               save={(text, was, force) => api.call('fileWrite', { ws: ws.id, path: previewed.path, text, was, force })}
             />
+            )}
             </div>
           )}
           {panelShown && ws && ( // the right panel: Info, Files, Changes, Review, Preview

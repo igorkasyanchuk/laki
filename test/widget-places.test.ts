@@ -89,6 +89,22 @@ test('row: a per-workspace one fetches every live workspace’s instance, not on
   assert.deepEqual([w.inst[a.id].badge, w.inst[b.id].badge], ['one', 'two'])
 })
 
+// #25: a file action on an artifact: the file inside the workspace's storage folder, by the same inside check
+test('#25: an action on an artifact gets its path in the storage folder; one out of it is refused', async t => {
+  const rig = await fresh(t)
+  make(rig, 'art', { name: 'Art', actions: { see: { run: 'printf "%s" "$LAKI_FILE"', show: ['file'], insert: true } } })
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'art', on: true })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const ws = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === a.id && w.storage), 'its storage folder')
+  writeFileSync(join(ws.storage, 'report.md'), '# hi')
+  const r = await rig.rpc('widgetAction', { id: 'art', action: 'see', ctx: { ws: a.id, file: 'report.md', storage: true } })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.insert, join(ws.storage, 'report.md'))
+  await assert.rejects(rig.rpc('widgetAction', { id: 'art', action: 'see', ctx: { ws: a.id, file: '../x.md', storage: true } }), /not a path inside/)
+})
+
 // #22: a row mark's tone is its instance data's own `tone`, one of the kit's; any other word is none
 test("#22: a row mark takes its tone from its instance's data, only a kit tone", async t => {
   const rig = await fresh(t)

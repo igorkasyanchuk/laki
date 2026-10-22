@@ -549,13 +549,15 @@ a file's right click, a shortcut, or the new-workspace prompt. A command's or an
 | `ask` | a question first: the answer is its `$WIDGET_ARG` (Cancel: it doesn't run) |
 | `confirm` | a yes or no first |
 | `insert` | what it prints (its JSON's `"insert"`, else all of it) goes into the prompt: the box it was picked in, else the workspace's agent's prompt (typed, not sent), else the clipboard |
-| `view` | its full view opens after it runs: a **file opener** prints `{"data": …}` about `$LAKI_FILE`, and its full view shows it |
+| `view` | its full view opens after it runs: a **file opener** prints `{"data": …}` about `$LAKI_FILE`, and its full view opens as a tab beside the file's preview (closed like one); anywhere else, a dialog |
 
 Where it was picked comes with it: `$LAKI_CTX` (JSON: `ws`, the workspace as `$LAKI_WIDGET_WS` has it; `tab`, `{ id,
 name, agent }`; `file`, `{ path, abs }`), `$LAKI_FILE` (the file's absolute path), `$LAKI_TAB` and `$LAKI_TAB_NAME`, and
 the workspace's `$LAKI_WORKSPACE`, `$LAKI_BRANCH`, `$LAKI_PATH`, `$PORT`… An agent's prompt fills `{{file.path}}`,
 `{{tab.name}}` and `{{workspace.branch}}`. Laki checks it first: the workspace live (not a terminal's, a browser's or an
-SSH host's), the tab its own, the file inside it (links followed). A per-workspace extension's action runs in its own
+SSH host's), the tab its own, the file inside it (links followed). A `file` action shows on an artifact's right click
+too (the status bar's *Artifacts*, Files' *Artifacts*): `$LAKI_FILE` is then in the workspace's storage folder, and
+`$LAKI_CTX`'s `file` has `storage: true`. A per-workspace extension's action runs in its own
 workspace only. An agent's `laki widget action` gets no ctx (it has its own `$LAKI_WORKSPACE`), and is asked first as
 before.
 

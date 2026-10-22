@@ -246,7 +246,9 @@ function ctxOf(w: Entry, c: unknown, x?: Workspace) {
   const tab = typeof c.tab === 'string' && c.tab ? state.tabs.find(t => t.id === c.tab && t.workspace === ws?.id) : undefined
   if (typeof c.tab === 'string' && c.tab && !tab) throw new Error(`no tab ${c.tab}${ws ? ` in ${ws.id}` : ': which workspace? (ws)'}`)
   if (typeof c.file === 'string' && c.file && !ws) throw new Error('a file: which workspace? (ws)')
-  const file = typeof c.file === 'string' && c.file && ws ? { path: c.file, abs: inside(ws, c.file) } : undefined
+  // storage: one of its Artifacts (the storage folder), by the same check
+  if (c.storage === true && ws && !ws.storage) throw new Error(`${ws.id} has no storage folder`)
+  const file = typeof c.file === 'string' && c.file && ws ? { path: c.file, abs: inside(c.storage === true ? { ...ws, path: ws.storage! } : ws, c.file), ...(c.storage === true && { storage: true }) } : undefined
   const i = ws && wsInfo(ws)
   const info = { ...(i && { ws: i }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(file && { file }) }
   return { info, env: { ...(i && !x && infoEnv(i)), ...(tab && { LAKI_TAB: tab.id, LAKI_TAB_NAME: tab.name ?? '' }), ...(file && { LAKI_FILE: file.abs }), LAKI_CTX: JSON.stringify(info) } }

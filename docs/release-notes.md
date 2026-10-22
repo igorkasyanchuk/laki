@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a file opener's view opens as a tab beside the file's preview, and file actions show on an
+  artifact's right click too, with the artifact's path.
 - Extensions: Settings › Extensions has a search (name, id, place, project) and lists the ones failing first, with
   a red dot. ⌘K opens the UI kit, its icons and the starters; `laki://uikit`, `laki://uikit/icons`, `laki://starters`
   and `laki://desk` link to them.

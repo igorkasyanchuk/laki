@@ -780,7 +780,7 @@ export type WidgetTool = { action: string; description: string; ask: 'always' | 
 // an action offered where you work (widget.json's title, show, match, key, ask, confirm, insert, view: widgetSchema.ts actionMenu)
 export type WidgetMenu = { action: string; title: string; show: string[]; match?: string[]; key?: string; ask?: string; confirm?: string; insert?: boolean; view?: boolean }
 // where an action was picked (widgetAction ctx): a workspace, its tab, a file of it (relative)
-export type WidgetCtx = { ws?: string; tab?: string; file?: string }
+export type WidgetCtx = { ws?: string; tab?: string; file?: string; storage?: boolean } // storage: file is one of the workspace's Artifacts (its storage folder's)
 // an action's files (#26: its JSON's files, checked): an image as imageSave's copy (image), else the file itself
 export type ActionFile = { path: string; image?: boolean; size: number }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen

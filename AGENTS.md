@@ -1517,7 +1517,7 @@ workspace only: `manifestCheck` and `widgetSet` refuse a global one; `shownIn` f
 a window is shown, `AT_ONCE` at a time). An object action's `MENU` fields (widgetSchema.ts: `ACTION_SHOWS` palette,
 workspace, tab, file, prompt; `match` globs, `globMatch`; `key`, `normKey`/`pressOf`, Alt or Ctrl in it, a plain ⌘ one
 warned and never taken, a ⌃ one without Alt or ⌘ warned (a terminal's); `menuCheck`) become the view's `menus` (`actionMenu`, `WidgetMenu`). `widgetAction` `ctx`
-(`WidgetCtx`, `ctxOf`: a live `instOk` workspace, a scoped one's own; a tab of it; a file `inside` it) adds `$LAKI_CTX`,
+(`WidgetCtx`, `ctxOf`: a live `instOk` workspace, a scoped one's own; a tab of it; a file `inside` it, or with `storage` inside its storage folder: App's `artMenu`'s `extItems`) adds `$LAKI_CTX`,
 `$LAKI_FILE`, `$LAKI_TAB`, the workspace's env for a global one (`infoEnv`, no `LAKI_WIDGET_FILE`) and an AI action's
 `{{file.path}}`/`{{tab.name}}`; none from an agent or an event. `insert` (the JSON's, else all of stdout with `insert:
 true`, `INSERT_MAX`) comes back for the prompt; `open` (shared/widget.ts `openOk`, a button's rule) and `files` (#26:
@@ -1532,8 +1532,8 @@ and tab; Laki AI: `hereCtx`; the app's one box that sends to an agent: the old s
 confirm, ask and `widgetAction`); PromptInput's `Inserted`, files as its images and chips (a box without `saveFile`,
 Laki AI's: their paths typed), an image's thumbnail by `aiImage`; right after a word, a space first), else
 `intoAgent` (files as paths, `withPaths`; the Preview's `toPrompt` too), else the clipboard; `open`: `widgetApi.open`
-after it, a widget button's too; `view`: its full view), in
-the palette, `wsMenu`, `tabMenu`, `fileMenu` and the capture keys (before `act`, Alt or Ctrl only).
+after it, a widget button's too; `view`: its full view, a file's as a preview tab, `Opened.ext`, `fileKey`'s `ext:<id>:`), in
+the palette, `wsMenu`, `tabMenu`, `fileMenu`, `artMenu` and the capture keys (before `act`, Alt or Ctrl only).
 
 Sources (`test/widget-source.test.ts`): `types.ts` `WIDGET_SOURCES`, `WidgetSource`; widget.json's `source` the
 default, the store's (`widgetSet` `source`, `sourceOk`: a static text 64 KB, a path, an http(s) URL; `fetch` only with
