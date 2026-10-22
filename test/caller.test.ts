@@ -104,15 +104,18 @@ test("N14, N15: an agent's from: '' starts nothing that never asks; a project's 
     text: `run ${[
       curl('wsNew', { project: p.id, preset: 'yolo', name: 'y', from: '' }),
       curl('wsNew', { project: p.id, cmd: 'echo hi', name: 'c', from: '' }),
-      curl('wsFan', { project: p.id, presets: ['yolo', 'claude'], name: 'r', from: '' }),
+      curl('wsFan', { project: p.id, presets: ['claude', 'yolo'], name: 'r', from: '' }),
       curl('projectSet', { id: p.id, config: { setup: 'touch pwned' } }),
       curl('projectSet', { id: p.id, memory: [] }),
-      curl('projectTrust', { id: p.id }),
+      curl('projectTrust', { id: p.id, hash: 'x' }),
       curl('projectSet', { id: p.id, notes: 'from the agent' }),
+      curl('memoryAdd', { project: p.id, text: 'as yours', auto: false }),
+      curl('memoryAdd', { project: p.id, text: 'learned', tab: 'someone-else' }),
+      curl('projectTrust', { id: p.id }),
     ].join('; ')}; echo done >> ${out}`,
   })
   await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
-  const [yolo, cmd, fan, setup, memory, trust, notes] = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
+  const [yolo, cmd, fan, setup, memory, trust, notes, mine, learned, look] = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
   assert.match(yolo.error, /an agent can't start an agent that never asks/)
   assert.match(cmd.error, /an agent can't start a command of its own/)
   assert.match(fan.error, /an agent can't start an agent that never asks/)
@@ -120,6 +123,10 @@ test("N14, N15: an agent's from: '' starts nothing that never asks; a project's 
   assert.equal(memory.error, "an agent can't change a project's memory list (laki memory add adds to it): it's the user's (ask them)")
   assert.equal(trust.error, "an agent can't trust a project's .laki.json: it's the user's (ask them)")
   assert.equal(notes.error, undefined)
+  assert.equal(mine.error, "an agent can't add to a project's memory as the user's (laki memory add without --mine keeps it as learned): it's the user's (ask them)")
+  assert.equal(learned.result.auto, true)
+  assert.match(learned.result.by, /in one$/) // its own tab, not the one it named
+  assert.equal(look.error, undefined) // a read: what you'd be shown
   const s = await rig.rpc('state')
   assert.deepEqual(s.workspaces.filter((w: any) => ['y', 'c'].includes(w.name ?? w.id) || (w.name ?? w.id).startsWith('r-')), [])
   const proj = s.projects.find((x: any) => x.id === p.id)

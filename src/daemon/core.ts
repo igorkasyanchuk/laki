@@ -1923,6 +1923,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     presetCheck(p)
     const agent = presetNamed(p)?.agent ?? p
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
+    if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
   }
   const base = await fromPRLink(proj, await fromIssue(proj, o))
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
@@ -1960,9 +1961,9 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 // development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
 // the workspace's own log too once it has an id; a failure's message last
 // the CLI's laki new: from, the workspace of the agent that ran it (agentCaller); yours in a shell isn't one
-// N14: the caller main.ts found by its process wins over what the RPC says; a from it says is a workspace's id or none
-// ('' would skip every agent check: agentNoCmd, cloudCheck, the agent's mark)
-export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? (typeof o.from === 'string' && o.from.trim() ? o.from : undefined), agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
+// N14: the caller main.ts found by its process wins over what the RPC says; a from it says (MCP's $LAKI_WORKSPACE) is
+// kept only as a non-blank string ('' would skip every agent check: agentNoCmd, cloudCheck, the agent's mark)
+export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? ((typeof o.from === 'string' && o.from.trim()) || undefined), agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {

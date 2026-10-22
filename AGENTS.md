@@ -150,7 +150,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   workspace's own log; `spawnTab` logs each tab's command line there;
 - project memory: `memoryAdd` (`project`, `text`, `auto`: unset an agent's, `MEMORY_AUTO_LEN`; `tab`: `by`, the agent and
   its workspace; the same text again dated anew; the oldest learned one past `MEMORY_MAX` goes; the user's, `auto`
-  false, refused past it), `memoryRm` (a learned one only); the CLI's `laki memory`, MCP's `laki_memory` and
+  false, refused past it and from an agent's tab: main.ts' `agentNo`), `memoryRm` (a learned one only); the CLI's `laki memory`, MCP's `laki_memory` and
   `laki_remember` (not Laki AI's: its `laki_memory_write` keeps the user's). `memoryNote` gives both lists to claude and
   codex at every start with Laki's note (the preset's `laki`), each item cut at 2,000 characters, the newest within
   40,000, and how to add to it (claude's settings allow `laki memory add .` and `rm .`); before them *Global memory*
@@ -1212,8 +1212,9 @@ else the RPC's if it's a workspace's id, else none; N14: `from: ''` skipped `age
 mark); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `projectTrust`), `projectSet` with `config` or `memory` (N15: what
-runs in every new workspace, and the list every agent starts with; `memoryAdd` is an agent's), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `projectTrust` with a `hash`, `projectSet` with `config` or
+`memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
+with; an agent adds learned ones, `by` its found tab; `wsFan` checks each preset's `agentNoCmd` before any worktree), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
 its data) (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
