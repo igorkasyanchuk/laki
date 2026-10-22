@@ -2335,9 +2335,10 @@ export function App() {
     setOnboard(o => ({ ...o, seen: true }))
     setDialog('onboard') // once, as it opens: everyone, this update's users too
   }, [!!view, !dialog])
-  // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on)
+  // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on). Once the first view
+  // is in (the socket is open: Workflows are on before the settings come), and quietly: a list in the background
   const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
-  useEffect(() => void (flowsOn ? call<WorkflowItem[]>('flowList', {}).then(l => setFlowItems(l.filter(f => f.source !== 'builtin')), () => {}) : setFlowItems([])), [flowsOn, view?.flowFiles])
+  useEffect(() => void (flowsOn && view ? api.call<WorkflowItem[]>('flowList', {}).then(l => setFlowItems(l.filter(f => f.source !== 'builtin')), () => {}) : setFlowItems([])), [flowsOn, !view, view?.flowFiles])
   // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
   useEffect(() => {
     const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
