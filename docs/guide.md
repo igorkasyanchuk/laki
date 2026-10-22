@@ -109,8 +109,15 @@ Download the dmg for your Mac (Apple silicon or Intel) from
 a double-click opens it. Drag Laki to Applications. Or with Homebrew:
 
 ```bash
-brew install --cask igorkasyanchuk/laki/laki    # brew upgrade --cask laki: each new version
+brew install --cask igorkasyanchuk/laki/laki    # Laki.app in /Applications
+brew upgrade --cask laki                        # a new version (quit Laki first)
+brew uninstall --cask laki                      # --zap also removes its settings; ~/.laki stays
 ```
+
+The tap is [igorkasyanchuk/homebrew-laki](https://github.com/igorkasyanchuk/homebrew-laki); each release updates it.
+Homebrew installs the app only: the `laki` command comes from Settings › General › *Developer* › *Install the laki
+command*. `~/.laki` holds
+your workspaces' worktrees and Laki's state, so no uninstall removes it: delete it yourself once nothing in it matters.
 
 To build it yourself, you need:
 
@@ -1999,7 +2006,13 @@ sidebar for (youtube-nocookie.com).
 
 ## Updating
 
-After pulling or changing the code, rebuild (`npm run pack`) and reopen the app. The running daemon stays the
+Laki doesn't update itself yet. Quit it (⌘Q: the daemon and your agents keep running), then either
+`brew upgrade --cask laki` or download the new dmg from
+[the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and replace the app in
+/Applications. Your projects, workspaces and settings stay. Built from source: after pulling or changing the code,
+rebuild (`npm run pack`) and reopen the app.
+
+Either way, the running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
 come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`).

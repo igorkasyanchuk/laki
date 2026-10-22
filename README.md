@@ -96,14 +96,19 @@ time and AI money per run (`budget: 60 min, $5`).
 macOS (Apple silicon or Intel). Optional: your agents on PATH, and `gh` (logged in) for PRs.
 
 Download the dmg for your Mac from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest)
-(signed and notarized: a double-click opens it), or `brew install --cask igorkasyanchuk/laki/laki`, or build it
-(Node 22.6+, git):
+(signed and notarized: a double-click opens it), or with Homebrew:
+
+```bash
+brew install --cask igorkasyanchuk/laki/laki    # then: brew upgrade --cask laki
+```
+
+Or build it (Node 22.6+, git):
 
 ```bash
 git clone https://github.com/igorkasyanchuk/laki && cd laki
 npm install && npm run pack
 open dist/mac-arm64/Laki.app      # Intel: dist/mac; or copy it to /Applications
-npm link                          # optional: the laki CLI (or Settings › General › Command line)
+npm link                          # optional: the laki CLI (or Settings › General › Developer › Install the laki command)
 ```
 
 Linux and Windows (WSL 2), a preview: `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker
