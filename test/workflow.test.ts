@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { QUEUE_MAX, apiQuestions, shellFill, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
+import { neverAsks } from '../src/shared/types.ts'
 
 // every kind of block, loops limited by a max and an ask
 const LOOPS = `# Loops
@@ -1842,6 +1843,45 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
   assert.deepEqual(r.flows, [])
   assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
+})
+
+// #3: an agent's event never starts an agent that never asks by its flags either (codex's approvals off, not only
+// bypass permissions), and an agent's event for another workspace asks you first, as a send there does
+test("#3: an agent's event starts no agent that never asks, by its mode or its flags; one for another workspace asks first", async t => {
+  assert.deepEqual(
+    [['claude', 'bypassPermissions'], ['claude', undefined, '--dangerously-skip-permissions'], ['claude', 'bypassPermissions', '--permission-mode plan'], ['codex', 'acceptEdits'], ['codex', undefined, '-a never'], ['codex', undefined, '--ask-for-approval=never'], ['codex', 'bypassPermissions', '-c approval_policy="never"'], ['codex', undefined, '-a on-request'], ['codex', 'auto'], ['claude', 'acceptEdits'], ['gemini', 'bypassPermissions']].map(([a, p, x]) => neverAsks(a, p, x)),
+    [true, true, false, true, true, true, true, false, false, false, true],
+  )
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true, presets: [{ name: 'claude', agent: 'claude' }, { name: 'cx', agent: 'codex', args: '-a never' }, { name: 'cx2', agent: 'codex', args: '-c approval_policy="never"' }, { name: 'cx3', agent: 'codex', perm: 'acceptEdits' }] })
+  const flow = (agent: string) => `# Go ${agent}\nruns in: here · on: custom.go\n\n## start\ninput: task\nnext: work\n\n## work\nagent: ${agent}\n> {{event.data.msg}}\nnext: done\nerror: done\n\n## done\nend: success\n`
+  for (const a of ['cx', 'cx2', 'cx3']) await rig.rpc('flowSave', { id: a, text: flow(a) })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'aaa' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'bbb' })
+  const ag = await rig.rpc('tabNew', { ws: a.id, preset: 'claude' })
+  const r = await rig.rpc('widgetEmit', { name: 'go', data: { msg: 'from A' }, ws: a.id, from: { ws: a.id, tab: ag.id } })
+  assert.deepEqual(r.flows, [])
+  assert.deepEqual((await rig.rpc('widgetEvents'))[0].refused.sort(), ['cx', 'cx2', 'cx3'].map(x => `${x}: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks`).sort())
+  assert.equal((await rig.rpc('state')).flows?.length ?? 0, 0)
+  // for B: no window, refused; with one, you're asked (a no is a refusal, Allow once sends it)
+  const toB = () => rig.rpc('widgetEmit', { name: 'hello', data: { msg: 'from A' }, ws: b.id, from: { ws: a.id, tab: ag.id } })
+  await assert.rejects(toB(), /bbb is another workspace: the user allows that in Laki's window, and it isn't open/)
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  for (const [allow, said] of [['deny', /custom\.hello is for bbb, another workspace: the user said no/], ['once', null]] as const) {
+    const sent = toB()
+    const ask = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'emit' && !m.seen), 'asked in the app')
+    ask.seen = true
+    assert.deepEqual([ask.from, ask.to, ask.target, ask.text], ['aaa', 'bbb', 'custom.hello', '{"msg":"from A"}'])
+    await rig.rpc('widgetToolAnswer', { req: ask.req, allow })
+    if (said) await assert.rejects(sent, said)
+    else assert.equal((await sent).ok, true)
+  }
+  // yours, or into its own workspace: no ask
+  assert.equal((await rig.rpc('widgetEmit', { name: 'hello', ws: b.id })).ok, true)
+  assert.equal((await rig.rpc('widgetEmit', { name: 'hello', ws: a.id, from: { ws: a.id, tab: ag.id } })).ok, true)
+  assert.equal(app.events.filter(m => m.ev === 'toolAsk').length, 2)
 })
 
 test('only when: tests on the event filter its runs; one live run per workspace an event came from; a chain of events stops at HOPS_MAX', async t => {

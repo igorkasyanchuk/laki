@@ -34,6 +34,15 @@ export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent 
 const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
 export const permInArgs = (agent?: string, args?: string) => !!args && !!PERM_FLAGS[agent as Agent]?.test(args)
 export const bypassArgs = (args?: string) => !!args && /(^|\s)(--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--permission-mode[\s=]+['"]?bypassPermissions)\b/.test(args)
+// codex's approvals off: -a / --ask-for-approval never, -c approval_policy=never
+const NO_APPROVALS = /(^|\s)(-a|--ask-for-approval)[\s=]+['"]?never\b|\bapproval_policy\s*=\s*['"]?never\b/
+// #3: an agent that never asks before it acts, by its mode (perm: bypass permissions, or codex's with approvals off) or
+// its own flags, which win when they set one (agentCmd): what an agent, an agent's event or an extension may never start.
+// ponytail: flags only; an env var that changes it isn't read (none is known)
+export const neverAsks = (agent?: string, perm?: string, args?: string) => {
+  const flags = permInArgs(agent, args) ? args! : permArgs(agent, perm).join(' ')
+  return bypassArgs(flags) || (agent === 'codex' && NO_APPROVALS.test(flags)) || (!permInArgs(agent, args) && perm === 'bypassPermissions')
+}
 // fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
 export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
 // API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a

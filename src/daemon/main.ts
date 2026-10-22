@@ -374,7 +374,7 @@ const api: Record<string, Handler> = {
   widgetTick: p => widgetTick(p.now), // tests move the clock
   widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
   widgetPush: p => widgetPush(p),
-  widgetEmit: p => widgetEmit(p), // laki widget emit, MCP's laki_extension_emit: custom.<name>
+  widgetEmit: async p => (await crossAsk(p, 'emit'), widgetEmit(p)), // laki widget emit, MCP's laki_extension_emit: custom.<name>; an agent's into another workspace asks first (#3)
   widgetEvents: () => widgetEvents(), // laki widget events: the last 50, what each reached
   widgetTools: p => widgetTools({ ws: p.ws }), // ws: the caller's workspace (a repo's only in its project's)
   widgetToolCall: p => widgetToolCall(p),
@@ -506,17 +506,22 @@ function typed(p: any, tab: string, data: string) {
   if (core.agentCaller(p.from)) core.agentTyped(tab)
   else core.youTyped(tab, data)
 }
-// keys (input) ask as a send does, a terminal attached to as a screen read
-async function crossAsk(p: any, kind: 'send' | 'screen', target = p.target, text = p.text) {
+// keys (input) ask as a send does, a terminal attached to as a screen read; an event (emit, #3) with another workspace's
+// ws: its workflows and extensions run there, so it asks as a send does (target: the event, text: its data)
+async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target = p.target, text = p.text) {
   const by = core.agentCaller(p.from)
-  const tab = by && core.resolveTarget(String(target ?? ''))
-  if (!by || !tab || tab.workspace === by || crossOk.has(`${kind}:${by}>${tab.workspace}`)) return
+  if (!by) return
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
-  if (!core.clients.size) throw new Error(`${name(tab.workspace)} is another workspace: the user allows that in Laki's window, and it isn't open`)
+  const tab = kind === 'emit' ? undefined : core.resolveTarget(String(target ?? ''))
+  const to = tab ? tab.workspace : core.state.workspaces.find(w => w.id === p.ws || w.name === p.ws)?.id
+  if (!to || to === by || crossOk.has(`${kind}:${by}>${to}`)) return
+  const what = tab ? tab.name : `custom.${String(p.name ?? '').replace(/^custom\./, '')}`
+  if (!core.clients.size) throw new Error(`${name(to)} is another workspace: the user allows that in Laki's window, and it isn't open`)
   const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(tab.workspace), target: tab.name, text: kind === 'send' ? String(text ?? '').slice(0, 2000) : undefined, ws: by, tab: p.from.tab })
-  if (how === 'always') crossOk.add(`${kind}:${by}>${tab.workspace}`)
-  else if (how !== 'once') throw new Error(`${tab.name} is in ${name(tab.workspace)}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+  const said = kind === 'send' ? String(text ?? '') : kind === 'emit' ? JSON.stringify(p.data ?? {}) : undefined
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said?.slice(0, 2000), ws: by, tab: p.from.tab })
+  if (how === 'always') crossOk.add(`${kind}:${by}>${to}`)
+  else if (how !== 'once') throw new Error(`${tab ? `${tab.name} is in ${name(to)}` : `${what} is for ${name(to)}`}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {

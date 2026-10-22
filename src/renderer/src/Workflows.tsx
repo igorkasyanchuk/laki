@@ -6,7 +6,7 @@
 // close the page: it stays open while runs go. The engine is the daemon's (daemon/workflow.ts). Loaded as the page
 // opens (App's lazy import).
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { type Agent, FAST, findAction, mergeActions, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
+import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
@@ -1346,7 +1346,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
                 ))}
                 {b.perm && !perms.some(p => p[0] === b.perm) && <option value={b.perm}>{b.perm}? ({ag} hasn’t it)</option>}
               </select>,
-              (permOf(wf, b, ag) ?? prof?.perm) === 'bypassPermissions' ? 'Never asks: an agent can’t start this workflow, only you' : 'Unattended, an agent that asks waits for you. Blocks sharing its tab need the same.',
+              neverAsks(prof?.agent ?? ag, permOf(wf, b, ag) ?? prof?.perm, prof?.args) ? 'Never asks: an agent can’t start this workflow, only you' : 'Unattended, an agent that asks waits for you. Blocks sharing its tab need the same.',
             )}
           {(FAST[ag] || b.fast) && (
             <Switch className="switch-row" on={!!b.fast} onChange={v => set(x => void (x.fast = v || undefined))}>

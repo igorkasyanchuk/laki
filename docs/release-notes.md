@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's event never starts a workflow whose agent never asks by its flags either (codex's `-a never`, its
+  *Accept edits*, claude's skip-permissions args), and an agent's event for another workspace asks you first.
 - Gates: one that fails (an error, past its 30 s, a repo's that changed) now holds an agent's ship, merge or archive
   and a workflow's; only a step you start goes ahead, with a toast.
 - An agent's `laki send` reaches other agents, or a terminal of its own workspace; what it runs there is the agent's

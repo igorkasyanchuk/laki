@@ -187,7 +187,8 @@ the last 50 events, and which extensions and workflows each reached (or why a wo
 `laki_extension_emit`) sends `custom.deploy.done` with that `data` (64 KB at most; a name of letters, digits, `.`, `_`,
 `-`). `"on": { "custom.deploy.done": "refresh" }` answers it, `"custom.*"` every custom event. From an extension's own
 command (`"$LAKI_CLI" widget emit …`) `from.widget` says which, and it never gets its own; an agent's says
-`from.agent` (MCP's `laki_extension_emit` always does). For an agent's event (Laki AI's too) a handler that's an action
+`from.agent` (MCP's `laki_extension_emit` always does). An agent's event for another workspace (`--ws`) waits until you
+allow it in the app, as its send there does. For an agent's event (Laki AI's too) a handler that's an action
 asks you first in the app, as an agent's tool call does (*Always in <workspace>* keeps it, listed with its tools in
 Settings › Extensions as *On an agent's event*, with *Revoke*; no window, no answer or Deny:
 it doesn't run, its log says so); a `refresh` isn't asked. What an extension emits while handling one counts as the

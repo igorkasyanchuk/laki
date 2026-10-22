@@ -1032,7 +1032,9 @@ none for an agent without modes; neither: its profile's, as any tab's) go to `ad
 core's `modelCheck` on each agent block with its preset's agent (`agentOf`) before any workspace; `check` (offline)
 names an unknown mode, a mode or fast mode an agent id lacks, and blocks sharing a tab (`tabKey`: session run of one
 agent, or `session: <block>`) in different modes; a shared session's last tab in another mode is forked, not reused.
-`bypassIn` (its `profile`: a block's profile's `perm` counts, and its `args` when they set the mode, `bypassArgs`): `flowStart` `by: 'agent'` (MCP's; the CLI's `caller` from an agent's tab, main.ts: `agentCaller`) and an agent's event refuse a workflow with a bypassPermissions block; StartRun
+`bypassIn` (its `profile`: a block's profile's `perm` counts, and its `args` when they set the mode; `shared/types.ts`
+`neverAsks`, the one rule (core's `agentNoCmd` and the editor's hint too): bypass permissions by a mode or `bypassArgs`, or
+codex's approvals off, `-a never`, `approval_policy=never`, its Accept edits; never env): `flowStart` `by: 'agent'` (MCP's; the CLI's `caller` from an agent's tab, main.ts: `agentCaller`) and an agent's event refuse a workflow with a bypassPermissions block; StartRun
 names them in red, a dry run's log too. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
 `deliver`): this turn's answer as `steps.<id>.answer`, a
 `failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
@@ -1206,7 +1208,8 @@ before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `s
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
 `answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
-another workspace's tab ask (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
+another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
+its data) (`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
 App's dialog and notification; `always`: `crossOk`, in memory). `state` gives each project's `groups` (its seps' names) and `groupTemplates`
 (a group's prompt template by the group's name), and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused

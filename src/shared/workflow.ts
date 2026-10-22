@@ -3,7 +3,7 @@
 // after a restart. One Markdown file per workflow, none to start with: yours (<data>/workflows/<id>.md) or a project's
 // (.laki/workflows/<id>.md in its repo). This file is the format both sides share: parse, toFile, check.
 
-import { type Agent, bypassArgs, eventOk, FAST, isAgent, PERMS, permInArgs, type Preset, WIDGET_EVENTS } from './types.ts'
+import { type Agent, eventOk, FAST, isAgent, neverAsks, PERMS, type Preset, WIDGET_EVENTS } from './types.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -186,13 +186,14 @@ export const PERM_IDS = [...new Set(Object.values(PERMS).flatMap(l => (l ?? []).
 export const permOf = (wf: Pick<Workflow, 'perm'>, b: Block, agent = b.agent || 'claude') => b.perm ?? (isAgent(agent) && !PERMS[agent] ? undefined : wf.perm)
 // a mode in a block's words (accept edits · fast), as the new-workspace page names it
 export const permWords = (perm?: string, fast?: boolean, agent = 'claude') => [perm && ((PERMS[agent as Agent] ?? PERMS.claude)!.find(p => p[0] === perm)?.[1].toLowerCase() ?? perm), fast && 'fast'].filter(Boolean).join(' · ')
-// the blocks whose agent never asks (bypassPermissions): an agent can't start the workflow. profile: a block's (by its
-// agent's name): its agent, its perm when the block and the workflow give none, and its flags, which win when they set a
-// mode (agentCmd)
+// the blocks whose agent never asks (neverAsks): an agent can't start the workflow. profile: a block's (by its agent's
+// name): its agent, its perm when the block and the workflow give none, and its flags, which win when they set a mode
+// (agentCmd)
 export const bypassIn = (wf: Workflow, profile?: (b: Block) => Pick<Preset, 'agent' | 'perm' | 'args'> | undefined) =>
   wf.blocks.filter(b => {
     const p = b.kind === 'agent' ? profile?.(b) : undefined
-    return b.kind === 'agent' && (permInArgs(p?.agent, p?.args) ? bypassArgs(p?.args) : (permOf(wf, b, p?.agent) ?? p?.perm) === 'bypassPermissions')
+    const agent = p?.agent ?? (b.agent || 'claude')
+    return b.kind === 'agent' && neverAsks(agent, permOf(wf, b, agent) ?? p?.perm, p?.args)
   })
 // the tab an agent block's prompt goes to in a run: its own (session new), another block's (session: <id>), else the
 // run's tab of its agent

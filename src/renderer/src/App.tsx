@@ -1838,12 +1838,14 @@ export function App() {
       return toolShow()
     }
     if (m.cross) {
-      // an agent's send or screen into another workspace's tab (main.ts' crossAsk): what it sends, or that it reads
+      // an agent's send or screen into another workspace's tab (main.ts' crossAsk): what it sends, or that it reads; an
+      // event for another workspace (emit): its workflows and extensions run there
       const send = m.cross === 'send'
-      const title = `${m.agent} in ${m.from} wants to ${send ? 'send to' : 'read'} ${m.target} in ${m.to}`
+      const emit = m.cross === 'emit'
+      const title = emit ? `${m.agent} in ${m.from} wants to send ${m.target} to ${m.to}` : `${m.agent} in ${m.from} wants to ${send ? 'send to' : 'read'} ${m.target} in ${m.to}`
       const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always from ${m.from} to ${m.to}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, send ? String(m.text ?? '').slice(0, 200) : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
-      toolLine.add({ req: m.req, title, text: `${send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
+      notify(title, send || emit ? String(m.text ?? '').slice(0, 200) : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      toolLine.add({ req: m.req, title, text: `${emit ? `An event: the workflows and extensions listening in ${m.to} would run there, with this:\n\n${m.text}` : send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
       return toolShow()
     }
     const where = m.ws ? (view?.workspaces.find(w => w.id === m.ws)?.name ?? m.ws) : ''

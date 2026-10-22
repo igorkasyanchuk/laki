@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, type Agent, AGENT_NAMES, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Check, type Doctor, EFFORTS, bypassArgs, FAST, FILE_MAX, fillTemplate, fillVars, type FixWhat, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, jobOf, type Link, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, MERGE_METHODS, type MergeMethod, permArgs, permInArgs, PERMS, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRFix, prIn, type PRLabel, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, refsIn, type Reminder, REMINDERS_MAX, type Remote, REMOTE, REMOTE_TRIES, type Resources, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Schedule, type ScheduleRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type Stat, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type Today, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { actionSlug, againOnEnter, type Agent, AGENT_NAMES, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Check, type Doctor, EFFORTS, FAST, FILE_MAX, fillTemplate, fillVars, type FixWhat, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, jobOf, type Link, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, MERGE_METHODS, type MergeMethod, neverAsks, permArgs, permInArgs, PERMS, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRAllow, prAllows, type Preset, type PRFix, prIn, type PRLabel, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, refsIn, type Reminder, REMINDERS_MAX, type Remote, REMOTE, REMOTE_TRIES, type Resources, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Schedule, type ScheduleRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type Stat, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type Today, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { emojiOf, isIconName } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -1503,11 +1503,11 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 // why addTab would refuse an agent: checked before wsNew makes a worktree for it
 // an agent's laki new / laki tab (from, agentCaller): an agent of a preset or a shell, never a command it picks (--cmd,
 // or a preset whose agent is a command): a prompt injected into it would leave a program of its own running elsewhere
-// nor one that never asks (bypass permissions: its own pick, else its profile's mode or flags), as workflows' bypassIn
+// nor one that never asks (neverAsks: its own pick, else its profile's mode or flags), as workflows' bypassIn
 export function agentNoCmd(o: { preset?: string; cmd?: string; perm?: string }) {
   if (o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command') throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
   const pr = presetNamed(o.preset || state.settings?.agent || 'claude')
-  if (permInArgs(pr?.agent, pr?.args) ? bypassArgs(pr?.args) : (o.perm ?? pr?.perm) === 'bypassPermissions') throw new Error("an agent can't start an agent that never asks (bypass permissions): the user starts it")
+  if (neverAsks(pr?.agent ?? o.preset ?? 'claude', o.perm ?? pr?.perm, pr?.args)) throw new Error("an agent can't start an agent that never asks (bypass permissions, or approvals off): the user starts it")
 }
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
