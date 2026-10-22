@@ -1692,13 +1692,17 @@ under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` lea
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
-`trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles`: what git would commit under the folder
-(`git ls-files -z --cached --others --exclude-standard`, in it: what it writes and the repo ignores doesn't count, an
-untracked file it doesn't does), plus widget.json, its `script` and the scripts its commands name (`SCRIPT` or executable: a data file a command cats isn't), ignored or not; git
-failing (not a repo): every file under it but hidden ones, node_modules and __pycache__, a link to a folder followed
-while its realpath stays inside (a loop back to a folder it's in skipped); `repoBad`: a file or link out of it (realpath)
+`trusted` is `dirHash` and `files` each file's (`eachHash`) over `repoFiles` (#4): every file under the folder (`git
+ls-files --stage` and `--others --directory`, ignored ones too; a gitlink (160000), an untracked folder and a nested
+repo walked, `.git` left out) but its state: widget.json's `state` (`stateOf`, `stateHas`: a glob without a / by name,
+with one by path, a trailing / a folder; `manifestCheck` checks it) and `STATE` (`.DS_Store`, `__pycache__/`, `*.pyc`;
+`node_modules/` too, not for an agent's folder), unless it runs it (widget.json, its `script`, a `SCRIPT` or executable
+its commands name, an executable: a data file a command cats isn't); git failing (not a repo): the same walk, hidden ones
+left out, a link to a folder followed (and listed, as git does) while its realpath stays inside (a loop back to a folder
+it's in skipped); `repoBad`: a file or link out of it (realpath)
 or past `REPO_MAX` 2000 files is never trusted (`widgetSet` `on` refuses, a scan or `trusted` turns it off); `repoShown`
-lists every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules),
+lists every file and the text of the ones it runs: named in a command, executable, or `SCRIPT` outside node_modules;
+the ones git ignores, `ignoredOf`, and its state),
 and a scan that finds an on one with another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`,
 `ungrant`, a warn line and a `widget-say` `notify` naming the files whose `eachHash` differs, five at most). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
 (no workspace: `app.open` and `custom.*` only), `widgetGates`, `widgetTools` (`ws`: MCP's `ext_*` by

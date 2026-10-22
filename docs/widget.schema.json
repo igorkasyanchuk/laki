@@ -142,6 +142,13 @@
       "type": "boolean",
       "description": "Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)"
     },
+    "state": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What it writes in its own folder as it runs (globs, relative to it; a folder with a trailing /, like [\"last.txt\", \"cache/\"]): a repo’s extension isn’t trusted as those, so writing them doesn’t turn it off. .DS_Store, __pycache__/, *.pyc and node_modules/ never count; what it runs always does"
+    },
     "fetch": {
       "type": "string",
       "description": "A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON"

@@ -788,13 +788,17 @@ and commit it. Folders and one-file extensions both work.
 
 - **Its id** is `<project>.<id>` (`shop-web.deploys`), so it never covers yours or another project's.
 - **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
-  runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (what git
-  would commit there: tracked files and untracked ones the repo doesn't ignore, hidden ones and `node_modules` too, plus
-  the scripts its commands name; outside git, every file but hidden ones, `node_modules` and `__pycache__`), the events it
-  answers, its settings and what it can hold; *Turn on in shop-web* turns on
+  runs first: its fetch, its actions' commands, the text of the scripts it runs, every file it's trusted as (every file
+  in its folder, tracked, untracked and ignored, a submodule's and hidden ones too; outside git, every file but hidden
+  ones), which of them the repo ignores, the events it answers, its settings and what it can hold; *Turn on in shop-web*
+  turns on
   exactly that. A link to a folder inside it counts as that folder; one with a link out of its folder, or more than
   2,000 files, can't be turned on. From the CLI: `laki widget what shop-web.deploys`, then
   `laki widget on shop-web.deploys --seen <hash>`.
+- **Its state.** What it writes in its own folder as it runs goes in widget.json's `"state"`, globs relative to its
+  folder (`["last.txt", "cache/"]`): those aren't what it's trusted as, so writing them keeps it on. `.DS_Store`,
+  `__pycache__/`, `*.pyc` and `node_modules/` never count; a script it runs, an executable and widget.json always do.
+  Better still, keep it in `$LAKI_WIDGET_FILE`, outside the repo.
 - **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's
   folder, a new file an agent drops there) turns it off and marks it *changed*: its streams and agents stop, its tools'
   *Always* go, and you get a toast and a notification naming the files that changed. Its page says what changed;

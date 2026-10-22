@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, actionMenu, aiActOf, gateOf, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
+import { actionCmd, actionMenu, aiActOf, gateOf, globMatch, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -28,7 +28,7 @@ import { agentCaller, agentIn, broadcast, callerAgent, inside, changed, cliArgv,
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[]; required?: boolean }
 type ActionDef = string | { run?: string; tool?: unknown; ai?: string; tools?: string; profile?: string } // a command, or one an agent may call too (widgetSchema.ts' toolOf), or a prompt an agent answers (aiActOf)
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; notify?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; state?: unknown; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; notify?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
@@ -940,7 +940,10 @@ function repoShown(w: Entry) {
       return [`${n}:\n\n${block(cut.trimEnd())}`]
     })
   const bad = 'bad' in all && all.bad ? `\n\nIt can't be trusted: ${all.bad}.` : ''
-  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nWhat it runs:\n\n${files.join('\n\n')}` : ''}\n\nEvery file it's trusted as (a change to any turns it off):\n\n${block(all.names.sort().join('\n'))}${bad}`
+  const ig = w.project && !w.file ? ignoredOf(w, all.names) : []
+  const state = stateOf(w.m)
+  const said = `${ig.length ? `\n\nOf those, the repo ignores (an agent in it could write them):\n\n${block(ig.join('\n'))}` : ''}${state.length ? `\n\nLeft out as what it writes (its state): ${state.join(', ')}` : ''}`
+  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nWhat it runs:\n\n${files.join('\n\n')}` : ''}\n\nEvery file it's trusted as (a change to any turns it off):\n\n${block(all.names.sort().join('\n'))}${said}${bad}`
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)
@@ -1832,46 +1835,40 @@ const filesUnder = (d: string, max = 500, rel = '', out: string[] = []) => {
   for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, max, rel ? `${rel}/${x.name}` : x.name, out)
   return out
 }
-// a repo's extension, what trusting it covers: what git would commit under its folder (tracked files, and untracked
-// ones the repo doesn't ignore: what it writes there and the repo ignores, a last.txt or __pycache__, doesn't count),
-// with widget.json and the scripts its commands name (code: a script's name or executable), ignored or not. Not in a repo (git fails): every file under it but
-// hidden ones, node_modules and __pycache__, a link to a folder followed while it stays inside the folder (realpath,
-// each folder once), a link to a file as the file. bad: why it can't be trusted (a file or link out of it, past
-// REPO_MAX files: a change past them wouldn't be seen)
+// a repo's extension, what trusting it covers (#4): every file under its folder, what git tracks, what it doesn't and
+// what the repo ignores (git ls-files --stage and --others --directory: a submodule (a gitlink) and an untracked folder,
+// a nested repo too, walked file by file), but its state: what widget.json's "state" names (globs, relative to its
+// folder; one with a trailing / a folder) and STATE's clutter, unless it's what it runs (widget.json, its script, a file
+// a command names, an executable). Not in a repo (git fails): the same walk from its folder, hidden ones left out. An
+// agent's linked folder: the walk, hidden files and node_modules too (code it could hide there). Links: one to a folder
+// followed while it stays inside (realpath, each folder once), one to a file as the file. bad: why it can't be trusted
+// (a file or link out of it, past REPO_MAX files: a change past them wouldn't be seen)
 const REPO_MAX = 2000
 const SCRIPT = /\.(sh|bash|zsh|fish|py|rb|pl|php|js|mjs|cjs|ts|mts|lua)$/i
+const STATE = ['.DS_Store', '__pycache__/', '*.pyc'] // every folder's; a repo's node_modules/ too (not an agent's)
+const stateOf = (m: Manifest) => (Array.isArray(m.state) ? m.state.filter((g): g is string => typeof g === 'string' && !!g.trim()) : [])
+// a glob of state: without a /, any file or folder by name; with one, by its path; a trailing /, a folder and all in it
+function stateHas(globs: string[], n: string, dir = false) {
+  const parts = n.split('/')
+  const ups = parts.slice(0, dir ? parts.length : -1).map((_, i) => parts.slice(0, i + 1).join('/')) // the folders it's in (and itself)
+  return globs.some(g => (g.endsWith('/') ? ups.some(u => globMatch(g.slice(0, -1), u)) : globMatch(g, n) || ups.some(u => globMatch(g, u))))
+}
 function repoFiles(w: Entry): { names: string[]; bad?: string } {
   const d = w.dir
   let top = d
   try {
     top = realpathSync(d)
   } catch {}
-  let listed: string[] | undefined
-  if (w.project) try { // an agent's folder: never git's listing, whose .gitignore it writes
-    // ponytail: a sync git per run (trusted), as the walk was; cache by the index's and the folder's mtimes if it shows
-    listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
-  } catch {}
-  if (listed) {
-    const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
-    const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
-    const code = (n: string) => (st => !!st?.isFile() && (n === 'widget.json' || n === w.m.script || SCRIPT.test(n) || (st.mode & 0o111) !== 0))(statSync(join(d, n), { throwIfNoEntry: false })) // a cache.json a command cats isn't code
-    const names = [...new Set([...listed, ...['widget.json', w.m.script ?? '', ...named].filter(n => n && code(n))])]
-    if (names.length > REPO_MAX) return { names: names.slice(0, REPO_MAX), bad: `more than ${REPO_MAX} files` }
-    for (const n of names) {
-      let to: string
-      try {
-        to = realpathSync(join(d, n))
-      } catch {
-        continue // gone, or a broken link: its name only
-      }
-      if (!under(to, top)) return { names, bad: `${n} links out of its folder (to ${to})` }
-    }
-    return { names }
-  }
-  const names: string[] = []
+  const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
+  const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
+  const file = (n: string) => statSync(join(d, n), { throwIfNoEntry: false })
+  const runs = new Set(['widget.json', w.m.script ?? '', ...named.filter(n => SCRIPT.test(n) || ((file(n)?.mode ?? 0) & 0o111) !== 0)].filter(n => n && file(n)?.isFile())) // a cache.json a command cats isn't code
+  const globs = [...STATE, ...(w.agentDev ? [] : ['node_modules/']), ...stateOf(w.m)]
+  const kept = (n: string) => runs.has(n) || (file(n)?.isFile() && ((file(n)?.mode ?? 0) & 0o111) !== 0) || !stateHas(globs, n)
+  const names = new Set<string>()
   let bad: string | undefined
   // up: the folders it's in now (a link back to one of them would loop)
-  const walk = (rel: string, up: Set<string>) => {
+  const walk = (rel: string, up: Set<string>, hidden: boolean) => {
     let real = join(top, rel)
     try {
       real = realpathSync(join(d, rel))
@@ -1883,9 +1880,7 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
       es = readdirSync(join(d, rel), { withFileTypes: true })
     } catch {}
     const subs: string[] = []
-    // an agent's folder: its hidden files and node_modules too (code it could hide there). ponytail: __pycache__ left
-    // out (python rewrites it as it runs), and one with node_modules past REPO_MAX can't be trusted: your own link can
-    for (const x of es.filter(x => (w.agentDev ? x.name !== '.git' : !x.name.startsWith('.') && x.name !== 'node_modules') && x.name !== '__pycache__')) {
+    for (const x of es.filter(x => x.name !== '.git' && (hidden || !x.name.startsWith('.')))) {
       if (bad) return
       const n = rel ? `${rel}/${x.name}` : x.name
       let dir = x.isDirectory()
@@ -1894,19 +1889,58 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
         try {
           to = realpathSync(join(d, n))
         } catch {
-          names.push(n) // a broken link: its name only
+          names.add(n) // a broken link: its name only
           continue
         }
         if (!under(to, top)) return void (bad = `${n} links out of its folder (to ${to})`)
         dir = statSync(to, { throwIfNoEntry: false })?.isDirectory() ?? false
+        if (dir) names.add(n) // the link itself, as git lists it
       }
-      if (dir) subs.push(n)
-      else if (names.push(n) > REPO_MAX) return void (bad = `more than ${REPO_MAX} files`)
+      if (dir) !stateHas(globs, n, true) && subs.push(n)
+      else if (kept(n) && names.add(n).size > REPO_MAX) return void (bad = `more than ${REPO_MAX} files`)
     }
-    for (const n of subs) if (!bad) walk(n, up)
+    for (const n of subs) if (!bad) walk(n, up, hidden)
   }
-  walk('', new Set())
-  return { names, bad }
+  let listed: string[] | undefined
+  const trees: string[] = [] // a submodule, an untracked folder (a nested repo too): walked
+  if (w.project && !w.agentDev) try { // an agent's folder: never git's listing, whose .gitignore it writes
+    // ponytail: two sync gits per run (trusted), as the walk was; cache by the index's and the folder's mtimes if it shows
+    const ls = (...a: string[]) => execFileSync('git', ['ls-files', '-z', ...a, '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
+    const staged = ls('--stage') // <mode> <sha> <stage>\t<path>: 160000, a gitlink
+    const others = ls('--others', '--directory') // ignored ones too; a folder git has nothing of as <dir>/
+    listed = []
+    for (const l of staged) (l.startsWith('160000 ') ? trees : listed).push(l.slice(l.indexOf('\t') + 1))
+    for (const n of others) (n.endsWith('/') ? trees : listed).push(n === './' ? '' : n.replace(/\/$/, '')) // ./: its folder isn't git's at all
+  } catch {}
+  if (listed) {
+    for (const n of listed) if (kept(n)) names.add(n)
+    for (const n of trees) if (!bad && (!n || !stateHas(globs, n, true))) walk(n, new Set(), true)
+    for (const n of runs) names.add(n) // named, though in a folder of its state (node_modules/.bin/x)
+    if (bad) return { names: [...names], bad }
+    if (names.size > REPO_MAX) return { names: [...names].slice(0, REPO_MAX), bad: `more than ${REPO_MAX} files` }
+    for (const n of names) {
+      let to: string
+      try {
+        to = realpathSync(join(d, n))
+      } catch {
+        continue // gone, or a broken link: its name only
+      }
+      if (!under(to, top)) return { names: [...names], bad: `${n} links out of its folder (to ${to})` }
+    }
+    return { names: [...names] }
+  }
+  walk('', new Set(), !!w.agentDev)
+  return { names: [...names], bad }
+}
+// a repo's files that git ignores, of those it's trusted as: repoShown names them (a change turns it off; what it writes
+// belongs in its state)
+function ignoredOf(w: Entry, names: string[]) {
+  try {
+    const ig = new Set(execFileSync('git', ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', '.'], { cwd: w.dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0'))
+    return names.filter(n => ig.has(n)).sort()
+  } catch {
+    return []
+  }
 }
 // a repo's that can't be trusted (repoFiles' bad): never on
 function repoBad(w: Entry) {

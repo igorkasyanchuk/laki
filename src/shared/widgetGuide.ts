@@ -111,8 +111,10 @@ export const widgetFormat = () => `## widget.json
   no answer lets the step go ahead (print \`ok: false\` yourself to block), except Merge when green. Command actions only.
 - For a team: put it in the repo's \`.laki/extensions/<id>/\` (\`laki widget new <name> --dir .laki/extensions/<id>\`) and
   commit it. Each teammate's Laki lists it as \`<project>.<id>\`, off until they look at what it runs, and off again when
-  it changes (its files as git would commit them); it shows and runs only in that project's workspaces. Keep what it
-  writes in \`$LAKI_WIDGET_FILE\` or a file the repo ignores, never beside its code.
+  it changes (every file in its folder, ignored ones and a submodule's too); it shows and runs only in that project's
+  workspaces. Keep what it writes in \`$LAKI_WIDGET_FILE\`; a file it must write in its folder goes in \`"state":
+  ["last.txt", "cache/"]\` (globs), else writing it turns the extension off. \`node_modules/\`, \`__pycache__/\`, \`*.pyc\`
+  and \`.DS_Store\` never count.
 - An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
 - \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
   each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.

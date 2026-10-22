@@ -110,13 +110,12 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   assert.match((await rig.rpc('widgetWhat', { id })).text, /lib\/run\.sh:\n\n```\necho deploy\n```/)
   await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
   await until(async () => !(await find()).running, 'its first fetch done')
-  // a hidden file and node_modules count too (code a fetch may run), said though not shown
+  // node_modules doesn't count (its installed deps: the user's call, #4); a hidden file does (code a fetch may run)
   mkdirSync(join(d, 'node_modules', 'x'), { recursive: true })
   writeFileSync(join(d, 'node_modules', 'x', 'index.js'), 'module.exports = 1\n')
-  assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo/)
-  assert.match((await rig.rpc('widgetWhat', { id })).text, /```\nfetch\.sh\nlib\/run\.sh\nnode_modules\/x\/index\.js\nwidget\.json\n```/)
-  await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
-  await until(async () => !(await find()).running, 'its first fetch done')
+  assert.doesNotMatch((await rig.rpc('widgetRun', { id })).error ?? '', /changed/)
+  assert.equal((await find()).on, true)
+  assert.match((await rig.rpc('widgetWhat', { id })).text, /```\nfetch\.sh\nlib\/run\.sh\nwidget\.json\n```/)
   writeFileSync(join(d, '.helper.sh'), 'echo hidden\n')
   assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo/)
 
@@ -181,10 +180,10 @@ test("a repo's extension's links: one to a folder inside is followed (a change t
   await rig.rpc('widgetReload')
   assert.equal((await find()).on, false)
 
-  // past 2000 files: never trusted
+  // past 2000 files: never trusted (node_modules isn't counted: a folder of its own)
   const d3 = ext(rig.repo, 'big', { name: 'Big', fetch: 'echo {}' })
-  mkdirSync(join(d3, 'node_modules'))
-  for (let i = 0; i <= 2000; i++) writeFileSync(join(d3, 'node_modules', `f${i}.js`), '')
+  mkdirSync(join(d3, 'vendor'))
+  for (let i = 0; i <= 2000; i++) writeFileSync(join(d3, 'vendor', `f${i}.js`), '')
   await rig.rpc('widgetReload')
   const w4 = await rig.rpc('widgetWhat', { id: `${p.id}.big` })
   await assert.rejects(rig.rpc('widgetSet', { id: `${p.id}.big`, on: true, seen: w4.hash }), /can't be trusted: more than 2000 files/)
@@ -222,12 +221,12 @@ test("a repo's extension's turn-on question shows widget.json as it is on disk; 
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
 })
 
-test("a repo's extension is trusted as git would commit it: what its fetch writes and the repo ignores keeps it on; a new file the repo doesn't ignore or an edit to its fetch.sh turns it off, the notice naming it; not a repo: hidden files, node_modules and __pycache__ don't count", async t => {
+test("a repo's extension is trusted as every file in its folder but its state: what its fetch writes and widget.json's state names (or __pycache__) keeps it on; a new file or an edit to its fetch.sh turns it off, the notice naming it; not a repo: hidden files, node_modules and __pycache__ don't count", async t => {
   const rig = await fresh(t)
   const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
-  const d = ext(rig.repo, 'w', { name: 'W', fetch: 'sh fetch.sh' }, { 'fetch.sh': `date > last.txt; mkdir -p __pycache__; date > __pycache__/x.pyc; echo '{"n": 1}'\n` })
+  const d = ext(rig.repo, 'w', { name: 'W', fetch: 'sh fetch.sh', state: ['last.txt'] }, { 'fetch.sh': `date > last.txt; mkdir -p __pycache__; date > __pycache__/x.pyc; echo '{"n": 1}'\n` })
   ext(rig.repo, 'v', { name: 'V', fetch: `date > state.txt; echo '{"n": 1}'` })
-  ext(rig.repo, 'c', { name: 'C', fetch: `date > cache.json; cat cache.json >/dev/null; echo '{"n": 1}'` }) // its command names an ignored data file
+  ext(rig.repo, 'c', { name: 'C', fetch: `date > cache.json; cat cache.json >/dev/null; echo '{"n": 1}'`, state: ['cache.json'] }) // its command names a data file, its state
   writeFileSync(join(rig.repo, '.gitignore'), 'last.txt\n__pycache__/\ncache.json\n')
   git('add', '-A')
   git('commit', '-qm', 'extensions')
@@ -275,4 +274,63 @@ test("a repo's extension is trusted as git would commit it: what its fetch write
   assert.ok(existsSync(join(z, '.state')))
   writeFileSync(join(z, 'extra.sh'), 'echo extra\n')
   assert.match((await rig.rpc('widgetRun', { id: `${pp.id}.z` })).error ?? '', /changed in .*'s repo/)
+})
+
+// #4: git's listing missed code a repo's extension runs: a submodule's files (one gitlink line) and an ignored file a
+// tracked script sources. Both count now; what it declares as its state, and .DS_Store, don't
+test("#4: a submodule moved or an ignored file it sources rewritten turns it off; its declared state and .DS_Store don't; not a repo: its state neither", async t => {
+  const rig = await fresh(t)
+  const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'protocol.file.allow=always', ...a], { cwd, env: rig.env, stdio: 'pipe' })
+  const sub = gitRepo(rig, 'sub')
+  writeFileSync(join(sub, 'run.sh'), '. "$(dirname "$0")/helper.sh"\n')
+  writeFileSync(join(sub, 'helper.sh'), `echo '{"n": 1}'\n`)
+  git(sub, 'add', '-A')
+  git(sub, 'commit', '-qm', 'run')
+  const s = ext(rig.repo, 's', { name: 'S', fetch: 'sh lib/run.sh' })
+  git(rig.repo, 'submodule', 'add', '-q', sub, '.laki/extensions/s/lib')
+  ext(rig.repo, 'l', { name: 'L', fetch: 'sh fetch.sh', state: ['last.txt', 'cache/'] }, { 'fetch.sh': `. ./local.sh; date > last.txt; mkdir -p cache; date > cache/a; echo '{"n": 1}'\n`, 'local.sh': 'true\n' })
+  writeFileSync(join(rig.repo, '.gitignore'), 'local.sh\nlast.txt\ncache/\n.DS_Store\n')
+  git(rig.repo, 'add', '-A')
+  git(rig.repo, 'commit', '-qm', 'extensions')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const find = async (id: string) => (await rig.rpc('state')).widgets.find((w: any) => w.id === id)
+  const turnOn = async (id: string) => {
+    const what = await rig.rpc('widgetWhat', { id })
+    await rig.rpc('widgetSet', { id, on: true, seen: what.hash })
+    await until(async () => (x => x.at && !x.running)(await find(id)), 'its first fetch done')
+    return what.text as string
+  }
+  const settle = () => new Promise(r => setTimeout(r, 1800)) // the watch's scan, a second after the last change
+
+  // its state and .DS_Store: written, it stays on; the sheet names the ignored files it's trusted as and its state
+  const l = `${p.id}.l`
+  const shown = await turnOn(l)
+  assert.match(shown, /Of those, the repo ignores \(an agent in it could write them\):\n\n```\nlocal\.sh\n```/)
+  assert.match(shown, /Left out as what it writes \(its state\): last\.txt, cache\//)
+  for (let i = 0; i < 2; i++) assert.equal((await rig.rpc('widgetRun', { id: l })).error, undefined)
+  writeFileSync(join(rig.repo, '.laki', 'extensions', 'l', '.DS_Store'), 'x')
+  await settle()
+  assert.deepEqual([(await find(l)).on, (await find(l)).changed], [true, undefined])
+  // the ignored local.sh it sources, rewritten (an agent in the project's folder): off
+  writeFileSync(join(rig.repo, '.laki', 'extensions', 'l', 'local.sh'), 'echo agent-wrote-this\n')
+  assert.match((await rig.rpc('widgetRun', { id: l })).error ?? '', /changed in .*'s repo: off until you look/)
+
+  // a submodule moved: off
+  const id = `${p.id}.s`
+  assert.match(await turnOn(id), /lib\/helper\.sh/)
+  writeFileSync(join(s, 'lib', 'helper.sh'), `echo '{"n": 2}'\n`)
+  git(join(s, 'lib'), 'commit', '-qam', 'moved')
+  await until(async () => (await find(id)).changed, 'off: the submodule moved')
+  assert.equal((await find(id)).on, false)
+
+  // not a repo: its declared state stays on, an undeclared file it writes doesn't
+  const plain = join(rig.home, 'plain')
+  ext(plain, 'z', { name: 'Z', fetch: `date > last.txt; echo '{"n": 1}'`, state: ['last.txt'] })
+  ext(plain, 'y', { name: 'Y', fetch: `date > last.txt; echo '{"n": 1}'` })
+  const pp = await rig.rpc('projectAdd', { path: plain })
+  await turnOn(`${pp.id}.z`)
+  await turnOn(`${pp.id}.y`)
+  for (const x of ['z', 'y']) await rig.rpc('widgetRun', { id: `${pp.id}.${x}` })
+  await settle()
+  assert.deepEqual([(await find(`${pp.id}.z`)).on, (await find(`${pp.id}.y`)).on], [true, false])
 })

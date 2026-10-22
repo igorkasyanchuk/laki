@@ -142,7 +142,7 @@ test('the schema: docs/widget.schema.json in step, every manifest key and UI ele
   const file = readFileSync(join(root, 'docs/widget.schema.json'), 'utf8')
   assert.equal(file, `${JSON.stringify(WIDGET_SCHEMA, null, 2)}\n`, 'docs/widget.schema.json is out of date: node --experimental-strip-types scripts/widget-schema.ts')
   // the keys widgets.ts reads (its Manifest type): this list, and the schema's
-  const KEYS = ['name', 'description', 'size', 'every', 'view', 'place', 'fetch', 'script', 'config', 'actions', 'icon', 'label', 'badge', 'tip', 'click', 'sample', 'sampleConfig', 'ui', 'scope', 'on', 'stream', 'source', 'notify']
+  const KEYS = ['name', 'description', 'size', 'every', 'view', 'place', 'fetch', 'script', 'config', 'actions', 'icon', 'label', 'badge', 'tip', 'click', 'sample', 'sampleConfig', 'ui', 'scope', 'on', 'stream', 'state', 'source', 'notify']
   const src = readFileSync(join(root, 'src/daemon/widgets.ts'), 'utf8')
   const manifest = /type Manifest = \{([^\n]*)\}\n/.exec(src)![1]
   assert.deepEqual([...manifest.matchAll(/(\w+)\?:/g)].map(m => m[1]).sort(), [...KEYS].sort(), "widgets.ts' Manifest and this list")

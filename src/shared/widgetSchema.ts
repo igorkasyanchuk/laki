@@ -106,6 +106,7 @@ export const MANIFEST: Record<string, J> = {
   scope: { enum: ['global', 'workspace'], description: 'global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}' },
   on: { type: 'object', propertyNames: { anyOf: [{ enum: [...WIDGET_EVENTS, 'custom.*'] }, { pattern: CUSTOM_EVENT.source }] }, additionalProperties: { type: 'string' }, description: 'Events it answers: { "turn.done": "one of its actions" | "refresh" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT' },
   stream: { type: 'boolean', description: 'Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)' },
+  state: { type: 'array', items: { type: 'string' }, description: 'What it writes in its own folder as it runs (globs, relative to it; a folder with a trailing /, like ["last.txt", "cache/"]): a repo’s extension isn’t trusted as those, so writing them doesn’t turn it off. .DS_Store, __pycache__/, *.pyc and node_modules/ never count; what it runs always does' },
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
   script: str('Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data'),
   config: { type: 'object', additionalProperties: SPEC, description: 'Its settings, by name (a letter or _, then letters, digits, _)' },
@@ -305,6 +306,8 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     else if (src.kind === 'url' && typeof src.url === 'string' && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) say('error', 'widget.json source', 'url: http or https')
     else if (src.kind === 'static' && (typeof (src.text ?? '') !== 'string' || String(src.text ?? '').length > 64 << 10)) say('error', 'widget.json source', 'static: a text, 64 KB at most')
   }
+  if (m.state !== undefined && !(Array.isArray(m.state) && m.state.every(g => typeof g === 'string' && g.trim() && !g.startsWith('/') && !g.split('/').includes('..'))))
+    say('error', 'widget.json state', `globs relative to its folder, like ["last.txt", "cache/"], not ${JSON.stringify(m.state)}`)
   if (m.stream !== undefined && typeof m.stream !== 'boolean') say('error', 'widget.json stream', `true or false, not ${kindOf(m.stream)}`)
   if (m.stream === true && m.scope === 'workspace') say('error', 'widget.json stream', 'a stream is global only: not with "scope": "workspace"') // ponytail: one process per workspace
   if (m.stream === true && !(m.fetch || m.script)) say('error', 'widget.json stream', 'a stream needs a fetch or a script that runs all along')

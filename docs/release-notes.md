@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A repo's extension is trusted as every file in its folder now, a submodule's and ignored ones too, so a pull or an
+  agent that changes code it runs turns it off; widget.json's `"state": ["last.txt", "cache/"]` names what it writes there.
 - An agent's event never starts a workflow whose agent never asks by its flags either (codex's `-a never`, its
   *Accept edits*, claude's skip-permissions args), and an agent's event for another workspace asks you first.
 - Gates: one that fails (an error, past its 30 s, a repo's that changed) now holds an agent's ship, merge or archive
