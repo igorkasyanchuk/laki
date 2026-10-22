@@ -1507,7 +1507,7 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 export function agentNoCmd(o: { preset?: string; cmd?: string; perm?: string }) {
   if (o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command') throw new Error("an agent can't start a command of its own (--cmd, or a command preset): the user starts it")
   const pr = presetNamed(o.preset || state.settings?.agent || 'claude')
-  if (neverAsks(pr?.agent ?? o.preset ?? 'claude', o.perm ?? pr?.perm, pr?.args)) throw new Error("an agent can't start an agent that never asks (bypass permissions, or approvals off): the user starts it")
+  if (neverAsks(pr?.agent || o.preset || state.settings?.agent || 'claude', o.perm ?? pr?.perm, pr?.args)) throw new Error("an agent can't start an agent that never asks (bypass permissions, or approvals off): the user starts it")
 }
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')

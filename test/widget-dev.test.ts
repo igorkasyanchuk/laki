@@ -254,6 +254,17 @@ test("#10: an agent's dev link over an installed id is refused, nothing starts; 
   assert.deepEqual([existsSync(`${ran}-feed`), existsSync(`${ran}-other`)], [false, false])
   assert.equal((await find(rig, 'feed')).name, 'Feed')
   assert.deepEqual((await rig.rpc('widgetDev', { list: true })).links, [])
+  // your own dev link counts as yours: an agent's folder with its id is refused, and it stays on
+  const yours = join(rig.home, 'my-code')
+  mkdirSync(join(yours, 'mine'), { recursive: true })
+  writeFileSync(join(yours, 'mine', 'widget.json'), JSON.stringify({ name: 'Mine', fetch: 'echo {}' }))
+  await rig.rpc('widgetDev', { folder: yours })
+  const theirs = join(rig.home, 'agent-mine')
+  mkdirSync(join(theirs, 'mine'), { recursive: true })
+  writeFileSync(join(theirs, 'mine', 'widget.json'), JSON.stringify({ name: 'Agent mine', fetch: 'echo {}' }))
+  await assert.rejects(rig.rpc('widgetDev', { folder: theirs, from }), /has mine: it would cover your Mine/)
+  assert.deepEqual([(await find(rig, 'mine')).name, (await find(rig, 'mine')).on], ['Mine', true])
+  await rig.rpc('widgetDev', { off: yours })
   // without it: a new id, whose store says on (one you had once), comes in off
   rmSync(join(code, 'feed'), { recursive: true })
   writeFileSync(join(rig.data, 'widget-data', 'other.json'), JSON.stringify({ on: true }))

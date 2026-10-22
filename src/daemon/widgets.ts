@@ -4,7 +4,7 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import { appendFileSync, chmodSync, cpSync, type Dirent, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, watch, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, cpSync, type Dirent, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, type Stats, symlinkSync, unlinkSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -1902,7 +1902,8 @@ function repoFiles(w: Entry): { names: string[]; bad?: string } {
   } catch {}
   const cmds = [w.m.fetch, ...Object.values(w.m.actions ?? {}).map(a => actionCmd(a))].filter(Boolean).join(' ')
   const named = cmds.split(/[\s'"`;|&()<>=]+/).map(t => t.replace(/^\.\//, '')).filter(t => t && !/^[-/$~]/.test(t) && !t.split('/').includes('..'))
-  const file = (n: string) => statSync(join(d, n), { throwIfNoEntry: false })
+  const stats = new Map<string, Stats | undefined>()
+  const file = (n: string) => (stats.has(n) ? stats.get(n) : (st => (stats.set(n, st), st))(statSync(join(d, n), { throwIfNoEntry: false }))) // each file once a scan
   const runs = new Set(['widget.json', w.m.script ?? '', ...named.filter(n => SCRIPT.test(n) || ((file(n)?.mode ?? 0) & 0o111) !== 0)].filter(n => n && file(n)?.isFile())) // a cache.json a command cats isn't code
   const globs = [...STATE, ...(w.agentDev ? [] : ['node_modules/']), ...stateOf(w.m)]
   const kept = (n: string) => runs.has(n) || (file(n)?.isFile() && ((file(n)?.mode ?? 0) & 0o111) !== 0) || !stateHas(globs, n)
@@ -2640,7 +2641,7 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
   const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you look at them, then off again as they change (N10; one that shadows an installed one too: they share its store); yours makes it yours again
   if (agent) {
     // over one you have installed it would share its store and secrets: refused; the others off before the scan, so none starts
-    const yours = found.map(x => widgets.get(idOf(x))).find(w => w && !w.dev)
+    const yours = found.map(x => widgets.get(idOf(x))).find(w => w && !w.agentDev) // installed, built in or your own dev link: only its own earlier link's may come again
     if (yours) throw new Error(`${folder} has ${yours.id}: it would cover your ${yours.m.name || yours.id} (its settings and secrets). Pick another id`)
     for (const x of found) if (statOf(storePath(idOf(x)))) writeStore(idOf(x), { ...readStore(idOf(x)), on: false })
   }
