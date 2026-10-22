@@ -83,7 +83,7 @@ type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
 type Field = { value: string; placeholder?: string; multi?: boolean } // multi: a text box (Enter a new line, ⌘⏎ OK)
 export type Fact = { label: string; value: string; icon?: string } // a line of ask's facts, under its text; icon: a name (Icon) or an emoji
-type Asking = { title: string; text?: string; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
+type Asking = { n?: number; title: string; text?: string; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
@@ -91,6 +91,7 @@ export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: stri
   )
 // one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
 let early: Asking[] = []
+let asked = 0
 export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string, facts?: Fact[]) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, facts, buttons, check, done, tag }))
 // a line typed in the app's own dialog (an extension action's ask): the text, or null for Cancel, Esc or outside
 export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string; value?: string; multi?: boolean } = {}) =>
@@ -111,6 +112,7 @@ export function AskHost() {
   const waiting = useRef<Asking[]>([]) // ones a newer ask covered, the last covered first
   const box = useRef<HTMLDivElement>(null)
   const show = (next: Asking, back: Element | null) => {
+    next.n ??= ++asked // its own dialog: a covered one back gets its own field, not the newer one's typing
     cur.current = { a: next, back }
     setOn(!!next.check?.on)
     setA(next)
@@ -167,7 +169,7 @@ export function AskHost() {
   if (!a) return null
   return (
     <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(-1)}>
-      <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
+      <div key={a.n} className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
         {!!a.facts?.length && (

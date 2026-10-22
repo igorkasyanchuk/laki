@@ -1847,6 +1847,7 @@ export function closeTab(id: string) {
   sessions.delete(id)
   asleep.delete(id)
   rt.delete(id)
+  typedBy.delete(id), treeAgents.delete(id)
   state.tabs = state.tabs.filter(x => x !== t)
   stopShares({ tab: id })
   save()

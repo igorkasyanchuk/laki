@@ -1848,7 +1848,7 @@ export function App() {
       const agent = String(c.agent ?? '').trim()
       // #30: its model, effort, mode and fast mode (wsNew checks them); never an agent that doesn't ask, by the mode it
       // asks for or its profile's own
-      const pr = view?.presets.find(x => x.name === (agent || settings.agent)) ?? view?.presets.find(x => x.agent !== 'command')
+      const pr = view?.presets.find(x => x.name === (agent || settings.agent)) ?? (agent ? undefined : view?.presets.find(x => x.agent !== 'command')) // an agent named but no profile of it: that agent itself, never another's mode
       const kind = pr?.agent ?? (agent || 'claude')
       const [model, effort, perm] = [c.model, c.effort, c.perm].map(x => String(x ?? '').trim() || undefined)
       if (neverAsks(kind, perm ?? pr?.perm, pr?.args)) return toast(`${w.name}: an extension never starts an agent that doesn't ask first${perm ? ` (${perm})` : ` (${pr?.name}'s mode)`}`)

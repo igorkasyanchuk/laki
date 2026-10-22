@@ -453,6 +453,7 @@ const remoteNo = (method: string, p: any) =>
 const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact'])
 const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
+const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
 const peerOf = (sock: Socket) => {
   let t = peers.get(sock)
@@ -472,7 +473,9 @@ async function whoCalls(sock: Socket, method: string, p: any) {
   }
   const o = p && typeof p === 'object' ? p : {}
   const said = FROM.has(method) ? o.from : o.caller // a process in no tab: what its env says (the CLI's caller())
-  await core.treeAgent(tab || core.state.tabs.find(t => t.id === said?.tab)) // #14: a shell tab's agent, whatever runs in front
+  // #14: a shell tab's agent, whatever runs in front; once per connection, as its peer (a window's keys are calls)
+  if (!trees.has(sock)) trees.set(sock, core.treeAgent(tab || core.state.tabs.find(t => t.id === said?.tab)))
+  await trees.get(sock)
   if (!tab) return p
   const me = { ws: tab.workspace, tab: tab.id }
   return FROM.has(method) ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
