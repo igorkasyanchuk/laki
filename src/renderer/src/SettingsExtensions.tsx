@@ -244,7 +244,7 @@ export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
   return [
     { label: w.on ? 'Turn off' : 'Turn on', icon: 'power', sub: w.on ? 'nothing of it runs until you turn it on' : undefined, run: () => void api.set(w.id, { on: !w.on }) },
     { label: 'Show in', icon: 'layout', items: offered.map(([v, n, tip]) => ({ label: n, sub: tip, ...(places.includes(v) && { hint: ON }), run: () => flip(v) })) },
-    ...(places.some(p => BARS.includes(p)) && (!w.button || fits(w)) ? [{ label: 'Size', icon: 'grid', items: [...(fits(w) ? [{ label: 'Auto: in a bar, as wide as it needs', ...(w.fit && { hint: ON }), run: () => void api.set(w.id, { fit: true }) }] : []), ...SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(!w.fit && size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d], fit: false }) }))] } as MenuItem] : []),
+    ...(places.some(p => BARS.includes(p)) && (!w.button || fits(w)) ? [{ label: 'Size', icon: 'grid', items: [...(fits(w) ? [{ label: 'Auto: in a bar, as wide as it needs', ...(w.fit && { hint: ON }), run: () => void api.set(w.id, { fit: true }) }] : []), ...SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(!(w.fit && fits(w)) && size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d], fit: false }) }))] } as MenuItem] : []),
     null,
     ...(api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` ? [{ label: 'Edit with Laki AI', icon: 'ai', sub: 'the studio', run: () => api.studio!(w.id) } as MenuItem] : []),
     ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),

@@ -2379,7 +2379,7 @@ export function App() {
   const termIn = (p: Project, place?: string) => quickNew('shells', undefined, true, { project: p.id, ...(place && { place }) })
   const plusMenu = (p: Project, place?: string): MenuItem[] => [
     { label: 'New workspace', icon: 'plus', key: 'n', hint: place ? undefined : kh('newWs'), run: () => newWs(p.id, place ? { place } : undefined) },
-    { label: 'Terminal', icon: 'terminal', key: 't', hint: `in ${shortPath(p.path)}`, run: () => termIn(p, place) },
+    { label: 'Terminal', icon: 'terminal', key: 't', hint: `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`, run: () => termIn(p, place) },
   ]
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
