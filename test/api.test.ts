@@ -92,12 +92,46 @@ test("tabs: named by their task: a prompt's words, the first prompt typed, a com
   assert.equal(named.name, 'tests')
   // a command: its first words
   assert.equal((await rig.rpc('tabNew', { ws: ws.id, cmd: '/usr/bin/env npm run dev --port 3000' })).name, 'env npm run')
-  // a given name is trimmed; a workspace made without a prompt: its first agent takes its first prompt's words
+  // a given name is trimmed; a workspace made without a prompt or a name (ws-<tail>): its first prompt names the
+  // workspace, its tab keeps the agent's name
   assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'x', name: '  docs  ' })).name, 'docs')
   const bare = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  assert.match(bare.id, /^ws-/)
   const b1 = await rig.tab(bare.id)
   await rig.rpc('hook', { tab: b1.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'fix the login page' } })
-  assert.equal((await rig.tab(bare.id)).name, 'claude: fix the login page')
+  const wsOf = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
+  assert.deepEqual([(await wsOf(bare.id)).name, (await rig.tab(bare.id)).name], ['fix the login page', 'claude'])
+})
+
+test("Local sessions: named after their prompt, or their agent's first prompt; never the folder's name, never over yours", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const wsOf = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
+  const say = async (ws: string, prompt: string) => rig.rpc('hook', { tab: (await rig.tab(ws)).id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt } })
+  // the folder's own, with a prompt: its words, not the folder's
+  const own = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'claude', prompt: 'Please fix the cart total rounding' })
+  assert.deepEqual([own.id, (await wsOf(own.id)).name], [p.id, 'fix the cart total rounding'])
+  // beside it, no prompt: <folder>-<tail> until its agent's first prompt names it, once
+  const next = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'claude' })
+  assert.equal((await wsOf(next.id)).name, undefined)
+  await say(next.id, '/model') // a bare command says nothing
+  assert.equal((await wsOf(next.id)).name, undefined)
+  await say(next.id, 'can you add dark mode to the settings page')
+  assert.equal((await wsOf(next.id)).name, 'add dark mode to the settings')
+  assert.equal((await rig.tab(next.id)).name, 'claude')
+  // a name given, or a rename: kept
+  const named = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'claude', name: 'Docs pass' })
+  assert.equal((await wsOf(named.id)).name, 'Docs pass')
+  const later = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'claude' })
+  await rig.rpc('wsSet', { id: later.id, name: 'mine' })
+  await say(later.id, 'write the docs')
+  assert.equal((await wsOf(later.id)).name, 'mine')
+  // renamed back to its id (the folder's): yours too, no prompt names it again
+  await rig.rpc('wsSet', { id: own.id, name: own.id })
+  const t2 = await rig.rpc('tabNew', { ws: own.id, preset: 'claude' })
+  await rig.rpc('hook', { tab: t2.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'write the docs' } })
+  assert.equal((await wsOf(own.id)).name, undefined)
+  await assert.doesNotReject(rig.rpc('wsNew', { project: p.id, local: true, preset: 'none', another: true, name: 42 })) // a name that isn't text: ignored
 })
 
 test('tabs: a command preset, numbered names, close, resize, detach, queue, codex Enter, interrupt, a gone folder', async t => {

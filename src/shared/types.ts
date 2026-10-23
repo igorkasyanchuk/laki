@@ -154,6 +154,7 @@ export type Workspace = {
   archivedAt?: number // when (ms), for settings.archivedDays
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
+  untitled?: boolean // made with no name or prompt: its agent's first prompt names it (core's titleFrom); false: renamed, never
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
   pinned?: boolean // the sidebar shows it above the projects, under Pinned

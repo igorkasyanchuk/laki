@@ -9,6 +9,8 @@ version it builds, with the date. -->
   the PR's title.
 - The context meter reads Claude's own settings: `opus[1m]` there counts against 1M, not 200K.
 - Deleting a workspace with a PR names the PR's author.
+- A Local session is named after its prompt, not the folder; one started without a prompt or a name takes its agent's
+  first prompt's words, until you rename it.
 - Extensions: *Auto* size in the top or status bar (as wide as its words need); data with `"hidden": true` hides one
   everywhere until it changes; a Laki AI edit that only changes its look keeps it on; Laki AI's chat and the studio
   link the extension's page.

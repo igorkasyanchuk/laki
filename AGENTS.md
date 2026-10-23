@@ -203,8 +203,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - tabs and agents: `tabNew`/`tabClose` (a tab's name: `addTab`, `freeName` numbers it; an agent tab after the
   workspace's first, with a prompt, is `<agent>: <taskTitle(prompt)>` (`shared/types.ts`: its first words, no URLs, paths,
   flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit and
-  gemini's BeforeAgent `prompt`, codex's first notify `input-messages`, never a bare /command; MCP's `laki_new_tab` takes
-  a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
+  gemini's BeforeAgent `prompt`, codex's first notify `input-messages`, never a bare /command; in an untitled workspace
+  (a workspace's `untitled`: made with no name or prompt, a Local one or a worktree's `ws-<tail>`; or a folder's own from
+  before, its project's id; `wsSet` `name` sets it false), that prompt names the workspace instead and the tab keeps its
+  agent's name; a new Local one is named the name given, else `taskTitle` of its prompt (the renderer's `nameOf` too); MCP's `laki_new_tab` takes a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
   (main.ts `agentSend`): to an agent's tab (`agent: true`), or a terminal of its own workspace, which is then the agent's
   (`agentCaller`, core's `agentTyped`; its keys through `input` too) until you send or type there (`youTyped`: keys with
   no escape), another workspace's terminal refused before any ask), `queueClear`;

@@ -1267,14 +1267,24 @@ function freeName(ws: string, base: string, self?: string) {
   return name
 }
 
-// an agent tab still named as it started ("claude 2") takes its first prompt's words: "claude: fix the login" (a host's
-// tabs never: its running hook sends no payload)
+// a workspace still called what Laki made up, never named or renamed (a rename sets untitled false): one made with no
+// name or prompt (untitled), or a folder's own from before (its project's id; not Terminals' or Browsers'). Its agent's
+// first prompt names it (titleFrom)
+function untitled(w: Workspace) {
+  if (w.name || w.untitled === false) return false
+  return !!w.untitled || (w.kind === 'local' && state.projects.some(p => p.id === w.id && p.id === w.project && !p.kind))
+}
+
+// an agent tab still named as it started ("claude 2") takes its first prompt's words: "claude: fix the login"; in an
+// untitled workspace the prompt names the workspace instead (a host's tabs never: its running hook sends no payload)
 function titleFrom(tab: Tab, prompt: unknown) {
   if (tab.titled || tab.kind !== 'agent' || typeof prompt !== 'string') return
-  const agent = tab.profile ?? tab.preset ?? ''
-  if (!new RegExp(`^${agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\d+)?$`).test(tab.name)) return // renamed before titles were kept
   const task = taskTitle(prompt)
   if (!task || /^\/\S*$/.test(task)) return // a bare /command (/clear, /model) says nothing of the task
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  if (ws && untitled(ws)) return void ((ws.name = task), (ws.untitled = undefined), (tab.titled = true), save()) // the tab keeps its agent's name, as a workspace's first agent does
+  const agent = tab.profile ?? tab.preset ?? ''
+  if (!new RegExp(`^${agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\d+)?$`).test(tab.name)) return // renamed before titles were kept
   tab.name = freeName(tab.workspace, `${agent}: ${task}`, tab.id)
   tab.titled = true
   save()
@@ -1304,6 +1314,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.name !== undefined) {
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
     w.name = name && name !== w.id ? name : undefined // the id itself: back to it
+    w.untitled = false // yours: no prompt renames it
   }
   // turned on again: fix CI and fix conflicts get their tries back at the next scan (autoPR: a scan under way would
   // write its own copy of ws.fix over a reset made here)
@@ -1642,6 +1653,8 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 }
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
+  if (typeof o.name !== 'string') o = { ...o, name: undefined } // an RPC's number or object: no name (slug and trim take text)
+  const asked = o.name?.trim() // the caller's, not one made below from the prompt (another's words, a PR's, an issue's)
   // an agent's (MCP's from alone: its preset unknown). ponytail: Laki AI's laki_shell and laki_run_action tabs and
   // quickNew's workspaces aren't marked; pass agent there too if they should be
   const by = o.agent || (o.from ? 'agent' : undefined)
@@ -1682,6 +1695,11 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     if (have && !o.another) return step(`${have.id}: the folder's own workspace, as it is`), have
     const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
     ws = { id, project: proj.id, path: proj.path, ...(proj.host && { host: proj.host }), branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
+    // its id is the folder's (or a slug): named after what it's for, the name given or its prompt's words; with neither, its
+    // agent's first prompt names it (untitled)
+    const called = Array.from(asked || (o.prompt?.trim() ? taskTitle(o.prompt) : '')).slice(0, 60).join('')
+    if (called) ws.name = called
+    else ws.untitled = true
   } else {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
     const id = await uniqueWsId(want, proj)
@@ -1709,7 +1727,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       const has = (ref: string) => git(at, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
       if (!(await has(`refs/heads/${base}`)) && (await has(`refs/remotes/origin/${base}`))) base = `origin/${base}`
     }
-    ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }) }
+    ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }), ...(!want && { untitled: true }) } // untitled: ws-<tail>, named by its first prompt
     if (!proj.host) await copyIncludes(proj, ws) // before setup and the agent: they may read .env. ponytail: not on a host (setup can copy them from $LAKI_PROJECT_PATH)
   }
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports

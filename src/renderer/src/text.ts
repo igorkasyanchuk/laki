@@ -1,13 +1,13 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, prRef, type RunAction, type TabView, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, prRef, type RunAction, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
 export { fillTemplate, mergeActions, prRef, templated, templatesFor } // shared: laki mcp's (Laki AI's) templates and actions too
 
 // a workspace's name from what was typed, not the template around it (as the daemons do: its first words)
-export const nameOf = (prompt: string) => prompt.trim().split(/\s+/).slice(0, 4).join(' ') || undefined
+export const nameOf = (prompt: string) => taskTitle(prompt, 4) || undefined // its words, no links, paths or please
 
 // the prompt an agent gets: the text, then each pasted image's or attached file's path on a line of its own, in quotes
 // (JSON's) when it has a space, a quote or a backslash: the agent reads it whole

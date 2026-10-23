@@ -14,6 +14,7 @@ test('prompt templates: variables, unknown ones kept, a template without {{promp
   assert.equal(templated(undefined, 'as typed'), 'as typed')
   assert.equal(nameOf('  the cart total rounding is off '), 'the cart total rounding')
   assert.equal(nameOf(' '), undefined)
+  assert.equal(nameOf('please look at https://x.io/a/b now'), 'look at now')
 })
 
 test("prompt templates: a project's first, replacing a global one of its name", () => {

@@ -208,6 +208,8 @@ npm link
      *Origin's* (recommended) starts the worktree off `origin/<base>`, your own branch as it is; *Fast-forward mine*
      moves your base branch up to origin's first, when it can. Turn off the *worktree* switch to work in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
+   - The workspace is named after what it's for: the name you give, else its prompt's words. One started with neither
+     takes its agent's first prompt's words (never the folder's name), until you rename it.
 
 ## Using it
 
