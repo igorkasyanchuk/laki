@@ -264,7 +264,9 @@ selected workspace's PR is in the status bar.
   laki memory rm . <id>                   # a learned one (yours you delete in the app)
   ```
 - ＋ on a project (or a group) offers *New workspace* or *Terminal*: a shell in the project's own folder, a workspace
-  of its own (terminal 1, terminal 2…; add tabs to it as to any). A project with no workspaces lists both under it.
+  of its own (terminal 1, terminal 2…; add tabs to it as to any). A project with no workspaces lists both under it;
+  its ⋯ (and a group's) has *New terminal* too. A terminal's menu says *Close terminal* (asked only while something
+  runs in it), and it stays off the Board.
 - ＋ at the sidebar's top: *Project folder…* (⌘O), *Terminal* or *Browser*. *Terminal* opens a shell in your home
   folder, without a terminal app: a workspace of the *Terminals* project (made by the first one; terminal 1, terminal
   2…). *Browser* opens any website in Laki: a workspace of the *Browsers* project, with back, forward, reload and an

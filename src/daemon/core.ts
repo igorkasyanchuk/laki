@@ -151,6 +151,8 @@ export function load() {
     else delete state.widgetGrants![ws]
   }
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
+  // ponytail: a project's terminal from before `term` (0.25's builds), known by quickMake's name and its shells only; a renamed one stays a workspace
+  for (const w of state.workspaces) if (w.term === undefined && w.kind === 'local' && /^terminal-\d+$/.test(w.id) && /^terminal \d+$/.test(w.name ?? '') && state.tabs.every(t => t.workspace !== w.id || t.kind === 'shell')) w.term = true
   for (const w of state.workspaces) if (w.csState === 'Creating') Object.assign(w, { csState: 'Failed', csError: 'Laki stopped while gh made it: delete this workspace (gh codespace list says whether one was left)' }) // csMake's, gone with it
   const hook = state.settings?.webhook
   if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
@@ -928,6 +930,7 @@ async function quickMake(o: Quick) {
   while (names.has(`${word} ${n}`)) n++
   const ws = await wsNew({ project: p.id, local: true, another: true, name: `${word} ${n}`, preset: o.kind === 'shells' ? 'shell' : 'none', ...(o.kind === 'browsers' && { browser: o.url ?? 'about:blank' }), ...(mine && o.place && { place: o.place }) })
   ws.name = o.url && o.url !== 'about:blank' ? new URL(o.url).host : `${word} ${n}` // its id is terminal-1: the name with its space; a page's site until its title comes
+  if (o.kind === 'shells') ws.term = true
   save()
   changed()
   return ws

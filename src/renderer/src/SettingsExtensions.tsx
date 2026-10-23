@@ -48,8 +48,8 @@ export type WidgetsApi = {
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3, 4].map(a => [a, d] as [number, number])) // ½ down: a thin line
-// Auto: in the top or status bar, as wide as it needs (a JS page has no width of its own to give)
-const fits = (w: WidgetView) => !w.js && placesOf(w).some(p => p === 'top' || p === 'status')
+// Auto: in the top or status bar, as wide as it needs (a JS page: as its page measures itself)
+const fits = (w: WidgetView) => placesOf(w).some(p => p === 'top' || p === 'status')
 const PLACES: [WidgetPlace, string, string][] = [
   ['side', 'Sidebar', 'In the sidebar, above its buttons'],
   ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],

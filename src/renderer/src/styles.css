@@ -82,10 +82,30 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .nodrag, .drag button, .drag input { -webkit-app-region: no-drag; }
 
 .splash { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-.splash .logo { display: flex; flex-direction: column; align-items: center; gap: 14px; font-size: 26px; font-weight: 700; letter-spacing: 0.14em; }
-.splash .logo img { width: 96px; height: 96px; filter: drop-shadow(0 12px 28px rgba(255, 122, 69, 0.22)); }
 .splash-problem { max-width: 420px; margin: 8px 16px 0; padding: 10px 14px; text-align: center; color: var(--fg); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--radius); }
-.splash .wordmark { padding-left: 0.14em; } /* the spacing after the last letter, matched before the first */
+.splash:not(.pinning) { position: relative; isolation: isolate; } /* the body's background under it: a gradient theme's, glass */
+.splash:not(.pinning)::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 60% 45% at 50% 20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), radial-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1.5px) 0 0 / 22px 22px; mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, #000, transparent 80%); }
+/* the loading splash (panels.tsx Loading): the mark in a turning arc, the steps, a tip that changes (each fades in) */
+.loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 0 16px; animation: loading-in 0.4s 0.15s both; } /* a load that's quick never shows it */
+.loading-mark { position: relative; width: 132px; height: 132px; display: grid; place-items: center; }
+.loading-mark img { width: 96px; height: 96px; filter: drop-shadow(0 12px 28px rgba(255, 122, 69, 0.22)); animation: loading-float 3s ease-in-out infinite; }
+.loading-ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0 62%, color-mix(in srgb, var(--accent) 80%, transparent) 92%, transparent 100%); mask: radial-gradient(closest-side, transparent calc(100% - 3px), #000 calc(100% - 2px)); animation: loading-spin 1.4s linear infinite; }
+.loading-word { font-size: 26px; font-weight: 700; letter-spacing: 0.14em; padding-left: 0.14em; }
+.loading-steps { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.loading-steps > span { display: inline-flex; align-items: center; gap: 6px; }
+.loading-steps .now { color: var(--fg); }
+.loading-steps .done { color: var(--fg); } .loading-steps .done svg { color: var(--accent-ink, var(--accent)); }
+.loading-steps i, .loading-steps b { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
+.loading-steps .now i { background: var(--accent); opacity: 1; animation: loading-pulse 1s ease-in-out infinite; }
+.loading-line { width: 22px; height: 1px; background: var(--line); }
+.loading-tip { display: flex; align-items: flex-start; gap: 10px; max-width: 360px; margin-top: 18px; padding: 10px 14px; font-size: 12.5px; line-height: 1.5; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--panel) 85%, transparent); animation: loading-in 0.5s both; }
+.loading-tip kbd { margin-left: 4px; padding: 0 5px; font: 11px var(--mono, ui-monospace, monospace); border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
+.loading-tip-icon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: var(--accent-ink, var(--accent)); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+@keyframes loading-spin { to { transform: rotate(1turn); } }
+@keyframes loading-float { 50% { transform: translateY(-5px); } }
+@keyframes loading-pulse { 50% { transform: scale(0.6); opacity: 0.5; } }
+@keyframes loading-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .loading, .loading-tip, .loading-mark img, .loading-ring, .loading-steps .now i { animation: none; } }
 /* the remote page's PIN (App's PinForm): one solid card on the theme's background, a soft light from above and a faint
    dot grid; Laki's mark and Remote access at its top, a lock in a ring that fills a sixth per digit, the PIN in six boxes
    (one input over them: paste and one-time-code autofill work), the accent's button. It rises in as it opens; a wrong PIN
@@ -239,6 +259,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .widget-strip .widget-dot { top: 3px; right: 3px; }
 .widget-strip .widget.fit { width: max-content; } /* Auto: its words' width, 4 cells at most (Widgets.tsx' maxWidth) */
 .widget.fit .widget-button-label { flex: none; }
+.widget.fit .widget-frame { width: var(--fit-w, 100%); max-width: 100%; } /* a JS page: the width it said */
 .widget-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--running); }
 /* a widget as a button (Widgets.tsx): in a cell, on the rail, in the sidebar's foot; its icon, label and badge */
 .widget.is-button { padding: 0; }

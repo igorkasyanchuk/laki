@@ -112,7 +112,7 @@ function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: Widg
 
 // one widget's preview or full view; a click on a preview (not a link or button) opens the full view. sample: with its
 // made-up data, as it would look (nothing it shows does anything). cells: where it shows, across and down (½: a bar)
-export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean | string; cells?: [number, number] }) {
+export function WidgetBody({ w, full, api, sample, cells, onSize }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean | string; cells?: [number, number]; onSize?: (px: number) => void }) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [err, setErr] = useState('')
@@ -168,6 +168,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       if (m.laki === 'ui') return win?.postMessage({ laki: 'ui', req: m.req, html: uiHtml(m.spec, m.ctx && typeof m.ctx === 'object' ? (m.ctx as Record<string, unknown>) : {}, { full, cells: now.current.cells }) }, '*')
       if (m.laki === 'close' && full) return api.close()
       if (m.laki === 'log') return sample || api.log?.(w.id, String(m.text ?? '').slice(0, 2048), wsOf(w)) // any time, as a page's console: 50 a second at most (the daemon's)
+      if (m.laki === 'size') return void (!full && typeof m.w === 'number' && m.w > 0 && onSize?.(Math.min(Math.ceil(m.w), 2000))) // its content's width: a bar's Auto
       const ok = !sample && document.activeElement === frame.current && navigator.userActivation?.isActive !== false // made-up data: its buttons and links do nothing
       const done = ok ? act(m, w, full, api) : undefined
       if (m.laki === 'run') void Promise.resolve(done).finally(() => win?.postMessage({ laki: 'done', action: m.action, arg: String(m.arg ?? '') }, '*')) // its button works again
@@ -251,9 +252,13 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
 // fit: a bar's Auto, as wide as its content (styles.css' .widget.fit, UI_CSS' :host-context)
+// fit: a bar's Auto, its content's width, 4 cells at most; a JS page's as the page says it (its cells until then)
 function Cell({ w, api, parked, load, style, cells, fit }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number]; fit?: boolean }) {
+  const [fw, setFw] = useState(0)
+  const on = fit && (!w.js || w.button || fw > 0)
+  const st = on ? ({ maxWidth: 'calc(4 * var(--widget-cell, 92px))', ...(fw > 0 && { '--fit-w': `${fw}px` }) } as CSSProperties) : style
   return (
-    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''} ${fit ? 'fit' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
+    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''} ${on ? 'fit' : ''}`} style={st} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
       {w.missing?.length ? (
         // a setting it needs is empty: say which, and open it there
         <button className="widget-parked muted small" onClick={() => api.settings(w.id, w.missing![0])}>
@@ -266,7 +271,7 @@ function Cell({ w, api, parked, load, style, cells, fit }: { w: WidgetView; api:
           Stopped · load
         </button>
       ) : (
-        <WidgetBody w={w} full={false} api={api} cells={cells} />
+        <WidgetBody w={w} full={false} api={api} cells={cells} onSize={fit ? setFw : undefined} />
       )}
       {!w.missing?.length && (w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
       {w.mock && <span className="widget-mock">Sample data</span>}
@@ -334,7 +339,7 @@ export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; ap
   return (
     <div className={`widget-strip ${place} nodrag`}>
       {on.map(w => (
-        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={[w.size[0], 0.5]} fit={w.fit && !w.js} style={w.fit && !w.js ? { maxWidth: 'calc(4 * var(--widget-cell, 92px))' } : { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={[w.size[0], 0.5]} fit={w.fit} style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
       ))}
     </div>
   )

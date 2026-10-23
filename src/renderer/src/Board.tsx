@@ -54,7 +54,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
   const [over, setOver] = useState('') // the column a to-do is dragged over
   const name = (id: string) => view.projects.find(p => p.id === id)?.name ?? id
   const cards = view.workspaces
-    .filter(w => !w.archived && projects.some(p => p.id === w.project))
+    .filter(w => !w.archived && !w.term && projects.some(p => p.id === w.project)) // a project's terminal: not a task
     .map(w => {
       const tabs = view.tabs.filter(t => t.workspace === w.id)
       return { w, tabs, col: columnOf(w, tabs) }

@@ -4,7 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
-- A project's or group's ＋ also opens a *Terminal*: a shell in the project's folder, no agent, no worktree.
+- A project's or group's ＋ (and its ⋯) also opens a *Terminal*: a shell in the project's folder, no agent, no
+  worktree. A terminal's menu closes it instead of deleting a workspace.
+- A livelier loading screen: what it waits for, and a tip.
+- ⌘K › *Themes* opens Settings at the themes.
 - The sidebar, Board and Bird view show a workspace named after its PR number (`pr-14885-…`, *Review PR 14810 …*) by
   the PR's title.
 - The context meter reads Claude's own settings: `opus[1m]` there counts against 1M, not 200K.

@@ -1297,6 +1297,51 @@ const TIPS: [IconName, string, string, string][] = [
   ['race', 'Race', 'One prompt, many agents', 'Compare their work side by side and keep the best'],
   ['search', '⌘K', 'Everything by name', 'Workspaces, tabs, actions and settings'],
 ]
+// the splash's: Ready's, then a few more
+const MORE_TIPS: typeof TIPS = [
+  ['pr', 'Fix CI', 'PRs that fix themselves', 'Turn on fix CI and review: failing checks and comments go to the agent'],
+  ['clock', '⌘L', 'Send it later', 'A prompt for the agent in an hour, or at 9am'],
+  ['file', '⌘P', 'Any file in a keystroke', 'Find, preview and edit what the agent changed'],
+  ['globe', 'Share', 'Your dev server, anywhere', "The globe beside a port gives it a link you can open on a phone"],
+]
+const SPLASH_TIPS = [...TIPS, ...MORE_TIPS]
+
+// the splash while the daemon wakes and the first view comes: Laki's mark in a turning ring, where it's at (the daemon,
+// then your workspaces; the seconds once it's slow) and a tip that changes every few seconds
+export function Loading({ connected }: { connected: boolean }) {
+  const [s, setS] = useState(0)
+  useEffect(() => {
+    const i = setInterval(() => setS(x => x + 1), 1000)
+    return () => clearInterval(i)
+  }, [])
+  const n = Math.floor(s / 4)
+  const [ic, k, title, text] = SPLASH_TIPS[n % SPLASH_TIPS.length]
+  return (
+    <div className="loading">
+      <div className="loading-mark">
+        <span className="loading-ring" />
+        <img src={icon} alt="" />
+      </div>
+      <span className="loading-word">Laki</span>
+      <div className="loading-steps" role="status">
+        <span className={connected ? 'done' : 'now'}>{connected ? <Icon name="check" size={11} /> : <i />} Daemon</span>
+        <span className="loading-line" />
+        <span className={connected ? 'now' : ''}>{connected ? <i /> : <b />} Your workspaces</span>
+        {s >= 3 && <span className="muted"> · {s}s</span>}
+      </div>
+      <div className="loading-tip" key={n}>
+        <span className="loading-tip-icon">
+          <Icon name={ic} size={14} />
+        </span>
+        <span>
+          <b>{title}</b> <kbd>{k}</kbd>
+          <br />
+          <span className="muted">{text}</span>
+        </span>
+      </div>
+    </div>
+  )
+}
 
 // a workspace without tabs: start something (agents first, as cards), what Laki is good at, and the star
 export function Ready({ name, branch, project, actions }: { name: string; branch?: string; project?: string; actions: { label: string; icon?: IconName; hint?: string; sub?: string; run: () => void }[] }) {

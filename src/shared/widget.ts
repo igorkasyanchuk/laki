@@ -180,7 +180,7 @@ export const hasScript = (html: string) => /<script\b/i.test(html)
 // the UI kit's elements (widgetUi.ts): only the theme's variables and these fallbacks, so they read in every theme.
 // .k is a container: an element adapts to the cells it has (1 to 4 across); data-line: a bar's line (½ high)
 export const UI_CSS = `.k { container: kit / inline-size; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-:host-context(.widget.fit) .k { container-type: normal; } /* a bar's Auto: its content's width (an inline-size container has none) */
+:host-context(.widget.fit) .k, html.laki-measure .k { container-type: normal; } /* a bar's Auto: its content's width (an inline-size container has none); a JS page's as pageOf measures it */
 .k [hidden] { display: none !important; }
 .k[data-kit=preview] { height: 100%; gap: 6px; padding: 4px 6px; overflow: hidden; }
 .k[data-line] { flex-direction: row; align-items: center; gap: 8px; padding: 0 6px; white-space: nowrap; }
@@ -836,6 +836,18 @@ window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url =
   mount: (el, spec, data) => laki.ui(spec, data).then(html => { el.innerHTML = html }) }
 ;(${String(uiBehave)})(window, say)
 addEventListener('keydown', e => e.key === 'Escape' && !e.defaultPrevented && say({ laki: 'close' })) // not one that closed a popover or dropdown
+// a preview's content width, for a bar's Auto: the page at max-content for a moment (no paint between), said as it changes
+if (!laki.full) addEventListener('DOMContentLoaded', () => {
+  let was = 0
+  const fit = () => {
+    const h = document.documentElement, s = h.style.width
+    h.classList.add('laki-measure'), (h.style.width = 'max-content')
+    const w = Math.ceil(h.getBoundingClientRect().width)
+    h.classList.remove('laki-measure'), (h.style.width = s)
+    if (w > 0 && w !== was) say({ laki: 'size', w: (was = w) })
+  }
+  fit(), new MutationObserver(fit).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }), document.fonts?.ready.then(fit)
+})
 // the app says an action is done (its buttons work again), or gives the UI kit's HTML
 addEventListener('message', e => {
   if (e.source !== parent || !e.data) return

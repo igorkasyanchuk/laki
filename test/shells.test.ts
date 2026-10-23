@@ -1,6 +1,6 @@
 // Shell tabs: running until the prompt is back; the Terminals and Browsers projects.
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -49,11 +49,20 @@ test("a project's + › Terminal: a local workspace with a shell in the project'
   const a = await rig.rpc('quickNew', { kind: 'shells', project: p.id })
   const b = await rig.rpc('quickNew', { kind: 'shells', project: p.id, place: 'top' })
   assert.deepEqual([a.name, b.name, a.kind, a.path, a.project], ['terminal 1', 'terminal 2', 'local', p.path, p.id])
+  assert.equal(b.term, true) // its menus close it, never a workspace's delete
   const v = await rig.rpc('state')
   assert.equal(v.tabs.filter((x: any) => x.workspace === b.id && x.kind === 'shell').length, 1)
   assert.equal(v.projects.some((x: any) => x.kind === 'shells'), false) // no Terminals project for it
   assert.equal(v.workspaces.find((w: any) => w.project === p.id).id, b.id) // placed first (a group's + gives its id)
   await assert.rejects(rig.rpc('quickNew', { kind: 'shells', project: 'nope' }), /no project nope/)
+  // one made before the mark: marked as the daemon starts, by its name and its shells
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  for (const w of st.workspaces) delete w.term
+  writeFileSync(file, JSON.stringify(st))
+  await rig.start()
+  assert.deepEqual((await rig.rpc('state')).workspaces.filter((w: any) => w.project === p.id).map((w: any) => w.term), [true, true])
 })
 
 test('Terminals and Browsers: a project each in the home folder, a workspace per terminal or page', async t => {
@@ -68,6 +77,7 @@ test('Terminals and Browsers: a project each in the home folder, a workspace per
   assert.deepEqual([a.name, b.name, a.kind, a.path, a.project, b.project], ['terminal 1', 'terminal 2', 'local', rig.home, shells.id, shells.id])
   assert.equal(v.tabs.filter((x: any) => x.workspace === a.id && x.kind === 'shell').length, 1)
   assert.deepEqual([web.name, web.browser, v.tabs.some((x: any) => x.workspace === web.id)], ['example.com', 'https://example.com/', false]) // the site, until its title
+  assert.deepEqual([a.term, web.term], [true, undefined])
   assert.equal((await rig.rpc('quickNew', { kind: 'browsers' })).name, 'browser 1')
   await rig.rpc('wsSet', { id: web.id, browser: 'https://example.org/a', name: 'Example' })
   await assert.rejects(rig.rpc('wsSet', { id: web.id, browser: 'javascript:alert(1)' }), /http\(s\) page/)

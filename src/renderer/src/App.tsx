@@ -6,7 +6,7 @@ import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyActio
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
@@ -1274,6 +1274,14 @@ export function App() {
     if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
+  // a terminal closes as a tab does: asked only while something runs in it (an agent, a command, a server) or it keeps artifacts
+  const closeTerm = async (w: WorkspaceView) => {
+    const busy = w.ports.length > 0 || (!!w.artifacts && !view?.settings?.keepStorage) || (view?.tabs ?? []).some(t => t.workspace === w.id && t.status !== 'exited' && (t.kind === 'agent' || t.status === 'running' || !!t.runs))
+    if (busy && !(await ask(`Close ${wsName(w)}?`, { text: 'What runs in it stops.', facts: await rmFacts(w), ok: 'Close', danger: true }))) return
+    if (!(await busyWith([w.id], 'closing', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return
+    done(`Closed ${wsName(w)}`)
+  }
+  const rmItem = (w: WorkspaceView): MenuItem => (isTerm(w) ? { label: 'Close terminal', icon: 'x', key: 'x', danger: true, run: () => closeTerm(w) } : { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) })
   // an extension's gates on a ship, a merge or an archive: Checking… on its button while they run (checking: the step and
   // workspace; an archive's row says it, busyWith); a hold says what held it, each by its icon, then Do it anyway (asked
   // first) or the agent's fix, shown to change first. f(force) makes the call; undefined: failed (the toast says), or not done
@@ -1657,6 +1665,7 @@ export function App() {
   const railOf = (k?: RailKind): RailKind => ((k === 'shells' && settings.railShells === false) || (k === 'browsers' && settings.railBrowsers === false) ? 'projects' : (k ?? 'projects'))
   const rawKind = (w: WorkspaceView): RailKind => view?.projects.find(p => p.id === w.project)?.kind ?? 'projects'
   const kindOf = (w: WorkspaceView): RailKind => railOf(rawKind(w))
+  const isTerm = (w: WorkspaceView) => !!w.term || rawKind(w) === 'shells' // a terminal: closed, not deleted
   useEffect(() => void (railOf(railKind) !== railKind && setRailKind('projects')), [railKind, settings.railShells, settings.railBrowsers])
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
   useEffect(() => {
@@ -2048,6 +2057,7 @@ export function App() {
   const sepMenu = (p: Project, s: Sep): MenuItem[] => [
     { colors: TAB_COLORS, value: s.color, pick: c => call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === s.id ? { ...x, color: c } : x)) }) },
     { label: 'New workspace here…', icon: 'plus', key: 'n', run: () => newWs(p.id, { place: s.id }) },
+    ...(termsOk ? [{ label: 'New terminal here', icon: 'terminal', key: 't', run: () => termIn(p, s.id) } as MenuItem] : []),
     { label: folded.includes(s.id) ? 'Expand' : 'Collapse', icon: folded.includes(s.id) ? 'chevron' : 'chevronRight', key: 'c', run: () => fold(s.id) },
     { label: 'Edit…', icon: 'pencil', key: 'e', run: () => setDialog({ sep: p.id, id: s.id }) },
     ...sortItems(s.sort, sort => call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === s.id ? { ...x, sort } : x)) }), p.sort ?? 'manual'),
@@ -2107,7 +2117,7 @@ export function App() {
     ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
-    ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
+    ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
     ...(w.kind === 'worktree' ? [{ label: w.pr ? 'Refresh PR status' : 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
     ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', key: 'h', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
     ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
@@ -2122,7 +2132,7 @@ export function App() {
           { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(w) } as MenuItem,
         ]
       : []),
-    { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
+    rmItem(w),
     ...extItems('workspace', w, { ws: w.id }),
   ]
 
@@ -2149,7 +2159,7 @@ export function App() {
   // terminal's, a browser's, a host's or an archived one)
   const flowsHere = (w: WorkspaceView) => flowItems.filter(f => f.source === 'yours' || f.project === w.project)
   const flowMenu = (w: WorkspaceView): MenuItem[] =>
-    !flowsOn || rawKind(w) !== 'projects' || w.host || w.archived
+    !flowsOn || rawKind(w) !== 'projects' || w.term || w.host || w.archived
       ? []
       : (l => [{ label: 'Run workflow', icon: 'flow', key: 'w', items: l.length ? l.map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }])(flowsHere(w))
   const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
@@ -2157,7 +2167,7 @@ export function App() {
   // a terminal or a browser has none
   const runItems = (w: WorkspaceView): MenuItem[] => (rawKind(w) === 'projects' ? [{ label: 'Run', icon: 'run', key: 'n', items: runMenu(w) }] : [])
   // a git workspace on a branch with no PR found: one can be attached by hand (prAttach)
-  const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && view?.projects.find(p => p.id === w.project)?.git !== false
+  const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && !w.term && view?.projects.find(p => p.id === w.project)?.git !== false
   // the status bar's branch, short: Laki's prefix (Settings › Git & worktrees) off
   const shortBranch = (b: string, pre = settings.branchPrefix?.trim() || 'laki/') => (b.startsWith(pre) ? b.slice(pre.length) : b)
   // a workspace for the info panel and the status bar's PR
@@ -2379,8 +2389,9 @@ export function App() {
   const termIn = (p: Project, place?: string) => quickNew('shells', undefined, true, { project: p.id, ...(place && { place }) })
   const plusMenu = (p: Project, place?: string): MenuItem[] => [
     { label: 'New workspace', icon: 'plus', key: 'n', hint: place ? undefined : kh('newWs'), run: () => newWs(p.id, place ? { place } : undefined) },
-    { label: 'Terminal', icon: 'terminal', key: 't', hint: `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`, run: () => termIn(p, place) },
+    { label: 'Terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p, place) },
   ]
+  const termWhere = (p: Project) => `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
   // keys: capture phase, before xterm.js sees them. force: an action of Settings › Keys by its id (a menu bar item's,
@@ -2485,7 +2496,7 @@ export function App() {
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
         ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
         { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
-        { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws) },
+        rmItem(ws) as Action,
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
   // fold a project's workspaces away, or back; ids of removed projects go
@@ -2494,6 +2505,7 @@ export function App() {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : kh('newWs'), run: () => newIn(p) },
+      ...(!p.kind && termsOk ? [{ label: 'New terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p) } as MenuItem] : []),
       ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', run: () => setDialog({ project: p.id }) } as MenuItem]),
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
@@ -2536,6 +2548,7 @@ export function App() {
     a({ label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
     a({ label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
     a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
+    a({ label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     if (!achKept.off) a({ label: 'Achievements: what to try next', icon: 'trophy', run: () => setDialog('achievements') })
@@ -2614,13 +2627,7 @@ export function App() {
   if (!view)
     return (
       <div className={`splash ${pinning ? 'pinning' : ''}`}>
-        {!pinning && (
-          <div className="logo">
-            <img src={icon} alt="" />
-            <span className="wordmark">Laki</span>
-          </div>
-        )}
-        {pinning ? <PinForm left={pinAsk.left} /> : <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>}
+        {pinning ? <PinForm left={pinAsk.left} /> : <Loading connected={connected} />}
         {problem && !connected && <div className="splash-problem">{problem}</div>}
       </div>
     )
