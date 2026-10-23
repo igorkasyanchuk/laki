@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.25.0 · Oct 23, 2026
 
 - Linux: the AppImage starts on a plain Ubuntu, arm64 too: no libfuse2 or zlib1g-dev to install first.
 - Laki runs on Electron 45 (Chromium 156, Node 24.22). Mermaid 12 lays out flowcharts, state, class and ER diagrams
