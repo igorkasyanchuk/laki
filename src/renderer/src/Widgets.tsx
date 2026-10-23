@@ -251,8 +251,8 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 }
 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
-// fit: a bar's Auto, as wide as its content (styles.css' .widget.fit, UI_CSS' :host-context)
-// fit: a bar's Auto, its content's width, 4 cells at most; a JS page's as the page says it (its cells until then)
+// fit: a bar's Auto, its content's width, 4 cells at most (styles.css' .widget.fit, UI_CSS' :host-context); a JS page's
+// as the page says it, kept while Auto is off too (it says it once), its cells until then
 function Cell({ w, api, parked, load, style, cells, fit }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number]; fit?: boolean }) {
   const [fw, setFw] = useState(0)
   const on = fit && (!w.js || w.button || fw > 0)
@@ -271,7 +271,7 @@ function Cell({ w, api, parked, load, style, cells, fit }: { w: WidgetView; api:
           Stopped · load
         </button>
       ) : (
-        <WidgetBody w={w} full={false} api={api} cells={cells} onSize={fit ? setFw : undefined} />
+        <WidgetBody w={w} full={false} api={api} cells={cells} onSize={setFw} />
       )}
       {!w.missing?.length && (w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
       {w.mock && <span className="widget-mock">Sample data</span>}

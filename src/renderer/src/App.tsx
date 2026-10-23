@@ -628,7 +628,7 @@ export function App() {
     if ('schedules' in d) return 'Schedule'
     if ('compare' in d) return 'Compare'
     if ('specs' in d) return 'Specs'
-    if ('workflows' in d) return d.nav?.startsWith('run:') ? 'A workflow run' : d.nav ? 'A workflow' : 'Flows'
+    if ('workflows' in d) return (n => (n.startsWith('run:') ? 'A workflow run' : n ? 'A workflow' : 'Flows'))(d.nav ?? (d.run ? 'run:' : d.wf ? 'wf:' : ''))
     if ('note' in d) return 'Notes'
     return 'a page'
   }
@@ -1121,7 +1121,7 @@ export function App() {
     const proj = (id?: string) => view.projects.find(p => p.id === id || p.name === id)?.id
     if (l?.to === 'ws') {
       // by id, else by name (a model may write the name): a live one first
-      const w = view.workspaces.find(w => w.id === l.ws) ?? [...view.workspaces].sort((a, b) => +!!a.archived - +!!b.archived).find(w => wsName(w) === l.ws)
+      const w = view.workspaces.find(w => w.id === l.ws) ?? [...view.workspaces].sort((a, b) => +!!a.archived - +!!b.archived).find(w => (w.name || w.id) === l.ws || wsName(w) === l.ws) // its own name (MCP's) or the one shown
       const t = view.tabs.find(t => t.id === l.tab && t.workspace === w?.id)
       if (!w) toast(`No workspace ${l.ws}`)
       else if (w.archived) toast(`${wsName(w)} is archived`)
@@ -3131,6 +3131,8 @@ export function App() {
     const desk = dialog === 'desk' && (view.widgets ?? []).filter(onDesk).map(x => `"${x.name}" (extension id ${x.id}${x.byAi ? ', made by Laki AI' : ''}${x.on ? '' : ', off'})`)
     return [`On ${page}`, desk && (desk.length ? `its tiles: ${desk.join(', ')}` : 'no tiles yet'), w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
+  // the names Laki AI's answers may write in bold (made links): its own (MCP's state) and the one shown (a PR's title)
+  const aiNames = view.workspaces.filter(w => !w.archived).flatMap(w => [...new Set([w.name || w.id, wsName(w)])].map(name => ({ id: w.id, name })))
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const ownWidgets = shownWidgets.filter(w => (!w.project || w.project === ws?.project) && !(w.on && w.hidden)) // a repo's (.laki/extensions): only while a workspace of its project is selected; hidden: its data says so
   const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
@@ -3668,7 +3670,7 @@ export function App() {
             cfg={extCfg}
             api={widgetApi}
             ai={settings.ai}
-            workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))}
+            workspaces={aiNames}
             spots={order.filter(w => !w.host && !view.projects.find(p => p.id === w.project)?.kind).map(w => ({ id: w.id, name: wsName(w) }))}
             here={wsHere}
             back={backWord(e.back)}
@@ -3763,7 +3765,7 @@ export function App() {
             }}
           />
         ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} />}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} />}
         {(o =>
           o &&
           specsOn && (
@@ -4126,7 +4128,7 @@ export function App() {
           <>
             {aiFloat && (
               <AiFloat>
-                <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} />
+                <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} />
               </AiFloat>
             )}
             {!aiDock && (

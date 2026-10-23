@@ -426,7 +426,7 @@ const toolName = (m: AiMsg) =>
 // work (a spinner: only calls are kept, so which one runs, if any, isn't known)
 export function Tools({ list, live }: { list: AiMsg[]; live?: boolean }) {
   const names = [...new Set(list.map(toolName))]
-  const made = [...new Set(list.flatMap(m => (/^laki_extension_(write|set|on) /.test(m.text) ? (a => (typeof a?.id === 'string' ? [a.id] : []))(argsOf(m)) : [])))] // the extensions it made or changed: each one's page, a click away
+  const made = [...new Set(list.flatMap(m => (/^laki_extension_(write|set|on) /.test(m.text) ? (/"id":"([a-z0-9-]+)"/.exec(m.text)?.slice(1) ?? []) : [])))] // the extensions it made or changed: each one's page, a click away (a write's args hold its files: no parse; a quote in them is escaped, so only a key matches)
   return (
     <>
     <details className={`ai-tools ${live ? 'live' : ''}`}>
@@ -463,11 +463,6 @@ export function Tools({ list, live }: { list: AiMsg[]; live?: boolean }) {
     )}
     </>
   )
-}
-const argsOf = (m: AiMsg) => {
-  try {
-    return JSON.parse(m.text.slice(m.text.indexOf(' ') + 1))
-  } catch {}
 }
 
 // the workspace (and tab) a tool call was about: its ws, or send's target (<ws> or <ws>/<tab>)

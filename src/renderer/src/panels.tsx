@@ -1327,7 +1327,7 @@ export function Loading({ connected }: { connected: boolean }) {
         <span className={connected ? 'done' : 'now'}>{connected ? <Icon name="check" size={11} /> : <i />} Daemon</span>
         <span className="loading-line" />
         <span className={connected ? 'now' : ''}>{connected ? <i /> : <b />} Your workspaces</span>
-        {s >= 3 && <span className="muted"> · {s}s</span>}
+        {s >= 3 && <span className="muted" aria-hidden> · {s}s</span> /* not read out each second */}
       </div>
       <div className="loading-tip" key={n}>
         <span className="loading-tip-icon">

@@ -57,11 +57,11 @@ const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daem
 // nav, onNav: where it is (the index, a workflow, a run) as App's dialog has it, so Back and Forward go through them
 export function WorkflowsPage({ view, projects, presets, actions, at: first, nav, onNav, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; nav?: string; onNav?: (nav: string | undefined) => void; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
-  const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : first?.wf ? { kind: 'wf', sel: first.wf } : { kind: 'index' }) // wf: a refused one's Look…
   // Back and Forward: each move here is a place of App's (onNav; the one it opened at is no nav), and a place travelled
-  // to (nav) is shown again; drafts stay in `drafts`, so nothing typed is lost on the way
+  // to (nav) is shown again, also as it mounts there; drafts stay in `drafts`, so nothing typed is lost on the way
+  const home = useRef(navOf(first?.run ? { kind: 'run', id: first.run } : first?.wf ? { kind: 'wf', sel: first.wf } : { kind: 'index' })).current // wf: a refused one's Look…
+  const [at, setAt] = useState<At>(() => atOf(nav ?? home))
   const navKey = navOf(at)
-  const home = useRef(navKey).current
   const told = useRef(nav)
   useEffect(() => {
     if ((told.current ?? home) === navKey) return
