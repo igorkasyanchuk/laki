@@ -43,6 +43,8 @@ const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status
 // unsaved edits, by workflow: kept while Laki runs, whatever closes the editor (the rail, another page, a notification)
 const drafts = new Map<string, string>()
 const keyOf = (w: { id: string; source: WorkflowSource; project?: string }) => `${w.source}/${w.project ?? ''}/${w.id}`
+const navOf = (a: At) => (a.kind === 'index' ? '' : a.kind === 'run' ? `run:${a.id}` : `wf:${JSON.stringify({ id: a.sel.id, source: a.sel.source, project: a.sel.project })}`)
+const atOf = (nav: string): At => (nav.startsWith('run:') ? { kind: 'run', id: nav.slice(4) } : nav.startsWith('wf:') ? { kind: 'wf', sel: JSON.parse(nav.slice(3)) as Sel } : { kind: 'index' })
 
 // the agent actions a workflow's blocks can use (Run ▾'s: Settings', and the project's or, for yours, every project's)
 function agentActions(global: RunAction[] | undefined, projects: Project[], item: { source: WorkflowSource; project?: string }) {
@@ -52,9 +54,25 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; api: WorkflowsApi; onClose: () => void }) {
+// nav, onNav: where it is (the index, a workflow, a run) as App's dialog has it, so Back and Forward go through them
+export function WorkflowsPage({ view, projects, presets, actions, at: first, nav, onNav, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; nav?: string; onNav?: (nav: string | undefined) => void; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : first?.wf ? { kind: 'wf', sel: first.wf } : { kind: 'index' }) // wf: a refused one's Look…
+  // Back and Forward: each move here is a place of App's (onNav; the one it opened at is no nav), and a place travelled
+  // to (nav) is shown again; drafts stay in `drafts`, so nothing typed is lost on the way
+  const navKey = navOf(at)
+  const home = useRef(navKey).current
+  const told = useRef(nav)
+  useEffect(() => {
+    if ((told.current ?? home) === navKey) return
+    told.current = navKey === home ? undefined : navKey
+    onNav?.(told.current)
+  }, [navKey])
+  useEffect(() => {
+    if (nav === told.current) return
+    told.current = nav
+    if ((nav ?? home) !== navKey) setAt(atOf(nav ?? home))
+  }, [nav])
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
   const [startWs, setStartWs] = useState(first?.start?.ws) // Run workflow › from a workspace's menu or ⌘K: that one, fixed
   const startIn = (w: WorkflowItem | null, ws?: string) => (setStartWs(ws), setStarting(w))
@@ -231,7 +249,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
             </div>
           )}
 
-          {templates.length > 0 && (
+          {templates.length > 0 && !mine?.length && ( // once you have one, New ▾ › From a template… has them
             <section>
               <div className="sched-head">
                 <h3>Start from a template</h3>

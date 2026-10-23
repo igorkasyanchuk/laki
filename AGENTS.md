@@ -1009,7 +1009,7 @@ key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's 
 sources (yours `<data>/workflows/<id>.md`, a project's `.laki/workflows/<id>.md`, not a host's; and `builtin`, the templates
 in the repo's `workflows/` (packaged, `build.files`; `BUILTIN` found like widgets.ts'), listed last: `fileOf` refuses them,
 so `flowSave`, `flowRm`, `flowHistory`/`flowRevert` do, `flowStart` and `scheduleSet` too, the listener's list leaves them out,
-never `untrusted`; the index's *Start from a template* cards, the read-only editor's *Use this…*: `UseTemplate`, a
+never `untrusted`; the index's *Start from a template* cards (only while you have none: New ▾ has them), the read-only editor's *Use this…*: `UseTemplate`, a
 `flowSave` copy, its `on:` dropped when *Start on events* is off; App's `flowItems` leave them out), and the
 engine. A run (`state.flows`: live ones and the last 100 ended) copies its workflow (`flow`: pinned), makes its
 workspace (`wsNew` `preset: 'none'`: a worktree named by the task, its `flow` the run's id; or `local`, the folder's
@@ -1992,7 +1992,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
   - Back and forward (`settings.history`, on unless false; Settings › Appearance › Rail): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
     back) gets each new place (`isPlace`: a page, `PAGES`/`PAGE_KEYS`, or none; a dialog over them isn't one), what was
-    ahead dropped; `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
+    ahead dropped (Workflows' index, a workflow and a run are places too: its dialog's `nav`, `WorkflowsPage` `onNav`); `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
   - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window

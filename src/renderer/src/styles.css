@@ -248,6 +248,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .widget { position: relative; min-width: 0; overflow: hidden; margin: -1px 0 0 -1px; padding: 4px 9px; border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
 .widget.opens { cursor: pointer; }
 .widget.opens:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); } /* a tint, not a block: on glass too */
+.widget.opens:has(> .widget-frame):hover { background: none; } /* a JS page takes its own clicks and draws its own hover: a tint round it reads as a box bigger than it */
 .widget-body, .widget-frame { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
 .widget-body { contain: paint; } /* a widget's position: fixed stays in its box, never over the app */
 /* a line of them in the top bar or the status bar (a widget's place): each its cells across wide, a line high */

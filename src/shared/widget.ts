@@ -553,7 +553,7 @@ a { color: var(--accent, #7aa2f7); text-decoration: none; } a:hover { text-decor
 .tag { display: inline-block; margin: 0 4px 2px 0; padding: 0 6px; border: 1px solid var(--line, #232833); border-radius: 9px; font-size: 10.5px; line-height: 16px; white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; } th { text-align: left; font-weight: 600; color: var(--muted, #7a8294); }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line, #232833); vertical-align: top; }
-button { font: inherit; color: inherit; background: var(--hover, #1b2029); border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); padding: 3px 10px; cursor: pointer; }
+button { font: inherit; color: inherit; background: var(--hover, #1b2029); border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); padding: 3px 10px; cursor: pointer; user-select: none; } /* a double click never selects its words */
 [data-busy] { opacity: 0.6; cursor: progress; }
 p { margin: 0 0 10px; }
 .row { display: flex; align-items: center; gap: 6px; min-width: 0; } .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
