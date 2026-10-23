@@ -30,7 +30,7 @@ rel() {
 }
 
 # what a release holds, besides SHA256SUMS.txt: the downloads and the updaters' feeds (latest-mac.yml…)
-files() { (cd "dist/release/$1" && shopt -s nullglob && printf '%s\n' Laki-"$1"-*.dmg Laki-"$1"-*.zip Laki-"$1"-*.AppImage \
+files() { (cd "$ROOT/dist/release/$1" && shopt -s nullglob && printf '%s\n' Laki-"$1"-*.dmg Laki-"$1"-*.zip Laki-"$1"-*.AppImage \
   *.blockmap *-mac.yml *-linux*.yml update-mac-*.json); }
 
 upload() {
