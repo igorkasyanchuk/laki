@@ -2889,7 +2889,7 @@ export function App() {
     if (!find) return true
     const q = find.q.trim().toLowerCase()
     const wt = view.tabs.filter(t => t.workspace === w.id)
-    if (q && ![wsName(w), w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
+    if (q && ![wsName(w), w.name, w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
     return find.only === 'needs' ? wt.some(needsYou) : find.only === 'busy' ? !!w.setup || wt.some(t => spins(t)) : find.only === 'pr' ? !!w.pr : true
   }
   const found = find && live.filter(shows).length

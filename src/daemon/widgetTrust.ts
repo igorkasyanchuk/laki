@@ -6,6 +6,7 @@ import { type Dirent, readdirSync, readFileSync, realpathSync, type Stats, statS
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { actionCmd, gateOf, globMatch } from '../shared/widgetSchema.ts'
+import { hasScript } from '../shared/widget.ts'
 import { type Entry, find, guarded, type Manifest, manifestOf, oneFile, onOf, scanWidgets, sourceOf, under, widgets } from './widgets.ts'
 import { gatesOf } from './widgetEvents.ts'
 
@@ -82,16 +83,17 @@ export function filesHash(w: Entry, fresh = false) {
 export function runsOf(d: string) {
   const m = manifestOf(d)
   if (typeof m === 'string') return
-  const h = createHash('sha256').update(JSON.stringify([m.fetch, m.script, m.source, m.stream, m.on, m.actions, m.config, m.scope]))
+  const said = JSON.stringify([m.fetch, m.script, m.source, m.stream, m.on, m.actions, m.config, m.scope])
+  const h = createHash('sha256').update(said)
   for (const n of filesUnder(d).sort()) {
-    if (n === 'widget.json' || n.startsWith('fixtures/') || /\.md$/i.test(n)) continue
+    if (n === 'widget.json' || ((n.startsWith('fixtures/') || /\.md$/i.test(n)) && !said.includes(n))) continue // a look, unless a command names it
     let t: Buffer
     try {
       t = readFileSync(join(d, n))
     } catch {
       continue
     }
-    if (n === 'widget.html' && !/<script/i.test(t.toString('utf8'))) continue // a template: sanitized, runs nothing
+    if (n === 'widget.html' && !hasScript(t.toString('utf8'))) continue // a template: sanitized, runs nothing
     h.update(`\0${n}\0`).update(t)
   }
   return h.digest('hex')

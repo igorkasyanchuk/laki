@@ -61,7 +61,7 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   const r = meters.get(tab.id) ?? { m: meterNew() }
   meters.set(tab.id, r)
   if (look) r.looked = 0
-  const big = tab.preset === 'claude' && claudeBig(tab) // read each time: settings change without the transcript
+  const big = tab.preset === 'claude' && state.settings?.contextMeter !== false && claudeBig(tab) // read each time: settings change without the transcript
   const moved = big !== r.big
   r.big = big
   const text = tailOf(tab, r, () => (r.m = meterNew()))
