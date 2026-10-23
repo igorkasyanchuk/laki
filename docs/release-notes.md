@@ -10,7 +10,7 @@ version it builds, with the date. -->
 - ⌘K › *Themes* opens Settings at the themes.
 - Back and Forward go through Workflows: a workflow or a run, then the list again.
 - Workflows' list shows the templates only until you have a workflow (New ▾ has them).
-- An extension's button never gets its words selected, and a JS page in a bar has no hover box around it.
+- An extension's button never gets its words selected, and a JS page in a bar has no hover box around it. Its Auto width follows a theme or font change.
 - The sidebar, Board and Bird view show a workspace named after its PR number (`pr-14885-…`, *Review PR 14810 …*) by
   the PR's title.
 - The context meter reads Claude's own settings: `opus[1m]` there counts against 1M, not 200K.

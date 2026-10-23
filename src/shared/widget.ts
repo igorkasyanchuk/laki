@@ -836,7 +836,8 @@ window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url =
   mount: (el, spec, data) => laki.ui(spec, data).then(html => { el.innerHTML = html }) }
 ;(${String(uiBehave)})(window, say)
 addEventListener('keydown', e => e.key === 'Escape' && !e.defaultPrevented && say({ laki: 'close' })) // not one that closed a popover or dropdown
-// a preview's content width, for a bar's Auto: the page at max-content for a moment (no paint between), said as it changes
+// a preview's content width, for a bar's Auto: the page at max-content for a moment (no paint between), said as it changes:
+// a node or text changed, or any element's size (a font that came late, words that wrapped in a frame too narrow)
 if (!laki.full) addEventListener('DOMContentLoaded', () => {
   let was = 0
   const fit = () => {
@@ -846,7 +847,10 @@ if (!laki.full) addEventListener('DOMContentLoaded', () => {
     h.classList.remove('laki-measure'), (h.style.width = s)
     if (w > 0 && w !== was) say({ laki: 'size', w: (was = w) })
   }
-  fit(), new MutationObserver(fit).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }), document.fonts?.ready.then(fit)
+  const sizes = new ResizeObserver(fit)
+  const watch = () => (sizes.disconnect(), [...document.body.querySelectorAll('*')].slice(0, 200).forEach(e => sizes.observe(e))) // ponytail: a preview's first 200 elements
+  fit(), watch(), new MutationObserver(() => (watch(), fit())).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true })
+  document.fonts?.addEventListener('loadingdone', fit), addEventListener('load', fit)
 })
 // the app says an action is done (its buttons work again), or gives the UI kit's HTML
 addEventListener('message', e => {
