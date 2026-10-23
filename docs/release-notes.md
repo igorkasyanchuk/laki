@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.26.0 · Oct 24, 2026
 
 - A project's or group's ＋ (and its ⋯) also opens a *Terminal*: a shell in the project's folder, no agent, no
   worktree. A terminal's menu closes it instead of deleting a workspace.
