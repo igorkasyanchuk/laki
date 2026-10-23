@@ -512,7 +512,12 @@ the daemon either way.
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
 *Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk / Right panel / Workspace rows*, one or several). For the
-bars, design it ½ high: a number and a word, a few links.
+bars, design it ½ high: a number and a word, a few links. In a bar its width is its cells across, or *Auto* (its Size):
+as wide as its words need, 4 cells at most (not a JS page's: a page has no width of its own).
+
+To show nothing for now (no PR on this branch, no deploy running), its data says `"hidden": true` (a fetch's, a push's, a
+stream's line, an action's `data`): it vanishes from every place until data without it comes, a per-workspace one in
+that workspace only. Settings › Extensions still lists it, tagged *hidden*, and its page still previews it.
 
 A `row` extension is fetched for every live workspace, not only the one on screen (4 at a time; the rest at the next
 ticks): keep its fetch cheap and its `every` long. Its data's own `tone` colors the mark: one of the kit's tones,

@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { rowsOf, type TabView, type View } from '../../shared/types'
 import { Glyph, rollup } from './Glyph'
+import { wsShown } from './text'
 import { colorVar, Icon, Page, TAB_COLORS } from './ui'
 
 export type BirdApi = {
@@ -99,7 +100,7 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
           <section key={w.id} className="bird-ws" style={colorVar(tint.get(w.id))}>
             <h3>
               <Glyph s={w.setup ? 'setup' : rollup(tabs)} />
-              <span className="bird-ws-name">{w.name || w.id}</span>
+              <span className="bird-ws-name">{wsShown(w)}</span>
               <span className="muted">{project(w.project)}</span>
             </h3>
             <div className="bird-cards">
@@ -107,7 +108,7 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
                 const needs = api.needs(t)
                 const text = (screens[t.id] ?? '').replace(/\s+$/, '')
                 return (
-                  <button key={t.id} type="button" className={`bird-card${needs ? ' needs' : ''}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${w.name || w.id}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
+                  <button key={t.id} type="button" className={`bird-card${needs ? ' needs' : ''}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${wsShown(w)}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
                     <div className="bird-card-head">
                       <Icon name={t.kind === 'agent' ? 'agent' : 'terminal'} size={14} />
                       <span className="bird-card-name">{t.name}</span>

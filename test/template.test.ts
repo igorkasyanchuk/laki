@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prRef, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prRef, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -321,4 +321,16 @@ test('a plan limit at 90%: told as it crosses, once per window per reset, again 
   assert.match(limitText(hits[0], two, now), /^Claude Code · Work · 5-hour limit at 93% · resets \S/)
   assert.match(limitText(hits[0], [two[1]], now), /^Claude Code · 5-hour limit at 93%/)
   assert.equal(limitsCrossed(two, 95, {}, {}, now).hits.length, 0) // the threshold
+})
+
+test("wsShown: a name that only numbers its PR shows the PR's title; any other stays", () => {
+  const pr = { number: 14810, title: 'Shard routing for chat' }
+  assert.equal(wsShown({ id: 'pr-14810-shard', pr }), 'Shard routing for chat')
+  assert.equal(wsShown({ id: 'x', name: 'Review PR 14810 shard', pr }), 'Shard routing for chat')
+  assert.equal(wsShown({ id: 'x', name: 'Review PR #14810', pr }), 'Shard routing for chat')
+  assert.equal(wsShown({ id: 'pr-14810', pr }), 'Shard routing for chat') // gh failed as it was made
+  assert.equal(wsShown({ id: 'x', name: 'fix #14810', pr }), 'Shard routing for chat')
+  assert.equal(wsShown({ id: 'x', name: 'shard work', pr }), 'shard work') // yours
+  assert.equal(wsShown({ id: 'x', name: 'Review PR 148100', pr }), 'Review PR 148100') // another number
+  assert.equal(wsShown({ id: 'pr-14810-shard' }), 'pr-14810-shard') // no PR yet
 })

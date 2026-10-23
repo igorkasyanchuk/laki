@@ -76,6 +76,26 @@ export function filesHash(w: Entry, fresh = false) {
   const out = JSON.stringify([sourceOf(cur), cur.m, !!cur.s.net]) // its manifest as read (widgetWhat's text is made from it)
   return createHash('sha256').update(`${dirHash(w, fresh)}\0${out}`).digest('hex')
 }
+// what an extension in its folder runs, for a rewrite (widgetWrite, widgetUndo): its manifest's commands, prompts,
+// handlers and settings, and every file of it but its looks (widget.html without a script, fixtures, Markdown). A rewrite
+// that changes none of it keeps it on (a look, a label, its ui); undefined: no widget.json that reads
+export function runsOf(d: string) {
+  const m = manifestOf(d)
+  if (typeof m === 'string') return
+  const h = createHash('sha256').update(JSON.stringify([m.fetch, m.script, m.source, m.stream, m.on, m.actions, m.config, m.scope]))
+  for (const n of filesUnder(d).sort()) {
+    if (n === 'widget.json' || n.startsWith('fixtures/') || /\.md$/i.test(n)) continue
+    let t: Buffer
+    try {
+      t = readFileSync(join(d, n))
+    } catch {
+      continue
+    }
+    if (n === 'widget.html' && !/<script/i.test(t.toString('utf8'))) continue // a template: sanitized, runs nothing
+    h.update(`\0${n}\0`).update(t)
+  }
+  return h.digest('hex')
+}
 // its own files' hash (cached by their times and sizes): a repo's extension's trust
 // every file under its folder, relative, a folder's files before its subfolders (a link as a file): none hidden, no
 // node_modules (a repo's: repoFiles). ponytail: max files at most, a change past them isn't seen

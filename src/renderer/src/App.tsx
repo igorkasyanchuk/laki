@@ -37,7 +37,7 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, youtubeEmbed, withPaths } from './text'
+import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
@@ -262,7 +262,7 @@ let requests = 0
 // opener's full view (an extension's action with view, on this file) in its place
 type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean; ext?: string }
 const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`
-const wsName = (w: { id: string; name?: string }) => w.name || w.id
+const wsName = wsShown
 // remote access's page, with Laki's PIN: the code shown in Settings › Remote access on the Mac (api.pin); a wrong one
 // counts down, the last stops remote access. One solid card (styles.css' .pin-*): Laki's mark, a lock in a ring that
 // fills a sixth per digit, the PIN in six boxes over one input (paste, one-time-code autofill), sent as the sixth digit
@@ -1262,6 +1262,7 @@ export function App() {
     if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: lost` : 'none uncommitted' })
     if (pk.ahead) facts.push({ label: 'Commits', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (w.pr) facts.push({ label: 'PR', value: `#${w.pr.number} ${w.pr.draft ? 'draft' : w.pr.state.toLowerCase()}${w.pr.title ? ` · ${w.pr.title}` : ''} (stays on GitHub)` })
+    if (w.pr?.author) facts.push({ label: 'Author', value: `${w.pr.author}${w.pr.mine ? ' (you)' : ''}` })
     facts.push({ label: 'Tabs', value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
     if (w.ports.length) facts.push({ label: 'Servers', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
     if (w.artifacts) facts.push(view?.settings?.keepStorage ? { label: 'Artifacts', value: `${n(w.artifacts, 'file')} (kept)` } : { label: 'Artifacts', value: `${n(w.artifacts, 'file')}: deleted` })
@@ -2358,8 +2359,8 @@ export function App() {
   }
   // the sidebar's + › Terminal or Browser: a new one in the Terminals or Browsers project (the first makes it), selected
   // a page's link to a new tab (url; front: target=_blank, else a middle click, ⌘-click or its menu): one more, selected or not
-  const quickNew = async (kind: 'shells' | 'browsers', url?: string, front = true) => {
-    const w = await call<WorkspaceView>('quickNew', { kind, ...(url && { url }) }).catch(() => null) // the toast says why
+  const quickNew = async (kind: 'shells' | 'browsers', url?: string, front = true, at?: { project: string; place?: string }) => {
+    const w = await call<WorkspaceView>('quickNew', { kind, ...(url && { url }), ...at }).catch(() => null) // the toast says why
     if (w && front) (showNew(w.id), setDialog(null))
   }
   const quickRef = useRef(quickNew)
@@ -2373,6 +2374,13 @@ export function App() {
     { label: 'Browser', icon: 'globe', key: 'b', hint: 'any website', run: () => quickNew('browsers') },
   ]
   const newIn = (p: Project) => (p.kind ? quickNew(p.kind) : newWs(p.id)) // a project head's +
+  // a project's or group's +: a workspace, or a terminal in the project's own folder (API 107; before: a workspace at once)
+  const termsOk = (view?.api ?? 0) >= 107
+  const termIn = (p: Project, place?: string) => quickNew('shells', undefined, true, { project: p.id, ...(place && { place }) })
+  const plusMenu = (p: Project, place?: string): MenuItem[] => [
+    { label: 'New workspace', icon: 'plus', key: 'n', hint: place ? undefined : kh('newWs'), run: () => newWs(p.id, place ? { place } : undefined) },
+    { label: 'Terminal', icon: 'terminal', key: 't', hint: `in ${shortPath(p.path)}`, run: () => termIn(p, place) },
+  ]
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
   // keys: capture phase, before xterm.js sees them. force: an action of Settings › Keys by its id (a menu bar item's,
@@ -2909,7 +2917,7 @@ export function App() {
         {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}
         <span className="project-count">{n}</span>
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-          <IconButton icon="plus" title={`New workspace in ${s.name || 'this group'}`} onClick={() => newWs(p.id, { place: s.id })} />
+          <IconButton icon="plus" title={termsOk ? `New workspace or terminal in ${s.name || 'this group'}` : `New workspace in ${s.name || 'this group'}`} onClick={e => (termsOk ? openMenu(e, plusMenu(p, s.id)) : newWs(p.id, { place: s.id }))} />
           <IconButton icon="more" title="Group" onClick={e => openMenu(e, sepMenu(p, s))} />
         </span>
       </div>
@@ -3117,8 +3125,8 @@ export function App() {
     return [`On ${page}`, desk && (desk.length ? `its tiles: ${desk.join(', ')}` : 'no tiles yet'), w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
-  const ownWidgets = shownWidgets.filter(w => !w.project || w.project === ws?.project) // a repo's (.laki/extensions): only while a workspace of its project is selected
-  const deskWidgets = shownWidgets.map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
+  const ownWidgets = shownWidgets.filter(w => (!w.project || w.project === ws?.project) && !(w.on && w.hidden)) // a repo's (.laki/extensions): only while a workspace of its project is selected; hidden: its data says so
+  const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   // back and forward's buttons: the rail's top, else the sidebar's head; a right click lists where each goes
@@ -3272,7 +3280,7 @@ export function App() {
                   </>
                 )}
                 <span className="spacer" />
-                <IconButton icon="plus" title={newWord(p)} onClick={() => newIn(p)} />
+                <IconButton icon="plus" title={p.kind || !termsOk ? newWord(p) : 'New workspace or terminal'} onClick={e => (p.kind || !termsOk ? newIn(p) : openMenu(e, plusMenu(p)))} />
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
@@ -3281,6 +3289,12 @@ export function App() {
                 <div className="ws ws-new" onClick={() => newIn(p)}>
                   <Icon name="plus" size={12} />
                   <span className="ws-name">{newWord(p)}</span>
+                </div>
+              )}
+              {!shut && !hits && !p.kind && termsOk && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // or just a shell there
+                <div className="ws ws-new" onClick={() => termIn(p)}>
+                  <Icon name="terminal" size={12} />
+                  <span className="ws-name">Terminal</span>
                 </div>
               )}
               </div>
@@ -4355,7 +4369,7 @@ export function App() {
         <Prompt
           title="Rename workspace"
           hint="Only the name shown here: the folder and branch keep the id. Enter the id to go back to it."
-          initial={wsName(live.find(w => w.id === dialog.renameWs)!)}
+          initial={(w => w.name || w.id)(live.find(w => w.id === dialog.renameWs)!)}
           onClose={() => setDialog(null)}
           onSubmit={async name => {
             await call('wsSet', { id: dialog.renameWs, name })

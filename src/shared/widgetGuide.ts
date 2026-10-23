@@ -68,6 +68,8 @@ export const widgetFormat = () => `## widget.json
   \`sample\` (Laki's own hide them). To fail, exit non-zero with a line on stderr ("Set Repo in Settings › Extensions"): the last
   data stays. 2 minutes at most. Prefer what every Mac has (sh with curl, gh, jq; python3's standard library; a JS
   script) and shape the data there: small, with ready fields (\`"ci": "failing"\`): templates have no comparisons.
+  To show nothing for now (no PR on this branch, nothing to say), add \`"hidden": true\` to the data: it vanishes from
+  every place (bars, sidebar, rail, foot, Desk, panel, row marks) until data without it comes; Settings still lists it.
 - Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
   them), \`$LAKI_WIDGET_CONFIG\` (all of them, typed JSON), \`$LAKI_WIDGET_FILE\` (its storage: the last \`data\`),
   \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).

@@ -90,7 +90,7 @@ const themeVars = () => {
 export const inWs = (w: WidgetView, ws: string | null | undefined): WidgetView => {
   if (!w.scope) return w
   const i = ws ? w.inst?.[ws] : undefined
-  return { ...w, here: ws ?? null, at: i?.at, error: i?.error, running: i?.running, mock: i?.mock, ...(i && { label: i.label, badge: i.badge, tip: i.tip }) }
+  return { ...w, here: ws ?? null, at: i?.at, error: i?.error, running: i?.running, mock: i?.mock, hidden: i?.hidden, ...(i && { label: i.label, badge: i.badge, tip: i.tip }) }
 }
 const wsOf = (w: WidgetView) => w.here ?? undefined
 const NO_WS = uiHtml({ type: 'empty', icon: 'folder', text: 'Select a workspace' }, {}, {})
@@ -250,9 +250,10 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 }
 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
-function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number] }) {
+// fit: a bar's Auto, as wide as its content (styles.css' .widget.fit, UI_CSS' :host-context)
+function Cell({ w, api, parked, load, style, cells, fit }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number]; fit?: boolean }) {
   return (
-    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
+    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''} ${fit ? 'fit' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
       {w.missing?.length ? (
         // a setting it needs is empty: say which, and open it there
         <button className="widget-parked muted small" onClick={() => api.settings(w.id, w.missing![0])}>
@@ -287,7 +288,7 @@ export function WidgetPanel({ w, api }: { w: WidgetView; api: WidgetApi }) {
 // place row: a per-workspace one's mark on each workspace's row (and its peek card), its instance's badge (else label),
 // tip and its data's tone; a click runs its click action there, else opens that workspace's full view, else goes on to
 // the row (it selects the workspace)
-export const rowMarks = (widgets: WidgetView[], ws: string) => widgets.filter(w => w.on && w.scope === 'workspace' && placesOf(w).includes('row') && (w.inst?.[ws]?.badge || w.inst?.[ws]?.label))
+export const rowMarks = (widgets: WidgetView[], ws: string) => widgets.filter(w => w.on && w.scope === 'workspace' && placesOf(w).includes('row') && !w.inst?.[ws]?.hidden && (w.inst?.[ws]?.badge || w.inst?.[ws]?.label))
 export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: string; api: WidgetApi }) {
   const on = rowMarks(widgets, ws)
   return (
@@ -333,7 +334,7 @@ export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; ap
   return (
     <div className={`widget-strip ${place} nodrag`}>
       {on.map(w => (
-        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={[w.size[0], 0.5]} style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={[w.size[0], 0.5]} fit={w.fit && !w.js} style={w.fit && !w.js ? { maxWidth: 'calc(4 * var(--widget-cell, 92px))' } : { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
       ))}
     </div>
   )

@@ -144,6 +144,9 @@ export function WidgetStudio({ id, first, widgets, cfg, api, back, onNamed, onCl
       tools={
         w && (
           <span className="studio-acts">
+            <button className="sm" data-tip="Its page: where it shows, its settings, its switch" onClick={() => cfg.page(w.id)}>
+              Its page
+            </button>
             <button className="sm" disabled={!w.history?.length} data-tip={w.history?.length ? 'Back to the version before the last change' : 'Nothing to undo yet'} onClick={() => void undo()}>
               Undo
             </button>

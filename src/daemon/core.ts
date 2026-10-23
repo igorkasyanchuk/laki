@@ -905,24 +905,28 @@ export async function projectAdd(path: string): Promise<Project> {
 }
 
 // the sidebar's + › Shell and Browser: a new shell in your home folder, or a page in a browser, each a workspace of
-// the Terminals (kind shells) or Browsers project (made by the first one; a project like any other: dragged, folded, removed)
+// the Terminals (kind shells) or Browsers project (made by the first one; a project like any other: dragged, folded, removed);
+// a shell with project: a project's + › Terminal, a local workspace in its own folder (place: where, as wsNew's)
 const URL_OK = /^(https?:\/\/\S+|about:blank)$/
 let quick: Promise<unknown> = Promise.resolve()
 // one at a time: two quick clicks would both pick terminal 1 (an id is taken only once its workspace is pushed)
-export function quickNew(o: { kind: 'shells' | 'browsers'; url?: string }) {
+type Quick = { kind: 'shells' | 'browsers'; url?: string; project?: string; place?: string }
+export function quickNew(o: Quick) {
   const r = quick.then(() => quickMake(o))
   quick = r.catch(() => {})
   return r
 }
-async function quickMake(o: { kind: 'shells' | 'browsers'; url?: string }) {
+async function quickMake(o: Quick) {
   if (o.kind !== 'shells' && o.kind !== 'browsers') throw new Error('kind: shells or browsers')
   if (o.url !== undefined && !URL_OK.test(o.url)) throw new Error('url: http(s) only')
-  const p = state.projects.find(p => p.kind === o.kind && !p.host) ?? projectPush({ id: '', name: o.kind === 'shells' ? 'Terminals' : 'Browsers', path: homedir(), git: false, kind: o.kind })
+  const mine = o.project !== undefined && o.kind === 'shells' ? state.projects.find(p => p.id === o.project && p.kind !== 'browsers') : undefined
+  if (o.project !== undefined && !mine) throw new Error(`no project ${o.project} for a terminal`)
+  const p = mine ?? state.projects.find(p => p.kind === o.kind && !p.host) ?? projectPush({ id: '', name: o.kind === 'shells' ? 'Terminals' : 'Browsers', path: homedir(), git: false, kind: o.kind })
   const word = o.kind === 'shells' ? 'terminal' : 'browser'
   const names = new Set(state.workspaces.filter(w => w.project === p.id).map(w => w.name ?? w.id))
   let n = 1
   while (names.has(`${word} ${n}`)) n++
-  const ws = await wsNew({ project: p.id, local: true, another: true, name: `${word} ${n}`, preset: o.kind === 'shells' ? 'shell' : 'none', ...(o.kind === 'browsers' && { browser: o.url ?? 'about:blank' }) })
+  const ws = await wsNew({ project: p.id, local: true, another: true, name: `${word} ${n}`, preset: o.kind === 'shells' ? 'shell' : 'none', ...(o.kind === 'browsers' && { browser: o.url ?? 'about:blank' }), ...(mine && o.place && { place: o.place }) })
   ws.name = o.url && o.url !== 'about:blank' ? new URL(o.url).host : `${word} ${n}` // its id is terminal-1: the name with its space; a page's site until its title comes
   save()
   changed()

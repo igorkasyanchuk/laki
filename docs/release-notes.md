@@ -2,6 +2,17 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- A project's or group's ＋ also opens a *Terminal*: a shell in the project's folder, no agent, no worktree.
+- The sidebar, Board and Bird view show a workspace named after its PR number (`pr-14885-…`, *Review PR 14810 …*) by
+  the PR's title.
+- The context meter reads Claude's own settings: `opus[1m]` there counts against 1M, not 200K.
+- Deleting a workspace with a PR names the PR's author.
+- Extensions: *Auto* size in the top or status bar (as wide as its words need); data with `"hidden": true` hides one
+  everywhere until it changes; a Laki AI edit that only changes its look keeps it on; Laki AI's chat and the studio
+  link the extension's page.
+
 ## 0.25.0 · Oct 23, 2026
 
 - Linux: the AppImage starts on a plain Ubuntu, arm64 too: no libfuse2 or zlib1g-dev to install first.

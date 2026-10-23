@@ -426,7 +426,9 @@ const toolName = (m: AiMsg) =>
 // work (a spinner: only calls are kept, so which one runs, if any, isn't known)
 export function Tools({ list, live }: { list: AiMsg[]; live?: boolean }) {
   const names = [...new Set(list.map(toolName))]
+  const made = [...new Set(list.flatMap(m => (/^laki_extension_(write|set|on) /.test(m.text) ? (a => (typeof a?.id === 'string' ? [a.id] : []))(argsOf(m)) : [])))] // the extensions it made or changed: each one's page, a click away
   return (
+    <>
     <details className={`ai-tools ${live ? 'live' : ''}`}>
       <summary>
         {live ? <span className="btn-spin" /> : <Icon name="gear" size={11} />}
@@ -450,7 +452,22 @@ export function Tools({ list, live }: { list: AiMsg[]; live?: boolean }) {
         )
       })}
     </details>
+    {made.length > 0 && !live && (
+      <div className="ai-made">
+        {made.map(id => (
+          <button key={id} className="sm" onClick={() => openExternal(`laki://settings/widgets/${encodeURIComponent(id)}`)}>
+            <Icon name="panel" size={11} /> {id}: its page
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   )
+}
+const argsOf = (m: AiMsg) => {
+  try {
+    return JSON.parse(m.text.slice(m.text.indexOf(' ') + 1))
+  } catch {}
 }
 
 // the workspace (and tab) a tool call was about: its ws, or send's target (<ws> or <ws>/<tab>)

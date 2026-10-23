@@ -367,7 +367,7 @@ test('widgets that come with Laki: My PRs, Links', async t => {
   assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links').key}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
 })
 
-test('widget sizes: half a cell down is kept (a thin line), other fractions round; Links comes as one', async t => {
+test('widget sizes: half a cell down is kept (a thin line), other fractions round, Auto for a bar; Links comes as one', async t => {
   const rig = await fresh(t)
   const links = async () => (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
   assert.deepEqual((await links()).size, [4, 0.5], 'Links: a line across')
@@ -377,9 +377,14 @@ test('widget sizes: half a cell down is kept (a thin line), other fractions roun
   assert.deepEqual((await links()).size, [1, 0.5])
   await rig.rpc('widgetSet', { id: 'links', size: [9, 0] })
   assert.deepEqual((await links()).size, [4, 1], 'clamped to the grid')
+  // Auto: in a bar as wide as it needs, its size kept for the sidebar; a size picked again drops it
+  await rig.rpc('widgetSet', { id: 'links', fit: true })
+  assert.deepEqual([(await links()).fit, (await links()).size], [true, [4, 1]])
+  await rig.rpc('widgetSet', { id: 'links', size: [2, 1], fit: false })
+  assert.equal((await links()).fit, undefined)
 })
 
-test('extensions Laki AI writes: in its own folder only, saved off, read back; never over another folder’s', async t => {
+test('extensions Laki AI writes: in its own folder only, saved off (one on stays on while what it runs is the same), read back; never over another folder’s', async t => {
   const rig = await fresh(t)
   const json = JSON.stringify({ name: 'NY clock', fetch: 'echo "{\\"t\\": 1}"', every: 1, sample: { t: 7 } })
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': JSON.stringify({ name: 'NY clock', fetch: 'date' }) } }), /a sample too/, 'a fetch without made-up data for its preview')
@@ -398,7 +403,24 @@ test('extensions Laki AI writes: in its own folder only, saved off, read back; n
   assert.ok(statSync(join(dir, 'fetch.sh')).mode & 0o100, 'a script with #! runs')
   await rig.rpc('widgetSet', { id: 'ny', on: true })
   await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': '<template preview>new</template>' } })
-  assert.equal((await find(rig, 'ny')).on, false, 'a change turns it off again')
+  assert.equal((await find(rig, 'ny')).on, true, 'a new look: still on (what it runs is the same)')
+  await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': JSON.stringify({ ...JSON.parse(json), name: 'NY time', label: '{{t}}' }) } })
+  assert.equal((await find(rig, 'ny')).on, true, 'its name and label too')
+  await rig.rpc('widgetWrite', { id: 'ny', files: { 'fetch.sh': '#!/bin/sh\necho "{\\"t\\": 2}"' } })
+  assert.equal((await find(rig, 'ny')).on, false, 'a script it has changed: off until you turn it on')
+  await rig.rpc('widgetSet', { id: 'ny', on: true })
+  await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': JSON.stringify({ ...JSON.parse(json), fetch: 'date' }) } })
+  assert.equal((await find(rig, 'ny')).on, false, 'a new command: off')
+  const idle = () => until(async () => !(await find(rig, 'ny')).running, 'its fetch') // an undo waits for none
+  await rig.rpc('widgetSet', { id: 'ny', on: true })
+  await idle()
+  await rig.rpc('widgetUndo', { id: 'ny' })
+  assert.equal((await find(rig, 'ny')).on, false, 'undone to another command: off')
+  await rig.rpc('widgetSet', { id: 'ny', on: true })
+  await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': '<template preview>one</template>' } })
+  await idle()
+  await rig.rpc('widgetUndo', { id: 'ny' })
+  assert.equal((await find(rig, 'ny')).on, true, 'undone to another look: on')
   assert.deepEqual(Object.keys((await rig.rpc('widgetFiles', { id: 'ny' })).files).sort(), ['fetch.sh', 'widget.html', 'widget.json'], 'files left out stay')
   assert.match((await rig.rpc('widgetFiles', { id: 'links' })).files['widget.json'], /"name"/, 'an example that comes with Laki')
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: ['x'] }), /1 to 20 files/)

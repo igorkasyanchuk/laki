@@ -46,7 +46,7 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
 // the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on
 // every 10 s (main.ts' meterTick) and as a turn ends. Today's by chat in <data>/usage-today.json: a closed tab's stays,
 // and a restart reading each chat anew counts it once (the more of the two)
-type MeterRun = Tail & { m: Meter }
+type MeterRun = Tail & { m: Meter; big?: boolean } // big: claude's own settings run it on a 1M window
 const meters = new Map<string, MeterRun>()
 const todayPath = join(dir, 'usage-today.json')
 let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
@@ -61,8 +61,11 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   const r = meters.get(tab.id) ?? { m: meterNew() }
   meters.set(tab.id, r)
   if (look) r.looked = 0
+  const big = tab.preset === 'claude' && claudeBig(tab) // read each time: settings change without the transcript
+  const moved = big !== r.big
+  r.big = big
   const text = tailOf(tab, r, () => (r.m = meterNew()))
-  if (!text) return false
+  if (!text) return moved
   meterOf(tab.preset!, text, r.m)
   const s = spentNow()
   if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
@@ -80,13 +83,24 @@ export function meterTick() {
   if (any) changed()
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
+// claude's own settings, as it reads them (the workspace's local, then its project's, then yours: its account's folder):
+// a model made [1m] there (opus[1m]) runs a 1M window. ponytail: not ANTHROPIC_MODEL in an env
+function claudeBig(tab: Tab) {
+  const path = state.workspaces.find(w => w.id === tab.workspace)?.path
+  const files = [...(path ? ['settings.local.json', 'settings.json'].map(f => join(path, '.claude', f)) : []), join(accountNamed(tab.account)?.dir ?? homeDir('claude'), 'settings.json')]
+  for (const f of files) {
+    const m = readJson<{ model?: unknown }>(f)?.model
+    if (typeof m === 'string' && m) return /\[1m\]/i.test(m)
+  }
+  return false
+}
 export function meterView(t: Tab): Pick<TabView, 'context' | 'usage'> {
   const r = meters.get(t.id)
   if (!r?.file?.endsWith(`${t.resumeId}.jsonl`)) return {} // another chat's (a /clear): until this one's is read
   const { m } = r
   const pr = t.preset === 'claude' ? presetOf(t) : undefined
-  // ponytail: a model made [1m] elsewhere (claude's own settings) shows against 200K until it holds more
-  const max = m.max ?? (t.preset === 'claude' ? (/\[1m\]/i.test(`${t.model || pr?.model || ''} ${pr?.args ?? ''}`) || (m.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
+  const said = t.model || pr?.model || (/--model\b/.test(pr?.args ?? '') ? pr!.args : '') // a model the tab or its profile names wins over claude's settings
+  const max = m.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r.big) || (m.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
   return { ...(m.used !== undefined && max && { context: { used: m.used, max } }), ...(m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 // today's, the workspaces that used most first (5)

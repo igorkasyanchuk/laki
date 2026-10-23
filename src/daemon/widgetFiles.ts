@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { needsSample } from '../shared/widgetSchema.ts'
 import { move, readJson } from '../shared/conn.ts'
 import { agents, AI_MAY, find, type Manifest, pathOf, readStore, refetch, repoSays, running, scanWidgets, secretsOf, setSecrets, stopAgents, storePath, widgetHome, widgets, widgetsView, wLog, writeStore } from './widgets.ts'
-import { filesHash, hashes } from './widgetTrust.ts'
+import { filesHash, hashes, runsOf } from './widgetTrust.ts'
 import { fixturesOf } from './widgetDev.ts'
 import { dir } from './dir.ts'
 import { errAt, flushLogs, lastN, logPath, pending } from './widgetLogs.ts'
@@ -124,6 +124,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   mkdirSync(widgetHome(), { recursive: true })
   const at = statOf(d)
   if (at && !at.isDirectory()) throw new Error(`${d} isn't a folder`)
+  const runs = at && runsOf(d) // what it runs before: the same after, an extension that's on stays on
   snapshot(o.id, d)
   mkdirSync(d, { recursive: true })
   if (files.some(([n]) => n.startsWith('fixtures/'))) {
@@ -138,10 +139,11 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     writeFileSync(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
-  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too: the user allows the network for the page they looked at, not a rewrite; the user's own: its hour's leave stays (a write, a check, a fix)
+  const stays = !!was.on && !!runs && runs === runsOf(d) // on, and only its looks changed
+  writeStore(o.id, { ...readStore(o.id), on: stays, net: stays ? was.net : undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too: the user allows the network for the page they looked at, not a rewrite (a JS page is what it runs); the user's own: its hour's leave stays (a write, a check, a fix)
   scanWidgets()
-  wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
-  return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
+  wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; ${stays ? 'on still: what it runs is the same' : "off until it's turned on"}`)
+  return { ...widgetsView().find(w => w.id === o.id), note: stays ? 'Saved, still on: what it runs (its commands, scripts, prompts, handlers, settings) is the same as before' : 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
 }
 
 // ---------- the studio (WidgetStudio.tsx): each write undoable, a copy to change, a name for a new one
@@ -175,7 +177,7 @@ export function snapshot(id: string, d: string) {
   hist.delete(id)
 }
 // Undo (after: the first one taken after then, a turn's Undo to here; none: the newest): that one back, it and the
-// newer ones gone. Laki's own folder only; off again, as a write leaves it
+// newer ones gone. Laki's own folder only; off again, as a write leaves it, unless what it runs is the same
 export function widgetUndo(o: { id: string; after?: number }) {
   if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
   const all = historyOf(o.id)
@@ -187,6 +189,7 @@ export function widgetUndo(o: { id: string; after?: number }) {
   if (fetching(o.id)) throw new Error(`${o.id} is fetching: try again in a moment`)
   if (statOf(d)?.isSymbolicLink()) throw new Error(`${d} is a link: not undone`)
   const from = join(histDir(o.id), String(at))
+  const runs = runsOf(d)
   if (existsSync(join(from, '.none'))) rmSync(d, { recursive: true, force: true })
   else {
     for (const n of filesAndDirs(d)) if (!KEPT.test(n)) rmSync(join(d, n), { recursive: true, force: true }) // its node_modules and .git stay
@@ -194,7 +197,7 @@ export function widgetUndo(o: { id: string; after?: number }) {
   }
   for (const n of all.filter(n => n >= at)) rmSync(join(histDir(o.id), String(n)), { recursive: true, force: true })
   hist.delete(o.id)
-  if (existsSync(storePath(o.id))) writeStore(o.id, { ...readStore(o.id), on: false })
+  if (existsSync(storePath(o.id))) (st => writeStore(o.id, { ...st, on: !!st.on && !!runs && runs === runsOf(d) }))(readStore(o.id))
   scanWidgets()
   wLog({ id: o.id }, `undone: back to before ${new Date(at).toLocaleTimeString()}`)
   return { ok: true, at, gone: !widgets.has(o.id) }

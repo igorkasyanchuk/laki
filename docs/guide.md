@@ -261,7 +261,8 @@ selected workspace's PR is in the status bar.
   laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours (not in an agent's tab)
   laki memory rm . <id>                   # a learned one (yours you delete in the app)
   ```
-- ＋ on a project creates a new workspace in it.
+- ＋ on a project (or a group) offers *New workspace* or *Terminal*: a shell in the project's own folder, a workspace
+  of its own (terminal 1, terminal 2…; add tabs to it as to any). A project with no workspaces lists both under it.
 - ＋ at the sidebar's top: *Project folder…* (⌘O), *Terminal* or *Browser*. *Terminal* opens a shell in your home
   folder, without a terminal app: a workspace of the *Terminals* project (made by the first one; terminal 1, terminal
   2…). *Browser* opens any website in Laki: a workspace of the *Browsers* project, with back, forward, reload and an

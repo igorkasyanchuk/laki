@@ -43,6 +43,19 @@ setTimeout(() => {}, 60000)
   await until(async () => !(await sh()).runs && (await sh()).status === 'idle', 'the agent gone', 5000)
 })
 
+test("a project's + › Terminal: a local workspace with a shell in the project's own folder, where it's put", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('quickNew', { kind: 'shells', project: p.id })
+  const b = await rig.rpc('quickNew', { kind: 'shells', project: p.id, place: 'top' })
+  assert.deepEqual([a.name, b.name, a.kind, a.path, a.project], ['terminal 1', 'terminal 2', 'local', p.path, p.id])
+  const v = await rig.rpc('state')
+  assert.equal(v.tabs.filter((x: any) => x.workspace === b.id && x.kind === 'shell').length, 1)
+  assert.equal(v.projects.some((x: any) => x.kind === 'shells'), false) // no Terminals project for it
+  assert.equal(v.workspaces.find((w: any) => w.project === p.id).id, b.id) // placed first (a group's + gives its id)
+  await assert.rejects(rig.rpc('quickNew', { kind: 'shells', project: 'nope' }), /no project nope/)
+})
+
 test('Terminals and Browsers: a project each in the home folder, a workspace per terminal or page', async t => {
   const rig = await fresh(t)
   const [a, b] = await Promise.all([rig.rpc('quickNew', { kind: 'shells' }), rig.rpc('quickNew', { kind: 'shells' })]) // at once: one after the other

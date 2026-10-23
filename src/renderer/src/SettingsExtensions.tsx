@@ -16,7 +16,7 @@ import { describeHours, parseHours } from '../../shared/when'
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
+  set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on: a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
@@ -48,6 +48,8 @@ export type WidgetsApi = {
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3, 4].map(a => [a, d] as [number, number])) // ½ down: a thin line
+// Auto: in the top or status bar, as wide as it needs (a JS page has no width of its own to give)
+const fits = (w: WidgetView) => !w.js && placesOf(w).some(p => p === 'top' || p === 'status')
 const PLACES: [WidgetPlace, string, string][] = [
   ['side', 'Sidebar', 'In the sidebar, above its buttons'],
   ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],
@@ -242,7 +244,7 @@ export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
   return [
     { label: w.on ? 'Turn off' : 'Turn on', icon: 'power', sub: w.on ? 'nothing of it runs until you turn it on' : undefined, run: () => void api.set(w.id, { on: !w.on }) },
     { label: 'Show in', icon: 'layout', items: offered.map(([v, n, tip]) => ({ label: n, sub: tip, ...(places.includes(v) && { hint: ON }), run: () => flip(v) })) },
-    ...(places.some(p => BARS.includes(p)) && !w.button ? [{ label: 'Size', icon: 'grid', items: SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d] }) })) } as MenuItem] : []),
+    ...(places.some(p => BARS.includes(p)) && (!w.button || fits(w)) ? [{ label: 'Size', icon: 'grid', items: [...(fits(w) ? [{ label: 'Auto: in a bar, as wide as it needs', ...(w.fit && { hint: ON }), run: () => void api.set(w.id, { fit: true }) }] : []), ...SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(!w.fit && size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d], fit: false }) }))] } as MenuItem] : []),
     null,
     ...(api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` ? [{ label: 'Edit with Laki AI', icon: 'ai', sub: 'the studio', run: () => api.studio!(w.id) } as MenuItem] : []),
     ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),
@@ -319,8 +321,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           </div>
         </WcRow>
         {places.some(p => BARS.includes(p)) && (
-          <WcRow title="Size" hint={places.includes('side') ? 'Cells across × down in the sidebar. In a bar: its width, a line high' : 'Its width in the bar, in cells; a bar is a line high'}>
-            <select value={w.size.join('x')} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+          <WcRow title="Size" hint={`${places.includes('side') ? 'Cells across × down in the sidebar. In a bar: its width, a line high' : 'Its width in the bar, in cells; a bar is a line high'}${fits(w) ? '. Auto: a bar gives it what its words need' : ''}`}>
+            <select value={w.fit && fits(w) ? 'auto' : w.size.join('x')} onChange={e => void api.set(w.id, e.target.value === 'auto' ? { fit: true } : { size: e.target.value.split('x').map(Number) as [number, number], fit: false })}>
+              {fits(w) && <option value="auto">Auto: in a bar, as wide as it needs</option>}
               {SIZES.map(([a, d]) => (
                 <option key={`${a}x${d}`} value={`${a}x${d}`}>
                   {a} across × {d === 0.5 ? '½' : d} down
@@ -545,10 +548,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}
                 {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}
                 {w.net && <span className="tag" data-tip="Its page may reach https sites">network</span>}
+                {w.on && w.hidden && <span className="tag" data-tip="Its data says hidden: true: it shows nowhere until its data changes">hidden</span>}
                 {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
                 {w.log && (bad => <span className={`tag ${bad ? 'tag-closed' : ''}`} data-tip={bad ? 'An error in its log in the last hour: its page’s Logs' : 'It keeps a log: its page’s Logs'}>log</span>)(!!w.logErr && Date.now() - w.logErr < 3600e3)}
                 <span className="tag">
-                  {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
+                  {w.fit && fits(w) ? 'auto · ' : ''}{w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
                 </span>
                 {w.every !== undefined && <span className="tag">every {w.every} min</span>}
                 {w.scope ? <span className="tag" data-tip="An instance in each workspace: its data, fetched while it's on screen">per workspace</span> : w.every !== undefined && <span className={`tag ${w.error && !w.running ? 'tag-closed' : ''}`}>{w.running ? 'fetching…' : w.error ? 'last fetch failed' : w.at ? `fetched ${ago(w.at)}` : 'not fetched yet'}</span>}

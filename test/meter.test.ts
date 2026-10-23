@@ -1,7 +1,7 @@
 // The meters (meters.ts' meterTick, share.ts' meterOf): each claude and codex tab's context, from its transcript read on as
 // it grows, and what its chat used, tokens and ≈ cost by shared/types.ts' PRICES; today's kept in usage-today.json.
 import assert from 'node:assert/strict'
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { dayOf, meterNew, meterOf } from '../src/daemon/share.ts'
@@ -95,6 +95,11 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   assert.deepEqual(v.context, { used: 142000, max: 200000 })
   const r4 = (x: number) => Math.round(x * 1e4) / 1e4 // the view's cost: to a hundredth of a cent
   assert.deepEqual(v.usage, { tokens: 143000, cost: r4((5 * 100 + 6.25 * 1900 + 0.5 * 140000 + 25 * 1000) / 1e6) })
+  // claude's own settings make it opus[1m]: a 1M window (its transcript says only claude-opus-…)
+  const own = join(rig.home, '.claude/settings.json')
+  writeFileSync(own, JSON.stringify({ model: 'opus[1m]' }))
+  await until(async () => (await rig.tab(ws.id))?.context?.max === 1e6, 'the 1M window')
+  rmSync(own)
   // read on (a half-written line waits for its end); past 200K the window is 1M
   appendFileSync(file, line({ type: 'assistant', timestamp: stamp(), message: { id: 'b', model: 'claude-opus-4-6', usage: u(300000, 2000) } }) + '{"type":"assistant","mess')
   const w = await until(async () => (x => x?.context?.used > 142000 && x)(await rig.tab(ws.id)), 'the next answer')

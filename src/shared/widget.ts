@@ -180,6 +180,7 @@ export const hasScript = (html: string) => /<script\b/i.test(html)
 // the UI kit's elements (widgetUi.ts): only the theme's variables and these fallbacks, so they read in every theme.
 // .k is a container: an element adapts to the cells it has (1 to 4 across); data-line: a bar's line (½ high)
 export const UI_CSS = `.k { container: kit / inline-size; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+:host-context(.widget.fit) .k { container-type: normal; } /* a bar's Auto: its content's width (an inline-size container has none) */
 .k [hidden] { display: none !important; }
 .k[data-kit=preview] { height: 100%; gap: 6px; padding: 4px 6px; overflow: hidden; }
 .k[data-line] { flex-direction: row; align-items: center; gap: 8px; padding: 0 6px; white-space: nowrap; }

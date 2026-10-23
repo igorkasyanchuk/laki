@@ -14,6 +14,13 @@ export const nameOf = (prompt: string) => prompt.trim().split(/\s+/).slice(0, 4)
 export const pathText = (p: string) => (/[\s"'\\]/.test(p) ? JSON.stringify(p) : p)
 export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.map(pathText).join('\n')].filter(Boolean).join('\n\n')
 
+// a workspace's name as shown: one that numbers its PR (pr-14885-sq3-…, Review PR 14810 …, #14810) shows the PR's title,
+// whatever named it (a prompt's words, a template, gh failing as it was made: pr-<n>)
+export function wsShown(w: { id: string; name?: string; pr?: { number: number; title?: string } }) {
+  const n = w.name || w.id
+  return w.pr?.title && new RegExp(`(?:\\bpr[\\s#-]*|#)${w.pr.number}\\b`, 'i').test(n) ? w.pr.title : n
+}
+
 // a path for the status bar: ~ for the home folder, and only the last two folders of a long one
 export function shortPath(p: string) {
   const parts = p.replace(/^\/Users\/[^/]+(?=\/|$)/, '~').split('/')

@@ -152,7 +152,7 @@ test('streams: each line of JSON is its data, again after an exit with backoff, 
   assert.ok(ps.some((x: string) => /on\.turn\.don: refresh, or one of its actions/.test(x)), ps.join('\n'))
 })
 
-test('push: data put there by the CLI, merged, per workspace; refused when off', async t => {
+test('push: data put there by the CLI, merged, per workspace; refused when off; hidden: true hides it', async t => {
   const rig = await fresh(t)
   make(rig, 'pu', { name: 'Pushed', ui: { type: 'text', value: '{{a}} {{b}}' } })
   make(rig, 'pw', { name: 'Pushed here', scope: 'workspace', ui: { type: 'text', value: '{{a}} on {{workspace.branch}}' } })
@@ -171,6 +171,14 @@ test('push: data put there by the CLI, merged, per workspace; refused when off',
   assert.equal((await rig.cli('widget', 'push', 'pw', '{"a": "hi"}', '--ws', ws.id)).code, 0)
   assert.match(await rig.rpc('widgetRender', { id: 'pw', ws: ws.id }), new RegExp(`hi on ${ws.branch}`))
   assert.match((await rig.cli('widget', 'push', 'pw', '{}')).err, /is per workspace: which one/)
+  // its data hides it (hidden: true): the view says so, for an instance too, until data says otherwise
+  const pu = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === 'pu')
+  await rig.cli('widget', 'push', 'pu', '{"hidden": true}', '--merge')
+  assert.equal((await pu()).hidden, true)
+  await rig.cli('widget', 'push', 'pu', '{"hidden": false}', '--merge')
+  assert.equal((await pu()).hidden, undefined)
+  await rig.cli('widget', 'push', 'pw', '{"hidden": true}', '--ws', ws.id)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'pw').inst[ws.id].hidden, true)
 })
 
 test('a fetch that times out ends what it started; a stream stopped in Resources ends its children too', async t => {

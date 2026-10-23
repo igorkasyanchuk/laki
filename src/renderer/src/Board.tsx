@@ -9,6 +9,7 @@ import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
 import { FileChip, type Img, PromptInput } from './PromptInput'
+import { wsShown } from './text'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
 export type BoardApi = {
@@ -147,7 +148,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                     <div className="board-foot">
                       <Glyph s={w.setup ? 'running' : rollup(tabs)} />
                       <button type="button" className="board-name" onClick={e => (e.stopPropagation(), api.open(w.id))}>
-                        {w.name || w.id}
+                        {wsShown(w)}
                       </button>
                       <span className="spacer" />
                       {going[w.id] ? <span className="muted small">{going[w.id]}…</span> : timers && <TurnTime tabs={tabs} />}
