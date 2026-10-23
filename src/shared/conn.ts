@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -105,7 +105,35 @@ export function move(from: string, to: string) {
     renameSync(from, to)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-    cpSync(from, to, { recursive: true, verbatimSymlinks: true })
+    copyTree(from, to)
     rmSync(from, { recursive: true, force: true })
   }
+}
+
+// cpSync's recursive copy (links as they are, modes kept, over what's there), each file read in chunks until it ends:
+// node's copyfile spins for ever on a file that shrinks while it's copied (libuv's sendfile counts on the size it saw),
+// and an extension's folder or a workspace is written to as it's copied. filter: false leaves a path and what's under it
+export function copyTree(from: string, to: string, filter: (path: string) => boolean = () => true) {
+  if (!filter(from)) return
+  const st = lstatSync(from)
+  if (st.isSymbolicLink()) return void (rmSync(to, { force: true }), symlinkSync(readlinkSync(from), to))
+  if (st.isDirectory()) {
+    mkdirSync(to, { recursive: true })
+    for (const n of readdirSync(from)) copyTree(join(from, n), join(to, n), filter)
+    return void chmodSync(to, st.mode & 0o7777)
+  }
+  if (!st.isFile()) return // a socket or a pipe: nothing to copy
+  const i = openSync(from, 'r')
+  try {
+    const o = openSync(to, 'w')
+    try {
+      const buf = Buffer.allocUnsafe(1 << 20)
+      for (let n; (n = readSync(i, buf, 0, buf.length, null)) > 0; ) writeSync(o, buf, 0, n)
+    } finally {
+      closeSync(o)
+    }
+  } finally {
+    closeSync(i)
+  }
+  chmodSync(to, st.mode & 0o7777)
 }

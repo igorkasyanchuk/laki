@@ -5,7 +5,7 @@ import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readF
 import { basename, dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { needsSample } from '../shared/widgetSchema.ts'
-import { move, readJson } from '../shared/conn.ts'
+import { copyTree, move, readJson } from '../shared/conn.ts'
 import { agents, AI_MAY, find, type Manifest, pathOf, readStore, refetch, repoSays, running, scanWidgets, secretsOf, setSecrets, stopAgents, storePath, widgetHome, widgets, widgetsView, wLog, writeStore } from './widgets.ts'
 import { filesHash, hashes, runsOf } from './widgetTrust.ts'
 import { fixturesOf } from './widgetDev.ts'
@@ -171,7 +171,7 @@ export function snapshot(id: string, d: string) {
   const all = historyOf(id)
   const at = Math.max(Date.now(), (all.at(-1) ?? 0) + 1) // two in one ms: still in order
   const to = join(histDir(id), String(at))
-  if (statOf(d)?.isDirectory()) cpSync(d, to, { recursive: true, verbatimSymlinks: true, filter: p => dirname(p) !== d || !KEPT.test(basename(p)) })
+  if (statOf(d)?.isDirectory()) copyTree(d, to, p => dirname(p) !== d || !KEPT.test(basename(p))) // its fetch may be writing there
   else mkdirSync(to, { recursive: true }), writeFileSync(join(to, '.none'), '')
   for (const n of all.slice(0, Math.max(0, all.length + 1 - HISTORY))) rmSync(join(histDir(id), String(n)), { recursive: true, force: true })
   hist.delete(id)
@@ -213,7 +213,7 @@ export function widgetRemix(o: { id: string; newId?: string }) {
   if (widgets.has(id) || statOf(d)) throw new Error(`${id} is taken`)
   mkdirSync(widgetHome(), { recursive: true })
   const src = realpathSync(w.dir) // a linked folder: what it links to, not the link
-  cpSync(src, d, { recursive: true, verbatimSymlinks: true, filter: p => p === src || !KEPT.test(basename(p)) })
+  copyTree(src, d, p => p === src || !KEPT.test(basename(p))) // its fetch may be writing there
   try {
     const m = JSON.parse(readFileSync(join(d, 'widget.json'), 'utf8'))
     writeFileSync(join(d, 'widget.json'), `${JSON.stringify({ ...m, name: `${m.name || w.id} (copy)` }, null, 2)}\n`)

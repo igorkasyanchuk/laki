@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { copyTree } from '../src/shared/conn.ts'
 import { ntfyReplies, pushRequest, pushText, replies, tapSig } from '../src/daemon/push.ts'
 import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
@@ -255,4 +260,26 @@ test("Line: extension tools' asks one at a time; a newer one waits, a click brin
   assert.equal(l.front('c'), false, 'already first')
   assert.equal(l.drop('c'), true, 'the one on screen')
   assert.equal(l.first?.req, 'a')
+})
+
+test('copyTree: files read until they end, modes and links as they are, a filter, a pipe left out', t => {
+  const d = mkdtempSync(join(tmpdir(), 'laki-copy-'))
+  t.after(() => rmSync(d, { recursive: true, force: true }))
+  const a = join(d, 'a')
+  mkdirSync(join(a, 'sub', 'node_modules'), { recursive: true })
+  writeFileSync(join(a, 'run.sh'), '#!/bin/sh\necho hi\n', { mode: 0o755 })
+  writeFileSync(join(a, 'sub', 'big.bin'), Buffer.alloc(3 << 20, 7)) // past one chunk
+  writeFileSync(join(a, 'sub', 'node_modules', 'x.js'), 'x')
+  symlinkSync('../run.sh', join(a, 'sub', 'link'))
+  execFileSync('mkfifo', [join(a, 'pipe')])
+  copyTree(a, join(d, 'b'), p => !p.endsWith('node_modules'))
+  assert.equal(readFileSync(join(d, 'b', 'run.sh'), 'utf8'), '#!/bin/sh\necho hi\n')
+  assert.equal(statSync(join(d, 'b', 'run.sh')).mode & 0o777, 0o755)
+  assert.equal(statSync(join(d, 'b', 'sub', 'big.bin')).size, 3 << 20)
+  assert.equal(readlinkSync(join(d, 'b', 'sub', 'link')), '../run.sh', 'verbatim')
+  assert.throws(() => statSync(join(d, 'b', 'sub', 'node_modules')), 'filtered')
+  assert.throws(() => statSync(join(d, 'b', 'pipe')), 'a pipe is not read')
+  writeFileSync(join(a, 'run.sh'), 'new')
+  copyTree(a, join(d, 'b'), p => !p.endsWith('node_modules')) // over what's there
+  assert.equal(readFileSync(join(d, 'b', 'run.sh'), 'utf8'), 'new')
 })

@@ -7,7 +7,7 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
@@ -16,7 +16,7 @@ import { ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, mi
 import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
-import { move, readCapped, readJson } from '../shared/conn.ts'
+import { copyTree, move, readCapped, readJson } from '../shared/conn.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -691,7 +691,7 @@ function keep(r: FlowRun, b: Block, vars: Record<string, string>) {
     if (!existsSync(src)) throw new Error(`${b.from}: no such file in the workspace`)
     const real = realpathSync(src) // a link out of the workspace isn't its file
     if (real === top || !within(top, real)) throw new Error(`${b.from}: a file or folder in the workspace (not all of it)`)
-    cpSync(real, path, { recursive: true, force: true })
+    copyTree(real, path) // a log or build its agent still writes
   } else if (link) writeFileSync(path, `[InternetShortcut]\r\nURL=${link}\r\n`)
   else writeFileSync(path, fill(b.text ?? '', vars))
   r.vars[`steps.${b.id}.output`] = path
