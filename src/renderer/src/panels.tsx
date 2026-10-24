@@ -431,8 +431,11 @@ declare const __BUILT__: string // electron.vite.config.ts' define
 // the build's THIRD_PARTY_NOTICES.txt (electron.vite.config.ts' notices), beside the app's page: opened in TextEdit;
 // from the dev server or a browser elsewhere, the summary on GitHub
 const NOTICES = `${REPO}/blob/main/THIRD_PARTY_LICENSES.md`
-const openNotices = () =>
-  location.protocol === 'file:' && bridge?.openPath ? void bridge.openPath(decodeURIComponent(new URL('THIRD_PARTY_NOTICES.txt', location.href).pathname)) : openExternal(NOTICES)
+const openNotices = () => {
+  const path = fileOf(new URL('THIRD_PARTY_NOTICES.txt', location.href).href)
+  if (path && bridge?.openPath) void bridge.openPath(path).then(r => r === 'missing' && openExternal(NOTICES))
+  else openExternal(NOTICES)
+}
 
 export function About({ onClose }: { onClose: () => void }) {
   return (

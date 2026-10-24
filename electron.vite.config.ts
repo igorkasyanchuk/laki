@@ -31,25 +31,28 @@ const notices = (last: boolean) => ({
       shipped = execFileSync('npm', ['ls', '--omit=dev', '--all', '--parseable'], { encoding: 'utf8' })
     } catch (e) {
       shipped = (e as { stdout?: string }).stdout ?? '' // npm ls exits 1 on an extraneous package (pack:x64's node-pty)
+      if (!shipped.includes(NM)) throw e // no npm, or it said nothing: the notices would lack the daemon's packages
     }
     for (const dir of shipped.split('\n')) if (dir.includes(NM)) used.add(dir)
     const byText = new Map<string, string[]>()
     for (const dir of used) {
-      let pkg: { name?: string; version?: string; license?: string | { type?: string } }
+      let pkg: { name?: string; version?: string; license?: string | { type?: string }; repository?: string | { url?: string } }
       try {
         pkg = JSON.parse(readFileSync(`${dir}/package.json`, 'utf8'))
       } catch {
         continue
       }
       const license = (typeof pkg.license === 'string' ? pkg.license : pkg.license?.type) ?? 'no license named'
-      const files = readdirSync(dir).filter(f => /^(licen[cs]e|copying|notice)([.-]|$)/i.test(f)).sort()
-      const text = files.map(f => readFileSync(`${dir}/${f}`, 'utf8').trim()).join('\n\n') || `${license} (the package has no license file)`
+      const repo = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url
+      const files = readdirSync(dir, { withFileTypes: true }).filter(f => f.isFile() && /^(licen[cs]e|copying|notice)([.-]|$)/i.test(f.name)).map(f => f.name).sort()
+      const text = files.map(f => readFileSync(`${dir}/${f}`, 'utf8').trim()).join('\n\n') || `${license}: the package has no license file${repo ? `; its text is in ${repo}` : ''}`
       byText.set(text, [...(byText.get(text) ?? []), `${pkg.name}@${pkg.version} (${license})`])
     }
     const rule = `\n\n${'='.repeat(78)}\n`
     const groups = [...byText].map(([text, names]) => `${names.sort().join('\n')}\n\n${text}`).sort()
     const fonts = ['NOTICE.md', 'OFL.txt', 'HACK-LICENSE.md'].map(f => readFileSync(resolve('src/renderer/src/fonts', f), 'utf8').trim())
-    const head = `Laki bundles the open-source packages and fonts below, each under its own license. Laki itself is MIT.\n${used.size} packages; each license text follows the packages it covers.`
+    const n = [...byText.values()].reduce((n, names) => n + names.length, 0)
+    const head = `Laki bundles the open-source packages and fonts below, each under its own license. Laki itself is MIT.\n${n} packages; each license text follows the packages it covers.`
     this.emitFile({ type: 'asset', fileName: 'THIRD_PARTY_NOTICES.txt', source: [head, ...groups, ...fonts].join(rule) + '\n' })
   },
 })

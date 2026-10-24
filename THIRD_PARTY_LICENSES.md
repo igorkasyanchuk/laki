@@ -16,5 +16,6 @@ Laki is MIT (`LICENSE`). The app bundles open-source packages, each under its ow
 - **Fonts**: SIL Open Font License 1.1, and Hack's MIT and Bitstream Vera licenses: `src/renderer/src/fonts/NOTICE.md`,
   `OFL.txt`, `HACK-LICENSE.md`.
 
-The app carries every bundled package's own license text, and the fonts': `THIRD_PARTY_NOTICES.txt`, which each build
-writes (About Laki › *Open-source licenses*).
+The app carries each bundled package's license (its own text, where the package has one) and the fonts':
+`THIRD_PARTY_NOTICES.txt`, which each build writes (About Laki › *Open-source licenses*). Chromium's notices aren't in
+it: they're `LICENSES.chromium.html` in each Electron release's zip.

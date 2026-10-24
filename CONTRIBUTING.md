@@ -32,7 +32,7 @@ To try the UI in a browser without your own projects or agents, a demo world (a 
 ```bash
 npm run demo -- /tmp/laki-x              # prints a URL with the daemon's port and token
 npm run dev:web                          # then open that URL
-LAKI_HOME=/tmp/laki-x/data node out/main/cli.js stop    # afterwards (and stop vite)
+LAKI_HOME=/tmp/laki-x/data node bin/laki.js stop        # afterwards (and stop vite)
 ```
 
 ## The rules
