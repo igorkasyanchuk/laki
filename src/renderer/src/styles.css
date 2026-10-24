@@ -1889,7 +1889,13 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .bird-card { display: flex; flex-direction: column; min-width: 0; padding: 0; text-align: left; font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; }
 .bird-card:hover { border-color: var(--muted); }
 .bird-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.bird-card.needs { border-color: color-mix(in srgb, var(--accent) 70%, var(--line)); } /* needs you: the accent, as the sidebar's bold name; red is for errors */
+/* needs you (Bird.tsx' why): a waiting agent amber with a slow glow, a done one not looked at green; the outline makes the
+   border 2px without moving the grid (an outline takes no room), and paints over the card's screen */
+.bird-card.needs-wait { border-color: var(--waiting); outline: 1px solid var(--waiting); animation: bird-glow 2.4s ease-in-out infinite; }
+.bird-card.needs-done { border-color: var(--done); outline: 1px solid var(--done); }
+@keyframes bird-glow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--waiting) 0%, transparent); } 50% { box-shadow: 0 0 14px 2px color-mix(in srgb, var(--waiting) 45%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .bird-card.needs-wait { animation: none; box-shadow: 0 0 10px 1px color-mix(in srgb, var(--waiting) 35%, transparent); } }
+html[data-motion='none'] .bird-card.needs-wait { animation: none !important; box-shadow: 0 0 10px 1px color-mix(in srgb, var(--waiting) 35%, transparent); }
 .bird-card.asleep { opacity: 0.6; }
 .bird-card-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 12px; border-bottom: 1px solid var(--line); }
 .bird-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

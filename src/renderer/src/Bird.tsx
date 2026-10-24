@@ -106,9 +106,10 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
             <div className="bird-cards">
               {tabs.map(t => {
                 const needs = api.needs(t)
+                const why = needs ? (t.status === 'waiting' ? ' needs needs-wait' : ' needs needs-done') : '' // waiting: amber, pulsing; done unseen: green
                 const text = (screens[t.id] ?? '').replace(/\s+$/, '')
                 return (
-                  <button key={t.id} type="button" className={`bird-card${needs ? ' needs' : ''}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${wsShown(w)}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
+                  <button key={t.id} type="button" className={`bird-card${why}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${wsShown(w)}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
                     <div className="bird-card-head">
                       <Icon name={t.kind === 'agent' ? 'agent' : 'terminal'} size={14} />
                       <span className="bird-card-name">{t.name}</span>

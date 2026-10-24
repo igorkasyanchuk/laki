@@ -2,6 +2,11 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Bird view: a card whose agent waits for you has an amber border with a slow glow, one that's done and not looked
+  at a green one.
+
 ## 0.26.0 · Oct 24, 2026
 
 - A project's or group's ＋ (and its ⋯) also opens a *Terminal*: a shell in the project's folder, no agent, no
