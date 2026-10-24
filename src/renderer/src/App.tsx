@@ -15,7 +15,7 @@ import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
-import { type Inserted, type Inserts, VoiceBar, withImages } from './PromptInput'
+import { type Inserted, type Inserts, keepFile, VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
@@ -1047,6 +1047,63 @@ export function App() {
     }
   }, [view])
   const layoutNew = useRef<Record<string, { since: number; asked: Set<Role> }>>({})
+  // files, an image or text dropped on a workspace's row (or its rail pin): to its agent, the one focused there, else its
+  // first live one, else a new one (its last agent's profile, else the default); queued while it works (Undo takes it
+  // back off the queue); with ⌥, a box first to add a line. Terminals', Browsers' and archived rows take none
+  const [dropOn, setDropOn] = useState<string | null>(null)
+  const dropAgent = (w: WorkspaceView) => (ts => ts.find(t => t.id === tabByWs[w.id]) ?? ts[0])((viewRef.current?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited'))
+  const takesDrop = (w: WorkspaceView, e: React.DragEvent) => !w.archived && !projOf(w)?.kind && w.browser === undefined && ['Files', 'text/plain'].some(k => e.dataTransfer.types.includes(k))
+  const dropProps = (w: WorkspaceView) => ({
+    onDragOver: (e: React.DragEvent) => takesDrop(w, e) && (e.preventDefault(), (e.dataTransfer.dropEffect = 'copy'), dropOn !== w.id && setDropOn(w.id)),
+    onDragLeave: (e: React.DragEvent) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropOn(d => (d === w.id ? null : d)),
+    onDrop: (e: React.DragEvent) => {
+      setDropOn(null)
+      if (!takesDrop(w, e)) return
+      e.preventDefault() // the window's own drop (a folder: a project) leaves it
+      void dropTo(w, [...e.dataTransfer.items].flatMap(i => (i.kind === 'file' ? [{ f: i.getAsFile(), dir: !!i.webkitGetAsEntry?.()?.isDirectory }] : [])), e.dataTransfer.files.length ? '' : e.dataTransfer.getData('text/plain'), e.altKey)
+    },
+  })
+  const dropTo = async (w: WorkspaceView, files: { f: File | null; dir: boolean }[], text: string, more: boolean) => {
+    const paths: string[] = []
+    for (const { f, dir } of files) {
+      if (!f) continue
+      if (dir) {
+        const p = bridge?.pathOf?.(f) // a folder: its path, never read
+        if (p) paths.push(p)
+        else toast(`${f.name}: a folder goes in by its path, in the app only`)
+        continue
+      }
+      try {
+        paths.push((await keepFile(f, (data, ext) => api.call<string>('imageSave', { data, ext }), (data, name) => api.call<string>('fileSave', { data, name }))).path)
+      } catch (e) {
+        toast(`${f.name}: ${(e as Error).message}, not sent`)
+      }
+    }
+    let msg = withPaths(text, paths)
+    if (!msg.trim()) return
+    const agent = dropAgent(w)
+    const names = files.map(x => x.f?.name).filter(Boolean).join(', ') || clip(text, 40)
+    if (more) {
+      const t = await askText(`To ${wsName(w)}${agent ? ` · ${agent.name}` : ''}`, { text: 'Add a line if you like: it goes before the paths.', value: msg, multi: true, ok: 'Send' })
+      if (!t?.trim()) return
+      msg = t
+    }
+    if (!agent) {
+      const last = viewRef.current?.tabs.filter(t => t.workspace === w.id && t.kind === 'agent').at(-1)
+      const t = await call<TabView>('tabNew', { ws: w.id, preset: last?.profile ?? last?.preset ?? settings.agent ?? 'claude', prompt: msg }).catch(() => null)
+      return t && done(`Started ${t.name} in ${wsName(w)} with ${names}`)
+    }
+    const r = await call<{ queued?: number }>('send', { target: agent.id, text: msg, whenIdle: true }).catch(() => null)
+    if (!r) return
+    const where = `${wsName(w)} · ${agent.name}`
+    if (!r.queued) return done(`Sent ${names} to ${where}`)
+    toast(`Sent ${names} to ${where}: queued until it's free`, () => {
+      const was = viewRef.current?.tabs.find(t => t.id === agent.id)?.queue ?? []
+      const i = was.lastIndexOf(msg)
+      if (i < 0) return toast('Already sent: it was free')
+      void queueSave(agent, was.filter((_, j) => j !== i), was)
+    })
+  }
   // a session by id, or one just created (its view may not have arrived yet)
   const selectTab = useCallback((ref: string | { id: string; workspace: string }) => {
     const t = typeof ref === 'string' ? viewRef.current?.tabs.find(t => t.id === ref) : ref
@@ -2823,7 +2880,7 @@ export function App() {
     return (
       <div
         key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
@@ -2834,6 +2891,7 @@ export function App() {
         onPointerLeave={() => peekAt()}
         onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
         onContextMenu={e => openMenu(e, wsMenu(w))}
+        {...dropProps(w)}
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />}
         {marksAt === 'start' && yes}
@@ -2842,6 +2900,7 @@ export function App() {
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
+        {dropOn === w.id && <span className="ws-drop">to {dropAgent(w)?.name ?? 'a new agent'}</span>}
         <span className="spacer" />
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
@@ -3237,7 +3296,7 @@ export function App() {
     // never lit as the open one: its kind's button above is, and the list shows the row; a mouse click lets go of the
     // focus (a key pressed later would ring it, :focus-visible), Enter or Space keeps a keyboard user's place
     return (
-      <button key={`pin:${w.id}`} type="button" className="rail-kind rail-pin nodrag" aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
+      <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${dropOn === w.id ? 'drop-on' : ''}`} {...dropProps(w)} aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
         <span className="rail-icon" style={colorVar(tint(w))}>
           {k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
           {k === 'projects' && <ProjectMark p={projOf(w)} size={11} /> /* its project's, at the corner */}

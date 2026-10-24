@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Drop files, an image or text on a workspace's row to hand them to its agent (queued while it works, with Undo; ⌥
+  to add a line first).
 - One-click layouts in the tab bar: the agent beside Preview, Changes, the dev server or a shell, all agents at
   once, or your own saved ones; a project can start each new workspace in one.
 - Hold ⌘ for a moment to see every key: a badge beside each tab, button and row that has one, the rest in a strip.

@@ -77,6 +77,17 @@ const read = (f: File) =>
     r.readAsDataURL(f)
   })
 
+// a pasted or dropped file to the daemon: an image (EXT) through save (imageSave), any other (HEIC, SVG too) through
+// saveFile (fileSave), else refused; too big, refused before it's read (past the socket's maxPayload the connection drops)
+export async function keepFile(f: File, save: (base64: string, ext: string) => Promise<string>, saveFile?: (base64: string, name: string) => Promise<string>) {
+  const ext = EXT[f.type]
+  const no = !ext && !saveFile ? 'PNG, JPEG, GIF or WebP only' : f.size > (ext ? 20 << 20 : FILE_MAX) ? `over ${ext ? 20 : 25} MB` : ''
+  if (no) throw new Error(no)
+  const url = await read(f)
+  const data = url.slice(url.indexOf(',') + 1)
+  return ext ? { path: await save(data, ext), url } : { path: await saveFile!(data, f.name) }
+}
+
 export function PromptInput(p: {
   value: string
   onChange: (v: string) => void
@@ -131,18 +142,9 @@ export function PromptInput(p: {
     setErr('')
     p.onBusy?.(++saving.current > 0)
     for (const f of files) {
-      const ext = EXT[f.type] // else a file (HEIC, SVG too): saveFile's, or refused
-      // too big: refused before it's read (past the socket's maxPayload the connection drops)
-      const no = !ext && !p.saveFile ? 'PNG, JPEG, GIF or WebP only' : f.size > (ext ? 20 << 20 : FILE_MAX) ? `over ${ext ? 20 : 25} MB` : ''
-      if (no) {
-        setErr(`${f.name || 'image'}: ${no}`)
-        continue
-      }
       try {
-        const url = await read(f)
-        const data = url.slice(url.indexOf(',') + 1)
-        const path = ext ? await p.save(data, ext) : await p.saveFile!(data, f.name)
-        p.onImages(x => [...x, ext ? { path, url } : { path, size: f.size }])
+        const k = await keepFile(f, p.save, p.saveFile)
+        p.onImages(x => [...x, k.url ? { path: k.path, url: k.url } : { path: k.path, size: f.size }])
       } catch (e) {
         setErr(`${f.name || 'image'}: ${(e as Error).message}`)
       }

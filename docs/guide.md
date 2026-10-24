@@ -238,6 +238,11 @@ selected workspace's PR is in the status bar.
   there. A done one's shows its answer's first line and diff size, *Review* (the right panel's Changes) and *Seen*
   (clears its ●). A click anywhere else opens the tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes
   through the same list. Settings › Appearance › Sidebar › *Needs you list* turns it off.
+- **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
+  agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
+  paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message
+  says so, with Undo), and a workspace with no agent running starts one with them. Hold ⌥ as you drop to add a line
+  first. Terminals', Browsers' and archived rows take none.
 - A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
   a guide line beside them; none by default).
 - *Diff size in the sidebar* (Settings › Appearance › Sidebar, off by default) puts each workspace's diff size on its row

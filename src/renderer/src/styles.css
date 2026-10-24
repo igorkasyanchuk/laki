@@ -2556,3 +2556,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .key-strip { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; max-width: min(900px, 90vw); padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.3); }
 .key-strip kbd { font: 600 11px var(--mono); color: var(--fg); }
 @media (prefers-reduced-motion: reduce) { .key-overlay { animation: none; } }
+
+/* a file, an image or text dragged over a workspace's row or rail pin (App's dropProps): to its agent */
+.ws.drop-on, .rail-pin.drop-on { outline: 1.5px dashed var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ws-drop { flex: none; font-size: 11px; color: var(--accent-ink, var(--accent)); white-space: nowrap; }
