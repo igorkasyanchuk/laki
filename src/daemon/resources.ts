@@ -5,7 +5,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { basename } from 'node:path'
 import { type Proc, type ProcUse, type Resources, SLEEP_AFTER, type Tab } from '../shared/types.ts'
 import { scanArtifacts } from './artifacts.ts'
-import { changed, findTab, findWs, log, ports, procs, projectConfig, rt, rtOf, run, sessions, spawnTab, state } from './core.ts'
+import { changed, findTab, findWs, log, ports, procs, projectConfig, queued, restoreNow, rt, rtOf, run, sessions, spawnTab, state } from './core.ts'
 import { syncBranches } from './pr.ts'
 import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
@@ -259,7 +259,7 @@ export async function resources(): Promise<Resources> {
 // (it frees what it holds, and a long one grows), its screen stays, and a look (attach), a key or a message resumes
 // its chat (wake). Not one with a queue or a usage limit, without a chat to resume, on an SSH host, in a workspace
 // whose PR feedback goes to it (autoFix…), nor one with a port listening under it (a dev server it started).
-// ponytail: in memory; a daemon restart resumes every tab, asleep or not
+// ponytail: in memory; a daemon restart resumes every tab, asleep or not, in turn (core.ts restoreAll)
 export const asleep = new Set<string>()
 export const isLive = (t: Tab) => asleep.has(t.id) || !!(sessions.get(t.id) && !sessions.get(t.id)!.exited)
 // why a tab can't sleep even when asked: a chat it can resume, here, idle with nothing waiting for it
@@ -313,9 +313,12 @@ export function sleepNow(id: string) {
 // then delivers what was sent meanwhile. Its unread ● stays
 export function wake(id: string) {
   const tab = state.tabs.find(t => t.id === id)
-  if (!tab || !asleep.has(id) || !sessions.has(id)) return false // no session: the daemon dropped it (shutdown)
+  // no session: a restart's, not started yet (core's queue: a shell's key or message goes straight in), else the
+  // daemon dropped it (shutdown)
+  if (!tab || !asleep.has(id) || !(sessions.has(id) || queued.has(id))) return false
   const done = rtOf(id).done
-  spawnTab(tab, { resume: true })
+  if (!queued.has(id)) spawnTab(tab, { resume: true })
+  else if (!restoreNow(id)) return false
   Object.assign(rtOf(id), { status: 'running', done })
   changed()
   return true

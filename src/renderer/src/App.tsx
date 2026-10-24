@@ -2,6 +2,7 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEff
 import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
+import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -1652,8 +1653,13 @@ export function App() {
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey)), [shotKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
   useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto)), [updateAuto])
-  // a version a scheduled check found, once each (main's update.json): its notes and Download are in Settings
-  useEffect(() => bridge?.onUpdate?.(s => void (s.found && s.latest && toast(`Laki ${s.latest.version} is out`, () => setDialog({ section: 'general', spot: 'Updates' }), "See what's new"))), [])
+  // main's update.ts: a newer release stays in the status bar until you update (every check says so, a restart too);
+  // a version a scheduled check found also toasts, once each (main's update.json). Its notes and Download: Settings
+  const [upd, setUpd] = useState<UpdateState | null>(null)
+  useEffect(() => {
+    void bridge?.update?.('state').then(x => setUpd(s => s ?? x)) // an event that came first is newer
+    return bridge?.onUpdate?.(s => (setUpd(s), void (s.found && s.latest && toast(`Laki ${s.latest.version} is out`, () => setDialog({ section: 'general', spot: 'Updates' }), "See what's new"))))
+  }, [])
   // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
   const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)
@@ -2978,7 +2984,7 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -4103,6 +4109,12 @@ export function App() {
             </button>
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
+          {upd?.latest && ( // a newer release: here until you update (Settings › General › Updates: its notes, Update)
+            <button className={`sb-update ${upd.status === 'ready' ? 'ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
+              <Icon name="download" size={11} />
+              {upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
+            </button>
+          )}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
           {!achKept.off && (
             <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>

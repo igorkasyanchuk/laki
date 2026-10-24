@@ -26,7 +26,8 @@
   --find-active: #ff8a00;
   --radius: 6px;
   --mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, monospace;
-  --ui-font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --ui-default: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; /* SF Pro on a Mac, Inter elsewhere */
+  --ui-font: var(--ui-default);
   --tc-red: #f7768e;
   --tc-orange: #ff9e64;
   --tc-yellow: #e0af68;
@@ -46,6 +47,7 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+::placeholder { color: var(--muted); opacity: 1; } /* a hint, readable on every theme (the browser's grey isn't on some) */
 body { background: var(--app-bg, var(--bg)); color: var(--fg); font: 13px/1.4 var(--ui-font); overflow: hidden; -webkit-font-smoothing: antialiased; }
 /* Sidebar see-through, and glass (applyTheme): the window's blur under the sidebar and the rail, the window's background (glass: its glow) under the main area only */
 html.side-clear body { background: transparent; }
@@ -2451,6 +2453,9 @@ html.picking, html.picking * { cursor: crosshair !important; }
 @media (hover: none) { .ach-hide.ib { opacity: 1; } } /* a phone: no hover to show it */
 .status .sb-trophy { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 2px; border: none; background: none; color: inherit; line-height: 20px; }
 .status .sb-trophy:hover, .status .sb-trophy.on { color: var(--fg); background: none; }
+.status .sb-update { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 7px; border: none; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font: 500 11px/18px var(--ui-font); min-height: 18px; } /* a newer release: until you update */
+.status .sb-update:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.status .sb-update.ready { background: var(--accent); color: var(--accent-fg); }
 .ach-toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 31; /* over a page (30) */ display: flex; align-items: center; gap: 10px; max-width: min(480px, calc(100vw - 32px)); padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); border-radius: 999px; background: var(--panel); color: var(--fg); font: inherit; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); cursor: pointer; animation: ach-in 0.25s ease-out; }
 .ach-toast.up { bottom: 84px; } /* over a toast shown with it */
 .ach-toast > svg { flex: none; color: var(--tc-yellow); }

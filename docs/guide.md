@@ -1523,7 +1523,7 @@ lit for a moment.
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
   button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
-  from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
+  from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Inter, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
@@ -2025,9 +2025,9 @@ sidebar for (youtube-nocookie.com).
 
 ## Updating
 
-Laki checks for a new version at launch and once a day (Settings › General › *Updates*, where *Check for updates*
-turns it off; the app menu's *Check for Updates…* asks now). A new version says so once, in a toast; nothing
-downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
+Laki checks for a new version at launch and every 4 hours (Settings › General › *Updates*, where *Check for updates*
+turns it off; the app menu's *Check for Updates…* asks now). A new version shows in the status bar (*Update to x.y*,
+a click opens Settings › Updates) until you update, and says so once in a toast; nothing downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
 signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
 your own: the release's page). Pre-releases are never offered.
 
@@ -2039,7 +2039,8 @@ the code, rebuild (`npm run pack`) and reopen the app.
 Either way, the running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
-come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`).
+come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`), a
+few seconds apart so the Mac stays quick; the rest wait dimmed (*asleep*), and the workspace you open starts at once.
 Shells come back in the folder they were in. An agent you started in one comes back too: claude resumes its own chat,
 codex its last one in that folder. Any other program that was running (a dev server, a watcher) is typed back at the
 prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was

@@ -30,7 +30,7 @@ type Bridge = {
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
   update?(op: 'state' | 'check' | 'download' | 'install'): Promise<UpdateState | null> // main's update.ts
-  updateAuto?(on: boolean): void // Settings' Check for updates: at launch, then daily
+  updateAuto?(on: boolean): void // Settings' Check for updates: at launch, then every 4 hours
   onUpdate?(cb: (s: UpdateState) => void): () => void // its state as it changes; the function stops listening
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)

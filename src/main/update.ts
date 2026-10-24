@@ -1,5 +1,5 @@
 // The app's updates (Settings › General › Updates, the app menu's Check for Updates…): the releases repo's newest
-// release, at launch and daily while Settings says so, or when asked. Nothing downloads until you click: on a
+// release, at launch and every 4 hours while Settings says so, or when asked. Nothing downloads until you click: on a
 // Developer ID signed Mac through Electron's autoUpdater (Squirrel.Mac, the release's update-mac-<arch>.json), then
 // Restart to update; anywhere else Download is the release's page. The daemon outlives it: its yellow bar, as before.
 // ponytail: no Linux self-update (an AppImage updater is a new dependency), no beta channel
@@ -89,7 +89,7 @@ export function updater(send: (s: UpdateState) => void) {
   }
 
   // Settings' Check for updates: at launch (once, a little after), then every UPDATE_EVERY; off stops both. The
-  // same again (a window's reload) keeps the day's timer
+  // same again (a window's reload) keeps the timer
   function auto(on: boolean) {
     if (on === autoOn) return
     autoOn = on

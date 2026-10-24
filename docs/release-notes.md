@@ -2,6 +2,15 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- A newer Laki shows in the status bar (*Update to x.y*) until you update, after a restart too; Laki checks every 4
+  hours instead of once a day.
+- The interface is SF Pro by default, whatever the theme: a theme's own fonts (typewriter, chalk, pixel…) only with
+  Settings › Appearance › Interface font › *The theme's own*. Placeholders read on every theme.
+- After a daemon restart (an update) agents come back a few seconds apart instead of all at once; the workspace you
+  open comes back first.
+
 ## 0.26.0 · Oct 24, 2026
 
 - A project's or group's ＋ (and its ⋯) also opens a *Terminal*: a shell in the project's folder, no agent, no

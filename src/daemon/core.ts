@@ -521,7 +521,7 @@ export function view(): View {
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
     projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
@@ -599,8 +599,11 @@ export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focus
   const hidden = c.view?.shown === false
   const wsWas = c.view && (c.view.ws === undefined ? state.tabs.find(t => t.id === c.view?.tab)?.workspace : c.view.ws)
   c.view = v
+  const here = v.ws === undefined ? state.tabs.find(t => t.id === v.tab)?.workspace : v.ws
+  // a restart's tabs (restoreAll) in the workspace a window shows: now, ahead of the queue
+  if (here && v.shown !== false && queued.size) for (const t of tabsOf(here)) restoreNow(t.id)
   if (hidden && v.shown !== false) widgetTick() // the window's back: what fell due meanwhile
-  else if (v.shown !== false && (v.ws === undefined ? state.tabs.find(t => t.id === v.tab)?.workspace : v.ws) !== wsWas) widgetTick(undefined, 'select') // another workspace: its extensions' instances, if stale
+  else if (v.shown !== false && here !== wsWas) widgetTick(undefined, 'select') // another workspace: its extensions' instances, if stale
   if (!v.focused) return
   for (const id of shown(v)) {
     const r = rt.get(id)
@@ -2014,26 +2017,50 @@ export async function wsFork(ref: string) {
   return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, perm: agent?.perm, fast: agent?.fast, fork: src.fork })
 }
 
-// restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat, shells come
-// back with what they ran (keepShells), a Run tab that was running starts again.
+// restoreAll brings back every tab of every live workspace after a daemon restart: agents resume their chat, shells come
+// back with what they ran (keepShells), a Run tab that was running starts again. Not all at once (twenty claudes
+// starting together stall the Mac): each waits in `queued`, as asleep (the view's dimmed tab), and starts in turn,
+// RESTORE_GAP apart (a shell a tenth of it); one a look (attach), a key or a message wants (wake), or in a workspace a
+// window shows (setView), starts at once. LAKI_RESTORE_GAP 0: all at once (tests')
+const RESTORE_GAP = Number(process.env.LAKI_RESTORE_GAP ?? 2500)
+export const queued = new Set<string>()
 export function restoreAll() {
   for (const f of readdirSync(runDir)) if (/\.(setup|go|err)$/.test(f)) rmSync(join(runDir, f), { force: true }) // hostTab's too
   state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell' || (t.kind === 'dev' && t.again))
-  for (const ws of state.workspaces) {
-    if (ws.archived) continue
-    for (const t of tabsOf(ws.id)) {
-      const a = t.again
-      t.again = undefined
-      try {
-        const s = spawnTab(t, { resume: true, cwd: a?.cwd })
-        restoredAt.set(t.id, Date.now())
-        if (a?.cmd) bringBack(s, a.cmd, !!a.run)
-      } catch (e) {
-        console.error(`restore ${t.id}:`, (e as Error).message)
-      }
-    }
-  }
+  for (const ws of state.workspaces) if (!ws.archived) for (const t of tabsOf(ws.id)) queued.add(t.id), asleep.add(t.id)
+  if (!RESTORE_GAP) for (const id of [...queued]) restoreNow(id)
   save()
+  nextRestore()
+}
+function nextRestore() {
+  const t = state.tabs.find(x => queued.has(x.id)) // the oldest first
+  if (!t) return
+  restoreNow(t.id)
+  setTimeout(nextRestore, tracked(t) ? RESTORE_GAP : RESTORE_GAP / 10).unref()
+}
+// a queued tab now (its `again` kept until then: a shutdown meanwhile keeps it for the next start). An agent's counts
+// as woken (wake: what's sent waits for its turn)
+export function restoreNow(id: string) {
+  if (!queued.delete(id)) return false
+  asleep.delete(id)
+  const t = state.tabs.find(x => x.id === id)
+  const ws = t && state.workspaces.find(w => w.id === t.workspace)
+  if (!t || !ws) return false
+  const a = t.again
+  t.again = undefined // archived meanwhile too: what it ran then isn't for a later start
+  if (a) save()
+  if (ws.archived || sessions.has(id)) return changed(), false
+  let ok = true
+  try {
+    const s = spawnTab(t, { resume: true, cwd: a?.cwd })
+    restoredAt.set(t.id, Date.now())
+    if (a?.cmd) bringBack(s, a.cmd, !!a.run)
+  } catch (e) {
+    ok = false // shown as ended: Enter tries again
+    console.error(`restore ${t.id}:`, (e as Error).message)
+  }
+  changed()
+  return ok && tracked(t)
 }
 
 // ---------- shells across restarts

@@ -1129,8 +1129,10 @@ export function applyTheme(p: string | Paint = '') {
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
   seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
+  // the interface font: unset, SF Pro (Inter off a Mac) whatever the theme; 'theme': its look's own (look.css' last rules)
   const font = o.uiFont?.trim()
-  if (font) st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
+  root.classList.toggle('theme-font', font === 'theme')
+  if (font && font !== 'theme') st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
   // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
   // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); pills and circles stay
   if (o.accent && /^#[\da-f]{6}$/i.test(o.accent)) st.setProperty('--accent', o.accent), st.setProperty('--accent-fg', onAccent(o.accent))
