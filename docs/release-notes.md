@@ -8,6 +8,8 @@ version it builds, with the date. -->
   open a tunnel to Laki's own port.
 - The Homebrew cask quits the app before an uninstall (the daemon and your agents keep running: *Quit Laki
   Completely* first stops them) and lets Laki update itself. About links to laki.sh.
+- About › *Open-source licenses*: the license of every package and font the app carries. Mermaid diagrams' sanitizer
+  (DOMPurify) is patched.
 
 ## 0.27.0 · Oct 24, 2026
 
