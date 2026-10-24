@@ -262,14 +262,14 @@ export const termLook = (s: AppSettings) => ({
 })
 
 const SAMPLE = [
-  '\x1b[32m~/projects/app\x1b[0m \x1b[35mmain\x1b[0m ❯ npm run dev -- --port $PORT',
+  '\x1b[32m~/code/app\x1b[0m \x1b[35mmain\x1b[0m ❯ npm run dev -- --port $PORT',
   '\x1b[2m→ ready on http://localhost:3000 in 412 ms\x1b[0m',
-  '\x1b[32m~/projects/app\x1b[0m ❯ npm test',
+  '\x1b[32m~/code/app\x1b[0m ❯ npm test',
   '\x1b[32m✓\x1b[0m 14 tests passed · 0.24s',
-  '\x1b[32m~/projects/app\x1b[0m ❯ git status --short',
+  '\x1b[32m~/code/app\x1b[0m ❯ git status --short',
   '\x1b[33m M\x1b[0m src/settings.tsx   \x1b[31m D\x1b[0m old.ts   \x1b[32m??\x1b[0m panel.tsx',
   '\x1b[1mbold\x1b[0m \x1b[3mitalic\x1b[0m \x1b[4munderline\x1b[0m \x1b[2mdim\x1b[0m  => !== >= <= -> ||',
-  '\x1b[32m~/projects/app\x1b[0m ❯ ',
+  '\x1b[32m~/code/app\x1b[0m ❯ ',
 ].join('\r\n')
 
 // a terminal drawing SAMPLE with the settings; click it to see the cursor as in a focused tab

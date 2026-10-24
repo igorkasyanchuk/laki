@@ -33,10 +33,10 @@ test("a prompt's attachments: each path on a line after the text, quoted when it
 })
 
 test('short paths for the status bar', () => {
-  assert.equal(shortPath('/Users/igor/projects/app'), '~/projects/app')
-  assert.equal(shortPath('/Users/igor/.laki/worktrees/app/fix-login'), '~/…/app/fix-login')
+  assert.equal(shortPath('/Users/me/code/app'), '~/code/app')
+  assert.equal(shortPath('/Users/me/.laki/worktrees/app/fix-login'), '~/…/app/fix-login')
   assert.equal(shortPath('/opt/src/a/b/c'), '/…/b/c')
-  assert.equal(shortPath('/Users/igor'), '~')
+  assert.equal(shortPath('/Users/me'), '~')
 })
 
 test('tunnel emails: whole domains by *@, @ or a bare name; what the daemons take', async () => {
