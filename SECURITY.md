@@ -58,8 +58,9 @@ Out of scope:
 - An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
   phone webhook or extension folders, nor a project's scripts, env, trust or memory list), and ask Laki AI, which acts
   as you.
-- Releases are signed with a Developer ID and notarized. A build from source is ad-hoc signed: macOS asks you to
-  allow it once (Privacy & Security › Open Anyway).
+- Releases (since 0.25.0) are signed with a Developer ID, with the hardened runtime, and notarized. A build from
+  source (`npm run pack`) is ad-hoc signed: macOS asks you to allow it once (Privacy & Security › Open Anyway; the
+  guide's [Install](docs/guide.md#install)).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
 - A public tunnel (Expose to the world, *anyone with the link*) comes back after Laki restarts or updates, at a new
   address, until its time runs out or you stop it. A permanent tunnel (your own domain) has no lock of Laki's: protect
