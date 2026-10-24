@@ -268,6 +268,25 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
       ]
     : []
   const first = steps.findIndex(x => !x.ok) // the next step: the one that shows its command
+  const copy = (id: string, text: string) => navigator.clipboard.writeText(text).then(() => (setCopied(id), setTimeout(() => setCopied(''), 2000)), e => setErr(String(e?.message ?? e)))
+  const code = (id: string, text: string) => (
+    <div className="tunnel-code sim-fix">
+      <code>{text}</code>
+      <IconButton icon={copied === id ? 'check' : 'copy'} title={copied === id ? 'Copied' : 'Copy'} onClick={() => copy(id, text)} />
+    </div>
+  )
+  const eg = DOMAIN_OK.test(domain) ? domain : 'example.com'
+  // how to set one up, once: what the checks above look for, then using it
+  const howto: [string, string, string?][] = [
+    ['A domain on Cloudflare', "Add your domain to Cloudflare (the free plan does) and move its nameservers there, as Cloudflare's dashboard says: the records Laki adds live in its DNS."],
+    ['Install cloudflared', "Homebrew, or Cloudflare's download.", 'brew install cloudflared'],
+    ['Sign in', 'Your browser opens: pick that domain. Its certificate goes to ~/.cloudflared/cert.pem.', 'cloudflared tunnel login'],
+    ['Make the tunnel', `Once: its credentials go to ~/.cloudflared/<id>.json. On a second Mac, copy that file over instead of making another.`, `cloudflared tunnel create ${name || 'laki'}`],
+    ['Tell Laki', 'Its name and the domain above, until every check is green.'],
+    ['Expose a port', `The globe beside a port in the status bar › Address › Permanent, a name (shop is shop.${eg}) › Expose permanently. It stays until you stop it, Laki's restarts and your Mac's too.`],
+    ['Keep it to you (optional)', "Cloudflare's dashboard › Zero Trust › Access › Applications › Add an application › Self-hosted: the address, and a policy that allows your email. Visitors sign in first."],
+    ["When you're done with a name", `Stop leaves its DNS record, so the name stays yours: delete it in the dashboard's DNS records. A name is one word under the domain (shop.${eg}, not a.shop.${eg}): Cloudflare's free certificate covers only that.`],
+  ]
   return (
     <>
       <h2>Tunnels</h2>
@@ -298,7 +317,7 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
               {!x.ok && i === first && x.fix && (
                 <div className="tunnel-code sim-fix">
                   <code>{x.fix}</code>
-                  {!x.fix.startsWith('~') && <IconButton icon={copied === x.id ? 'check' : 'copy'} title={copied === x.id ? 'Copied' : 'Copy'} onClick={() => navigator.clipboard.writeText(x.fix!).then(() => (setCopied(x.id), setTimeout(() => setCopied(''), 2000)), e => setErr(String(e?.message ?? e)))} />}
+                  {!x.fix.startsWith('~') && <IconButton icon={copied === x.id ? 'check' : 'copy'} title={copied === x.id ? 'Copied' : 'Copy'} onClick={() => copy(x.id, x.fix!)} />}
                 </div>
               )}
             </div>
@@ -308,6 +327,20 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
           Laki adds a DNS record for each name (never over one that&rsquo;s there) and runs one cloudflared for all of them. A permanent address is public, and certificate logs
           make such names easy to find: protect it with Cloudflare Access in your dashboard (Zero Trust › Access) when it shouldn&rsquo;t be open.
         </p>
+      </Group>
+      <Group title="How to set one up" hint={c?.ok ? 'Done: every check above is green' : 'Once, about ten minutes, with a domain of yours'}>
+        <ol className="tunnel-steps">
+          {howto.map(([t, says, cmd], i) => (
+            <li key={t}>
+              <span className="ext-step-n">{i + 1}</span>
+              <div>
+                <b>{t}</b>
+                <p className="muted small">{says}</p>
+                {cmd && code(`how${i}`, cmd)}
+              </div>
+            </li>
+          ))}
+        </ol>
       </Group>
     </>
   )

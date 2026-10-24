@@ -2497,6 +2497,11 @@ html.picking, html.picking * { cursor: crosshair !important; }
   .ext-chat { flex: none; height: 560px; border-left: none; border-top: 1px solid var(--line); }
 }
 .narrow .ext-steps { grid-template-columns: minmax(0, 1fr); }
+/* Settings › Tunnels' setup: numbered, a command each where there is one */
+.tunnel-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.tunnel-steps > li { display: flex; gap: 10px; }
+.tunnel-steps > li > div { flex: 1; min-width: 0; }
+.tunnel-steps p { margin: 2px 0 0; }
 /* the extension studio (WidgetStudio.tsx): the chat left, the preview and the inspector right */
 .page-body > .studio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); }
 .studio-chat { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--side); }
