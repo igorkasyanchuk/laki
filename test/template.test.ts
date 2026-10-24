@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -354,4 +354,29 @@ test("the Words sidebar style: a row's one fact, the first that applies; its PR 
   assert.equal(rowFact({ ...w, pr: pr({ state: 'MERGED', checks: 'fail' }) }, []).kind, 'branch') // a merged PR's checks aren't news
   assert.equal(rowFact(w, [tab({ kind: 'shell', status: 'waiting' })]).kind, 'branch') // a shell isn't an agent asking
   assert.deepEqual([prPill(pr({})), prPill(pr({ checks: 'fail' })), prPill(pr({ conflict: true })), prPill(pr({ draft: true })), prPill(pr({ state: 'MERGED' })), prPill(pr({ state: 'CLOSED' }))].map(p => p.text), ['#42 ✓', '#42 ✕', '#42 ⚠', '#42 draft', '#42 merged', '#42 closed'])
+})
+
+test("the palette's groups: suggestions, needs you, recent, then workspaces, tabs, actions; typing keeps the headings", () => {
+  const items = [
+    { label: 'Settings', kind: 'action' as const },
+    { label: 'cart', kind: 'ws' as const, hint: 'CI failing' },
+    { label: 'Fix CI: send #42', kind: 'for' as const },
+    { label: 'cart / claude', kind: 'tab' as const },
+    { label: 'docs is done', kind: 'needs' as const },
+    { label: 'dark-mode', kind: 'ws' as const },
+    { label: 'Help' }, // no kind: an action
+  ]
+  const heads = (g: { head: string; items: { label: string }[] }[]) => g.map(x => `${x.head}: ${x.items.map(i => i.label).join(', ')}`)
+  assert.deepEqual(heads(paletteGroups(items, '', ['Help', 'Fix CI: send #42'], 'cart')), [
+    'For cart: Fix CI: send #42',
+    'Needs you: docs is done',
+    'Recent: Help', // a suggestion stays in its own group
+    'Workspaces: cart, dark-mode',
+    'Tabs: cart / claude',
+    'Actions: Settings',
+  ])
+  // typing: the suggestion first when it matches, then each kind's group, its best match's first
+  assert.deepEqual(heads(paletteGroups(items, 'cart', [])), ['Workspaces: cart', 'Tabs: cart / claude'])
+  assert.deepEqual(heads(paletteGroups(items, 'fix', []))[0], 'For this workspace: Fix CI: send #42')
+  assert.deepEqual(paletteGroups(items, 'zzz', []), [])
 })

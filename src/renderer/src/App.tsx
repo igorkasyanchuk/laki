@@ -2544,11 +2544,29 @@ export function App() {
   const palette: PaletteItem[] = useMemo(() => {
     const items: PaletteItem[] = []
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
-    if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') }) // first: it opens a search of its own
-    for (const w of order) items.push({ label: wsName(w), hint: [w.branch || 'folder', prNum(w), 'workspace'].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, run: () => setWsId(w.id) })
+    // For <workspace>: its next step, only the ones that apply
+    if (ws) {
+      const wt = view!.tabs.filter(t => t.workspace === ws.id)
+      const f = (x: Action) => items.push({ ...x, kind: 'for' })
+      const asks = wt.find(t => t.status === 'waiting')
+      if (asks) f({ label: `Answer ${asks.name}: ${asks.ask?.question || asks.ask?.options.map(o => o.label).join(' / ') || 'it waits for you'}`, icon: 'bell', run: () => selectTab(asks) })
+      const pr = ws.pr?.state === 'OPEN' ? ws.pr : undefined
+      if (pr?.checks === 'fail') f({ label: `Fix CI: send #${pr.number}'s failing checks to the agent`, icon: 'ciFail', run: () => void prFix(ws, 'ci') })
+      if (pr?.conflict) f({ label: `Resolve conflicts with ${pr.base ?? 'the base'}`, icon: 'conflict', run: () => void prFix(ws, 'conflict') })
+      if (pr && !pr.draft && pr.checks === 'pass' && !pr.conflict && pr.ready !== false && allows(ws, 'merge')) f({ label: `Merge #${pr.number}…`, icon: 'pr', run: () => prAct(ws, 'merge') })
+      if (ws.kind === 'worktree' && !ws.pr && (ws.stat ? ws.stat.files > 0 || ws.stat.dirty > 0 : wt.some(t => t.kind === 'agent' && t.last))) f({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
+      if (git && wt.some(t => t.kind === 'agent' && t.done && t.status === 'idle')) f({ label: 'Review changes: the agent is done', icon: 'changes', run: () => showPanel('changes') })
+    }
+    // Needs you: every other tab of needsYou, in its order
+    for (const t of needsSorted(needing)) {
+      const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
+      if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
+    }
+    if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
+    for (const w of order) items.push({ kind: 'ws', more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
-      if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
+      if (w) items.push({ kind: 'tab', more: () => tabMenu([t.id]), label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
     }
     a({ label: 'Next tab that needs you', icon: 'bell', hint: kh('next'), run: nextNeed })
     for (const { w, m } of extMenus('palette', ws)) a({ label: `${w.name}: ${m.title}`, icon: 'panel', hint: m.key ? keyText(m.key) : 'extension', run: () => void extRun(w, m, hereCtx()) })
@@ -4224,7 +4242,7 @@ export function App() {
         />
       )}
       {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
-      {dialog === 'palette' && <Palette items={palette} onClose={() => setDialog(null)} />}
+      {dialog === 'palette' && <Palette items={palette} forName={ws && wsName(ws)} onClose={() => setDialog(null)} />}
       {dialog === 'ship' && ws && (
         <Prompt
           title={`Ship ${ws.id}`}

@@ -835,7 +835,12 @@ opens over the others to draw on it: *Crop* (C), *Arrow* (A), *Text* (T: click, 
 do with it. *Add to prompt* (⌘⏎) opens the new-workspace page with the picture and that note in the prompt: pick the
 project and agent, ⌘⏎. Esc drops it. macOS asks once for Screen Recording for Laki.
 
-**⌘K palette:** jump to any workspace or tab, or run any action.
+**⌘K palette:** jump to any workspace or tab, or run any action. With nothing typed it starts with what the
+workspace in front needs (*For <workspace>*: answer its agent, *Fix CI*, *Resolve conflicts*, *Merge #n* when green,
+*Ship* when it has changes and no PR, *Review changes* when its agent is done), then *Needs you* (every other tab
+waiting or done), *Recent*, *Workspaces* (each with what it's at, in words), *Tabs* and *Actions*. Typing matches
+everything, under the same headings. ⇥ on a workspace or a tab lists its own actions (its ⋯ menu) right there, filtered
+as you type; Esc or ⇧⇥ goes back.
 
 **Status**
 

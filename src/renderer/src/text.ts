@@ -457,3 +457,49 @@ export function prPill(pr: PR): { text: string; tone: RowTone | 'merged' } {
   if (pr.checks === 'pass') return { text: `${n} ✓`, tone: 'done' }
   return { text: n, tone: pr.checks === 'pending' ? 'running' : 'muted' }
 }
+
+// fuzzy: the query's characters in order; contiguous runs and word starts score higher
+export function fuzzy(q: string, s: string): number {
+  q = q.toLowerCase()
+  s = s.toLowerCase()
+  if (!q) return 1
+  let score = 0
+  let j = 0
+  let prev = -2
+  for (let i = 0; i < s.length && j < q.length; i++) {
+    if (s[i] !== q[j]) continue
+    score += 1 + (i === prev + 1 ? 2 : 0) + (i === 0 || /[\s/\-_.]/.test(s[i - 1]) ? 3 : 0)
+    prev = i
+    j++
+  }
+  return j === q.length ? score - s.length * 0.01 : 0
+}
+
+// the palette's groups (⌘K), each under a heading: with nothing typed, what the focused workspace needs next (for),
+// every other tab that needs you, the last few picked, then workspaces, tabs and actions as given; typing matches
+// everything as before (fuzzy over the label and hint, a recent pick a little ahead), the suggestions first when they
+// match, then each kind under its heading, the best match's group first
+export type PalKind = 'for' | 'needs' | 'ws' | 'tab' | 'action'
+const PAL_HEADS: Record<Exclude<PalKind, 'for'>, string> = { needs: 'Needs you', ws: 'Workspaces', tab: 'Tabs', action: 'Actions' }
+export const PAL_RECENT = 30 // laki.recent's length
+export function paletteGroups<T extends { label: string; hint?: string; kind?: PalKind }>(items: T[], q: string, recent: string[], forName = 'this workspace', recentMax = 8): { head: string; items: T[] }[] {
+  const kind = (x: T): PalKind => x.kind ?? 'action'
+  const head = (k: PalKind) => (k === 'for' ? `For ${forName}` : PAL_HEADS[k])
+  const of = (k: PalKind, xs: T[]) => ({ head: head(k), items: xs.filter(x => kind(x) === k) })
+  const top = (x: T) => kind(x) === 'for' || kind(x) === 'needs'
+  if (!q.trim()) {
+    const rec = recent.flatMap(l => items.filter(x => x.label === l && !top(x)).slice(0, 1)).slice(0, recentMax)
+    const rest = items.filter(x => !rec.includes(x))
+    return [of('for', items), of('needs', items), { head: 'Recent', items: rec }, of('ws', rest), of('tab', rest), of('action', rest)].filter(g => g.items.length)
+  }
+  const score = new Map<T, number>()
+  for (const x of items) {
+    const all = `${x.label} ${x.hint ?? ''}`
+    const s = fuzzy(q, all) && fuzzy(q, x.label) + 0.5 * fuzzy(q, all)
+    const r = recent.indexOf(x.label)
+    if (s > 0) score.set(x, s + (r < 0 ? 0 : PAL_RECENT - r) * 0.1) // a recent one wins a close call, not a much better match
+  }
+  const hits = [...score.keys()].sort((a, b) => score.get(b)! - score.get(a)!)
+  const rest = (['ws', 'tab', 'action'] as const).map(k => of(k, hits)).filter(g => g.items.length).sort((a, b) => score.get(b.items[0])! - score.get(a.items[0])!)
+  return [of('for', hits), of('needs', hits), ...rest].filter(g => g.items.length)
+}

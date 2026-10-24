@@ -7,7 +7,7 @@ import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Img, type Inserted, type Inserts, PromptInput, withImages } from './PromptInput'
-import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
+import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
 import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
@@ -1194,27 +1194,11 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
   )
 }
 
-export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void } // mark: before the hint (its project's)
+export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void; kind?: PalKind; more?: () => MenuItem[] } // mark: before the hint (its project's); kind: its group (text.ts paletteGroups; none: an action); more: ⇥'s actions (its ⋯ menu)
 
-// fuzzy: the query's characters in order; contiguous runs and word starts score higher
-export function fuzzy(q: string, s: string): number {
-  q = q.toLowerCase()
-  s = s.toLowerCase()
-  if (!q) return 1
-  let score = 0
-  let j = 0
-  let prev = -2
-  for (let i = 0; i < s.length && j < q.length; i++) {
-    if (s[i] !== q[j]) continue
-    score += 1 + (i === prev + 1 ? 2 : 0) + (i === 0 || /[\s/\-_.]/.test(s[i - 1]) ? 3 : 0)
-    prev = i
-    j++
-  }
-  return j === q.length ? score - s.length * 0.01 : 0
-}
+export { fuzzy } from './text' // the palette's matching
 
 // what the palette ran last (labels, newest first; localStorage laki.recent): first in it, and ahead when they match
-const RECENT = 30
 const recent = (): string[] => {
   try {
     return JSON.parse(localStorage.getItem('laki.recent') ?? '[]')
@@ -1223,36 +1207,69 @@ const recent = (): string[] => {
   }
 }
 
-export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () => void }) {
+// ⌘K: groups under headings (text.ts paletteGroups). ⇥ on a workspace or a tab shows its own actions in here (its ⋯
+// menu, the same items), filtered as you type; Esc or ⇧⇥ goes back, a submenu goes in with ⇥ or ⏎
+type Step = { title: string; items: MenuItem[]; q: string; i: number } // an actions list, and where the one under it was
+const acts = (xs: MenuItem[]) => xs.filter((m): m is Extract<MenuItem, { label: string }> => !!m && 'label' in m)
+export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onClose: () => void; forName?: string }) {
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
+  const [steps, setSteps] = useState<Step[]>([])
   const ran = useMemo(recent, [])
-  const list = useMemo(() => {
-    const rank = (x: PaletteItem) => (r => (r < 0 ? 0 : RECENT - r))(ran.indexOf(x.label)) // 30 for the last one, 0: never
-    return items
-      .map(x => ({ x, r: rank(x), s: fuzzy(q, `${x.label} ${x.hint ?? ''}`) && fuzzy(q, x.label) + 0.5 * fuzzy(q, `${x.label} ${x.hint ?? ''}`) }))
-      .filter(r => r.s > 0)
-      .map(r => ({ ...r, s: r.s + r.r * 0.1 })) // a recent one wins a close call, not a much better match
-      .sort((a, b) => (q ? b.s - a.s : b.r - a.r))
-      .map(r => r.x)
-  }, [items, q, ran])
+  const groups = useMemo(() => paletteGroups(items, q, ran, forName), [items, q, ran, forName])
+  const step = steps.at(-1)
+  const shown = step ? acts(step.items).filter(m => fuzzy(q, `${m.label} ${m.sub ?? ''}`) > 0) : []
+  const list: (PaletteItem | (typeof shown)[number])[] = step ? shown : groups.flatMap(g => g.items)
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => void ref.current?.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }), [i])
+  useEffect(() => void ref.current?.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }), [i, steps.length])
   const pick = (x?: PaletteItem) => {
     if (!x) return
     try {
-      localStorage.setItem('laki.recent', JSON.stringify([x.label, ...recent().filter(l => l !== x.label)].slice(0, RECENT)))
+      localStorage.setItem('laki.recent', JSON.stringify([x.label, ...recent().filter(l => l !== x.label)].slice(0, PAL_RECENT)))
     } catch {}
     onClose()
     x.run()
   }
+  const into = (title: string, xs: MenuItem[]) => (setSteps(s => [...s, { title, items: xs, q, i }]), setQ(''), setI(0))
+  const back = () => step && (setSteps(s => s.slice(0, -1)), setQ(step.q), setI(step.i))
+  const runAct = (m?: (typeof shown)[number], deeper = false) => {
+    if (!m) return
+    if (m.items) return into(m.label, m.items)
+    if (deeper) return
+    onClose()
+    m.run()
+  }
+  const row = (x: PaletteItem | (typeof shown)[number], n: number) => {
+    const p = x as PaletteItem
+    const m = x as (typeof shown)[number]
+    return (
+      <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''} ${step && m.danger ? 'danger' : ''}`} onMouseMove={() => setI(n)} onClick={() => (step ? runAct(m) : pick(p))}>
+        <span className="pg">{x.icon ? <Icon name={x.icon} /> : !step && p.glyph && <Glyph s={p.glyph} />}</span>
+        <span className="pl">{x.label}</span>
+        <span className="ph muted">
+          {x.mark}
+          {step ? (m.items ? '›' : m.sub ?? (m.hint === ON ? '✓' : m.hint)) : p.hint}
+        </span>
+        {!step && p.more && n === i && <span className="palette-tab">⇥</span>}
+      </div>
+    )
+  }
+  let n = 0
   return (
     <Modal title="Go to" onClose={onClose} wide loose>
+      {step && (
+        <div className="palette-crumb">
+          <button className="ghost" onClick={back} aria-label="Back">
+            <Icon name="chevronLeft" size={12} />
+          </button>
+          {steps.map(s => s.title).join(' › ')}
+        </div>
+      )}
       <input
         className="palette-input"
         value={q}
         autoFocus
-        placeholder="Workspace, tab or action…"
+        placeholder={step ? `What to do with ${step.title}…` : 'Workspace, tab or action…'}
         onChange={e => {
           setQ(e.target.value)
           setI(0)
@@ -1260,24 +1277,26 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
         onKeyDown={e => {
           if (e.key === 'ArrowDown') setI(n => Math.min(n + 1, list.length - 1))
           else if (e.key === 'ArrowUp') setI(n => Math.max(n - 1, 0))
-          else if (e.key === 'Enter') pick(list[i])
+          else if (e.key === 'Enter') step ? runAct(list[i] as (typeof shown)[number]) : pick(list[i] as PaletteItem)
+          else if (e.key === 'Tab' && e.shiftKey) back()
+          else if (e.key === 'Tab') step ? runAct(list[i] as (typeof shown)[number], true) : (x => x?.more && into(x.label, x.more()))(list[i] as PaletteItem)
+          else if (e.key === 'Escape' && step) back()
           else return
           e.preventDefault()
         }}
       />
       <div className="palette-list" ref={ref}>
-        {list.map((x, n) => (
-          <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''}`} onMouseMove={() => setI(n)} onClick={() => pick(x)}>
-            <span className="pg">{x.icon ? <Icon name={x.icon} /> : x.glyph && <Glyph s={x.glyph} />}</span>
-            <span className="pl">{x.label}</span>
-            <span className="ph muted">
-              {x.mark}
-              {x.hint}
-            </span>
-          </div>
-        ))}
+        {step
+          ? shown.map(m => row(m, n++))
+          : groups.map(g => (
+              <div key={g.head} className="palette-group" role="group" aria-label={g.head}>
+                <div className="palette-head">{g.head}</div>
+                {g.items.map(x => row(x, n++))}
+              </div>
+            ))}
         {!list.length && <div className="muted pad">Nothing matches.</div>}
       </div>
+      <div className="palette-foot muted">{step ? '⏎ run · ⇧⇥ or esc back' : '⏎ open · ⇥ actions · esc close'}</div>
     </Modal>
   )
 }
