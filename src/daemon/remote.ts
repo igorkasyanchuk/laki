@@ -3,27 +3,40 @@
 
 import { spawn } from 'node:child_process'
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
-import { existsSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
 import { type Agent, AGENT_NAMES, type Remote, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
-import { broadcast, changed, dir, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, screen, settingsSet, state } from './core.ts'
+import { broadcast, changed, dir, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
 import { type Tail, tailOf } from './meters.ts'
 import { own } from './resources.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage } from './share.ts'
 
-// ---------- tunnels: a port exposed at a trycloudflare.com URL by cloudflared (Cloudflare Quick Tunnels).
-// With mails, only those addresses (or *@domain) get in, after a one-time code from Cloudflare Access.
-// They live in this process only: a daemon restart ends them.
+// ---------- tunnels: a port exposed by cloudflared. A quick one (Cloudflare Quick Tunnels) at a random
+// trycloudflare.com URL; with mails, only those addresses (or *@domain) get in, after a one-time code from Cloudflare
+// Access. A permanent one (host) at a hostname of your own named tunnel (settings.tunnel: Settings › Tunnels), until you
+// stop it. Both are kept in state.json (state.tunnels, keep) and come back after a daemon restart (tunnelsBack), and
+// cloudflared starts again when it ends on its own (AGAIN apart, then a minute each time): a quick one at a new address
+// (the `tunnel` event says so), a permanent one at its own
 
-type TunnelRun = Tunnel & { ws: string; cf: Cf }
+type TunnelRun = Tunnel & { ws: string; cf?: Cf; tries: number; was?: string; timer?: ReturnType<typeof setTimeout> } // cf: a quick one's cloudflared; was: its address before it went
 const tunnels = new Map<string, TunnelRun>() // by `<ws>:<port>`
 export const MAIL_VERSION = '2026.9.3' // the first cloudflared with --allowed-mail
 // a quick tunnel's name is random words with dashes: not api. (in cloudflared's errors) or login.
 const TUNNEL_URL = /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/
 const MAIL = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/ // an address, or *@domain: a whole domain
-export const tunnelsOf = (ws: string) => [...tunnels.values()].filter(t => t.ws === ws).map(({ port, url, mails, until }) => ({ port, url, mails, ...(until && { until }) }))
+const AGAIN = [2, 5, 15, 30, 60].map(s => s * 1000) // before cloudflared starts again, by how many times in a row
+export const tunnelsOf = (ws: string) => [...tunnels.values()].filter(t => t.ws === ws).map(({ port, url, mails, until, host, down }) => ({ port, url, mails, ...(until && { until }), ...(host && { host }), ...(down && { down }) }))
+const keyOf = (t: { ws: string; port: number }) => `${t.ws}:${t.port}`
+// state.json's copy: what tunnelsBack starts again
+function keep() {
+  const all = [...tunnels.values()].map(({ ws, port, mails, until, host, url, was }) => ({ ws, port, ...(mails?.length && { mails }), ...(until && { until }), ...(host && { host }), ...((url ?? was) && { url: url ?? was }) }))
+  if (all.length) state.tunnels = all
+  else delete state.tunnels
+  save()
+}
 // a < b, for x.y.z versions
 const older = (a: string, b: string) => {
   const [x, y] = [a, b].map(v => v.split('.').map(Number))
@@ -33,13 +46,14 @@ const older = (a: string, b: string) => {
 const cfVersion = () => run('cloudflared', ['--version'], { timeout: 10000 }).then(r => /\d+\.\d+\.\d+/.exec(r.stdout + r.stderr)?.[0] ?? '?', () => undefined)
 
 // is cloudflared installed (its version), and who to let in by default: the workspace's project says (expose:
-// only those; its settings, else .laki.json), else the popup offers the last list, or git's user.email
-export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: string; mails: string[]; expose?: string }> {
+// only those; its settings, else .laki.json), else the popup offers the last list, or git's user.email. named: the
+// permanent tunnels' (Settings › Tunnels), when set
+export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: string; mails: string[]; expose?: string; named?: { name: string; domain: string } }> {
   const expose = o.ws ? projectConfig(findWs(o.ws)).expose?.trim() || undefined : undefined
   const version = await cfVersion()
   let mails = state.settings?.tunnelMails ?? []
   if (!mails.length) mails = await run('git', ['config', '--global', '--get', 'user.email'], { timeout: 5000 }).then(r => (r.stdout.trim() ? [r.stdout.trim()] : []), () => [])
-  return { version, mails, expose }
+  return { version, mails, expose, named: named() }
 }
 
 // cloudflared publishing target (with mails: only those, after a one-time code from Cloudflare Access). url resolves
@@ -47,7 +61,8 @@ export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: 
 type Cf = { stop: () => void }
 function cloudflare(target: string, mails: string[], ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
   // the values go in as arguments of their own (=), so one starting with - is no flag
-  return publisher('cloudflared', 'cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], TUNNEL_URL, ended, who)
+  // --no-autoupdate: cloudflared's own updater (a download from GitHub) restarts it, and a quick tunnel's address with it
+  return publisher('cloudflared', 'cloudflared', ['tunnel', '--no-autoupdate', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], TUNNEL_URL, ended, who)
 }
 // L14: each publisher's pid and start time in <data>/children.json while it runs: a daemon that died without stopping
 // them (a crash, a kill -9) leaves them there, and the next one stops them as it starts (reapChildren); off: what turns
@@ -153,60 +168,254 @@ async function tsReady() {
 const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
   publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who, [funnel ? 'funnel' : 'serve', '--https=443', 'off'])
 
-// tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output. hours:
-// how long it runs, as a shared tab's (SHARE_HOURS; unset: 8, so a forgotten one doesn't stay open for good)
-export async function tunnelStart(o: { ws: string; port: number; mails?: string[]; hours?: number }): Promise<Tunnel> {
+// tunnelStart resolves once cloudflared prints the URL (a permanent one's: once its connector is up), or was stopped
+// meanwhile, and fails with its output. hours: how long a quick one runs, as a shared tab's (SHARE_HOURS; unset: 8, so a
+// forgotten one doesn't stay open for good). host: a permanent one at that name under settings.tunnel's domain (a word,
+// or the whole hostname), until it's stopped
+export async function tunnelStart(o: { ws: string; port: number; mails?: string[]; hours?: number; host?: string }): Promise<Tunnel> {
   const ws = findWs(o.ws)
   const live = () => state.workspaces.includes(ws) && !ws.archived
   const port = Number(o.port)
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`not a port: ${o.port}`)
+  const key = `${ws.id}:${port}`
+  if (o.host !== undefined) return namedStart(ws.id, port, String(o.host), live)
   const hours = Number(o.hours ?? 8)
   if (!SHARE_HOURS.includes(hours)) throw new Error(`for how long: ${SHARE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   const mails = [...new Set((o.mails ?? []).map(m => m.trim()).filter(Boolean))]
   const bad = mails.find(m => !MAIL.test(m))
   if (bad) throw new Error(`not an email address or *@domain: ${bad}`)
-  const key = `${ws.id}:${port}`
   await cfReady(mails.length > 0)
   if (!live()) throw new Error(`no workspace ${o.ws}`) // archived, or gone while cloudflared answered
   const cur = tunnels.get(key)
-  if (cur) return { port, url: cur.url, mails: cur.mails, ...(cur.until && { until: cur.until }) }
+  if (cur) return viewOf(cur)
   if (mails.length) settingsSet({ tunnelMails: mails })
-  const drop = () => {
-    if (tunnels.get(key) !== t) return
-    tunnels.delete(key)
-    changed()
-  }
-  const { cf, url } = cloudflare(`http://localhost:${port}`, mails, why => (log(`tunnel ${key} ended (${why})`), drop()), [`Expose to the world · ${ws.name ?? ws.id} :${port}`, `tunnel:${key}`])
-  const t: TunnelRun = { ws: ws.id, port, mails, cf, ...(hours && { until: Date.now() + hours * 3600e3 }) }
+  const t: TunnelRun = { ws: ws.id, port, mails, tries: 0, ...(hours && { until: Date.now() + hours * 3600e3 }) }
   tunnels.set(key, t)
   changed()
   try {
-    t.url = await url
+    await quickRun(key, t, true)
   } catch (e) {
-    drop()
+    if (tunnels.get(key) === t) tunnels.delete(key), changed()
     throw e
   }
-  if (!t.url) return { port, mails } // stopped first (tunnelStop took it out)
+  return t.url ? viewOf(t) : { port, mails } // no url: stopped first (tunnelStop took it out)
+}
+const viewOf = (t: TunnelRun): Tunnel => ({ port: t.port, url: t.url, mails: t.mails, ...(t.until && { until: t.until }), ...(t.host && { host: t.host }) })
+
+// a quick one's cloudflared, and again (again) when it ends on its own or can't start; first: tunnelStart's, whose
+// failure is the caller's to see, not tried again
+function quickRun(key: string, t: TunnelRun, first = false): Promise<string | undefined> {
+  const w = state.workspaces.find(x => x.id === t.ws)
+  const { cf, url } = cloudflare(`http://localhost:${t.port}`, t.mails ?? [], why => again(key, t, `cloudflared ended (${why})`), [`Expose to the world · ${w?.name ?? t.ws} :${t.port}`, `tunnel:${key}`])
+  t.cf = cf
+  return url.then(
+    u => {
+      if (tunnels.get(key) !== t || !u) return u
+      const was = t.was
+      Object.assign(t, { url: u, down: undefined, tries: 0, was: undefined })
+      if (was && was !== u) log(`tunnel ${key}: back at ${u} (was ${was})`), broadcast({ ev: 'tunnel', ws: t.ws, port: t.port, url: u, was })
+      keep()
+      changed()
+      return u
+    },
+    e => {
+      if (first) throw e
+      again(key, t, firstLine(e))
+      return undefined
+    },
+  )
+}
+function again(key: string, t: TunnelRun, why: string) {
+  if (tunnels.get(key) !== t) return
+  log(`tunnel ${key}: ${why}; starting it again`)
+  Object.assign(t, { was: t.url ?? t.was, url: undefined, down: why, cf: undefined })
   changed()
-  return { port, url: t.url, mails, ...(t.until && { until: t.until }) }
+  clearTimeout(t.timer)
+  t.timer = setTimeout(() => void (tunnels.get(key) === t && quickRun(key, t)), AGAIN[Math.min(t.tries++, AGAIN.length - 1)])
+  t.timer.unref?.()
+}
+
+// ---------- permanent tunnels: your named tunnel (cloudflared tunnel login, then tunnel create <name>: its cert.pem and
+// credentials in ~/.cloudflared), a hostname per workspace port under settings.tunnel's domain, its DNS record made once
+// (tunnel route dns: never over one that's there), and one cloudflared for all of them (connect), its ingress in
+// <data>/cloudflared/ingress.yml. Who gets in is Cloudflare Access's, in your dashboard: Laki sets none
+const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+const DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/
+const NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/
+const named = () => {
+  const n = state.settings?.tunnel ?? {}
+  const name = n.name?.trim()
+  const domain = n.domain?.trim().toLowerCase().replace(/^\.+|\.+$/g, '')
+  return name && NAME.test(name) && domain && DOMAIN.test(domain) ? { name, domain } : undefined
+}
+// a word under the domain, or the whole hostname: one level (Cloudflare's free certificate covers name.domain, no deeper)
+export function hostOf(given: string, domain: string) {
+  const h = given.trim().toLowerCase().replace(/\.$/, '')
+  const label = h.endsWith(`.${domain}`) ? h.slice(0, -domain.length - 1) : h
+  if (!LABEL.test(label)) throw new Error(`not a name for ${domain}: ${given || '(none)'} (one word: letters, digits and dashes)`)
+  return `${label}.${domain}`
+}
+async function namedStart(ws: string, port: number, given: string, live: () => boolean): Promise<Tunnel> {
+  const n = named()
+  if (!n) throw new Error('permanent tunnels: set your named tunnel and its domain in Settings › Tunnels first')
+  const host = hostOf(given, n.domain)
+  const key = `${ws}:${port}`
+  const cur = tunnels.get(key)
+  if (cur) {
+    if (cur.host === host) return viewOf(cur)
+    throw new Error(`:${port} is exposed already${cur.host ? ` at ${cur.host}` : ''}: stop that first`)
+  }
+  const other = [...tunnels.values()].find(t => t.host === host)
+  if (other) throw new Error(`${host} is taken: ${other.ws}'s :${other.port}`)
+  await cfReady(false)
+  await routeDns(n.name, host)
+  if (!live()) throw new Error(`no workspace ${ws}`)
+  if (tunnels.has(key)) throw new Error(`:${port} is exposed already: stop that first`) // one started meanwhile
+  const t: TunnelRun = { ws, port, mails: [], host, tries: 0 }
+  tunnels.set(key, t)
+  changed()
+  try {
+    await connect()
+    if (tunnels.get(key) === t && !t.url && conn) await conn.ready // another started meanwhile: its connector has this one too
+  } catch (e) {
+    if (tunnels.get(key) === t) tunnels.delete(key), void connect().catch(() => {}), changed() // the others as they were
+    throw e
+  }
+  if (tunnels.get(key) !== t) return { port, mails: [], host } // stopped meanwhile
+  keep()
+  return viewOf(t)
+}
+// its DNS record: a CNAME to the tunnel, made by cloudflared; one there already that's this tunnel's is fine, another
+// name's is never replaced (no --overwrite-dns)
+async function routeDns(name: string, host: string) {
+  await run('cloudflared', ['tunnel', 'route', 'dns', name, host], { timeout: 30000 }).catch(e => {
+    const out = String(e.stderr || e.stdout || e.message || e)
+    if (/already exists/i.test(out)) throw new Error(`${host} has a DNS record already that isn't this tunnel's: pick another name, or remove that record in Cloudflare's dashboard`)
+    throw new Error(`cloudflared couldn't route ${host} to ${name}: ${out.split('\n').filter(l => /ERR|error|failed/i.test(l)).pop()?.trim() ?? firstLine(e)}`)
+  })
+}
+type Connector = { cf: Cf; key: string; ready: Promise<void> }
+let conn: Connector | undefined
+let connTries = 0
+let connTimer: ReturnType<typeof setTimeout> | undefined
+// every permanent tunnel through one cloudflared, started again as their list changes (ponytail: cloudflared reads its
+// ingress only as it starts, so the others are off the air for a second or two) or when it ends on its own; none: stopped
+function connect(): Promise<void> {
+  const list = [...tunnels.values()].filter(t => t.host).sort((a, b) => a.host!.localeCompare(b.host!))
+  const n = named()
+  const key = JSON.stringify([n?.name, list.map(t => [t.host, t.port])])
+  if (conn?.key === key) return conn.ready
+  clearTimeout(connTimer)
+  conn?.cf.stop()
+  conn = undefined
+  if (!list.length) return Promise.resolve()
+  if (!n) {
+    for (const t of list) t.down = 'no named tunnel set: Settings › Tunnels'
+    changed()
+    return Promise.reject(new Error('permanent tunnels: set your named tunnel and its domain in Settings › Tunnels first'))
+  }
+  const folder = join(dir, 'cloudflared')
+  mkdirSync(folder, { recursive: true, mode: 0o700 })
+  const file = join(folder, 'ingress.yml')
+  writeFileSync(file, `# Laki's permanent tunnels (Settings › Tunnels): written each time one starts or stops\ningress:\n${list.map(t => `  - hostname: ${t.host}\n    service: http://localhost:${t.port}\n`).join('')}  - service: http_status:404\n`, { mode: 0o600 })
+  const me = {} as Connector
+  const { cf, url } = publisher('cloudflared', 'cloudflared', ['tunnel', '--no-autoupdate', '--config', file, 'run', n.name], /Registered tunnel connection/, why => connDown(me, `cloudflared ended (${why})`), ['Permanent tunnels', 'tunnel:named'])
+  Object.assign(me, {
+    cf,
+    key,
+    ready: url.then(
+      up => {
+        if (conn !== me || up === undefined) return
+        connTries = 0
+        for (const t of list) if (tunnels.get(keyOf(t)) === t) Object.assign(t, { url: `https://${t.host}`, down: undefined })
+        keep()
+        changed()
+      },
+      e => {
+        connDown(me, firstLine(e))
+        throw e
+      },
+    ),
+  })
+  me.ready.catch(() => {})
+  conn = me
+  return me.ready
+}
+function connDown(me: Connector, why: string) {
+  if (conn !== me) return
+  conn = undefined
+  log(`permanent tunnels: ${why}; starting cloudflared again`)
+  for (const t of tunnels.values()) if (t.host) t.down = why
+  changed()
+  connTimer = setTimeout(() => void connect().catch(() => {}), AGAIN[Math.min(connTries++, AGAIN.length - 1)])
+  connTimer.unref?.()
+}
+
+// Settings › Tunnels' check: cloudflared there, signed in (cert.pem), the named tunnel in the account, its credentials
+// on this Mac, a domain
+export async function tunnelCheck() {
+  const n = state.settings?.tunnel ?? {}
+  const version = await cfVersion()
+  const cfHome = join(homedir(), '.cloudflared')
+  const cert = existsSync(process.env.TUNNEL_ORIGIN_CERT || join(cfHome, 'cert.pem'))
+  let tunnel: { id: string; name: string } | undefined
+  let why: string | undefined
+  if (version && cert && n.name?.trim())
+    tunnel = await run('cloudflared', ['tunnel', 'list', '--output', 'json'], { timeout: 30000 }).then(
+      r => (JSON.parse(r.stdout || '[]') as { id: string; name: string }[]).map(x => ({ id: x.id, name: x.name })).find(x => x.name === n.name!.trim() || x.id === n.name!.trim()),
+      e => void (why = firstLine(e)),
+    )
+  const creds = !!tunnel && existsSync(join(cfHome, `${tunnel.id}.json`))
+  return { version, cert, tunnel, creds, why, ok: !!(version && cert && tunnel && creds && named()) }
 }
 
 // every 15 s (main.ts): tunnels past their hours stop
 export function tunnelTick(now = Date.now()) {
-  for (const [key, t] of [...tunnels]) if (t.until && now >= t.until) tunnels.delete(key), t.cf.stop(), log(`tunnel ${key}: its time is up`), changed()
+  for (const t of [...tunnels.values()]) if (t.until && now >= t.until) log(`tunnel ${keyOf(t)}: its time is up`), drop(t)
 }
 
 export function tunnelStop(o: { ws: string; port: number }) {
   const t = tunnels.get(`${findWs(o.ws).id}:${Number(o.port)}`)
-  if (!t) return
-  tunnels.delete(`${t.ws}:${t.port}`)
-  t.cf.stop()
+  if (t) drop(t)
+}
+function drop(t: TunnelRun) {
+  if (tunnels.get(keyOf(t)) !== t) return
+  tunnels.delete(keyOf(t))
+  clearTimeout(t.timer)
+  t.cf?.stop()
+  if (t.host) void connect().catch(() => {})
+  keep()
   changed()
 }
 
-// every tunnel, or a workspace's
-export function stopTunnels(ws?: string) {
-  for (const t of [...tunnels.values()]) if (!ws || t.ws === ws) tunnelStop({ ws: t.ws, port: t.port })
+// every tunnel, or a workspace's (its teardown), or the permanent ones (Resources' Stop on their cloudflared): stopped
+// for good
+export function stopTunnels(ws?: string, permanent = false) {
+  for (const t of [...tunnels.values()]) if ((!ws || t.ws === ws) && (!permanent || t.host)) drop(t)
+}
+
+// shutdown: every cloudflared stopped, state.tunnels kept for the next start (tunnelsBack)
+export function tunnelsDown() {
+  for (const t of tunnels.values()) clearTimeout(t.timer), t.cf?.stop()
+  clearTimeout(connTimer)
+  conn?.cf.stop()
+  conn = undefined
+  tunnels.clear()
+}
+
+// as the daemon starts (main.ts, after reapChildren): the tunnels state.json kept, each of a live workspace and not past
+// its time, started again; a quick one's address is new (the tunnel event, once it has one)
+export function tunnelsBack(now = Date.now()) {
+  for (const s of state.tunnels ?? []) {
+    const w = state.workspaces.find(x => x.id === s?.ws && !x.archived)
+    if (!w || !Number.isInteger(s.port) || (s.until && s.until <= now) || tunnels.has(keyOf(s))) continue
+    const t: TunnelRun = { ws: w.id, port: s.port, mails: Array.isArray(s.mails) ? s.mails.filter(m => typeof m === 'string' && MAIL.test(m)) : [], tries: 0, was: s.url, down: 'starting again after a restart', ...(s.until && { until: s.until }), ...(typeof s.host === 'string' && { host: s.host }) }
+    tunnels.set(keyOf(t), t)
+    if (!t.host) void quickRun(keyOf(t), t)
+  }
+  keep()
+  if ([...tunnels.values()].some(t => t.host)) void connect().catch(() => {})
+  changed()
 }
 
 // ---------- shared tabs (share.ts): a tab as a read-only page at <a quick tunnel>/s/<uuid> for anyone with the link,

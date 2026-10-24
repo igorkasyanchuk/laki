@@ -516,7 +516,7 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   const tn = await rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: [' me@x.dev', '*@team.dev', 'me@x.dev', ''] })
   assert.deepEqual({ ...tn, until: undefined }, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'], until: undefined })
   assert.ok(Math.abs(tn.until - (t0 + 8 * 3600e3)) < 5000) // 8 hours unless asked
-  assert.match(log(), /cloudflared tunnel --url http:\/\/localhost:5173 --allowed-mail=me@x\.dev --allowed-mail=\*@team\.dev\n/)
+  assert.match(log(), /cloudflared tunnel --no-autoupdate --url http:\/\/localhost:5173 --allowed-mail=me@x\.dev --allowed-mail=\*@team\.dev\n/)
   assert.deepEqual((await rig.rpc('cloudflared')).mails, ['me@x.dev', '*@team.dev'])
   assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), tn) // running already: that one
   const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, hours: 1 })
@@ -595,7 +595,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.deepEqual([on.mail, on.url], ['me@x.dev', url])
   assert.match(on.link, new RegExp(`^${url}/\\?token=[0-9a-f]{64}$`))
   assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
-  assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
+  assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
   assert.deepEqual((await rig.rpc('state')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
@@ -661,7 +661,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   for (const hours of [0, 48]) await assert.rejects(rig.rpc('remoteStart', { hours, mail: '', open: true }), /without an email, 24 hours at most/)
   const pub = await rig.rpc('remoteStart', { hours: 1, mail: '', open: true })
   assert.deepEqual([pub.mail, pub.open], ['', true])
-  assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port}\n`))
+  assert.match(log(), new RegExp(`cloudflared tunnel --no-autoupdate --url http://127\\.0\\.0\\.1:${port}\n`))
   assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
   assert.equal(await ping((await pinAt({ token: pub.link.split('?token=')[1] })).token, url), 200)
   assert.equal(await ping('nope', url), 401)
@@ -679,7 +679,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const pinned = await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev', pin: true })
   assert.deepEqual([pinned.mail, pinned.open, pinned.tries], ['', undefined, 3])
   assert.match(pinned.pin, /^\d{6}$/)
-  assert.equal(log().split(`cloudflared tunnel --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
+  assert.equal(log().split(`cloudflared tunnel --no-autoupdate --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
   const link = pinned.link.split('?token=')[1]
   assert.equal(await ping(link, url), 401) // the link's key alone isn't in
   assert.deepEqual(await pinAt({ token: link }), { need: true, left: 3 })

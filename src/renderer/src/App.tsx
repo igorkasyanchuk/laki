@@ -1226,6 +1226,10 @@ export function App() {
           toast(`Reminder: ${m.text}`.slice(0, 160), open, w ? 'Open' : 'Calendar')
         }
         ring()
+      } else if (m.ev === 'tunnel') {
+        // a quick tunnel cloudflared started again (it dropped, or the daemon restarted): its address is new
+        const w = viewRef.current?.workspaces.find(x => x.id === m.ws)
+        toast(`${w?.name ?? m.ws} :${m.port}'s tunnel is back at a new address: ${m.url}`, () => void navigator.clipboard.writeText(String(m.url)), 'Copy it')
       } else if (m.ev === 'started') {
         // a delayed start's agent (wsNew startAt), started by the daemon: where it is, and late when it was down then
         const open = () => (setDialog(null), selectTab(m.tab))
@@ -1739,10 +1743,12 @@ export function App() {
     }, fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
     check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
-    start: (port, mails, hours) => api.call('tunnelStart', { ws: w.id, port, mails, hours }),
+    start: (port, mails, hours, host) => api.call('tunnelStart', { ws: w.id, port, mails, hours, host }),
     stop: port => api.call('tunnelStop', { ws: w.id, port }),
     open: openExternal,
     copy,
+    name: w.id,
+    settings: () => setDialog({ section: 'tunnels' }),
   })
   const settings = view?.settings ?? {}
   const specsOn = specsOnIn(settings) // Settings › General › Pages: on unless turned off
@@ -3900,6 +3906,7 @@ export function App() {
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
             uiReset={() => api.call('uiReset')}
             simulator={p => api.call('sim', p)}
+            tunnels={() => api.call('tunnelCheck')}
             resources={{
               load: () => api.call<Resources>('resources'),
               tabs: view.tabs,

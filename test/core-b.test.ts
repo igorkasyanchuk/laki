@@ -171,9 +171,12 @@ exec sleep 600
   // it ends saying nothing: the error is only that
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 1111 }), (e: Error) => e.message === 'cloudflared ended (exit 2)')
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 1112 }), (e: Error) => e.message === 'cloudflared ended (exit 1):\nERR boom')
-  // it gives a URL, then ends on its own: the tunnel goes from the view
+  // it gives a URL, then ends on its own: it stays, down, and cloudflared starts again until it's stopped
   assert.equal((await rig.rpc('tunnelStart', { ws: ws.id, port: 2222 })).url, 'https://quick-gone.trycloudflare.com')
-  await until(async () => !(await wsOf(rig, ws.id)).tunnels.length, 'the ended tunnel dropped')
+  await until(async () => (await wsOf(rig, ws.id)).tunnels.some((x: any) => x.port === 2222 && !x.url && x.down === 'cloudflared ended (exit 3)'), 'the ended tunnel down')
+  await until(() => fakeLog(rig).split('localhost:2222').length === 3, 'started again')
+  await rig.rpc('tunnelStop', { ws: ws.id, port: 2222 })
+  assert.ok(!(await wsOf(rig, ws.id)).tunnels.length)
 
   // the workspace goes while cloudflared says its version
   writeFileSync(join(cf, 'slow'), '')
@@ -185,7 +188,7 @@ exec sleep 600
   // remote access asked twice at once: one cloudflared
   const both = await Promise.all([rig.rpc('remoteStart', { hours: 1, mail: 'me@x.co' }), rig.rpc('remoteStart', { hours: 1, mail: 'me@x.co' })])
   assert.ok(both.every(r => r.mail === 'me@x.co'))
-  assert.equal(fakeLog(rig).split('\n').filter(l => /^cloudflared tunnel --url http:\/\/127\.0\.0\.1:/.test(l)).length, 1)
+  assert.equal(fakeLog(rig).split('\n').filter(l => /^cloudflared tunnel --no-autoupdate --url http:\/\/127\.0\.0\.1:/.test(l)).length, 1)
   await until(async () => (await state(rig)).remote?.url, 'remote access up')
   await rig.rpc('remoteStop')
 })

@@ -330,6 +330,7 @@ const api: Record<string, Handler> = {
     if (k === 'ai') return aiStop()
     if (k === 'remote') return core.remoteStop()
     if (k === 'share') return core.stopShares()
+    if (k === 'tunnel:named') return core.stopTunnels(undefined, true) // the permanent tunnels' one cloudflared: all of them
     if (k.startsWith('stream:')) return widgetStreamStop(k.slice(7))
     if (k.startsWith('agent:')) return stopAgents(k.slice(6)) // an extension's agent runs
     if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
@@ -340,6 +341,7 @@ const api: Record<string, Handler> = {
   tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
+  tunnelCheck: () => core.tunnelCheck(), // Settings › Tunnels: is the named tunnel ready
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
@@ -442,7 +444,7 @@ const api: Record<string, Handler> = {
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
 const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin'])
-const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env)$/ // settings it may send back unchanged (Settings saves them all), not change
+const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel)$/ // settings it may send back unchanged (Settings saves them all), not change
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
@@ -457,7 +459,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -503,6 +505,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
+  else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }
 // M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
@@ -682,7 +685,10 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 })
 
 const timers: NodeJS.Timeout[] = []
-void core.reapChildren().catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
+void core
+    .reapChildren()
+    .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
+    .then(() => core.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   port = typeof addr === 'object' && addr ? addr.port : 0
@@ -727,7 +733,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
 function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
-  core.stopTunnels()
+  core.tunnelsDown() // kept in state.json: they come back with the next daemon
   core.stopShares()
   core.remoteStop()
   flowStopAll() // a run block's command

@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Tunnels stay up: when cloudflared drops, Laki starts it again (a toast gives a random address's new link), and
+  they come back after a daemon restart. With your own Cloudflare domain (Settings › Tunnels), a permanent address
+  like `https://shop.example.com` that keeps its name until you stop it.
 - Start a new workspace's agent later: at a date and time, or after your plan limit resets (the new-workspace
   page's clock, `laki new --at` / `--after-limit`). The workspace is made at once; only the agent waits.
 - In the prompt boxes, `@` puts in a file's path, `#` an open PR or issue's link, `/` a prompt template.

@@ -1,5 +1,5 @@
-// Settings' connect sections: phone pushes, remote access and the simulators. Settings.tsx re-exports it.
-import { ANSWER_WHY, answerOk, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
+// Settings' connect sections: phone pushes, tunnels, remote access and the simulators. Settings.tsx re-exports it.
+import { ANSWER_WHY, answerOk, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
 import { Fragment, useEffect, useState } from 'react'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
@@ -239,6 +239,75 @@ export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: 
       </Group>
       <Group title="Android" hint="adb from Android Studio's SDK (Laki finds it there, no PATH needed), and an emulator or a phone with USB debugging on">
         {list('android') ?? (busy && <p className="muted small">Checking…</p>)}
+      </Group>
+    </>
+  )
+}
+
+// Settings › Tunnels: Expose to the world's two kinds. A random address (cloudflared's quick tunnels, nothing to set up),
+// and permanent ones: your named tunnel and the domain its hostnames go under (settings.tunnel), each step checked by
+// the daemon (tunnelCheck) with the command that does it
+export type TunnelCheck = { version?: string; cert: boolean; tunnel?: { id: string; name: string }; creds: boolean; why?: string; ok: boolean }
+const DOMAIN_OK = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/ // the daemon's
+export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; onNamed: (n: NamedTunnel) => void; check: () => Promise<TunnelCheck> }) {
+  const [c, setC] = useState<TunnelCheck | null>(null)
+  const [busy, setBusy] = useState(true)
+  const [err, setErr] = useState('')
+  const [copied, setCopied] = useState('')
+  const run = () => (setBusy(true), check().then(r => (setC(r), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  useEffect(() => void run(), [])
+  const name = named.name?.trim() ?? ''
+  const domain = named.domain?.trim().toLowerCase().replace(/^\.+|\.+$/g, '') ?? ''
+  const steps: { id: string; ok: boolean; label: string; says: string; fix?: string }[] = c
+    ? [
+        { id: 'cf', ok: !!c.version, label: 'cloudflared', says: c.version ? `version ${c.version}` : 'not installed', fix: 'brew install cloudflared' },
+        { id: 'cert', ok: c.cert, label: 'Signed in to Cloudflare', says: c.cert ? 'its certificate is in ~/.cloudflared' : 'it opens your browser: pick the domain the tunnels go under', fix: 'cloudflared tunnel login' },
+        { id: 'tunnel', ok: !!c.tunnel, label: name ? `The tunnel ${name}` : 'A named tunnel', says: c.tunnel ? `in your account, ${c.tunnel.id}` : !name ? 'its name below' : c.why ?? 'not in your account yet', fix: `cloudflared tunnel create ${name || 'laki'}` },
+        { id: 'creds', ok: c.creds, label: 'Its credentials on this Mac', says: c.creds ? `~/.cloudflared/${c.tunnel!.id}.json` : c.tunnel ? 'made where the tunnel was created: copy that file here, or create a tunnel here' : 'made with the tunnel', fix: c.tunnel ? `~/.cloudflared/${c.tunnel.id}.json from the Mac that made it` : undefined },
+        { id: 'domain', ok: DOMAIN_OK.test(domain), label: 'Its domain', says: DOMAIN_OK.test(domain) ? `addresses like name.${domain}` : 'below: the one you picked at login, like example.com' },
+      ]
+    : []
+  const first = steps.findIndex(x => !x.ok) // the next step: the one that shows its command
+  return (
+    <>
+      <h2>Tunnels</h2>
+      <p className="muted small">The globe beside a port in the status bar puts your dev server on the internet through Cloudflare&rsquo;s cloudflared.</p>
+      <Group title="A random address" hint="Nothing to set up: a new trycloudflare.com address each time, for 1, 8 or 24 hours or until you stop it, for anyone or only some emails">
+        <p className="muted small">
+          When cloudflared drops (the network, the Mac asleep), Laki starts it again, and brings it back after its daemon restarts; a random address is new each time, and
+          a toast gives you the new one. Cloudflare offers these without an account and without any promise to keep them up.
+        </p>
+      </Group>
+      <Group title="Permanent addresses" hint="Your own Cloudflare domain: a name per port that stays, comes back after restarts and runs until you stop it" act={<button type="button" disabled={busy} onClick={run}>{busy ? 'Checking…' : 'Check again'}</button>}>
+        <label>
+          <span>Named tunnel</span>
+          <input className="mono" value={named.name ?? ''} placeholder="laki" spellCheck={false} onChange={e => onNamed({ ...named, name: e.target.value })} onBlur={run} />
+        </label>
+        <label>
+          <span>Domain</span>
+          <input className="mono" value={named.domain ?? ''} placeholder="example.com" spellCheck={false} onChange={e => onNamed({ ...named, domain: e.target.value })} onBlur={run} />
+        </label>
+        {err && <p className="warn small">{err}</p>}
+        {steps.map((x, i) => (
+          <div key={x.id} className="sim-check" data-state={x.ok ? 'ok' : i === first ? 'bad' : 'warn'}>
+            <Icon name={x.ok ? 'checkCircle' : i === first ? 'xCircle' : 'alertCircle'} />
+            <div>
+              <div>
+                {x.label} <span className="muted">· {x.says}</span>
+              </div>
+              {!x.ok && i === first && x.fix && (
+                <div className="tunnel-code sim-fix">
+                  <code>{x.fix}</code>
+                  {!x.fix.startsWith('~') && <IconButton icon={copied === x.id ? 'check' : 'copy'} title={copied === x.id ? 'Copied' : 'Copy'} onClick={() => navigator.clipboard.writeText(x.fix!).then(() => (setCopied(x.id), setTimeout(() => setCopied(''), 2000)), e => setErr(String(e?.message ?? e)))} />}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        <p className="muted small">
+          Laki adds a DNS record for each name (never over one that&rsquo;s there) and runs one cloudflared for all of them. A permanent address is public, and certificate logs
+          make such names easy to find: protect it with Cloudflare Access in your dashboard (Zero Trust › Access) when it shouldn&rsquo;t be open.
+        </p>
       </Group>
     </>
   )

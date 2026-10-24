@@ -456,6 +456,7 @@ export type Settings = {
   actions?: RunAction[] // Run ▾'s: a prompt for an agent, or a command for a terminal
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
+  tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
   workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)
@@ -685,7 +686,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once; flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; tunnels?: SavedTunnel[] } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once; flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -735,7 +736,12 @@ export type ProcUse = { pid: number; rss: number; cpu: number; cmd: string }
 export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse & { heap: number }; tabs: { tab: string; rss: number; cpu: number; procs: ProcUse[] }[]; others?: { name: string; stop?: string; rss: number; cpu: number; procs: ProcUse[] }[] }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
-export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number } // until: when it stops (ms; none: when you stop it)
+export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number; host?: string; down?: string } // until: when it stops (ms; none: when you stop it); host: a permanent one's (settings.tunnel's named tunnel); down: why it's reconnecting (no url meanwhile, a quick one's comes back new)
+// a tunnel kept in state.json, so it comes back after a daemon restart (remote.ts tunnelsBack)
+export type SavedTunnel = { ws: string; port: number; mails?: string[]; until?: number; host?: string; url?: string }
+// permanent tunnels (Settings › Tunnels): your own named tunnel (cloudflared tunnel login, tunnel create) and the domain
+// its hostnames go under (the one you picked at login)
+export type NamedTunnel = { name?: string; domain?: string }
 
 // run: the project has a dev command; scripts: the RUN_SCRIPTS it has
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
@@ -841,5 +847,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 113
+export const API = 114
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

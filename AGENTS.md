@@ -154,7 +154,10 @@ prompt boxes' @ # / (PromptInput.tsx `useComplete`, `completeOf`; text.ts `trigg
 its agent later, `ws.pending` (`Pending`: what `addTab` gets; the view's `pending`, `PendingView`), `pendingTick` (schedule.ts:
 every 30 s and at start, `now` for tests; a limit's time `resetOf` its account's `usage` until it passes), `startPending`
 (the `started` event, a late one's `late`), `wsSet` `pending` (null cancels, `at`, `prompt`) and `start`; the CLI's `--at`,
-`--after-limit`, MCP's `start_at`; the new-workspace page's Start chip (panels.tsx `StartChip`). A
+`--after-limit`, MCP's `start_at`; the new-workspace page's Start chip (panels.tsx `StartChip`); 114: tunnels that stay
+up (`state.tunnels`, `tunnelsBack`, cloudflared started again, a tunnel's `down`, the `tunnel` event: a quick one's new
+address) and permanent ones (`settings.tunnel`, `tunnelStart` `host`, a tunnel's `host`, `cloudflared`'s `named`,
+`tunnelCheck`: Settings › Tunnels). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -265,8 +268,9 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   only); the workspace's `noSetup` until `run` `script: 'setup'` (worktrees only, trusted only: Run ▾'s *Run the setup
   script*, `laki run <ws> setup`) runs it and clears it;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
-  `expose`: what the popup starts from), `tunnelStart`
-  (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
+  `expose`: what the popup starts from; `named`: settings.tunnel's, when set), `tunnelStart`
+  (`ws`, `port`, `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
+  `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file);
 - worktree actions: `diff` (git's text but its last newline: a hunk to revert must match), `run`, `ship`; Changes'
   Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
   as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
@@ -329,7 +333,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   *Load it again*); `daemon` with its heap; `tabs`, each live session's process
   tree, the program first; RSS in KB; `others`: what else the daemon runs, each child with what's under it, named by `own`
   (Laki AI's agent, a tunnel, remote access, an SSH host's master, a widget's fetch, an extension's agent; the rest, short git/gh/lsof, in `app` by name), `resourceStop`
-  (main.ts: `ai`, `remote`, `share`, `tunnel:<ws>:<port>`, `stream:<id>`, `agent:<id>`) for a row's Stop); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
+  (main.ts: `ai`, `remote`, `share`, `tunnel:<ws>:<port>`, `tunnel:named`, `stream:<id>`, `agent:<id>`) for a row's Stop); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
   `tabWake`, `sleepTick` (`now`: tests move the clock; every 60 s);
 - development mode (`settings.devMode`): `logs` (`key`: `ws:<id>` or `widget:<id>`): `core.ts` `devLog`'s lines, the
   last 500 per key in memory, a line among the last 6 again counted (`n`) and moved to the end, all let go when dev mode
@@ -431,6 +435,7 @@ WebSocket events:
 - `timer`: Laki AI's `laki_timer` (`core.ts` `timer`: checked there, `req` and `which`, not `id`), for the app's window, whose
   timers and stopwatches live in its localStorage (App's `timerAct`); answered with `browseDone`, like `browse`;
 - `ai`: Laki AI's conversation and `busy`, as each message comes;
+- `tunnel`: a quick tunnel cloudflared started again, at its new `url` (`was`: the old one), for App's toast;
 - `open` / `close`: the connection's own status.
 
 `view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen), `focused` and `browse` (the app's
@@ -791,11 +796,30 @@ PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's 
 
 ### Tunnels
 
-Expose to the world (`remote.ts` `tunnelStart`): `cloudflared tunnel --url http://localhost:<port>
-[--allowed-mail=<m>…]`, a Cloudflare Quick Tunnel; the URL is the first `https://<name>.trycloudflare.com` in its
+Expose to the world (`remote.ts` `tunnelStart`): `cloudflared tunnel --no-autoupdate --url http://localhost:<port>
+[--allowed-mail=<m>…]`, a Cloudflare Quick Tunnel (`--no-autoupdate`: cloudflared's own updater restarts it, every
+`cloudflare()`'s); the URL is the first `https://<name>.trycloudflare.com` in its
 output that isn't `login.`. No emails: public, anyone with the link (the popup's default). Emails need
-cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels live in the daemon's memory (`tunnels`, in `WorkspaceView.tunnels`): stopped by
-`tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset 8, 0 none; `tunnelTick`, every 15 s), a workspace's teardown, and shutdown; a daemon restart ends them.
+cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels run in the daemon (`tunnels`, in `WorkspaceView.tunnels`) and are kept in `state.tunnels`
+(`keep`: ws, port, mails, until, host, the last url): stopped by `tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset
+8, 0 none; `tunnelTick`, every 15 s) and a workspace's teardown, gone from state then; shutdown (`tunnelsDown`) stops their
+cloudflareds and keeps them, and `tunnelsBack` (main.ts, after `reapChildren`) starts each again whose workspace is live
+and whose time hasn't passed. One that ends on its own, or can't start (not its first start: that error is
+`tunnelStart`'s), is `again`: `down` (why, in the view: the popup's *Reconnecting*, the globe dimmed) and `AGAIN` later
+(2, 5, 15, 30 s, then each minute) started again; a quick one's new URL broadcasts `tunnel` (`was`: the one before;
+App's toast, *Copy it*). ponytail: no health check of a cloudflared that stays up but reaches nothing; it reconnects
+its own edge connections.
+Permanent ones (`host`; `settings.tunnel` `{ name, domain }`, Settings › Tunnels' `TunnelsSection`, `tunnelCheck`; the
+popup's *Address* when `cloudflared`'s `named` is there): a locally managed named tunnel of yours (`cloudflared tunnel
+login`'s `~/.cloudflared/cert.pem`, `tunnel create`'s `<id>.json`), `hostOf` (one label, `LABEL`, under the domain:
+Cloudflare's universal certificate covers one level), `routeDns` (`tunnel route dns <name> <host>` once, never
+`--overwrite-dns`: a record that's another's is refused), then `connect`: one cloudflared for all of them, `tunnel
+--no-autoupdate --config <data>/cloudflared/ingress.yml run <name>` (an ingress rule per hostname, then 404), up at
+`Registered tunnel connection`, started again as the list changes (the `key`) or when it ends (`connDown`, `AGAIN`);
+`url` is `https://<host>` and stays. Who gets in is Cloudflare Access's (your dashboard): Laki sets none, and the popup
+and Settings say so. An agent's `tunnelStart` with `host` is refused (main.ts `agentNo`; `tunnelStart` in `FROM`); a
+remote client can't change `settings.tunnel` (`REMOTE_KEYS`). Resources' *Permanent tunnels* row stops them all
+(`tunnel:named`). Tested in `test/tunnel.test.ts` (the fake `test/cloudflared`'s `tunnel list`, `route dns`, `run`).
 Every `publisher` child (cloudflared, tailscale serve or funnel) is in `<data>/children.json` (pid, `ps -o lstart=`, its
 binary, tailscale's `off` args) while it runs; `reapChildren`, as a daemon starts, SIGTERMs those still running with the
 same start time and command (a crash or a kill -9 left them) and turns a tailscale one off (L14). One per workspace and port.
@@ -832,7 +856,7 @@ takes the tunnel's URL as an Origin, and that token only with it (a client with 
 `remoteStop` drops both, so an old link is dead. A client from that Origin (`Conn.remote`, the `/rpc` call's) is
 refused `REMOTE_NO` (`remoteStart`, `cliInstall`, `cliRemove`, `shutdown`, `aiKey`, `skillSet`, `accountAdd`,
 `accountLogin`), `widgetSet` with `on: true`, `net: true` or a `source`, and `settingsSet` changing a `REMOTE_KEYS`
-setting (`remote*`, `webhook`, `widgetDirs`, `widgetDev`, `presets`, `env`; sent back unchanged is fine: Settings saves
+setting (`remote*`, `webhook`, `widgetDirs`, `widgetDev`, `presets`, `env`, `tunnel`; sent back unchanged is fine: Settings saves
 them all) (M4). `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
 `--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings): the link's token (`POST /pin`, `remotePin`, main.ts:
 from the tunnel's origin) then says `need`, and `{ token, pin }` gives `access` (and `used`: a right PIN, once); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the

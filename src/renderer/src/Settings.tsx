@@ -4,7 +4,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
+import { ACCOUNT_AGENTS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
 import { RELEASES_URL, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
@@ -23,7 +23,7 @@ import { version } from '../../../package.json'
 import { Group, Says, Scope } from './SettingsKit'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
-import { type RemoteApi, RemoteSection, type SimApi, SimSection, WebhookSection } from './SettingsConnect'
+import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
 export * from './SettingsKit'
@@ -134,6 +134,7 @@ export type AppSettings = Paint & {
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   remoteMail?: string // the one address remote access lets in
+  tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
   remoteAuth?: 'email' | 'pin' | 'tailscale' // remote access by Cloudflare's email code (unset too), Laki's PIN, or your tailnet
   remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
   remoteTsPin?: boolean // Tailscale: a PIN as well
@@ -426,6 +427,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
+  ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
   ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
@@ -454,6 +456,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
   { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
+  { id: 'tunnels', label: 'Tunnels', icon: 'share', group: 'Connect' },
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
   { id: 'simulator', label: 'Simulators', icon: 'phone', group: 'Connect' },
 ]
@@ -777,6 +780,7 @@ export function SettingsPage(p: {
   skill?: SkillApi
   ai?: AiApi
   remote?: RemoteApi
+  tunnels?: () => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck)
   widgets?: WidgetsApi
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
@@ -793,7 +797,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
+  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'tunnels' || p.tunnels) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources) && (x.id !== 'achievements' || p.achievements))
   const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
@@ -1906,6 +1910,7 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} onLogs={widgetLogs => set({ widgetLogs })} />}
+          {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} />}
           {sec === 'remote' && p.remote && (
             <RemoteSection
               api={p.remote}

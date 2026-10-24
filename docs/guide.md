@@ -466,7 +466,8 @@ switches (see PRs below), and
 the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a button that copies the whole path.
 
 **Expose to the world** (the globe next to `$PORT` and each listening port): publishes the port at a random
-`https://….trycloudflare.com` link through Cloudflare Quick Tunnels, with no Cloudflare account. It needs
+`https://….trycloudflare.com` link through Cloudflare Quick Tunnels, with no Cloudflare account, or at a permanent
+address on your own domain (below). It needs
 `cloudflared` on your PATH (`brew install cloudflared`; the popup says so when it's missing).
 - *Who can open it*: *Anyone with the link* (the default: public, no sign-in; what your dev server trusts from
   localhost, like Vite's `/@fs` files or a debug console, is open to them too), or *Only these emails*: addresses, or
@@ -479,7 +480,20 @@ the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a 
 - Once it's up: a QR code to open it on your phone, the link (copy, open), and *Stop*. The globe lights up,
   and *Info* (⌘I) shows the public link too.
 - *For how long*: 1, 8 (the default) or 24 hours, or until you stop it. It runs in the daemon until then, or
-  until you stop it, delete or archive the workspace, or stop the daemon; closing the app leaves it on. A port with a tunnel stays in the status bar after its server stops.
+  until you stop it, delete or archive the workspace; closing the app leaves it on. A port with a tunnel stays in the status bar after its server stops.
+- When cloudflared drops (the network goes, the Mac sleeps), the globe dims and the popup says *Reconnecting*: Laki
+  starts it again a few seconds later, then every minute until it's back. A daemon restart (an update, *Quit Laki
+  Completely*) brings it back too, for the time it had left. A random address is new each time: a toast gives you
+  the new link (*Copy it*).
+- *Permanent*, with your own Cloudflare domain (Settings › Tunnels): an address like `https://shop.example.com` that
+  stays, comes back after restarts and runs until you stop it. Set up once in a terminal: `cloudflared tunnel login`
+  (it opens your browser: pick the domain), then `cloudflared tunnel create laki`; then Settings › Tunnels takes the
+  tunnel's name and the domain, and checks each step. The popup then offers *Address*: *A random one, for a while* or
+  *Permanent, on example.com* with a name (one word, prefilled from the workspace and port). Laki adds its DNS record
+  once (`cloudflared tunnel route dns`, never over a record that's there) and runs one cloudflared for all of them
+  (`<data>/cloudflared/ingress.yml`). *Stop* takes it off the tunnel; the DNS record stays. Anyone can open a
+  permanent address, and certificate logs make such names easy to find: protect it with Cloudflare Access in your
+  dashboard (Zero Trust › Access) when it shouldn't be open. An agent can't make one.
 
 **Share a tab** (a tab's right click › *Share live view…*: for 1, 8 or 24 hours, or until you stop it): a page
 anyone with the link can read, at a random `https://….trycloudflare.com/s/<id>` (the same Quick Tunnels, so it needs

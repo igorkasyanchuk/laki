@@ -1,18 +1,38 @@
 #!/bin/sh
 # fake cloudflared, not on PATH until a test links it into $HOME/bin. --version says $HOME/cf-version's
 # (default 2026.9.3). tunnel logs its args, prints a quick tunnel's banner for its port and runs until
-# stopped; $HOME/cf-fail: that error and exit 1; $HOME/cf-silent: no URL.
+# stopped; $HOME/cf-fail: that error and exit 1; $HOME/cf-silent: no URL; $HOME/cf-gen: added to the URL
+# (a restart's new address). A named tunnel: tunnel list (signed in: $HOME/.cloudflared/cert.pem), tunnel
+# route dns (a host in $HOME/cf-dns-taken has a record already) and tunnel run (its connection registered).
 v=$(cat "$HOME/cf-version" 2>/dev/null || echo 2026.9.3)
 [ "$1" = --version ] && { echo "cloudflared version $v (built 2026-09-30-1200 UTC)"; exit 0; }
 echo "cloudflared $*" >> "${FAKE_LOG:-/dev/null}"
-port=$(printf '%s\n' "$*" | sed -nE 's/.*(localhost|127\.0\.0\.1):([0-9]+).*/\2/p')
-echo "2026-10-03T10:00:00Z INF Requesting new quick Tunnel on trycloudflare.com..." >&2
-[ -f "$HOME/cf-fail" ] && { echo "2026-10-03T10:00:01Z ERR failed to request quick Tunnel: Post \"https://api.trycloudflare.com/tunnel\": $(cat "$HOME/cf-fail")" >&2; exit 1; }
-case "$*" in *--allowed-mail*) echo "2026-10-03T10:00:01Z INF Visitors sign in at https://login.trycloudflare.com (email rules: on)" >&2 ;; esac
-[ -f "$HOME/cf-silent" ] || {
-  echo "2026-10-03T10:00:01Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |" >&2
-  echo "2026-10-03T10:00:01Z INF |  https://fake-$port.trycloudflare.com  |" >&2
-}
+case "$1 $2" in
+"tunnel list")
+  [ -f "$HOME/.cloudflared/cert.pem" ] || { echo "2026-10-03T10:00:00Z ERR Cannot determine default origin certificate path. No file cert.pem in [~/.cloudflared]" >&2; exit 1; }
+  cat "$HOME/cf-tunnels.json" 2>/dev/null || echo '[{"id":"6f1e0c1a-0000-4000-8000-000000000001","name":"laki","created_at":"2026-10-01T10:00:00Z","connections":[]}]'
+  exit 0 ;;
+"tunnel route")
+  grep -qx "$5" "$HOME/cf-dns-taken" 2>/dev/null && { echo "2026-10-03T10:00:00Z ERR Failed to add route: code: 1003, reason: Failed to create record $5 with err An A, AAAA, or CNAME record with that host already exists." >&2; exit 1; }
+  echo "2026-10-03T10:00:00Z INF Added CNAME $5 which will route to this tunnel tunnelID=6f1e0c1a-0000-4000-8000-000000000001" >&2
+  exit 0 ;;
+esac
+case "$*" in *" run "*) port=named ;; *) port=$(printf '%s\n' "$*" | sed -nE 's/.*(localhost|127\.0\.0\.1):([0-9]+).*/\2/p') ;; esac
+# before any output: a stop the moment it says it's up is still logged
 trap 'echo "cloudflared $port stopped" >> "${FAKE_LOG:-/dev/null}"; kill $! 2>/dev/null; exit 0' TERM INT
+case "$*" in
+*" run "*)
+  echo "2026-10-03T10:00:00Z INF Starting tunnel tunnelID=6f1e0c1a-0000-4000-8000-000000000001" >&2
+  [ -f "$HOME/cf-fail" ] && { echo "2026-10-03T10:00:01Z ERR $(cat "$HOME/cf-fail")" >&2; exit 1; }
+  echo "2026-10-03T10:00:01Z INF Registered tunnel connection connIndex=0 connection=abc event=0 ip=198.41.200.13 location=ams01 protocol=quic" >&2 ;;
+*)
+  echo "2026-10-03T10:00:00Z INF Requesting new quick Tunnel on trycloudflare.com..." >&2
+  [ -f "$HOME/cf-fail" ] && { echo "2026-10-03T10:00:01Z ERR failed to request quick Tunnel: Post \"https://api.trycloudflare.com/tunnel\": $(cat "$HOME/cf-fail")" >&2; exit 1; }
+  case "$*" in *--allowed-mail*) echo "2026-10-03T10:00:01Z INF Visitors sign in at https://login.trycloudflare.com (email rules: on)" >&2 ;; esac
+  [ -f "$HOME/cf-silent" ] || {
+    echo "2026-10-03T10:00:01Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |" >&2
+    echo "2026-10-03T10:00:01Z INF |  https://fake-$port$(cat "$HOME/cf-gen" 2>/dev/null).trycloudflare.com  |" >&2
+  } ;;
+esac
 sleep 600 &
 wait $!
