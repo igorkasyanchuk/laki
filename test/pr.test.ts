@@ -285,6 +285,22 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   writeFileSync(join(gh, 'comment.json'), JSON.stringify({ html_url: 'https://example.invalid/pr/9#c1' }))
   assert.deepEqual(await rig.rpc('prComment', { ...c, side: 'LEFT' }), { url: 'https://example.invalid/pr/9#c1' })
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
+
+  // the full review's comments as one review: checked, each line against the PR's diff (nothing posted), then posted
+  const r = (comments: unknown[]) => rig.rpc('prReview', { ws: ws.id, comments })
+  await assert.rejects(r([]), /no comments to post/)
+  await assert.rejects(r([{ path: 'a.ts', line: 3, startLine: 3, body: 'x' }]), /a\.ts:3: its range starts after it ends/)
+  await assert.rejects(r([{ path: 'a.ts', line: 3, body: '' }]), /a\.ts:3: the comment is empty/)
+  writeFileSync(join(gh, 'pr.diff'), 'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -2,3 +2,4 @@\n one\n-two\n+2\n+2b\n three\n')
+  const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
+  const before = log().split('/reviews').length
+  await assert.rejects(r([{ path: 'a.ts', line: 3, side: 'RIGHT', body: 'ok' }, { path: 'a.ts', line: 9, body: 'far' }, { path: 'b.ts', line: 1, body: 'nope' }, { path: 'a.ts', line: 4, startLine: 1, body: 'too wide' }]), /not in PR #9's diff \(commit and push first\): a\.ts:9, b\.ts:1, a\.ts:1-4$/)
+  assert.equal(log().split('/reviews').length, before) // nothing went
+  writeFileSync(join(gh, 'comment.json'), JSON.stringify({ html_url: 'https://example.invalid/pr/9#r1' }))
+  assert.deepEqual(await r([{ path: 'a.ts', line: 4, startLine: 3, body: 'both "2"s' }, { path: 'a.ts', line: 3, side: 'LEFT', body: 'why go?' }]), { url: 'https://example.invalid/pr/9#r1', n: 2 })
+  assert.match(log(), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/reviews -f event=COMMENT -f commit_id=beef -f comments\[\]\[path\]=a\.ts -f comments\[\]\[body\]=both "2"s -F comments\[\]\[line\]=4 -f comments\[\]\[side\]=RIGHT -F comments\[\]\[start_line\]=3 -f comments\[\]\[start_side\]=RIGHT -f comments\[\]\[path\]=a\.ts -f comments\[\]\[body\]=why go\? -F comments\[\]\[line\]=3 -f comments\[\]\[side\]=LEFT\n/)
+  rmSync(join(gh, 'comment.json'))
+  await assert.rejects(r([{ path: 'a.ts', line: 2, body: 'x' }]), /GitHub turned the review down: HTTP 422/)
 })
 
 test("a PR's author: yours (gh api user) is mine; its whole diff (gh pr diff) for Changes, each file's status and lines", async t => {

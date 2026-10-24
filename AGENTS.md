@@ -144,7 +144,10 @@ refused as "changed since you opened it" otherwise), `queueNow` (Esc, then the f
 line or two above the menu), a tab's `needAt` (waiting since, `Runtime.waitAt`; done since, `idleAt`), `seen` (the inverse of
 `unread`): the sidebar's Needs you list (Needs.tsx, `needsSorted`, ⌘J's order too); 110: a project's `config.layout` (a saved
 layout's name, `settings.layouts`, `SETTINGS_KEPT`), kept by `projectSet`: the tab bar's Layout menu (shared/layout.ts
-`LAYOUT_PRESETS`, `fillRoles`, `toRoles`; App's `applyLayout`, `layoutNew`). A
+`LAYOUT_PRESETS`, `fillRoles`, `toRoles`; App's `applyLayout`, `layoutNew`); 111: `prReview` (`ws`, `comments`: `path`, `line`,
+`startLine`, `side`, `body`; each line checked against `gh pr diff` (`diffLines`) before anything goes, then one review,
+event COMMENT at the PR's head commit, by gh's `comments[][…]` fields), `scanStats` for every live git workspace with
+`settings.fullReview`: the full review (FullReview.tsx, the tab bar's first tab, ⌘1; Diff.tsx the pieces Changes shares). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -2471,6 +2474,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/notes.ts` | notes (experimental): one JSON file each, their pasted files, the list with search |
+| `src/renderer/src/FullReview.tsx` | the full review (experimental, `settings.fullReview`): the tab bar's Review tab over the panes, files with Viewed boxes, every file's diff, the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`) |
+| `src/renderer/src/Diff.tsx` | a diff's shared pieces (Changes, Review, the full review): `diffByFile`, `DiffRows`, `CommentBox`, `ImageDiff`, `useRevert`, `useGhViewed`, `ThreadCard`, `useSuggestions`, `useLoad` |
 | `src/renderer/src/Notes.tsx` | the Notes page: the list with search and colors, the open note in BlockNote (SpecEditor) |
 | `src/daemon/plans.ts` | specs and brainstorms: their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |

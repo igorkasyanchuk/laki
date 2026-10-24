@@ -1438,7 +1438,7 @@ export function settingsSet(o: Settings, own = false) {
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
   save()
   changed()
-  if ('diffStat' in o) void scanStats() // its numbers now, not at the next scan
+  if ('diffStat' in o || 'fullReview' in o) void scanStats() // its numbers now, not at the next scan
   if (dirs(state.settings) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's (an agent's) too
   return state.settings
 }

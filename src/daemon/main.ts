@@ -300,6 +300,7 @@ const api: Record<string, Handler> = {
   skills: () => skills(),
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),
+  prReview: p => core.prReview(p),
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
   prLabel: p => core.prLabel(p),

@@ -1,15 +1,16 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
 // checks and review comments; a phone's screen (Simulator); a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
-import { Folded, Markdown } from './MarkdownView'
+import { Markdown } from './MarkdownView'
+import { CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions } from './Diff'
 import type { MergeMethod } from '../../shared/types'
-import { ago, type AutoKey, Avatar, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, linesAt, parseCsv, parseSize, previewAddr, previewUrl, reviewedLines, type RunAction, sameLines, SIZES, splitRows, type Suggestion, suggestionOf, toCsv } from './text'
-import { ask, escapes, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
+import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
+import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
+import { ask, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -66,27 +67,6 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'device', label: 'Simulator', icon: 'phone' },
 ]
 
-// what load gives, again every few seconds while the window is in front, and on reload()
-function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
-  const [d, setD] = useState<T | null>(null)
-  const [err, setErr] = useState('')
-  const [n, setN] = useState(0)
-  const f = useRef(load)
-  f.current = load
-  useEffect(() => setD(null), [key])
-  useEffect(() => {
-    let alive = true
-    const go = () => f.current().then(x => alive && (setD(x), setErr('')), e => alive && setErr(String(e?.message ?? e)))
-    go()
-    const t = setInterval(() => !document.hidden && go(), every)
-    return () => {
-      alive = false
-      clearInterval(t)
-    }
-  }, [key, n, every])
-  return [d, err, () => setN(x => x + 1)] as const
-}
-
 type Node = { name: string; path: string; dir: boolean }
 
 // each folder's entries, folders first; a path ending in / is an empty folder
@@ -107,7 +87,6 @@ function tree(files: string[]) {
   return kids
 }
 
-const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const ST: Record<string, string> = { M: 'modified', A: 'new', D: 'deleted', R: 'renamed', '?': 'new' }
 
 // root: the worktree's files, or its Artifacts (read-only here: no new files; a double click opens one in its app)
@@ -242,125 +221,6 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
   )
 }
 
-// the diff of one file, without its header lines
-const fileOf = (l: string) => l.match(/ b\/(.*)$/)?.[1] ?? ''
-
-// a diff line with its line numbers: old (the base's) and new (the branch's); a hunk header has neither. hunk: which
-// of the file's hunks it's in, at: its index in that hunk's body (the hunk header has none)
-type DiffLine = { text: string; old?: number; new?: number; hunk?: number; at?: number }
-// a file's diff lines and its hunks' raw text (the @@ line and its body, as Revert sends it); cut: the diff's size cap
-// ran into it
-type FileDiff = { lines: DiffLine[]; hunks: string[]; cut?: boolean }
-const CUT = '\n… (cut)'
-// lines picked for Revert (⌥-click, ⇧-click a range): one hunk's, by their index in its body; last: where ⇧ starts
-type Picks = { path: string; hunk: number; text: string; at: number[]; last: number }
-const changeLine = (l: DiffLine) => (l.old === undefined) !== (l.new === undefined) // a + or - line
-
-// a comment on one diff line: to the PR on GitHub, or to the workspace's agent. The text lives in ChangesTab: a
-// refresh can move the line, and the box with it.
-function CommentBox({ path, line, text, setText, pr, api, onClose }: { path: string; line: DiffLine; text: string; setText: (t: string) => void; pr?: number; api: PanelApi; onClose: () => void }) {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const n = line.new ?? line.old!
-  const go = (f: () => Promise<unknown>) => {
-    if (busy || !text.trim()) return
-    setBusy(true)
-    setErr('')
-    f().then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
-  }
-  const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: text }))
-  const toAgent = () => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`, true))
-  return (
-    <div className="dl-comment" onClick={e => e.stopPropagation()}>
-      <textarea
-        autoFocus
-        rows={3}
-        value={text}
-        placeholder={`A comment on line ${n} · ⌘⏎ ${pr ? 'posts it' : 'sends it to the agent'}`}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Escape') onClose()
-          else if (e.key === 'Enter' && e.metaKey) pr ? toPR() : toAgent()
-        }}
-      />
-      {err && <div className="warn small">{err}</div>}
-      <div className="row">
-        {pr ? (
-          <button className="primary" disabled={busy || !text.trim()} onClick={toPR}>
-            Comment on PR #{pr}
-          </button>
-        ) : (
-          <span className="muted small">No PR yet</span>
-        )}
-        <button disabled={busy || !text.trim()} onClick={toAgent}>
-          Send to the agent
-        </button>
-        <span className="grow" />
-        <button className="link small" onClick={onClose}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// an image the changes touched, before and after side by side (one side when it's new or gone), each with its size in
-// pixels and bytes; a click shows it full size. An SVG is an <img> too: never markup in the page
-const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i
-function ImageDiff({ api, path, status }: { api: PanelApi; path: string; status: string }) {
-  const s = status[0] === '?' ? 'A' : status[0]
-  const [sides, setSides] = useState<[string, FileContent | string][]>([])
-  const [zoom, setZoom] = useState<string | null>(null)
-  useEffect(() => {
-    const want: [string, Promise<FileContent> | null][] = [
-      ['before', s === 'A' || s === 'R' ? null : api.read(path, true)], // a rename's old path isn't known here
-      ['after', s === 'D' ? null : api.read(path)],
-    ]
-    let live = true
-    Promise.all(want.filter(([, p]) => p).map(([label, p]) => p!.then(c => [label, c] as [string, FileContent], e => [label, (e as Error).message] as [string, string]))).then(r => live && setSides(r))
-    return () => void (live = false)
-  }, [path, s])
-  useEffect(() => {
-    if (!zoom) return
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), setZoom(null))
-    window.addEventListener('keydown', f, true)
-    return () => window.removeEventListener('keydown', f, true)
-  }, [zoom])
-  return (
-    <div className="img-diff">
-      {!sides.length && <span className="muted small pad">Loading…</span>}
-      {sides.map(([label, c]) => (
-        <ImageSide key={label} label={label} c={c} onZoom={setZoom} />
-      ))}
-      {zoom && (
-        <div className="img-zoom" onClick={() => setZoom(null)} data-tip="Click or Esc to close">
-          <img src={zoom} alt={path} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ImageSide({ label, c, onZoom }: { label: string; c: FileContent | string; onZoom: (src: string) => void }) {
-  const [px, setPx] = useState('')
-  if (typeof c === 'string' || !c.image)
-    return (
-      <figure className="img-side">
-        <span className="muted small">{typeof c === 'string' ? c : `too big to show (${sizeText(c.size)})`}</span>
-        <figcaption className="muted small">{label}</figcaption>
-      </figure>
-    )
-  return (
-    <figure className="img-side">
-      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} onClick={() => onZoom(c.image!)} />
-      <figcaption className="muted small">
-        {label} · {px}
-        {sizeText(c.size)}
-      </figcaption>
-    </figure>
-  )
-}
-
 // whole: the PR's diff (gh pr diff) instead of the workspace's; first for a workspace that only links its PR
 function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; onOpen: (url: string) => void }) {
   const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the panel opens)
@@ -369,121 +229,30 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, all])
-  const byFile = useMemo(() => {
-    const m = new Map<string, FileDiff>()
-    let cur: FileDiff | null = null
-    let old = 0
-    let now = 0
-    let last = ''
-    let at = 0 // a line's index in its hunk's body
-    const text = d?.diff ?? ''
-    for (const l of (text.endsWith(CUT) ? text.slice(0, -CUT.length) : text).split('\n')) {
-      const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l)
-      const hunk = cur ? cur.hunks.length - 1 : -1
-      if (l.startsWith('diff --git ')) m.set((last = fileOf(l)), (cur = { lines: [], hunks: [] }))
-      else if (!cur || (hunk < 0 && !h)) continue // its header: index, ---, +++, new file, rename… (a body line can start with --- too)
-      else if (h) (old = +h[1]), (now = +h[2]), (at = 0), cur.hunks.push(l), cur.lines.push({ text: l, hunk: hunk + 1 })
-      else {
-        cur.hunks[hunk] += '\n' + l
-        if (l[0] === '+') cur.lines.push({ text: l, new: now++, hunk, at: at++ })
-        else if (l[0] === '-') cur.lines.push({ text: l, old: old++, hunk, at: at++ })
-        else if (l[0] === ' ') cur.lines.push({ text: l, old: old++, new: now++, hunk, at: at++ })
-        else cur.lines.push({ text: l, hunk, at: at++ }) // \ No newline at end of file
-      }
-    }
-    const lastOne = m.get(last)
-    if (text.endsWith(CUT) && lastOne) lastOne.cut = true // its hunks may be whole only in part: no Revert but the file's
-    return m
-  }, [d])
-  // Revert's picks: a refresh that changes their hunk drops them
-  const [picks, setPicks] = useState<Picks | null>(null)
-  useEffect(() => setPicks(p => (p && byFile.get(p.path)?.hunks[p.hunk] === p.text ? p : null)), [byFile])
-  useEffect(() => setPicks(null), [ws, all])
-  useEffect(() => {
-    if (!picks) return
-    // Esc drops them, before a terminal with the keyboard gets it (its agent would stop)
-    const f = (e: KeyboardEvent) => escapes(e) && (e.stopPropagation(), e.preventDefault(), setPicks(null)) // not a dialog's (Revert's ask): it keeps them
-    window.addEventListener('keydown', f, true)
-    return () => window.removeEventListener('keydown', f, true)
-  }, [!!picks])
-  // ⌥-click toggles a + or - line, ⇧-click picks the range from the last pick (one hunk's: another's starts over)
-  const pickLine = (path: string, l: DiffLine, range: boolean) => {
-    const text = byFile.get(path)?.hunks[l.hunk!]
-    if (text === undefined || l.at === undefined) return
-    setPicks(p => {
-      const here = p && p.path === path && p.hunk === l.hunk ? p : null
-      if (!here || !range) {
-        const at = here?.at.includes(l.at!) ? here.at.filter(x => x !== l.at) : [...(here?.at ?? []), l.at!]
-        return at.length ? { path, hunk: l.hunk!, text, at, last: l.at! } : null
-      }
-      const [a, b] = [Math.min(here.last, l.at!), Math.max(here.last, l.at!)]
-      const span = (byFile.get(path)?.lines ?? []).filter(x => x.hunk === l.hunk && x.at !== undefined && x.at >= a && x.at <= b && changeLine(x)).map(x => x.at!)
-      return { ...here, at: [...new Set([...here.at, ...span])], last: l.at! }
-    })
-  }
-  const picked = (path: string, l: DiffLine) => !!picks && picks.path === path && picks.hunk === l.hunk && l.at !== undefined && picks.at.includes(l.at)
-  const [busyRevert, setBusyRevert] = useState(false)
-  const revert = (f: () => Promise<boolean>) => {
-    if (busyRevert) return
-    setBusyRevert(true)
-    f().then(done => done && setPicks(null), () => {}).finally(() => setBusyRevert(false)) // a no keeps the picks
-  }
-  const revertHunk = (path: string, hunk: number) => {
-    const text = byFile.get(path)?.hunks[hunk]
-    if (text !== undefined) revert(() => api.undoHunk(path, text, undefined, reload))
-  }
-  const revertPicks = () => picks && revert(() => api.undoHunk(picks.path, picks.text, [...picks.at].sort((a, b) => a - b), reload))
+  const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
+  const rv = useRevert(api, byFile, all, reload, `${ws}#${all}`)
   const [menu, openMenu] = useMenu()
-  const fileMenu = (e: MouseEvent, path: string) =>
-    !all && openMenu(e, [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => revert(() => api.undoFile(path, reload)) }])
-  const same = (a: DiffLine, b: DiffLine) => a.old === b.old && a.new === b.new && a.text === b.text
+  const fileMenu = (e: MouseEvent, path: string) => !all && openMenu(e, [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) }])
   // a click (not a drag that selects text) on a line opens its comment box
-  const pick = (path: string, l: DiffLine, e?: MouseEvent) => {
-    if (e && (e.altKey || e.shiftKey) && !all && changeLine(l) && !byFile.get(path)?.cut) return pickLine(path, l, e.shiftKey)
-    if ((l.old ?? l.new) !== undefined && !window.getSelection()?.toString()) setAt(a => (a?.path === path && same(a.line, l) ? null : { path, line: l, text: '' }))
+  const pick = (path: string, l: DiffLine, e: MouseEvent) => {
+    if (rv.onPick(path, l, e)) return
+    if ((l.old ?? l.new) !== undefined && !window.getSelection()?.toString()) setAt(a => (a?.path === path && sameLine(a.line, l) ? null : { path, line: l, text: '' }))
   }
-  // ⌥ and ⇧ pick lines: no text selection meanwhile
-  const noSelect = (e: MouseEvent) => (e.altKey || e.shiftKey) && !all && e.preventDefault()
   // where the box goes after a refresh: under its line, else (the line changed) at the end of the file's diff
   const boxAt = (path: string, lines: DiffLine[]) => {
-    if (at?.path !== path) return -1
-    const i = lines.findIndex(l => same(l, at.line))
-    return i < 0 ? lines.length - 1 : i
+    if (at?.path !== path) return undefined
+    return lines.find(l => sameLine(l, at.line)) ?? lines.at(-1)
   }
   const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
   const [split, setSplit] = useState(() => localStore('laki.diffSplit') === 'split') // side by side, as GitHub's split view; the last one picked
   const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
-  const lineClass = (path: string, l: DiffLine) => `dl ${l.text.startsWith('@@') ? 'dl-hunk' : l.new === undefined && l.old !== undefined ? 'dl-del' : l.old === undefined && l.new !== undefined ? 'dl-add' : ''}${(l.old ?? l.new) !== undefined ? ' dl-line' : ''}${picked(path, l) ? ' picked' : ''}`
-  // a hunk header's Revert (Here only: the PR's diff needn't be the worktree's)
-  const hunkHead = (path: string, l: DiffLine, cut?: boolean) => (
-    <>
-      <span>{l.text || ' '}</span>
-      {!all && !cut && l.hunk !== undefined && (
-        <button type="button" className="dl-revert" disabled={busyRevert} data-tip="Take this hunk back to the base: Undo is in the toast" onClick={e => (e.stopPropagation(), revertHunk(path, l.hunk!))}>
-          Revert
-        </button>
-      )}
-    </>
-  )
   const files = d?.files ?? []
-  // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims.
-  // DISMISSED (viewed, then changed by a commit) is unticked. mine: ticks made here until GitHub's next answer has them
-  const [gh] = useLoad<PRFiles | null>(pr ? api.prFiles : () => Promise.resolve(null), `${ws}#${pr?.number ?? ''}`, 60000)
-  const [mine, setMine] = useState<Record<string, string>>({})
-  useEffect(() => setMine({}), [ws])
-  useEffect(() => setMine(m => Object.fromEntries(Object.entries(m).filter(([p, v]) => gh?.files[p] !== v))), [gh]) // kept until GitHub's answer has them (one asked for before the tick doesn't)
-  const viewedOf = (p: string) => mine[p] ?? gh?.files[p]
+  // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims
+  const vw = useGhViewed(api, ws, pr?.number)
+  const viewedOf = vw.viewedOf
   const inPR = files.filter(f => viewedOf(f.path))
   const viewed = inPR.filter(f => viewedOf(f.path) === 'VIEWED').length
-  const [vErr, setVErr] = useState('')
-  const mark = (p: string, on: boolean) => {
-    if (!gh) return
-    const was = viewedOf(p)
-    setMine(m => ({ ...m, [p]: on ? 'VIEWED' : 'UNVIEWED' }))
-    if (on) setOpen(o => (o.delete(p), new Set(o)))
-    setVErr('')
-    api.setViewed(p, on, gh.id).catch(e => (setMine(m => ({ ...m, [p]: was! })), setVErr(String(e?.message ?? e))))
-  }
+  const mark = (p: string, on: boolean) => (vw.mark(p, on), on && setOpen(o => (o.delete(p), new Set(o))))
   return (
     <>
       <div className="sp-tools">
@@ -516,7 +285,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
       </div>
       <div className="sp-body">
         {err && <div className="warn small pad">{err}</div>}
-        {vErr && <div className="warn small pad">{vErr}</div>}
+        {vw.err && <div className="warn small pad">{vw.err}</div>}
         {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {files.map(f => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
@@ -543,38 +312,18 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             {open.has(f.path) && (!IMAGE.test(f.path) || all) /* the PR's images: GitHub has them */ && (
               <div className={`sp-diff ${split ? 'split' : ''}`}>
                 {(fd => {
-                  const lines = fd.lines
-                  const box = boxAt(f.path, lines)
-                  const comment = at && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />
-                  const row = (l: DiffLine, more = '') => (
-                    <div className={`${lineClass(f.path, l)}${more}`} onMouseDown={noSelect} onClick={e => pick(f.path, l, e)}>
-                      {l.text.startsWith('@@') ? hunkHead(f.path, l, fd.cut) : more ? l.text.slice(1) || ' ' : l.text || ' '}
-                    </div>
+                  const box = boxAt(f.path, fd.lines)
+                  return (
+                    <DiffRows
+                      fd={fd}
+                      split={split}
+                      cls={l => lineClass(l, rv.picked(f.path, l))}
+                      row={l => ({ onMouseDown: rv.noSelect, onClick: e => pick(f.path, l, e) })}
+                      head={l => rv.hunkHead(f.path, l, fd.cut)}
+                      after={l => at && l === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />}
+                    />
                   )
-                  if (split) {
-                    // two columns: the base's lines on the left, the branch's on the right, without their - and +
-                    const cell = (l?: DiffLine) => (l ? row(l, ' dl-cell') : <div className="dl dl-none" />)
-                    return splitRows(lines).map((r, i) => (
-                      <Fragment key={i}>
-                        {r.full ? (
-                          <div className={`${lineClass(f.path, r.full)} dl-full`}>{r.full.text.startsWith('@@') ? hunkHead(f.path, r.full, fd.cut) : r.full.text || ' '}</div>
-                        ) : (
-                          <>
-                            {cell(r.left)}
-                            {cell(r.right)}
-                          </>
-                        )}
-                        {at && box >= 0 && [r.full, r.left, r.right].includes(lines[box]) && comment}
-                      </Fragment>
-                    ))
-                  }
-                  return lines.map((l, i) => (
-                    <Fragment key={i}>
-                      {row(l)}
-                      {i === box && comment}
-                    </Fragment>
-                  ))
-                })(byFile.get(f.path) ?? { lines: [{ text: '(no text diff: binary, or past the size cap)' }], hunks: [] })}
+                })(byFile.get(f.path) ?? NO_DIFF)}
                 {f.status[0] !== 'D' && !all /* this workspace's copy needn't be the PR's */ && (
                   <span className="row">
                     <button className="link small" onClick={() => api.preview(f.path)}>
@@ -589,19 +338,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             )}
           </div>
         ))}
-        {picks && (
-          <div className="dl-picks" role="status">
-            <span>
-              {picks.at.length} line{picks.at.length === 1 ? '' : 's'} picked
-            </span>
-            <button type="button" className="primary" disabled={busyRevert} onClick={revertPicks}>
-              Revert these
-            </button>
-            <button type="button" className="link small" onClick={() => setPicks(null)}>
-              Esc
-            </button>
-          </div>
-        )}
+        {rv.bar}
       </div>
       {menu}
     </>
@@ -614,32 +351,7 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
   const said = (threads ?? []).filter(t => t.comments.length)
   const open = said.filter(t => !t.resolved)
   const resolved = said.filter(t => t.resolved)
-  // each file's open suggestions (a thread's newest) and the file as it is now; pending: those still as the review saw them
-  const edits = new Map<string, Suggestion[]>()
-  for (const t of open) {
-    const e = !t.outdated && editOf(t, t.comments.map(c => suggestionOf(c.body)).filter(x => !!x).at(-1)?.lines)
-    if (e) edits.set(t.path, [...(edits.get(t.path) ?? []), e])
-  }
-  const [texts, setTexts] = useState<Record<string, string | undefined>>({})
-  const [n, setN] = useState(0) // after an Apply and its Undo: read again
-  const [busy, setBusy] = useState(false)
-  useEffect(() => setTexts({}), [p.w.id])
-  const files = [...edits.keys()].join('\n')
-  useEffect(() => {
-    let alive = true
-    for (const f of files ? files.split('\n') : []) p.api.read(f).then(c => alive && setTexts(x => ({ ...x, [f]: c.text })), () => {})
-    return () => {
-      alive = false
-    }
-  }, [files, threads, n])
-  const pending = (path: string) => (edits.get(path) ?? []).filter(e => texts[path] === undefined || sameLines(linesAt(texts[path]!, e.start, e.end), e.seen))
-  const apply = (path: string, es: Suggestion[]) => {
-    setBusy(true)
-    p.api
-      .apply(path, es, () => setN(x => x + 1))
-      .catch(() => {})
-      .finally(() => setBusy(false))
-  }
+  const props = useSuggestions(p.api, open, p.w.id, threads)
   return (
     <div className="sp-body info-body">
       <PRSection w={p.w} threads={threads ? open.length : err ? undefined : 0} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />
@@ -655,7 +367,7 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
           {!threads && !err && <span className="muted small">Loading…</span>}
           {threads && !open.length && <span className="muted small">{resolved.length ? 'No open review comments' : 'No review comments'}</span>}
           {open.map(t => (
-            <ThreadCard key={threadKey(t)} t={t} api={p.api} text={texts[t.path]} pending={pending(t.path)} busy={busy} onApply={es => apply(t.path, es)} />
+            <ThreadCard key={threadKey(t)} t={t} api={p.api} {...props(t)} />
           ))}
           {resolved.length > 0 && (
             <details className="sp-resolved">
@@ -668,94 +380,6 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
           {threads && <span className="muted small">From reviewers with write access and bots: what the agent gets.</span>}
         </section>
       )}
-    </div>
-  )
-}
-
-// a thread's key across refreshes: where it is and when it began (the daemon gives no id)
-const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`
-
-// a thread's suggestion as an edit: lines on the new file's side whose hunk shows them (what the review saw: Apply
-// needs the file's lines there to be those still)
-const editOf = (t: Thread, lines?: string[]): Suggestion | null => {
-  if (!lines || t.side !== 'RIGHT' || !t.line || !t.hunk) return null
-  const start = t.startLine ?? t.line
-  const seen = reviewedLines(t.hunk, t.line - start + 1)
-  return seen && { start, end: t.line, seen, lines }
-}
-
-type ApplyProps = { text?: string; pending?: Suggestion[]; busy?: boolean; onApply?: (edits: Suggestion[]) => void } // an open thread's: its file now, the file's suggestions still to apply
-
-// a review thread: where (a click shows the file at that line), then each comment as Markdown, a suggestion as a diff
-function ThreadCard({ t, api, ...a }: { t: Thread; api: PanelApi } & ApplyProps) {
-  return (
-    <div className="sp-thread">
-      <button className="sp-thread-head" onClick={() => api.preview(t.path, t.line)} data-tip="Show the file at this line">
-        <Icon name="file" />
-        <span className="sp-thread-path">
-          {t.path}
-          {t.line ? `:${t.line}` : ''}
-        </span>
-        {t.outdated && <span className="tag">outdated</span>}
-      </button>
-      {t.comments.map((c, j) => (
-        <div key={j} className="sp-comment">
-          <div className="sp-comment-by">
-            <Avatar login={c.author} size={16} />
-            <b>{c.author}</b>
-            {c.at && <span className="muted">{ago(c.at)}</span>}
-          </div>
-          {(s =>
-            s ? (
-              <>
-                {s.rest && <Folded text={s.rest} lines={10} />}
-                <Suggested t={t} lines={s.lines} {...a} />
-              </>
-            ) : (
-              <Folded text={c.body} lines={10} />
-            ))(suggestionOf(c.body))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// a comment's suggestion: the file's lines now (else what the review saw) and the suggested ones; Apply while they're
-// as the review saw them (an open thread, not outdated, on the new file's side), Apply all with the file's others
-function Suggested({ t, lines, text, pending = [], busy, onApply }: { t: Thread; lines: string[] } & ApplyProps) {
-  const e = !t.outdated && onApply ? editOf(t, lines) : null
-  const now = e && text !== undefined ? linesAt(text, e.start, e.end) : null
-  const state = !e ? '' : !now || sameLines(now, e.seen) ? 'apply' : sameLines(now, lines) ? 'applied' : 'changed'
-  const was = (state === 'changed' ? now : e?.seen) ?? []
-  return (
-    <div className="sp-sugg">
-      <div className="sp-diff">
-        {was.map((l, i) => (
-          <div key={`-${i}`} className="dl dl-del">
-            -{l}
-          </div>
-        ))}
-        {lines.map((l, i) => (
-          <div key={`+${i}`} className="dl dl-add">
-            +{l}
-          </div>
-        ))}
-        {!lines.length && <div className="dl muted">(the lines go)</div>}
-      </div>
-      {state === 'apply' && (
-        <span className="row-buttons">
-          <button type="button" disabled={busy} data-tip="Put it in the file: Undo is in the toast; nothing is committed" onClick={() => onApply!([e!])}>
-            Apply
-          </button>
-          {pending.length > 1 && (
-            <button type="button" className="link small" disabled={busy} onClick={() => onApply!(pending)}>
-              Apply all {pending.length} in {t.path.slice(t.path.lastIndexOf('/') + 1)}
-            </button>
-          )}
-        </span>
-      )}
-      {state === 'applied' && <span className="muted small">Applied: it goes in with your next commit</span>}
-      {state === 'changed' && <span className="muted small">Changed since the review: these lines aren't what it saw</span>}
     </div>
   )
 }
@@ -1519,7 +1143,6 @@ function CsvTable({ path, text, edit, onText }: { path: string; text: string; ed
   )
 }
 
-const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
 export function FilePreview(p: {
@@ -1688,15 +1311,6 @@ export function FilePreview(p: {
       )}
     </div>
   )
-}
-
-// localStorage, or nothing (a private window, blocked storage)
-function localStore(k: string, v?: string) {
-  try {
-    if (v === undefined) return localStorage.getItem(k)
-    localStorage.setItem(k, v)
-  } catch {}
-  return null
 }
 
 // q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and

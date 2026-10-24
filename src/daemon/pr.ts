@@ -609,6 +609,66 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
   return { url: c.html_url as string | undefined }
 }
 
+export type ReviewComment = { path: string; line: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; body: string }
+// prReview: the full review's pending comments on the PR as one review (event COMMENT, at its head commit), as you.
+// Every line must be in the PR's diff on its side (gh pr diff): one that isn't refuses them all, by name, before
+// anything is posted. Fields as gh's comments[][…], so no body file (a host's gh too); ponytail: gh 2.50+ reads them
+export async function prReview(o: { ws: string; body?: string; comments: ReviewComment[] }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (!pr.head) throw new Error(`PR #${pr.number}'s head commit isn't known yet: try again in a minute`)
+  const cs = Array.isArray(o.comments) ? o.comments : []
+  if (!cs.length) throw new Error('no comments to post')
+  if (cs.length > 100) throw new Error('100 comments at most in one review')
+  for (const c of cs) {
+    inside(ws, String(c?.path ?? ''))
+    if (!Number.isInteger(c.line) || c.line < 1) throw new Error(`${c.path}: which line?`)
+    if (c.startLine !== undefined && (!Number.isInteger(c.startLine) || c.startLine < 1 || c.startLine >= c.line)) throw new Error(`${c.path}:${c.line}: its range starts after it ends`)
+    if (typeof c.body !== 'string' || !c.body.trim()) throw new Error(`${c.path}:${c.line}: the comment is empty`)
+  }
+  const shown = diffLines((await prDiff(ws.id)).diff)
+  const side = (c: ReviewComment) => (c.side === 'LEFT' ? 'LEFT' : 'RIGHT')
+  const out = cs.filter(c => {
+    const s = shown.get(c.path)?.[side(c)]
+    for (let n = c.startLine ?? c.line; n <= c.line; n++) if (!s?.has(n)) return true
+    return false
+  })
+  if (out.length) throw new Error(`not in PR #${pr.number}'s diff (commit and push first): ${out.map(c => `${c.path}:${c.startLine ? `${c.startLine}-` : ''}${c.line}`).join(', ')}`)
+  const args = ['api', `repos/{owner}/{repo}/pulls/${pr.number}/reviews`, '-f', 'event=COMMENT', '-f', `commit_id=${pr.head}`, ...(o.body?.trim() ? ['-f', `body=${o.body}`] : [])]
+  for (const c of cs) {
+    args.push('-f', `comments[][path]=${c.path}`, '-f', `comments[][body]=${c.body}`, '-F', `comments[][line]=${c.line}`, '-f', `comments[][side]=${side(c)}`)
+    if (c.startLine) args.push('-F', `comments[][start_line]=${c.startLine}`, '-f', `comments[][start_side]=${side(c)}`)
+  }
+  const { stdout } = await exec(ws, 'gh', args, { timeout: 30000 }).catch(e => {
+    const why = String(e.stderr || e.stdout || '').trim()
+    throw new Error(/422|Unprocessable/i.test(why) ? `GitHub turned the review down: ${why.split('\n')[0]}` : `gh couldn't post the review: ${why.split('\n')[0] || 'it failed'}`)
+  })
+  const r = JSON.parse(stdout || '{}')
+  return { url: r.html_url as string | undefined, n: cs.length }
+}
+
+// the lines a unified diff shows, each file's on either side: what GitHub lets a comment go on
+function diffLines(text: string) {
+  const m = new Map<string, { LEFT: Set<number>; RIGHT: Set<number> }>()
+  let f: { LEFT: Set<number>; RIGHT: Set<number> } | undefined
+  let old = 0
+  let now = 0
+  let hunk = false
+  for (const l of text.split('\n')) {
+    const g = /^diff --git a\/.* b\/(.*)$/.exec(l)
+    const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l)
+    if (g) m.set(g[1], (f = { LEFT: new Set(), RIGHT: new Set() })), (hunk = false)
+    else if (!f) continue
+    else if (h) (old = +h[1]), (now = +h[2]), (hunk = true)
+    else if (!hunk) continue
+    else if (l[0] === '+') f.RIGHT.add(now++)
+    else if (l[0] === '-') f.LEFT.add(old++)
+    else if (l[0] === ' ') f.LEFT.add(old++), f.RIGHT.add(now++)
+  }
+  return m
+}
+
 // prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
 // as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
 // scan, for its new state

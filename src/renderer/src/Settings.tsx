@@ -184,6 +184,7 @@ export type AppSettings = Paint & {
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
   todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
+  fullReview?: boolean // experimental: the tab bar's Review tab (FullReview.tsx), off unless true
   cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
@@ -415,6 +416,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
   ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
+  ['general', 'Full review', 'experimental review diff changes files viewed comments pending post github pr tab code review'],
   ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
@@ -1346,6 +1348,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
                   <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.fullReview === true} onChange={v => set({ fullReview: v })}>
+                  <Says title="Full review" hint="A Review tab first in the tab bar (⌘1) while a workspace has changes: every file's diff with Viewed boxes, comments you gather on lines, then sent to its agent or posted on the PR as one review" />
                 </Switch>
                 <Switch className="switch-row" on={s.cloud === true} onChange={v => set({ cloud: v })}>
                   <Says title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it" />

@@ -5,6 +5,7 @@ import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
+import { FullReview, type ReviewApi } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
@@ -1111,6 +1112,7 @@ export function App() {
     mru.current = [t.id, ...mru.current.filter(x => x !== t.id)].slice(0, 200)
     setWsId(t.workspace)
     setTabByWs(m => ({ ...m, [t.workspace]: t.id }))
+    setReviewing(m => (m[t.workspace] ? { ...m, [t.workspace]: false } : m))
   }, [])
   const selectGroup = (g: Layout) => selectTab(mru.current.find(id => tabsOf(g).includes(id)) ?? tabsOf(g)[0])
   // narrow shows them flat: kept as they were. To the daemon a moment later (a divider's drag is many)
@@ -1659,6 +1661,14 @@ export function App() {
         }
       : undefined,
   })
+  // the full review's: the panel's, the workspace's agents (the focused one first), a send when its turn ends, and the
+  // PR's review
+  const reviewApi = (w: WorkspaceView): ReviewApi => ({
+    ...panelApi(w),
+    agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
+    send: (tab, text) => api.call('send', { target: tab, text, whenIdle: true }).then(() => done(`Sent the review to ${view?.tabs.find(t => t.id === tab)?.name ?? 'the agent'}`)),
+    post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
+  })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
   // rest a document in its app, else shown in Finder
   const inViewer = (path: string) => settings.artifactsIn !== 'browser' && VIEWED.test(path)
@@ -1822,6 +1832,17 @@ export function App() {
   const kindOf = (w: WorkspaceView): RailKind => railOf(rawKind(w))
   const isTerm = (w: WorkspaceView) => !!w.term || rawKind(w) === 'shells' // a terminal: closed, not deleted
   useEffect(() => void (railOf(railKind) !== railKind && setRailKind('projects')), [railKind, settings.railShells, settings.railBrowsers])
+  // the full review (settings.fullReview, FullReview.tsx): the tab bar's first tab while a git workspace has changes
+  // (its stat); shown or not per workspace (a session's tab picked leaves it), and the stat it last showed: its dot,
+  // files changed since
+  const [reviewing, setReviewing] = useState<Record<string, boolean>>({})
+  const [reviewSeen, setReviewSeen] = useState<Record<string, string>>({})
+  const statKey = ws?.stat ? JSON.stringify(ws.stat) : ''
+  const reviewTab = !!ws && settings.fullReview === true && git && !!ws.stat?.files && ws.browser === undefined && !isTerm(ws) && !ws.archived
+  const reviewOn = reviewTab && !!reviewing[ws!.id]
+  const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
+  const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
+  useEffect(() => void (reviewOn && ws && setReviewSeen(m => (m[ws.id] === statKey ? m : { ...m, [ws.id]: statKey }))), [reviewOn, ws?.id, statKey])
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
   useEffect(() => {
     if (!ws || !project) return
@@ -2603,7 +2624,7 @@ export function App() {
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
-    if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
+    if (/^[1-9]$/.test(k)) act[k] = () => (n => (n < 0 ? openReview() : groups[n] && selectGroup(groups[n])))(Number(k) - 1 - (reviewTab ? 1 : 0)) // the review's tab first: ⌘1
     if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
     const t = e.target as HTMLElement | null // ⌘↑/⌘↓ in a text field move its cursor (xterm's own textarea isn't one)
     if (k.startsWith('arrow') && t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t instanceof HTMLInputElement && !/^(checkbox|radio|button|submit)$/.test(t.type))) && !t.classList.contains('xterm-helper-textarea')) return
@@ -3172,8 +3193,15 @@ export function App() {
   const ctxLook = settings.contextMeter === false ? undefined : settings.contextMeter === 'ring' || settings.contextMeter === 'status' ? settings.contextMeter : 'line' // Settings › Appearance: the context meter, and how its tab shows it
   const ctxOn = !!ctxLook
   const costsOn = settings.costs !== false // and what agents used
+  const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
   const tabList = (
     <>
+      {reviewTab && (
+        <div className={`tab nodrag review-tab ${reviewOn ? 'sel' : ''}`} role="tab" aria-label="Review" onClick={openReview} data-keys="⌘1" data-tip={`Review: ${ws!.stat!.files} file${ws!.stat!.files === 1 ? '' : 's'}, +${ws!.stat!.add} −${ws!.stat!.del}${reviewDot ? ' · changed since you looked' : ''} · ⌘1`}>
+          <Icon name="review" size={13} />
+          {reviewDot && <i className="review-dot" />}
+        </div>
+      )}
       {groups.map(g => {
         const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
         const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3181,15 +3209,15 @@ export function App() {
         return (
           <div
             key={ts[0]?.id}
-            className={`tab nodrag ${g === group ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
+            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
             style={colorVar(colorOf(ts[0]))}
             onClick={() => selectGroup(g)}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-keys={groups.indexOf(g) < 9 ? `⌘${groups.indexOf(g) + 1}` : undefined}
-            data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
+            data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -3662,7 +3690,7 @@ export function App() {
                   <Term
                     key={transparent() ? 'clear' : 'solid' /* xterm takes allowTransparency only as it opens */}
                     tab={id}
-                    active={id === tab?.id && !dialog}
+                    active={id === tab?.id && !dialog && !reviewOn}
                     findSeq={finds[id] ?? 0}
                     fontSize={narrow ? Math.min(sizeOf(id), 11) : sizeOf(id) /* ponytail: a phone's own size, not a setting */}
                     fontFamily={settings.fontFamily}
@@ -3701,6 +3729,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} />] : []
             })}
+            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} pr={ws.pr} linked={ws.prLinked} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
           {tabsAt === 'right' && tabStrip}
           {previewed && ws && (

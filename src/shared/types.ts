@@ -466,6 +466,7 @@ export type Settings = {
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
+  fullReview?: boolean // experimental: the tab bar's Review tab, a workspace's whole diff in three columns (off unless true)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
@@ -826,5 +827,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 110
+export const API = 111
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

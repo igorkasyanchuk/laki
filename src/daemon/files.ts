@@ -246,8 +246,9 @@ export async function scanStats(): Promise<void> {
   if (statting) return void (restat = true)
   statting = true
   try {
-    // the sidebar's (settings.diffStat, off by default), and a race's always: Compare shows them
-    const on = state.settings?.diffStat === true
+    // the sidebar's (settings.diffStat, off by default) or the full review's tab (settings.fullReview: shown while
+    // there's a diff), and a race's always: Compare shows them
+    const on = state.settings?.diffStat === true || state.settings?.fullReview === true
     const wanted = (w: Workspace) => !w.archived && !away(w) && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
     for (const id of stats.keys()) if (!state.workspaces.some(w => w.id === id && wanted(w))) (stats.delete(id), changed())
     for (const w of state.workspaces) {

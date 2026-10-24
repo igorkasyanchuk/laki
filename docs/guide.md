@@ -395,6 +395,17 @@ selected workspace's PR is in the status bar.
 - ⌘1…⌘9 switch tabs. Double click a tab to rename it. A workspace's first agent tab, made with a prompt, is named after the
   agent (the workspace's name says its task); any other agent tab gets its prompt's first words, `claude: fix the cart
   total`, or the first prompt you type in it.
+- *Full review* (Settings › General › Experimental): a *Review* tab first in the tab bar (⌘1, the sessions' tabs from ⌘2)
+  while a workspace has changes; its tooltip says how many files and lines, a dot that they changed since you looked.
+  Three columns: the files, each with a *Viewed* box (a PR's file: GitHub's, as in Changes; any other: kept on this
+  Mac until its diff changes) and *n of m viewed*; every file's diff (one column or two, *All changes vs <base>* or
+  *PR #n*, *Revert* and a reviewer's *Apply* as in Changes and Review, a PR's open threads at their lines); and your
+  comments. Click a line to comment on it, or drag over lines for a range; *Add to the review* (⌘⏎) puts it in the
+  list, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*. *Send to <agent>*
+  gives them all to the workspace's agent as one message when its turn ends (▾: another agent); *Post on #n* posts
+  them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing goes. Keys: j / k
+  the next or last file, v Viewed, c a comment on the line under the mouse, ⌘⏎ sends to the agent. It reads the diff
+  again as the workspace's files change, keeping your place and comments.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
