@@ -78,7 +78,8 @@ Laki sends no analytics and no crash reports. With nothing set up, it calls:
 - GitHub, through your `gh`: PRs, checks, reviews;
 - GitHub's avatars (`avatars.githubusercontent.com`): PR authors' pictures (Settings › Appearance › GitHub pictures);
 - GitHub's API (`api.github.com`), every 4 hours: whether a newer release is out (Settings › General › Updates turns
-  it off). Nothing about you goes with it.
+  it off). It sends what any web request does (your IP address, and Laki's version as its user agent), nothing
+  else.
 
 Everything else only when you set it up or click it: Laki AI and Voice (OpenRouter), phone pushes (your webhook),
 Cloudflare or Tailscale (remote access, tunnels, shared tabs), memes (Reddit), a video (YouTube), an extension's own

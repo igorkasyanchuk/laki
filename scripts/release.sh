@@ -11,11 +11,8 @@
 set -eo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
-# .env (gitignored, .env.example): who signs and notarizes, so no name or team id lives in the repo
-if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
 REPO=$(node -p "const p = [].concat(require('./package.json').build.publish)[0]; p.owner + '/' + p.repo")
 TAP=${REPO%%/*}/homebrew-laki # brew install --cask <owner>/laki/laki
-PROFILE=${APPLE_KEYCHAIN_PROFILE:-laki-notary}
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
 # v<v> on the releases repo: draft, published or none; anything else gh says stops the script (in $(…) too: an
@@ -201,6 +198,10 @@ if want mac-x64; then
   arch -x86_64 /usr/bin/true 2> /dev/null || die "the Intel smoke test needs Rosetta: softwareupdate --install-rosetta (or --skip=mac-x64)"
 fi
 SIGN=()
+# .env (gitignored, .env.example): who signs and notarizes, so no name or team id lives in the repo; read here only,
+# so cask, tap, upload and publish never depend on it
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env" || die ".env: not a shell file (quote a value with spaces)"; set +a; fi
+PROFILE=${APPLE_KEYCHAIN_PROFILE:-laki-notary}
 if [ $ADHOC = 1 ]; then # package.json's identity "-": what `npm run dmg` makes; nothing to notarize with
   unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_KEYCHAIN_PROFILE
   echo "Ad-hoc: a download opens only through System Settings › Privacy & Security › Open Anyway, and can't auto-update."

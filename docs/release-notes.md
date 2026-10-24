@@ -6,7 +6,8 @@ version it builds, with the date. -->
 
 - An agent can't post a PR review or a line comment as you any more (the app's Review and Changes still do), nor
   open a tunnel to Laki's own port.
-- The Homebrew cask quits Laki before an uninstall and lets Laki update itself. About links to laki.sh.
+- The Homebrew cask quits the app before an uninstall (the daemon and your agents keep running: *Quit Laki
+  Completely* first stops them) and lets Laki update itself. About links to laki.sh.
 
 ## 0.27.0 · Oct 24, 2026
 

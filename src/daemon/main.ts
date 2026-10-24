@@ -505,6 +505,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
+  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }
@@ -685,9 +686,11 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 })
 
 const timers: NodeJS.Timeout[] = []
+const listening = new Promise<void>(r => server.once('listening', () => r()))
 void core
   .reapChildren()
   .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
+  .then(() => listening) // tunnelsBack skips the daemon's own port: known once it listens
   .then(() => core.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {

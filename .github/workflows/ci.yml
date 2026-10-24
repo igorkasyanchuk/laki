@@ -1,4 +1,4 @@
-# Typecheck, build and every test on Linux, as scripts/linux.sh runs them in Docker. ponytail: no macOS runner
+# Typecheck, build and every test (npm test) on Linux, as scripts/linux.sh runs them in Docker. ponytail: no macOS runner
 # (10x the minutes on a private repo); docs/release.md's checks run the Mac's before each release
 name: CI
 on:
@@ -25,4 +25,4 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npx electron-vite build
-      - run: node --experimental-strip-types --no-warnings --test --test-concurrency=2 test/*.test.ts
+      - run: npm test

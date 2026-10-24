@@ -418,7 +418,7 @@ export function tunnelsDown() {
 export function tunnelsBack(now = Date.now()) {
   for (const s of state.tunnels ?? []) {
     const w = state.workspaces.find(x => x.id === s?.ws && !x.archived)
-    if (!w || !Number.isInteger(s.port) || (s.until && s.until <= now) || tunnels.has(keyOf(s))) continue
+    if (!w || !Number.isInteger(s.port) || s.port === daemonPort || (s.until && s.until <= now) || tunnels.has(keyOf(s))) continue
     const t: TunnelRun = { ws: w.id, port: s.port, mails: Array.isArray(s.mails) ? s.mails.filter(m => typeof m === 'string' && MAIL.test(m)) : [], tries: 0, was: s.url, down: 'starting again after a restart', ...(s.until && { until: s.until }), ...(typeof s.host === 'string' && { host: s.host, ...(typeof s.via === 'string' && { via: s.via }) }) }
     tunnels.set(keyOf(t), t)
     if (!t.host) void quickRun(keyOf(t), t)
