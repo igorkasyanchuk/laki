@@ -345,6 +345,25 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .project-head { display: flex; align-items: center; gap: 1px; height: 28px; padding: 0 6px 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg); font-weight: 700; }
 .project-ws { margin-left: var(--ws-indent, 11px); border-left: var(--ws-guide, none); } /* its workspaces: indented under the chevron; a guide line only where a look draws one (look.css), or Settings' */
 .project-ws:empty { display: none; }
+/* the Needs you list (Needs.tsx) above Pinned: a card each, waiting ones edged in --waiting, done ones in --done */
+.needs-cards { display: flex; flex-direction: column; gap: 6px; padding: 2px 8px 8px 10px; }
+.need { display: flex; flex-direction: column; gap: 5px; padding: 7px 8px; border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: var(--rs, 8px); background: color-mix(in srgb, var(--fg) 3%, transparent); cursor: pointer; font-size: 12px; min-width: 0; }
+.need.need-done { border-left-color: var(--done); }
+.need:hover { background: var(--hover); }
+.need:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.need-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.need-ws { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.need-tab { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.need-head .elapsed { flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.need-q { color: var(--fg); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.need-last { color: var(--muted); -webkit-line-clamp: 2; }
+.need-opts { display: flex; flex-direction: column; gap: 3px; }
+.need-opts button, .need-acts button { font: inherit; font-size: 12px; text-align: left; padding: 3px 7px; border-radius: var(--rs, 6px); border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need-opts button:hover, .need-acts button:hover { border-color: var(--muted); }
+.need-opts button.on { border-color: color-mix(in srgb, var(--waiting) 60%, var(--line)); }
+.need-n { display: inline-block; min-width: 1.3em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.need-acts { display: flex; align-items: center; gap: 5px; }
+.need-acts button { text-align: center; }
 .project-ws .ws { padding-left: 8px; }
 .ws { font-size: var(--ws-font); } /* unset: invalid, so inherited */
 /* Settings › Appearance › Project names (App.tsx phAttrs): over any theme's */

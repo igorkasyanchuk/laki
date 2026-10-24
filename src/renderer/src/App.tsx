@@ -6,6 +6,7 @@ import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyActio
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
+import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, QueueStrip, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
@@ -2479,11 +2480,21 @@ export function App() {
     { label: 'Command…', icon: 'terminal', run: () => (w && setWsId(w.id), setDialog('custom')) }, // the dialog is for the selected one
   ]
   const newTabActions = newTabIn(ws)
-  // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), in the sidebar's order, around
+  // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), around
+  // the Needs you list's cards: answered as main's notification actions do (answer refuses a menu that changed)
+  const needsApi: NeedsApi = {
+    open: t => (setDialog(null), selectTab(t), narrow && setSideOpen(false)),
+    answer: (t, n, label) => void api.call('answer', { tab: t.id, n, label }).catch(() => toast('It asks something else now: open it', () => needsApi.open(t), 'Open')),
+    pick: (t, pick) => void api.call('answer', { tab: t.id, pick }).catch(e => toast((e as Error).message, () => needsApi.open(t), 'Open')),
+    permission: t => /permission/i.test(waits.current.get(t.id) ?? ''),
+    review: t => (setDialog(null), setWsId(t.workspace), showPanel('changes'), narrow && setSideOpen(false)),
+    seen: t => void call('seen', { tab: t.id }).catch(() => {}),
+    name: wsName,
+  }
+  // ⌘J and the Needs you list walk the same list: waiting first, then done, the oldest first in each
   const nextNeed = () => {
     earn('jump')
-    const tabs = order.flatMap(w => view?.tabs.filter(t => t.workspace === w.id && needsYou(t)) ?? [])
-    const need = [...tabs.filter(t => t.status === 'waiting'), ...tabs.filter(t => t.status !== 'waiting')]
+    const need = needsSorted(needing.filter(t => order.some(w => w.id === t.workspace)))
     if (!need.length) return toast('Nothing needs you')
     setDialog(null)
     selectTab(need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])
@@ -2508,7 +2519,7 @@ export function App() {
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
   // fold a project's workspaces away, or back; ids of removed projects go
-  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x))))
+  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => x === 'needs' || view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x)))) // needs: the Needs you list
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
@@ -3258,6 +3269,9 @@ export function App() {
         )}
         <div className="side-scroll">
           {find && !found && <div className="empty-side muted">No workspace matches.</div>}
+          {!find && (!rail || railKind === 'projects') && settings.needsList !== false && (
+            <NeedsList items={needsSorted(needing).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} />
+          )}
           {pins.length > 0 && (
             <div className="project pinned">
               <div className="project-head">

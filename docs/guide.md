@@ -232,6 +232,12 @@ selected workspace's PR is in the status bar.
   | <img src="icons/approved.svg" width="14" alt="check"> | approved |
   | <img src="icons/approved-you.svg" width="14" alt="double check"> | approved, and by you too |
   | 👀 | you commented on, or reviewed with comments, someone else's PR |
+- **Needs you**, at the sidebar's top (above Pinned and the projects; hidden when empty, a click on its head folds it):
+  every agent waiting for you, then the ones done while you looked away, the oldest first. A waiting one's card shows
+  what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a click answers it
+  there. A done one's shows its answer's first line and diff size, *Review* (the right panel's Changes) and *Seen*
+  (clears its ●). A click anywhere else opens the tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes
+  through the same list. Settings › Appearance › Sidebar › *Needs you list* turns it off.
 - A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
   a guide line beside them; none by default).
 - *Diff size in the sidebar* (Settings › Appearance › Sidebar, off by default) puts each workspace's diff size on its row

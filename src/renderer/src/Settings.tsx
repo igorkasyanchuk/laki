@@ -104,6 +104,7 @@ export type AppSettings = Paint & {
   env?: Record<string, string> // every session's
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
+  needsList?: boolean // the sidebar's Needs you list (unset: on)
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
@@ -321,6 +322,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
   ['appearance', 'Turn timers', 'elapsed time'],
   ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
+  ['appearance', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
@@ -1450,6 +1452,9 @@ export function SettingsPage(p: {
               </Group>
               <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
               <div className="setting-box">
+                <Switch className="switch-row" on={s.needsList !== false} onChange={v => set({ needsList: v })}>
+                  <Says title="Needs you list" hint="At the top of the sidebar: every agent waiting for you, its question and options to answer it there, then the ones done while you looked away (Review, Seen). ⌘J goes through the same list" />
+                </Switch>
                 <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
                   <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
                 </Switch>

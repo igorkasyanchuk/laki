@@ -217,6 +217,7 @@ const api: Record<string, Handler> = {
   wsFan: p => core.wsFan(core.byCaller(p)),
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
+  seen: p => core.seen(p.tab), // the Needs you list's Seen: its ● cleared, as a look does
   browse: p => core.browse(p),
   timer: p => core.timer(p),
   browseDone: p => core.browseDone(p),

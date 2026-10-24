@@ -781,6 +781,8 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   await rig.rpc('send', { target: tab.id, text: 'menu' })
   const asked = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.ask, 'the ask')
   assert.deepEqual(asked.options.map((o: any) => o.n), [1, 2, 3])
+  assert.equal(asked.question, 'Do you want to proceed?') // the Needs you list's card
+  assert.ok((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.needAt <= Date.now()) // waiting since
   const first = rig.rpc('answer', { tab: tab.id, n: 3 })
   await new Promise(r => setTimeout(r, 100)) // it holds the tab for a second after its Enter
   await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1 }), /being answered/) // a double click answers once
@@ -790,6 +792,9 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   // unread: ● again
   await rig.rpc('unread', { tab: tab.id })
   assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.done, true)
+  // seen: the ● gone without a look
+  await rig.rpc('seen', { tab: tab.id })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.done, false)
   // a race: one workspace per agent, named for it, one race id
   await assert.rejects(rig.rpc('wsFan', { project: p.id, presets: ['claude'], prompt: 'x' }), /two agents or more/)
   await assert.rejects(rig.rpc('wsFan', { project: p.id, presets: ['claude', 'codex'], prompt: 'x', local: true }), /needs worktrees/)
