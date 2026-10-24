@@ -60,6 +60,30 @@ test('resume after a daemon restart: agents get --resume <id>, shells start fres
   assert.deepEqual(v.tabs.map((t: any) => [t.name, t.status === 'exited']), [['claude', false], ['codex', false], ['shell', false]])
 })
 
+test("a restart's tabs start in turn: the rest wait as asleep, a look, a message or a shown workspace starts one now", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const wss = []
+  for (const name of ['one', 'two', 'three']) wss.push(await rig.rpc('wsNew', { project: p.id, name, preset: 'claude', prompt: `hi ${name}` }))
+  const ids = []
+  for (const ws of wss) ids.push((await until(async () => (t => t?.resumeId && t)(await rig.tab(ws.id, 'claude')), 'session id')).id)
+  await rig.stop()
+  rig.env.LAKI_RESTORE_GAP = '60000' // the first now, the next a minute later: past this test
+  await rig.start()
+  const claudes = () => rig.fakeLog().filter(l => l.bin === 'claude').length
+  const asleep = async () => (await rig.rpc('state')).tabs.filter((x: any) => x.asleep && x.queued).map((x: any) => x.id) // queued: its tooltip says so
+  await until(() => claudes() === 4, 'the oldest resumed')
+  assert.deepEqual(await asleep(), [ids[1], ids[2]]) // live (not exited), waiting their turn
+  await rig.rpc('tabWake', { tab: ids[2] }) // a look
+  await until(() => claudes() === 5, 'the one looked at')
+  assert.deepEqual(await asleep(), [ids[1]])
+  const app = await rig.connect()
+  await app.call('view', { tab: null, ws: wss[1].id, focused: true }) // a window shows its workspace
+  await until(async () => claudes() === 6 && (await asleep()).length === 0, 'the shown workspace')
+  await sleep(500)
+  assert.equal(claudes(), 6, 'each once')
+})
+
 test('shells come back after a daemon restart: their folder, an agent resumed, a command typed back, a Run tab again', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

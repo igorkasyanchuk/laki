@@ -4,7 +4,7 @@
 
 export const RELEASES = 'igorkasyanchuk/laki-releases'
 export const RELEASES_URL = `https://github.com/${RELEASES}/releases`
-export const UPDATE_EVERY = 24 * 60 * 60_000 // auto checks: at launch, then daily
+export const UPDATE_EVERY = 4 * 60 * 60_000 // auto checks: at launch, then every 4 hours
 
 export type Release = { version: string; notes: string; url: string; at?: string; feed: boolean } // feed: this Mac's
 export type UpdateState = {

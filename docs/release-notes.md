@@ -25,6 +25,12 @@ version it builds, with the date. -->
   remove it (with Undo), or *Send now*, which stops the turn under way and types the first.
 - Bird view: a card whose agent waits for you has an amber border with a slow glow, one that's done and not looked
   at a green one.
+- A newer Laki shows in the status bar (*Update to x.y*) until you update, after a restart too; Laki checks every 4
+  hours instead of once a day.
+- The interface is SF Pro by default, whatever the theme: a theme's own fonts (typewriter, chalk, pixel…) only with
+  Settings › Appearance › Interface font › *The theme's own*. Placeholders read on every theme.
+- After a daemon restart (an update) agents come back a few seconds apart instead of all at once; the workspace you
+  open comes back first.
 
 ## 0.26.0 · Oct 24, 2026
 

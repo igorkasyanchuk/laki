@@ -691,7 +691,9 @@ they work).
 `state.json` keeps projects, workspaces, tabs and resume ids (`save`: fsync, then rename; `load` copies one that
 reads as `state.json.bak`, and moves one that doesn't to `state.json.broken-<ms>`, then loads the `.bak`: never
 empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts. Starting the daemon brings every tab back:
-`claude --resume <id>`, `codex resume <id>`. Shells come back with what ran in them: `keepShells`, in `main.ts`'s
+`claude --resume <id>`, `codex resume <id>`, a few at a time (`restoreAll`: each in `queued`, as `asleep` meanwhile, the
+oldest first, `RESTORE_GAP` 2.5 s apart, a shell's a tenth; the view's `queued`, the tab's tooltip; `restoreNow` for one a look, a key or a message wakes,
+and every one of a workspace a window shows, `setView`; `LAKI_RESTORE_GAP` 0: all at once, tests'; shutdown clears it). Shells come back with what ran in them: `keepShells`, in `main.ts`'s
 `shutdown` before the sessions are killed, gives each local shell tab `again` (state.json): its front program's
 folder (`lsof -d cwd`) and `rerun`'s command. An agent resumes and runs: claude by `~/.claude/sessions/<pid>.json`'s
 `sessionId` (read only), else `--continue`; codex `resume --last` (its newest chat in that folder). Anything else is
@@ -1846,13 +1848,14 @@ row says *merged* while the setting is on.
 equal; pre-releases and drafts never answer) through `net.fetch`, `newer` than `app.getVersion()`: `available`
 with `releaseOf`'s notes, page and `feed` (the release has `update-mac-<arch>.json`); a 404 (none published) is up to
 date. Only Settings' auto checks (`updateCheck`, on unless false: App's `updateAuto` once settings come, `auto`: 10 s
-after the first, then `UPDATE_EVERY`, a day) announce a version, once (`found`, userData's `update.json` `told`: App's
-toast, *See what's new*). Nothing downloads until `download` (Settings' *Update to x.y*), only with `install`
+after the first, then `UPDATE_EVERY`, 4 hours) announce a version, once (`found`, userData's `update.json` `told`: App's
+toast, *See what's new*); App's `upd` (the state as it opens, then each change) keeps `.sb-update` in the status bar
+while `latest` is there (*Update to x.y*, *Downloading…*, *Restart to update*: Settings › Updates). Nothing downloads until `download` (Settings' *Update to x.y*), only with `install`
 (packaged, macOS, `codesign -dv` says Developer ID) and the feed: Electron's `autoUpdater` (Squirrel.Mac, `serverType:
 'json'`, that version's feed, `feedOf`: its zip), `ready` on `update-downloaded`, then `install` is `quitAndInstall`
 (main sets `quitting` on autoUpdater's `before-quit-for-update`: the window's close would only hide it). A check has
 30 s (`AbortSignal.timeout`) and sets `checking` before any await, so a second one meanwhile returns its state; `auto`
-the same again (a window's reload) keeps the day's timer. Else *Download* is the release's page. The
+the same again (a window's reload) keeps the timer. Else *Download* is the release's page. The
 daemon outlives it: the stale bar, as before. IPC `update` (state, check, download, install; `from(e)`), `update-auto`,
 the `update` event; preload's `update`, `updateAuto`, `onUpdate` (returns its unsubscribe). The app menu's *Check for
 Updates…* is `laki://settings/general?spot=Updates` (links.ts' settings `spot`) and a check. `scripts/release.sh`
@@ -2174,7 +2177,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   line as `--tab-line` (a gradient across it as `--tab-line-bg` and `--tab-line-w`, one down it as `--tab-line-img`):
   styles.css' real tab draws it beside the selected tab (the bar's `::before`/`::after`, CSS anchor positioning on the
   tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
-  (`html.glass`) and the creative themes' looks (`[data-look=…]`, from a theme's `look`), some selectors also name
+  (`html.glass`) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
+  else look.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Animations, styles.css'
   last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets

@@ -695,7 +695,7 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
         </div>
       )}
       <Switch className="switch-row" on={on} onChange={onOn}>
-        <Says title="Check for updates" hint="At launch and once a day Laki asks GitHub for its newest release, and tells you once per version. Nothing downloads until you click Update." />
+        <Says title="Check for updates" hint="At launch and every 4 hours Laki asks GitHub for its newest release: the status bar says so until you update, a toast once per version. Nothing downloads until you click Update." />
       </Switch>
       <p className="muted small">
         After an update the yellow bar offers to restart Laki's daemon when you're ready. <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>All releases ↗</a>
@@ -1385,8 +1385,9 @@ export function SettingsPage(p: {
                     value={s.uiFont ?? ''}
                     onChange={e => paint({ uiFont: e.target.value })}
                   >
-                    <option value="">Default (Inter, or the theme's)</option>
-                    {s.uiFont && !UI_FONTS.includes(s.uiFont) && <option value={s.uiFont}>{s.uiFont}</option>}
+                    <option value="">Default (SF Pro on a Mac)</option>
+                    <option value="theme">The theme's own</option>
+                    {s.uiFont && s.uiFont !== 'theme' && !UI_FONTS.includes(s.uiFont) && <option value={s.uiFont}>{s.uiFont}</option>}
                     {UI_FONTS.map(f => (
                       <option key={f} value={f}>
                         {f === 'system' ? 'SF Pro (the Mac’s)' : f}

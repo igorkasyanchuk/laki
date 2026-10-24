@@ -734,6 +734,7 @@ function shutdown() {
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   core.stopHosts()
   widgetsStop() // dev mode's watchers
+  core.queued.clear() // a restart's tabs not started yet: none starts now (each keeps its `again` for the next start)
   try {
     core.keepShells() // what the shells run, for the next start
   } catch (e) {

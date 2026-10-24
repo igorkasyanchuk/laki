@@ -58,6 +58,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     LAKI_PORT_SCAN_MS: '300',
     LAKI_PR_SCAN_MS: '500',
     LAKI_STAT_SCAN_MS: '300',
+    LAKI_RESTORE_GAP: '0', // a restart's tabs all at once (restart.test.ts tries the queue)
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 't',
     GIT_AUTHOR_EMAIL: 't@t',
