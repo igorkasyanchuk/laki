@@ -138,6 +138,19 @@ export const rowsOf = <W extends { id: string; project: string }>(p: Pick<Projec
 // a folder over SSH, as scp writes it: host:path (the host never an option, -…)
 export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 
+// a workspace whose first agent starts later (wsNew startAt, wsSet pending): at a time, or (limit) as its account's plan
+// limit resets, at then that reset as last read (none: not known yet); failed: why its start didn't (Start now tries
+// again); the rest is what its agent tab gets
+export type Pending = { at?: number; limit?: boolean; account?: string; failed?: string; preset: string; cmd?: string; prompt?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string }
+export type PendingView = { at?: number; limit?: boolean; failed?: string; prompt?: string; agent: string } // the view's: its prompt's first line, the preset
+export const USAGE_AT = 90 // a plan limit's % that notifies (settings.usageAt unset), and that a delayed start's limit waits for
+// a plan limit's reset, a delayed start's (schedule.ts pendingTick, the new-workspace page): the soonest among the
+// windows at or past at (%), else the 5-hour window's (one with a note, an amount, isn't a limit)
+export function resetOf(windows: UsageWindow[], at: number) {
+  const real = windows.filter(w => !w.note && w.resets)
+  const hit = real.filter(w => w.used >= at).map(w => w.resets!)
+  return hit.length ? Math.min(...hit) : real.find(w => w.label === '5-hour')?.resets
+}
 export type Workspace = {
   id: string
   project: string
@@ -180,6 +193,7 @@ export type Workspace = {
   codespace?: string // a cloud workspace's GitHub Codespace (settings.cloud): its name, '' while gh makes it; host: Laki's ssh name for it, path: the repo there
   csState?: string // its state as gh says it (Available, Shutdown, Starting…), Creating while it's made, Failed when that failed
   csError?: string // why making or starting it failed
+  pending?: Pending // its agent starts later
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -729,7 +743,7 @@ export type Tunnel = { port: number; url?: string; mails?: string[]; until?: num
 export type Stat = { add: number; del: number; files: number; dirty: number }
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
-export type WorkspaceView = Workspace & { setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -827,5 +841,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 112
+export const API = 113
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

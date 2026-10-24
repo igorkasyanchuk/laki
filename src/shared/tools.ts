@@ -5,9 +5,16 @@ import { rpc as conn } from './conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { AI_ACTS, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
-import { stamp } from './when.ts'
+import { parseAt, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
+
+// a later start's time in words or ms (when.ts parseAt)
+const laterAt = (v: unknown) => {
+  const t = parseAt(typeof v === 'number' || /^\d+$/.test(String(v)) ? Number(v) : String(v))
+  if (typeof t !== 'number') throw new Error(t.error)
+  return t
+}
 
 export type Tool = { name: string; description: string; inputSchema: object; max?: number; run: (a: any) => Promise<unknown> } // max: what Laki AI's model may read of its result (TOOL_TEXT)
 export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T>
@@ -81,6 +88,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
         group: str("one of the project's groups (laki_state's groups), the sidebar's heading it goes under: the one whose name fits the task best (a PR review under Reviews); leave it out when none fits"),
         no_setup: { type: 'boolean', description: "skip the project's setup script (a worktree only; files .worktreeinclude names are still copied): when the user asks for it" },
+        start_at: str('start its agent later, the workspace now: a time (tomorrow at 9am, in 2h, 2026-10-20 14:30, or ms) or "limit" (claude and codex: once the plan limit resets); only when the user asks for a later start'),
       },
       ['project'],
     ),
@@ -90,7 +98,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
       const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
       const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, from, place, agent: who ?? 'agent', ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, startAt: a.start_at === undefined || a.start_at === '' ? undefined : a.start_at === 'limit' ? ('limit' as const) : laterAt(a.start_at), from, place, agent: who ?? 'agent', ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
       if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },

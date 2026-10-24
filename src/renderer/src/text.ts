@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
@@ -396,7 +396,7 @@ export class Line<T extends { req: string }> {
 // unless told for this reset (told: each window's reset when it was said; within an hour is the same one, as Codex's may
 // come from "in n seconds"). A window past its reset is at 0; one with a note (an amount, extra usage) isn't a limit.
 // seen: last as it is now
-export const USAGE_AT = 90
+export { USAGE_AT } from '../../shared/types.ts'
 export type LimitHit = { id: string; r: AgentUsage; w: UsageWindow; used: number }
 export function limitsCrossed(rows: AgentUsage[], at: number, last: Record<string, number>, told: Record<string, number>, now = Date.now()) {
   const seen = { ...last }
@@ -423,10 +423,17 @@ export function limitText({ r, w, used }: LimitHit, rows: AgentUsage[], now = Da
 // the Words sidebar style (Settings' SIDE_STYLES 'words'): a row's second line says the one thing that matters most,
 // the first of these that applies; its first line one PR pill (prPill) instead of the marks. The palette and the peek
 // card can say the same (ROW_WORDS)
+// a delayed start in words (wsNew startAt): Starts Fri 09:00, Starts at the limit reset ~14:20, or why it didn't
+export function pendingWords(p: PendingView, long = false) {
+  const hm = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (p.failed) return `Didn't start: ${p.failed}`
+  if (p.limit) return `Starts at the limit reset${p.at ? ` ~${hm(p.at)}` : ''}`
+  return p.at ? `Starts ${new Date(p.at).toLocaleString([], { weekday: 'short', ...(long && { day: 'numeric', month: 'short' }), hour: '2-digit', minute: '2-digit' })}` : 'Starts later'
+}
 export const ROW_WORDS = { asks: 'Asks', pick: 'Asks you to pick', ci: 'CI failing', conflict: 'Conflicts with', changes: 'Changes requested by', working: 'Working', done: 'Done', unseen: 'not looked at', ready: 'Ready to merge' }
 export type RowTone = 'waiting' | 'error' | 'running' | 'done' | 'muted'
-export type RowFact = { kind: 'asks' | 'ci' | 'conflict' | 'changes' | 'working' | 'done' | 'ready' | 'branch'; text: string; tone: RowTone; since?: number; note?: string } // since: a turn's start, its time after the words; note: the agent's progress after that
-export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Stat }, tabs: TabView[]): RowFact {
+export type RowFact = { kind: 'asks' | 'ci' | 'conflict' | 'changes' | 'working' | 'done' | 'ready' | 'later' | 'branch'; text: string; tone: RowTone; since?: number; note?: string } // since: a turn's start, its time after the words; note: the agent's progress after that
+export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Stat; pending?: PendingView }, tabs: TabView[]): RowFact {
   const agents = tabs.filter(t => t.kind === 'agent' || t.runs)
   const asks = agents.find(t => t.status === 'waiting')
   if (asks) return { kind: 'asks', text: asks.ask?.question ? `${ROW_WORDS.asks}: ${asks.ask.question}` : ROW_WORDS.pick, tone: 'waiting' }
@@ -444,6 +451,7 @@ export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Sta
     return { kind: 'done', text: [ROW_WORDS.done, stat, ROW_WORDS.unseen].filter(Boolean).join(' · '), tone: 'done' }
   }
   if (pr && !pr.draft && pr.checks !== 'pending' && (pr.review === 'APPROVED' || (!pr.review && !!pr.approved?.length))) return { kind: 'ready', text: ROW_WORDS.ready, tone: 'done' }
+  if (w.pending) return { kind: 'later', text: pendingWords(w.pending), tone: w.pending.failed ? 'error' : 'muted' }
   return { kind: 'branch', text: w.branch || 'folder', tone: 'muted' }
 }
 // the Words style's one PR pill: #n and how it stands

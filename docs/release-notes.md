@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Start a new workspace's agent later: at a date and time, or after your plan limit resets (the new-workspace
+  page's clock, `laki new --at` / `--after-limit`). The workspace is made at once; only the agent waits.
 - In the prompt boxes, `@` puts in a file's path, `#` an open PR or issue's link, `/` a prompt template.
 - A *Review* tab (experimental: Settings › General): every changed file's diff with Viewed boxes, comments
   gathered on lines and ranges, then sent to the agent as one message or posted on the PR as one review.

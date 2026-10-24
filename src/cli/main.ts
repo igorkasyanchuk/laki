@@ -10,7 +10,7 @@ import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { state } from '../shared/tools.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
-import { describe } from '../shared/when.ts'
+import { describe, parseAt } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
 import { ICONS } from '../shared/icons.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
@@ -19,8 +19,14 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
+// --at's words as a time (when.ts parseAt)
+const startAt = (s: string) => {
+  const t = parseAt(/^\d+$/.test(s) ? Number(s) : s)
+  if (typeof t !== 'number') throw new Error(t.error)
+  return t
+}
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -243,7 +249,7 @@ async function main() {
       return out(projects, projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--at when | --after-limit] [--prompt text]')
       // .: the project of the workspace this tab is in (an agent's /laki:new)
       const v = process.env.LAKI_WORKSPACE ? ((await rpc('state')) as View) : undefined
       const here = rest[0] === '.' && v?.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
@@ -262,6 +268,7 @@ async function main() {
         pr: flags.pr || undefined,
         link: flags.link || undefined, // the PR it's about (a review), not checked out: its primary
         noSetup: !!flags['no-setup'] || undefined, // a worktree without the project's setup script
+        startAt: flags['after-limit'] ? ('limit' as const) : flags.at ? startAt(String(flags.at)) : undefined, // its agent later (the workspace now)
         caller: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB }, // an agent's (its tab, or typed in a shell: the daemon's agentCaller): the prompt's PRs are only related; yours in a shell aren't
       }
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`

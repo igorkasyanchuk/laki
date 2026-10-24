@@ -351,6 +351,7 @@ const api: Record<string, Handler> = {
   scheduleRm: p => core.scheduleRm(p.id),
   scheduleRun: p => (notAgent(p, 'run a scheduled task now'), core.scheduleRun(p.id)),
   scheduleTick: p => core.scheduleTick(p.now), // tests move the clock
+  pendingTick: p => core.pendingTick(p.now),
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
@@ -702,13 +703,14 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => core.watchLimits())
   every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))
   every(30000, () => core.scheduleTick())
+  every(30000, () => core.pendingTick())
   every(30000, () => core.reminderTick())
   every(1800000, () => memoryTick())
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
-  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)

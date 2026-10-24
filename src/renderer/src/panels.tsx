@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, type TabView, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type AgentUsage, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -451,7 +451,7 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string } // codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (More's; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (More's; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -479,6 +479,89 @@ const MODEL_SAYS: Record<string, [string, string, 'good' | 'warn' | undefined]> 
 // bar's screenshots
 const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
+// when a new workspace's agent starts (wsNew startAt): now (the default, each time: never kept), at a date and time,
+// or once its account's plan limit resets (claude and codex: usage's reset, resetOf). The workspace is made now
+export const startWords = (at: number) => new Date(at).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const ZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return ''
+  }
+})()
+const pad = (n: number) => String(n).padStart(2, '0')
+const dayOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+function StartChip({ start, onStart, agent, account, usageAt, off }: { start?: number | 'limit'; onStart: (s?: number | 'limit') => void; agent?: string; account?: string; usageAt: number; off?: string }) {
+  const [open, setOpen] = useState(false)
+  const [reset, setReset] = useState<number | null>() // the limit's: undefined not read yet, null not known
+  const box = useRef<HTMLSpanElement>(null)
+  const limits = agent === 'claude' || agent === 'codex'
+  useEffect(() => {
+    if (!limits || (!open && start !== 'limit')) return
+    api.call<AgentUsage[]>('usage').then(
+      rows => (r => setReset((r && !r.error && resetOf(r.windows, usageAt)) || null))(rows.find(x => x.agent === agent && (account ? x.account === account : x.default))),
+      () => setReset(null),
+    )
+  }, [open, agent, account, start === 'limit'])
+  useEffect(() => {
+    if (!open) return
+    const out = (e: globalThis.MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
+    const esc = (e: KeyboardEvent) => escapes(e) && (e.preventDefault(), setOpen(false))
+    document.addEventListener('mousedown', out)
+    window.addEventListener('keydown', esc, true)
+    return () => (document.removeEventListener('mousedown', out), window.removeEventListener('keydown', esc, true))
+  }, [open])
+  useEffect(() => void ((off || (start === 'limit' && !limits)) && start !== undefined && onStart(undefined)), [off, limits]) // a codespace, another agent: now
+  const at = typeof start === 'number' ? new Date(start) : null
+  const noLimit = !limits ? `${agent ?? 'This agent'} has no plan limits Laki reads: claude and codex only` : reset === null ? "Laki can't read this account's plan usage (signed out, or Settings › Appearance turned it off)" : undefined
+  const pick = (d: string, t: string) => {
+    const ms = new Date(`${d}T${t || '09:00'}`).getTime()
+    if (Number.isFinite(ms)) onStart(Math.max(ms, Date.now() + 60_000))
+  }
+  const later = () => {
+    const d = new Date(Date.now() + 3_600_000)
+    d.setMinutes(0, 0, 0)
+    onStart(d.getTime())
+  }
+  const word = start === 'limit' ? `Starts at the limit reset${reset ? ` (~${new Date(reset).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}` : at ? `Starts ${startWords(at.getTime())}` : ''
+  const earliest = start === 'limit' ? (reset ? startWords(reset) : 'when usage says, read again each half minute') : at ? startWords(at.getTime()) : ''
+  return (
+    <span className="nw-start" ref={box}>
+      <button type="button" className={`ib nw-start-btn ${start !== undefined ? 'on labeled' : ''}`} aria-haspopup="dialog" aria-expanded={open} disabled={!!off} data-tip={off || (start === undefined ? 'Start now, or later: at a time, or after the plan limit resets' : word)} onMouseDown={e => e.preventDefault()} onClick={() => setOpen(o => !o)}>
+        <Icon name="clock" />
+        {word && <span className="ib-label">{word}</span>}
+      </button>
+      {open && (
+        <div className="nw-start-pop" role="dialog" aria-label="Start task">
+          <b>Start task</b>
+          <label className="nw-start-opt">
+            <input type="radio" checked={start === undefined} onChange={() => onStart(undefined)} /> Now
+          </label>
+          <label className="nw-start-opt">
+            <input type="radio" checked={typeof start === 'number'} onChange={later} /> Pick date &amp; time
+          </label>
+          {at && (
+            <span className="nw-start-when">
+              <input type="date" value={dayOf(at)} min={dayOf(new Date())} onChange={e => pick(e.target.value, `${pad(at.getHours())}:${pad(at.getMinutes())}`)} />
+              <input type="time" value={`${pad(at.getHours())}:${pad(at.getMinutes())}`} onChange={e => pick(dayOf(at), e.target.value)} />
+            </span>
+          )}
+          <label className={`nw-start-opt ${noLimit ? 'off' : ''}`} data-tip={noLimit}>
+            <input type="radio" disabled={!!noLimit && start !== 'limit'} checked={start === 'limit'} onChange={() => onStart('limit')} /> After usage limit resets
+          </label>
+          {start !== undefined && (
+            <span className="muted small">
+              Earliest start: {earliest}
+              {ZONE && ` · ${ZONE}`}
+            </span>
+          )}
+          <span className="muted small">Laki's daemon must be running then (closing the window is fine). It doesn't reserve plan usage.</span>
+        </div>
+      )}
+    </span>
+  )
+}
+
 export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams> & { linked?: boolean }; images?: Shot[]; inserts?: (project: string) => Inserts; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
@@ -555,6 +638,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     )
   }, [inCs, p.project])
   const prof = view.presets.find(x => x.name === p.preset)
+  const [start, setStart] = useState<number | 'limit'>() // the Start chip's: now each time the page opens
   const starts = prof?.agent // what the preset starts: its model and effort flags
   // its permission mode ('': ask first) and fast mode: picked here, else the profile's (none when its flags set the mode);
   // sent only when it isn't the profile's, so an edit of the profile applies at the next start
@@ -615,7 +699,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }) })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -765,10 +849,11 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       <Icon name="zap" />
     </button>
   )
-  const label = fan ? `Create ${fan.length} workspaces` : 'Create'
+  const later = start !== undefined && isAgent(starts) && !inCs
+  const label = later ? 'Schedule' : fan ? `Create ${fan.length} workspaces` : 'Create'
   const send = (
-    <button type="button" className="nw-send" aria-label={label} data-tip={`${saving ? 'Saving an image…' : label} (⌘⏎)`} disabled={busy || saving || !p.project} onMouseDown={e => e.preventDefault()} onClick={submit}>
-      {busy || saving ? <span className="btn-spin" /> : <Icon name="arrowUp" />}
+    <button type="button" className={`nw-send ${later ? 'wide' : ''}`} aria-label={label} data-tip={`${saving ? 'Saving an image…' : later ? 'Make the workspace now, its agent at its time' : label} (⌘⏎)`} disabled={busy || saving || !p.project} onMouseDown={e => e.preventDefault()} onClick={submit}>
+      {busy || saving ? <span className="btn-spin" /> : later ? <span>Schedule</span> : <Icon name="arrowUp" />}
       {fan && !busy && <span className="nw-send-n">{fan.length}</span>}
     </button>
   )
@@ -855,7 +940,12 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               rows={8}
               placeholder="Message the agent: paste or drop screenshots and files"
               lead={lead || <span />}
-              tools={fast}
+              tools={
+                <>
+                  {fast}
+                  {isAgent(starts) && <StartChip start={start} onStart={setStart} agent={starts} account={prof?.account} usageAt={view.settings.usageAt ?? USAGE_AT} off={inCs ? "A codespace's agent starts with it" : undefined} />}
+                </>
+              }
               send={send}
               inserts={inserts?.(p.project) /* the project picked: its repo's extensions too */}
               complete={completeOf(view, { project: p.project, files: true })}
@@ -1368,7 +1458,7 @@ export function Loading({ connected }: { connected: boolean }) {
 }
 
 // a workspace without tabs: start something (agents first, as cards), what Laki is good at, and the star
-export function Ready({ name, branch, project, actions }: { name: string; branch?: string; project?: string; actions: { label: string; icon?: IconName; hint?: string; sub?: string; run: () => void }[] }) {
+export function Ready({ name, branch, project, actions, later }: { name: string; branch?: string; project?: string; actions: { label: string; icon?: IconName; hint?: string; sub?: string; run: () => void }[]; later?: { title: string; prompt?: string; failed?: string; onStart: () => void; onChange: () => void; onCancel: () => void } }) {
   const agents = actions.filter(a => a.icon === 'agent')
   const starts = [...agents, ...actions.filter(a => !agents.includes(a))]
   return (
@@ -1392,6 +1482,28 @@ export function Ready({ name, branch, project, actions }: { name: string; branch
           . Start an agent on the task, or a shell to look around.
         </p>
       </div>
+      {later && (
+        <div className={`ready-later ${later.failed ? 'failed' : ''}`}>
+          <span className="ready-start-icon">
+            <Icon name="clock" size={16} />
+          </span>
+          <span className="ready-start-text">
+            <b>{later.title}</b>
+            {later.prompt && <small>{later.prompt}</small>}
+          </span>
+          <span className="row-buttons">
+            <button type="button" className="primary" onClick={later.onStart}>
+              Start now
+            </button>
+            <button type="button" onClick={later.onChange}>
+              Change
+            </button>
+            <button type="button" className="link small" onClick={later.onCancel}>
+              Cancel
+            </button>
+          </span>
+        </div>
+      )}
       <div className="ready-starts">
         {starts.map((a, i) => (
           <button key={a.label} type="button" className={`ready-start ${i === 0 && agents.length ? 'first' : ''}`} onClick={a.run}>

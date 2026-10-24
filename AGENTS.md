@@ -149,7 +149,12 @@ layout's name, `settings.layouts`, `SETTINGS_KEPT`), kept by `projectSet`: the t
 event COMMENT at the PR's head commit, by gh's `comments[][…]` fields), `scanStats` for every live git workspace with
 `settings.fullReview`: the full review (FullReview.tsx, the tab bar's first tab, ⌘1; Diff.tsx the pieces Changes shares);
 112: `issueList` (`project`: `gh issue list --state open`, a minute per project), `files` `project` (its own folder's): the
-prompt boxes' @ # / (PromptInput.tsx `useComplete`, `completeOf`; text.ts `triggerAt`, `completions`, `completeInto`). A
+prompt boxes' @ # / (PromptInput.tsx `useComplete`, `completeOf`; text.ts `triggerAt`, `completions`, `completeInto`); 113:
+`wsNew` `startAt` (ms or `'limit'`, `startCheck`: an agent, not a codespace, limit for claude and codex): the workspace now,
+its agent later, `ws.pending` (`Pending`: what `addTab` gets; the view's `pending`, `PendingView`), `pendingTick` (schedule.ts:
+every 30 s and at start, `now` for tests; a limit's time `resetOf` its account's `usage` until it passes), `startPending`
+(the `started` event, a late one's `late`), `wsSet` `pending` (null cancels, `at`, `prompt`) and `start`; the CLI's `--at`,
+`--after-limit`, MCP's `start_at`; the new-workspace page's Start chip (panels.tsx `StartChip`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);

@@ -1,7 +1,7 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
-import { stamp } from '../../shared/when'
+import { parseAt, stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
@@ -40,7 +40,7 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
@@ -1223,6 +1223,12 @@ export function App() {
           toast(`Reminder: ${m.text}`.slice(0, 160), open, w ? 'Open' : 'Calendar')
         }
         ring()
+      } else if (m.ev === 'started') {
+        // a delayed start's agent (wsNew startAt), started by the daemon: where it is, and late when it was down then
+        const open = () => (setDialog(null), selectTab(m.tab))
+        const text = `${m.agent} started (scheduled${m.late ? `, late: it was due ${new Date(m.late).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : ''})`
+        if (viewRef.current?.settings.notify !== false) notify(String(m.name), text, m.tab, open, viewRef.current?.settings.notifySound)
+        toast(`${m.name}: ${text}`, open, 'Open')
       } else if (m.ev === 'focus') {
         selectTab(m.tab) // Laki AI's "show me": that tab, in its workspace
       } else if (m.ev === 'archived') {
@@ -2282,7 +2288,19 @@ export function App() {
   ]
 
   // right click on a workspace in the sidebar
+  // a delayed start (wsNew startAt): its agent now, at another time (when.ts parseAt's words, or limit), or never
+  const laterNow = (w: WorkspaceView) => void call('wsSet', { id: w.id, start: true }).catch(() => {})
+  const laterChange = async (w: WorkspaceView) => {
+    const t = (await askText(`When should ${w.pending?.agent ?? 'its agent'} start?`, { text: 'tomorrow 9am, in 2h, 2026-10-20 14:30, or limit: after the plan limit resets', value: w.pending?.limit ? 'limit' : '', ok: 'Change' }))?.trim()
+    if (!t) return
+    const at = /^(after )?(the )?(plan )?limit/i.test(t) ? ('limit' as const) : parseAt(t)
+    if (typeof at === 'object') return toast(at.error)
+    call('wsSet', { id: w.id, pending: { at } }).then(() => done(pendingWords({ at: at === 'limit' ? undefined : at, limit: at === 'limit', agent: '' }, true)), () => {})
+  }
+  const laterCancel = (w: WorkspaceView) => call('wsSet', { id: w.id, pending: null }).then(() => done(`${w.pending?.agent ?? 'Its agent'} won't start in ${wsName(w)}`), () => {})
+  const laterItems = (w: WorkspaceView): MenuItem[] => (w.pending ? [{ head: pendingWords(w.pending, true) }, { label: 'Start now', icon: 'run', run: () => laterNow(w) }, { label: 'Change time…', icon: 'clock', run: () => void laterChange(w) }, { label: 'Cancel delayed start', icon: 'x', danger: true, run: () => void laterCancel(w) }, null] : [])
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
+    ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
@@ -2914,7 +2932,7 @@ export function App() {
         onContextMenu={e => openMenu(e, wsMenu(w))}
         {...dropProps(w)}
       >
-        {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />}
+        {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : w.pending && !wt.length ? 'idle' /* its agent comes later: not ended */ : rollup(wt)} />}
         {marksAt === 'start' && yes}
         <span className="ws-name">{wsName(w)}</span>
         {marksAt === 'name' && yes}
@@ -2935,6 +2953,11 @@ export function App() {
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />
+          </span>
+        )}
+        {w.pending && (
+          <span className={`ws-mark ${w.pending.failed ? 'err' : ''}`} data-tip={`${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`}>
+            <Icon name="clock" size={11} />
           </span>
         )}
         {timers.some(t => t.then === 'remind' && t.ws === w.id) && (
@@ -3058,6 +3081,7 @@ export function App() {
       w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
       w.race && 'in a race: ⋯ › Compare the race',
       w.muted && 'notifications muted',
+      w.pending && `${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`,
       ...wt.filter(t => t.queue?.length).map(t => `${t.queue!.length} queued for ${t.name}`),
       ...timers.filter(t => t.then === 'remind' && t.ws === w.id).map(t => `a reminder at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
       w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
@@ -3711,7 +3735,7 @@ export function App() {
             ) : (
               <div className="empty">
                 {ws ? (
-                  ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} project={view.projects.find(p => p.id === ws.project)?.name} actions={newTabActions.filter(x => x.label !== 'Command…')} />
+                  ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} project={view.projects.find(p => p.id === ws.project)?.name} actions={newTabActions.filter(x => x.label !== 'Command…')} later={ws.pending && { title: `${ws.pending.agent} ${pendingWords(ws.pending, true).replace(/^S/, 's')}`, prompt: ws.pending.prompt, failed: ws.pending.failed, onStart: () => laterNow(ws), onChange: () => void laterChange(ws), onCancel: () => void laterCancel(ws) }} />
                 ) : (
                   view.projects.length ? (
                     <>

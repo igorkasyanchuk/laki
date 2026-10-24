@@ -3,10 +3,12 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { flowsOn, isAgent, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Todo } from '../shared/types.ts'
+import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
-import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsNew } from './core.ts'
+import { usageWho } from './accounts.ts'
+import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
@@ -280,6 +282,53 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
 
 export function scheduleRun(id: string) {
   return runSchedule(findSchedule(id))
+}
+
+// ---------- a workspace's agent started later (wsNew startAt)
+
+export const pendingView = (p: Pending): PendingView => ({ at: p.at, limit: p.limit, failed: p.failed, prompt: p.prompt?.trim().split('\n')[0].slice(0, 200), agent: p.preset })
+
+// every 30 s and as the daemon starts (tests pass `now`): each workspace whose agent waits, started once its time has
+// come; a limit one's time is its account's reset (usage, kept 5 minutes), read again each tick until it has passed
+// (then it starts: a reset moves on as it's reached). Usage not known: the next tick
+let pendingBusy = false
+export async function pendingTick(now = Date.now()) {
+  if (pendingBusy) return
+  pendingBusy = true
+  try {
+    for (const w of state.workspaces.filter(x => x.pending && !x.archived && !x.pending.failed)) {
+      const p = w.pending!
+      if (p.limit && !(p.at !== undefined && p.at <= now)) {
+        const agent = presetNamed(p.preset)?.agent ?? p.preset
+        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === (p.account ?? HOME_ACCOUNT))).catch(() => [])
+        const at = u && !u.error ? resetOf(u.windows, state.settings?.usageAt ?? USAGE_AT) : undefined
+        if (at !== undefined && at !== p.at && w.pending === p) (p.at = at), save(), changed()
+      }
+      if (p.at !== undefined && p.at <= now && w.pending === p) startPending(w, now)
+    }
+  } finally {
+    pendingBusy = false
+  }
+}
+
+// its agent now, as wsNew would have started it; a late one (the daemon was down) says so. One that fails stays, with
+// why (Start now tries again). asked: Start now's (no notification: you started it)
+export function startPending(w: Workspace, now = Date.now(), asked = false) {
+  const p = w.pending!
+  const late = p.at !== undefined && now - p.at > 90_000 ? p.at : undefined
+  try {
+    const t = addTab(w.id, { preset: p.preset, cmd: p.cmd, prompt: p.prompt, model: p.model, effort: p.effort, perm: p.perm, fast: p.fast, vars: p.vars, agent: p.agent })
+    delete w.pending
+    wsLog(w, asked ? `${t.name} started now (Start now)` : late ? `${t.name} started late, was due ${new Date(late).toLocaleString()}` : `${t.name} started, as it was scheduled`)
+    if (!asked) broadcast({ ev: 'started', ws: w.id, tab: t.id, name: w.name || w.id, agent: t.name, late })
+    return t
+  } catch (e) {
+    p.failed = String((e as Error).message ?? e)
+    wsLog(w, `its agent didn't start: ${p.failed}`)
+  } finally {
+    save()
+    changed()
+  }
 }
 
 // every 30 s (tests pass `now`): what's due runs, what's long overdue is logged as missed; then the next time

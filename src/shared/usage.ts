@@ -13,6 +13,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                     tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
             [--no-setup]            without the project's setup script (.worktreeinclude's files still copied)
+            [--at <when>]           the workspace now, its agent later: tomorrow 9am, in 2h, 2026-10-20 14:30
+            [--after-limit]         its agent once the plan limit resets (claude, codex)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
   laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
@@ -93,11 +95,13 @@ script, with the agent started on the prompt. Prints the new workspace's id. In 
 Write the prompt as for a colleague who hasn't seen this conversation: the goal, where to look, how to tell it's done.
 From an agent's tab: an agent or a shell, no --cmd and no command preset. A repo's .laki.json (its setup, env, scripts)
 waits until the user trusts it in the app: the workspace is made, its setup runs then. --no-setup skips the setup
-script (laki run <ws> setup runs it later).
+script (laki run <ws> setup runs it later). --at starts its agent later, --after-limit once the plan limit resets
+(the soonest reset of a window at Settings' Plan limit at, else the 5-hour one's); Laki must be running then.
 
   laki new . --prompt "Add CSV export to the reports page; npm test passes"
   laki new shop --preset codex --name csv-export --prompt "…"
   laki new shop --issue 42                     the issue's title and text as the prompt
+  laki new shop --at "tomorrow 9am" --prompt "…"  made now, its agent starts at 9
   laki new shop --pr 118 --prompt "Fix the failing test"
   laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
   laki new shop --fan claude,codex --prompt "…"        a race: one worktree each`,

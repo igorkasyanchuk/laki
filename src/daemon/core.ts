@@ -30,7 +30,7 @@ import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { meterRead, meterView, todayView } from './meters.ts'
 import { inside, scanStats, stats } from './files.ts'
-import { flowFiles, REMINDERS_DONE, RUNS_SHOWN } from './schedule.ts'
+import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 export { dir }
@@ -531,7 +531,7 @@ export function view(): View {
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`) }
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending) }
     }),
     tabs,
     presets: presets(),
@@ -1316,8 +1316,12 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
   const w = findWs(o.id)
+  // a later start: null cancels it (the workspace stays, no agent), at moves it (or to the limit's reset), prompt
+  // changes what it says; start: now
+  if ((o.pending !== undefined || o.start) && !w.pending) throw new Error(`${w.id} has no agent waiting to start`)
+  if (o.pending?.at !== undefined) startCheck(o.pending.at, w.pending!.preset, presetNamed(w.pending!.preset)?.agent ?? w.pending!.preset)
   if (o.railPin && !w.railPin && railTaken() >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
   if (o.browser !== undefined) w.browser = o.browser
@@ -1341,6 +1345,15 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.muted !== undefined) w.muted = o.muted || undefined
   if (o.pinned !== undefined) w.pinned = o.pinned || undefined
   if (o.railPin !== undefined) w.railPin = o.railPin ? (w.railPin ?? Date.now()) : undefined
+  if (o.pending === null) delete w.pending
+  else if (o.pending) {
+    const p = w.pending!
+    if (o.pending.at === 'limit') Object.assign(p, { limit: true, at: undefined, failed: undefined, account: p.account ?? accountFor({ preset: presetNamed(p.preset)?.agent ?? p.preset } as Tab, presetNamed(p.preset)?.account) })
+    else if (o.pending.at !== undefined) Object.assign(p, { at: o.pending.at, limit: undefined, failed: undefined })
+    if (typeof o.pending.prompt === 'string') p.prompt = o.pending.prompt
+    if (p.limit) void pendingTick()
+  }
+  if (o.start) startPending(w, Date.now(), true)
   save()
   changed()
   if (o.autoFix || o.autoReview || o.autoMerge || o.autoLand) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
@@ -1542,7 +1555,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string } // hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
 // (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
@@ -1678,6 +1691,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
   if (o.codespace !== undefined) cloudCheck(proj, o)
+  if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   // the folder's own workspace (not a scheduled run's session): Local again is that one, as it is (asked again below:
   // another wsNew may make it meanwhile)
@@ -1766,13 +1780,32 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (cfg.setup && ws.kind === 'worktree' && !ws.noSetup) (step(`setup: ${cfg.setup}`), runSetup(ws, cfg.setup, by, cause))
   else if (ws.kind === 'worktree' && cfgWait(proj)) (ws.setupWait = true), save(), step(`setup: waits for you to trust ${proj.name}'s .laki.json`) // a skipped one's copy too
   try {
-    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by, ...cause }).name} (its command: the workspace's Logs)`)
+    if (o.startAt !== undefined && preset !== 'none') {
+      // its agent later (schedule.ts pendingTick): what addTab would get, kept in state.json
+      ws.pending = { ...(o.startAt === 'limit' ? { limit: true, account: accountFor({ preset: agent } as Tab, presetNamed(preset)?.account) } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }
+      save()
+      step(`agent: ${preset} later, ${o.startAt === 'limit' ? 'as its plan limit resets' : new Date(o.startAt).toISOString()}`)
+      if (o.startAt === 'limit') void pendingTick() // its reset read now, for the view
+    } else if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by, ...cause }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
   }
   widgetEvent('workspace.new', { prompt: o.prompt ? o.prompt.slice(0, 2000) : undefined, agent: preset === 'none' ? undefined : preset, ...causeRun(cause) }, ws.id, undefined, causeEv(by, cause)) // an agent's: a workflow that runs commands doesn't start on it
   return ws
+}
+
+// a later start: a time from now on (a minute's slack), or limit for claude and codex (their plan limits); an agent to
+// start, not in a codespace (it may not be up then)
+export function startCheck(at: unknown, preset: string, agent: string, codespace?: string) {
+  if (preset === 'none') throw new Error('nothing starts later: pick an agent')
+  if (codespace !== undefined) throw new Error("a codespace's agent starts now: no later start there")
+  if (at === 'limit') {
+    if (agent !== 'claude' && agent !== 'codex') throw new Error(`after the plan limit resets: claude and codex only, not ${agent}`)
+    return
+  }
+  if (typeof at !== 'number' || !Number.isFinite(at)) throw new Error("startAt: a time (ms) or 'limit'")
+  if (at < Date.now() - 60_000) throw new Error(`${new Date(at).toLocaleString()} has passed`)
 }
 
 function runSetup(ws: Workspace, setup: string, agent?: string, cause: Cause = {}) {

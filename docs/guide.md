@@ -847,6 +847,13 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
 - *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
+- the clock beside the send button: when the agent starts. *Now* (each time the page opens); *Pick date & time*; or
+  *After usage limit resets* (claude and codex, the profile's account: the soonest reset of a window at Settings'
+  *Plan limit at*, else the 5-hour one's, read again until it comes). The chip says *Starts Fri 16 Oct 09:00*, the
+  button *Schedule*: the workspace is made now (worktree, setup), only the agent waits, its row with a clock and *Starts
+  …*. Its ⋯ (and its page) has *Start now*, *Change time…* and *Cancel delayed start* (the workspace stays, no agent). A
+  notification says when it starts (late, if Laki was closed then). Laki's daemon must be running at that time; it
+  doesn't reserve plan usage. Not in a codespace;
 - *Race* (an agent, in a worktree): ＋ adds other presets; each gets a worktree of its own (named
   `<name>-<preset>`) on the same prompt, and Compare opens (also in a race workspace's menu and ⌘K). Compare shows
   each one's status, diff size, last answer and changed files; *Open* goes to it, *Keep this one* archives the
@@ -1896,6 +1903,8 @@ laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's 
 laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki new app --no-setup --prompt "…"                    # without the setup script (laki run <ws> setup: later)
+laki new app --at "tomorrow 9am" --prompt "…"            # made now, its agent starts at 9 (Laki must be running then)
+laki new app --after-limit --prompt "…"                 # its agent once the plan limit resets (claude, codex)
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
 laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
