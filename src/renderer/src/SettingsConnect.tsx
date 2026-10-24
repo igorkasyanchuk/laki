@@ -1,6 +1,6 @@
 // Settings' connect sections: phone pushes, tunnels, remote access and the simulators. Settings.tsx re-exports it.
 import { ANSWER_WHY, answerOk, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
 import { QR } from './Tunnel'
@@ -249,12 +249,20 @@ export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: 
 // the daemon (tunnelCheck) with the command that does it
 export type TunnelCheck = { version?: string; cert: boolean; tunnel?: { id: string; name: string }; creds: boolean; why?: string; ok: boolean }
 const DOMAIN_OK = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/ // the daemon's
-export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; onNamed: (n: NamedTunnel) => void; check: () => Promise<TunnelCheck> }) {
+export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; onNamed: (n: NamedTunnel) => void; check: (n: NamedTunnel) => Promise<TunnelCheck> }) {
   const [c, setC] = useState<TunnelCheck | null>(null)
   const [busy, setBusy] = useState(true)
   const [err, setErr] = useState('')
   const [copied, setCopied] = useState('')
-  const run = () => (setBusy(true), check().then(r => (setC(r), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  const seq = useRef(0) // the newest check's: an older one answering later is dropped
+  const run = () => {
+    const n = ++seq.current
+    setBusy(true)
+    // the name and domain as typed: Settings saves them a moment later
+    void check({ name: named.name ?? '', domain: named.domain ?? '' })
+      .then(r => n === seq.current && (setC(r), setErr('')), e => n === seq.current && setErr(String(e?.message ?? e)))
+      .finally(() => n === seq.current && setBusy(false))
+  }
   useEffect(() => void run(), [])
   const name = named.name?.trim() ?? ''
   const domain = named.domain?.trim().toLowerCase().replace(/^\.+|\.+$/g, '') ?? ''
@@ -263,7 +271,8 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
         { id: 'cf', ok: !!c.version, label: 'cloudflared', says: c.version ? `version ${c.version}` : 'not installed', fix: 'brew install cloudflared' },
         { id: 'cert', ok: c.cert, label: 'Signed in to Cloudflare', says: c.cert ? 'its certificate is in ~/.cloudflared' : 'it opens your browser: pick the domain the tunnels go under', fix: 'cloudflared tunnel login' },
         { id: 'tunnel', ok: !!c.tunnel, label: name ? `The tunnel ${name}` : 'A named tunnel', says: c.tunnel ? `in your account, ${c.tunnel.id}` : !name ? 'its name below' : c.why ?? 'not in your account yet', fix: `cloudflared tunnel create ${name || 'laki'}` },
-        { id: 'creds', ok: c.creds, label: 'Its credentials on this Mac', says: c.creds ? `~/.cloudflared/${c.tunnel!.id}.json` : c.tunnel ? 'made where the tunnel was created: copy that file here, or create a tunnel here' : 'made with the tunnel', fix: c.tunnel ? `~/.cloudflared/${c.tunnel.id}.json from the Mac that made it` : undefined },
+        // two Macs on one tunnel are both its connectors: Cloudflare sends each visitor to either, whatever its ingress
+        { id: 'creds', ok: c.creds, label: 'Its credentials on this Mac', says: c.creds ? `~/.cloudflared/${c.tunnel!.id}.json` : c.tunnel ? 'made on the Mac that created the tunnel: here, make one of its own and put its name above (two Macs on one tunnel share its visitors)' : 'made with the tunnel', fix: c.tunnel ? `cloudflared tunnel create ${name}-2` : undefined },
         { id: 'domain', ok: DOMAIN_OK.test(domain), label: 'Its domain', says: DOMAIN_OK.test(domain) ? `addresses like name.${domain}` : 'below: the one you picked at login, like example.com' },
       ]
     : []
@@ -281,9 +290,9 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
     ['A domain on Cloudflare', "Add your domain to Cloudflare (the free plan does) and move its nameservers there, as Cloudflare's dashboard says: the records Laki adds live in its DNS."],
     ['Install cloudflared', "Homebrew, or Cloudflare's download.", 'brew install cloudflared'],
     ['Sign in', 'Your browser opens: pick that domain. Its certificate goes to ~/.cloudflared/cert.pem.', 'cloudflared tunnel login'],
-    ['Make the tunnel', `Once: its credentials go to ~/.cloudflared/<id>.json. On a second Mac, copy that file over instead of making another.`, `cloudflared tunnel create ${name || 'laki'}`],
+    ['Make the tunnel', "Once: its credentials go to ~/.cloudflared/<id>.json. A second Mac makes its own under another name: two Macs on one tunnel share its visitors.", `cloudflared tunnel create ${name || 'laki'}`],
     ['Tell Laki', 'Its name and the domain above, until every check is green.'],
-    ['Expose a port', `The globe beside a port in the status bar › Address › Permanent, a name (shop is shop.${eg}) › Expose permanently. It stays until you stop it, Laki's restarts and your Mac's too.`],
+    ['Expose a port', `The globe beside a port in the status bar › Address › Permanent, a name (shop is shop.${eg}) › Expose permanently. It stays until you stop it, and comes back each time Laki starts.`],
     ['Keep it to you (optional)', "Cloudflare's dashboard › Zero Trust › Access › Applications › Add an application › Self-hosted: the address, and a policy that allows your email. Visitors sign in first."],
     ["When you're done with a name", `Stop leaves its DNS record, so the name stays yours: delete it in the dashboard's DNS records. A name is one word under the domain (shop.${eg}, not a.shop.${eg}): Cloudflare's free certificate covers only that.`],
   ]
@@ -314,12 +323,7 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
               <div>
                 {x.label} <span className="muted">· {x.says}</span>
               </div>
-              {!x.ok && i === first && x.fix && (
-                <div className="tunnel-code sim-fix">
-                  <code>{x.fix}</code>
-                  {!x.fix.startsWith('~') && <IconButton icon={copied === x.id ? 'check' : 'copy'} title={copied === x.id ? 'Copied' : 'Copy'} onClick={() => copy(x.id, x.fix!)} />}
-                </div>
-              )}
+              {!x.ok && i === first && x.fix && code(x.id, x.fix)}
             </div>
           </div>
         ))}

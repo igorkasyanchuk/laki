@@ -1747,7 +1747,7 @@ export function App() {
     stop: port => api.call('tunnelStop', { ws: w.id, port }),
     open: openExternal,
     copy,
-    name: w.id,
+    name: w.name || w.id,
     settings: () => setDialog({ section: 'tunnels' }),
   })
   const settings = view?.settings ?? {}
@@ -3906,7 +3906,7 @@ export function App() {
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
             uiReset={() => api.call('uiReset')}
             simulator={p => api.call('sim', p)}
-            tunnels={() => api.call('tunnelCheck')}
+            tunnels={n => api.call('tunnelCheck', n)}
             resources={{
               load: () => api.call<Resources>('resources'),
               tabs: view.tabs,

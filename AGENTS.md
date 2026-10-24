@@ -270,7 +270,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from; `named`: settings.tunnel's, when set), `tunnelStart`
   (`ws`, `port`, `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
-  `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file);
+  `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file
+  beside the certificate or in `~/.cloudflared`; `name`, `domain`: the form's as typed, Settings saving 300 ms later);
 - worktree actions: `diff` (git's text but its last newline: a hunk to revert must match), `run`, `ship`; Changes'
   Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
   as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
@@ -801,7 +802,7 @@ Expose to the world (`remote.ts` `tunnelStart`): `cloudflared tunnel --no-autoup
 `cloudflare()`'s); the URL is the first `https://<name>.trycloudflare.com` in its
 output that isn't `login.`. No emails: public, anyone with the link (the popup's default). Emails need
 cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels run in the daemon (`tunnels`, in `WorkspaceView.tunnels`) and are kept in `state.tunnels`
-(`keep`: ws, port, mails, until, host, the last url): stopped by `tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset
+(`keep`: ws, port, mails, until, host and `via`, the last url): stopped by `tunnelStop`, past `until` (`hours`: `SHARE_HOURS`, unset
 8, 0 none; `tunnelTick`, every 15 s) and a workspace's teardown, gone from state then; shutdown (`tunnelsDown`) stops their
 cloudflareds and keeps them, and `tunnelsBack` (main.ts, after `reapChildren`) starts each again whose workspace is live
 and whose time hasn't passed. One that ends on its own, or can't start (not its first start: that error is
@@ -816,7 +817,9 @@ Cloudflare's universal certificate covers one level), `routeDns` (`tunnel route 
 `--overwrite-dns`: a record that's another's is refused), then `connect`: one cloudflared for all of them, `tunnel
 --no-autoupdate --config <data>/cloudflared/ingress.yml run <name>` (an ingress rule per hostname, then 404), up at
 `Registered tunnel connection`, started again as the list changes (the `key`) or when it ends (`connDown`, `AGAIN`);
-`url` is `https://<host>` and stays. Who gets in is Cloudflare Access's (your dashboard): Laki sets none, and the popup
+`url` is `https://<host>` and stays. A tunnel's `via` is the named tunnel its record goes to: after another name in
+Settings, `connect` leaves the others out, `down` (*stop it, remove that record…*). A random start on a port a permanent
+one has is refused, as the other way round; the hostname is checked free again after `routeDns`. Who gets in is Cloudflare Access's (your dashboard): Laki sets none, and the popup
 and Settings say so. An agent's `tunnelStart` with `host` is refused (main.ts `agentNo`; `tunnelStart` in `FROM`); a
 remote client can't change `settings.tunnel` (`REMOTE_KEYS`). Resources' *Permanent tunnels* row stops them all
 (`tunnel:named`). Tested in `test/tunnel.test.ts` (the fake `test/cloudflared`'s `tunnel list`, `route dns`, `run`).

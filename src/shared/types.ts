@@ -738,7 +738,7 @@ export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse &
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number; host?: string; down?: string } // until: when it stops (ms; none: when you stop it); host: a permanent one's (settings.tunnel's named tunnel); down: why it's reconnecting (no url meanwhile, a quick one's comes back new)
 // a tunnel kept in state.json, so it comes back after a daemon restart (remote.ts tunnelsBack)
-export type SavedTunnel = { ws: string; port: number; mails?: string[]; until?: number; host?: string; url?: string }
+export type SavedTunnel = { ws: string; port: number; mails?: string[]; until?: number; host?: string; via?: string; url?: string } // via: the named tunnel a permanent one's DNS record goes to
 // permanent tunnels (Settings › Tunnels): your own named tunnel (cloudflared tunnel login, tunnel create) and the domain
 // its hostnames go under (the one you picked at login)
 export type NamedTunnel = { name?: string; domain?: string }

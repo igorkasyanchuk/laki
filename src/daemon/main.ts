@@ -341,7 +341,7 @@ const api: Record<string, Handler> = {
   tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
-  tunnelCheck: () => core.tunnelCheck(), // Settings › Tunnels: is the named tunnel ready
+  tunnelCheck: p => core.tunnelCheck(p), // Settings › Tunnels: is the named tunnel ready
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
@@ -686,9 +686,10 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 
 const timers: NodeJS.Timeout[] = []
 void core
-    .reapChildren()
-    .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
-    .then(() => core.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
+  .reapChildren()
+  .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
+  .then(() => core.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
+  .catch(e => log('tunnelsBack', e))
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   port = typeof addr === 'object' && addr ? addr.port : 0

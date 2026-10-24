@@ -69,6 +69,8 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   assert.deepEqual(await rig.rpc('tunnelCheck'), { version: '2026.9.3', cert: true, tunnel: { id, name: 'laki' }, creds: false, ok: false })
   writeFileSync(join(cfHome, `${id}.json`), '{}')
   assert.equal((await rig.rpc('tunnelCheck')).ok, true)
+  // the form's values as typed, before Settings saves them
+  assert.deepEqual(await rig.rpc('tunnelCheck', { name: 'nope', domain: 'example.com' }), { version: '2026.9.3', cert: true, creds: false, ok: false })
   assert.deepEqual((await rig.rpc('cloudflared')).named, { name: 'laki', domain: 'example.com' })
 
   // one: its record, then the connector with it in its ingress
@@ -79,6 +81,7 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   assert.match(ingress(), /- hostname: shop\.example\.com\n {4}service: http:\/\/localhost:3000\n {2}- service: http_status:404\n/)
   assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, host: 'shop.example.com' }), shop) // the same: that one
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 3000, host: 'other' }), /:3000 is exposed already at shop\.example\.com: stop that first/)
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 3000 }), /:3000 is exposed already at shop\.example\.com: stop that first/) // a random one there: no
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000, host: 'shop' }), /shop\.example\.com is taken/)
   for (const bad of ['a.b', '-x', 'x_y', ''])
     await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000, host: bad }), /one word: letters, digits and dashes/)
@@ -108,6 +111,14 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   await rig.start()
   await until(async () => (await tunnels())?.[0]?.url === 'https://api.example.com' && !(await tunnels())[0].down, 'back after the restart')
   assert.equal(routes(), was)
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).tunnels[0].via, 'laki')
+
+  // another named tunnel in Settings: api's record still goes to laki, so the new connector leaves it out, down
+  await rig.rpc('settingsSet', { tunnel: { name: 'laki2', domain: 'example.com' } })
+  await rig.rpc('tunnelStart', { ws: ws.id, port: 5000, host: 'web' })
+  assert.match((await tunnels())[0].down, /goes to your tunnel laki, not laki2/)
+  assert.doesNotMatch(ingress(), /api/)
+  await rig.rpc('tunnelStop', { ws: ws.id, port: 5000 })
   await rig.rpc('tunnelStop', { ws: ws.id, port: 4000 })
-  await until(() => log().split(' run laki\n').length === log().split('cloudflared named stopped').length, 'none left: the connector stops').catch(e => assert.fail(`${e.message}\n${log()}`))
+  await until(() => log().split(/ run laki2?\n/).length === log().split('cloudflared named stopped').length, 'none left: the connector stops').catch(e => assert.fail(`${e.message}\n${log()}`))
 })

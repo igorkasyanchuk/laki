@@ -780,7 +780,7 @@ export function SettingsPage(p: {
   skill?: SkillApi
   ai?: AiApi
   remote?: RemoteApi
-  tunnels?: () => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck)
+  tunnels?: (n: NamedTunnel) => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck) of the name and domain as typed
   widgets?: WidgetsApi
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
