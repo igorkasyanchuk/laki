@@ -70,8 +70,9 @@ release, like one published before these feeds existed, is offered as *Download*
    ```
    Check with `xcrun notarytool history --keychain-profile laki-notary` (*No submission history* is fine).
    Another profile name: `APPLE_KEYCHAIN_PROFILE=<name>` in `.env`, or before `npm run release`.
-3. **The releases repo**, public (an updater reads its releases with no token, and the source repo's releases page stays
-   for the code): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases), made. Its
+3. **The releases repo**, public (an updater reads its releases with no token): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases),
+   made. It stays apart from the source repo: the cask, the update feed and every installed Laki point there (moving
+   them is a migration), and it keeps the app's downloads off the code's releases page. Its
    README is what visitors read: the download link (`/releases/latest`) and what Laki needs. Another one:
    `gh repo create <owner>/<repo> --public --add-readme`, and `build.publish` in `package.json`.
 4. **The Homebrew tap**, public, the releases repo's owner's `homebrew-laki` (`TAP` in the script; Homebrew reads
