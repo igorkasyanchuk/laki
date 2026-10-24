@@ -671,10 +671,15 @@ function diffLines(text: string) {
   let now = 0
   let hunk = false
   for (const l of text.split('\n')) {
-    const g = /^diff --git a\/.* b\/(.*)$/.exec(l)
+    if (l.startsWith('diff --git ')) {
+      const g = /^diff --git a\/.* b\/(.*)$/.exec(l)
+      f = g ? { LEFT: new Set(), RIGHT: new Set() } : undefined // a header it can't read (a quoted path): its lines count for no file
+      if (g) m.set(g[1], f!)
+      hunk = false
+      continue
+    }
     const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l)
-    if (g) m.set(g[1], (f = { LEFT: new Set(), RIGHT: new Set() })), (hunk = false)
-    else if (!f) continue
+    if (!f) continue
     else if (h) (old = +h[1]), (now = +h[2]), (hunk = true)
     else if (!hunk) continue
     else if (l[0] === '+') f.RIGHT.add(now++)

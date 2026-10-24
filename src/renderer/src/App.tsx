@@ -1065,6 +1065,8 @@ export function App() {
     },
   })
   const dropTo = async (w: WorkspaceView, files: { f: File | null; dir: boolean }[], text: string, more: boolean) => {
+    // its agent starts later: a new one now would make two
+    if (w.pending && !dropAgent(w)) return toast(`${wsName(w)}'s ${w.pending.agent} ${pendingWords(w.pending).replace(/^S/, 's')}: Start now first (its menu), then drop it again`)
     const paths: string[] = []
     for (const { f, dir } of files) {
       if (!f) continue
@@ -2941,7 +2943,7 @@ export function App() {
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
-        {dropOn === w.id && <span className="ws-drop">to {dropAgent(w)?.name ?? 'a new agent'}</span>}
+        {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
