@@ -11,6 +11,8 @@
 set -eo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
+# .env (gitignored, .env.example): who signs and notarizes, so no name or team id lives in the repo
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
 REPO=$(node -p "const p = [].concat(require('./package.json').build.publish)[0]; p.owner + '/' + p.repo")
 TAP=${REPO%%/*}/homebrew-laki # brew install --cask <owner>/laki/laki
 PROFILE=${APPLE_KEYCHAIN_PROFILE:-laki-notary}
@@ -116,11 +118,14 @@ ${arch}  version "$v"
   url "https://github.com/$REPO/releases/download/v#{version}/Laki-#{version}-$dmg.dmg"
   name "Laki"
   desc "Runs coding agents side by side, each task in its own git worktree"
-  homepage "https://github.com/$REPO"
+  homepage "https://laki.sh"
 
-${dep}  depends_on :macos
+  auto_updates true
+${dep}  depends_on macos: ">= :ventura"
 
   app "Laki.app"
+
+  uninstall quit: "dev.laki.app"
 
   zap trash: [
     "~/Library/Application Support/Laki",
@@ -200,8 +205,13 @@ if [ $ADHOC = 1 ]; then # package.json's identity "-": what `npm run dmg` makes;
   unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_KEYCHAIN_PROFILE
   echo "Ad-hoc: a download opens only through System Settings › Privacy & Security › Open Anyway, and can't auto-update."
 else
-  ID=$(security find-identity -v -p codesigning | sed -n 's/.*"Developer ID Application: \(.*\)"$/\1/p')
-  ID=${ID%%$'\n'*} # the first one; not `| head -1`: with pipefail, its early exit can SIGPIPE the pipeline
+  IDS=$(security find-identity -v -p codesigning | sed -n 's/.*"Developer ID Application: \(.*\)"$/\1/p')
+  if [ -n "$LAKI_SIGN_ID" ]; then # .env's: that one, never another the Keychain happens to list first
+    grep -qxF "$LAKI_SIGN_ID" <<< "$IDS" || die "no 'Developer ID Application: $LAKI_SIGN_ID' in the Keychain (.env's LAKI_SIGN_ID)"
+    ID=$LAKI_SIGN_ID
+  else
+    ID=${IDS%%$'\n'*} # the first one; not `| head -1`: with pipefail, its early exit can SIGPIPE the pipeline
+  fi
   [ -n "$ID" ] || die "no Developer ID Application certificate in the Keychain (docs/manual-release.md › Once), or --adhoc"
   xcrun notarytool history --keychain-profile "$PROFILE" > /dev/null 2>&1 ||
     die "no working notary credentials '$PROFILE': xcrun notarytool store-credentials $PROFILE … (docs/manual-release.md › Once)"

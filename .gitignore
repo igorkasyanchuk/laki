@@ -3,3 +3,6 @@ out/
 dist/
 *.log
 .DS_Store
+
+# signing and notarizing (scripts/release.sh): your own, never committed
+.env

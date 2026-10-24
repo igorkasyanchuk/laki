@@ -57,6 +57,8 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'perm' })
   const tunnels = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).tunnels
   const ingress = () => readFileSync(join(rig.data, 'cloudflared/ingress.yml'), 'utf8')
+  const own = JSON.parse(readFileSync(join(rig.data, 'daemon.json'), 'utf8')).port // Laki's API: never through a tunnel
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: own }), /Laki's own port/)
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 3000, host: 'shop' }), /set your named tunnel and its domain in Settings › Tunnels first/)
 
   // the check: each step as it stands

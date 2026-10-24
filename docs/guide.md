@@ -10,6 +10,10 @@ side panel (files, changes, review), a Run button, dev servers, listening ports,
 
 Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.js, the same shape as Superset.
 
+[Features](#features) · [Install](#install) · [First run](#first-run) · [Using it](#using-it) · [Settings](#settings) ·
+[Project settings](#project-settings) · [CLI](#cli) · [Data](#data) · [Updating](#updating) ·
+[Troubleshooting](#troubleshooting) · [Known limits](#known-limits)
+
 What Laki is and where it's going: [requirements](../requirements/README.md). How the code works, for agents
 changing it: [AGENTS.md](../AGENTS.md).
 
@@ -129,7 +133,7 @@ Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PAT
 `grok`, `opencode`. Each one found there is a preset; Claude Code and Codex always are.
 
 ```bash
-cd ~/projects/laki
+git clone https://github.com/igorkasyanchuk/laki && cd laki
 npm install            # if node_modules/electron/dist is missing: node node_modules/electron/install.js
 npm run pack
 ```
@@ -2118,11 +2122,6 @@ codex its last one in that folder. Any other program that was running (a dev ser
 prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was
 running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
 a log out). After a crash, shells start fresh, and nothing comes back over SSH.
-
-Coming from Laki Electron (the app's old name): build, quit *Laki Electron*, and open `dist/mac-arm64/Laki.app`.
-It finds the same daemon and data, and says the daemon is older: restart it there. Then delete the old app. The
-CLI is `laki` now (`npm link` again); the skill is `laki` (*Settings → Agent skill*: install it, and remove an
-old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you had one).
 
 ## Troubleshooting
 

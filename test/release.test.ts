@@ -27,7 +27,9 @@ test("the Homebrew tap's cask: both Macs, Apple silicon only, none without an ar
   assert.equal(arm.status, 0, arm.stderr)
   assert.ok(arm.stdout.includes(`  sha256 "${a}"\n`))
   assert.ok(arm.stdout.includes('Laki-#{version}-arm64.dmg"'))
-  assert.ok(arm.stdout.includes('  depends_on arch: :arm64\n  depends_on :macos\n'))
+  assert.ok(arm.stdout.includes('  depends_on arch: :arm64\n  depends_on macos: ">= :ventura"\n'))
+  assert.match(arm.stdout, /auto_updates true/)
+  assert.match(arm.stdout, /uninstall quit: "dev\.laki\.app"/)
 
   assert.equal(cask(`${b}  Laki-1.2.3-x64.dmg\n`).status, 1)
 })

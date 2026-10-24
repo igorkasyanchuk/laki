@@ -96,7 +96,7 @@ export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; n
   )
 }
 
-const SITE = 'https://laki.igorkasyanchuk.com'
+const SITE = 'https://laki.sh'
 
 // development mode's event log for a workspace (ws:<id>) or a widget (widget:<id>): the daemon's last 500 lines,
 // newest at the bottom, asked again every 2 s while it's open

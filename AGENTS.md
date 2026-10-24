@@ -3,7 +3,7 @@
 Notes for coding agents working on **Laki** (CLI `laki`): how the code works and how to change it
 safely. User-facing docs: `README.md` (the short version: features, install, quick start) and `docs/guide.md` (the
 full guide); the product, in `requirements/`. Laki is a successor to wb
-(`~/projects/specdrop-cli`, tmux + iTerm). That repo is read-only from here; ideas and code are ported
+(a tmux + iTerm workbench; its repo, if you have it, is read-only from here); ideas and code are ported
 from it (limits, hooks).
 
 ## Build, test, run
@@ -48,9 +48,9 @@ npm run dev                       # Electron + renderer dev server on :5199
   wanted both; Ubuntu has neither by default). Tried on Ubuntu 24.04 arm64 (a live session) with `--no-sandbox`.
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
-- The user runs their own daemon with real agents in it, in `~/.laki-electron` (from when the app was called
-  Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
-  at it.
+- The maintainer's own daemon may be running with real agents in it, in `~/.laki` or `~/.laki-electron` (from when
+  the app was called Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never
+  point tests at it.
 - Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release);
   `scripts/release.sh` (`npm run release`, `docs/manual-release.md`) does all of it for macOS arm64/x64 and Linux
   arm64/x64 (Docker), signed and notarized when a Developer ID is in the Keychain (`--adhoc` otherwise), into
@@ -64,7 +64,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   with `identity: null` (unsigned) a downloaded dmg (Slack, mail, a browser) says *"Laki" is damaged* on other Macs;
   ad-hoc, it says Apple could not verify it, and System Settings › Privacy & Security › *Open Anyway* opens it.
   `codesign --verify --deep --strict` on the built app must pass. `npm run release` overrides it with the Developer ID
-  in the Keychain (`Igor Kasyanchuk (VV2UN2324U)`), the hardened runtime and notarization (`laki-notary`): what goes to
+  in the Keychain (`.env`'s `LAKI_SIGN_ID`, gitignored: `.env.example`), the hardened runtime and notarization (`laki-notary`): what goes to
   `igorkasyanchuk/laki-releases`, a plain double-click everywhere.
 - Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, so another
   program can't run its code as Laki (and borrow its privacy grants); `runAsNode` stays (the daemon, the CLI, hooks, MCP,
@@ -269,7 +269,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   script*, `laki run <ws> setup`) runs it and clears it;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from; `named`: settings.tunnel's, when set), `tunnelStart`
-  (`ws`, `port`, `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
+  (`ws`, `port` (never the daemon's own), `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
   `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file
   beside the certificate or in `~/.cloudflared`; `name`, `domain`: the form's as typed, Settings saving 300 ms later);
 - worktree actions: `diff` (git's text but its last newline: a hunk to revert must match), `run`, `ship`; Changes'
@@ -1271,7 +1271,7 @@ else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: 
 and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`), `projectTrust` with a `hash`, `projectSet` with `config` or
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
@@ -2479,7 +2479,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   from the URL hash.
 
 Laki was built twice while the stack was picked; the Go + Wails build is now its own repository
-(`igorkasyanchuk/laki-go`, `~/projects/laki-go`) and nothing here keeps it in step. Many renderer files were
+and nothing here keeps it in step. Many renderer files were
 shared with it: some class and variable names in `look.css` and `themes.ts` are its, and harmless here.
 
 ## Files

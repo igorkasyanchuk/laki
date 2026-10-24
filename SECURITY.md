@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-The latest release only: the dmg (and AppImage) on
-[igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases). No backports.
+The latest release only: the dmg on
+[igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases) (or `brew install --cask
+igorkasyanchuk/laki/laki`). No backports. Builds from source (Intel, Linux) are best effort.
 
 ## Reporting a vulnerability
 
@@ -57,8 +58,12 @@ Out of scope:
 - An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
   phone webhook or extension folders, nor a project's scripts, env, trust or memory list), and ask Laki AI, which acts
   as you.
-- The app is ad-hoc signed, not notarized: macOS asks you to allow it once (Privacy & Security › Open Anyway).
+- Releases are signed with a Developer ID and notarized. A build from source is ad-hoc signed: macOS asks you to
+  allow it once (Privacy & Security › Open Anyway).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
+- A public tunnel (Expose to the world, *anyone with the link*) comes back after Laki restarts or updates, at a new
+  address, until its time runs out or you stop it. A permanent tunnel (your own domain) has no lock of Laki's: protect
+  it with Cloudflare Access, as Settings › Tunnels says.
 - Remote access with no email or PIN (*anyone with the link*) is only as safe as the link: 24 hours at most, and the
   link works once.
 - An extension's https picture comes through the daemon from a public site, judged by its name: a name that resolves
@@ -71,7 +76,9 @@ Laki sends no analytics and no crash reports. With nothing set up, it calls:
 - Anthropic (`api.anthropic.com`) and OpenAI (`chatgpt.com`): your Claude and Codex plan limits, with the agents' own
   sign-in (Settings › Appearance turns each off);
 - GitHub, through your `gh`: PRs, checks, reviews;
-- GitHub's avatars (`avatars.githubusercontent.com`): PR authors' pictures (Settings › Appearance › GitHub pictures).
+- GitHub's avatars (`avatars.githubusercontent.com`): PR authors' pictures (Settings › Appearance › GitHub pictures);
+- GitHub's API (`api.github.com`), every 4 hours: whether a newer release is out (Settings › General › Updates turns
+  it off). Nothing about you goes with it.
 
 Everything else only when you set it up or click it: Laki AI and Voice (OpenRouter), phone pushes (your webhook),
 Cloudflare or Tailscale (remote access, tunnels, shared tabs), memes (Reddit), a video (YouTube), an extension's own

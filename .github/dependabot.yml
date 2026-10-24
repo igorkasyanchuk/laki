@@ -1,0 +1,15 @@
+# Laki takes no new dependencies (AGENTS.md); these keep the ones it has, and the CI's actions, current
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      all:
+        patterns: ['*']
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

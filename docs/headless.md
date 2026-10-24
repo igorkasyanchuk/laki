@@ -24,7 +24,7 @@ until stopped
 ```
 
 On a Mac, the same through the app: `/Applications/Laki.app/Contents/MacOS/Laki --headless --tailscale`. From a clone
-of the repo (Node 22.6+): `npm ci && npm run build`, then `node bin/laki.js serve --tailscale`.
+of the repo (Node 22.12+): `npm ci && npm run build`, then `node bin/laki.js serve --tailscale`.
 
 It runs until stopped (Ctrl-C, `laki stop`, your service manager). `laki remote` prints the link again; each start
 makes a new one (the old one stops working).

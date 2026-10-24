@@ -5,6 +5,9 @@
   "description": "Workbench for coding agents in parallel git worktrees",
   "license": "MIT",
   "author": "Igor Kasyanchuk",
+  "homepage": "https://laki.sh",
+  "repository": "github:igorkasyanchuk/laki",
+  "bugs": "https://github.com/igorkasyanchuk/laki/issues",
   "type": "module",
   "main": "out/main/index.js",
   "bin": {
@@ -68,7 +71,10 @@
       "out/**/*",
       "widgets/**/*",
       "workflows/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_LICENSES.md",
+      "src/renderer/src/fonts/*.{md,txt}"
     ],
     "asar": false,
     "electronFuses": {

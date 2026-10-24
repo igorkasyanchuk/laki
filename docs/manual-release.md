@@ -48,8 +48,8 @@ release, like one published before these feeds existed, is offered as *Download*
    [certificates page](https://developer.apple.com/account/resources/certificates/list) (G2 Sub-CA) with a request from
    Keychain Access › Certificate Assistant. Only the account holder can make one. Not *Developer ID Installer* (a
    `.pkg`'s) nor *Apple Distribution* (the Mac App Store's). It goes into your login Keychain; check with
-   `security find-identity -v -p codesigning`: `Developer ID Application: <name> (<team id>)`. Laki's is
-   `Igor Kasyanchuk (VV2UN2324U)`. Listed only without `-v`, as not trusted: Apple's *Developer ID - G2* intermediate is
+   `security find-identity -v -p codesigning`: `Developer ID Application: <name> (<team id>)`. Put the part after
+   the colon in `.env` (gitignored; copy `.env.example`) as `LAKI_SIGN_ID`, so the script signs with that one. Listed only without `-v`, as not trusted: Apple's *Developer ID - G2* intermediate is
    missing ([apple.com/certificateauthority](https://www.apple.com/certificateauthority/)).
 
    Back it up: Keychain Access › My Certificates, its right click › *Export*, a `.p12` with a password, into a password
@@ -60,7 +60,7 @@ release, like one published before these feeds existed, is offered as *Download*
    app-specific password from [account.apple.com](https://account.apple.com) › Sign-In and Security ›
    App-Specific Passwords, then
    ```bash
-   xcrun notarytool store-credentials laki-notary --apple-id <your Apple ID> --team-id VV2UN2324U
+   xcrun notarytool store-credentials laki-notary --apple-id <your Apple ID> --team-id <your team id>
    ```
    (it asks for the password: none in the shell's history). Or with an App Store Connect API key, once the account
    holder's *Request Access* under [Users and Access › Integrations](https://appstoreconnect.apple.com/access/integrations/api)
@@ -69,9 +69,9 @@ release, like one published before these feeds existed, is offered as *Download*
    xcrun notarytool store-credentials laki-notary --key ~/keys/AuthKey_ABC123.p8 --key-id ABC123 --issuer <issuer-id>
    ```
    Check with `xcrun notarytool history --keychain-profile laki-notary` (*No submission history* is fine).
-   Another profile name: `APPLE_KEYCHAIN_PROFILE=<name> npm run release`.
-3. **The releases repo**, public (an updater can't read a private repo's releases without a token inside the app; the
-   source stays private): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases), made. Its
+   Another profile name: `APPLE_KEYCHAIN_PROFILE=<name>` in `.env`, or before `npm run release`.
+3. **The releases repo**, public (an updater reads its releases with no token, and the source repo's releases page stays
+   for the code): [igorkasyanchuk/laki-releases](https://github.com/igorkasyanchuk/laki-releases), made. Its
    README is what visitors read: the download link (`/releases/latest`) and what Laki needs. Another one:
    `gh repo create <owner>/<repo> --public --add-readme`, and `build.publish` in `package.json`.
 4. **The Homebrew tap**, public, the releases repo's owner's `homebrew-laki` (`TAP` in the script; Homebrew reads

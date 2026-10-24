@@ -62,8 +62,7 @@ For example \`"${cli}" ls --json\`. Below, \`laki\` stands for it.
 ## Where you are
 
 Inside a Laki tab, \`$LAKI_APP\` is \`true\`, \`$LAKI_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
-\`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset. A tab with
-\`$LAKI_GO_HOME\` instead is Laki Go's: use the laki-go skill there, not this one.
+\`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset.
 
 ## Report progress
 

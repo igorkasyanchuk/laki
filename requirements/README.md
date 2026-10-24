@@ -2,8 +2,8 @@
 
 Laki is a macOS desktop app for running several coding agents at once (Claude Code, Codex, Gemini, Grok, OpenCode, or any command
 line program), each task in its own git worktree, in real terminals. You see every agent's state at a
-glance, step in when one needs you, and ship its branch as a PR. It's the successor of **wb**
-(`~/projects/specdrop-cli`), a tmux + iTerm workbench with the same goal.
+glance, step in when one needs you, and ship its branch as a PR. It's the successor of **wb**,
+a tmux + iTerm workbench with the same goal.
 
 This folder is the product side: what Laki is for, what it does, and what's still open. How it works is in
 `AGENTS.md`; how to use it, in `README.md` (the short version) and `docs/guide.md` (all of it).
@@ -48,7 +48,7 @@ Electron + a Node daemon (node-pty, @xterm/headless) + React + xterm.js. The dae
 on 127.0.0.1 behind a token. CLI `laki`, data `~/.laki` (`LAKI_HOME`). The app is ~290 MB and uses ~500 MB.
 
 Laki was built twice while we picked the stack: this one, and **Laki Go** (a Go daemon + Wails, ~10 MB, much
-less memory; now its own repository, `igorkasyanchuk/laki-go`). We picked Electron: the next asks (image
+less memory; now its own repository). We picked Electron: the next asks (image
 preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, and it's one language.
 
 ## Concepts
@@ -152,7 +152,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 **Help**
 - ⌘/ (or the sidebar's ?): a page with the keys, status glyphs, where things are and the main CLI commands.
-- About (the app menu, ⌘K): the version and a link to the website, laki.igorkasyanchuk.com.
+- About (the app menu, ⌘K): the version and a link to the website, laki.sh.
 
 **Look**
 - 86 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; sixty-eight of
@@ -215,6 +215,6 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
   `~/.wb-spike`) is left as it was.
 - **2026-10-04**: picked Electron. Laki Electron became **Laki** (CLI `laki`, data `~/.laki`; an existing
   `~/.laki-electron` stays in use), its code moved to the repository's root, with an icon of its own. Laki Go
-  moved to its own repository (`igorkasyanchuk/laki-go`). Remote access added.
+  moved to its own repository. Remote access added.
 - **2026-10-05**: projects on SSH hosts, after looking at Orca, BridgeMind, Superset and Supacode: the system's ssh
   and nothing to install on the host, as Supacode does.

@@ -1,15 +1,16 @@
 # Laki
 
 Run Claude Code, Codex, Gemini, Grok, OpenCode or any command side by side on macOS, each task in its own git
-worktree. Agents keep running when the window is closed.
+worktree. Agents keep running when the window is closed. [laki.sh](https://laki.sh)
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
-  messages sent later (in 2h, at 3pm; to Laki AI too). Agents resume after a
-  restart or a usage limit.
+  messages sent later (in 2h, at 3pm; to Laki AI too). *Needs you* at the top of the sidebar answers a waiting agent
+  from its card; what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
+  a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
@@ -53,7 +54,10 @@ time and AI money per run (`budget: 60 min, $5`).
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
   this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
   a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
-  every app.
+  every app. A *Review* tab (experimental) puts every changed file's diff in one page, with comments gathered and
+  posted as one PR review. One-click layouts put the agent beside the preview, the diff or a shell.
+- **Expose to the world**: a dev server's port as a public link (Cloudflare), for anyone or only some emails; it
+  comes back if cloudflared drops, and with your own Cloudflare domain keeps an address like `shop.example.com`.
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
@@ -93,16 +97,18 @@ time and AI money per run (`budget: 60 min, $5`).
 
 ## Install
 
-macOS (Apple silicon or Intel). Optional: your agents on PATH, and `gh` (logged in) for PRs.
+macOS 13 or later on Apple silicon (an Intel Mac: build it, below). Optional: your agents on PATH, and `gh`
+(logged in: `gh auth login`) for PRs.
 
-Download the dmg for your Mac from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest)
+Download the dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest)
 (signed and notarized: a double-click opens it), or with Homebrew:
 
 ```bash
 brew install --cask igorkasyanchuk/laki/laki    # then: brew upgrade --cask laki
 ```
 
-Or build it (Node 22.12+, git):
+Or build it (Node 22.12+, git); a build of your own is ad-hoc signed, so macOS asks once: System Settings › Privacy &
+Security › *Open Anyway*.
 
 ```bash
 git clone https://github.com/igorkasyanchuk/laki && cd laki
@@ -113,6 +119,9 @@ npm link                          # optional: the laki CLI (or Settings › Gene
 
 Working on Laki: `npm test` runs every test (a few minutes), `npm run test:one -- test/pr.test.ts` only the files named;
 [AGENTS.md](AGENTS.md) says how the code works.
+
+If something's off: Laki keeps its data, logs included, in `~/.laki` (`daemon.log`); an agent Laki can't find isn't on
+the PATH your login shell gives (`$SHELL -lic 'which claude'`).
 
 Linux and Windows (WSL 2), a preview: `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker
 and tests it there (`ARCH=x64` for Intel/AMD); [the guide](docs/guide.md#linux-and-windows-through-wsl) says how to run it.

@@ -177,6 +177,7 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
   const live = () => state.workspaces.includes(ws) && !ws.archived
   const port = Number(o.port)
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`not a port: ${o.port}`)
+  if (port === daemonPort) throw new Error("that's Laki's own port: remote access shares it (Settings › Remote access)")
   const key = `${ws.id}:${port}`
   if (o.host !== undefined) return namedStart(ws.id, port, String(o.host), live)
   const hours = Number(o.hours ?? 8)

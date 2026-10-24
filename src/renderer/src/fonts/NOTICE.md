@@ -24,11 +24,11 @@ Fontsource and Hack from its own webfonts, cut to the same Latin set). Used by `
   (https://github.com/mozilla/Fira).
 - **Manrope**: Copyright 2018 The Manrope Project Authors (https://github.com/sharanda/manrope).
 
-These are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). They may be
+These are licensed under the SIL Open Font License, Version 1.1 (`OFL.txt`, https://openfontlicense.org). They may be
 used, bundled and redistributed with this app; they may not be sold on their own.
 
 - **Hack** (Latin subset of its 3.003 webfonts): the Hack work is Copyright 2018 Source Foundry Authors, under the MIT
   License; it derives from DejaVu (public domain) and Bitstream Vera Sans Mono, Copyright 2003 Bitstream Inc., under the
   Bitstream Vera License, with Reserved Font Names "Bitstream" and "Vera"
-  (https://github.com/source-foundry/Hack/blob/master/LICENSE.md). It may be bundled and redistributed; it may not be
+  (`HACK-LICENSE.md`, https://github.com/source-foundry/Hack/blob/master/LICENSE.md). It may be bundled and redistributed; it may not be
   sold on its own.
