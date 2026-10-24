@@ -6,7 +6,7 @@ import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
-import { type Img, type Inserted, type Inserts, PromptInput, withImages } from './PromptInput'
+import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
 import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
@@ -858,6 +858,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               tools={fast}
               send={send}
               inserts={inserts?.(p.project) /* the project picked: its repo's extensions too */}
+              complete={completeOf(view, { project: p.project, files: true })}
             />
           ) : (
             <>
@@ -1115,12 +1116,13 @@ export function RemindDialog({ name, onClose, onPick }: { name: string; onClose:
 // workspace's agents, or Laki AI (id 'ai'), at a time; a timer in the sidebar until then (edit: its message, agent and
 // time again). picks: Run ▾'s agent actions, a click puts one's text in; inserts: extensions' actions for the agent
 // picked (its workspace and tab), what one prints goes in at the cursor, its files as paths
-export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; picks?: { name: string; text: string }[]; inserts?: (tab: string) => Inserts; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
+export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; picks?: { name: string; text: string }[]; inserts?: (tab: string) => Inserts; complete?: (tab: string) => Complete | undefined; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
   const [to, setTo] = useState(p.agents.some(a => a.id === p.tab) ? p.tab! : (p.agents[0]?.id ?? ''))
   const [text, setText] = useState(p.text ?? '')
   const [menu, openMenu] = useMenu()
   const box = useRef<HTMLTextAreaElement>(null)
   const ins = p.inserts?.(to) ?? []
+  const cmp = useComplete(box, p.complete?.(to), setText)
   const put = (t: Inserted) => {
     const add = withPaths(t.text, (t.files ?? []).map(f => f.path))
     const el = box.current
@@ -1145,7 +1147,10 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
         </label>
         <label>
           Message
-          <textarea ref={box} rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
+          <span className="pi-wrap">
+            <textarea ref={box} rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails · @ a file, # a PR, / a template" onChange={e => (setText(e.target.value), cmp.look())} onSelect={cmp.look} onBlur={cmp.blur} onKeyDown={e => !cmp.key(e) && e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
+            {cmp.menu}
+          </span>
         </label>
         {ins.length > 0 && (
           <div className="remind-quick">

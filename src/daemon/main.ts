@@ -289,7 +289,7 @@ const api: Record<string, Handler> = {
   queueNow: async p => (await crossAsk(p, 'send', p.tab, ''), core.queueNow(p.tab)), // its Send now: the turn stopped, the first one typed
   hook: p => core.hook(p),
   diff: p => core.diff(p.ws),
-  files: p => core.files(p.ws),
+  files: p => core.files(p.ws, p.project),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
   artifactList: p => core.artifactList(p.ws),
@@ -301,6 +301,7 @@ const api: Record<string, Handler> = {
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),
   prReview: p => core.prReview(p),
+  issueList: p => core.issueList(p),
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
   prLabel: p => core.prLabel(p),

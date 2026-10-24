@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- In the prompt boxes, `@` puts in a file's path, `#` an open PR or issue's link, `/` a prompt template.
 - A *Review* tab (experimental: Settings › General): every changed file's diff with Viewed boxes, comments
   gathered on lines and ranges, then sent to the agent as one message or posted on the PR as one review.
 - Drop files, an image or text on a workspace's row to hand them to its agent (queued while it works, with Undo; ⌥

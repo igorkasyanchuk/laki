@@ -147,7 +147,9 @@ layout's name, `settings.layouts`, `SETTINGS_KEPT`), kept by `projectSet`: the t
 `LAYOUT_PRESETS`, `fillRoles`, `toRoles`; App's `applyLayout`, `layoutNew`); 111: `prReview` (`ws`, `comments`: `path`, `line`,
 `startLine`, `side`, `body`; each line checked against `gh pr diff` (`diffLines`) before anything goes, then one review,
 event COMMENT at the PR's head commit, by gh's `comments[][…]` fields), `scanStats` for every live git workspace with
-`settings.fullReview`: the full review (FullReview.tsx, the tab bar's first tab, ⌘1; Diff.tsx the pieces Changes shares). A
+`settings.fullReview`: the full review (FullReview.tsx, the tab bar's first tab, ⌘1; Diff.tsx the pieces Changes shares);
+112: `issueList` (`project`: `gh issue list --state open`, a minute per project), `files` `project` (its own folder's): the
+prompt boxes' @ # / (PromptInput.tsx `useComplete`, `completeOf`; text.ts `triggerAt`, `completions`, `completeInto`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -2217,7 +2219,9 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
   global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
   prompt, the daemons' first-4-words rule) and `shortPath` (the ⋯'s *Copy path* hint).
-- **`PromptInput.tsx`**: a prompt with pasted/dropped images (saved by the daemon) and dictation (the mic's ⌄: where
+- **`PromptInput.tsx`**: `useComplete` (@ a file, # a PR or issue, / a template; the box's `complete`, `completeOf(view, …)`:
+  each kind read as its menu first opens, a minute; Esc keeps the word, a space or the caret out of it opens the next);
+  a prompt with pasted/dropped images (saved by the daemon) and dictation (the mic's ⌄: where
   macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end;
   `saveFile` (`fileSave`; the new-workspace page's and the board's, never Laki AI's): any other file (HEIC, SVG too) a
   `FileChip` (icon, name, size, ✕; an `Img` without `url`), refused past `FILE_MAX` before it's read (the socket would

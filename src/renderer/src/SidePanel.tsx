@@ -9,7 +9,7 @@ import { Markdown } from './MarkdownView'
 import { CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
+import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
@@ -1311,38 +1311,6 @@ export function FilePreview(p: {
       )}
     </div>
   )
-}
-
-// q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and
-// where they matched; null when they don't
-function match(q: string, s: string) {
-  const ls = s.toLowerCase()
-  const hits: number[] = []
-  let score = 0
-  let j = 0
-  for (const c of q) {
-    j = ls.indexOf(c, j)
-    if (j < 0) return null
-    const start = j === 0 || '/_-. '.includes(s[j - 1]) || (s[j] !== ls[j] && s[j - 1] === ls[j - 1])
-    score += 1 + (hits.at(-1) === j - 1 ? 3 : 0) + (start ? 2 : 0)
-    hits.push(j++)
-  }
-  return { score, hits }
-}
-
-// the files matching q best: its letters in the file name first, else anywhere in the path
-// ponytail: greedy first match per letter, not the best alignment; fine for picking files
-export function findFiles(q: string, files: string[], max = 60) {
-  q = q.toLowerCase().replace(/\s+/g, '')
-  if (!q) return files.slice(0, max).map(path => ({ path, hits: [] as number[] }))
-  const out: { path: string; hits: number[]; score: number }[] = []
-  for (const path of files) {
-    const at = path.lastIndexOf('/') + 1
-    const b = match(q, path.slice(at))
-    const m = b ? { score: b.score * 2 + 10, hits: b.hits.map(h => h + at) } : match(q, path)
-    if (m) out.push({ path, hits: m.hits, score: m.score - path.length * 0.02 })
-  }
-  return out.sort((a, b) => b.score - a.score).slice(0, max)
 }
 
 // ⌘P: find a file in the workspace by a few letters of its name or path

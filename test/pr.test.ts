@@ -301,6 +301,16 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   assert.match(log(), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/reviews -f event=COMMENT -f commit_id=beef -f comments\[\]\[path\]=a\.ts -f comments\[\]\[body\]=both "2"s -F comments\[\]\[line\]=4 -f comments\[\]\[side\]=RIGHT -F comments\[\]\[start_line\]=3 -f comments\[\]\[start_side\]=RIGHT -f comments\[\]\[path\]=a\.ts -f comments\[\]\[body\]=why go\? -F comments\[\]\[line\]=3 -f comments\[\]\[side\]=LEFT\n/)
   rmSync(join(gh, 'comment.json'))
   await assert.rejects(r([{ path: 'a.ts', line: 2, body: 'x' }]), /GitHub turned the review down: HTTP 422/)
+
+  // the prompt boxes' # completion: the repo's open issues (gh issue list), gh's failure in words and tried again, then
+  // kept a minute; @ on the new-workspace page: the project's own folder's files
+  await assert.rejects(rig.rpc('issueList', { project: p.id }), /gh: Command failed/)
+  writeFileSync(join(gh, 'issues.json'), JSON.stringify([{ number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7', labels: [] }]))
+  assert.deepEqual(await rig.rpc('issueList', { project: p.id }), [{ number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7' }])
+  writeFileSync(join(gh, 'issues.json'), '[]')
+  assert.equal((await rig.rpc('issueList', { project: p.id })).length, 1) // a minute's
+  assert.match(log(), /gh issue list --state open --json number,title,url --limit 50/)
+  assert.ok((await rig.rpc('files', { project: p.id })).files.includes('README.md'))
 })
 
 test("a PR's author: yours (gh api user) is mine; its whole diff (gh pr diff) for Changes, each file's status and lines", async t => {

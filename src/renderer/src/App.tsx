@@ -16,7 +16,7 @@ import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
-import { type Inserted, type Inserts, keepFile, VoiceBar, withImages } from './PromptInput'
+import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
@@ -4010,7 +4010,7 @@ export function App() {
             }}
           />
         ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} />}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />}
         {(o =>
           o &&
           specsOn && (
@@ -4373,7 +4373,7 @@ export function App() {
           <>
             {aiFloat && (
               <AiFloat>
-                <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} />
+                <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />
               </AiFloat>
             )}
             {!aiDock && (
@@ -4515,6 +4515,7 @@ export function App() {
             at={old?.end}
             picks={picks}
             inserts={to => (t => extInserts(to === 'ai' ? hereCtx() : { ws: t?.workspace, tab: t?.id }))(view.tabs.find(x => x.id === to))}
+            complete={to => (to === 'ai' ? completeOf(view, { project: w?.project }) : completeOf(view, { ws: view.tabs.find(x => x.id === to)?.workspace }))}
             onClose={() => setDialog(dialog.back ?? null)}
             onPick={o => {
               if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))

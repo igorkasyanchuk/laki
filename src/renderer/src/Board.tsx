@@ -8,7 +8,7 @@ import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
 import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
-import { FileChip, type Img, PromptInput } from './PromptInput'
+import { completeOf, FileChip, type Img, PromptInput } from './PromptInput'
 import { wsShown } from './text'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
@@ -108,7 +108,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
           ))}
           {projects.length > 0 && (
             <form className="board-add" onSubmit={add}>
-              <PromptInput value={text} onChange={setText} images={images} onImages={setImages} save={api.saveImage} saveFile={api.saveFile} onSubmit={add} onBusy={setSaving} rows={3} focus={false} placeholder="What should an agent do? Paste or drop screenshots and files. (⌘⏎ adds it)" />
+              <PromptInput value={text} onChange={setText} images={images} onImages={setImages} save={api.saveImage} saveFile={api.saveFile} onSubmit={add} onBusy={setSaving} rows={3} focus={false} placeholder="What should an agent do? Paste or drop screenshots and files. (⌘⏎ adds it)" complete={completeOf(view, { project, files: true })} />
               <div className="board-foot">
                 {projects.length > 1 && (
                   <select value={project} onChange={e => setPick(e.target.value)} title="Project">

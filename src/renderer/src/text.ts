@@ -503,3 +503,73 @@ export function paletteGroups<T extends { label: string; hint?: string; kind?: P
   const rest = (['ws', 'tab', 'action'] as const).map(k => of(k, hits)).filter(g => g.items.length).sort((a, b) => score.get(b.items[0])! - score.get(a.items[0])!)
   return [of('for', hits), of('needs', hits), ...rest].filter(g => g.items.length)
 }
+
+// q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and
+// where they matched; null when they don't
+function fileMatch(q: string, s: string) {
+  const ls = s.toLowerCase()
+  const hits: number[] = []
+  let score = 0
+  let j = 0
+  for (const c of q) {
+    j = ls.indexOf(c, j)
+    if (j < 0) return null
+    const start = j === 0 || '/_-. '.includes(s[j - 1]) || (s[j] !== ls[j] && s[j - 1] === ls[j - 1])
+    score += 1 + (hits.at(-1) === j - 1 ? 3 : 0) + (start ? 2 : 0)
+    hits.push(j++)
+  }
+  return { score, hits }
+}
+
+// the files matching q best: its letters in the file name first, else anywhere in the path
+// ponytail: greedy first match per letter, not the best alignment; fine for picking files
+export function findFiles(q: string, files: string[], max = 60) {
+  q = q.toLowerCase().replace(/\s+/g, '')
+  if (!q) return files.slice(0, max).map(path => ({ path, hits: [] as number[] }))
+  const out: { path: string; hits: number[]; score: number }[] = []
+  for (const path of files) {
+    const at = path.lastIndexOf('/') + 1
+    const b = fileMatch(q, path.slice(at))
+    const m = b ? { score: b.score * 2 + 10, hits: b.hits.map(h => h + at) } : fileMatch(q, path)
+    if (m) out.push({ path, hits: m.hits, score: m.score - path.length * 0.02 })
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, max)
+}
+
+// the prompt boxes' completion (PromptInput's complete): @ a file, # a PR or issue, after the start or a space; / a
+// prompt template at the start of a line. The trigger the caret is in, its word so far and where it starts
+export type Trigger = { ch: '@' | '#' | '/'; q: string; from: number }
+export function triggerAt(v: string, caret: number): Trigger | null {
+  const before = v.slice(0, caret)
+  const m = /(^|\s)([@#])([^\s@#]*)$/.exec(before)
+  if (m) return { ch: m[2] as '@' | '#', q: m[3], from: caret - m[3].length - 1 }
+  const s = /(^|\n)\/([^\s/]*)$/.exec(before)
+  return s ? { ch: '/', q: s[2], from: caret - s[2].length - 1 } : null
+}
+export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue' }
+// the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
+// templates by name
+export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
+  const q = t.q.toLowerCase()
+  if (t.ch === '@') {
+    const changed = new Set(o.changed ?? [])
+    const all = [...(o.changed ?? []).filter(f => (o.files ?? []).includes(f) || !o.files), ...(o.files ?? []).filter(f => !changed.has(f))]
+    return findFiles(q, all, max).map(f => ({ label: f.path.slice(f.path.lastIndexOf('/') + 1), sub: `${f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}${changed.has(f.path) ? (f.path.includes('/') ? ' · changed' : 'changed') : ''}`, value: f.path }))
+  }
+  if (t.ch === '#') {
+    const words = q.replace(/^#/, '').split(/\s+/).filter(Boolean)
+    return (o.refs ?? [])
+      .filter(r => words.every(w => String(r.n).startsWith(w) || r.title.toLowerCase().includes(w)))
+      .slice(0, max)
+      .map(r => ({ label: `#${r.n} ${r.title}`, sub: r.kind, value: r.url }))
+  }
+  return (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).slice(0, max).map(x => ({ label: `/${x.name}`, sub: x.text.split('\n')[0].slice(0, 60), value: x.text, template: x }))
+}
+// a pick put in: the trigger's word replaced by a path or URL and a space, or by a template's text, the caret where
+// its {{prompt}} was (else at its end)
+export function completeInto(v: string, t: Trigger, caret: number, value: string, template?: boolean) {
+  if (!template) return { value: `${v.slice(0, t.from)}${value}${/^\s/.test(v.slice(caret)) ? '' : ' '}${v.slice(caret)}`, caret: t.from + value.length + 1 } // a space after it (one there already: past it)
+  const at = value.search(/\{\{\s*prompt\s*\}\}/)
+  const [a, b] = at < 0 ? [fillTemplate(value, {}), ''] : [fillTemplate(value.slice(0, at), {}), fillTemplate(value.slice(at).replace(/^\{\{\s*prompt\s*\}\}/, ''), {})]
+  return { value: `${v.slice(0, t.from)}${a}${b}${v.slice(caret)}`, caret: t.from + a.length }
+}

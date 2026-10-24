@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -379,4 +379,29 @@ test("the palette's groups: suggestions, needs you, recent, then workspaces, tab
   assert.deepEqual(heads(paletteGroups(items, 'cart', [])), ['Workspaces: cart', 'Tabs: cart / claude'])
   assert.deepEqual(heads(paletteGroups(items, 'fix', []))[0], 'For this workspace: Fix CI: send #42')
   assert.deepEqual(paletteGroups(items, 'zzz', []), [])
+})
+
+test('prompt completion: @ and # after a space, / at a line\'s start; the rows; what a pick puts in', () => {
+  assert.deepEqual(triggerAt('fix @src/ca', 11), { ch: '@', q: 'src/ca', from: 4 })
+  assert.deepEqual(triggerAt('#4', 2), { ch: '#', q: '4', from: 0 })
+  assert.deepEqual(triggerAt('see\n/rev', 8), { ch: '/', q: 'rev', from: 4 })
+  assert.equal(triggerAt('me@x.com', 8), null) // an email
+  assert.equal(triggerAt('src/foo', 7), null) // a path, not a template
+  assert.equal(triggerAt('a /x', 4), null) // / only at a line's start
+  assert.equal(triggerAt('@a b', 4), null) // a space ends it
+  assert.deepEqual(triggerAt('@a b', 2), { ch: '@', q: 'a', from: 0 }) // the caret in it
+  const files = ['README.md', 'src/cart.js', 'src/cart.test.js', 'src/app.js']
+  // nothing typed: the changed ones first; typed: the file name's letters first
+  assert.deepEqual(completions({ ch: '@', q: '', from: 0 }, { files, changed: ['src/app.js'] }).map(r => [r.value, r.sub]), [['src/app.js', 'src · changed'], ['README.md', ''], ['src/cart.js', 'src'], ['src/cart.test.js', 'src']])
+  assert.equal(completions({ ch: '@', q: 'test', from: 0 }, { files })[0].value, 'src/cart.test.js')
+  const refs = [{ n: 42, title: 'Fix cart total', url: 'u42', kind: 'PR' as const }, { n: 7, title: 'Totals round wrong', url: 'u7', kind: 'issue' as const }]
+  assert.deepEqual(completions({ ch: '#', q: '4', from: 0 }, { refs }).map(r => r.label), ['#42 Fix cart total'])
+  assert.deepEqual(completions({ ch: '#', q: 'tot', from: 0 }, { refs }).map(r => [r.value, r.sub]), [['u42', 'PR'], ['u7', 'issue']])
+  const templates = [{ name: 'Review', text: 'Review {{prompt}} carefully' }, { name: 'Tests', text: 'Write tests' }]
+  assert.deepEqual(completions({ ch: '/', q: 'rev', from: 0 }, { templates }).map(r => r.label), ['/Review'])
+  // a path or URL and a space; a template's text, the caret at its {{prompt}}, else at its end
+  assert.deepEqual(completeInto('fix @ca now', { ch: '@', q: 'ca', from: 4 }, 7, 'src/cart.js'), { value: 'fix src/cart.js now', caret: 16 })
+  assert.deepEqual(completeInto('@ca', { ch: '@', q: 'ca', from: 0 }, 3, 'src/cart.js'), { value: 'src/cart.js ', caret: 12 })
+  assert.deepEqual(completeInto('/rev', { ch: '/', q: 'rev', from: 0 }, 4, templates[0].text, true), { value: 'Review  carefully', caret: 7 })
+  assert.deepEqual(completeInto('a\n/te', { ch: '/', q: 'te', from: 2 }, 5, 'Write tests', true), { value: 'a\nWrite tests', caret: 13 })
 })

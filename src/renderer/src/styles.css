@@ -886,7 +886,17 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 
 /* prompt with images and dictation (PromptInput.tsx) */
 .form .field { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
-.prompt-input { display: flex; flex-direction: column; gap: 6px; }
+.prompt-input { display: flex; flex-direction: column; gap: 6px; position: relative; }
+/* @ # / completion (PromptInput's complete): under the box, over it when there's no room */
+.pi-complete { position: absolute; left: 8px; right: 8px; top: calc(100% - 4px); z-index: 30; max-height: 260px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: 0 8px 24px color-mix(in srgb, #000 30%, transparent); font-size: 12.5px; }
+.pi-complete.up { top: auto; bottom: calc(100% - 4px); }
+.pi-wrap { position: relative; display: block; }
+.pi-wrap > textarea { width: 100%; }
+.pi-row { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border-radius: var(--rs, 6px); cursor: pointer; white-space: nowrap; overflow: hidden; }
+.pi-row.on { background: var(--sel); }
+.pi-label { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pi-sub { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.pi-foot { padding: 4px 8px 2px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); margin-top: 2px; }
 .prompt-input textarea { color: var(--fg); font-size: 13px; }
 .prompt-images { display: flex; flex-wrap: wrap; gap: 6px; }
 .prompt-image { position: relative; width: 64px; height: 48px; border: 1px solid var(--line); border-radius: var(--rs, 5px); overflow: hidden; background: var(--bg); }

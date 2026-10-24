@@ -3,11 +3,11 @@
 // a folder dropped in is its path, typed in), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
-import { type ReactNode, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { type ActionFile, FILE_MAX } from '../../shared/types'
+import { type ReactNode, type RefObject, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
-import { pathText, withPaths } from './text'
+import { completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
@@ -88,6 +88,95 @@ export async function keepFile(f: File, save: (base64: string, ext: string) => P
   return ext ? { path: await save(data, ext), url } : { path: await saveFile!(data, f.name) }
 }
 
+// what a box completes as you type (text.ts triggerAt): @ a file (its path), # an open PR or issue (its URL), / a
+// prompt template (its text, the caret at {{prompt}}); each read as its menu first opens, kept a minute. None: no menu
+// ponytail: a template's agent variables ({{branch}}…) go in as written, filled only where the box's sender fills them
+export type Complete = {
+  files?: () => Promise<{ files: string[]; changed?: string[] }>
+  refs?: () => Promise<Ref[]>
+  templates?: () => Template[]
+}
+
+// @ # / for a text box (PromptInput's, Send later's): the trigger the caret is in (one Esc closed stays closed: shut,
+// its start), the row lit, what's been read. The box's own handlers call look (a change, a caret move), blur and key
+// (true: the menu took it); menu goes beside the box, in a parent with position: relative
+export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete: Complete | undefined, onChange: (v: string) => void) {
+  const [trig, setTrig] = useState<Trigger | null>(null)
+  const [shut, setShut] = useState(-1)
+  const [lit, setLit] = useState(0)
+  const [got, setGot] = useState<{ files?: string[]; changed?: string[]; refs?: Ref[]; err?: string; loading?: boolean }>({})
+  const read = useRef<Record<string, number>>({})
+  const source = (t: Trigger | null) => t && (t.ch === '@' ? complete?.files : t.ch === '#' ? complete?.refs : complete?.templates)
+  const look = () => {
+    const el = box.current
+    if (!complete || !el) return
+    const t = el.selectionStart === el.selectionEnd ? triggerAt(el.value, el.selectionStart) : null
+    const next = t && source(t) ? t : null
+    if (!next) setShut(-1) // a space, or the caret out of it: the next one opens again
+    if (next?.from !== trig?.from || next?.q !== trig?.q) setLit(0)
+    setTrig(next)
+  }
+  useEffect(() => {
+    const k = trig?.ch === '@' ? 'files' : trig?.ch === '#' ? 'refs' : ''
+    if (!k || !complete || Date.now() - (read.current[k] ?? 0) < 60_000) return
+    read.current[k] = Date.now()
+    setGot(g => ({ ...g, err: undefined, loading: true }))
+    ;(k === 'files' ? complete.files!().then(r => setGot(g => ({ ...g, files: r.files, changed: r.changed, loading: false }))) : complete.refs!().then(refs => setGot(g => ({ ...g, refs, loading: false })))).catch(e => ((read.current[k] = 0), setGot(g => ({ ...g, err: String(e?.message ?? e), loading: false }))))
+  }, [trig?.ch])
+  const shown = trig && trig.from !== shut ? trig : null
+  const rows = shown ? completions(shown, { ...got, templates: shown.ch === '/' ? complete?.templates?.() : undefined }) : []
+  const pick = (r: (typeof rows)[number]) => {
+    const el = box.current
+    if (!el || !shown) return
+    const c = completeInto(el.value, shown, el.selectionStart, r.value, !!r.template)
+    onChange(c.value)
+    setTrig(null)
+    setTimeout(() => (el.focus(), el.setSelectionRange(c.caret, c.caret))) // once the new value is in
+  }
+  const key = (e: KeyboardEvent) => {
+    if (!shown || e.nativeEvent.isComposing) return false
+    if (e.key === 'Escape') return e.preventDefault(), setShut(shown.from), true // the text stays as typed (claude's own /commands)
+    if (!rows.length) return false
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') return e.preventDefault(), setLit(i => (i + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length), true
+    if ((e.key === 'Enter' && !e.metaKey && !e.shiftKey && !e.altKey) || (e.key === 'Tab' && !e.shiftKey)) return e.preventDefault(), pick(rows[Math.min(lit, rows.length - 1)]), true
+    return false
+  }
+  const up = !!shown && !!box.current && box.current.getBoundingClientRect().bottom + 260 > innerHeight // no room under the box: over it
+  const menu = shown && (rows.length > 0 || got.loading || got.err) && (
+    <div className={`pi-complete ${up ? 'up' : ''}`} role="listbox" onMouseDown={e => e.preventDefault() /* the box keeps the focus */}>
+      {rows.map((r, i) => (
+        <div key={r.value + i} role="option" aria-selected={i === lit} className={`pi-row ${i === lit ? 'on' : ''}`} onMouseEnter={() => setLit(i)} onClick={() => pick(r)}>
+          <span className="pi-label">{r.label}</span>
+          {r.sub && <span className="pi-sub">{r.sub}</span>}
+        </div>
+      ))}
+      {!rows.length && <div className="pi-row muted">{got.err ?? 'Loading…'}</div>}
+      <div className="pi-foot">↑↓ · ⏎ or ⇥ picks · esc {shown.ch === '/' ? `keeps /${shown.q}` : 'closes'}</div>
+    </div>
+  )
+  return { look, key, menu, blur: () => setTrig(null) }
+}
+
+// what a box can complete from the view: a workspace's files (else, files: true, the project's own folder's), the
+// project's open PRs and issues (a git one), its prompt templates and the global ones. None outside a project
+export function completeOf(view: View | null, o: { ws?: string; project?: string; files?: boolean }): Complete | undefined {
+  const w = o.ws ? view?.workspaces.find(x => x.id === o.ws) : undefined
+  const proj = view?.projects.find(x => x.id === (w?.project ?? o.project))
+  if (!view || !proj || proj.kind) return undefined
+  type Item = { number: number; title: string; url: string }
+  return {
+    files: w || o.files ? () => api.call<{ files: string[]; changed: Record<string, string> }>('files', w ? { ws: w.id } : { project: proj.id }).then(r => ({ files: r.files, changed: Object.keys(r.changed) })) : undefined,
+    refs:
+      proj.git !== false
+        ? () =>
+            Promise.all([api.call<Item[]>('prList', { project: proj.id, who: 'all' }), api.call<Item[]>('issueList', { project: proj.id }).catch(() => [] as Item[])]).then(([prs, issues]) =>
+              [...prs.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'PR' as const })), ...issues.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'issue' as const }))].sort((a, b) => b.n - a.n),
+            )
+        : undefined,
+    templates: () => templatesFor(view.settings?.templates, proj.config?.templates),
+  }
+}
+
 export function PromptInput(p: {
   value: string
   onChange: (v: string) => void
@@ -109,6 +198,7 @@ export function PromptInput(p: {
   inserts?: Inserts // extensions' actions (show prompt): what one prints goes in at the cursor, its files (#26) with the images
   files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
   saveFile?: (base64: string, name: string) => Promise<string> // other files kept by the daemon (fileSave): chips, their paths in the prompt like images'
+  complete?: Complete
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
@@ -137,6 +227,7 @@ export function PromptInput(p: {
     if (typed) insertText(typed)
     if (kept.length) void Promise.all(kept.map(f => (f.image ? api.call<string>('aiImage', { path: f.path }).then(url => ({ path: f.path, url }), () => ({ path: f.path, size: f.size })) : { path: f.path, size: f.size }))).then(x => p.onImages(i => [...i, ...x]))
   }
+  const cmp = useComplete(box, p.complete, p.onChange)
   const saving = useRef(0)
   const add = async (files: File[]) => {
     setErr('')
@@ -232,10 +323,13 @@ export function PromptInput(p: {
         value={p.value}
         autoFocus={p.focus !== false}
         placeholder={p.placeholder ?? 'What should the agent do? Paste or drop screenshots here.'}
-        onChange={e => p.onChange(e.target.value)}
+        onChange={e => (p.onChange(e.target.value), cmp.look())}
+        onSelect={cmp.look}
+        onBlur={cmp.blur}
         onPaste={paste}
-        onKeyDown={(e: KeyboardEvent) => e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing)) && (e.preventDefault(), p.onSubmit?.())}
+        onKeyDown={(e: KeyboardEvent) => !cmp.key(e) && e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing)) && (e.preventDefault(), p.onSubmit?.())}
       />
+      {cmp.menu}
       {p.images.length > 0 && (
         <div className="prompt-images">
           {p.images.map(i =>

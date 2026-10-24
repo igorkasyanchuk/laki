@@ -242,6 +242,21 @@ export async function prList(o: { project: string; who?: 'mine' | 'others' | 'al
     .map(x => ({ number: x.number, title: x.title, author: x.author?.login, mine: o.who === 'mine' || (!!me && x.author?.login === me), url: x.url, branch: x.headRefName, base: x.baseRefName, draft: x.isDraft || undefined, review: x.reviewDecision || undefined, updated: x.updatedAt, workspace: state.workspaces.find(w => !w.archived && w.prUrl === x.url)?.id ?? state.workspaces.find(w => !w.archived && w.project === p.id && w.kind === 'worktree' && w.branch === x.headRefName)?.id }))
 }
 
+// issueList: the repo's open issues (gh issue list), for the prompt boxes' # completion; a minute per project
+const issues = new Map<string, { at: number; list: Promise<{ number: number; title: string; url: string }[]> }>()
+export function issueList(o: { project: string }) {
+  const p = findProject(o.project)
+  if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
+  const had = issues.get(p.id)
+  if (had && Date.now() - had.at < 60_000) return had.list
+  const list = exec(p, 'gh', ['issue', 'list', '--state', 'open', '--json', 'number,title,url', '--limit', '50'], { timeout: 30000 }).then(
+    r => (JSON.parse(r.stdout || '[]') as { number: number; title: string; url: string }[]).map(x => ({ number: x.number, title: x.title, url: x.url })),
+    e => (issues.delete(p.id), Promise.reject(new Error(ghSays(e, 'the repo')))),
+  )
+  issues.set(p.id, { at: Date.now(), list })
+  return list
+}
+
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
   // a worktree's primary PR guessed (prSaid: its prompt or its agent named it; not one you attached or asked for) gives

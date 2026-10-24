@@ -7,7 +7,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { type Stat, type Workspace } from '../shared/types.ts'
-import { changed, exec, findWs, firstLine, git, q, run, state, within } from './core.ts'
+import { changed, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 
 // ---------- the diff against the base
@@ -284,8 +284,9 @@ const MAX_FILES = 50000
 
 // files lists the workspace's files (git's: tracked and untracked, not ignored; a plain folder's: all
 // but dependencies), and how the changed ones changed: M, A (new), D, R
-export async function files(ref: string) {
-  const ws = findWs(ref)
+// project: its own folder's instead (the new-workspace page's @ completion, before there's a workspace)
+export async function files(ref: string, project?: string) {
+  const ws = project ? (p => ({ path: p.path, host: p.host, project: p.id }))(findProject(project)) : findWs(ref)
   // Terminals and Browsers: your home folder, whose walk would be junk and macOS's prompts (Desktop, Documents…)
   if (state.projects.find(p => p.id === ws.project)?.kind) return { files: [], changed: {}, cut: false }
   if (ws.host && state.projects.find(p => p.id === ws.project)?.git === false) {

@@ -837,6 +837,11 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   goes after your text. Any other file (a PDF, a log, a zip; up to 25 MB) goes the same way, as a chip with its name and
   size (✕ takes it off): Laki keeps a copy for the agent to open, for as long as pasted images (Settings › AI); a path
   with a space goes in quotes. A folder dropped in is its path, typed where the cursor is. Laki AI takes images only;
+- `@` (at the start or after a space) finds a file of the project, the changed ones first, and puts its path in; `#` an
+  open PR or issue of its repo (`#42 Fix cart total · PR`), by number or words, and puts its link in; `/` at the start
+  of a line, a prompt template, its text in place with the cursor where its `{{prompt}}` was. ↑↓, ⏎ or ⇥ picks, Esc
+  closes it and keeps what you typed (so claude's own `/commands` still go as typed). Send later's box, the Board's to-dos
+  and Laki AI's box (`#` and `/` only) have it too;
 - the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
   (System Settings › Keyboard › Dictation) and opens it. With Settings › Voice on *Cloud*, the mic records instead: a
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
