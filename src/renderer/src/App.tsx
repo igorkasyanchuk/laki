@@ -2677,13 +2677,15 @@ export function App() {
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
     name: wsName,
   }
-  // ⌘J and the Needs you list walk the same list: waiting first, then done, the oldest first in each
+  // ⌘J and the Needs you list walk the same list: waiting first, then done, the oldest first in each; the one after
+  // the tab in front (needNext: the card and row it's marked on)
+  const needAfter = () => (need => need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])(needsSorted(needing.filter(t => order.some(w => w.id === t.workspace))))
   const nextNeed = () => {
     earn('jump')
-    const need = needsSorted(needing.filter(t => order.some(w => w.id === t.workspace)))
-    if (!need.length) return toast('Nothing needs you')
+    const t = needAfter()
+    if (!t) return toast('Nothing needs you')
     setDialog(null)
-    selectTab(need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])
+    selectTab(t)
   }
   // ⌘⇧A, the status bar's Artifacts › Show here: the strip of what its agents keep, over the status bar, or not
   const toggleArtifacts = () => (ws?.storage ? setGallery(g => (g === ws.id ? null : ws.id)) : toast('No artifacts here: its folder is made with its first agent'))
@@ -2901,7 +2903,7 @@ export function App() {
   const upWs = wsAt(-1)?.id
   const downWs = wsAt(1)?.id
   // where ⌘J goes: the Needs you list's card when it shows, else its workspace's row
-  const needNext = (need => need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])(needsSorted(needing))
+  const needNext = needAfter()
   const needsShown = !find && (!rail || railKind === 'projects') && settings.needsList !== false && !folded.includes('needs')
   const needWs = needsShown ? undefined : needNext?.workspace
   const wsRow = (w: WorkspaceView, pin = false) => {

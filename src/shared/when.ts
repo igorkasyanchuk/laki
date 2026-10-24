@@ -129,6 +129,13 @@ export function parseAt(text: string | number, now = Date.now()): number | { err
   return nextRun(r, now) ?? say
 }
 
+// parseAt's time, or its words as an error: ms as digits too (laki new --at, MCP's start_at)
+export function atOrThrow(v: unknown) {
+  const t = parseAt(typeof v === 'number' || /^\d+$/.test(String(v)) ? Number(v) : String(v))
+  if (typeof t !== 'number') throw new Error(t.error)
+  return t
+}
+
 // widgets' working hours (Settings › Widgets): 9am-9pm · weekdays 8:00 to 18:30 · 22:00-6:00 except weekends. to before
 // from: across midnight (the night belongs to the day it starts on). Empty: always
 export type Hours = { days: number[]; from: number; to: number }

@@ -133,7 +133,7 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   assert.deepEqual([made?.kind, made?.name, made?.schedule], ['worktree', `Deps ${date}`, s.id])
   assert.equal(first.tab, (await rig.tab(first.ws)).id)
   await until(async () => (await rig.tab(first.ws)).last === 'answer: nightly deps', 'the agent got the prompt')
-  assert.equal(v.schedules[0].next, s.next + 86400e3)
+  assert.equal(v.schedules[0].next, (d => d.setDate(d.getDate() + 1))(new Date(s.next))) // the next day's same time: a DST night isn't 24 hours
   assert.equal(v.schedules[0].last, s.next)
   await rig.rpc('scheduleTick', { now: s.next + 1000 }) // not due again
   assert.equal((await rig.rpc('state')).runs.length, 1)

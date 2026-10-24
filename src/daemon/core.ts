@@ -1618,6 +1618,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     const agent = presetNamed(p)?.agent ?? p
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
     if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
+    if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: claude and codex only) likewise
   }
   const base = await fromPRLink(proj, await fromIssue(proj, o))
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'

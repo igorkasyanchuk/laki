@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { changeLine, CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions } from './Diff'
 import type { PanelApi, Thread } from './SidePanel'
-import { Icon, IconButton, useMenu } from './ui'
+import { Icon, IconButton, keep as store, load, useMenu } from './ui'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 export type ReviewApi = PanelApi & {
@@ -20,19 +20,8 @@ export type ReviewApi = PanelApi & {
 
 const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet
 const VIEWED = 'laki.reviewed' // each workspace's files viewed here: path → its diff's hash
-const readAll = <T,>(k: string): Record<string, T> => {
-  try {
-    return JSON.parse(localStore(k) ?? '{}') ?? {}
-  } catch {
-    return {}
-  }
-}
-const keep = <T,>(k: string, ws: string, v: T | undefined) => {
-  const all = readAll<T>(k)
-  if (v === undefined) delete all[ws]
-  else all[ws] = v
-  localStore(k, JSON.stringify(all))
-}
+const readAll = <T,>(k: string) => load<Record<string, T>>(k, {})
+const keepFor = <T,>(k: string, ws: string, v: T | undefined) => store(k, { ...readAll<T>(k), [ws]: v }) // undefined: dropped by JSON
 const hash = (s: string) => {
   let h = 5381
   for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i)
@@ -72,7 +61,7 @@ export function FullReview({ ws, base, pr, linked, api, stat, onOpen }: { ws: st
     if (on) next[p] = hashOf(p)
     else delete next[p]
     setLocal(next)
-    keep(VIEWED, ws, Object.keys(next).length ? next : undefined)
+    keepFor(VIEWED, ws, Object.keys(next).length ? next : undefined)
   }
   const nViewed = files.filter(f => viewed(f.path)).length
 
@@ -87,7 +76,7 @@ export function FullReview({ ws, base, pr, linked, api, stat, onOpen }: { ws: st
   const setNotes = (f: (n: ReviewNote[]) => ReviewNote[]) =>
     setNotesNow(n => {
       const next = f(n)
-      keep(NOTES, ws, next.length ? next : undefined)
+      keepFor(NOTES, ws, next.length ? next : undefined)
       return next
     })
   const outdated = (n: ReviewNote) => !!d && !(byFile.get(n.path)?.lines ?? []).some(l => numOf(l, n.side) === n.line && l.text === n.quote)
@@ -159,7 +148,7 @@ export function FullReview({ ws, base, pr, linked, api, stat, onOpen }: { ws: st
   const keys = useRef<(e: KeyboardEvent) => void>(() => {})
   keys.current = e => {
     const t = e.target as HTMLElement | null
-    if (e.defaultPrevented || e.altKey || e.ctrlKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) || document.querySelector('.overlay, .ask-overlay, .menu')) return
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) || document.querySelector('.overlay, .ask-overlay, .menu, .settings-page')) return
     const i = files.findIndex(f => f.path === here)
     if (e.metaKey) return void (e.key === 'Enter' && api.agents[0] && (e.preventDefault(), send(api.agents[0].id)))
     if (e.shiftKey) return
@@ -180,12 +169,15 @@ export function FullReview({ ws, base, pr, linked, api, stat, onOpen }: { ws: st
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
+  // the keyboard as it opens: the terminal behind it keeps it otherwise (Term only focuses), and j or c would go to its agent
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => root.current?.focus({ preventScroll: true }), [])
 
   const add_ = files.reduce((n, f) => n + (f.add ?? 0), 0)
   const del_ = files.reduce((n, f) => n + (f.del ?? 0), 0)
   const agent = api.agents[0]
   return (
-    <div className="full-review">
+    <div className="full-review" ref={root} tabIndex={-1}>
       <div className="fr-head">
         {pr && (
           <span className="seg">

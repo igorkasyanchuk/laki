@@ -16,6 +16,8 @@ test("a delayed start: the workspace now, its agent at its time (a tick), after 
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'claude', startAt: Date.now() - 3_600_000 }), /has passed/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'claude', startAt: 'soon' }), /a time \(ms\) or 'limit'/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'gemini', startAt: 'limit' }), /claude and codex only, not gemini/)
+  await assert.rejects(rig.rpc('wsFan', { project: p.id, presets: ['claude', 'gemini'], prompt: 'x', startAt: 'limit' }), /claude and codex only, not gemini/) // a race: every one checked before any worktree
+  assert.equal((await rig.rpc('state')).workspaces.length, 0)
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'fix the cart\nand more', startAt: at })
   const view = async (id = ws.id) => ((s: any) => ({ w: s.workspaces.find((w: any) => w.id === id), tabs: s.tabs.filter((t: any) => t.workspace === id) }))(await rig.rpc('state'))
   assert.ok(existsSync(ws.path)) // made now: only its agent waits

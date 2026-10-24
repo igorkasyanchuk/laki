@@ -92,6 +92,7 @@ export async function keepFile(f: File, save: (base64: string, ext: string) => P
 // prompt template (its text, the caret at {{prompt}}); each read as its menu first opens, kept a minute. None: no menu
 // ponytail: a template's agent variables ({{branch}}…) go in as written, filled only where the box's sender fills them
 export type Complete = {
+  key?: string // whose they are (a workspace's, a project's): another's are read anew
   files?: () => Promise<{ files: string[]; changed?: string[] }>
   refs?: () => Promise<Ref[]>
   templates?: () => Template[]
@@ -106,6 +107,10 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
   const [lit, setLit] = useState(0)
   const [got, setGot] = useState<{ files?: string[]; changed?: string[]; refs?: Ref[]; err?: string; loading?: boolean }>({})
   const read = useRef<Record<string, number>>({})
+  const whose = complete?.key ?? ''
+  const now = useRef(whose)
+  now.current = whose
+  useEffect(() => ((read.current = {}), setGot({})), [whose]) // another project or agent picked: not the last one's
   const source = (t: Trigger | null) => t && (t.ch === '@' ? complete?.files : t.ch === '#' ? complete?.refs : complete?.templates)
   const look = () => {
     const el = box.current
@@ -120,9 +125,11 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
     const k = trig?.ch === '@' ? 'files' : trig?.ch === '#' ? 'refs' : ''
     if (!k || !complete || Date.now() - (read.current[k] ?? 0) < 60_000) return
     read.current[k] = Date.now()
+    const of = whose
+    const put = (x: Partial<typeof got>) => now.current === of && setGot(g => ({ ...g, ...x, loading: false })) // an answer for the one picked before: dropped
     setGot(g => ({ ...g, err: undefined, loading: true }))
-    ;(k === 'files' ? complete.files!().then(r => setGot(g => ({ ...g, files: r.files, changed: r.changed, loading: false }))) : complete.refs!().then(refs => setGot(g => ({ ...g, refs, loading: false })))).catch(e => ((read.current[k] = 0), setGot(g => ({ ...g, err: String(e?.message ?? e), loading: false }))))
-  }, [trig?.ch])
+    ;(k === 'files' ? complete.files!().then(r => put({ files: r.files, changed: r.changed })) : complete.refs!().then(refs => put({ refs }))).catch(e => ((read.current[k] = 0), put({ err: String(e?.message ?? e) })))
+  }, [trig?.ch, whose])
   const shown = trig && trig.from !== shut ? trig : null
   const rows = shown ? completions(shown, { ...got, templates: shown.ch === '/' ? complete?.templates?.() : undefined }) : []
   const pick = (r: (typeof rows)[number]) => {
@@ -165,6 +172,7 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
   if (!view || !proj || proj.kind) return undefined
   type Item = { number: number; title: string; url: string }
   return {
+    key: w?.id ?? proj.id,
     files: w || o.files ? () => api.call<{ files: string[]; changed: Record<string, string> }>('files', w ? { ws: w.id } : { project: proj.id }).then(r => ({ files: r.files, changed: Object.keys(r.changed) })) : undefined,
     refs:
       proj.git !== false

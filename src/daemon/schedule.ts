@@ -312,7 +312,8 @@ export async function pendingTick(now = Date.now()) {
 }
 
 // its agent now, as wsNew would have started it; a late one (the daemon was down) says so. One that fails stays, with
-// why (Start now tries again). asked: Start now's (no notification: you started it)
+// why (Start now tries again). asked: Start now's (no notification: you started it; a failure is thrown to it, the time
+// kept)
 export function startPending(w: Workspace, now = Date.now(), asked = false) {
   const p = w.pending!
   const late = p.at !== undefined && now - p.at > 90_000 ? p.at : undefined
@@ -323,8 +324,10 @@ export function startPending(w: Workspace, now = Date.now(), asked = false) {
     if (!asked) broadcast({ ev: 'started', ws: w.id, tab: t.id, name: w.name || w.id, agent: t.name, late })
     return t
   } catch (e) {
-    p.failed = String((e as Error).message ?? e)
-    wsLog(w, `its agent didn't start: ${p.failed}`)
+    const why = String((e as Error).message ?? e)
+    wsLog(w, `its agent didn't start: ${why}`)
+    if (asked) throw e // Start now's: said where it was asked, and still due at its time
+    p.failed = why
   } finally {
     save()
     changed()
