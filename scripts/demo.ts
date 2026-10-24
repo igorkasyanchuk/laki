@@ -63,7 +63,12 @@ writeFileSync(
     { id: 't1', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 2, comments: { nodes: [said('ann', 'Round to cents before summing, or `0.1 + 0.2` shows up in totals:\n\n```suggestion\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n```')] } },
     { id: 't2', isResolved: false, isOutdated: true, path: 'src/cart.test.js', line: 5, comments: { nodes: [said('bob', 'Add a case for an empty cart.'), said('demo', 'On it.', 600)] } },
     { id: 't3', isResolved: true, isOutdated: false, path: 'README.md', line: 1, comments: { nodes: [said('ann', 'Typo.')] } },
-  ] } } } } }),
+    { id: 't4', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 3, comments: { nodes: [{ ...said('dana', 'Would `Math.round(cents) / 100` read clearer here?', 3000), authorAssociation: 'NONE' }] } }, // not a member: the full review shows it, the agent never gets it
+  ] },
+  // the full review's GitHub tab: the conversation and the reviews' summaries (prTalk)
+  comments: { nodes: [{ author: { login: 'carol' }, body: 'Thanks! The discount rules look right to me.', createdAt: ago(5400), url: 'https://github.com/acme/shop/pull/42#issuecomment-1' }] },
+  reviews: { nodes: [{ author: { login: 'carol' }, body: '', state: 'APPROVED', submittedAt: ago(5000), url: 'https://github.com/acme/shop/pull/42#pullrequestreview-1' }, { author: { login: 'bob' }, body: 'A test for the empty cart, please.', state: 'CHANGES_REQUESTED', submittedAt: ago(4000), url: 'https://github.com/acme/shop/pull/42#pullrequestreview-2' }] },
+  } } } }),
 )
 mkdirSync(join(repo, 'src'), { recursive: true })
 git('init', '-q', '-b', 'main')
@@ -75,6 +80,10 @@ writeFileSync(
 )
 git('add', '-A')
 git('commit', '-qm', 'init')
+// a second author in the base, for the full review's blame; origin for Open on remote
+writeFileSync(join(repo, 'src/cart.js'), 'export function total(items) {\n  return items.reduce((s, i) => s + i.price, 0)\n}\n\nexport const empty = () => []\n')
+execFileSync('git', ['commit', '-qam', 'An empty cart'], { cwd: repo, env: { ...process.env, GIT_AUTHOR_NAME: 'Bob Builder' } })
+git('remote', 'add', 'origin', 'git@github.com:acme/shop.git')
 
 const info = await ensureDaemon()
 const p = await rpc('projectAdd', { path: repo })
@@ -85,7 +94,7 @@ const c = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'checkout-
 for (const w of [a, b, c]) await rpc('tabNew', { ws: w.id })
 await new Promise(r => setTimeout(r, 3000))
 // some changes to look at in the diff
-writeFileSync(join(a.path, 'src/cart.js'), 'export function total(items) {\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n  return cents / 100\n}\n')
+writeFileSync(join(a.path, 'src/cart.js'), 'export function total(items) {\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n  return cents / 100\n}\n\nexport const empty = () => []\n')
 writeFileSync(join(a.path, 'src/cart.test.js'), "import { total } from './cart.js'\nconsole.assert(total([{ price: 0.1 }, { price: 0.2 }]) === 0.3)\n")
 await rpc('run', { ws: a.id })
 // what its agents kept: the status bar's Artifacts

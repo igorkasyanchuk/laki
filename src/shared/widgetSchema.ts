@@ -77,9 +77,11 @@ export function pressOf(e: { metaKey: boolean; ctrlKey: boolean; altKey: boolean
   return [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Cmd', k].filter(Boolean).join('+')
 }
 // a glob over a path in the workspace: * (not /), ** (any folders), ?; one without / matches the file's name
-export function globMatch(glob: string, path: string) {
-  const re = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '\0').replace(/\*\*/g, '\x01').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\0/g, '(?:.*/)?').replace(/\x01/g, '.*')
-  return new RegExp(`^${re}$`).test(glob.includes('/') ? path : (path.split('/').pop() ?? path))
+export const globMatch = (glob: string, path: string) => globTest(glob)(path)
+// the same, compiled once for many paths (the full review's filter)
+export function globTest(glob: string) {
+  const re = new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '\0').replace(/\*\*/g, '\x01').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\0/g, '(?:.*/)?').replace(/\x01/g, '.*')}$`)
+  return (path: string) => re.test(glob.includes('/') ? path : (path.split('/').pop() ?? path))
 }
 export type ActionMenu = { title: string; show: string[]; match?: string[]; key?: string; ask?: string; confirm?: string; insert?: boolean; view?: boolean }
 // where an action is offered: one with show or a key (an object action's menu fields)

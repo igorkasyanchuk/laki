@@ -401,15 +401,25 @@ selected workspace's PR is in the status bar.
   total`, or the first prompt you type in it.
 - *Full review* (Settings › General › Experimental): a *Review* tab first in the tab bar (⌘1, the sessions' tabs from ⌘2)
   while a workspace has changes; its tooltip says how many files and lines, a dot that they changed since you looked.
-  Three columns: the files, each with a *Viewed* box (a PR's file: GitHub's, as in Changes; any other: kept on this
-  Mac until its diff changes) and *n of m viewed*; every file's diff (one column or two, *All changes vs <base>* or
-  *PR #n*, *Revert* and a reviewer's *Apply* as in Changes and Review, a PR's open threads at their lines); and your
-  comments. Click a line to comment on it, or drag over lines for a range; *Add to the review* (⌘⏎) puts it in the
-  list, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*. *Send to <agent>*
-  gives them all to the workspace's agent as one message when its turn ends (▾: another agent); *Post on #n* posts
-  them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing goes. Keys: j / k
-  the next or last file, v Viewed, c a comment on the line under the mouse, ⌘⏎ sends to the agent. It reads the diff
-  again as the workspace's files change, keeping your place and comments.
+  Three columns, each edge dragged wider or narrower (double-click: back to its width): the files, each with a *Viewed*
+  box (a PR's file: GitHub's, as in Changes; any other: kept on this Mac until its diff changes) and *n of m viewed*,
+  under a filter (words, or a glob: `spec/**`, `*.rb`, `**/*_test.go`) whose *Mark n viewed* ticks every file it shows;
+  every file's diff (one column or two, *All changes vs <base>* or *PR #n*, Collapse all / Expand all, *Revert* and a
+  reviewer's *Apply* as in Changes and Review, a PR's open threads at their lines); and the comments, which » hides to
+  a strip at the right edge (a click brings them back). A file's clock button (b) is its blame: who last changed each
+  line and when, the base's commits for the lines taken out (the left column in two columns) and the branch's for the
+  rest (*not committed* for yours); hover for the commit, click to copy its id. A file's ↗ (or its right click's
+  *Open on remote*) opens it on origin's site, GitHub, GitLab or Bitbucket, at the base branch or at the branch as
+  pushed; a line's right click opens it at that line. The right click also has *Mark viewed* › *Everything in
+  <folder>/* for each folder above the file, *Open in* and *Copy path*, *Show the file*, *Open in the editor*. With a
+  PR, the comments have two tabs: *Yours* and *GitHub*: everyone's review threads (not only those an agent gets),
+  open ones first, resolved folded, a click goes to the line; then the PR's conversation and each review's summary
+  (approved, changes requested). Click a line to comment on it, or drag over lines for a range; *Add to the review*
+  (⌘⏎) puts it in *Yours*, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*.
+  *Send to <agent>* gives them all to the workspace's agent as one message when its turn ends (▾: another agent);
+  *Post on #n* posts them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing
+  goes. Keys: j / k the next or last file, v Viewed, b blame, c a comment on the line under the mouse, ⌘⏎ sends to the
+  agent. It reads the diff again as the workspace's files change, keeping your place and comments.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
@@ -941,7 +951,7 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 on than fit, the least used (To-dos, Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail: with
 the pages that are on by default, Flows and Specs. Settings ›
 Appearance › Rail › *Its buttons* picks which show (the others go into ⋯ *More*) and, dragged, their order; a right
-click on a rail button puts it into *More*, and *More*'s *Show them all on the rail* brings them back. Board and Schedule are pages
+click on a rail button gives its icon a color (a row of swatches; the first takes it off) or puts it into *More*, and *More*'s *Show them all on the rail* brings them back. Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the

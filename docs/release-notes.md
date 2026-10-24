@@ -4,6 +4,12 @@ version it builds, with the date. -->
 
 ## Next
 
+- The *Review* tab: blame for each file (who last changed each line, the base's for lines taken out), every
+  file on GitHub, GitLab or Bitbucket at the base or your branch, a filter (`spec/**`) whose matches one click marks
+  viewed (or a folder's from the right click), Collapse all / Expand all, columns you drag wider, and the comments
+  hidden to a strip at the edge. With a PR, a *GitHub* tab shows everyone's comments: the threads, the conversation
+  and each review's summary.
+- A right click on a rail button gives its icon a color.
 - An agent can't post a PR review or a line comment as you any more (the app's Review and Changes still do), nor
   open a tunnel to Laki's own port.
 - The Homebrew cask quits the app before an uninstall (the daemon and your agents keep running: *Quit Laki

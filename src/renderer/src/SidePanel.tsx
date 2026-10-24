@@ -6,7 +6,7 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
-import { CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions } from './Diff'
+import { CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -43,6 +43,8 @@ export type PanelApi = {
   setup?: () => void // Settings › Simulators: what a simulator needs on this Mac, the devices to start
   float?: (device: string) => void // the Simulator tab's device in a window of its own (Electron's)
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
+  fileItems?: (path: string) => MenuItem[] // that menu's items for a file, in another menu (the full review's right click)
+  web?: (path: string, at: 'base' | 'branch', line?: number) => void // the file's page on origin's site (the daemon's fileWeb), in the browser
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
   undoHunk: (path: string, hunk: string, lines?: number[], then?: () => void) => Promise<boolean> // false: you said no
@@ -232,7 +234,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
   const rv = useRevert(api, byFile, all, reload, `${ws}#${all}`)
   const [menu, openMenu] = useMenu()
-  const fileMenu = (e: MouseEvent, path: string) => !all && openMenu(e, [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) }])
+  const fileMenu = (e: MouseEvent, path: string) => (m => m.length && openMenu(e, m))([...webItems(api, path, d?.base ?? '', undefined), ...(all ? [] : [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) } as MenuItem])])
   // a click (not a drag that selects text) on a line opens its comment box
   const pick = (path: string, l: DiffLine, e: MouseEvent) => {
     if (rv.onPick(path, l, e)) return
@@ -252,7 +254,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   const viewedOf = vw.viewedOf
   const inPR = files.filter(f => viewedOf(f.path))
   const viewed = inPR.filter(f => viewedOf(f.path) === 'VIEWED').length
-  const mark = (p: string, on: boolean) => (vw.mark(p, on), on && setOpen(o => (o.delete(p), new Set(o))))
+  const mark = (p: string, on: boolean) => (vw.mark([p], on), on && setOpen(o => (o.delete(p), new Set(o))))
   return (
     <>
       <div className="sp-tools">
@@ -289,7 +291,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
         {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {files.map(f => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
-            <div className="sp-row" onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? f.path : `${f.path} · right click: Revert this file`}>
+            <div className="sp-row" onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
               <span className="sp-chev">
                 <Icon name={open.has(f.path) ? 'chevron' : 'chevronRight'} />
               </span>

@@ -6,7 +6,7 @@ import { closeSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, rea
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
-import { type Stat, type Workspace } from '../shared/types.ts'
+import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
 import { changed, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 
@@ -57,6 +57,70 @@ export async function diff(ref: string) {
   return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
 }
 const CUT = '\n… (cut)'
+
+// ---------- blame and the file on the repo's site: the full review's
+
+// who last changed each line: at the diff's base (old) or as the worktree has it (new: a line not committed yet is the
+// zero commit's). --incremental: no file text, each commit's words once
+export async function blame(o: { ws: string; path: string; side?: 'old' | 'new' }): Promise<Blame> {
+  const ws = findWs(o.ws)
+  if (state.projects.find(p => p.id === ws.project)?.git === false) throw new Error(`${ws.name}: not a git repo`)
+  const rel = inside(ws, String(o.path ?? '')).slice(ws.path.length + 1)
+  const at = o.side === 'old' ? [await diffBase(ws)] : []
+  const { stdout } = await exec(ws, 'git', ['blame', '--incremental', ...at, '--', rel], { timeout: 30000 }).catch(e => {
+    const why = firstLine(String(e.stderr || e.message))
+    throw new Error(/no such path/i.test(why) ? (at.length ? `not in ${ws.base}` : 'not committed yet') : `git blame: ${why}`)
+  })
+  const commits: Blame['commits'] = []
+  const idx = new Map<string, number>()
+  const lines: number[] = []
+  let cur = -1
+  for (const l of stdout.split('\n')) {
+    const h = /^([0-9a-f]{40,64}) \d+ (\d+) (\d+)$/.exec(l)
+    if (h) {
+      let i = idx.get(h[1])
+      if (i === undefined) idx.set(h[1], (i = commits.push({ sha: h[1], author: '', at: 0, summary: '' }) - 1))
+      cur = i
+      for (let k = 0; k < +h[3]; k++) lines[+h[2] - 1 + k] = cur
+    } else if (cur >= 0) {
+      const [key, val = ''] = [l.slice(0, l.indexOf(' ')), l.slice(l.indexOf(' ') + 1)]
+      if (key === 'author') commits[cur].author = val
+      else if (key === 'author-time') commits[cur].at = Number(val) || 0
+      else if (key === 'summary') commits[cur].summary = val
+    }
+  }
+  return { commits, lines: Array.from(lines, x => x ?? -1) }
+}
+
+// a remote's web address (https, ssh or scp's form; its user out, and its port but an https one's: ssh's isn't the
+// site's), '' when it isn't one
+export function webOf(remote: string) {
+  const r = remote.trim().replace(/\/+$/, '').replace(/\.git$/, '')
+  const m = /^(ssh|git|https?):\/\/(?:[^@/]+@)?([^/:]+)(:\d+)?\/(.+)$/.exec(r)
+  if (m) return `https://${m[2]}${/^http/.test(m[1]) ? (m[3] ?? '') : ''}/${m[4]}`
+  const scp = /^(?:[\w.-]+@)?([\w.-]+):(?!\/\/)([^\\]+)$/.exec(r)
+  return scp ? `https://${scp[1]}/${scp[2]}` : ''
+}
+// a file's page on origin's site: at the base branch, or at the branch as pushed; line: its anchor. GitLab's and
+// Bitbucket's shapes, else GitHub's
+export async function fileWeb(o: { ws: string; path: string; at?: 'base' | 'branch'; line?: number }) {
+  const ws = findWs(o.ws)
+  const rel = inside(ws, String(o.path ?? '')).slice(ws.path.length + 1)
+  const web = webOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
+  if (!web) throw new Error('no origin remote with a web address')
+  let ref = ws.base?.replace(/^origin\//, '') || (await git(ws, 'symbolic-ref', '--short', '-q', 'refs/remotes/origin/HEAD').catch(() => '')).replace(/^origin\//, '')
+  if (o.at === 'branch') {
+    if (!ws.branch) throw new Error(`${ws.name} isn't on a branch`)
+    if (!(await git(ws, 'for-each-ref', '--count=1', '--format=%(refname)', `refs/remotes/origin/${ws.branch}`).catch(() => ''))) throw new Error(`${ws.branch} isn't on origin: push it first`)
+    ref = ws.branch
+  }
+  if (!ref) throw new Error("the base branch isn't known")
+  const path = [...ref.split('/'), ...rel.split('/')].map(encodeURIComponent).join('/')
+  const n = Number.isInteger(o.line) && o.line! > 0 ? o.line : 0
+  const host = new URL(web).hostname
+  if (/(^|\.)bitbucket\.org$/.test(host)) return { url: `${web}/src/${path}${n ? `#lines-${n}` : ''}` }
+  return { url: `${web}/${/gitlab/.test(host) ? '-/' : ''}blob/${path}${n ? `#L${n}` : ''}` }
+}
 
 // ---------- revert: Changes' hunks, a few lines of one, or a whole file back to the base, each with an Undo
 

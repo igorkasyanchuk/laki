@@ -305,7 +305,10 @@ const api: Record<string, Handler> = {
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
   prLabel: p => core.prLabel(p),
-  prThreads: p => core.prThreads(p.ws),
+  prThreads: p => core.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
+  prTalk: p => core.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
+  blame: p => core.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
+  fileWeb: p => core.fileWeb(p), // a file's page on origin's site, at the base or the branch
   prDiff: p => core.prDiff(p.ws),
   prFiles: p => core.prFiles(p.ws),
   prViewed: p => core.prViewed(p),

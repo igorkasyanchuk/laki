@@ -228,13 +228,14 @@ export function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
 
 // the rail's or the sidebar's foot's widgets: buttons like theirs (look), the rail's with its words under (words), the
 // foot's beside (words: the foot's labels). places: those shown here (the foot takes the rail's when there's no rail)
-export function WidgetButtons({ widgets, api, places, look, words }: { widgets: WidgetView[]; api: WidgetApi; places: WidgetPlace[]; look: 'rail' | 'foot'; words: boolean }) {
+// colors: the rail's (settings.railColors, by widget:<id>), its right click's swatches
+export function WidgetButtons({ widgets, api, places, look, words, colors }: { widgets: WidgetView[]; api: WidgetApi; places: WidgetPlace[]; look: 'rail' | 'foot'; words: boolean; colors?: Record<string, string> }) {
   const on = widgets.filter(w => w.on && placesOf(w).some(p => places.includes(p)))
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
       <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
-        <span className="rail-icon">
+        <span className={`rail-icon ${colors?.[`widget:${w.id}`] ? 'tinted' : ''}`} style={colors?.[`widget:${w.id}`] ? ({ '--tab-c': `var(--tc-${colors[`widget:${w.id}`]})` } as CSSProperties) : undefined}>
           <Glyph w={w} size={18} />
           {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
         </span>

@@ -161,7 +161,11 @@ every 30 s and at start, `now` for tests; a limit's time `resetOf` its account's
 `--after-limit`, MCP's `start_at`; the new-workspace page's Start chip (panels.tsx `StartChip`); 114: tunnels that stay
 up (`state.tunnels`, `tunnelsBack`, cloudflared started again, a tunnel's `down`, the `tunnel` event: a quick one's new
 address) and permanent ones (`settings.tunnel`, `tunnelStart` `host`, a tunnel's `host`, `cloudflared`'s `named`,
-`tunnelCheck`: Settings › Tunnels). A
+`tunnelCheck`: Settings › Tunnels); 115: the full review's `blame` (`ws`, `path`, `side` old: at the diff's base, new:
+the worktree's, `git blame --incremental`; shared/types.ts `Blame`), `fileWeb` (`ws`, `path`, `at` base or branch,
+`line`: the file's page on origin's site, files.ts `webOf`: GitHub's, GitLab's `-/blob`, Bitbucket's `src`; a branch
+not on origin refused), `prThreads` `all` (everyone's comments, not only `trusted`'s: for you to read, never sent to an
+agent), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -2098,7 +2102,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     `RAIL_FIT` buttons above the pins, `RAIL_MORE`'s (todos, calendar, workflows, specs, board: the least used first; the default
     pages: workflows and specs) go into a ⋯ More menu, lit while its page is open. `settings.railOrder` and `railHide` (Settings › Appearance › Rail's
     `RailField`: `RAIL_ITEMS`' boxes, an HTML5 drag; `railSorted`; AI fixed at the foot): the order and the ones put
-    into More; a right click on the rail (`railMenu`) moves one there, More's foot shows them all again or opens it.
+    into More; a right click on the rail (`railMenu`) colors one (`settings.railColors`, by its `data-rail` key, a pinned spec's `plan:<project>/<kind>/<slug>`; `.rail-icon.tinted` in `--tab-c`) or moves one there, More's foot shows them all again or opens it.
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
@@ -2520,7 +2524,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/notes.ts` | notes (experimental): one JSON file each, their pasted files, the list with search |
-| `src/renderer/src/FullReview.tsx` | the full review (experimental, `settings.fullReview`): the tab bar's Review tab over the panes, files with Viewed boxes, every file's diff, the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`) |
+| `src/renderer/src/FullReview.tsx` | the full review (experimental, `settings.fullReview`): the tab bar's Review tab over the panes, files with Viewed boxes under a filter (words or `globMatch`'s glob; Mark viewed takes its matches, `useGhViewed`'s `mark` one file after another), every file's diff (Collapse/Expand all, blame per file: `blame` old and new, DiffRows' `gutter`), the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`), and everyone's on GitHub (`prThreads` `all`, `prTalk`); its columns' widths `laki.reviewFilesW`, `laki.reviewNotesW`, the comments hidden `laki.reviewNotesOff`, their tab `laki.reviewSide`; a file's right click: blame, `fileWeb` (Diff.tsx `webItems`, Changes' too), Mark viewed by folder, PanelApi's `fileItems` (App's `fileMenu`), Revert |
 | `src/renderer/src/Diff.tsx` | a diff's shared pieces (Changes, Review, the full review): `diffByFile`, `DiffRows`, `CommentBox`, `ImageDiff`, `useRevert`, `useGhViewed`, `ThreadCard`, `useSuggestions`, `useLoad` |
 | `src/renderer/src/Notes.tsx` | the Notes page: the list with search and colors, the open note in BlockNote (SpecEditor) |
 | `src/daemon/plans.ts` | specs and brainstorms: their folders, the editor's save, files, agents' output, a prototype's page |

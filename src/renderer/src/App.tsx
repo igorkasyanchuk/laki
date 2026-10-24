@@ -1,12 +1,12 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile } from '../../shared/types'
+import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { FullReview, type ReviewApi } from './FullReview'
+import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
@@ -1650,6 +1650,8 @@ export function App() {
     setup: () => setDialog({ section: 'simulator' }),
     float: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id)),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
+    fileItems: path => fileMenu(w, path, false),
+    web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
     undoHunk: async (path, hunk, lines, then) => {
       if (!(await revertOk(w))) return false
       const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines })
@@ -1680,6 +1682,9 @@ export function App() {
     ...panelApi(w),
     agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
     send: (tab, text) => api.call('send', { target: tab, text, whenIdle: true }).then(() => done(`Sent the review to ${view?.tabs.find(t => t.id === tab)?.name ?? 'the agent'}`)),
+    threadsAll: () => api.call<Thread[]>('prThreads', { ws: w.id, all: true }),
+    talk: () => api.call<Talk[]>('prTalk', { ws: w.id }),
+    blame: (path, side) => api.call<Blame>('blame', { ws: w.id, path, side }),
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
@@ -1997,7 +2002,7 @@ export function App() {
     },
     do: (w, c, label) => widgetDo(w, c, label),
     settings: (id, key) => setDialog(id ? { extension: id, back: dialog, ...(key && { edit: key }) } : { section: 'widgets' }),
-    menu: (w, e) => openMenu(e, [{ head: w.name }, ...widgetApi.items!(w)]),
+    menu: (w, e) => openMenu(e, [{ head: w.name }, ...((e.currentTarget as Element).closest?.('.rail') ? [{ colors: TAB_COLORS, value: railColors[`widget:${w.id}`], pick: (c: string) => railColor(`widget:${w.id}`, c) }, null] : []), ...widgetApi.items!(w)]), // on the rail: its color too
     items: w => [
       ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
       { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
@@ -3337,10 +3342,17 @@ export function App() {
     const mine = view.tabs.filter(t => kinds?.get(t.workspace) === k)
     return { n: mine.filter(needsYou).length, busy: mine.some(t => spins(t)) }
   }
+  // a rail button's color (its right click's swatches: settings.railColors, by its key); 'none' drops it
+  const railColors = settings.railColors ?? {}
+  const railColor = (key: string, c: string) => {
+    const { [key]: _, ...rest } = railColors
+    void call('settingsSet', { railColors: c === 'none' ? rest : { ...rest, [key]: c } }).catch(fail)
+  }
+  const tinted = (key: string) => (railColors[key] ? { className: 'rail-icon tinted', style: colorVar(railColors[key]) } : { className: 'rail-icon' })
   // a rail button: its icon, words (Labels), and a count or a dot on the icon
   const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode, menu?: (e: React.MouseEvent) => void) => (
     <button key={key} type="button" data-rail={key} data-key={isKeyId(key) ? key : undefined} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run}>
-      <span className="rail-icon">
+      <span {...tinted(key)}>
         <Icon name={icon} size={18} />
         {mark}
       </span>
@@ -3386,10 +3398,11 @@ export function App() {
   }
   const planButton = (p: PlanPin) => {
     const words = p.kind === 'spec' ? 'Spec' : 'Brainstorm'
-    const tip = `${words}: ${p.title || 'Untitled'} · ${view.projects.find(x => x.id === p.project)?.name ?? ''} · right click: unpin`
+    const tip = `${words}: ${p.title || 'Untitled'} · ${view.projects.find(x => x.id === p.project)?.name ?? ''} · right click: unpin, color`
+    const key = `plan:${p.project}/${p.kind}/${p.slug}`
     return (
-      <button key={`plan:${p.project}/${p.kind}/${p.slug}`} type="button" className="rail-kind rail-pin nodrag" aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog({ specs: p.project, kind: p.kind, slug: p.slug }))} onContextMenu={e => (e.preventDefault(), openMenu(e, [{ label: 'Open', icon: (p.kind === 'spec' ? 'spec' : 'bulb'), run: () => setDialog({ specs: p.project, kind: p.kind, slug: p.slug }) }, { label: 'Unpin from the rail', icon: 'pin', run: () => pinPlan(p, false) }]))}>
-        <span className="rail-icon">
+      <button key={`plan:${p.project}/${p.kind}/${p.slug}`} type="button" className="rail-kind rail-pin nodrag" aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog({ specs: p.project, kind: p.kind, slug: p.slug }))} onContextMenu={e => (e.preventDefault(), openMenu(e, [{ label: 'Open', icon: (p.kind === 'spec' ? 'spec' : 'bulb'), run: () => setDialog({ specs: p.project, kind: p.kind, slug: p.slug }) }, { label: 'Unpin from the rail', icon: 'pin', run: () => pinPlan(p, false) }, { colors: TAB_COLORS, value: railColors[key], pick: c => railColor(key, c) }]))}>
+        <span {...tinted(key)}>
           <Icon name={(p.kind === 'spec' ? 'spec' : 'bulb')} size={18} />
         </span>
         {railWords && <span className="rail-label">{p.title || 'Untitled'}</span>}
@@ -3460,6 +3473,7 @@ export function App() {
     const item = RAIL_ITEMS.find(x => x.key === key)
     e.preventDefault()
     openMenu(e, [
+      ...(key ? [{ head: 'Color' }, { colors: TAB_COLORS, value: railColors[key], pick: (c: string) => railColor(key, c) }, null] : []),
       ...(item ? [{ label: `Move ${item.label} into ⋯ More`, icon: 'more' as const, run: () => void call('settingsSet', { railHide: [...railHide, item.key] }).catch(() => {}) }] : []),
       { label: 'Customize the rail…', icon: 'gear', sub: 'which buttons show, their order', run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
     ])
@@ -3480,7 +3494,7 @@ export function App() {
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       {planPins.map(planButton)}
-      <WidgetButtons widgets={ownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} />
+      <WidgetButtons widgets={ownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} colors={railColors} />
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
       {aiOn(settings) && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
@@ -3769,7 +3783,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} />] : []
             })}
-            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} pr={ws.pr} linked={ws.prLinked} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
+            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
           {tabsAt === 'right' && tabStrip}
           {previewed && ws && (

@@ -567,8 +567,9 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   } } } }
 }`
 
-// a PR's review threads, and who you are on GitHub
-async function reviewThreads(at: At, pr: number): Promise<{ threads: Thread[]; me: string; dropped: number }> {
+// a PR's review threads, and who you are on GitHub; all: everyone's comments (the full review's, for you to read), else
+// only what an agent may act on
+async function reviewThreads(at: At, pr: number, all = false): Promise<{ threads: Thread[]; me: string; dropped: number }> {
   const { stdout } = await exec(at, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { timeout: 20000 }).catch(e => {
     throw new Error(`gh couldn't read the review comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
   })
@@ -576,6 +577,7 @@ async function reviewThreads(at: At, pr: number): Promise<{ threads: Thread[]; m
   const threads: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
   if (!threads) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
   const dropped = threads.reduce((n, t) => n + t.comments.nodes.filter(c => !trusted(c)).length, 0)
+  if (all) return { threads, me: d.viewer.login, dropped: 0 }
   for (const c of threads.flatMap(t => t.comments.nodes)) if (c.author?.__typename === 'Bot' && !botOk(c) && !botSaid.has(`${pr}:${c.author.login}`)) (botSaid.add(`${pr}:${c.author.login}`), log(`PR #${pr}: ${c.author.login}'s review comments skipped: not a bot in Settings › Pull requests`))
   return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login, dropped }
 }
@@ -840,12 +842,13 @@ export async function prViewed(p: { ws: string; path: string; viewed: boolean; i
 }
 
 // prThreads: the PR's review threads, for the side panel. startLine: a range's first line; side: its lines' (LEFT, the
-// old file's, when a range starts there); hunk: the diff the review saw, ending at line (Review's Apply checks it)
-export async function prThreads(ref: string) {
+// old file's, when a range starts there); hunk: the diff the review saw, ending at line (Review's Apply checks it); all:
+// everyone's comments (the full review's), else what the agent gets
+export async function prThreads(ref: string, all = false) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
   if (!pr) return []
-  const { threads } = await reviewThreads(ws, pr.number)
+  const { threads } = await reviewThreads(ws, pr.number, all)
   return threads.map(t => ({
     path: t.path,
     line: t.line ?? undefined,
@@ -856,4 +859,31 @@ export async function prThreads(ref: string) {
     outdated: t.isOutdated,
     comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt })),
   }))
+}
+
+const TALK_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
+    comments(last: 100) { nodes { author { login } body createdAt url } }
+    reviews(last: 100) { nodes { author { login } body state submittedAt url } }
+  } }
+}`
+// prTalk: the PR's conversation, everyone's (the full review's): its comments and each review's summary (one with
+// words, or an approval or a change asked for; a pending one is yours, not sent), oldest first
+export async function prTalk(ref: string) {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) return []
+  const { stdout } = await exec(ws, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr.number}`, '-f', `query=${TALK_QUERY}`], { timeout: 20000 }).catch(e => {
+    throw new Error(`gh couldn't read the PR's comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
+  })
+  const p = JSON.parse(stdout).data?.repository?.pullRequest
+  if (!p?.comments || !p.reviews) throw new Error(`no comments for PR #${pr.number} (gh api graphql)`)
+  type Said = { author: { login: string } | null; body: string; url?: string }
+  const said = [
+    ...(p.comments.nodes as (Said & { createdAt: string })[]).map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt, url: c.url })),
+    ...(p.reviews.nodes as (Said & { state: string; submittedAt: string | null })[])
+      .filter(r => r.state !== 'PENDING' && (r.body.trim() || r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED'))
+      .map(r => ({ author: r.author?.login ?? 'ghost', body: r.body, at: r.submittedAt ?? '', url: r.url, state: r.state })),
+  ]
+  return said.sort((a, b) => a.at.localeCompare(b.at))
 }

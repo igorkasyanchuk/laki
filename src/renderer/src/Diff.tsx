@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState, type HTMLAttributes, type MouseE
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
-import { escapes, Icon } from './ui'
+import { escapes, Icon, type MenuItem } from './ui'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 
 // what load gives, again every few seconds while the window is in front, and on reload()
@@ -87,11 +87,18 @@ export const lineClass = (l: DiffLine, picked = false) => `dl ${l.text.startsWit
 
 // a file's lines: one column (with their - and +), or two (the base's on the left, the branch's on the right, without
 // them; a context line is both). row: a line's own props (its clicks); head: a hunk header's contents; after: what goes
-// under a line (its comment box, a review's threads)
-export function DiffRows({ fd, split, cls, row, head, after }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode }) {
-  const line = (l: DiffLine, more = '') => (
+// under a line (its comment box, a review's threads); gutter: before a line's text (the full review's blame), side: the
+// column it's in (both: one column)
+export type Side = 'old' | 'new' | 'both'
+export function DiffRows({ fd, split, cls, row, head, after, gutter }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode; gutter?: (l: DiffLine, side: Side) => ReactNode }) {
+  const line = (l: DiffLine, more = '', side: Side = 'both') => (
     <div className={`${cls(l)}${more}`} {...row(l)}>
-      {l.text.startsWith('@@') ? head(l) : more ? l.text.slice(1) || ' ' : l.text || ' '}
+      {l.text.startsWith('@@') ? head(l) : (
+        <>
+          {gutter?.(l, side)}
+          {more ? l.text.slice(1) || ' ' : l.text || ' '}
+        </>
+      )}
     </div>
   )
   if (!split)
@@ -101,13 +108,13 @@ export function DiffRows({ fd, split, cls, row, head, after }: { fd: FileDiff; s
         {after?.(l)}
       </Fragment>
     ))
-  const cell = (l?: DiffLine) => (l ? line(l, ' dl-cell') : <div className="dl dl-none" />)
+  const cell = (side: Side, l?: DiffLine) => (l ? line(l, ' dl-cell', side) : <div className="dl dl-none" />)
   return splitRows(fd.lines).map((r, i) => (
     <Fragment key={i}>
       {r.full ? <div className={`${cls(r.full)} dl-full`}>{r.full.text.startsWith('@@') ? head(r.full) : r.full.text || ' '}</div> : (
         <>
-          {cell(r.left)}
-          {cell(r.right)}
+          {cell('old', r.left)}
+          {cell('new', r.right)}
         </>
       )}
       {after && [...new Set([r.full, r.left, r.right])].map((l, j) => l && <Fragment key={j}>{after(l)}</Fragment>)}
@@ -321,15 +328,34 @@ export function useGhViewed(api: PanelApi, ws: string, pr?: number) {
   useEffect(() => setMine(m => Object.fromEntries(Object.entries(m).filter(([p, v]) => gh?.files[p] !== v))), [gh]) // kept until GitHub's answer has them (one asked for before the tick doesn't)
   const [err, setErr] = useState('')
   const viewedOf = (p: string): string | undefined => mine[p] ?? gh?.files[p]
-  const mark = (p: string, on: boolean) => {
-    if (!gh) return
-    const was = viewedOf(p)
-    setMine(m => ({ ...m, [p]: on ? 'VIEWED' : 'UNVIEWED' }))
+  const line = useRef(Promise.resolve()) // every mark's calls in one line: a later click's never lands before an earlier one's
+  // shown at once, sent one after another (a folder's at a time: GitHub's limits); a failure puts back the ones not sent
+  // ponytail: a call per file (GitHub's markFileAsViewed takes one path), so a few hundred take a minute or two
+  const mark = (ps: string[], on: boolean) => {
+    if (!gh || !ps.length) return
+    const was = Object.fromEntries(ps.map(p => [p, viewedOf(p)!]))
+    const state = on ? 'VIEWED' : 'UNVIEWED'
+    setMine(m => ({ ...m, ...Object.fromEntries(ps.map(p => [p, state])) }))
     setErr('')
-    api.setViewed(p, on, gh.id).catch(e => (setMine(m => ({ ...m, [p]: was! })), setErr(String(e?.message ?? e))))
+    let sent = 0
+    line.current = ps
+      .reduce((chain, p) => chain.then(() => api.setViewed(p, on, gh.id)).then(() => void sent++), line.current)
+      .catch(e => (setMine(m => ({ ...m, ...Object.fromEntries(ps.slice(sent).map(p => [p, was[p]])) })), setErr(String(e?.message ?? e))))
   }
   return { viewedOf, mark, err }
 }
+
+// a file's page on the repo's site (PanelApi's web): at the base branch, or at the branch as pushed; line: a diff
+// line's numbers, the base's for the one, the branch's for the other. webItems: in a submenu
+export const webSub = (api: PanelApi, path: string, base: string, branch?: string, line?: { old?: number; new?: number }): MenuItem[] =>
+  api.web
+    ? [
+        { label: `At ${base.replace(/^origin\//, '')}`, icon: 'gitBranch', sub: `the base branch on origin${line?.old ? `, line ${line.old}` : ''}`, run: () => api.web!(path, 'base', line?.old) },
+        { label: `At ${branch || 'this branch'}`, icon: 'gitBranch', sub: `as pushed to origin${line?.new ? `, line ${line.new}` : ''}`, run: () => api.web!(path, 'branch', line?.new) },
+      ]
+    : []
+export const webItems = (api: PanelApi, path: string, base: string, branch?: string, line?: { old?: number; new?: number }): MenuItem[] =>
+  api.web ? [{ label: 'Open on remote', icon: 'externalLink', items: webSub(api, path, base, branch, line) }] : []
 
 // a thread's key across refreshes: where it is and when it began (the daemon gives no id)
 export const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`

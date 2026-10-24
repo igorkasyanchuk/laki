@@ -526,6 +526,7 @@ export type Settings = {
   railBrowsers?: boolean // the rail's Browser button; off: Browsers is a project in Projects' list (unset: on)
   railOrder?: string[] // the rail's buttons after Projects, in this order (RAIL_ITEMS' keys; one not in it: after them)
   railHide?: string[] // the rail's buttons put into its ⋯ More menu (Settings › Appearance › Rail, Slack's way)
+  railColors?: Record<string, string> // a rail button's color (TAB_COLORS), by its key (data-rail; a pinned spec's plan:<project>/<kind>/<slug>): its right click
   imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
@@ -847,5 +848,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 114
+// a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
+export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
+export const API = 115
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
