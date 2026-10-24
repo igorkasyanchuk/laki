@@ -16,4 +16,5 @@ Laki is MIT (`LICENSE`). The app bundles open-source packages, each under its ow
 - **Fonts**: SIL Open Font License 1.1, and Hack's MIT and Bitstream Vera licenses: `src/renderer/src/fonts/NOTICE.md`,
   `OFL.txt`, `HACK-LICENSE.md`.
 
-Each package's own license file is in its folder under `node_modules` once you `npm install`.
+The app carries every bundled package's own license text, and the fonts': `THIRD_PARTY_NOTICES.txt`, which each build
+writes (About Laki › *Open-source licenses*).

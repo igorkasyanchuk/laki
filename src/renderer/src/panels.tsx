@@ -428,6 +428,12 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
 
 // About (the app menu's, ⌘K): the version, when it was built and the website
 declare const __BUILT__: string // electron.vite.config.ts' define
+// the build's THIRD_PARTY_NOTICES.txt (electron.vite.config.ts' notices), beside the app's page: opened in TextEdit;
+// from the dev server or a browser elsewhere, the summary on GitHub
+const NOTICES = `${REPO}/blob/main/THIRD_PARTY_LICENSES.md`
+const openNotices = () =>
+  location.protocol === 'file:' && bridge?.openPath ? void bridge.openPath(decodeURIComponent(new URL('THIRD_PARTY_NOTICES.txt', location.href).pathname)) : openExternal(NOTICES)
+
 export function About({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="About Laki" onClose={onClose}>
@@ -442,6 +448,9 @@ export function About({ onClose }: { onClose: () => void }) {
         </a>
         <a className="small" href={`${REPO}/blob/main/SECURITY.md`} onClick={e => (e.preventDefault(), openExternal(`${REPO}/blob/main/SECURITY.md`))}>
           Security: reporting a vulnerability
+        </a>
+        <a className="small" href={NOTICES} onClick={e => (e.preventDefault(), openNotices())}>
+          Open-source licenses
         </a>
       </div>
     </Modal>

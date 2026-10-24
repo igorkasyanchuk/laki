@@ -74,6 +74,10 @@ npm run dev                       # Electron + renderer dev server on :5199
   `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
   browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
+- Licenses: each build writes `out/renderer/THIRD_PARTY_NOTICES.txt` (electron.vite.config.ts' `notices`: every npm
+  package in a bundle, the daemon's `dependencies` and Electron, each with its own license files, then the fonts'
+  `NOTICE.md`, `OFL.txt`, `HACK-LICENSE.md`); About's *Open-source licenses* opens it. `THIRD_PARTY_LICENSES.md` is
+  the summary.
 
 ## Architecture
 
@@ -2470,7 +2474,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `.nw-making` says what's happening and the seconds so far), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
   (`SITE`, the version from `package.json`, the build's time: `__BUILT__`, electron.vite.config.ts' `define`, none
-  under `dev:web`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
+  under `dev:web`; *Open-source licenses*: the build's notices through main's `open-path`, else the summary on GitHub;
+  the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
   `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the sidebar foot's
   smiley: `meme`, Next; a right click on it: copy (a PNG drawn on a canvas, the clipboard takes no other),
   download through an `<a download>`, open on Reddit). A PR's branch is `laki new --pr` (the CLI): the page has no PR field.
