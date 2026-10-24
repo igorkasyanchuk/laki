@@ -25,7 +25,7 @@ npm test                                 # everything: a few minutes, 4 files at
 ```
 
 The tests use fakes for every agent, `gh` and `ssh` (`test/fakes`), a temp `LAKI_HOME` and `HOME` each, and no
-network. CI only typechecks and builds: run the tests on your Mac before you send a PR.
+network. There is no CI: run the typecheck and the tests on your Mac before you send a PR.
 
 To try the UI in a browser without your own projects or agents, a demo world (a repo, three workspaces, fake agents):
 
