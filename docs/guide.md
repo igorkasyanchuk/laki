@@ -1469,6 +1469,10 @@ codespace scope once: `gh auth refresh -s codespace` (the page says so when it's
 The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,. Settings › *Keys* changes
 most of them (not ⌘1…⌘9, ⌘↑ / ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N or the text size); these are the defaults.
 
+Hold ⌘ alone for a moment to see them on the window: a badge beside each tab, button and row that has a key, and the
+rest in a strip at the bottom (any other key, a click or letting go hides it). Settings › Keys › *Show the keys while
+⌘ is held* turns it off.
+
 | key | |
 |---|---|
 | ⌃⌥⌘L | from any app: bring Laki forward (Settings › General › *Global hotkey*: off, or other keys) |

@@ -106,6 +106,7 @@ export type AppSettings = Paint & {
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
   needsList?: boolean // the sidebar's Needs you list (unset: on)
+  keyOverlay?: boolean // Settings › Keys: hold ⌘ for the keys (unset: on)
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
@@ -403,6 +404,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
   ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
+  ['keys', 'Show the keys while ⌘ is held', 'hold command overlay badges cheat sheet hints which key'],
   ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Screenshot to Laki AI', 'global hotkey screenshot region area capture dictation voice mic ask ai menu bar tray'],
@@ -578,7 +580,7 @@ function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v
 
 // Settings › Keys: App's own actions (shared/keys.ts KEYS), each recorded over its default (settings.keys: only the
 // ones changed); others: [keys, name] the clash check counts too (the global hotkeys, the picker)
-function KeysSection({ over, others, onChange }: { over?: Record<string, string>; others: [string, string][]; onChange: (keys: Record<string, string>) => void }) {
+function KeysSection({ over, others, onChange, overlay, onOverlay }: { over?: Record<string, string>; others: [string, string][]; onChange: (keys: Record<string, string>) => void; overlay: boolean; onOverlay: (on: boolean) => void }) {
   const m = keyMap(over)
   const set = (id: KeyId, k: string) => onChange(Object.fromEntries(KEYS.map(x => [x.id, x.id === id ? k : m[x.id]] as const).filter(([i, v]) => v !== KEYS.find(x => x.id === i)!.key)))
   return (
@@ -603,6 +605,13 @@ function KeysSection({ over, others, onChange }: { over?: Record<string, string>
               </div>
             )
           })}
+        </div>
+      </Group>
+      <Group title="Show the keys">
+        <div className="setting-box">
+          <Switch className="switch-row" on={overlay} onChange={onOverlay}>
+            <Says title="Show the keys while ⌘ is held" hint="Hold ⌘ alone a moment: a badge beside each tab, button and row that has a key, and the rest of these keys in a strip at the bottom. Any other key, or letting go, hides it" />
+          </Switch>
         </div>
       </Group>
     </>
@@ -1908,6 +1917,8 @@ export function SettingsPage(p: {
                 ...(s.pickerKey !== '' ? ([[s.pickerKey ?? PICKER_KEY, 'Pick an element (development mode)']] as [string, string][]) : []),
               ]}
               onChange={keys => set({ keys })}
+              overlay={s.keyOverlay !== false}
+              onOverlay={keyOverlay => set({ keyOverlay })}
             />
           )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}

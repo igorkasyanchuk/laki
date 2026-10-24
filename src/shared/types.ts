@@ -415,6 +415,7 @@ export type Settings = {
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   needsList?: boolean // Settings › Appearance › Sidebar: the Needs you list above Pinned and the projects (on unless false)
+  keyOverlay?: boolean // Settings › Keys: hold ⌘ for a badge beside everything with a key (on unless false)
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR

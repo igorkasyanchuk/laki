@@ -2549,3 +2549,10 @@ html[data-motion='high'] .rail-icon { transition: background 0.12s, scale 0.15s;
 html[data-motion='high'] .rail-kind:hover .rail-icon { scale: 1.08; }
 html[data-motion='high'] :is(.board-card, .ach-card) { transition: translate 0.15s, box-shadow 0.15s; }
 html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25); }
+
+/* hold ⌘ (KeyOverlay.tsx): a veil, a badge at each element's top right, a strip of the keys with nothing on screen */
+.key-overlay { position: fixed; inset: 0; z-index: 60; pointer-events: none; background: color-mix(in srgb, var(--bg) 35%, transparent); animation: m-fade 0.12s ease-out; }
+.key-badge { position: absolute; transform: translate(-70%, -35%); padding: 1px 5px; border-radius: 5px; font: 600 11px/16px var(--mono); color: var(--accent-fg, #fff); background: var(--accent); box-shadow: 0 1px 4px rgb(0 0 0 / 0.35); white-space: nowrap; }
+.key-strip { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; max-width: min(900px, 90vw); padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.3); }
+.key-strip kbd { font: 600 11px var(--mono); color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { .key-overlay { animation: none; } }

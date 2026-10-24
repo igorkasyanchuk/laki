@@ -25,7 +25,7 @@ export const needsSorted = (tabs: TabView[]) => {
   return [...tabs.filter(t => t.status === 'waiting').sort(by), ...tabs.filter(t => t.status !== 'waiting').sort(by)]
 }
 
-export function NeedsList({ items, shut, onFold, api }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi }) {
+export function NeedsList({ items, shut, onFold, api, next }: { items: Need[]; shut: boolean; onFold: () => void; api: NeedsApi; next?: string }) {
   if (!items.length) return null
   return (
     <div className="project needs-list">
@@ -42,7 +42,7 @@ export function NeedsList({ items, shut, onFold, api }: { items: Need[]; shut: b
       {!shut && (
         <div className="needs-cards">
           {items.map(x => (
-            <NeedCard key={x.t.id} {...x} api={api} />
+            <NeedCard key={x.t.id} {...x} api={api} next={x.t.id === next} />
           ))}
         </div>
       )}
@@ -50,7 +50,7 @@ export function NeedsList({ items, shut, onFold, api }: { items: Need[]; shut: b
   )
 }
 
-function NeedCard({ t, w, api }: Need & { api: NeedsApi }) {
+function NeedCard({ t, w, api, next }: Need & { api: NeedsApi; next: boolean }) {
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
   const allow = waiting && !opts.length && api.permission(t)
@@ -64,7 +64,7 @@ function NeedCard({ t, w, api }: Need & { api: NeedsApi }) {
   const last = t.last?.trim().split('\n').find(l => l.trim())?.trim()
   const stat = w.stat && (w.stat.add > 0 || w.stat.del > 0) ? w.stat : undefined
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}`} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : 'done'} />
         <b className="need-ws">{api.name(w)}</b>

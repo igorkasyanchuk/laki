@@ -6,6 +6,7 @@ import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyActio
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
+import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, QueueStrip, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
@@ -1231,12 +1232,13 @@ export function App() {
   }
 
   // ⌘↑ ⌘↓: the rows in sight, not those a folded project or group hides
-  const moveWs = (d: number) => {
+  const wsAt = (d: number) => {
     const seen = order.filter(w => (w.id === ws?.id || !foldedAway(w)) && (!rail || kindOf(w) === railKind)) // the rail's: its list's
     if (!seen.length) return
     const i = Math.max(0, seen.findIndex(w => w.id === ws?.id))
-    setWsId(seen[(i + d + seen.length) % seen.length].id)
+    return seen[(i + d + seen.length) % seen.length]
   }
+  const moveWs = (d: number) => (w => w && setWsId(w.id))(wsAt(d))
   const foldedAway = (w: WorkspaceView) => {
     const p = view?.projects.find(p => p.id === w.project)
     if (w.pinned || !p || find) return false // filtering: the hits show, folded or not
@@ -2712,6 +2714,12 @@ export function App() {
   const more = sideStyle === 'extended' || sideStyle === 'cards' // a second line under each row
   const words = sideStyle === 'words' // a second line in words (text.ts rowFact), one PR pill for the marks
   const pctSide = settings.progressAt === 'sidebar' || settings.progressAt === 'both' // an agent's percent on its row (the second line has its own)
+  const upWs = wsAt(-1)?.id
+  const downWs = wsAt(1)?.id
+  // where ⌘J goes: the Needs you list's card when it shows, else its workspace's row
+  const needNext = (need => need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])(needsSorted(needing))
+  const needsShown = !find && (!rail || railKind === 'projects') && settings.needsList !== false && !folded.includes('needs')
+  const needWs = needsShown ? undefined : needNext?.workspace
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -2719,6 +2727,7 @@ export function App() {
     const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
     const pct = status ? Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)) : -1
     const pc = projOf(w)?.color // its bar's color where it has none of its own (styles.css' --ws-bar)
+    const moves = [w.id === upWs && '⌘↑', w.id === downWs && '⌘↓', w.id === needWs && kh('next')].filter(Boolean).join(' ') // the hold-⌘ overlay's
     const yes = words ? null : prMarks(w.pr)
     const fact = words ? rowFact(w, wt) : undefined
     const pill = words && w.pr && settings.prIcon !== false ? prPill(w.pr) : undefined
@@ -2730,6 +2739,7 @@ export function App() {
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
+        data-keys={moves || undefined}
         data-group={pin ? 'pinned' : w.project}
         onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
         onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
@@ -3031,6 +3041,7 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
+            data-keys={groups.indexOf(g) < 9 ? `⌘${groups.indexOf(g) + 1}` : undefined}
             data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
@@ -3113,7 +3124,7 @@ export function App() {
   }
   // a rail button: its icon, words (Labels), and a count or a dot on the icon
   const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode, menu?: (e: React.MouseEvent) => void) => (
-    <button key={key} type="button" data-rail={key} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run}>
+    <button key={key} type="button" data-rail={key} data-key={isKeyId(key) ? key : undefined} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run}>
       <span className="rail-icon">
         <Icon name={icon} size={18} />
         {mark}
@@ -3201,8 +3212,8 @@ export function App() {
   const histAt = hist.current
   const histNav = historyOn && (
     <span className="hist-nav nodrag">
-      <IconButton icon="chevronLeft" title={kt(histAt.at[histAt.i - 1] ? `Back to ${placeName(histAt.at[histAt.i - 1])}; right click: more` : 'Back', 'back')} disabled={histAt.i < 1} onClick={() => travel(histAt.i - 1)} onContextMenu={e => histMenu(e, -1)} />
-      <IconButton icon="chevronRight" title={kt(histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])}` : 'Forward', 'forward')} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
+      <IconButton icon="chevronLeft" keyId="back" title={kt(histAt.at[histAt.i - 1] ? `Back to ${placeName(histAt.at[histAt.i - 1])}; right click: more` : 'Back', 'back')} disabled={histAt.i < 1} onClick={() => travel(histAt.i - 1)} onContextMenu={e => histMenu(e, -1)} />
+      <IconButton icon="chevronRight" keyId="forward" title={kt(histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])}` : 'Forward', 'forward')} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
     </span>
   )
   // the rail's pages after Projects, then the other kinds; with words under the icons and more than RAIL_FIT buttons,
@@ -3276,14 +3287,14 @@ export function App() {
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
       <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
         <div className="side-head drag">
-          <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} onClick={() => setSideOpen(false)} />
+          <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} keyId="sidebar" onClick={() => setSideOpen(false)} />
           {!railBar && histNav}
           <span className="spacer" />
           <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
           {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
           {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
-          <IconButton icon="help" title={kt('Help: keys and commands', 'help')} on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
+          <IconButton icon="help" title={kt('Help: keys and commands', 'help')} keyId="help" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
         </div>
         {find && (
           <div className="side-find">
@@ -3303,7 +3314,7 @@ export function App() {
         <div className="side-scroll">
           {find && !found && <div className="empty-side muted">No workspace matches.</div>}
           {!find && (!rail || railKind === 'projects') && settings.needsList !== false && (
-            <NeedsList items={needsSorted(needing).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} />
+            <NeedsList items={needsSorted(needing).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} next={needNext?.id} />
           )}
           {pins.length > 0 && (
             <div className="project pinned">
@@ -3418,7 +3429,7 @@ export function App() {
           {!rail && (
             <>
               <span className="spacer" />
-              <IconButton icon="gear" title={kt('Settings', 'settings')} label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
+              <IconButton icon="gear" title={kt('Settings', 'settings')} keyId="settings" label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
             </>
           )}
         </div>
@@ -3429,11 +3440,11 @@ export function App() {
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <div className="tabbar drag" data-tabbar>
-          {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} className="nodrag side-show" onClick={() => setSideOpen(true)} />}
+          {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" />
-          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} className="nodrag" onClick={() => toggleFull(true)} />}
+          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
@@ -3444,14 +3455,14 @@ export function App() {
               {!narrow && ( // a phone: in ⌘K's palette (the search button)
                 <>
                   <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-                  <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
+                  <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
                   <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
                 </>
               )}
-              <IconButton icon="panel" title="Info, files, changes, review, preview (⌥⌘B)" on={panelShown} onClick={() => togglePanel()} />
+              <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
               {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
-              <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
-              {canLater && !narrow && <IconButton icon="timer" title="Send a message later (⌘L): to an agent or Laki AI" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
+              <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
+              {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
               <RunButton
                 running={devRunning}
@@ -4243,6 +4254,7 @@ export function App() {
       )}
       {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
       {dialog === 'palette' && <Palette items={palette} forName={ws && wsName(ws)} onClose={() => setDialog(null)} />}
+      <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (
         <Prompt
           title={`Ship ${ws.id}`}

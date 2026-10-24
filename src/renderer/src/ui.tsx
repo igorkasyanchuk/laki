@@ -36,9 +36,10 @@ export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
 
 // label: words beside the icon (the sidebar's foot)
 // tip false: its name for screen readers only, no tooltip
-export function IconButton({ icon, title, onClick, on, className = '', label, tip = true, disabled, onContextMenu }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean; disabled?: boolean; onContextMenu?: (e: MouseEvent<HTMLButtonElement>) => void }) {
+// keyId: its Settings › Keys action (data-key: the hold-⌘ overlay's badge beside it)
+export function IconButton({ icon, title, onClick, on, className = '', label, tip = true, disabled, onContextMenu, keyId }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean; disabled?: boolean; onContextMenu?: (e: MouseEvent<HTMLButtonElement>) => void; keyId?: string }) {
   return (
-    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} aria-label={title} disabled={disabled} onClick={onClick} onContextMenu={onContextMenu}>
+    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} data-key={keyId} aria-label={title} disabled={disabled} onClick={onClick} onContextMenu={onContextMenu}>
       <Icon name={icon} />
       {label && <span className="ib-label">{label}</span>}
     </button>

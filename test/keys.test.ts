@@ -1,7 +1,7 @@
 // Settings › Keys (shared/keys.ts): the keys in use over the defaults, a press to its action, what else has a key
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow } from '../src/shared/keys.ts'
+import { keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
 
 const press = (key: string, code: string, mods: { meta?: boolean; alt?: boolean; ctrl?: boolean; shift?: boolean } = { meta: true }) => ({ key, code, metaKey: !!mods.meta, altKey: !!mods.alt, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
 
@@ -58,4 +58,13 @@ test('keys: what else has them', () => {
   assert.equal(keyClash('later', keyMap({ later: '', back: '' })), '')
   assert.equal(keyShow('⇧⌘Enter'), '⇧⌘⏎')
   assert.equal(keyShow('⌘ArrowUp'), '⌘↑')
+})
+
+test('hold ⌘: a badge for each key whose button is on screen, yours over the default, the rest in the strip', () => {
+  const o = overlayKeys({ palette: '⇧⌘P', later: '' }, new Set(['sidebar', 'palette', 'later', 'full']))
+  assert.deepEqual(o.badges, { sidebar: '⌘B', palette: '⇧⌘P', full: '⇧⌘⏎' }) // later unbound: no badge
+  assert.deepEqual(o.strip.find(([, l]) => l === 'Find a file'), ['⌘P', 'Find a file'])
+  assert.ok(!o.strip.some(([, l]) => l === 'Send a message later')) // unbound: not in the strip either
+  assert.ok(!o.strip.some(([, l]) => l === 'Palette')) // on screen: a badge, not a strip entry
+  assert.equal(o.strip.length, KEYS.length - 4)
 })

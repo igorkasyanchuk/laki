@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Hold ⌘ for a moment to see every key: a badge beside each tab, button and row that has one, the rest in a strip.
 - ⌘K starts with what the workspace needs next (answer its agent, Fix CI, Merge when green, Ship…), then every
   other tab that needs you, recent picks, workspaces, tabs and actions under headings. ⇥ on a workspace or tab lists
   its actions in the palette.

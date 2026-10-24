@@ -88,3 +88,14 @@ export const keyClash = (id: KeyId, m: KeyMap, others: [string, string][] = []) 
 
 // keys to read: ⏎, the arrows and ⌫ for their names
 export const keyShow = (k: string) => k.replace(/Enter$/, '⏎').replace(/Arrow(Up|Down|Left|Right)$/, (_, d: string) => ({ Up: '↑', Down: '↓', Left: '←', Right: '→' })[d]!).replace(/Backspace$/, '⌫')
+
+// hold ⌘ (App's KeyOverlay): a badge beside each element marked data-key="<id>" (the ones on screen), and a strip for
+// the rest; an unbound one ('' in settings.keys) shows nowhere
+export const overlayKeys = (over: unknown, onScreen: Set<string>) => {
+  const m = keyMap(over)
+  const bound = KEYS.filter(x => m[x.id])
+  return {
+    badges: Object.fromEntries(bound.filter(x => onScreen.has(x.id)).map(x => [x.id, keyShow(m[x.id])])) as Partial<Record<KeyId, string>>,
+    strip: bound.filter(x => !onScreen.has(x.id)).map(x => [keyShow(m[x.id]), x.label.replace(/ \(.*\)$/, '')] as [string, string]), // its words without the aside
+  }
+}

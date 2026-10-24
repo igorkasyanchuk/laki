@@ -148,7 +148,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, onClose }: { cli: string; 
         'When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.',
       ].map((v, i) => ({ v, n: i + 1 })),
     },
-    { id: 'keys', title: 'Keys', items: [...keysOf(keys).map(([k, v]) => ({ k: kbds(k), v })), { note: true, v: 'Settings › Keys changes the keys of most of these.' }] },
+    { id: 'keys', title: 'Keys', items: [...keysOf(keys).map(([k, v]) => ({ k: kbds(k), v })), { note: true, v: 'Settings › Keys changes the keys of most of these. Hold ⌘ alone a moment to see them beside the buttons, tabs and rows they go to.' }] },
     {
       id: 'status',
       title: 'Status',
