@@ -66,5 +66,5 @@ test('hold ⌘: a badge for each key whose button is on screen, yours over the d
   assert.deepEqual(o.strip.find(([, l]) => l === 'Find a file'), ['⌘P', 'Find a file'])
   assert.ok(!o.strip.some(([, l]) => l === 'Send a message later')) // unbound: not in the strip either
   assert.ok(!o.strip.some(([, l]) => l === 'Palette')) // on screen: a badge, not a strip entry
-  assert.equal(o.strip.length, KEYS.length - 4)
+  assert.equal(o.strip.length, KEYS.filter(x => x.key).length - 4) // layout has none by default
 })

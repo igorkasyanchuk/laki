@@ -142,7 +142,9 @@ Auto; a JS page's preview says its content's width, `pageOf`'s `{ laki: 'size' }
 refused as "changed since you opened it" otherwise), `queueNow` (Esc, then the first delivered), both and `queueClear` in `FROM`
 (`crossAsk` as a send: panels.tsx' `QueueStrip`, Panes' `foot`); 109: an `Ask`'s `question` (`askOf`'s `questionAt`: the
 line or two above the menu), a tab's `needAt` (waiting since, `Runtime.waitAt`; done since, `idleAt`), `seen` (the inverse of
-`unread`): the sidebar's Needs you list (Needs.tsx, `needsSorted`, ⌘J's order too). A
+`unread`): the sidebar's Needs you list (Needs.tsx, `needsSorted`, ⌘J's order too); 110: a project's `config.layout` (a saved
+layout's name, `settings.layouts`, `SETTINGS_KEPT`), kept by `projectSet`: the tab bar's Layout menu (shared/layout.ts
+`LAYOUT_PRESETS`, `fillRoles`, `toRoles`; App's `applyLayout`, `layoutNew`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);

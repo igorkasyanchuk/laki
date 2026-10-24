@@ -842,6 +842,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       worktrees: typeof o.config.worktrees === 'string' && o.config.worktrees.trim() ? o.config.worktrees.trim().slice(0, 1000) : undefined,
       pr: prAllowOk(o.config.pr),
       simulator: typeof o.config.simulator === 'boolean' ? o.config.simulator : undefined,
+      layout: typeof o.config.layout === 'string' && o.config.layout.trim() ? o.config.layout.trim().slice(0, 100) : undefined, // a saved layout's name (settings.layouts): new workspaces start as it
       mergeMethod: p.config?.mergeMethod, // prAct's only: a page opened before a merge would send an older one
     }
     // merge when green off for the project: its workspaces' switches go too, so turning it on again merges nothing unasked
@@ -1444,7 +1445,7 @@ export function settingsSet(o: Settings, own = false) {
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows'] // specs, workflows: on unless false, so a false stays
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'layouts'] // specs, workflows: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings

@@ -28,6 +28,7 @@ export const KEYS = [
   { id: 'forward', label: 'Forward', key: '⌘]' },
   { id: 'settings', label: 'Settings', key: '⌘,' },
   { id: 'help', label: 'Help', key: '⌘/' },
+  { id: 'layout', label: 'Layout menu', key: '' }, // none until you give it one
 ] as const
 export type KeyId = (typeof KEYS)[number]['id']
 export type KeyMap = Record<KeyId, string>

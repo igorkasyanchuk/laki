@@ -1,5 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
-import type { Layout } from './layout.ts'
+import type { Layout, SavedLayout } from './layout.ts'
 import { type Rule, stamp } from './when.ts'
 import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
 
@@ -80,7 +80,7 @@ export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: s
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
 // ports: names for the status bar's ports ({"3000": "web"})
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean } // worktrees, pr, mergeMethod, simulator: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -416,6 +416,7 @@ export type Settings = {
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   needsList?: boolean // Settings › Appearance › Sidebar: the Needs you list above Pinned and the projects (on unless false)
   keyOverlay?: boolean // Settings › Keys: hold ⌘ for a badge beside everything with a key (on unless false)
+  layouts?: SavedLayout[] // the Layout menu's saved ones (shared/layout.ts): a split by role and the side panel
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
@@ -825,5 +826,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 109
+export const API = 110
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

@@ -94,3 +94,62 @@ export function describe(l: Layout, name: (tab: string) => string = t => t): str
   const part = (x: Layout) => ('tab' in x || x.dir === l.dir ? describe(x, name) : `(${describe(x, name)})`)
   return `${part(l.a)} ${l.dir === 'row' ? '|' : '/'} ${part(l.b)}`
 }
+
+// One-click layouts (App's Layout menu; settings.layouts, a project's config.layout): a split tree by role, filled from
+// the workspace's tabs. agent n: 0 the focused agent tab (else the first live one), then the others in order; dev the
+// Run tab; shell the shell tabs in order. A role with no tab drops out (its split becomes the other side)
+export type Role = 'agent' | 'dev' | 'shell'
+export type RoleLayout = { role: Role; n?: number } | { dir: 'row' | 'col'; a: RoleLayout; b: RoleLayout; at: number }
+export type SavedLayout = { name: string; tree: RoleLayout; panel?: { open: boolean; tab?: string; w?: number } }
+export type RoleTab = { id: string; role?: Role } // a workspace's live tabs in their order; role: what it is, if any
+const split = (dir: 'row' | 'col', a: RoleLayout, b: RoleLayout): RoleLayout => ({ dir, a, b, at: 0.5 })
+export const LAYOUT_PRESETS: { id: string; name: string; tree: RoleLayout; panel?: string; needs?: Role }[] = [
+  { id: 'agent', name: 'Just the agent', tree: { role: 'agent' } },
+  { id: 'preview', name: 'Agent | Preview', tree: { role: 'agent' }, panel: 'preview' },
+  { id: 'changes', name: 'Agent | Changes', tree: { role: 'agent' }, panel: 'changes' },
+  { id: 'dev', name: 'Agent | dev server', tree: split('row', { role: 'agent' }, { role: 'dev' }), needs: 'dev' },
+  { id: 'shell', name: 'Agent / shell', tree: split('col', { role: 'agent' }, { role: 'shell' }), needs: 'shell' },
+]
+// All agents: 2 side by side, 3–4 as 2 × 2 (the first four)
+export const allAgents = (n: number): RoleLayout =>
+  n <= 2 ? split('row', { role: 'agent' }, { role: 'agent', n: 1 }) : split('col', split('row', { role: 'agent' }, { role: 'agent', n: 1 }), split('row', { role: 'agent', n: 2 }, { role: 'agent', n: 3 }))
+
+export const rolesIn = (l: RoleLayout): Role[] => ('role' in l ? [l.role] : [...rolesIn(l.a), ...rolesIn(l.b)])
+
+// the tree's tabs as the first group, every other live tab a tab of its own after it, in order; null: no tab for any role
+export function fillRoles(tree: RoleLayout, tabs: RoleTab[], focused?: string): Layout[] | null {
+  const of = (r: Role) => tabs.filter(t => t.role === r)
+  const agents = of('agent')
+  const lists: Record<Role, RoleTab[]> = { agent: [...agents.filter(t => t.id === focused), ...agents.filter(t => t.id !== focused)], dev: of('dev'), shell: of('shell') }
+  const used = new Set<string>()
+  const fill = (l: RoleLayout): Layout | null => {
+    if ('role' in l) {
+      const t = lists[l.role][l.n ?? 0]
+      return t && !used.has(t.id) && used.add(t.id) ? { tab: t.id } : null
+    }
+    const a = fill(l.a)
+    const b = fill(l.b)
+    return !a ? b : !b ? a : { dir: l.dir, a, b, at: l.at }
+  }
+  const first = fill(tree)
+  return first && [first, ...tabs.filter(t => !used.has(t.id)).map(t => ({ tab: t.id }))]
+}
+
+// the other way, to save one: a tab's tree with its sessions as roles (n: its place among its kind's, the focused agent first)
+export function toRoles(l: Layout, tabs: RoleTab[], focused?: string): RoleLayout | null {
+  const of = (r: Role) => tabs.filter(t => t.role === r)
+  const agents = of('agent')
+  const order: Record<Role, RoleTab[]> = { agent: [...agents.filter(t => t.id === focused), ...agents.filter(t => t.id !== focused)], dev: of('dev'), shell: of('shell') }
+  const go = (x: Layout): RoleLayout | null => {
+    if ('tab' in x) {
+      const t = tabs.find(t => t.id === x.tab)
+      if (!t?.role) return null
+      const n = order[t.role].indexOf(t)
+      return n ? { role: t.role, n } : { role: t.role }
+    }
+    const a = go(x.a)
+    const b = go(x.b)
+    return !a ? b : !b ? a : { dir: x.dir, a, b, at: x.at }
+  }
+  return go(l)
+}

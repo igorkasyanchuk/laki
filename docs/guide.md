@@ -393,6 +393,13 @@ selected workspace's PR is in the status bar.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
+- **Layouts**: the tab bar's layers button (Settings › Keys can give it a key) has the splits people make most, each
+  filled from the workspace's tabs: *Just the agent*, *Agent | Preview* and *Agent | Changes* (the side panel on
+  that tab), *Agent | dev server* (starts the run script when there's no Run tab), *Agent / shell* (opens a shell
+  when there's none) and, with two agents or more, *All agents* (side by side; three or four as 2 × 2). The other tabs
+  stay as tabs. *Save this layout…* keeps the tab's splits by what each pane is (an agent, the Run tab, a shell) and the
+  side panel as it is; *Use for new workspaces in <project>* lays out each new workspace that way once its agent is up
+  (starting its shell or Run tab first).
 - Drop files or folders from Finder on a terminal: their paths are typed in (quoted when they need it), for a
   shell or an agent's prompt.
 - When an agent asks something with numbered choices (a permission prompt, a question), they show as buttons

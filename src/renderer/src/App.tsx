@@ -34,7 +34,7 @@ import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms } from './Term'
-import { groupsOf, type Layout, move, resize, tabsOf } from '../../shared/layout'
+import { groupsOf, type Layout, move, resize, tabsOf, allAgents, fillRoles, LAYOUT_PRESETS, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout, toRoles } from '../../shared/layout'
 import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
@@ -959,6 +959,94 @@ export function App() {
     const left = i === undefined ? [] : was.filter((_, j) => j !== i)
     void queueSave(t, left, was).then(ok => ok && toast(i === undefined ? `Cleared ${t.name}'s queue` : `Removed from ${t.name}'s queue`, () => void queueSave(t, was, left)))
   }
+  // the Layout menu (the tab bar's; Settings › Keys' layout): a split by role (shared/layout.ts fillRoles) from this
+  // workspace's tabs, and the side panel as it says. One that needs a Run tab or a shell starts it first, then
+  // layoutWait lays it out once it's in the view (10 s at most)
+  const roleOf = (t: TabView): Role | undefined => (t.kind === 'agent' ? 'agent' : t.kind === 'dev' ? 'dev' : t.kind === 'shell' ? 'shell' : undefined)
+  const roleTabs = (w: WorkspaceView, gs: Layout[]): RoleTab[] => {
+    const mine = viewRef.current?.tabs.filter(t => t.workspace === w.id && t.status !== 'exited') ?? []
+    return [...new Set([...gs.flatMap(tabsOf), ...mine.map(t => t.id)])].flatMap(id => (t => (t ? [{ id, role: roleOf(t) }] : []))(mine.find(t => t.id === id)))
+  }
+  const layoutWait = useRef<{ ws: string; tree: RoleLayout; panel?: SavedLayout['panel']; needs: Role; until: number } | null>(null)
+  const applyLayout = async (tree: RoleLayout, panel?: SavedLayout['panel'], needs?: Role) => {
+    if (!ws || narrow) return
+    if (needs && !roleTabs(ws, groups).some(t => t.role === needs)) {
+      layoutWait.current = { ws: ws.id, tree, panel, needs, until: Date.now() + 10000 }
+      return void (needs === 'dev' ? run() : call('tabNew', { ws: ws.id, preset: 'shell' }).catch(() => (layoutWait.current = null)))
+    }
+    const next = fillRoles(tree, roleTabs(ws, groups), tab?.kind === 'agent' ? tab.id : undefined)
+    if (!next) return toast('No agent running here to lay out')
+    setGroups(next)
+    selectTab(tabsOf(next[0])[0])
+    if (panel?.open && panel.tab) (setPanelTab(panel.tab as PanelTab), setPanelOpen(true), panel.w && setPanelW(panel.w))
+    else setPanelOpen(false)
+  }
+  const saveLayout = async () => {
+    if (!ws || !group) return
+    const tree = toRoles(group, roleTabs(ws, groups), tab?.kind === 'agent' ? tab.id : undefined)
+    if (!tree) return toast('Nothing here to save: a layout keeps agents, the Run tab and shells')
+    const name = (await askText('Save this layout', { text: 'Its splits, by what each pane is (an agent, the Run tab, a shell), and the side panel as it is now.', ok: 'Save', placeholder: 'Agent, dev server and Preview' }))?.trim()
+    if (!name) return
+    const saved: SavedLayout = { name, tree, panel: { open: panelOpen, tab: panelTab, w: panelW } }
+    call('settingsSet', { layouts: [...(settings.layouts ?? []).filter(l => l.name !== name), saved] }).then(() => done(`Saved the layout ${name}`), () => {})
+  }
+  const layoutMenu = (): MenuItem[] => {
+    if (!ws) return []
+    const rt = roleTabs(ws, groups)
+    const agents = rt.filter(t => t.role === 'agent').length
+    const saved = settings.layouts ?? []
+    const mine = project?.config?.layout
+    return [
+      ...LAYOUT_PRESETS.map((p): MenuItem => {
+        const off = p.needs === 'dev' && !rt.some(t => t.role === 'dev') && !ws.run
+        return off
+          ? { label: p.name, icon: 'splitRight', sub: 'No Run tab, and no run script to start one', run: editScripts }
+          : { label: p.name, icon: p.panel ? 'panel' : p.tree && 'dir' in p.tree ? (p.tree.dir === 'row' ? 'splitRight' : 'splitDown') : 'agent', run: () => void applyLayout(p.tree, p.panel ? { open: true, tab: p.panel, w: Math.max(panelW, 560) } : undefined, p.needs) }
+      }),
+      ...(agents > 1 ? [{ label: `All agents (${Math.min(agents, 4)})`, icon: 'layers', run: () => void applyLayout(allAgents(Math.min(agents, 4))) } as MenuItem] : []),
+      ...(saved.length ? [null as unknown as MenuItem, { head: 'Saved' } as MenuItem, ...saved.map((l): MenuItem => ({ label: l.name, icon: 'layers', hint: l.name === mine ? ON : undefined, run: () => void applyLayout(l.tree, l.panel) }))] : []),
+      null as unknown as MenuItem,
+      { label: 'Save this layout…', icon: 'save', run: () => void saveLayout() },
+      ...(saved.length && project && !project.kind
+        ? [
+            { label: `Use for new workspaces in ${project.name}`, icon: 'plus', items: [{ label: 'None', hint: mine ? undefined : ON, run: () => setProjectLayout(undefined) }, ...saved.map((l): MenuItem => ({ label: l.name, hint: l.name === mine ? ON : undefined, run: () => setProjectLayout(l.name) }))] } as MenuItem,
+            { label: 'Remove a saved layout', icon: 'trash', items: saved.map((l): MenuItem => ({ label: l.name, danger: true, run: () => call('settingsSet', { layouts: saved.filter(x => x !== l) }).catch(() => {}) })) } as MenuItem,
+          ]
+        : []),
+    ]
+  }
+  const setProjectLayout = (layout?: string) => project && call('projectSet', { id: project.id, config: { ...project.config, layout } }).then(() => done(layout ? `New workspaces in ${project.name} start as ${layout}` : `New workspaces in ${project.name} start as they come`), () => {})
+  // a layout waiting for its Run tab or shell; a new workspace whose project has a layout for new ones, once its tabs show
+  const layoutSeen = useRef<Set<string> | null>(null) // the workspaces there were: theirs stay as they are
+  useEffect(() => {
+    const v = view
+    if (!v) return
+    const p = layoutWait.current
+    if (p && (Date.now() > p.until || p.ws !== ws?.id)) layoutWait.current = null
+    else if (p && ws && roleTabs(ws, groups).some(t => t.role === p.needs)) (layoutWait.current = null), void applyLayout(p.tree, p.panel)
+    if (!layoutSeen.current) return void (layoutSeen.current = new Set(v.workspaces.map(w => w.id)))
+    for (const w of v.workspaces) {
+      if (layoutSeen.current.has(w.id) || w.archived) continue
+      const name = v.projects.find(p => p.id === w.project)?.config?.layout
+      const l = name ? v.settings.layouts?.find(x => x.name === name) : undefined
+      if (!l || narrow) {
+        layoutSeen.current.add(w.id)
+        continue
+      }
+      if (!v.tabs.some(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')) continue // its agent not up yet
+      // the shell and Run tab it has a place for: started once, laid out when they're there (15 s at most)
+      const at = (layoutNew.current[w.id] ??= { since: Date.now(), asked: new Set() })
+      const has = new Set(roleTabs(w, []).map(t => t.role))
+      const want = rolesIn(l.tree).filter(r => !has.has(r) && (r === 'shell' || (r === 'dev' && w.run)))
+      for (const r of want.filter(r => !at.asked.has(r))) at.asked.add(r), void (r === 'shell' ? call('tabNew', { ws: w.id, preset: 'shell' }) : call('run', { ws: w.id })).catch(() => {})
+      if (want.length && Date.now() - at.since < 15000) continue
+      layoutSeen.current.add(w.id)
+      delete layoutNew.current[w.id]
+      const next = fillRoles(l.tree, roleTabs(w, []))
+      if (next) setGroupsOf(w.id, next)
+    }
+  }, [view])
+  const layoutNew = useRef<Record<string, { since: number; asked: Set<Role> }>>({})
   // a session by id, or one just created (its view may not have arrived yet)
   const selectTab = useCallback((ref: string | { id: string; workspace: string }) => {
     const t = typeof ref === 'string' ? viewRef.current?.tabs.find(t => t.id === ref) : ref
@@ -969,9 +1057,8 @@ export function App() {
   }, [])
   const selectGroup = (g: Layout) => selectTab(mru.current.find(id => tabsOf(g).includes(id)) ?? tabsOf(g)[0])
   // narrow shows them flat: kept as they were. To the daemon a moment later (a divider's drag is many)
-  const setGroups = (next: Layout[]) => {
-    if (!ws || narrow) return
-    const id = ws.id
+  const setGroups = (next: Layout[]) => ws && !narrow && setGroupsOf(ws.id, next)
+  const setGroupsOf = (id: string, next: Layout[]) => {
     setStored(m => ({ ...m, [id]: next }))
     if (!layoutsOn) return
     clearTimeout(pushes.current[id] as ReturnType<typeof setTimeout>)
@@ -2433,6 +2520,7 @@ export function App() {
       forward: historyOn && !field && (() => travel(hist.current.i + 1)),
       settings: () => toSettings(),
       help: () => setDialog(d => (d === 'help' ? null : 'help')),
+      layout: !dialog && (() => document.querySelector<HTMLElement>('.layout-btn')?.click()),
     }
     const id = force ?? (fixed ? undefined : keyFor(e, kb))
     const run = id && bound[id]
@@ -3444,6 +3532,7 @@ export function App() {
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" />
+          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
           {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">

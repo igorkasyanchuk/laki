@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { skillTools, state, tools } from '../src/shared/tools.ts'
-import { describe, groupsOf, keep, move, place, resize, tabsOf } from '../src/shared/layout.ts'
+import { allAgents, describe, fillRoles, groupsOf, keep, LAYOUT_PRESETS, move, place, resize, tabsOf, toRoles } from '../src/shared/layout.ts'
 import { fresh, until } from './helpers.ts'
 
 test('tabs of panes: sessions in no tab get one, moving splits and merges, nothing nests', () => {
@@ -95,4 +95,24 @@ test('layouts in the daemon: a new tab beside a pane or the one you are on, chec
   await rig.rpc('wsRm', { id: ws.id })
   assert.equal(await layout(), undefined)
   c.close()
+})
+
+test('one-click layouts: roles filled from the tabs, the focused agent first, the rest tabs of their own', () => {
+  const tabs = [{ id: 'c1', role: 'agent' as const }, { id: 'sh', role: 'shell' as const }, { id: 'c2', role: 'agent' as const }, { id: 'run', role: 'dev' as const }, { id: 'setup' }]
+  const preset = (id: string) => LAYOUT_PRESETS.find(p => p.id === id)!.tree
+  const w = (g: ReturnType<typeof fillRoles>) => g?.map(x => describe(x))
+  assert.deepEqual(w(fillRoles(preset('agent'), tabs, 'c2')), ['c2', 'c1', 'sh', 'run', 'setup']) // the focused agent alone
+  assert.deepEqual(w(fillRoles(preset('agent'), tabs)), ['c1', 'sh', 'c2', 'run', 'setup']) // none focused: the first
+  assert.deepEqual(w(fillRoles(preset('dev'), tabs, 'c1')), ['c1 | run', 'sh', 'c2', 'setup'])
+  assert.deepEqual(w(fillRoles(preset('shell'), tabs, 'c1')), ['c1 / sh', 'c2', 'run', 'setup'])
+  assert.deepEqual(w(fillRoles(preset('dev'), tabs.filter(t => t.role !== 'dev'), 'c1')), ['c1', 'sh', 'c2', 'setup']) // no Run tab: the agent alone
+  assert.deepEqual(w(fillRoles(allAgents(2), tabs)), ['c1 | c2', 'sh', 'run', 'setup'])
+  const four = [1, 2, 3, 4].map(n => ({ id: `a${n}`, role: 'agent' as const }))
+  assert.equal(describe(fillRoles(allAgents(4), four)![0]), '(a1 | a2) / (a3 | a4)')
+  assert.equal(describe(fillRoles(allAgents(3), four.slice(0, 3))![0]), '(a1 | a2) / a3') // three: the fourth's place goes
+  assert.equal(fillRoles(preset('agent'), [{ id: 'sh', role: 'shell' }]), null) // no agent: nothing to lay out
+  // saved: a tab's tree as roles, back the same way on the same tabs
+  const tree = toRoles({ dir: 'row', a: { tab: 'c2' }, b: { dir: 'col', a: { tab: 'run' }, b: { tab: 'setup' }, at: 0.4 }, at: 0.6 }, tabs, 'c1')!
+  assert.deepEqual(tree, { dir: 'row', a: { role: 'agent', n: 1 }, b: { role: 'dev' }, at: 0.6 }) // a tab with no role drops out
+  assert.deepEqual(w(fillRoles(tree, tabs, 'c1')), ['c2 | run', 'c1', 'sh', 'setup'])
 })
