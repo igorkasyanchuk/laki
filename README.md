@@ -117,7 +117,7 @@ open dist/mac-arm64/Laki.app      # Intel: dist/mac; or copy it to /Applications
 npm link                          # optional: the laki CLI (or Settings › General › Developer › Install the laki command)
 ```
 
-Working on Laki: `npm test` runs every test (a few minutes), `npm run test:one -- test/pr.test.ts` only the files named;
+Working on Laki: [CONTRIBUTING.md](CONTRIBUTING.md) (build, test, the demo world, the rules);
 [AGENTS.md](AGENTS.md) says how the code works.
 
 If something's off: Laki keeps its data, logs included, in `~/.laki` (`daemon.log`); an agent Laki can't find isn't on
