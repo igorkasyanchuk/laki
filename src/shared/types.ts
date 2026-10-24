@@ -593,7 +593,7 @@ export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | '
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
-export type SideStyle = 'compact' | 'default' | 'extended' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
+export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prRef, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -334,4 +334,24 @@ test("wsShown: a name that only numbers its PR shows the PR's title; any other s
   assert.equal(wsShown({ id: 'x', name: 'shard work', pr }), 'shard work') // yours
   assert.equal(wsShown({ id: 'x', name: 'Review PR 148100', pr }), 'Review PR 148100') // another number
   assert.equal(wsShown({ id: 'pr-14810-shard' }), 'pr-14810-shard') // no PR yet
+})
+
+test("the Words sidebar style: a row's one fact, the first that applies; its PR pill", () => {
+  const tab = (o: object) => ({ id: 't', workspace: 'w', name: 'claude', kind: 'agent', preset: 'claude', status: 'idle', done: false, ...o }) as never
+  const pr = (o: object) => ({ number: 42, state: 'OPEN', url: '', checks: 'pass', ...o }) as never
+  const w = { branch: 'laki/cart', base: 'main' }
+  assert.deepEqual(rowFact(w, [tab({ status: 'waiting', ask: { options: [], at: 1, question: 'Do you want to proceed?' } })]), { kind: 'asks', text: 'Asks: Do you want to proceed?', tone: 'waiting' })
+  assert.equal(rowFact(w, [tab({ status: 'waiting' })]).text, 'Asks you to pick') // no question read
+  const ci = pr({ checks: 'fail', conflict: true, list: [{ name: 'lint', state: 'pass' }, { name: 'test (node 22)', state: 'fail' }] })
+  assert.equal(rowFact({ ...w, pr: ci }, [tab({ status: 'running' })]).text, 'CI failing · test (node 22)') // over working
+  assert.equal(rowFact({ ...w, pr: pr({ conflict: true, base: 'develop' }) }, []).text, 'Conflicts with develop')
+  assert.equal(rowFact({ ...w, pr: pr({ review: 'CHANGES_REQUESTED', changes: ['bob'] }) }, []).text, 'Changes requested by bob')
+  const run = rowFact(w, [tab({ status: 'running', runAt: 5, progress: { pct: 40, note: 'writing tests' } })])
+  assert.deepEqual([run.text, run.since, run.note, run.tone], ['Working', 5, 'writing tests', 'running'])
+  assert.equal(rowFact({ ...w, stat: { add: 38, del: 4, files: 2, dirty: 2 } }, [tab({ done: true })]).text, 'Done · +38 −4 · not looked at')
+  assert.equal(rowFact({ ...w, pr: pr({ review: 'APPROVED' }) }, []).text, 'Ready to merge')
+  assert.deepEqual(rowFact(w, [tab({})]), { kind: 'branch', text: 'laki/cart', tone: 'muted' })
+  assert.equal(rowFact({ ...w, pr: pr({ state: 'MERGED', checks: 'fail' }) }, []).kind, 'branch') // a merged PR's checks aren't news
+  assert.equal(rowFact(w, [tab({ kind: 'shell', status: 'waiting' })]).kind, 'branch') // a shell isn't an agent asking
+  assert.deepEqual([prPill(pr({})), prPill(pr({ checks: 'fail' })), prPill(pr({ conflict: true })), prPill(pr({ draft: true })), prPill(pr({ state: 'MERGED' })), prPill(pr({ state: 'CLOSED' }))].map(p => p.text), ['#42 ✓', '#42 ✕', '#42 ⚠', '#42 draft', '#42 merged', '#42 closed'])
 })

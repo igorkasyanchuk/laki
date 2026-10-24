@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A sixth sidebar style, *Words*: a second line that says what needs doing (*Asks: …*, *CI failing · test*,
+  *Conflicts with main*, *Working 2m*, *Done · not looked at*, *Ready to merge*) and one PR pill for the marks.
 - *Needs you* at the top of the sidebar: answer a waiting agent's question from its card, Review or mark seen the
   ones that are done. ⌘J goes through it in the same order.
 - What's queued for an agent shows in a strip under its terminal: edit a message, drag it into another place,

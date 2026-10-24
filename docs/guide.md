@@ -895,7 +895,10 @@ the same 5. A phone always has one sidebar.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
-progress, the PR's title, the diff; a hover shows its ⋯ in a place kept for it, so nothing moves), *Cards* (a card each, with the agent's last answer) or *Status* (the row's edge
+progress, the PR's title, the diff; a hover shows its ⋯ in a place kept for it, so nothing moves), *Words* (one PR
+pill, `#42 ✓`, for the marks, and a second line that says the one thing that matters most: *Asks: <its question>*,
+*CI failing · <check>*, *Conflicts with main*, *Changes requested by <who>*, *Working 2m*, *Done · +38 −4 · not
+looked at*, *Ready to merge*, else the branch), *Cards* (a card each, with the agent's last answer) or *Status* (the row's edge
 in its state's color: working, waiting, done, a limit; a thin line under it fills with the agent's reported progress,
 or sweeps along while it works without one). *Icon size* sets the PR
 mark, its author's picture and the other marks to one size.

@@ -1805,7 +1805,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
   .ws:hover > .ws-acts .icon-svg { animation: ws-dots 0.3s ease-out; }
   /* extended and cards (rows as tall as their first line's marks): the ⋯ keeps its place, hidden until a hover, and
      the marks stay, so a hover moves nothing */
-  .sidebar:is([data-style='extended'], [data-style='cards']) .ws > .ws-acts { width: 20px; margin: 0 -6px 0 0; }
+  .sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .ws-acts { width: 20px; margin: 0 -6px 0 0; }
 }
 @keyframes ws-dots { from { clip-path: inset(0 100% 0 0); } } /* the dots appear left to right */
 @media (prefers-reduced-motion: reduce) { .ws > .ws-acts { transition: none; } .ws:hover > .ws-acts .icon-svg { animation: none; } }
@@ -2050,15 +2050,23 @@ button.board-name:hover { background: none; }
    (branch, state, progress, PR, diff); cards, a box each with the agent's last answer */
 .sidebar[data-style='compact'] .ws { height: var(--ws-h, 22px); }
 .sidebar[data-style='compact'] .ws :is(.ws-pr, .ws-stat, .ws-mark, .ws-sched, .ws-merged, .elapsed, .ws-proj) { display: none; }
-.sidebar:is([data-style='extended'], [data-style='cards']) .ws { flex-wrap: wrap; height: auto; min-height: var(--ws-h, 28px); padding-block: 4px; row-gap: 1px; }
-.sidebar:is([data-style='extended'], [data-style='cards']) .ws > .ws-stat { display: none; } /* on the second line */
+.sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws { flex-wrap: wrap; height: auto; min-height: var(--ws-h, 28px); padding-block: 4px; row-gap: 1px; }
+.sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .ws-stat { display: none; } /* on the second line */
 /* the first line stays one: a long name shrinks (its basis 0, not its width, else it wraps under the glyph) */
-.sidebar:is([data-style='extended'], [data-style='cards']) .ws > .ws-name { flex: 1 1 0; min-width: 0; }
-.sidebar:is([data-style='extended'], [data-style='cards']) .ws > .spacer { display: none; }
+.sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .ws-name { flex: 1 1 0; min-width: 0; }
+.sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .spacer { display: none; }
 .ws-sub { flex-basis: 100%; display: flex; gap: 6px; min-width: 0; padding-left: 18px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .ws-sub > * { flex: none; }
 .ws-sub > .ws-sub-pr { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .ws-branch { font-family: var(--mono); font-size: 10.5px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto !important; }
+/* Words (text.ts rowFact, prPill): the second line one fact in its tone's color, the first line's one PR pill */
+.ws-fact > span:first-child { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.ws-fact .elapsed, .ws-fact-note { flex: none; }
+.ws-fact-note { flex: 0 1 auto !important; overflow: hidden; text-overflow: ellipsis; }
+.ws-fact.t-waiting { color: var(--waiting); } .ws-fact.t-error { color: var(--error); } .ws-fact.t-running { color: var(--running); } .ws-fact.t-done { color: var(--done); }
+.ws-fact.t-muted > span:first-child { font-family: var(--mono); font-size: 10.5px; }
+.ws-pill { flex: none; padding: 0 6px; border-radius: 999px; font: 600 10px/16px var(--mono); color: var(--muted); border: 1px solid color-mix(in srgb, currentColor 45%, transparent); font-variant-numeric: tabular-nums; }
+.ws-pill.t-done { color: var(--done); } .ws-pill.t-error { color: var(--error); } .ws-pill.t-running { color: var(--running); } .ws-pill.t-merged { color: var(--tc-purple); }
 .ws-state.g-waiting { color: var(--waiting); } .ws-state.g-running { color: var(--running); } .ws-state.g-done { color: var(--done); } .ws-state.g-limit { color: var(--error); }
 .sidebar[data-style='cards'] .ws { margin: 4px 8px; padding: 8px 10px; border: 1px solid var(--line); background-color: color-mix(in srgb, var(--panel) 70%, transparent); }
 .sidebar[data-style='cards'] .ws.sel { background-color: var(--sel); }

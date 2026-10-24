@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, prRef, type RunAction, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
@@ -418,4 +418,42 @@ export function limitText({ r, w, used }: LimitHit, rows: AgentUsage[], now = Da
   const at = w.resets && new Date(w.resets)
   const when = at && at.toLocaleString([], at.toDateString() === new Date(now).toDateString() ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' })
   return `${who} · ${w.label} limit at ${used}%${when ? ` · resets ${when}` : ''}`
+}
+
+// the Words sidebar style (Settings' SIDE_STYLES 'words'): a row's second line says the one thing that matters most,
+// the first of these that applies; its first line one PR pill (prPill) instead of the marks. The palette and the peek
+// card can say the same (ROW_WORDS)
+export const ROW_WORDS = { asks: 'Asks', pick: 'Asks you to pick', ci: 'CI failing', conflict: 'Conflicts with', changes: 'Changes requested by', working: 'Working', done: 'Done', unseen: 'not looked at', ready: 'Ready to merge' }
+export type RowTone = 'waiting' | 'error' | 'running' | 'done' | 'muted'
+export type RowFact = { kind: 'asks' | 'ci' | 'conflict' | 'changes' | 'working' | 'done' | 'ready' | 'branch'; text: string; tone: RowTone; since?: number; note?: string } // since: a turn's start, its time after the words; note: the agent's progress after that
+export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Stat }, tabs: TabView[]): RowFact {
+  const agents = tabs.filter(t => t.kind === 'agent' || t.runs)
+  const asks = agents.find(t => t.status === 'waiting')
+  if (asks) return { kind: 'asks', text: asks.ask?.question ? `${ROW_WORDS.asks}: ${asks.ask.question}` : ROW_WORDS.pick, tone: 'waiting' }
+  const pr = w.pr?.state === 'OPEN' ? w.pr : undefined
+  if (pr?.checks === 'fail') return { kind: 'ci', text: (c => (c ? `${ROW_WORDS.ci} · ${c}` : ROW_WORDS.ci))(pr.list?.find(c => c.state === 'fail')?.name), tone: 'error' }
+  if (pr?.conflict) return { kind: 'conflict', text: `${ROW_WORDS.conflict} ${pr.base || w.base || 'its base'}`, tone: 'error' }
+  if (pr?.review === 'CHANGES_REQUESTED' || pr?.changes?.length) return { kind: 'changes', text: `${ROW_WORDS.changes} ${pr.changes?.join(', ') || 'a reviewer'}`, tone: 'error' }
+  const working = agents.find(t => t.status === 'running')
+  if (working) {
+    const p = working.progress
+    return { kind: 'working', text: ROW_WORDS.working, tone: 'running', since: working.runAt, ...(p && { note: p.note || `${p.pct}%` }) }
+  }
+  if (agents.some(t => t.done && t.status === 'idle')) {
+    const stat = w.stat && (w.stat.add || w.stat.del) ? `+${w.stat.add} −${w.stat.del}` : ''
+    return { kind: 'done', text: [ROW_WORDS.done, stat, ROW_WORDS.unseen].filter(Boolean).join(' · '), tone: 'done' }
+  }
+  if (pr && !pr.draft && pr.checks !== 'pending' && (pr.review === 'APPROVED' || (!pr.review && !!pr.approved?.length))) return { kind: 'ready', text: ROW_WORDS.ready, tone: 'done' }
+  return { kind: 'branch', text: w.branch || 'folder', tone: 'muted' }
+}
+// the Words style's one PR pill: #n and how it stands
+export function prPill(pr: PR): { text: string; tone: RowTone | 'merged' } {
+  const n = `#${pr.number}`
+  if (pr.state === 'MERGED') return { text: `${n} merged`, tone: 'merged' }
+  if (pr.state !== 'OPEN') return { text: `${n} closed`, tone: 'muted' }
+  if (pr.draft) return { text: `${n} draft`, tone: 'muted' }
+  if (pr.conflict) return { text: `${n} ⚠`, tone: 'error' }
+  if (pr.checks === 'fail') return { text: `${n} ✕`, tone: 'error' }
+  if (pr.checks === 'pass') return { text: `${n} ✓`, tone: 'done' }
+  return { text: n, tone: pr.checks === 'pending' ? 'running' : 'muted' }
 }

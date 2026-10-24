@@ -69,6 +69,7 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['compact', 'Compact', 'one short line: its state and name'],
   ['default', 'Default', 'a line with its marks: PR, author, timers'],
   ['extended', 'Extended', 'a second line: branch, what the agent is doing, the PR, the diff'],
+  ['words', 'Words', 'a second line that says what needs doing; one PR pill instead of the marks'],
   ['cards', 'Cards', 'a card each, with the agent’s last answer'],
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]

@@ -38,12 +38,12 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { ask, askText, AskHost, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -2692,6 +2692,7 @@ export function App() {
   // sidebar's order)
   const sideStyle = settings.sideStyle ?? 'default'
   const more = sideStyle === 'extended' || sideStyle === 'cards' // a second line under each row
+  const words = sideStyle === 'words' // a second line in words (text.ts rowFact), one PR pill for the marks
   const pctSide = settings.progressAt === 'sidebar' || settings.progressAt === 'both' // an agent's percent on its row (the second line has its own)
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
@@ -2700,7 +2701,9 @@ export function App() {
     const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
     const pct = status ? Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)) : -1
     const pc = projOf(w)?.color // its bar's color where it has none of its own (styles.css' --ws-bar)
-    const yes = prMarks(w.pr)
+    const yes = words ? null : prMarks(w.pr)
+    const fact = words ? rowFact(w, wt) : undefined
+    const pill = words && w.pr && settings.prIcon !== false ? prPill(w.pr) : undefined
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     return (
       <div
@@ -2724,7 +2727,7 @@ export function App() {
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
         <span className="spacer" />
-        {pctSide && !more && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
+        {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
           <span className="ws-stat">
@@ -2764,12 +2767,17 @@ export function App() {
             <Icon name="flow" size={11} />
           </span>
         )}
-        {w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
+        {pill && (
+          <span className={`ws-pill t-${pill.tone}`} data-tip={`PR #${w.pr!.number}${w.pr!.title ? `: ${w.pr!.title}` : ''}`}>
+            {pill.text}
+          </span>
+        )}
+        {!words && w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
           <span className="ws-pr conflict" data-tip={`PR #${w.pr.number} has merge conflicts`}>
             <Icon name="conflict" size={11} />
           </span>
         )}
-        {w.pr?.checks === 'fail' && w.pr.state === 'OPEN' && settings.prIcon !== false && (
+        {!words && w.pr?.checks === 'fail' && w.pr.state === 'OPEN' && settings.prIcon !== false && (
           <span className="ws-pr ci" data-tip={(n => `PR #${w.pr!.number}: ${n ? `${n} failing check${n > 1 ? 's' : ''}` : 'CI is failing'}`)(w.pr.list?.filter(c => c.state === 'fail').length)}>
             <Icon name="ciFail" size={11} />
           </span>
@@ -2780,7 +2788,7 @@ export function App() {
           </span>
         )}
         {marksAt === 'end' && yes}
-        {w.pr && settings.prIcon !== false && (
+        {!words && w.pr && settings.prIcon !== false && (
           <span className={`ws-pr ${prState(w.pr)}`} /* failing checks: their own mark, before it; red here is a closed PR */>
             {(!w.pr.mine || settings.ownAvatar !== false) && <Avatar login={w.pr.author} size={16} />}
             <Icon name="github" size={11} />
@@ -2802,6 +2810,13 @@ export function App() {
                 <span className="del">−{short(w.stat.del)}</span>
               </span>
             )}
+          </div>
+        )}
+        {fact && (
+          <div className={`ws-sub ws-fact t-${fact.tone}`} data-tip={fact.text.length > 40 ? fact.text : undefined}>
+            <span>{w.setup ? 'Setting up' : fact.text}</span>
+            {!w.setup && fact.since && <Elapsed since={fact.since} />}
+            {!w.setup && fact.note && <span className="ws-fact-note">· {fact.note}</span>}
           </div>
         )}
         {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
