@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.27.0 · Oct 24, 2026
 
 - Tunnels stay up: when cloudflared drops, Laki starts it again (a toast gives a random address's new link), and
   they come back after a daemon restart. With your own Cloudflare domain (Settings › Tunnels), a permanent address
