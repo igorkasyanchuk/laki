@@ -28,7 +28,7 @@ const notices = (last: boolean) => ({
     if (!last) return
     let shipped: string
     try {
-      shipped = execFileSync('npm', ['ls', '--omit=dev', '--all', '--parseable'], { encoding: 'utf8' })
+      shipped = execFileSync('npm', ['ls', '--omit=dev', '--all', '--parseable'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) // its stderr in a rethrown error, not the log
     } catch (e) {
       shipped = (e as { stdout?: string }).stdout ?? '' // npm ls exits 1 on an extraneous package (pack:x64's node-pty)
       if (!shipped.includes(NM)) throw e // no npm, or it said nothing: the notices would lack the daemon's packages
@@ -43,7 +43,10 @@ const notices = (last: boolean) => ({
         continue
       }
       const license = (typeof pkg.license === 'string' ? pkg.license : pkg.license?.type) ?? 'no license named'
-      const repo = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url
+      const repo = (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url)
+        ?.replace(/^git\+/, '')
+        .replace(/\.git$/, '')
+        .replace(/^(github:)?([\w.-]+\/[\w.-]+)$/, 'https://github.com/$2') // npm's shorthands
       const files = readdirSync(dir, { withFileTypes: true }).filter(f => f.isFile() && /^(licen[cs]e|copying|notice)([.-]|$)/i.test(f.name)).map(f => f.name).sort()
       const text = files.map(f => readFileSync(`${dir}/${f}`, 'utf8').trim()).join('\n\n') || `${license}: the package has no license file${repo ? `; its text is in ${repo}` : ''}`
       byText.set(text, [...(byText.get(text) ?? []), `${pkg.name}@${pkg.version} (${license})`])

@@ -37,4 +37,8 @@ for i in $(seq 100); do [ -s "$H/notify.log" ] && break; sleep 0.1; done
 echo "--- notifications:"; cat "$H/notify.log"
 sleep 0.5; kill $APP_PID || true; laki stop
 grep -i refused "$H/daemon.out" || echo "no refused connections"
+# About's licenses: a bundled package (react) and a shipped one (ws, npm ls's)
+NOTICES=$RES/../renderer/THIRD_PARTY_NOTICES.txt
+grep -q '^react@' "$NOTICES" && grep -q '^ws@' "$NOTICES" || { echo "no license notices in the app: $NOTICES"; exit 1; }
+echo "license notices in the app"
 ls -la "$H/shot.png"
