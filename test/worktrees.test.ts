@@ -46,7 +46,8 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   await rig.rpc('projectTrust', { id: p.id, hash: look.hash })
   assert.equal((await proj()).cfgWait, undefined)
   // trusting runs the setup that waited, with its env, ZDOTDIR refused (and said once)
-  await until(() => existsSync(join(a.path, 'env.txt')), 'the waiting setup runs')
+  // its line, not just the file: the shell's > makes it empty first, echo writes it a moment later
+  await until(() => existsSync(join(a.path, 'env.txt')) && readFileSync(join(a.path, 'env.txt'), 'utf8').endsWith('\n'), 'the waiting setup runs')
   assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar-\n')
   assert.equal((await ws(a.id)).setupWait, undefined)
   assert.equal((await ws(skip.id)).setupWait, undefined)
