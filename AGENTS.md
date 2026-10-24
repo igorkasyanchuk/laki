@@ -226,7 +226,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   (main.ts `agentSend`): to an agent's tab (`agent: true`), or a terminal of its own workspace, which is then the agent's
   (`agentCaller`, core's `agentTyped`; its keys through `input` too) until you send or type there (`youTyped`: keys with
   no escape), another workspace's terminal refused before any ask), `queueClear`, `queueSet` (the whole list: an edit, a
-  reorder, a removal; `was` refuses one made over a delivery), `queueNow` (Esc into a running turn, 5 s for it to stop, then `deliver`);
+  reorder, a removal; `was` refuses one made over a delivery), `queueNow` (Esc into a running turn, 5 s for it to stop, then `deliver`; an asleep one, a restart's too, woken
+  instead, its first one going as it settles; an ended one refused, as is a delivery that couldn't type);
   `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below; `label`: refused unless choice `n` still says that), `unread` (its ● again: `done`, until a look clears it);
 - a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
   another, named `<name>-<preset>`, sharing a random `race` id (the sidebar's flag; the renderer's `Compare.tsx`);

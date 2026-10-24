@@ -249,10 +249,9 @@ export function issueList(o: { project: string }) {
   if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
   const had = issues.get(p.id)
   if (had && Date.now() - had.at < 60_000) return had.list
-  const list = exec(p, 'gh', ['issue', 'list', '--state', 'open', '--json', 'number,title,url', '--limit', '50'], { timeout: 30000 }).then(
-    r => (JSON.parse(r.stdout || '[]') as { number: number; title: string; url: string }[]).map(x => ({ number: x.number, title: x.title, url: x.url })),
-    e => (issues.delete(p.id), Promise.reject(new Error(ghSays(e, 'the repo')))),
-  )
+  const list = exec(p, 'gh', ['issue', 'list', '--state', 'open', '--json', 'number,title,url', '--limit', '50'], { timeout: 30000 })
+    .then(r => (JSON.parse(r.stdout || '[]') as { number: number; title: string; url: string }[]).map(x => ({ number: x.number, title: x.title, url: x.url })))
+    .catch(e => (issues.delete(p.id), Promise.reject(new Error(ghSays(e, 'the repo'))))) // gh's failure or an answer that isn't JSON: asked again next time
   issues.set(p.id, { at: Date.now(), list })
   return list
 }

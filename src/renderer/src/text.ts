@@ -420,9 +420,6 @@ export function limitText({ r, w, used }: LimitHit, rows: AgentUsage[], now = Da
   return `${who} · ${w.label} limit at ${used}%${when ? ` · resets ${when}` : ''}`
 }
 
-// the Words sidebar style (Settings' SIDE_STYLES 'words'): a row's second line says the one thing that matters most,
-// the first of these that applies; its first line one PR pill (prPill) instead of the marks. The palette and the peek
-// card can say the same (ROW_WORDS)
 // a delayed start in words (wsNew startAt): Starts Fri 09:00, Starts at the limit reset ~14:20, or why it didn't
 export function pendingWords(p: PendingView, long = false) {
   const hm = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -430,6 +427,9 @@ export function pendingWords(p: PendingView, long = false) {
   if (p.limit) return `Starts at the limit reset${p.at ? ` ~${hm(p.at)}` : ''}`
   return p.at ? `Starts ${new Date(p.at).toLocaleString([], { weekday: 'short', ...(long && { day: 'numeric', month: 'short' }), hour: '2-digit', minute: '2-digit' })}` : 'Starts later'
 }
+// the Words sidebar style (Settings' SIDE_STYLES 'words'): a row's second line says the one thing that matters most,
+// the first of these that applies; its first line one PR pill (prPill) instead of the marks. The palette and the peek
+// card can say the same (ROW_WORDS)
 export const ROW_WORDS = { asks: 'Asks', pick: 'Asks you to pick', ci: 'CI failing', conflict: 'Conflicts with', changes: 'Changes requested by', working: 'Working', done: 'Done', unseen: 'not looked at', ready: 'Ready to merge' }
 export type RowTone = 'waiting' | 'error' | 'running' | 'done' | 'muted'
 export type RowFact = { kind: 'asks' | 'ci' | 'conflict' | 'changes' | 'working' | 'done' | 'ready' | 'later' | 'branch'; text: string; tone: RowTone; since?: number; note?: string } // since: a turn's start, its time after the words; note: the agent's progress after that

@@ -1324,6 +1324,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   // a later start: null cancels it (the workspace stays, no agent), at moves it (or to the limit's reset), prompt
   // changes what it says; start: now
   if ((o.pending !== undefined || o.start) && !w.pending) throw new Error(`${w.id} has no agent waiting to start`)
+  if (o.start && w.archived) throw new Error(`${w.id} is archived: restore it first`) // its folder went with the archive
   if (o.pending?.at !== undefined) startCheck(o.pending.at, w.pending!.preset, presetNamed(w.pending!.preset)?.agent ?? w.pending!.preset)
   if (o.railPin && !w.railPin && railTaken() >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
@@ -1351,7 +1352,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.pending === null) delete w.pending
   else if (o.pending) {
     const p = w.pending!
-    if (o.pending.at === 'limit') Object.assign(p, { limit: true, at: undefined, failed: undefined, account: p.account ?? accountFor({ preset: presetNamed(p.preset)?.agent ?? p.preset } as Tab, presetNamed(p.preset)?.account) })
+    if (o.pending.at === 'limit') Object.assign(p, { limit: true, at: undefined, failed: undefined })
     else if (o.pending.at !== undefined) Object.assign(p, { at: o.pending.at, limit: undefined, failed: undefined })
     if (typeof o.pending.prompt === 'string') p.prompt = o.pending.prompt
     if (p.limit) void pendingTick()
@@ -1786,7 +1787,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   try {
     if (o.startAt !== undefined && preset !== 'none') {
       // its agent later (schedule.ts pendingTick): what addTab would get, kept in state.json
-      ws.pending = { ...(o.startAt === 'limit' ? { limit: true, account: accountFor({ preset: agent } as Tab, presetNamed(preset)?.account) } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }
+      ws.pending = { ...(o.startAt === 'limit' ? { limit: true } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }
       save()
       step(`agent: ${preset} later, ${o.startAt === 'limit' ? 'as its plan limit resets' : new Date(o.startAt).toISOString()}`)
       if (o.startAt === 'limit') void pendingTick() // its reset read now, for the view
@@ -2380,7 +2381,7 @@ function deliver(id: string) {
   const tab = state.tabs.find(t => t.id === id)
   const s = sessions.get(id)
   const r = rt.get(id)
-  if (!tab?.queue?.length || !s || s.exited || r?.status !== 'idle' || r.limit) return
+  if (!tab?.queue?.length || !s || s.exited || r?.status !== 'idle' || r.limit) return false
   const msg = tab.queue.shift()!
   if (!tab.queue.length) delete tab.queue
   save()
@@ -2388,6 +2389,7 @@ function deliver(id: string) {
   typeInto(s, textFor(tab, msg))
   r.status = 'running'
   changed()
+  return true
 }
 
 export function clearQueue(target: string) {
@@ -2422,12 +2424,18 @@ export async function queueNow(target: string) {
   const r = rtOf(tab.id)
   if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // Esc would answer it
   if (r.limit) throw new Error(`${tab.name} is at its plan limit: it goes as that resets`)
+  // asleep, or a restart's not started yet: woken, the first one goes as it settles (sweepRunning delivers)
+  if (asleep.has(tab.id)) {
+    if (!wake(tab.id)) throw new Error(`${tab.name} can't be woken: open it`)
+    return { tab: tab.id, sent: true, queued: tab.queue.length }
+  }
+  if (sessions.get(tab.id)?.exited) throw new Error(`${tab.name} has ended: ⏎ in it starts it again, and its queue goes then`)
   if (r.status === 'running') {
     input(tab.id, '\x1b')
     for (let i = 0; i < 50 && rtOf(tab.id).status === 'running'; i++) await new Promise(ok => setTimeout(ok, 100))
     if (rtOf(tab.id).status !== 'idle') throw new Error(`${tab.name} didn't stop: try again, or wait for its turn to end`)
   }
-  deliver(tab.id)
+  if (!deliver(tab.id)) throw new Error(`${tab.name} isn't ready for it: try again in a moment`)
   return { tab: tab.id, sent: true, queued: tab.queue?.length ?? 0 }
 }
 

@@ -187,6 +187,12 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   assert.equal(await qOf(), undefined)
   await assert.rejects(rig.rpc('queueNow', { tab: sl.id }), /nothing is queued/)
   assert.deepEqual((await rig.rpc('queueSet', { tab: sl.id, queue: [], was: [] })).queue, []) // nothing: a clear
+  // asleep (or a restart's not started yet): Send now wakes it, and the first goes as it settles
+  await until(async () => (await rig.tab(ws.id, 'claude: slow work')).status === 'idle', 'idle')
+  assert.equal(await rig.rpc('tabSleep', { tab: sl.id }), true)
+  await rig.rpc('queueSet', { tab: sl.id, queue: ['woke'], was: [] })
+  assert.equal((await rig.rpc('queueNow', { tab: sl.id })).sent, true)
+  await until(async () => (await rig.screen(sl.id)).includes('answer: woke'), 'typed once it woke', 15000)
 
   // codex reports only a turn's end: Enter starts one
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })

@@ -3,10 +3,10 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
+import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
-import { usageWho } from './accounts.ts'
+import { accountFor, usageWho } from './accounts.ts'
 import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
@@ -300,7 +300,8 @@ export async function pendingTick(now = Date.now()) {
       const p = w.pending!
       if (p.limit && !(p.at !== undefined && p.at <= now)) {
         const agent = presetNamed(p.preset)?.agent ?? p.preset
-        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === (p.account ?? HOME_ACCOUNT))).catch(() => [])
+        const account = accountFor({ preset: agent } as Tab, presetNamed(p.preset)?.account) ?? HOME_ACCOUNT // its tab's, now (one removed since: the agent's own)
+        const [u] = await usage(state.settings?.usage, usageWho().filter(x => x.agent === agent && x.account === account)).catch(() => [])
         const at = u && !u.error ? resetOf(u.windows, state.settings?.usageAt ?? USAGE_AT) : undefined
         if (at !== undefined && at !== p.at && w.pending === p) (p.at = at), save(), changed()
       }

@@ -54,6 +54,11 @@ test("a delayed start: the workspace now, its agent at its time (a tick), after 
   assert.equal(JSON.parse((await rig.cli('new', p.id, '--name', 'cli-limit', '--after-limit', '--prompt', 'x', '--json')).out).pending.limit, true)
   assert.match((await rig.cli('new', p.id, '--at', 'whenever', '--prompt', 'x')).err, /At what time\?/)
 
+  // archived: its folder went, so no Start now until it's restored
+  const d = await rig.rpc('wsNew', { project: p.id, preset: 'claude', startAt: at })
+  await rig.rpc('wsArchive', { id: d.id })
+  await assert.rejects(rig.rpc('wsSet', { id: d.id, start: true }), /is archived: restore it first/)
+
   // cancelled: the workspace stays, with no agent, and no tick starts one
   const c = await rig.rpc('wsNew', { project: p.id, preset: 'claude', startAt: at })
   await rig.rpc('wsSet', { id: c.id, pending: null })

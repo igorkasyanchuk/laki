@@ -1854,7 +1854,7 @@ export function QueueStrip({ tab, onSave, onNow, onClear, onRemove }: { tab: Tab
             <span
               className="queue-grip"
               draggable={!edit}
-              onDragStart={e => ((e.dataTransfer.effectAllowed = 'move'), e.dataTransfer.setData('text/plain', m), setDrag({ from: i, over: i }))}
+              onDragStart={e => ((e.dataTransfer.effectAllowed = 'move'), e.dataTransfer.setData('application/x-laki-queue', String(i)), setDrag({ from: i, over: i })) /* not text/plain: a sidebar row would take it as a message */}
               onDragEnd={() => setDrag(null)}
               data-tip="Drag into another place"
             >

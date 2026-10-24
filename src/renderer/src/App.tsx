@@ -1054,7 +1054,7 @@ export function App() {
   // back off the queue); with ⌥, a box first to add a line. Terminals', Browsers' and archived rows take none
   const [dropOn, setDropOn] = useState<string | null>(null)
   const dropAgent = (w: WorkspaceView) => (ts => ts.find(t => t.id === tabByWs[w.id]) ?? ts[0])((viewRef.current?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited'))
-  const takesDrop = (w: WorkspaceView, e: React.DragEvent) => !w.archived && !projOf(w)?.kind && w.browser === undefined && ['Files', 'text/plain'].some(k => e.dataTransfer.types.includes(k))
+  const takesDrop = (w: WorkspaceView, e: React.DragEvent) => !w.archived && !isTerm(w) && !projOf(w)?.kind && w.browser === undefined && ['Files', 'text/plain'].some(k => e.dataTransfer.types.includes(k))
   const dropProps = (w: WorkspaceView) => ({
     onDragOver: (e: React.DragEvent) => takesDrop(w, e) && (e.preventDefault(), (e.dataTransfer.dropEffect = 'copy'), dropOn !== w.id && setDropOn(w.id)),
     onDragLeave: (e: React.DragEvent) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropOn(d => (d === w.id ? null : d)),
