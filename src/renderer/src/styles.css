@@ -822,6 +822,24 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .pane-head .x { background: none; border: none; padding: 0 5px; color: var(--muted); }
 .pane-head .x:hover { color: var(--fg); }
 .pane-body { flex: 1; position: relative; min-height: 0; }
+/* a tab's queue (panels.tsx' QueueStrip) under its terminal: its own height, at most a third of the pane, the rest scrolls */
+.queue-strip { flex: none; max-height: 34%; padding-right: 48px; /* clear of the floating AI button */ display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--side); font-size: 12px; }
+.queue-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; color: var(--muted); }
+.queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-what b { color: var(--fg); font-weight: 600; }
+.queue-head button { font-size: 12px; padding: 2px 9px; }
+.queue-list { list-style: none; margin: 0; padding: 0 6px 5px; overflow: auto; min-height: 0; }
+.queue-list li { display: flex; align-items: center; gap: 6px; padding: 2px 2px 2px 4px; border-radius: var(--rs, 6px); }
+.queue-list li:hover { background: var(--hover); }
+.queue-list li.dragging { opacity: 0.45; }
+.queue-list li.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.queue-list li.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.queue-grip { flex: none; display: flex; color: var(--muted); cursor: grab; }
+.queue-n { flex: none; min-width: 14px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.queue-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.queue-edit { flex: 1; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--accent); border-radius: var(--rs, 6px); padding: 3px 6px; resize: vertical; }
+.queue-list .ib { opacity: 0.6; }
+.queue-list li:hover .ib, .queue-list .ib:focus-visible { opacity: 1; }
 .bar { position: absolute; z-index: 4; }
 .bar.row { width: 7px; transform: translateX(-50%); cursor: col-resize; }
 .bar.col { height: 7px; transform: translateY(-50%); cursor: row-resize; }

@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, type TabView, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -1673,6 +1673,89 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
         </Modal>
       )}
       {menu}
+    </div>
+  )
+}
+
+// a tab's queue: what goes as its turn ends, in a strip under its terminal (Panes' foot: the terminal gets shorter, the
+// TUI is never covered). Each one edited in place (⌘⏎ saves, Esc cancels), removed (App's toast has Undo) or dragged
+// into another place, all through onSave (the daemon's queueSet, with the list it started from); Send now stops the
+// turn and types the first
+export function QueueStrip({ tab, onSave, onNow, onClear, onRemove }: { tab: TabView; onSave: (queue: string[], was: string[]) => Promise<boolean>; onNow: () => void; onClear: () => void; onRemove: (i: number) => void }) {
+  const q = tab.queue ?? []
+  const [edit, setEdit] = useState<{ i: number; text: string; was: string } | null>(null)
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
+  if (edit && q[edit.i] !== edit.was) setEdit(null) // delivered or changed meanwhile: nothing left to edit there
+  if (!q.length) return null
+  const moved = (from: number, to: number) => {
+    const n = [...q]
+    n.splice(to, 0, ...n.splice(from, 1))
+    return n
+  }
+  const save = () => edit && void onSave(q.map((x, j) => (j === edit.i ? edit.text : x)), q).then(ok => ok && setEdit(null))
+  return (
+    <div className="queue-strip" role="region" aria-label={`Queued for ${tab.name}`}>
+      <div className="queue-head">
+        <Icon name="clock" size={13} />
+        <span className="queue-what">
+          Queued for <b>{tab.name}</b> · {q.length} · goes when this turn ends
+        </span>
+        <button onClick={onNow} data-tip="Stop the turn under way and send the first one">
+          Send now
+        </button>
+        <button className="ghost" onClick={onClear}>
+          Clear
+        </button>
+      </div>
+      <ol className="queue-list">
+        {q.map((m, i) => (
+          <li
+            key={`${i}:${m}`}
+            className={`${drag?.from === i ? 'dragging' : ''} ${drag && drag.over === i && drag.from !== i ? (drag.from < i ? 'drop-after' : 'drop-before') : ''}`}
+            onDragOver={e => drag && (e.preventDefault(), drag.over !== i && setDrag({ ...drag, over: i }))}
+            onDrop={e => (e.preventDefault(), drag && drag.from !== i && void onSave(moved(drag.from, i), q), setDrag(null))}
+          >
+            <span
+              className="queue-grip"
+              draggable={!edit}
+              onDragStart={e => ((e.dataTransfer.effectAllowed = 'move'), e.dataTransfer.setData('text/plain', m), setDrag({ from: i, over: i }))}
+              onDragEnd={() => setDrag(null)}
+              data-tip="Drag into another place"
+            >
+              <Icon name="move" size={12} />
+            </span>
+            <span className="queue-n">{i + 1}</span>
+            {edit?.i === i ? (
+              <textarea
+                className="queue-edit"
+                autoFocus
+                value={edit.text}
+                rows={Math.min(6, edit.text.split('\n').length)}
+                onChange={e => setEdit({ ...edit, text: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') e.preventDefault(), e.stopPropagation(), setEdit(null)
+                  else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) e.preventDefault(), save()
+                }}
+              />
+            ) : (
+              <span className="queue-text" data-tip={m.length > 80 || m.includes('\n') ? m.slice(0, 2000) : undefined} onDoubleClick={() => setEdit({ i, text: m, was: m })}>
+                {m.split('\n')[0]}
+              </span>
+            )}
+            {edit?.i === i ? (
+              <>
+                <IconButton icon="check" title="Save  ⌘⏎" onClick={save} />
+                <IconButton icon="x" title="Cancel  Esc" onClick={() => setEdit(null)} />
+              </>
+            ) : (
+              <>
+                <IconButton icon="pencil" title="Edit" onClick={() => setEdit({ i, text: m, was: m })} />
+                <IconButton icon="x" title="Remove" onClick={() => onRemove(i)} />
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

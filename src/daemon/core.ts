@@ -2326,6 +2326,40 @@ export function clearQueue(target: string) {
   changed()
 }
 
+// the queue as the user left it (edited, reordered, some removed: the pane's strip); `was`, the list it started from:
+// a delivery or another edit meanwhile refuses it. Blank ones go; none left is a clear
+export function queueSet(p: { tab: string; queue: unknown; was: unknown }) {
+  const tab = resolveTarget(String(p.tab ?? ''))
+  const list = (v: unknown) => (Array.isArray(v) && v.every(x => typeof x === 'string') ? (v as string[]) : null)
+  const next = list(p.queue)
+  const was = list(p.was)
+  if (!next || !was) throw new Error('queue and was: lists of messages')
+  if (JSON.stringify(was) !== JSON.stringify(tab.queue ?? [])) throw new Error('changed since you opened it')
+  const q = next.filter(t => t.trim())
+  if (q.length && !tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
+  if (q.length) tab.queue = q
+  else delete tab.queue
+  save()
+  changed()
+  return { queue: q }
+}
+
+// the first queued one now: the turn under way stopped (Esc, as a workflow's timeout does), then delivered
+export async function queueNow(target: string) {
+  const tab = resolveTarget(String(target ?? ''))
+  if (!tab.queue?.length) throw new Error(`nothing is queued for ${tab.name}`)
+  const r = rtOf(tab.id)
+  if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // Esc would answer it
+  if (r.limit) throw new Error(`${tab.name} is at its plan limit: it goes as that resets`)
+  if (r.status === 'running') {
+    input(tab.id, '\x1b')
+    for (let i = 0; i < 50 && rtOf(tab.id).status === 'running'; i++) await new Promise(ok => setTimeout(ok, 100))
+    if (rtOf(tab.id).status !== 'idle') throw new Error(`${tab.name} didn't stop: try again, or wait for its turn to end`)
+  }
+  deliver(tab.id)
+  return { tab: tab.id, sent: true, queued: tab.queue?.length ?? 0 }
+}
+
 // input from a client's keyboard. Agents but claude don't say when a turn starts: Enter does.
 // what xterm sends on its own, not a key: focus in/out and mouse reports (modes the agent left on)
 const REPORTS = /^(?:\x1b\[[IO]|\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\s\S]{3})+$/

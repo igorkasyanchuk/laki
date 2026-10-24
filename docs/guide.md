@@ -851,6 +851,9 @@ small window of its own over the app you're in, as the bubbles' + does; *Open La
 and with *Screenshot to Laki AI* on, its item (and its keys) is there too.
 Settings › General › *Menu bar icon* hides the mark. With *Turn timers* on (Settings › Appearance), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
+**The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes
+when this turn ends*): ✎ edits one in place (⌘⏎ saves, Esc cancels), ✕ removes it (with Undo), its handle drags it
+into another place; *Send now* stops the turn under way (Esc) and types the first; *Clear* drops them all.
 **A new session from an agent**: in a Claude Code tab, `/laki:new <the task> with codex` (or claude, gemini, grok,
 opencode; none named: claude) has the agent write the task up as a prompt and start it in a new workspace of this
 project (`laki new .`), with that agent; it doesn't do the task itself. Laki gives its Claude Code tabs this command

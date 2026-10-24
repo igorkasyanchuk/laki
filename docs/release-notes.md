@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- What's queued for an agent shows in a strip under its terminal: edit a message, drag it into another place,
+  remove it (with Undo), or *Send now*, which stops the turn under way and types the first.
 - Bird view: a card whose agent waits for you has an amber border with a slow glow, one that's done and not looked
   at a green one.
 

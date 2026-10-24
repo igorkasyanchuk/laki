@@ -170,6 +170,24 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   await rig.rpc('hook', { tab: cl.id, state: 'interrupted' })
   assert.equal((await rig.tab(ws.id, 'claude: ask me')).status, 'idle')
 
+  // the queue edited: a reorder and an edit as one list, refused over a list it didn't start from; Send now stops a
+  // slow turn (Esc) and types the first
+  const sl = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'slow work' })
+  await until(async () => (await rig.screen(sl.id)).includes('esc to interrupt'), 'a slow turn')
+  await until(async () => (await rig.tab(ws.id, 'claude: slow work')).status === 'running', 'running')
+  for (const text of ['one', 'two', 'three']) await rig.rpc('send', { target: sl.id, text, whenIdle: true })
+  const qOf = async () => (await rig.tab(ws.id, 'claude: slow work')).queue
+  await assert.rejects(rig.rpc('queueSet', { tab: sl.id, queue: ['x'], was: ['one'] }), /changed since you opened it/)
+  await assert.rejects(rig.rpc('queueSet', { tab: sl.id, queue: 'x', was: [] }), /lists of messages/)
+  assert.deepEqual((await rig.rpc('queueSet', { tab: sl.id, queue: ['three', 'one!', ' '], was: ['one', 'two', 'three'] })).queue, ['three', 'one!']) // a blank one goes
+  assert.deepEqual(await qOf(), ['three', 'one!'])
+  assert.equal((await rig.rpc('queueNow', { tab: sl.id })).queued, 1)
+  await until(async () => (await rig.screen(sl.id)).includes('answer: three'), 'the first one typed after Esc')
+  await until(async () => (await rig.screen(sl.id)).includes('answer: one!'), 'the next one at its turn\'s end')
+  assert.equal(await qOf(), undefined)
+  await assert.rejects(rig.rpc('queueNow', { tab: sl.id }), /nothing is queued/)
+  assert.deepEqual((await rig.rpc('queueSet', { tab: sl.id, queue: [], was: [] })).queue, []) // nothing: a clear
+
   // codex reports only a turn's end: Enter starts one
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
   await until(async () => (await rig.screen(cx.id)).includes('fake codex'), 'codex up')
@@ -190,7 +208,7 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   // the folder is gone: no tab
   rmSync(ws.path, { recursive: true, force: true })
   await assert.rejects(rig.rpc('tabNew', { ws: ws.id }), /is gone/)
-  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 4)
+  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 5)
 })
 
 test('claude StopFailure on a usage limit: ◷ until it resets; a time gone by is tomorrow\'s', async t => {

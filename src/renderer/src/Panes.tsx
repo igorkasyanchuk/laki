@@ -101,6 +101,7 @@ export function Panes(p: {
   onMenu: (e: MouseEvent, tab: string) => void // right click on a pane header
   ghost: ReactNode // what follows the pointer while dragging
   render: (tab: string) => ReactNode
+  foot?: (tab: string) => ReactNode // under the pane's terminal, which gets shorter (a tab's queue)
   onFocus: (tab: string) => void
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (Settings › Terminal)
   onClose: (tab: string) => void
@@ -135,6 +136,7 @@ export function Panes(p: {
             </div>
           )}
           <div className="pane-body">{p.render(tab)}</div>
+          {p.foot?.(tab)}
           {over && 'pane' in over && over.pane === tab && <div className={`drop-zone ${over.edge}`} />}
         </div>
       ))}

@@ -283,7 +283,9 @@ const api: Record<string, Handler> = {
   aiKey: p => aiKey(p),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
   send: async p => (agentSend(p), await crossAsk(p, 'send'), core.send(p)),
-  queueClear: p => core.clearQueue(p.target),
+  queueClear: async p => (await crossAsk(p, 'send', p.target, ''), core.clearQueue(p.target)),
+  queueSet: async p => (await crossAsk(p, 'send', p.tab, Array.isArray(p.queue) ? p.queue.join('\n\n') : ''), core.queueSet(p)), // the queue strip's edit, reorder, remove
+  queueNow: async p => (await crossAsk(p, 'send', p.tab, ''), core.queueNow(p.tab)), // its Send now: the turn stopped, the first one typed
   hook: p => core.hook(p),
   diff: p => core.diff(p.ws),
   files: p => core.files(p.ws),
@@ -451,7 +453,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
