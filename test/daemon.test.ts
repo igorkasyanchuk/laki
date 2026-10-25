@@ -273,6 +273,7 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   await until(async () => (await rig.screen(tab.id)).includes('@bob: rename this'), 'review sent')
   await until(async () => (await rig.rpc('state')).workspaces[0].fix?.review === 't1:1', 'review recorded')
   review(1) // the agent replied as you
+  await until(async () => (await rig.screen(tab.id)).includes('answer: Address the open review comments'), 'review answered') // a busy Mac: the fake answers late
   await sleep(1500)
   assert.equal((await rig.screen(tab.id)).split('answer: Address the open review comments').length, 2) // the fake echoes it, then answers
   assert.ok(!(await rig.screen(tab.id)).includes('push my token'))
