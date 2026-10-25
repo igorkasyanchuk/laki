@@ -1286,19 +1286,21 @@ function Start({ ai, home, onAiSettings }: { ai: boolean; home?: string; onAiSet
           </button>
         )}
       </section>
-      <section className="ext-card">
-        <div className="ext-card-head">
-          <b>Or with any AI chat</b>
-          <span className="muted small">the prompt: what you want, then how an extension is made</span>
-        </div>
-        <input value={want} onChange={e => setWant(e.target.value)} placeholder="What should it show? e.g. open Sentry issues of my project, by count" />
-        <div className="row">
-          <button type="button" onClick={() => void copy()}>
-            <Icon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy the prompt'}
-          </button>
-          <span className="muted small grow">Then save the files it gives you in Laki's folder (Settings › Extensions › Folders) and press Reload there.</span>
-        </div>
-      </section>
+      {!ai && ( // no chat beside it (Laki AI off): the prompt for another one
+        <section className="ext-card">
+          <div className="ext-card-head">
+            <b>Or with any AI chat</b>
+            <span className="muted small">the prompt: what you want, then how an extension is made</span>
+          </div>
+          <input value={want} onChange={e => setWant(e.target.value)} placeholder="What should it show? e.g. open Sentry issues of my project, by count" />
+          <div className="row">
+            <button type="button" onClick={() => void copy()}>
+              <Icon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy the prompt'}
+            </button>
+            <span className="muted small grow">Then save the files it gives you in Laki's folder (Settings › Extensions › Folders) and press Reload there.</span>
+          </div>
+        </section>
+      )}
     </>
   )
 }
