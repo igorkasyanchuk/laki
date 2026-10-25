@@ -459,14 +459,21 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [])
-  // kept inside the window: flipped up or left when there's no room
+  // kept inside the window: flipped up or left when there's no room. Inside a zoomed page (Settings' size) a px of its
+  // style is z of the window's: every place is the window's over z
   useLayoutEffect(() => {
     const el = box.current!
+    const z = el.currentCSSZoom || 1
+    const px = (n: number) => `${n / z}px`
     el.style.bottom = '' // another anchor: placed again
+    el.style.top = px(anchor.bottom + 4)
+    if (align === 'left') el.style.left = px(anchor.left)
+    else el.style.right = px(window.innerWidth - anchor.right)
     const r = el.getBoundingClientRect()
     // above it, held by its bottom: a filter that shrinks it keeps it by the button
-    if (r.bottom > window.innerHeight - 6) beside ? (el.style.top = `${Math.max(6, window.innerHeight - r.height - 6)}px`) : anchor.top - r.height - 4 < 6 ? (el.style.top = '6px') : ((el.style.top = 'auto'), (el.style.bottom = `${window.innerHeight - anchor.top + 4}px`))
-    if (r.right > window.innerWidth - 6) el.style.left = `${Math.max(6, beside ? beside.left - r.width - 4 : window.innerWidth - r.width - 6)}px` // a submenu: on the other side
+    if (r.bottom > window.innerHeight - 6) beside ? (el.style.top = px(Math.max(6, window.innerHeight - r.height - 6))) : anchor.top - r.height - 4 < 6 ? (el.style.top = px(6)) : ((el.style.top = 'auto'), (el.style.bottom = px(window.innerHeight - anchor.top + 4)))
+    // held by its right edge: by the left one, its width as measured squeezed against the window's edge, it'd widen past it
+    if (r.right > window.innerWidth - 6) (el.style.left = 'auto'), (el.style.right = px(beside ? window.innerWidth - beside.left + 4 : 6)) // a submenu: on the other side
   }, [anchor])
   const pos = align === 'left' ? { left: anchor.left } : { right: window.innerWidth - anchor.right }
   const menu = (
