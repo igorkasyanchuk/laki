@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.30.0 · Oct 25, 2026
 
 - The Review tab is on for everyone (Settings › *Pull requests* › *Review tab* turns it off), no longer experimental.
 - Review: the arrows by a change show more of the file around it, as on GitHub; pin files (p) to keep them at the top;
