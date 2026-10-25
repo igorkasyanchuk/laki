@@ -85,7 +85,7 @@ test("an extension's own working hours: refused when they don't read, always ove
   const app = await rig.connect()
   t.after(() => app.ws.close())
   await app.call('view', { tab: null, focused: true, shown: true })
-  const at = (await find(rig, 'hr')).at
+  const at = await until(() => find(rig, 'hr').then(w => w.at), 'its first fetch: always, though Settings say never')
   await rig.rpc('widgetTick', { now: Date.now() + 10 * 60_000 })
   await until(() => find(rig, 'hr').then(w => w.at && w.at !== at), 'fetched: always')
   await rig.rpc('widgetSet', { id: 'hr', hours: '' })
