@@ -3,10 +3,12 @@
 import { type ReactNode } from 'react'
 
 // a switch row's text: what it is, and under it a line on what it does
+// a hint's {{variables}} set apart (code.var), easier to pick out of a sentence
+export const withVars = (t: ReactNode) => (typeof t === 'string' && t.includes('{{') ? t.split(/(\{\{[^{}]+\}\})/).map((p, i) => (i % 2 ? <code key={i} className="var">{p}</code> : p)) : t)
 export const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
   <span className="switch-text">
     <span>{title}</span>
-    {hint && <span className="muted">{hint}</span>}
+    {hint && <span className="muted">{withVars(hint)}</span>}
   </span>
 )
 
@@ -15,7 +17,7 @@ export const Group = ({ title, hint, act, children }: { title: string; hint?: Re
   <section className="set-group">
     <div className={`set-head ${act ? 'with-act' : ''}`}>
       <h3>{title}</h3>
-      {hint && <p className="muted small">{hint}</p>}
+      {hint && <p className="muted small">{withVars(hint)}</p>}
       {act && <span className="set-act">{act}</span>}
     </div>
     {children}

@@ -48,8 +48,8 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
   const [spot, setSpot] = useState(0) // Edit: the settings' card scrolled to and lit, once per click
   // edit: a setting it needs (turned on with it empty, its cell's Set …): Overview, that field
   useEffect(() => void (edit && (setTab('overview'), setSpot(s => s + 1))), [edit])
-  const [at, setAt] = useState(here ?? spots[0]?.id ?? null) // a per-workspace one: whose instance
-  const w = (x => x && inWs(x, spots.some(s => s.id === at) ? at : null))(widgets.find(x => x.id === cur))
+  const at = here && spots.some(s => s.id === here) ? here : (spots[0]?.id ?? null) // a per-workspace one: the selected workspace's instance
+  const w = (x => x && inWs(x, at))(widgets.find(x => x.id === cur))
   const seen = useRef(false) // one just made (New ▾, Laki AI) comes with the next view
   if (w) seen.current = true
   useEffect(() => void (cur && !w && seen.current && onClose()), [cur, !w]) // deleted meanwhile
@@ -108,6 +108,8 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
         e => setOops(String(e?.message ?? e)),
       )
     )
+  // a repo's or an agent's folder's through App's repoSheet (every file it runs); else what it runs first (TrySheet)
+  const turnOn = () => (guarded ? void cfg.set(w!.id, { on: true }).catch(e => setOops(String(e?.message ?? e))) : setSheet('on'))
   const name = w?.name ?? (cur || 'New extension')
   return (
     <Page
@@ -129,7 +131,11 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
               From {w.repo}'s .laki/extensions
             </span>
           )}
-          {w && !w.on && <span className="tag">off</span>}
+          {w && (
+            <button className={`ext-state ${w.on ? 'on' : ''}`} role="switch" aria-checked={w.on} data-tip={w.on ? 'On: it runs and shows where you picked. Click to turn it off' : 'Off: nothing of it runs and it shows nowhere. Click to turn it on'} onClick={() => (w.on ? void cfg.set(w.id, { on: false }).catch(e => setOops(String(e?.message ?? e))) : turnOn())}>
+              <i /> {w.on ? 'On' : 'Off'}
+            </button>
+          )}
           {w?.byAi && <span className="tag" data-tip="Laki AI wrote it: look at what it runs before you turn it on">by Laki AI</span>}
           {errors > 0 && (
             <button className="tag tag-closed ext-problems" onClick={() => setTab('check')}>
@@ -157,7 +163,7 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
               </button>
             )}
             {!w.on && (
-              <button className="sm primary" onClick={() => (guarded ? void cfg.set(w.id, { on: true }).catch(e => setOops(String(e?.message ?? e))) : setSheet('on'))}>
+              <button className="sm primary" onClick={turnOn}>
                 Turn on
               </button>
             )}
@@ -169,7 +175,7 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
         <div className="ext-main">
           {w ? (
             <>
-              <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
+              <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} wsName={spots.find(s => s.id === w.here)?.name} />
               {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} pick={pick} setPick={setPick} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : tab === 'logs' ? <Logs w={w} cfg={cfg} spots={spots} copy={api.copy} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
             </>
           ) : cur ? (
@@ -516,7 +522,12 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
     const t = setTimeout(() => el.classList.remove('spot'), 2700)
     return () => clearTimeout(t)
   }, [spot])
-  const [cell, setCell] = useState<[number, number]>(w.size) // Everywhere's sidebar cell: any size, its own not changed
+  // Everywhere's size: a sidebar cell and a bar's width in cells, its own not changed; auto: the bars as wide as their
+  // words (Size › Auto), the sidebar at its own size
+  const [pickCell, setCell] = useState<[number, number] | 'auto'>(w.fit && !w.js ? 'auto' : w.size)
+  const auto = pickCell === 'auto'
+  const cell = auto ? w.size : pickCell
+  const barW = (n: number, fit: boolean) => (fit ? { width: 'max-content', maxWidth: 'calc(4 * var(--widget-cell, 92px))' } : { width: `calc(${n} * var(--widget-cell, 92px))` })
   // made-up data: widget.json's sample, or one of its fixtures (busy, empty…) by name
   const variants = w.fixtures ?? []
   const has = !!w.sample || !!variants.length
@@ -541,7 +552,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
       <section className="ext-card">
         <div className="ext-card-head">
           <b>Preview</b>
-          <span className={`small ${w.error && !w.running && !sample ? 'warn' : 'muted'}`}>{sample ? 'made-up data' : status(w, true) || (w.on ? 'live' : 'off')}</span>
+          <span className={`small ${w.error && !w.running && !sample ? 'warn' : 'muted'}`} data-tip="Its small view, as it shows in its place">{sample ? 'made-up data' : status(w, true) || (w.on ? 'live' : 'off')}</span>
           <span className="grow" />
           {w.on && w.every !== undefined && !sample && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && w.here !== null && void api.run(w.id, w.here ?? undefined).catch(() => {})} />}
           <div className="seg" role="tablist" aria-label="Its data">
@@ -566,7 +577,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
         <div className="ext-stage">
           <span className="ext-where muted small">
             {WHERE[place] ?? place}
-            {!button && !desk && !row && ` · ${w.size[0]}×${half(w.size[1])}`}
+            {!button && !desk && !row && (bar && w.fit && !w.js ? ' · auto' : ` · ${w.size[0]}×${half(w.size[1])}`)}
           </span>
           {row ? (
             <div className="ext-row">
@@ -581,7 +592,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
               <CellButton w={w} api={api} />
             </div>
           ) : (
-            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : place === 'panel' ? { width: 320, height: 300 } : desk ? { width: 400, height: 260 } : { width: w.size[0] * CELL_W, height: w.size[1] * 64 }}>
+            <div className={`widget ext-tile ${bar ? 'in-bar' : ''} ${bar && w.fit && !w.js ? 'fit' : ''}`} style={bar ? barW(w.size[0], !!w.fit && !w.js) : place === 'panel' ? { width: 320, height: 300 } : desk ? { width: 400, height: 260 } : { width: w.size[0] * CELL_W, height: w.size[1] * 64 }}>
               <WidgetBody key={`${made}`} w={w} full={desk && !!w.full} api={api} sample={made} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}
@@ -590,10 +601,16 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
           <>
             <div className="ext-card-head sub">
               <b>Full view</b>
-              <span className="muted small">a click away · {w.view === 's' ? 'small' : w.view === 'l' ? 'large' : 'medium'}</span>
+              <span className="muted small">a click on it opens this in a window over Laki · {w.view === 's' ? 'small' : w.view === 'l' ? 'large' : 'medium'}</span>
             </div>
             <div className={`ext-full ${w.view ?? 'm'}`}>
-              <WidgetBody key={`${made}`} w={w} full api={api} sample={made} />
+              <div className="ext-full-bar" aria-hidden>
+                <b>{w.name}</b>
+                <Icon name="x" size={12} />
+              </div>
+              <div className="ext-full-body">
+                <WidgetBody key={`${made}`} w={w} full api={api} sample={made} />
+              </div>
             </div>
           </>
         )}
@@ -602,9 +619,14 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
         <div className="ext-card-head">
           <b>Everywhere</b>
           <span className="muted small grow">how it looks in each place{sample ? ', with made-up data' : ''}</span>
-          <div className="seg" role="tablist" aria-label="Its size in the sidebar">
+          <div className="seg" role="tablist" aria-label="Its size here">
+            {!w.js && (
+              <button role="tab" aria-selected={auto} className={auto ? 'on' : ''} data-tip="The bars as wide as their words need (Size › Auto); the sidebar at its own size" onClick={() => setCell('auto')}>
+                Auto
+              </button>
+            )}
             {CELLS.map(c => (
-              <button key={c.join()} role="tab" aria-selected={cell.join() === c.join()} className={cell.join() === c.join() ? 'on' : ''} onClick={() => setCell(c)}>
+              <button key={c.join()} role="tab" aria-selected={!auto && cell.join() === c.join()} className={!auto && cell.join() === c.join() ? 'on' : ''} onClick={() => setCell(c)}>
                 {c[0]}×{half(c[1])}
               </button>
             ))}
@@ -619,9 +641,11 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
           </div>
           {(['Top bar', 'Status bar'] as const).map(where => (
             <div key={where}>
-              <span className="muted small">{where}</span>
-              <div className="widget ext-tile in-bar" style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }}>
-                {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${made}`} w={w} full={false} api={api} sample={made} cells={[w.size[0], 0.5]} />}
+              <span className="muted small">
+                {where} · {auto ? 'auto' : `${cell[0]} across`}
+              </span>
+              <div className={`widget ext-tile in-bar ${auto ? 'fit' : ''}`} style={barW(cell[0], auto)}>
+                {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${made}`} w={w} full={false} api={api} sample={made} cells={[cell[0], 0.5]} />}
               </div>
             </div>
           ))}
@@ -630,7 +654,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
             <div className="ext-button">
               <CellButton w={w} api={api} />
             </div>
-            <span className="muted small">tip: {w.tip ?? w.name}</span>
+            <span className="muted small">{w.hide?.tip ? 'no tooltip' : `tooltip: ${w.tip ?? w.name}`}</span>
           </div>
           <div className="ext-desk-spot">
             <span className="muted small">My Desk tile · {w.full ? 'its full view' : 'its preview'}, room for a long table or list</span>
@@ -651,7 +675,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
 
 // the inspector's head: its tabs, Run now and Reload, a dot while laki widget dev watches it, and why its files don't
 // read now (the last good version runs on); on a phone the tabs and buttons are one ⋯ menu (.ext-more)
-function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void; spots: { id: string; name: string }[]; setAt: (ws: string) => void }) {
+function InspectHead({ w, cfg, tab, setTab, wsName }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void; wsName?: string }) {
   const [menu, openMenu] = useMenu()
   const runNow = () => void cfg.run(w.id, w.here ?? undefined).catch(() => {})
   const more = () => [
@@ -677,14 +701,9 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
         </div>
         <span className="grow" />
         {w.scope && (
-          <select className="sm ext-ws" value={w.here ?? ''} aria-label="Whose instance" data-tip="Per workspace: whose instance this page shows, fetches and checks" onChange={e => setAt(e.target.value)}>
-            {!w.here && <option value="">No workspace</option>}
-            {spots.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <span className="muted small ext-ws" data-tip="Per workspace: each workspace has its own data. This page shows the selected workspace's (none there: the first one's)">
+            {wsName ? `in ${wsName}` : 'no workspace'}
+          </span>
         )}
         {w.dev && (
           <span className="ext-watch small muted" data-tip="laki widget dev links its folder: a save reloads it">

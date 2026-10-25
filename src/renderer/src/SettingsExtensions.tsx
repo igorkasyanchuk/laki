@@ -16,8 +16,9 @@ import { describeHours, parseHours } from '../../shared/when'
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
+  set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[]; hours?: string }) => Promise<unknown> // hours: its own working hours ('': Settings'); seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on: a place too
+  hours?: string // Settings › Extensions' working hours (settings.widgetHours): an extension's own empty one says it
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
@@ -233,6 +234,46 @@ const WcRow = ({ title, hint, children }: { title: ReactNode; hint?: ReactNode; 
 )
 const BARS: WidgetPlace[] = ['side', 'top', 'status']
 
+// Where it shows, drawn: a small Laki window with each place it's in lit, the pill under the mouse brighter
+function PlaceMap({ on, hot }: { on: WidgetPlace[]; hot?: WidgetPlace }) {
+  const c = (p: WidgetPlace) => `pm-${p} ${on.includes(p) ? 'on' : ''} ${hot === p ? 'hot' : ''}`
+  return (
+    <div className="place-map" aria-hidden>
+      <div className={c('rail')}>
+        <i />
+        <i />
+        <i />
+      </div>
+      <div className="pm-sidebar">
+        <div className={c('row')}>
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className={c('side')} />
+        <div className={c('foot')}>
+          <i />
+          <i />
+          <i />
+        </div>
+      </div>
+      <div className="pm-main">
+        <div className={c('top')} />
+        <div className="pm-body">
+          <div className={c('desk')}>
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
+          <div className={c('panel')} />
+        </div>
+        <div className={c('status')} />
+      </div>
+    </div>
+  )
+}
+
 // every extension's right click (a cell, a rail or foot button, a Desk tile's head; App's widgetApi.menu, Desk's
 // tileMenu), after its own items: on or off, its places and size as its card has them, Remix, Delete
 export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
@@ -252,6 +293,7 @@ export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
 }
 
 export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
+  const [hot, setHot] = useState<WidgetPlace>() // the place pill under the mouse: lit brighter in the map
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
   const places = placesOf(w)
   const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
@@ -291,7 +333,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
             {w.scope === 'workspace' && <span className="tag-soft" data-tip="An instance per workspace, its own data">per workspace</span>}
           </span>
-          <span className="muted small">{w.on ? 'On' : 'Off: nothing of it runs until you turn it on'}</span>
+          <span className={`wc-state small ${w.on ? 'on' : ''}`}>{w.on ? 'On: it runs and shows where you picked' : 'Off: nothing of it runs, and it shows nowhere'}</span>
         </div>
         <div className="wc-acts">
           {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
@@ -307,16 +349,20 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
       </div>
       {w.description && <div className="muted small wc-desc">{w.description}</div>}
       <WcSec title="Where it shows">
-        <WcRow title="Places" hint="Pick one or more: each shows the same data">
-          <div className="wc-places" role="group" aria-label="Where it shows">
-            {offered.map(([v, n, tip]) => (
-              <button key={v} type="button" aria-pressed={places.includes(v)} className={places.includes(v) ? 'on' : ''} data-tip={places.includes(v) && places.length === 1 ? `${tip}. Its only place: pick another first` : tip} onClick={() => flip(v)}>
-                {places.includes(v) && <Icon name="check" size={11} />}
-                {n}
-              </button>
-            ))}
+        <div className="wc-row wc-where">
+          <div className="wc-where-text">
+            <Says title="Places" hint={`Pick one or more: each shows its preview (its small view) of the same data${w.full ? '; a click opens its full view in a window' : ''}. Lit in the window: where it shows now, the one under the mouse brighter`} />
+            <div className="wc-places" role="group" aria-label="Where it shows" onPointerLeave={() => setHot(undefined)}>
+              {offered.map(([v, n, tip]) => (
+                <button key={v} type="button" aria-pressed={places.includes(v)} className={places.includes(v) ? 'on' : ''} data-tip={places.includes(v) && places.length === 1 ? `${tip}. Its only place: pick another first` : tip} onPointerEnter={() => setHot(v)} onFocus={() => setHot(v)} onBlur={() => setHot(undefined)} onClick={() => flip(v)}>
+                  {places.includes(v) && <Icon name="check" size={11} />}
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
-        </WcRow>
+          <PlaceMap on={places} hot={hot} />
+        </div>
         {places.some(p => BARS.includes(p)) && (
           <WcRow title="Size" hint={`${places.includes('side') ? 'Cells across × down in the sidebar. In a bar: its width, a line high' : 'Its width in the bar, in cells; a bar is a line high'}${fits(w) ? '. Auto: a bar gives it what its words need' : ''}`}>
             <select value={w.fit && fits(w) ? 'auto' : w.size.join('x')} onChange={e => void api.set(w.id, e.target.value === 'auto' ? { fit: true } : { size: e.target.value.split('x').map(Number) as [number, number], fit: false })}>
@@ -330,7 +376,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           </WcRow>
         )}
         {w.full && (
-          <WcRow title="Full view" hint="The window that opens when you click it">
+          <WcRow title="Full view" hint="Its bigger view: a click on it opens this in a window over Laki (Esc closes it). How big that window is">
             <div className="seg" role="radiogroup" aria-label="Full view size">
               {VIEWS.map(([v, n]) => (
                 <button key={v} type="button" role="radio" aria-checked={(w.view ?? 'm') === v} className={(w.view ?? 'm') === v ? 'on' : ''} onClick={() => void api.set(w.id, { view: v })}>
@@ -350,6 +396,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             </Switch>
           </>
         )}
+        <Switch className="switch-row" on={!w.hide?.tip} disabled={w.tipOff} onChange={on => void api.set(w.id, { hide: { tip: !on } })}>
+          <Says title="Show a tooltip" hint={w.tipOff ? 'Its widget.json says none ("tip": false)' : `What its name says on hover${w.tip ? ` ("${w.tip}")` : ''} and when it was fetched. Off: nothing shows as you hover it`} />
+        </Switch>
       </WcSec>
       {
         <WcSec title="Updates">
@@ -372,6 +421,24 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
                 />
                 <span className="muted small">minutes</span>
               </label>
+            </WcRow>
+          )}
+          {(fetches || w.stream) && (
+            <WcRow title="Working hours" hint={`When it fetches${w.stream ? ' (or streams)' : ''}: "9am-6pm weekdays", "no weekends", "always". Empty: Settings › Extensions' (${api.hours?.trim() || 'always'})`}>
+              <input
+                key={w.hours ?? ''}
+                className="wc-hours"
+                aria-label="Its working hours"
+                defaultValue={w.hours ?? ''}
+                placeholder={api.hours?.trim() || 'always'}
+                spellCheck={false}
+                onKeyDown={enter}
+                onBlur={e => {
+                  const el = e.target
+                  const v = el.value.trim()
+                  if (v !== (w.hours ?? '')) void api.set(w.id, { hours: v }).catch(() => (el.value = w.hours ?? '')) // refused: as it was (the toast says why)
+                }}
+              />
             </WcRow>
           )}
           {w.js && (
@@ -496,7 +563,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
     <>
       {menu}
       {starters && api.make && <StarterPicker onClose={() => setStarters(false)} onPick={k => (setStarters(false), void api.make!(k))} />}
-      {api.list.length > 3 && <input type="search" className="theme-find" value={q} placeholder={`Find an extension by name, id, place or project (${api.list.length})`} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && q && (e.stopPropagation(), setQ(''))} />}
+      {api.list.length > 3 && <input type="search" className="ext-find" value={q} placeholder={`Find an extension by name, id, place or project (${api.list.length})`} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && q && (e.stopPropagation(), setQ(''))} />}
       {words.length > 0 && !shown.length && <p className="muted small">No extension has “{q}” in its name, id, places or project.</p>}
       {!!api.chats?.length && (
         <Group title="Where you left off" hint="What you're making with Laki AI that isn't saved yet, or that it works on now: a click goes back to its page and chat">
@@ -638,7 +705,7 @@ export function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent, onL
       <Group title="Working hours">
         <label>
           <span>
-            Fetch only <span className="muted">· in plain English; empty: any time the app is open</span>
+            Fetch only <span className="muted">· in plain English; empty: any time the app is open. An extension's own (its page's Working hours) wins</span>
           </span>
           <input value={hours} spellCheck={false} placeholder="9am-9pm weekdays" onChange={e => onHours(e.target.value)} />
         </label>

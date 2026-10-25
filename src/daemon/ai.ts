@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -102,7 +102,8 @@ async function aboutWidget(id: string) {
 4. After every write, run laki_extension_check and fix every error before you answer.
 5. Never run its fetch or its actions: say in one line what its fetch will run and what it needs (a CLI on PATH, a token setting).
 6. Keep answers short.
-7. Here, write it at once from what the user says (not the two questions first): ask with laki_ask only when you can't tell what it shows or where its data comes from.`,
+7. A new one: before you write it, ask what the user's words don't tell, one question at a time with laki_ask (2-4 options, each with a look: a ui element over made-up data, drawn as it would show): where its data comes from, what it shows (a number, a list, a table, a chart), an icon alone or words beside it, plain words or rich text (Markdown). Ask 1 to 3, then write it. A change to one: do it; ask only when it's unclear.
+8. No short words beside an icon (a label on a button, a caption by a stat's icon) unless the user asks for them: the icon, a badge or the number, its words in tip.`,
     `How an extension is made:\n${widgetFormat()}`,
     shown.length ? `Its files now:\n${shown.join('\n')}` : 'It has no files yet.',
     v && (problems.length ? `Its last check:\n${problems.map(p => `${p.level} ${p.where}: ${p.text}`).join('\n')}` : 'Its last check: no problems.'),
@@ -747,7 +748,18 @@ async function codex(o: Opts) {
 
 // a question in the conversation, its options as buttons on the AI page; only while an ask is at work (its tools'). act:
 // a removal the AI asked about, or an extension to turn on, done here when the user picks Yes (the AI itself never does)
-export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct; chat?: string }) {
+// an option's look as laki_ask gave it: a UI kit element (an object with a type) over its data, 16 KB of JSON at most
+const LOOK_MAX = 16 << 10
+function lookOf(v: unknown): AiLook | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const l = v as Record<string, unknown>
+  const ui = l.ui && typeof l.ui === 'object' && !Array.isArray(l.ui) && typeof (l.ui as { type?: unknown }).type === 'string' ? (l.ui as Record<string, unknown>) : null
+  if (!ui) return null
+  const size = Array.isArray(l.size) && l.size.length === 2 && [1, 2, 3, 4].includes(Number(l.size[0])) && [0.5, 1, 2, 3, 4].includes(Number(l.size[1])) ? ([Number(l.size[0]), Number(l.size[1])] as [number, number]) : undefined
+  const look: AiLook = { ui, ...(l.data !== undefined && { data: l.data }), ...(size && { size }) }
+  return JSON.stringify(look).length <= LOOK_MAX ? look : null
+}
+export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unknown[]; act?: AiAct; chat?: string }) {
   const t = asking(p.chat) // the chat whose ask is at work
   const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }) } : undefined
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
@@ -758,10 +770,13 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct;
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
   const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
+  // each option with its look (an extension's chat: how it would show), the same option once
+  const given = (Array.isArray(p.options) ? p.options : []).map((o, i) => [String(o).trim().slice(0, 200), lookOf(Array.isArray(p.looks) ? p.looks[i] : undefined)] as const).filter(([o], i, all) => o && all.findIndex(x => x[0] === o) === i).slice(0, 6)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
   if (options.length < 2) throw new Error('2 to 6 options')
+  const looks = act || !given.some(([, l]) => l) ? undefined : given.map(([, l]) => l)
   const id = randomBytes(6).toString('hex')
-  t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act } })
+  t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
   return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }

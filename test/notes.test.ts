@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh } from './helpers.ts'
 
-test('notes: off unless turned on; made, saved, searched, colored, pinned, a file kept, deleted with its files', async t => {
+test('notes: on unless turned off; made, saved, searched, colored, pinned, a file kept, deleted with its files', async t => {
   const rig = await fresh(t)
+  await rig.rpc('settingsSet', { notes: false })
   await assert.rejects(rig.rpc('noteList'), /Notes are off/)
   await rig.rpc('settingsSet', { notes: true })
   assert.deepEqual(await rig.rpc('noteList'), [])
@@ -42,8 +43,10 @@ test('notes: off unless turned on; made, saved, searched, colored, pinned, a fil
   await assert.rejects(rig.rpc('noteGet', { id: b.id }), /no such note/)
 })
 
-test('to-dos: off unless turned on; one list, saved and read back, kept in a file of its own', async t => {
+test('to-dos: on unless turned off; one list, saved and read back, kept in a file of its own', async t => {
   const rig = await fresh(t)
+  assert.deepEqual(await rig.rpc('todoListGet'), { blocks: [], md: '', at: 0 }, 'on by default')
+  await rig.rpc('settingsSet', { todoList: false })
   await assert.rejects(rig.rpc('todoListGet'), /To-dos are off/)
   await rig.rpc('settingsSet', { todoList: true })
   assert.deepEqual(await rig.rpc('todoListGet'), { blocks: [], md: '', at: 0 }, 'none yet')

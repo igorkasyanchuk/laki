@@ -1,9 +1,9 @@
-// Notes (experimental, settings.notes; the rail's Notes, ⌘K): the user's own notes, one list for every project. Each is
+// Notes (settings.notes, on unless false; the rail's Notes, ⌘K): the user's own notes, one list for every project. Each is
 // <data>/notes/<id>.json ({ id, title, color, pinned, blocks: BlockNote's, md: its Markdown, created, at }), and what's
 // pasted or dropped into it <data>/notes/<id>/<name> (blocks keep files/<name>, noteFile shows an image). noteList is
 // the sidebar's: pinned first, then the newest edit, each with a preview of its text; q: every word in its title or text.
 // The renderer's Notes.tsx: BlockNote, as specs have it (SpecEditor).
-// To-dos (experimental, settings.todoList; the rail's To-dos, ⌘K): one checklist of the user's, Notion's way (checklist
+// To-dos (settings.todoList, on unless false; the rail's To-dos, ⌘K): one checklist of the user's, Notion's way (checklist
 // items, headings, nested ones, dragged into order), its blocks and Markdown in <data>/todo-list.json; no files (TodoList.tsx).
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ export type Note = { id: string; title: string; color?: string; pinned?: boolean
 export type NoteItem = { id: string; title: string; color?: string; pinned?: boolean; preview: string; created: number; at: number }
 
 const on = () => {
-  if (state.settings?.notes !== true) throw new Error('Notes are off: Settings › General › Experimental')
+  if (state.settings?.notes === false) throw new Error('Notes are off: Settings › General › Pages')
 }
 const fileOf = (id: unknown) => {
   if (typeof id !== 'string' || !ID.test(id)) throw new Error('no such note')
@@ -123,7 +123,7 @@ export function noteUpload(p: { id: string; name?: string; data?: string }) {
 
 const listFile = join(dir, 'todo-list.json')
 const listOn = () => {
-  if (state.settings?.todoList !== true) throw new Error('To-dos are off: Settings › General › Experimental')
+  if (state.settings?.todoList === false) throw new Error('To-dos are off: Settings › General › Pages')
 }
 export type TodoList = { blocks: unknown[]; md: string; at: number }
 export function todoListGet(): TodoList {

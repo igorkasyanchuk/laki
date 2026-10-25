@@ -329,7 +329,7 @@ async function main() {
           return out(sub === 'rm' ? await rpc('reminderRm', { id }) : await rpc('reminderSet', { id, done: true }), sub === 'rm' ? `removed ${id}` : `done ${id}`)
         }
         const v: View = await rpc('state')
-        if (!v.reminders) throw new Error('Calendar is off: Settings › General › Experimental')
+        if (!v.reminders) throw new Error('Calendar is off: Settings › General › Pages')
         return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}`).join('\n') || 'no reminders')
       }
       const [when, ...words] = rest

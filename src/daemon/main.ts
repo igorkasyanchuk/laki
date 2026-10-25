@@ -20,7 +20,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
-import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
+import { factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
 
@@ -384,6 +384,7 @@ const api: Record<string, Handler> = {
   widgetFileSave: p => widgetFileSave(p),
   widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
+  factsTick: () => factsTick(), // tests: workspace facts read now
   widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
   widgetPush: p => widgetPush(p),
   widgetEmit: async p => (await crossAsk(p, 'emit'), widgetEmit(p)), // laki widget emit, MCP's laki_extension_emit: custom.<name>; an agent's into another workspace asks first (#3)
@@ -397,14 +398,14 @@ const api: Record<string, Handler> = {
   widgetDev: p => widgetDev(p), // laki widget dev: link, unlink, list
   widgetNew: p => widgetNew(p), // laki widget new, Settings › Extensions › New ▾: a starter, yours, on
   widgetCheck: p => widgetCheck(p), // laki widget check, the inspector's Check (run: its fetch once), MCP's (never runs)
-  noteList: p => noteList(p), // notes (experimental): notes.ts
+  noteList: p => noteList(p), // notes: notes.ts
   noteGet: p => noteGet(p),
   noteNew: p => noteNew(p),
   noteSave: p => noteSave(p),
   noteRm: p => noteRm(p),
   noteUpload: p => noteUpload(p),
   noteFile: p => noteFile(p),
-  todoListGet: () => todoListGet(), // To-dos (experimental): notes.ts
+  todoListGet: () => todoListGet(), // To-dos: notes.ts
   todoListSave: p => todoListSave(p),
   planList: p => planList(p), // specs and brainstorms: plans.ts
   planNew: p => planNew(p),
@@ -720,6 +721,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => core.reminderTick())
   every(1800000, () => memoryTick())
   every(30000, () => widgetTick())
+  every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days

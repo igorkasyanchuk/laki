@@ -365,8 +365,8 @@ selected workspace's PR is in the status bar.
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it), *Copy contents* (its whole terminal as text, the scrollback
   too; ⌘K's *Copy the tab's contents*) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
-- A project's ⋯ (or a right click on it) › *Color* and *Icon…* (find an icon by name, or type or paste an emoji;
-  *No icon*), also in Settings › the project: its mark before its name in the sidebar, the new-workspace page's project
+- A project's ⋯ (or a right click on it) › *Color*, *Icon…* (find an icon by name, or type or paste an emoji;
+  *No icon*) and *Emoji…* (a grid of common ones, found by a word: rocket, bug, fire), also in Settings › the project: its mark before its name in the sidebar, the new-workspace page's project
   menu, the palette (⌘K) and Settings, and an emoji before the window's title (🛒 web · fix-login). The color tints its
   icon, its workspaces' bar where they have no color of their own, their rail pins (the project's mark at the corner)
   and the floating bubbles.
@@ -1024,7 +1024,15 @@ the app or MCP).
 
 *Working hours* (Settings › Extensions › *Fetch only*): when extensions fetch on their own, in plain English: `9am-9pm
 weekdays`, `8:00 to 18:30 except fri`, `9am-6pm, no weekends`, `noon-6`, `10pm-6am` (overnight). Outside them nothing fetches until they start again;
-*Fetch now* and a change of settings still do. Empty: any time the app is open.
+*Fetch now* and a change of settings still do. Empty: any time the app is open. An extension's own *Working hours*
+(its page's *Updates*) win over these for it; `always` fetches it at any hour.
+
+On an extension's page, *Places* draws a small Laki window with where it shows lit (the place under the mouse
+brighter); the head's *On* / *Off* says whether it runs, a click turns it off (or on, after showing what it runs).
+*Preview* is its small view in its place; its *Full view* opens in a window over Laki when you click it. A
+per-workspace one shows the selected workspace's, and can read that workspace's facts (its PR, its changed files, the
+diff, its commits, its agents) without a git or gh call of its own, fetched again as they change; an extension can
+also hand the workspace's agent a message, which the app shows and asks you about first (docs/extensions.md).
 
 Every extension, yours too, starts off: turn it on in Settings › Extensions. Two come with Laki:
 - *My PRs*: your open PRs in a repo (*Repo*, which it needs: turned on without one, its page opens at it, and its cell
@@ -1417,9 +1425,9 @@ from now on counts, not what was there before. A card's ✕ hides one you don't 
 off* (or Settings › Achievements) hides them all: no trophy, nothing unlocks. They're kept with Laki's settings, and
 Reset the interface keeps them.
 
-### Calendar (experimental)
+### Calendar
 
-Turn it on in Settings › General › *Experimental*; the rail's Calendar (⌘K too) opens it, a page to stay on (Esc
+The rail's Calendar (⌘K too; Settings › General › *Pages* turns it off) opens it, a page to stay on (Esc
 doesn't close it). A week (Monday first) or a month, switched at the top of the page, with ‹ *Today* › to move: your
 scheduled tasks at the times they'll run, the runs that happened, and your reminders. Click a day for its overview on
 the right (every task, run and reminder that day), *Remind me this day* or *+ Reminder* to add one: what, when, and a
@@ -1440,7 +1448,7 @@ page to stay on.
 
 **Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
 right click moves or removes it (its tiles go to the first tab, under the tiles there), gives it an icon (*Icon…*:
-type to find one, or type or paste an emoji; *No icon*) or a color (its icon in it, else a dot before its name). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
+type to find one, or type or paste an emoji; *Emoji…*: pick one from a grid; *No icon*) or a color (its icon in it, else a dot before its name). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
 there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) opens a dialog: say what it should show, add screenshots (paste, drop, + or the
@@ -1449,9 +1457,9 @@ extension for My Desk. It shows as a tile right away, dashed, with its made-up d
 *By Laki AI · off*: *Look* opens its page (what it runs, its settings), *Turn on* runs it. Ask the chat for changes
 and the tile follows; *Take it off My Desk* in a tile's ⋯ removes it.
 
-### Notes (experimental)
+### Notes
 
-Turn it on in Settings › General › *Experimental*; the rail's Notes (⌘K too) opens your notes: one list for every
+The rail's Notes (⌘K too; Settings › General › *Pages* turns it off) opens your notes: one list for every
 project, kept in Laki's data folder (`notes/`). The list on the left has a search box (every word, in a note's title or
 text), a dot per color in use (a click shows only those), and each note's color, title, the start of its text and when
 it changed, pinned ones first, then the newest edit. A right click on one pins it, colors it or deletes it. The note
@@ -1459,9 +1467,9 @@ on the right is written like a Notion page, the same editor as specs: type `/` f
 tables, code, quotes, images (paste or drop them in) and diagrams. It saves as you type. *New note* starts one (in
 the color you're showing only).
 
-### To-dos (experimental)
+### To-dos
 
-Turn it on in Settings › General › *Experimental*; the rail's To-dos (⌘K too) opens one checklist of your own, written
+The rail's To-dos (⌘K too; Settings › General › *Pages* turns it off) opens one checklist of your own, written
 like a Notion page: Enter makes the next to-do, `[] ` turns a line into one, `# ` makes a heading, Tab puts a to-do
 under the one above (⇧Tab back out), and the handle (⋮⋮, on hover) drags one, with the ones under it, into place; `/`
 has the other blocks. A click on a box ticks it off; the head says how many are done. It saves as you type, in

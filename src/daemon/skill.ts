@@ -198,7 +198,7 @@ more than 30 minutes late is skipped and logged as missed).
   become the run's workspace's and tab's.
 - \`laki schedule\` lists them (id, next run), \`laki schedule log\` the last runs; \`on\`, \`off\`, \`run\` (now)
   and \`rm\` take an id.
-- A reminder for the user (Calendar, when it's on: Settings › General › Experimental), only when they ask for one:
+- A reminder for the user (Calendar, unless it's off: Settings › General › Pages), only when they ask for one:
   \`laki remind "<when: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30>" <text> --ws .\` (\`--ws .\`: about your
   workspace); it notifies them then. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
 

@@ -138,6 +138,21 @@
       },
       "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
     },
+    "facts": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "pr",
+          "stat",
+          "changed_files",
+          "diff",
+          "commits",
+          "agents",
+          "ports"
+        ]
+      },
+      "description": "What it reads of its workspace (scope workspace): pr, stat, changed_files, diff, commits, agents, ports. Laki gives them as {{facts.<name>}} in its ui and templates, $LAKI_FACTS (JSON) to its fetch and actions, facts to a script, and fetches it again (or draws it again) when one changes"
+    },
     "stream": {
       "type": "boolean",
       "description": "Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)"
@@ -443,8 +458,15 @@
       "description": "As a button: a short count, a template (\"{{#if n}}{{n}}{{/if}}\")"
     },
     "tip": {
-      "type": "string",
-      "description": "Its tooltip, a template"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "const": false
+        }
+      ],
+      "description": "Its tooltip, a template; false: none (its name and status don’t show on hover)"
     },
     "click": {
       "type": "string",

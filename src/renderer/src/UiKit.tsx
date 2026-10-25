@@ -9,7 +9,7 @@ import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetSt
 import { Modal } from './panels'
 import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
-import { CELL_W, clean } from './Widgets'
+import { CELL_W, clean, KitBody } from './Widgets'
 
 const SIZES: [string, [number, number] | null][] = [
   ['1×1', [1, 1]],
@@ -18,18 +18,6 @@ const SIZES: [string, [number, number] | null][] = [
   ['Full', null],
 ]
 
-// one sample drawn: its buttons and links do nothing here, its filters and tabs work
-function KitBody({ spec, data, cells, ws }: { spec: UiSpec; data: unknown; cells: [number, number] | null; ws?: Record<string, unknown> }) {
-  const host = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const root = host.current!.shadowRoot ?? host.current!.attachShadow({ mode: 'open' })
-    const style = document.createElement('style')
-    style.textContent = WIDGET_CSS
-    root.replaceChildren(style, clean(uiHtml(spec, { data, config: {}, at: Date.now() - 120_000, sample: true, ...(ws && { workspace: ws }) }, cells ? { cells } : { full: true })))
-    return uiBehave(root, () => undefined)
-  }, [spec, data, cells?.join()])
-  return <div ref={host} className="widget-body" />
-}
 
 // New ▾ › From a starter: each starter drawn on its sample data (its ui; a button, rail or no look of its own, as one; a JS page or one file
 // as what it is), a click makes it (laki widget new: yours, on, its page opened)

@@ -11,6 +11,8 @@ import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { type Complete, type Img, type Inserts, PromptInput, useDraft } from './PromptInput'
 import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
+import type { UiSpec } from '../../shared/widgetUi'
+import { CELL_W, KitBody } from './Widgets'
 
 type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
 
@@ -538,7 +540,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
         <Markdown src={src} />
         {m.ask && (
           // its options: one pick, then they stay as they were picked
-          <div className="ai-options" role="group" aria-label="Answer">
+          <div className={`ai-options ${m.ask.looks ? 'looks' : ''}`} role="group" aria-label="Answer">
             {m.ask.options.map((o, n) => (
               <button
                 key={o}
@@ -547,7 +549,16 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
                 aria-pressed={m.ask!.picked === o}
                 onClick={() => onPick(m.ask!.id, n)}
               >
-                {m.ask!.picked === o && <Icon name="check" size={11} />} {o}
+                {(l =>
+                  l && (
+                    // how it would look (an extension's chat): drawn as the app draws one, nothing in it clickable
+                    <span className="ai-look" inert style={l.size ? { width: Math.min(4, l.size[0]) * CELL_W, height: l.size[1] * 64 } : undefined}>
+                      <KitBody spec={l.ui as UiSpec} data={l.data ?? {}} cells={l.size ?? null} />
+                    </span>
+                  ))(m.ask!.looks?.[n])}
+                <span className="ai-opt">
+                  {m.ask!.picked === o && <Icon name="check" size={11} />} {o}
+                </span>
               </button>
             ))}
           </div>

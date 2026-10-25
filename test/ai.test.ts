@@ -326,7 +326,7 @@ test("ai: chats ask at once, one ask each (AI_AT_ONCE in all); a question goes t
 test("ai: Laki's skill asks with options, writes memory, and removes only on the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [
-    call('c1', 'laki_ask', { question: 'Which one?', options: ['alpha', 'beta'] }),
+    call('c1', 'laki_ask', { question: 'Which one?', options: ['alpha', 'alpha', 'beta'], looks: [{ ui: { type: 'stat', value: '3', icon: 'pr' }, size: [1, 1] }, null, { ui: { value: 'no type' } }] }),
     reply({ content: 'Alpha it is.' }),
   ]) // more below: the project's id isn't known yet
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
@@ -346,6 +346,7 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
   let a = await rig.rpc('aiState')
   const q = a.chat.at(-1)
   assert.deepEqual([q.role, q.text, q.ask.options], ['ai', 'Which one?', ['alpha', 'beta']])
+  assert.deepEqual(q.ask.looks, [{ ui: { type: 'stat', value: '3', icon: 'pr' }, size: [1, 1] }, null], 'each option its look (the same option once, one without a type none)')
   await assert.rejects(rig.rpc('aiAnswer', { id: q.ask.id, n: 5 }), /no such option/)
   assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), { text: 'Alpha it is.' })
   a = await rig.rpc('aiState')

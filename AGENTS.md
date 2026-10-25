@@ -166,7 +166,11 @@ the worktree's, `git blame --incremental`; shared/types.ts `Blame`), `fileWeb` (
 `line`: the file's page on origin's site, files.ts `webOf`: GitHub's, GitLab's `-/blob`, Bitbucket's `src`; a branch
 not on origin refused), `prThreads` `all` (everyone's comments, not only `trusted`'s: for you to read, never sent to an
 agent), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). 116: the Review tab on unless
-`settings.fullReview` is false, its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). A
+`settings.fullReview` is false, its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). 117:
+workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`: a per-workspace one's `{{facts.…}}`, `$LAKI_FACTS`, a script's
+`facts`; `factsTick`, an instance's `fx`), `widgetSet` `hours` (an extension's own working hours, `always`; the view's `hours`) and
+`hide.tip` (widget.json's `tip: false` too: the view's `tipOff`), an action's JSON `send` (App's `widgetDo` send), `aiQuestion`
+`looks` (an `AiAsk`'s, laki_ask's), Calendar, Notes and To-dos on unless false. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -206,7 +210,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`, `images`:
   `imageSave`'s and `fileSave`'s paths only, 10 at most, after the text in the prompt as it starts; the board's `Thumbs`,
   a file's `FileChip`), `todoRm`;
-- the calendar's reminders (experimental, `settings.calendar`; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
+- the calendar's reminders (`settings.calendar`, on unless false; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
   `when.ts` `parseAt`'s words, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
   rings again; `done`; `ws`), `reminderRm`, `reminderTick` (every 30 s and as the first client connects; with no client
   it waits): each due one not `fired` or `done` broadcast once as a `reminder` event (`reminder`: its id, never `id`),
@@ -362,7 +366,7 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   move the clock; every 10 minutes); the AI page's earlier chats: `aiChats`, `aiOpen` (`id`), `aiChatRm` (`id`); `aiImage`
   (`path`: a message's pasted image, `imageOk`'s only, as a data URL);
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
-  for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
+  for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6 with `looks` (each a UI kit `ui` over its `data`, `size`: Ai.tsx draws the option so, Widgets.tsx' `KitBody`; ai.ts `lookOf`, 16 KB), or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, run (`text`: a command for a shell tab, `runIn`'s words, Yes runs it), or widget, turning an extension on (`laki_extension_on`; its words say
   what it runs, `widgetTrust.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
   Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
@@ -1037,7 +1041,7 @@ at each ask) and its files' names into the instructions. Tested in `test/plans.t
 
 ### Notes
 
-Experimental (`settings.notes`, Settings › General › *Experimental*; off: no rail button or ⌘K item, and every `note*`
+On unless `settings.notes` is false (Settings › General › *Pages*; kept by `uiReset`, `SETTINGS_KEPT`; off: no rail button or ⌘K item, and every `note*`
 method refuses). To-dos (`settings.todoList`, likewise; `todoList*` refuse off): one checklist, `<data>/todo-list.json`
 (`TodoList`: BlockNote's `blocks`, `md`, `at`), the renderer's `TodoList.tsx` (App's `lazy`, dialog `'todos'`, the
 rail's To-dos, `RAIL_MORE`'s first, ⌘K): `SpecEditor`, a new list one `checkListItem`, saved 600 ms after a change and
@@ -1362,8 +1366,17 @@ on `widgetReload` and when `widgetDirs` changes; only that list stays in memory.
 guide says so) in the widget's folder with `$WIDGET_<NAME>` per setting, `$LAKI_WIDGET_CONFIG`,
 `$LAKI_WIDGET_FILE`, `$LAKI_CLI` (`launcher`: `<data>/widget-data/laki`) and an action's `$WIDGET_ARG` (never in the
 command); stdout must be JSON; a failure keeps the last data. `widgetTick` (30 s, and as the first client connects)
-fetches what's due, only while a client is on the socket (the app is open) and within `settings.widgetHours` (`when.ts`
-`parseHours`/`inHours`: `9am-9pm weekdays`, `no weekends`, overnight spans; a line that doesn't read: always). An action that prints
+fetches what's due, only while a client is on the socket (the app is open) and within its working hours (`hoursOf(w)`: the
+store's `hours`, `widgetSet` `hours` through `hoursText`, `always` none; else `settings.widgetHours`; `when.ts`
+`parseHours`/`inHours`: `9am-9pm weekdays`, `no weekends`, overnight spans; a line that doesn't read: always; streams too).
+Workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`/`SAMPLE_FACTS`, scope workspace only: `factNames`): `readFacts` per
+instance (the PR from the scan, `stats`, `diff`'s files and text, `git log <base>..HEAD`, its agent tabs' status and last
+answer, `procs`; the git ones read again only as `stats` or HEAD move), kept in `facts` (by `keyOf`); `factsTick` (main.ts,
+10 s, `LAKI_FACTS_MS`; the API's for tests) reads each on-screen instance's again and, on a change, sets its `fx` (the view's
+`inst[ws].fx`, Widgets.tsx' render key) and fetches it (reason `facts`, why the names); `factsFor` before a run (its
+`$LAKI_FACTS`, a script's `facts`, a prompt's `{{facts.…}}`); templates and ui `facts` (`widgetRender`, `faceOf`). An
+action's JSON `send` comes back to the app (App's `widgetDo` send: asked, then `send` `whenIdle`); a JS page's
+`laki.send`/`laki.ai` are `do`'s. widget.json's `tip: false` (and the store's `hide.tip`): no tooltip (Widgets.tsx' `tipOf`). An action that prints
 JSON (all of stdout, or its last line) with `toast`/`modal`/`close` (`shared/widget.ts` `sayOf`: a modal's `title`,
 `text`, `ui` (a kit element, 64 KB) over its own `data` (512 KB), `size`, `id`; up to 6 buttons, each `run` (an action,
 `arg`), `open` (http(s), mailto, laki://) or nothing, `style` primary/danger/quiet, `close` false or `'done'`; `[]`: none;
@@ -1515,7 +1528,7 @@ when a scoped one uses nothing of the workspace (`WS_USE`) and wants `ws` to run
 The renderer: App's `wsHere` (none under a page over every workspace: `covered`, nor a terminal's, a browser's, a
 host's) is the view's `ws` and `Widgets.tsx` `inWs` (an instance over the widget, `here`: null is *Select a workspace*,
 `NO_WS`, dimmed `.no-ws`); `WidgetApi`'s render, run, action and say and `WidgetsApi`'s run, runs, mock and check take
-`ws` (`w.here`); `ExtensionPage`'s `spots` and `here`, the inspector's picker (`.ext-ws`); Settings' row says *per
+`ws` (`w.here`); `ExtensionPage`'s `spots` and `here` (the selected workspace's instance, else the first; the inspector's head names it, `.ext-ws`); Settings' row says *per
 workspace*. The `workspace` starter (*This branch*). The `pullmain` starter (*Pull main*): a status bar button per
 workspace (no `ui`: a button), its badge the base's commits not in the branch (`fetch.sh`: `git fetch origin <base>` once per repo every 15 minutes,
 20 s at most, its mark `laki-fetched-<base>` in the common git dir (FETCH_HEAD is per worktree), a failure said in its
@@ -2299,7 +2312,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc
   clears it first, its `typed` an item for what's typed itself, first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
   tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, shared/types.ts' (the daemon checks a project's), `colorVar`: CSS `--tc-<name>`),
-  `iconItems` (*Icon…*: every `ICONS` name by `iconWords`, an emoji typed or pasted, `emojiOf`; *No icon*: a Desk tab's, a
+  `iconItems` (*Icon…*: every `ICONS` name by `iconWords`, an emoji typed or pasted, `emojiOf`; *Emoji…*: icons.ts `EMOJIS`,
+  a menu item `{ emojis }` drawn as a grid its filter narrows, ⏎ the first; *No icon*: a Desk tab's, a
   project's), `ProjectMark`,
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
@@ -2378,7 +2392,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   chat's `whereNow` screen too) make core's `screen`/`browse` broadcast `peek` (ws, tab). App's `PeekGlow`: over that
   tab's `[data-pane]` when shown, else the window (`.ai-peek`, a conic `--peek-a` edge turning once and inset shadows,
   2.6 s, its own `animationend` clears it); none while `html.away`.
-- **`Calendar.tsx`**: Calendar (experimental, `settings.calendar`; the rail's Calendar after Flows, ⌘K; dialog
+- **`Calendar.tsx`**: Calendar (`settings.calendar`, on unless false; the rail's Calendar after Flows, ⌘K; dialog
   `'calendar'`): a week (Monday first) or a month (`laki.calendar`), scheduled tasks' times to come (`occurrences`: a rule
   with more than `MANY` a day is one line; a once task its `next`), the runs' log in the past, reminders (a tick: done,
   a click: its workspace, ✕ on hover); a day's click or *Reminder* opens the form (`datetime-local`, a workspace). The

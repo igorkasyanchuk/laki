@@ -250,25 +250,37 @@ export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: 
 export type TunnelCheck = { version?: string; cert: boolean; tunnel?: { id: string; name: string }; creds: boolean; why?: string; ok: boolean }
 const DOMAIN_OK = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/ // the daemon's
 // Tunnels and Remote access, each at the top of the other's section: which one does what, and a way over
+// this page's card says so; the other's is a button to its section (none where that isn't shown)
+const WAYS = {
+  tunnels: ['Tunnels', 'A workspace’s dev server (a port) on the internet, for whoever you send the link: a client, a teammate, your phone trying the app.'],
+  remote: ['Remote access', 'Laki itself, its terminals and agents, for you alone from a phone or another computer.'],
+} as const
 function TwoWays({ here, other }: { here: 'tunnels' | 'remote'; other?: () => void }) {
   return (
     <div className="two-ways">
-      <div className={here === 'tunnels' ? 'on' : ''}>
-        <b>Tunnels</b>
-        <span className="muted small">A workspace&rsquo;s dev server (a port) on the internet, for whoever you send the link: a client, a teammate, your phone trying the app.</span>
-      </div>
-      <div className={here === 'remote' ? 'on' : ''}>
-        <b>Remote access</b>
-        <span className="muted small">Laki itself, its terminals and agents, for you alone from a phone or another computer.</span>
-      </div>
-      <p className="muted small">
-        Both run cloudflared on this Mac (Remote access can use Tailscale instead); each has its own link and its own lock.{' '}
-        {other && (
-          <button type="button" className="link" onClick={other}>
-            {here === 'tunnels' ? 'Remote access' : 'Tunnels'} ›
+      {(['tunnels', 'remote'] as const).map(k =>
+        k === here ? (
+          <div key={k} className="here">
+            <b>
+              {WAYS[k][0]} <span className="tag-soft">this page</span>
+            </b>
+            <span className="muted small">{WAYS[k][1]}</span>
+          </div>
+        ) : other ? (
+          <button key={k} type="button" className="go" data-tip={`Settings › ${WAYS[k][0]}`} onClick={other}>
+            <b>
+              {WAYS[k][0]} <Icon name="chevronRight" size={12} />
+            </b>
+            <span className="muted small">{WAYS[k][1]}</span>
           </button>
-        )}
-      </p>
+        ) : (
+          <div key={k}>
+            <b>{WAYS[k][0]}</b>
+            <span className="muted small">{WAYS[k][1]}</span>
+          </div>
+        ),
+      )}
+      <p className="muted small">Both run cloudflared on this Mac (Remote access can use Tailscale instead); each has its own link and its own lock.</p>
     </div>
   )
 }

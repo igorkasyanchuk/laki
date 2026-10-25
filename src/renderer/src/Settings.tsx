@@ -413,10 +413,10 @@ const FIND: [string, string, string?][] = [
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'pages overview all sessions screens preview eye running'],
-  ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
+  ['general', 'Calendar', 'pages reminders follow-ups week month scheduled tasks dates'],
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
-  ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
-  ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
+  ['general', 'Notes', 'pages notes notebook notion editor write pages memo colors search'],
+  ['general', 'To-dos', 'pages todo todos to do checklist tasks list slack notion check off rail'],
   ['pr', 'Review tab', 'full review diff changes files viewed comments pending post github pr tab code review pin expand context description'],
   ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
@@ -499,9 +499,9 @@ export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s
   { key: 'specs', label: 'Specs', icon: 'spec', when: s => specsOn(s) },
   { key: 'workflows', label: 'Flows', icon: 'flow', when: s => flowsOn(s) },
   { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
-  { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
-  { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList === true },
-  { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar === true },
+  { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes !== false },
+  { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList !== false },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar !== false },
   { key: 'shells', label: 'Terminal', icon: 'terminal', when: s => s.railShells !== false },
   { key: 'browsers', label: 'Browser', icon: 'globe', when: s => s.railBrowsers !== false },
   { key: 'ai', label: 'AI', icon: 'ai', when: s => aiOn(s) },
@@ -1312,19 +1312,19 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={flowsOn(s)} onChange={v => set({ workflows: v })}>
                   <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
                 </Switch>
+                <Switch className="switch-row" on={s.calendar !== false} onChange={v => set({ calendar: v })}>
+                  <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.notes !== false} onChange={v => set({ notes: v })}>
+                  <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.todoList !== false} onChange={v => set({ todoList: v })}>
+                  <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
+                </Switch>
               </div>
               </Group>
               <Group title="Experimental" hint="New things to try: they may change, or go">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.calendar === true} onChange={v => set({ calendar: v })}>
-                  <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
-                </Switch>
-                <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
-                  <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
-                </Switch>
-                <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
-                  <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
-                </Switch>
                 <Switch className="switch-row" on={s.cloud === true} onChange={v => set({ cloud: v })}>
                   <Says title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it" />
                 </Switch>
@@ -1912,7 +1912,10 @@ export function SettingsPage(p: {
             />
           )}
           {sec === 'needs' && (
-            <Group title="Needs you" hint="Agents waiting for your answer, then the ones done while you looked away: the Dock's count and the menu bar's list are the same ones">
+            <>
+            <h2>Needs you</h2>
+            <p className="muted small">Agents waiting for your answer, then the ones done while you looked away: the Dock's count and the menu bar's list are the same ones.</p>
+            <Group title="The list">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.needsList !== false} onChange={v => set({ needsList: v })}>
                   <Says title="Needs you list" hint={`At the top of the sidebar: every agent waiting for you, its question and options to answer it there, then the ones done while you looked away (Review, Seen). ${nextKey ? `${nextKey} goes` : 'Next tab that needs you goes'} through the same list`} />
@@ -1938,6 +1941,7 @@ export function SettingsPage(p: {
                 . A workspace's or tab's menu mutes just it.
               </p>
             </Group>
+            </>
           )}
           {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
           {sec === 'keys' && (
@@ -1995,8 +1999,8 @@ export function SettingsPage(p: {
               <h2>Pull requests</h2>
               <p className="muted small">
                 The status bar's <b>fix CI</b>, <b>review</b> and <b>fix conflicts</b> switches, on for a workspace with a PR, send these to its agent
-                (when it's idle), and so do the info panel's send buttons. <code>{'{{pr}}'}</code> is the PR's number, <code>{'{{url}}'}</code> its link,{' '}
-                <code>{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
+                (when it's idle), and so do the info panel's send buttons. <code className="var">{'{{pr}}'}</code> is the PR's number, <code className="var">{'{{url}}'}</code> its link,{' '}
+                <code className="var">{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
               <p className="muted small">Merge, merge when green, approve and close are each project's to allow: its section here, under Pull requests (merge when green is off until you turn it on).</p>
               <Group title="Review tab">
@@ -2042,8 +2046,8 @@ export function SettingsPage(p: {
                 with the same name replaces a global one.
               </Scope>
               <p className="muted small">
-                Pick one under a new workspace's prompt and the agent gets it filled in: <code>{'{{prompt}}'}</code> is what you typed, <code>{'{{project}}'}</code> and{' '}
-                <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it.
+                Pick one under a new workspace's prompt and the agent gets it filled in: <code className="var">{'{{prompt}}'}</code> is what you typed, <code className="var">{'{{project}}'}</code> and{' '}
+                <code className="var">{'{{base}}'}</code> the project and base branch. A template without <code className="var">{'{{prompt}}'}</code> gets the prompt after it.
               </p>
               <TemplatesField value={s.templates} onChange={templates => set({ templates })} />
             </>

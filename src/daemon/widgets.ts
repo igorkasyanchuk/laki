@@ -14,12 +14,12 @@ import { fileURLToPath } from 'node:url'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, type LogLevel, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetOption, type WidgetTool, type WidgetRun, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, type ActionFile, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { type Tone, TONES, uiHtml, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, actionMenu, aiActOf, gateOf, SIZES_ACROSS, toolOf } from '../shared/widgetSchema.ts'
+import { actionCmd, actionMenu, aiActOf, type Fact, FACT_NAMES, gateOf, SAMPLE_FACTS, SIZES_ACROSS, toolOf } from '../shared/widgetSchema.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
 import { dir } from './dir.ts'
-import { agentCaller, broadcast, imageSave, inside, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, execGroup, killGroup, own, plainEnv, presets, q, state, wsVars } from './core.ts'
+import { agentCaller, broadcast, diff, git, headOf, imageSave, inside, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, execGroup, killGroup, own, plainEnv, prOf, presets, procs, q, rt, state, stats, tabStatus, wsVars } from './core.ts'
 import { errAt, flushLogs, LOG_RUN, logOn, masker, masks, xlog } from './widgetLogs.ts'
 import { gatesOf, stopStream, streaming, streams, streamSync } from './widgetEvents.ts'
 import { fixtureNames, fixturesOf } from './widgetDev.ts'
@@ -42,11 +42,11 @@ export * from './widgetDev.ts'
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[]; required?: boolean }
 type ActionDef = string | { run?: string; tool?: unknown; ai?: string; tools?: string; profile?: string } // a command, or one an agent may call too (widgetSchema.ts' toolOf), or a prompt an agent answers (aiActOf)
-export type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; state?: unknown; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; notify?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
+export type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; state?: unknown; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string | false; click?: string; notify?: string; facts?: string[]; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // allowFor: aiKey as allow was given // fit: in a bar, as wide as it needs (Auto) // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when an ask in its page's chat let Laki AI rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; log?: boolean; hours?: string; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // hours: its own working hours over Settings' (always: none) // allowFor: aiKey as allow was given // fit: in a bar, as wide as it needs (Auto) // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when an ask in its page's chat let Laki AI rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string; tone?: Tone; hidden?: boolean } // tone: its data's own `tone`, one of the kit's (a row mark's color); hidden: its data's own `hidden: true`, shown nowhere until it isn't
 export type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; agentDev?: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on); agentDev: one an agent linked (settings.widgetDevAgent): trusted as a repo's
@@ -228,7 +228,86 @@ const SAMPLE_WS = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fi
 const infoEnv = (i: WsInfo, gone = false): Record<string, string> => ({ LAKI_WORKSPACE: i.id, LAKI_WORKSPACE_NAME: i.name, LAKI_PROJECT: i.project ?? '', LAKI_BRANCH: i.branch ?? '', LAKI_BASE: i.base ?? '', LAKI_PATH: i.path, ...(!gone && { PORT: String(i.port ?? '') }), LAKI_PR: i.pr ?? '', ...(!gone && i.storage && { LAKI_STORAGE_FOLDER: i.storage }), LAKI_WIDGET_WS: JSON.stringify(i) })
 export function wsEnv(w: Entry, x?: Workspace, gone?: WsInfo): Record<string, string> {
   if (gone) return { ...infoEnv(gone, true), LAKI_WIDGET_FILE: '' }
-  return x ? { ...infoEnv(wsInfo(x)), LAKI_WIDGET_FILE: instPath(w.id, x.id) } : {}
+  return x ? { ...infoEnv(wsInfo(x)), LAKI_WIDGET_FILE: instPath(w.id, x.id), ...(factNames(w).length && { LAKI_FACTS: JSON.stringify(factsIn(w, x.id) ?? {}) }) } : {}
+}
+
+// ---------- a workspace's facts (widget.json's facts, widgetSchema.ts' FACTS): read for a per-workspace one's instance
+// and kept (facts, by keyOf); factsTick (every 10 s while a window shows) reads them again for each instance on screen
+// and, when one it reads changed, fetches it again (reason facts), or draws it again (its instance's fx) when it has no
+// fetch. The git ones (changed_files, diff, commits) are read again only as the workspace's stat or HEAD moves
+type Facts = { v: Record<string, unknown>; text: string; at: number; key: string; fx?: number }
+const facts = new Map<string, Facts>()
+const DIFF_MAX = 32 << 10
+export const factNames = (w: Entry): Fact[] => (scoped(w) && Array.isArray(w.m.facts) ? FACT_NAMES.filter(f => w.m.facts!.includes(f)) : [])
+export const factsIn = (w: Entry, ws: string) => facts.get(keyOf(w.id, ws))?.v
+const sampleFacts = (w: Entry) => Object.fromEntries(factNames(w).map(f => [f, SAMPLE_FACTS[f]]))
+const GIT_FACTS: Fact[] = ['changed_files', 'diff', 'commits']
+// one read at a time per instance: a render, a run and the tick asking at once share it
+const reading = new Map<string, Promise<{ now: Facts; was?: Facts }>>()
+function readFacts(w: Entry, x: Workspace) {
+  const k = keyOf(w.id, x.id)
+  const r = reading.get(k) ?? readNow(w, x).finally(() => reading.delete(k))
+  reading.set(k, r)
+  return r
+}
+async function readNow(w: Entry, x: Workspace) {
+  const names = factNames(w)
+  const was = facts.get(keyOf(w.id, x.id))
+  const key = JSON.stringify([stats.get(x.id) ?? null, headOf(x.path) ?? ''])
+  const v: Record<string, unknown> = {}
+  const p = prOf(x.id)
+  if (names.includes('pr')) v.pr = p ? { number: p.number, url: p.url, title: p.title ?? '', description: (p.body ?? '').slice(0, 8000), author: p.author ?? '', state: p.state, draft: !!p.draft, checks: p.checks, review: p.review ?? '', approved: p.approved ?? [], changes: p.changes ?? [], conflict: !!p.conflict, base: p.base ?? '', additions: p.additions ?? 0, deletions: p.deletions ?? 0, labels: (p.labels ?? []).map(l => l.name) } : null
+  if (names.includes('stat')) v.stat = stats.get(x.id) ?? null
+  if (names.some(f => GIT_FACTS.includes(f))) {
+    // ponytail: without the stat scan (Review tab and Diff size both off), the git ones are read at every tick; with it,
+    // an edit that leaves the counts as they were isn't seen until the next one that changes them (or HEAD)
+    if (was && was.key === key && stats.has(x.id) && GIT_FACTS.every(f => !names.includes(f) || f in was.v)) for (const f of GIT_FACTS) f in was.v && (v[f] = was.v[f])
+    else {
+      const d = names.includes('changed_files') || names.includes('diff') ? await diff(x.id).catch(() => null) : null
+      if (names.includes('changed_files')) v.changed_files = (d?.files ?? []).slice(0, 500)
+      if (names.includes('diff')) v.diff = d ? (d.diff.length > DIFF_MAX ? `${d.diff.slice(0, DIFF_MAX)}\n… (cut)` : d.diff) : ''
+      if (names.includes('commits'))
+        v.commits = x.kind === 'worktree' && x.base
+          ? await git(x, 'log', '-n', '50', '--format=%h%x09%an%x09%cI%x09%s', `${x.base}..HEAD`).then(
+              out => out.split('\n').filter(Boolean).map(l => (([hash, author, at, ...s]) => ({ hash, subject: s.join('\t'), author, at }))(l.split('\t'))),
+              () => [],
+            )
+          : []
+    }
+  }
+  if (names.includes('agents')) v.agents = state.tabs.filter(t => t.workspace === x.id && t.kind === 'agent').map(t => ({ tab: t.id, name: t.name ?? '', agent: t.preset ?? '', status: tabStatus(t.id), last: (rt.get(t.id)?.last ?? '').slice(0, 2000) }))
+  if (names.includes('ports')) v.ports = Object.entries(procs.get(x.id) ?? {}).filter(([, p]) => !p.own).map(([port, p]) => ({ port: Number(port), command: p.cmd }))
+  const now: Facts = { v, text: JSON.stringify(v), at: Date.now(), key, fx: was?.fx }
+  facts.set(keyOf(w.id, x.id), now)
+  return { now, was }
+}
+// fresh enough for a run (its $LAKI_FACTS): read again when older than a tick; 10 s at most (a stuck git: the last ones)
+export const factsFor = async (w: Entry, x?: Workspace) => void (x && factNames(w).length && Date.now() - (facts.get(keyOf(w.id, x.id))?.at ?? 0) > 9000 && (await Promise.race([readFacts(w, x).catch(() => undefined), new Promise(ok => setTimeout(ok, 10_000).unref())])))
+let factsGoing = false
+export async function factsTick() {
+  if (!shown() || factsGoing) return
+  factsGoing = true
+  for (const k of facts.keys()) if (!widgets.has(k.slice(0, k.lastIndexOf('@')))) facts.delete(k) // a removed extension's
+  try {
+    for (const w of [...widgets.values()]) {
+      if (!factNames(w).length || !onOf(w)) continue
+      for (const ws of shownIn(w)) {
+        const x = state.workspaces.find(v => v.id === ws)
+        if (!x || !widgets.has(w.id)) continue
+        const { now, was } = await readFacts(w, x)
+        if (!was || was.text === now.text) continue
+        const cur = widgets.get(w.id) // a scan meanwhile makes a new entry
+        if (!cur) continue
+        const why = factNames(cur).filter(f => JSON.stringify(was.v[f]) !== JSON.stringify(now.v[f]))
+        now.fx = now.at
+        cur.inst.set(ws, { ...cur.inst.get(ws), face: faceOf(cur, dataOf(cur, ws).data, ws) })
+        changed()
+        if (fetches(cur) && sourceOf(cur).kind !== 'static' && !outside(cur, now.at)) soon({ id: w.id, reason: 'facts', why: `changed: ${why.join(', ')}`, ws })
+      }
+    }
+  } finally {
+    factsGoing = false
+  }
 }
 // where an action was picked in the app (widgetAction ctx): a live workspace (a scope workspace one's: its own), a tab
 // of it, a file of it (inside it, links followed). Its env, $LAKI_CTX as JSON, and what an AI action's prompt fills
@@ -294,6 +373,7 @@ export function widgetsGone(ws: string) {
   for (const id of ids) rmSync(instPath(id, ws), { force: true })
   for (const w of widgets.values()) w.inst.delete(ws)
   for (const k of [...runs.keys()]) if (k.endsWith(`@${ws}`)) runs.delete(k)
+  for (const k of [...facts.keys()]) if (k.endsWith(`@${ws}`)) facts.delete(k)
   if (state.widgetGrants?.[ws]) delete state.widgetGrants[ws] // its tools' Always (dropWs saves)
 }
 
@@ -559,7 +639,7 @@ export function faceOf(w: Entry, data: unknown, ws: string | undefined, meta: Om
 export function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> = ws ? (w.inst.get(ws) ?? {}) : w.s, one?: string): Face | string | undefined {
   const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
   data ??= typedData(w)
-  const ctx = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), data, config: typedOf(w), at: meta.at, error: meta.error, workspace: x && wsInfo(x) } // {{open}} as {{data.open}}
+  const ctx = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), data, config: typedOf(w), at: meta.at, error: meta.error, workspace: x && wsInfo(x), ...(x && factNames(w).length && { facts: factsIn(w, x.id) ?? {} }) } // {{open}} as {{data.open}}
   const fill = (t: unknown, n: number) => {
     if (typeof t !== 'string' || !t.trim()) return undefined
     try {
@@ -657,7 +737,11 @@ export const widgetsView = (): WidgetView[] =>
     place: placeOf(w),
     places: placesOf(w),
     net: (w.js && w.s.net) || undefined,
-    hide: w.s.hide,
+    hide: w.m.tip === false ? { ...w.s.hide, tip: true } : w.s.hide, // widget.json's "tip": false hides it too
+    tipOff: w.m.tip === false || undefined,
+    hours: w.s.hours,
+    stream: w.m.stream === true || undefined,
+    facts: (f => (f.length ? f : undefined))(factNames(w)),
     js: w.js || undefined,
     ...(w.m.actions && Object.keys(w.m.actions).length && { actions: Object.keys(w.m.actions) }), // a scheduled task's picks
     ...(m => m.length && { menus: m })(Object.entries(w.m.actions ?? {}).flatMap(([action, a]) => (m => (m ? [{ action, ...m }] : []))(actionMenu(action, a)))), // offered in the palette, menus, a key, the prompt
@@ -699,12 +783,13 @@ export const widgetsView = (): WidgetView[] =>
 // a scope workspace one's instances in the view: each live workspace's that has fetched (or fetches now), its last fetch
 // and its button's words
 function instView(w: Entry) {
-  const out: Record<string, { at?: number; error?: string; running?: boolean; mock?: string } & Face> = {}
+  const out: Record<string, { at?: number; error?: string; running?: boolean; mock?: string; fx?: number } & Face> = {}
   for (const x of state.workspaces) {
     const m = w.inst.get(x.id)
     const run = running.has(keyOf(w.id, x.id))
-    if (!instOk(x) || !inProj(w, x) || (!m?.at && !run)) continue
-    out[x.id] = { at: m?.at, error: m?.error, running: run || undefined, mock: m?.mock, ...m?.face }
+    const fx = facts.get(keyOf(w.id, x.id))?.fx // its facts changed then: drawn again
+    if (!instOk(x) || !inProj(w, x) || (!m?.at && !run && !fx)) continue
+    out[x.id] = { at: m?.at, error: m?.error, running: run || undefined, mock: m?.mock, fx, ...m?.face }
   }
   return out
 }
@@ -740,9 +825,13 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
   const s = dataOf(w, x?.id)
   const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
   const workspace = x ? wsInfo(x) : scoped(w) ? SAMPLE_WS : undefined
+  // its facts: a sample's made-up ones; an instance's as last read (none yet: read now, then drawn again by its fx)
+  const known = x && factNames(w).length ? factsIn(w, x.id) : undefined
+  if (x && factNames(w).length && !known && !o.sample) void readFacts(w, x).then(({ now }) => ((now.fx = now.at), changed()), () => {})
+  const fx = factNames(w).length ? { facts: o.sample || !x ? sampleFacts(w) : (known ?? {}) } : {}
   const ctx = o.sample
-    ? { data: made ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
-    : { data: s.data ?? typedData(w), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
+    ? { data: made ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace, ...fx }
+    : { data: s.data ?? typedData(w), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace, ...fx }
   const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
   const hide = w.s.hide // the user's switches: a template's at gone too ({{ago at}} empty, {{#if at}} not)
   const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)), hide }) : render(own!, hide?.at ? { ...ctx, at: undefined } : ctx)
@@ -796,7 +885,7 @@ export function widgetsOff() {
 export const AI_MAY = 3600000 // ms: how long an ask in its page's chat lets Laki AI rewrite one of the user's
 // agent: an agent's change (MCP's laki_extension_set, Laki AI's too; laki widget set in an agent's tab): where it shows,
 // its size, every, view, hide and plain settings; never on, network access, its source or a secret: those are the user's
-export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?: WidgetSource | null; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; from?: { ws?: string; tab?: string }; agent?: boolean }) {
+export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?: WidgetSource | null; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; hours?: string; from?: { ws?: string; tab?: string }; agent?: boolean }) {
   const w = find(o.id)
   if (o.agent === true || agentCaller(o.from)) {
     if (o.on === true) throw new Error('only you can turn an extension on (Settings › Extensions)') // its code would run unlooked at
@@ -810,6 +899,10 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
   // a repo's (an agent-linked one's): on only after a look (laki widget what's hash), and trusted as its files are now
   if (o.on === true && guarded(w) && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} ${whence(w)}: look at what it runs first (laki widget what ${w.id})`)
+  const badPlace = o.place === undefined ? undefined : (Array.isArray(o.place) ? o.place : [o.place]).find(x => !isPlace(x)) // a typo would put back widget.json's
+  if (badPlace !== undefined) throw new Error(`no place ${badPlace}: ${WIDGET_PLACES.join(', ')}`)
+  if (o.place !== undefined && placeList(o.place).includes('row') && !scoped(w)) throw new Error(`${w.m.name || w.id} is one for the app: a row's mark is per workspace`)
+  const hours = o.hours === undefined ? undefined : hoursText(o.hours) // '': Settings' again; checked before anything changes
   const bad = o.on === true && repoBad(w)
   if (bad) throw new Error(`${w.m.name || w.id} can't be trusted: ${bad}`)
   const s = readStore(w.id)
@@ -826,15 +919,13 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   if (o.size) s.size = [clamp(o.size[0], 1, ACROSS, 1), down(o.size[1])]
   if (o.fit !== undefined) s.fit = o.fit === true || undefined
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
+  if (o.hours !== undefined) s.hours = hours
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
-  const badPlace = o.place === undefined ? undefined : (Array.isArray(o.place) ? o.place : [o.place]).find(x => !isPlace(x)) // a typo would put back widget.json's
-  if (badPlace !== undefined) throw new Error(`no place ${badPlace}: ${WIDGET_PLACES.join(', ')}`)
-  if (o.place !== undefined && placeList(o.place).includes('row') && !scoped(w)) throw new Error(`${w.m.name || w.id} is one for the app: a row's mark is per workspace`)
   if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
   if (o.log !== undefined) s.log = !!o.log || undefined // off: its file stays until Clear
   const yes = (v: unknown, was?: boolean) => (v === undefined ? was : v === true) || undefined // only true hides
-  if (o.hide) s.hide = (h => (h.refresh || h.at ? h : undefined))({ refresh: yes(o.hide.refresh, s.hide?.refresh), at: yes(o.hide.at, s.hide?.at) })
+  if (o.hide) s.hide = (h => (h.refresh || h.at || h.tip ? h : undefined))({ refresh: yes(o.hide.refresh, s.hide?.refresh), at: yes(o.hide.at, s.hide?.at), tip: yes(o.hide.tip, s.hide?.tip) })
   if (o.source !== undefined) {
     // null: widget.json's again; a fetch of its own only when it has one
     const src = o.source === null ? undefined : sourceOk(o.source)
@@ -1007,7 +1098,7 @@ try {
   if (typeof m.default === 'function') {
     let last
     try { last = JSON.parse(readFileSync(process.env.LAKI_WIDGET_FILE, 'utf8')).data } catch {}
-    const r = m.default({ config: JSON.parse(process.env.LAKI_WIDGET_CONFIG || '{}'), last, workspace: process.env.LAKI_WIDGET_WS ? JSON.parse(process.env.LAKI_WIDGET_WS) : undefined })
+    const r = m.default({ config: JSON.parse(process.env.LAKI_WIDGET_CONFIG || '{}'), last, workspace: process.env.LAKI_WIDGET_WS ? JSON.parse(process.env.LAKI_WIDGET_WS) : undefined, facts: process.env.LAKI_FACTS ? JSON.parse(process.env.LAKI_FACTS) : undefined })
     if (r && typeof r[Symbol.asyncIterator] === 'function') for await (const x of r) writeSync(1, JSON.stringify(x ?? null) + '\\n') // a stream: a line per yield
     else process.stdout.write(JSON.stringify((await r) ?? null))
   }
@@ -1019,7 +1110,7 @@ try {
 // run the widget's fetch now (exec); what it prints must be JSON. A failure keeps the last data and says why.
 // reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
 // hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
-export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream', 'workflow'] // and action:<name>, event:<name>
+export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream', 'workflow', 'facts'] // and action:<name>, event:<name>
 // an event handler's ($LAKI_EVENT, $LAKI_EVENT_FILE, the JSON on stdin) or a tool call's ($WIDGET_INPUT_<NAME>; why: who
 // called it and how it was allowed, for its run; full: all its stdout back)
 type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean; gone?: WsInfo } // gone: an archived or removed workspace's event, its info then
@@ -1064,6 +1155,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   let error: string | undefined
   let r: Ran | undefined
   let fail: Failed | undefined
+  await factsFor(w, x) // its $LAKI_FACTS, a script's facts and a prompt's {{facts.…}} as they are now
   try {
     if (src.kind !== 'fetch') {
       // a text, a file, a URL or an agent's answer: JSON, else { text }
@@ -1107,7 +1199,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
 // {{workspace.path}}
 const SOURCE_WAIT = 30_000
 async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
-  const at = (t: string) => fill(t, [{ config: typedOf(w), workspace: x ? wsInfo(x) : undefined }]).trim()
+  const at = (t: string) => fill(t, [{ config: typedOf(w), workspace: x ? wsInfo(x) : undefined, facts: x && factNames(w).length ? factsIn(w, x.id) : undefined }]).trim()
   if (src.kind === 'static') return src.text ?? ''
   if (src.kind === 'ai') {
     const prompt = at(src.prompt ?? '')
@@ -1158,7 +1250,7 @@ const lastJson = (out: string) => [...out.matchAll(/```json\s*\n([\s\S]*?)```/gi
 // an AI action: its prompt filled ({{arg}}, settings, its data, the workspace), the agent's answer
 async function aiAnswer(w: Entry, action: string, a: { prompt: string; tools?: string; profile?: string }, arg: string, x?: Workspace, ctx?: { ws?: WsInfo; tab?: object; file?: object }) {
   const data = dataOf(w, x?.id).data
-  const prompt = fill(a.prompt, [{ ...(isObj(data) ? data : {}), data, arg, config: typedOf(w), workspace: x ? wsInfo(x) : ctx?.ws, tab: ctx?.tab, file: ctx?.file }]).trim() // its data's fields, never over arg or config; where it was picked
+  const prompt = fill(a.prompt, [{ ...(isObj(data) ? data : {}), data, arg, config: typedOf(w), workspace: x ? wsInfo(x) : ctx?.ws, facts: x && factNames(w).length ? factsIn(w, x.id) : undefined, tab: ctx?.tab, file: ctx?.file }]).trim() // its data's fields, never over arg or config; where it was picked
   if (!prompt) throw new Error(`${action}: no prompt`)
   const system = `You answer "${action}", a button of "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Do what the prompt asks with the tools you have (their MCP servers among them); change nothing it doesn't ask you to. No one answers questions: decide yourself. Answer in a few short lines of plain text: the user reads it in a small dialog. Or end with a \`\`\`json block: { "toast": "…" }, { "modal": { "title", "text" } }, or { "data": … } (the extension's new data, in the shape of what it shows now).`
   const preset = agentOf(a as WidgetSource)
@@ -1246,6 +1338,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     }
   }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
+  if (!gone) await factsFor(w, x)
   const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
@@ -1269,12 +1362,12 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     } else if (!ai && fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
     // into the prompt: its JSON's insert, else (insert: true) all it printed, an agent's words too
     const insert = typeof j?.insert === 'string' ? j.insert : actionMenu(o.action, def)?.insert && !j ? out.trim() : undefined
-    const say = (j && sayOf(j)) ?? (ai && insert === undefined && !(j && 'data' in j) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', style: 'primary' as const }] } } : undefined) // an agent's words: a dialog
+    const say = (j && sayOf(j)) ?? (ai && insert === undefined && !(j && ('data' in j || 'send' in j)) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', style: 'primary' as const }] } } : undefined) // an agent's words: a dialog
     // #26: a link the app opens after it, and files it attaches where an insert goes
     const open = typeof j?.open === 'string' ? j.open.trim().slice(0, 2000) : j?.open
     if (open !== undefined && !openOk(open)) wLog(w, `action ${o.action}: open refused, not an http(s), mailto or laki:// link: ${String(open).slice(0, 200)}`, 'warn')
     const files = j && 'files' in j && !ev ? filesOut(w, j.files, x ?? state.workspaces.find(v => v.id === ctx?.info.ws?.id), o.action) : undefined
-    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }) }
+    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }), ...(typeof j?.send === 'string' && j.send.trim() && !ev && { send: j.send.trim().slice(0, INSERT_MAX) }) } // send: to the workspace's agent, the app asks first (widgetDo's send)
   } catch (e) {
     const f = e as Failed
     ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
@@ -1293,14 +1386,14 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
 export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' | 'select' = 'schedule') {
   streamSync(now)
   if (!shown()) return
-  const hours = hoursOf()
-  if (hours && !('error' in hours) && !inHours(hours, now)) {
-    for (const w of widgets.values()) if (scoped(w) ? shownIn(w).some(ws => due(w, now, ws)) : due(w, now)) wLog(w, () => `not fetched: outside the working hours (${describeHours(hours)})`)
-    return
-  }
-  for (const w of widgets.values())
+  for (const w of widgets.values()) {
+    if (outside(w, now)) {
+      if (scoped(w) ? shownIn(w).some(ws => due(w, now, ws)) : due(w, now)) wLog(w, () => `not fetched: outside the working hours (${(h => (h && !('error' in h) ? describeHours(h) : ''))(hoursOf(w))})`)
+      continue
+    }
     if (scoped(w)) for (const ws of shownIn(w)) due(w, now, ws) && soon({ id: w.id, reason, ws })
     else if (reason !== 'select' && due(w, now)) soon({ id: w.id, reason })
+  }
 }
 // fetch it now where it shows: a global one, or a scope workspace one's instances on screen (gate: which may)
 export function refetch(w: Entry, reason: string, why?: string, gate: (w: Entry, ws?: string) => boolean = fetchable) {
@@ -1323,7 +1416,22 @@ function onScreen() {
 }
 
 export const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
-export const hoursOf = () => (typeof state.settings?.widgetHours === 'string' && state.settings.widgetHours.trim() ? parseHours(state.settings.widgetHours) : null)
+// when one fetches on its own: its own working hours (always: none), else Settings' (settings.widgetHours); null: always
+export function hoursOf(w?: Entry) {
+  const own = w?.s.hours?.trim()
+  if (own && /^always$/i.test(own)) return null
+  const t = own || (typeof state.settings?.widgetHours === 'string' ? state.settings.widgetHours.trim() : '')
+  return t ? parseHours(t) : null
+}
+export const outside = (w: Entry, now: number) => (h => !!h && !('error' in h) && !inHours(h, now))(hoursOf(w))
+// an extension's own working hours as typed: '' none, always, or what parseHours reads (else refused, saying how)
+function hoursText(v: unknown) {
+  const t = typeof v === 'string' ? v.trim().slice(0, 200) : ''
+  if (!t || /^always$/i.test(t)) return t ? 'always' : undefined
+  const h = parseHours(t)
+  if ('error' in h) throw new Error(`working hours: ${h.error}, or always`)
+  return t
+}
 
 // laki widget push (a cron job, a git hook, CI on this Mac, another app): data put there as a fetch would, none run;
 // merge: over its last data, shallow (both objects). An off one refuses it

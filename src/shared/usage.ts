@@ -21,7 +21,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
   laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours, not in an agent's tab)
   laki memory rm <project>|. <id>             forget one agents learned
-  laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar, experimental): in 2h, tomorrow at 9am
+  laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
@@ -170,7 +170,7 @@ late is skipped). --where: new (a worktree each run), folder, folder-new, or a w
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
   laki schedule log`,
-  remind: `A reminder for the user on Laki's calendar (Calendar, experimental), only when they ask for one. --ws . ties it to
+  remind: `A reminder for the user on Laki's calendar (Calendar), only when they ask for one. --ws . ties it to
 this workspace.
 
   laki remind "tomorrow at 9am" Check the deploy --ws .`,

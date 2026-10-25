@@ -544,7 +544,7 @@ export function view(): View {
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
     todos: state.todos,
-    ...(state.settings?.calendar === true && { reminders: state.reminders!.filter(r => !r.done || r.at > Date.now() - REMINDERS_DONE) }), // done ones: the last few months'
+    ...(state.settings?.calendar !== false && { reminders: state.reminders!.filter(r => !r.done || r.at > Date.now() - REMINDERS_DONE) }), // done ones: the last few months'
     layouts: state.layouts,
     widgets: widgetsView(),
     widgetHome: widgetHome(),
@@ -1468,7 +1468,7 @@ export function settingsSet(o: Settings, own = false) {
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'layouts', 'tunnel'] // specs, workflows: on unless false, so a false stays
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings

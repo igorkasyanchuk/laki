@@ -97,6 +97,35 @@ export function actionMenu(name: string, a: unknown): ActionMenu | undefined {
 // an action's tool: its fields' types, how it asks (toolOf, below)
 export const TOOL_TYPES = ['string', 'number', 'boolean', 'string[]'] as const
 export const TOOL_ASKS = ['always', 'first', 'never'] as const
+// a workspace's facts a per-workspace extension may read (widget.json's facts, its vocabulary): Laki keeps them as they
+// are and fetches it again when one of them changes; templates and ui {{facts.pr.title}}, its fetch and actions
+// $LAKI_FACTS (JSON), a script's facts, an AI prompt's {{facts.…}}
+export const FACTS = {
+  pr: 'its PR, or null: { number, url, title, description, author, state (OPEN, MERGED, CLOSED), draft, checks (pass, fail, pending or ""), review (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED or ""), approved, changes (logins), conflict, base, additions, deletions, labels (names) }',
+  stat: 'its changes against its base, counted, or null: { files, add, del, dirty }',
+  changed_files: 'each changed file, new ones too: [{ path, status (M changed, A new), add, del }], 500 at most',
+  diff: 'the diff against its base as git writes it, 32 KB at most (then "… (cut)")',
+  commits: "its branch's commits not in its base, newest first: [{ hash, subject, author, at (ISO) }], 50 at most",
+  agents: 'its agent tabs: [{ tab, name, agent, status (running, waiting, idle, done, limit, failed), last (its last answer, 2,000 characters at most) }]',
+  ports: 'what listens in it (a dev server): [{ port, command }]',
+} as const
+export type Fact = keyof typeof FACTS
+export const FACT_NAMES = Object.keys(FACTS) as Fact[]
+// a sample's (a preview with made-up data)
+export const SAMPLE_FACTS: Record<Fact, unknown> = {
+  pr: { number: 412, url: 'https://github.com/acme/web/pull/412', title: 'Fix the login redirect', description: 'Sends you back where you were after signing in.', author: 'octocat', state: 'OPEN', draft: false, checks: 'pending', review: 'REVIEW_REQUIRED', approved: [], changes: [], conflict: false, base: 'main', additions: 48, deletions: 12, labels: ['bug'] },
+  stat: { files: 3, add: 48, del: 12, dirty: 1 },
+  changed_files: [
+    { path: 'src/login.ts', status: 'M', add: 30, del: 10 },
+    { path: 'src/redirect.ts', status: 'A', add: 14, del: 0 },
+    { path: 'test/login.test.ts', status: 'M', add: 4, del: 2 },
+  ],
+  diff: 'diff --git a/src/login.ts b/src/login.ts\n--- a/src/login.ts\n+++ b/src/login.ts\n@@ -1,3 +1,4 @@\n-redirect("/")\n+redirect(back ?? "/")\n',
+  commits: [{ hash: '3f2a9c1', subject: 'Keep where you were across sign-in', author: 'octocat', at: '2026-10-25T09:12:00Z' }],
+  agents: [{ tab: 'sample-1', name: 'claude', agent: 'claude', status: 'running', last: 'Fixed the redirect; the tests pass.' }],
+  ports: [{ port: 5173, command: 'vite' }],
+}
+
 export const MANIFEST: Record<string, J> = {
   $schema: str('This schema, for your editor'),
   name: str('Its name'),
@@ -107,6 +136,7 @@ export const MANIFEST: Record<string, J> = {
   place: { anyOf: [PLACE, { type: 'array', items: PLACE }], description: 'Where it shows at first (the user’s choice wins): one place or several' },
   scope: { enum: ['global', 'workspace'], description: 'global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}' },
   on: { type: 'object', propertyNames: { anyOf: [{ enum: [...WIDGET_EVENTS, 'custom.*'] }, { pattern: CUSTOM_EVENT.source }] }, additionalProperties: { type: 'string' }, description: 'Events it answers: { "turn.done": "one of its actions" | "refresh" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT' },
+  facts: { type: 'array', items: { enum: FACT_NAMES }, description: `What it reads of its workspace (scope workspace): ${FACT_NAMES.join(', ')}. Laki gives them as {{facts.<name>}} in its ui and templates, $LAKI_FACTS (JSON) to its fetch and actions, facts to a script, and fetches it again (or draws it again) when one changes` },
   stream: { type: 'boolean', description: 'Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)' },
   state: { type: 'array', items: { type: 'string' }, description: 'What it writes in its own folder as it runs (globs, relative to it; a folder with a trailing /, like ["last.txt", "cache/"]): a repo’s extension isn’t trusted as those, so writing them doesn’t turn it off. .DS_Store, __pycache__/, *.pyc and node_modules/ never count; what it runs always does' },
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
@@ -157,7 +187,7 @@ export const MANIFEST: Record<string, J> = {
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
   label: str('As a button: its words, a template over its data'),
   badge: str('As a button: a short count, a template ("{{#if n}}{{n}}{{/if}}")'),
-  tip: str('Its tooltip, a template'),
+  tip: { anyOf: [{ type: 'string' }, { const: false }], description: 'Its tooltip, a template; false: none (its name and status don’t show on hover)' },
   click: str('One of its actions, run on a click on its button'),
   source: {
     type: 'object',
@@ -236,6 +266,10 @@ interface Laki {
   error?: string
   /** true in its full view */
   full: boolean
+  /** a per-workspace one's workspace: { id, name, project, branch, base, path, port, pr, storage } */
+  workspace?: Record<string, unknown>
+  /** the workspace facts its widget.json asks for (facts: pr, stat, changed_files, diff, commits, agents, ports) */
+  facts?: Record<string, any>
   /** fetch again */
   refresh(): void
   /** open a link in the browser: http(s), mailto, laki:// */
@@ -246,6 +280,10 @@ interface Laki {
   run(action: string, arg?: string): void
   /** a Laki command (the app shows what and asks first): a new workspace whose agent starts on prompt, a prompt to the workspace's agent or to Laki AI, a command in a new terminal, a page in a Laki browser tab */
   do(cmd: { do: 'new' | 'send' | 'ai' | 'terminal' | 'browse'; prompt?: string; command?: string; url?: string; agent?: string; project?: string }, label?: string): void
+  /** a message to the workspace's agent (the one selected, or a per-workspace one's), typed once it's idle; the app shows it and asks first */
+  send(text: string, label?: string): void
+  /** a question to Laki AI, in its chat; the app shows it and asks first */
+  ai(text: string, label?: string): void
   toast(text: string): void
   modal(m: LakiModal): void
   /** close its dialog: the one with that id, else any of its own */
@@ -288,7 +326,10 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   const keys = Object.keys(MANIFEST)
   for (const k of Object.keys(m)) if (!keys.includes(k)) say('warn', 'widget.json', `no key ${k}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(k, keys))}`)
   for (const k of ['name', 'description', 'fetch', 'script', 'icon', 'label', 'badge', 'tip', 'click', 'notify'])
-    if (m[k] !== undefined && typeof m[k] !== 'string') say('error', `widget.json ${k}`, `text, not ${kindOf(m[k])}`)
+    if (m[k] !== undefined && typeof m[k] !== 'string' && !(k === 'tip' && m[k] === false)) say('error', `widget.json ${k}`, `text${k === 'tip' ? ' or false' : ''}, not ${kindOf(m[k])}`)
+  if (m.facts !== undefined && !Array.isArray(m.facts)) say('error', 'widget.json facts', `a list of ${FACT_NAMES.join(', ')}`)
+  for (const f of Array.isArray(m.facts) ? m.facts : []) if (!(FACT_NAMES as readonly unknown[]).includes(f)) say('error', 'widget.json facts', `${JSON.stringify(f)} isn't a fact: ${FACT_NAMES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(f), FACT_NAMES))}`)
+  if (Array.isArray(m.facts) && m.facts.length && m.scope !== 'workspace') say('error', 'widget.json facts', 'facts are a workspace’s: they need "scope": "workspace"')
   if (m.size !== undefined && !(Array.isArray(m.size) && m.size.length === 2 && SIZES_ACROSS.includes(Number(m.size[0])) && SIZES_DOWN.includes(Number(m.size[1]))))
     say('error', 'widget.json size', `[across, down]: across 1-4, down ½ (0.5) or 1-4, not ${JSON.stringify(m.size)}`)
   if (m.every !== undefined && !(Number.isInteger(m.every) && (m.every as number) >= 1 && (m.every as number) <= 1440)) say('error', 'widget.json every', `minutes, 1 to 1440, not ${JSON.stringify(m.every)}`)

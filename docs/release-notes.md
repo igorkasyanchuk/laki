@@ -8,6 +8,18 @@ version it builds, with the date. -->
   Laki AI's chat (its starters and examples, where you left off); once it's written the same page shows its preview,
   settings, data, runs, logs and files beside the chat, with *Undo*, *Try it live* and *Turn on* at the top. The
   separate studio is gone.
+- An extension's page: *Places* draws a small Laki window with where it shows lit; *Auto* in its sizes; *Preview* and
+  *Full view* say which is which (the full view drawn as the window it opens in); *On* / *Off* in its head; a
+  per-workspace one shows the selected workspace's, no picker.
+- Extensions: their own *Working hours* over Settings' (`always` too); *Show a tooltip* (or `"tip": false`); workspace
+  facts (`"facts": ["pr", "changed_files", "diff", …]`: its PR, files, diff, commits, agents and ports, kept current,
+  fetched again as they change); and a message to the workspace's agent (`{"send": …}`, `laki.send()`), asked first.
+- Laki AI asks before it makes an extension (its data, its look, an icon or words, rich text), each answer drawn as it
+  would look, and leaves short words beside icons out unless you ask.
+- *Icon…* menus have *Emoji…*: a grid of common ones, found by a word.
+- Calendar, Notes and To-dos are on for everyone (Settings › General › *Pages* turns them off), no longer experimental.
+- Settings: `{{variables}}` stand out in explanations; *Needs you* has a heading like the others; Tunnels and Remote
+  access link to each other as cards; *Find an extension* no longer floats over the list.
 
 ## 0.30.0 · Oct 25, 2026
 

@@ -2,7 +2,7 @@
 // copies for any AI chat (widgetPrompt). One text, so both say the same.
 
 import { WIDGET_EVENTS } from './types.ts'
-import { WIDGET_SCHEMA_URL } from './widgetSchema.ts'
+import { FACTS, WIDGET_SCHEMA_URL } from './widgetSchema.ts'
 import { CHARTS, COLORS, DO, TONES, UI, UI_EXAMPLES, UI_GROUPS, UI_SAMPLES } from './widgetUi.ts'
 
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
@@ -13,7 +13,17 @@ const catalog = () => UI_SAMPLES.map((s, i) => `${s.group !== UI_SAMPLES[i - 1]?
 const examples = () => UI_EXAMPLES.filter(x => x.title !== 'Colors').map(x => `- ${x.title}: \`${JSON.stringify(x.spec)}\``).join('\n')
 
 // widget.json, its ui and widget.html: all a widget is
-export const widgetFormat = () => `## widget.json
+export const widgetFormat = () => `## Before you write it
+
+Ask what the request doesn't tell, a question at a time (with options to pick): where its data comes from (a command,
+an API, a file, the workspace's facts), what it shows (a number, a list, a table, a chart), an icon alone or words
+beside it, plain words or rich text (Markdown). One to three questions, then write it. Draw each option as it would look
+when you can (Laki AI's laki_ask takes looks: a ui element over made-up data per option).
+
+By default no short words beside an icon: a button is its \`icon\` and a \`badge\` (no \`label\`), a stat its icon and
+number; put the words in \`tip\`. Add them only when the user asks.
+
+## widget.json
 
 \`\`\`json
 {
@@ -83,7 +93,8 @@ export const widgetFormat = () => `## widget.json
   its action runs, \`"done"\` closes it once that's done; \`[]\`: none, only ✕). A dialog can hold a UI kit element over
   its own data: \`"ui": {"type": "table", …}, "data": {…}, "size": "s|m|l"\`, its buttons running actions as in the
   full view. \`"id": "deploy"\`: a later modal with that id is drawn in its place (a progress dialog an action updates),
-  and \`{"close": "deploy"}\` (or \`true\`: any of its own) closes it.
+  and \`{"close": "deploy"}\` (or \`true\`: any of its own) closes it. \`{"send": "Fix the failing test"}\`: a message to the
+  workspace's agent (the app shows it and asks first; it's typed once the agent is idle).
   An action may be an agent instead of a command: \`"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
   "mcp__slack__post_message" }\` (\`{{arg}}\`, \`{{config.x}}\`, its data's fields and \`{{workspace.branch}}\` filled in; the
   agent of Settings › Extensions, with the user's MCP servers; \`tools\`: claude's it may use unasked). Its answer shows
@@ -94,12 +105,18 @@ export const widgetFormat = () => `## widget.json
   \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
   \`smile\`…: \`laki widget kit icons\` lists every one; or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
   (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).
+  \`"tip": false\`: no tooltip at all (the user can turn it off too).
 - \`"scope": "workspace"\`: one per workspace, for what's about the selected one (its branch's CI, its server, its PR):
   each workspace its own data, fetched while it's selected. Its fetch and actions get \`$LAKI_WORKSPACE\`,
   \`$LAKI_WORKSPACE_NAME\`, \`$LAKI_PROJECT\`, \`$LAKI_BRANCH\`, \`$LAKI_BASE\`, \`$LAKI_PATH\`, \`$PORT\`, \`$LAKI_PR\` (and
   \`$LAKI_STORAGE_FOLDER\`); a script \`workspace\`; templates and ui \`{{workspace.branch}}\`, \`{{workspace.port}}\`,
   \`{{workspace.pr}}\`, \`{{workspace.path}}\`; a JS page \`laki.workspace\`. Use it (\`--ws <id>\` checks one); the
   default, \`global\`, is one for everything.
+- \`"facts": ["pr", "changed_files"]\` (with \`"scope": "workspace"\`): what Laki knows of the workspace, kept current: it
+  fetches again (or draws again, with no fetch) when one it reads changes. Templates and ui \`{{facts.pr.title}}\`,
+  \`"each": "facts.changed_files"\`; a fetch and actions \`$LAKI_FACTS\` (JSON); a script \`facts\`; a JS page \`laki.facts\`;
+  an AI prompt \`{{facts.diff}}\`. Prefer them to running git or gh yourself. The vocabulary:
+${Object.entries(FACTS).map(([k, v]) => `  - \`${k}\`: ${v}`).join('\n')}
 - \`"on": { "turn.done": "<action>" | "refresh" }\`: events it answers, the event as JSON on stdin (and
   \`$LAKI_EVENT_FILE\`, \`$LAKI_EVENT\` its name): ${WIDGET_EVENTS.join(', ')}. Each has \`event\`, \`at\`, \`ws\`
   (\`{ id, name, project, branch, pr }\`), \`tab\` and its own fields (\`turn.done\`: \`last\`; \`pr.*\`: \`pr: { number, url, title }\`).
@@ -206,7 +223,8 @@ ${examples()}
 - Links open in the browser; \`data-laki="refresh"\` fetches; \`data-run="review" data-arg="{{url}}"\` runs an action.
   Without a script it's drawn in the app: scripts, frames, forms and \`on…\` attributes are removed.
 - With a \`<script>\`: a page in a sandboxed frame with no network (unless the user turns on its Network access) and
-  \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`, \`do(cmd)\`,
+  \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`workspace\`, \`facts\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`, \`do(cmd)\`,
+  \`send(text)\` (to the workspace's agent) and \`ai(text)\` (to Laki AI), both asked first,
   \`toast(text)\`, \`modal({…})\`, \`close(id?)\` (these right after a click), \`ui(spec, data)\` and \`mount(el, spec, data)\` (the kit's
   HTML). Inline everything; draw a canvas at a fixed size.
 `

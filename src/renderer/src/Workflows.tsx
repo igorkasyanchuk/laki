@@ -1743,7 +1743,7 @@ function VarsBody({ wf, toast }: { wf: Workflow; toast: (t: string) => void }) {
           <h4>{g.title}{g.id && <code className="wf-id">{g.id}</code>}</h4>
           {g.vars.map(v => (
             <button key={v.name} className="wf-var" draggable onDragStart={e => e.dataTransfer.setData('text/plain', `{{${v.name}}}`)} onClick={() => copy(v.name)} data-tip={v.what}>
-              <code>{`{{${v.name}}}`}</code>
+              <code className="var">{`{{${v.name}}}`}</code>
               <span>{v.what}</span>
             </button>
           ))}
@@ -2162,7 +2162,7 @@ function StartRun({ item, projects, presets, workspaces, fixed, api, onClose, on
         {tried && (
           <div className="wf-tried">
             <details>
-              <summary>{Object.keys(tried.vars).length} variables: <code>{'{{event.…}}'}</code></summary>
+              <summary>{Object.keys(tried.vars).length} variables: <code className="var">{'{{event.…}}'}</code></summary>
               <dl>
                 {Object.entries(tried.vars).slice(0, 60).map(([k, v]) => (
                   <Fragment key={k}>
@@ -2416,7 +2416,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
               {vars.map(([k, v]) => (
                 <details key={k} className="wf-var">
                   <summary>
-                    <code>{`{{${k}}}`}</code> <span className="wf-hint">{v.split('\n')[0].slice(0, 60)}</span>
+                    <code className="var">{`{{${k}}}`}</code> <span className="wf-hint">{v.split('\n')[0].slice(0, 60)}</span>
                   </summary>
                   <pre>{v}</pre>
                 </details>

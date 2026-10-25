@@ -9,8 +9,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetEvent, type WidgetStream, type Workspace } from '../shared/types.ts'
 import { actionCmd, gateOf } from '../shared/widgetSchema.ts'
-import { inHours } from '../shared/when.ts'
-import { type Entry, envOf, eventWs, exec, faceOf, type Failed, find, guarded, hoursOf, inProj, instOk, isObj, keep, keyOf, lastLine, onOf, ownFetch, ran, RUN_JS, scoped, shown, sourceOf, tail, trusted, where, widgetAction, widgetRun, widgets, wLog, wsEnv, wsInfo, type WsInfo } from './widgets.ts'
+import { type Entry, envOf, eventWs, exec, faceOf, type Failed, find, guarded, inProj, instOk, isObj, keep, keyOf, lastLine, onOf, outside, ownFetch, ran, RUN_JS, scoped, shown, sourceOf, tail, trusted, where, widgetAction, widgetRun, widgets, wLog, wsEnv, wsInfo, type WsInfo } from './widgets.ts'
 import { agentIn, broadcast, callerAgent, changed, devLog, killGroup, own, state } from './core.ts'
 import { filesHash } from './widgetTrust.ts'
 import { approve, grant, grantKey } from './widgetTools.ts'
@@ -241,15 +240,14 @@ let shownAt = 0 // the last time a window was shown
 export const streaming = (w: Entry) => w.m.stream === true && !scoped(w) && sourceOf(w).kind === 'fetch' && ownFetch(w)
 export function streamSync(now = Date.now()) {
   if (shown()) shownAt = now
-  const hours = hoursOf()
-  const ok = now - shownAt < STREAM_IDLE && (!hours || 'error' in hours || inHours(hours, now))
+  const ok = (w: Entry) => now - shownAt < STREAM_IDLE && !outside(w, now)
   for (const [id, st] of streams) {
     const w = widgets.get(id)
-    if (w && streaming(w) && onOf(w) && !w.s.mock && ok) continue
+    if (w && streaming(w) && onOf(w) && !w.s.mock && ok(w)) continue
     if (st.stopped && w && onOf(w)) continue // a Stop stays while it's on: nothing runs
     stopStream(id)
   }
-  if (ok) for (const w of widgets.values()) if (streaming(w) && onOf(w) && !w.s.mock && !streams.get(w.id)?.stopped) startStream(w)
+  for (const w of widgets.values()) if (streaming(w) && onOf(w) && !w.s.mock && ok(w) && !streams.get(w.id)?.stopped) startStream(w)
 }
 function startStream(w: Entry) {
   const was = streams.get(w.id)

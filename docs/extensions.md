@@ -140,8 +140,38 @@ Templates, `ui` and a JS page (`laki.workspace`) see it as `workspace`: `{{works
   are dimmed. Terminals, Browsers and workspaces on an SSH host have none.
 - Its data goes with its workspace: deleted with it, kept while it's archived and shown again as it's restored.
 - `laki widget run|render|action|check <id> --ws <workspace>` name the instance (a global one refuses `--ws`); its
-  inspector has a workspace picker. *Check* warns when a per-workspace one uses nothing of the workspace.
+  page shows the selected workspace's. *Check* warns when a per-workspace one uses nothing of the workspace.
 - The `workspace` starter (*This branch*) shows the branch, PR, port and path, and links to `http://localhost:$PORT`.
+
+### Workspace facts (`facts`)
+
+What Laki already knows of a workspace, without a git or gh call of yours: list the ones it reads in `facts`, and
+Laki keeps them current. When one of them changes, it fetches again (one with no fetch is drawn again).
+
+```json
+{
+  "scope": "workspace",
+  "facts": ["pr", "changed_files"],
+  "ui": { "type": "list", "each": "facts.changed_files", "title": "{{path}}", "subtitle": "+{{add}} −{{del}}" },
+  "label": "{{facts.pr.title}}"
+}
+```
+
+| fact | what |
+|---|---|
+| `pr` | its PR, or null: `number`, `url`, `title`, `description`, `author`, `state` (OPEN, MERGED, CLOSED), `draft`, `checks` (pass, fail, pending or empty), `review`, `approved` and `changes` (logins), `conflict`, `base`, `additions`, `deletions`, `labels` |
+| `stat` | its changes against its base, counted, or null: `files`, `add`, `del`, `dirty` |
+| `changed_files` | each changed file, new ones too: `path`, `status` (M or A), `add`, `del` (500 at most) |
+| `diff` | the diff against its base as git writes it, 32 KB at most |
+| `commits` | its branch's commits not in its base, newest first: `hash`, `subject`, `author`, `at` (50 at most) |
+| `agents` | its agent tabs: `tab`, `name`, `agent`, `status`, `last` (the agent's last answer) |
+| `ports` | what listens in it: `port`, `command` |
+
+Templates and `ui` read them as `{{facts.pr.title}}` (`"each": "facts.changed_files"`), the fetch and actions as
+`$LAKI_FACTS` (JSON: `jq -r .pr.title <<<"$LAKI_FACTS"`), a script as `facts`, a JS page as `laki.facts`, an AI
+source's or action's prompt as `{{facts.diff}}`. A preview with its sample gets made-up ones. Laki reads them again
+every 10 seconds for the workspaces on screen (the git ones only as the workspace's changes or HEAD move); a fetch they
+start says *changed: changed_files* in its runs.
 
 ## Events (`on`)
 
@@ -469,6 +499,18 @@ servers, and may use the `tools` named (claude's, comma-separated) unasked. Its 
 its end may say `{"toast"}`, `{"modal"}` or `{"data"}` (the extension's new data), like a command's JSON. No fetch
 follows an agent's action (its run costs).
 
+### Talking to the agent
+
+An extension can hand the workspace's agent a message (the selected workspace's, or a per-workspace one's own): the
+app shows the words and asks first, then types them once the agent is idle.
+
+| from | how |
+|---|---|
+| an action | print `{"send": "Fix the failing test in cart.ts"}` (with a toast or dialog too, if you like) |
+| a UI kit button | `{ "type": "button", "label": "Ask the agent", "do": "send", "prompt": "Rebase on {{workspace.base}}" }` |
+| a JS page | `laki.send("Review this diff")`; `laki.ai("…")` asks Laki AI instead |
+| a fetch or action's own script | `"$LAKI_CLI" send "$LAKI_WORKSPACE" --when-idle "…"` (no ask: your script, your words) |
+
 ### Notifications (`notify`)
 
 `"notify": "{{#if mentions}}{{mentions}} new mentions in Slack{{/if}}"`: a template over the data. After each fetch (a
@@ -488,6 +530,9 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `open(url)` | a link, in the browser |
 | `expand()` | the full view |
 | `run(action, arg)` | one of its actions |
+| `send(text)` | a message to the workspace's agent (the selected workspace's, or a per-workspace one's), typed once it's idle; the app shows it and asks first |
+| `ai(text)` | a question to Laki AI, in its chat; asked first too |
+| `facts` | the [workspace facts](#workspace-facts-facts) it reads |
 | `toast(text)`, `modal({ title, text, ui, data, buttons })`, `close(id?)` | as an action's JSON ([dialogs](#dialogs)) |
 | `ui(spec, data?)`, `mount(el, spec, data?)` | the UI kit's HTML for an element, or put in `el` (both promises) |
 | `log(...args)` | a line in its [log](#logs) (src `page`), any time; 50 a second, 2 KB a line at most |
@@ -605,7 +650,7 @@ click that does something.
 | `icon` | one of Laki's icons by name (`pr`, `github`, `bell`, `clock`, `board`, `globe`, `check`, `refresh`, `bulb`, `timer`, `terminal`, `link`, `file`, `folder`…), or an emoji; none: its name's first letter |
 | `label` | its words, a template over its data: `"{{open}} open"`; none: its name |
 | `badge` | a short count on the icon: `"{{#if failing}}{{failing}}{{/if}}"`; empty: none |
-| `tip` | its tooltip, a template too; none: its name |
+| `tip` | its tooltip, a template too; none: its name; `false`: no tooltip at all |
 | `click` | one of its `actions`, run on a click (its toast or dialog as any action's), then it fetches again; none: its full view, else a fetch now |
 
 ```json
@@ -792,7 +837,10 @@ right. As soon as Laki AI saves it, the page shows it, as any extension's page d
 inspector's tabs, the chat still beside them. One page for making it, changing it and setting it up.
 
 - Say what it should show ("Show my open PRs as a list with CI status"), or pick a starter or an example. Laki AI
-  writes it with the UI kit, with `fixtures/sample.json` and `fixtures/empty.json`, checks it and fixes what's wrong.
+  first asks what you didn't say, a question at a time: where its data comes from, what it shows, an icon alone or
+  words beside it, plain or rich text; each answer drawn as it would look. Then it writes it with the UI kit, with
+  `fixtures/sample.json` and `fixtures/empty.json`, checks it and fixes what's wrong. It leaves short words beside an
+  icon out unless you ask for them.
 - The preview shows it on its sample data, in its place and every other (sidebar at any size, the bars, a button,
   My Desk) and its full view; Data, Runs, Logs, Env, Files and Check are the inspector's. A check that fails shows as
   a chip in the head; Laki AI hears of it at your next ask.
@@ -860,8 +908,10 @@ and commit it. Folders and one-file extensions both work.
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
-  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, *Show a refresh button* and
-  *Show when it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
+  size, how often it fetches and its own *Working hours* (`9am-6pm weekdays`, `always`; empty: Settings › Extensions'),
+  its full view's size, its settings, *Network access* for a JS page, *Show a refresh button*,
+  *Show when it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`) and
+  *Show a tooltip* (off: nothing on hover), its folder, *Delete*
   (its folder, settings, data, history, chat and secrets go to the trash, with *Undo* in the toast; `laki widget trash`
   lists the last 30 days', `laki widget restore <trash-id>` puts one back; the ones that come with Laki only turn off), and Laki AI's chat
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Overview), or with Laki AI (without

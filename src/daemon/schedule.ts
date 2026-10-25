@@ -35,7 +35,7 @@ export function todoRm(o: { id: string }) {
   changed()
 }
 
-// ---------- the calendar's reminders (Calendar.tsx, experimental): a note for a moment, from the app, Laki AI, an agent or
+// ---------- the calendar's reminders (Calendar.tsx): a note for a moment, from the app, Laki AI, an agent or
 // the CLI; reminderTick rings each once as it's due, while a client is on (one due while the app was closed rings as it opens)
 
 export const REMINDERS_DONE = 92 * 86400000 // a done one is in the view (the Calendar) this long after its time
@@ -45,7 +45,7 @@ const reminderOf = (id: string) => {
   return r
 }
 const calendarOn = () => {
-  if (state.settings?.calendar !== true) throw new Error('turn Calendar on first: Settings › General › Experimental')
+  if (state.settings?.calendar === false) throw new Error('turn Calendar on first: Settings › General › Pages')
 }
 const reminderText = (t: unknown) => {
   const text = typeof t === 'string' ? t.trim() : ''
@@ -107,7 +107,7 @@ export function reminderRm(o: { id: string }) {
 // every 30 s (now: tests move the clock): the due ones not rung yet, rung once as a `reminder` event (App: a notification
 // and a toast); with nobody to hear it, it waits
 export function reminderTick(now = Date.now()) {
-  if (state.settings?.calendar !== true || !clients.size) return []
+  if (state.settings?.calendar === false || !clients.size) return []
   const due = state.reminders!.filter(r => !r.fired && !r.done && r.at <= now)
   for (const r of due) {
     r.fired = true

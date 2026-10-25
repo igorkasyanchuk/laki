@@ -17,8 +17,10 @@ test('parseAt: lengths from now, dates, a day and time; nonsense says how', () =
   for (const bad of ['2026-02-31', '2026-10-20 25:00', 'whenever', '']) assert.ok('error' in (parseAt(bad, now) as object), bad)
 })
 
-test('reminders: off until Calendar is on; added, moved, ticked off, rung once while the app is open, removed', async t => {
+test('reminders: on unless Calendar is off; added, moved, ticked off, rung once while the app is open, removed', async t => {
   const rig = await fresh(t)
+  assert.deepEqual((await rig.rpc('state')).reminders, [], 'on by default')
+  await rig.rpc('settingsSet', { calendar: false })
   await assert.rejects(rig.rpc('reminderAdd', { at: 'in 1h', text: 'x' }), /turn Calendar on/)
   assert.equal((await rig.rpc('state')).reminders, undefined, 'none in the view while off')
   await rig.rpc('settingsSet', { calendar: true })

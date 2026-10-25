@@ -9,7 +9,7 @@
 import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, type SayModal, sayOf, uiBehave, WIDGET_CSS, type WidgetButton, type WidgetSay } from '../../shared/widget'
-import { DO, type UiDo, uiHtml } from '../../shared/widgetUi'
+import { DO, type UiDo, uiHtml, type UiSpec } from '../../shared/widgetUi'
 import { daemonBase } from './api'
 import { ask, escapes, Icon, IconButton, isIconName, type MenuItem } from './ui'
 
@@ -85,12 +85,25 @@ const themeVars = () => {
   return { ...Object.fromEntries(VARS.map(v => [v, cs.getPropertyValue(v).trim()]).filter(([, x]) => x)), 'color-scheme': cs.colorScheme }
 }
 
+// one sample drawn: its buttons and links do nothing here, its filters and tabs work
+export function KitBody({ spec, data, cells, ws }: { spec: UiSpec; data: unknown; cells: [number, number] | null; ws?: Record<string, unknown> }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = host.current!.shadowRoot ?? host.current!.attachShadow({ mode: 'open' })
+    const style = document.createElement('style')
+    style.textContent = WIDGET_CSS
+    root.replaceChildren(style, clean(uiHtml(spec, { data, config: {}, at: Date.now() - 120_000, sample: true, ...(ws && { workspace: ws }) }, cells ? { cells } : { full: true })))
+    return uiBehave(root, () => undefined)
+  }, [JSON.stringify(spec), JSON.stringify(data), cells?.join()]) // by value: a chat's looks come in new objects at each update
+  return <div ref={host} className="widget-body" />
+}
+
 // a per-workspace one (scope workspace) as it shows in a workspace: that instance's fetch and button words over the
 // widget's; ws null or undefined: none on screen (Board, Schedule, the AI page), `here` null: "Select a workspace"
 export const inWs = (w: WidgetView, ws: string | null | undefined): WidgetView => {
   if (!w.scope) return w
   const i = ws ? w.inst?.[ws] : undefined
-  return { ...w, here: ws ?? null, at: i?.at, error: i?.error, running: i?.running, mock: i?.mock, hidden: i?.hidden, ...(i && { label: i.label, badge: i.badge, tip: i.tip }) }
+  return { ...w, here: ws ?? null, at: i?.at, error: i?.error, running: i?.running, mock: i?.mock, hidden: i?.hidden, fx: i?.fx, ...(i && { label: i.label, badge: i.badge, tip: i.tip }) }
 }
 const wsOf = (w: WidgetView) => w.here ?? undefined
 const NO_WS = uiHtml({ type: 'empty', icon: 'folder', text: 'Select a workspace' }, {}, {})
@@ -149,7 +162,7 @@ export function WidgetBody({ w, full, api, sample, cells, onSize }: { w: WidgetV
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, w.key, theme, sample, size, hide]) // net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
+  }, [w.id, w.js, w.at, w.fx, w.rev, w.net, w.here, none, full, config, w.key, theme, sample, size, hide]) // fx: its facts changed; net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
   // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything (a button
   // clicked is done at once: uiBehave waits on what this returns)
   useEffect(() => {
@@ -209,7 +222,9 @@ function useParked() {
 // action, else opens its full view, else fetches it now (else its settings)
 export const click = (w: WidgetView, api: WidgetApi) =>
   w.here === null ? undefined : w.click ? void api.action(w.id, w.click, '', w.name, wsOf(w)).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
-const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
+// its tooltip; none when its user (or widget.json's "tip": false) said so
+const tipOf = (w: WidgetView) => (w.hide?.tip ? undefined : tipText(w))
+const tipText = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter
 export function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
   if (isIconName(w.icon)) return <Icon name={w.icon} size={size} />
@@ -234,7 +249,7 @@ export function WidgetButtons({ widgets, api, places, look, words, colors }: { w
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
-      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipText(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
         <span className={`rail-icon ${colors?.[`widget:${w.id}`] ? 'tinted' : ''}`} style={colors?.[`widget:${w.id}`] ? ({ '--tab-c': `var(--tc-${colors[`widget:${w.id}`]})` } as CSSProperties) : undefined}>
           <Glyph w={w} size={18} />
           {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
@@ -242,7 +257,7 @@ export function WidgetButtons({ widgets, api, places, look, words, colors }: { w
         {words && <span className="rail-label">{w.label ?? w.name}</span>}
       </button>
     ) : (
-      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipText(w)} data-tip={tipOf(w)} onClick={() => click(w, api)} onContextMenu={api.menu && (e => (e.stopPropagation(), api.menu!(w, e)))}>
         <Glyph w={w} />
         {words && <span className="ib-label">{w.label ?? w.name}</span>}
         {w.badge && <span className="widget-badge">{w.badge}</span>}
@@ -303,7 +318,7 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
         const i = w.inst![ws]
         const go = w.click ? () => void api.action(w.id, w.click!, '', w.name, ws).catch(() => {}) : w.full ? () => api.full(w.id, ws) : undefined
         return (
-          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={`${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={go && (e => (e.stopPropagation(), go()))}>
+          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={w.hide?.tip && !i.error ? undefined : `${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={go && (e => (e.stopPropagation(), go()))}>
             <Glyph w={w} size={10} />
             {i.badge || i.label}
           </span>

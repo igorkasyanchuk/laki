@@ -13,7 +13,7 @@ export type AchGroup = (typeof ACH_GROUPS)[number]
 export type Achievement = { id: string; group: AchGroup; title: string; how: string; icon: IconName; go?: string; rpc?: string; ok?: (p: any) => boolean; page?: string; up?: (v: View) => number | string }
 
 const count = (v: View, f: (p: View['projects'][number]) => number) => v.projects.reduce((n, p) => n + f(p), 0)
-const EXPERIMENTAL = ['calendar', 'notes', 'todoList'] as const // Settings › General › Experimental
+const EXPERIMENTAL = ['cloud'] as const // Settings › General › Experimental
 const splits = (l: unknown): number => (l && typeof l === 'object' && 'dir' in l ? 1 + splits((l as any).a) + splits((l as any).b) : 0)
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -72,9 +72,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'desk', group: 'Extensions & AI', title: 'Open My Desk', how: 'Your extensions as tiles on a page of their own', icon: 'desk', go: 'desk', page: 'desk' },
 
   { id: 'experimental', group: 'Experimental', title: 'Try something new', how: 'Settings › General › Experimental: turn one on', icon: 'flask', go: 'section:general:Experimental', up: v => EXPERIMENTAL.filter(k => v.settings[k] === true).length },
-  { id: 'notes', group: 'Experimental', title: 'Take a note', how: 'Notes: yours, for any project', icon: 'note', go: 'notes', rpc: 'noteNew' },
-  { id: 'todos', group: 'Experimental', title: 'Keep a to-do list', how: 'To-dos: one checklist of your own, headings and to-dos under others', icon: 'listChecks', go: 'todos', rpc: 'todoListSave' },
-  { id: 'calendar', group: 'Experimental', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },
+  { id: 'notes', group: 'Power user', title: 'Take a note', how: 'Notes: yours, for any project', icon: 'note', go: 'notes', rpc: 'noteNew' },
+  { id: 'todos', group: 'Power user', title: 'Keep a to-do list', how: 'To-dos: one checklist of your own, headings and to-dos under others', icon: 'listChecks', go: 'todos', rpc: 'todoListSave' },
+  { id: 'calendar', group: 'Power user', title: 'Set a reminder', how: 'Calendar: your scheduled tasks and reminders by week or month', icon: 'calendar', go: 'calendar', rpc: 'reminderAdd' },
 
   { id: 'meme', group: 'Just for fun', title: 'Laugh a little', how: "The sidebar foot's smiley (Settings › Appearance › Fun): a meme while agents work", icon: 'smile', go: 'fun', rpc: 'meme' },
   { id: 'video', group: 'Just for fun', title: 'Play a video', how: "The sidebar foot's play button: a YouTube video beside your work", icon: 'youtube', go: 'video' },

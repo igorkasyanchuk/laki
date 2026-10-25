@@ -146,7 +146,7 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 
 const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
-const NotesPage = lazy(() => import('./Notes')) // experimental, and BlockNote with it: loaded as it opens
+const NotesPage = lazy(() => import('./Notes')) // BlockNote with it: loaded as it opens
 const TodoListPage = lazy(() => import('./TodoList')) // experimental, and BlockNote with it: loaded as it opens
 // what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment
 const Waiting = ({ title, onClose }: { title: string; onClose: () => void }) => (
@@ -182,7 +182,7 @@ type Dialog = null | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'f
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
 // the Specs page: specs is a project's id, '' all; kind and slug, the one to open
 const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
-// the Notes page (experimental): note, the one open ('': the first)
+// the Notes page: note, the one open ('': the first)
 const notesOf = (d: Dialog) => (d && typeof d === 'object' && 'note' in d ? d : undefined)
 // the Workflows page: run, the run to open
 const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ? d : undefined)
@@ -1947,7 +1947,7 @@ export function App() {
     if (arg === null) return
     clearTimeout(noteTimer.current)
     setNote({ text: `${m.title}…`, busy: true })
-    type R = { ok: boolean; out?: string; error?: string; insert?: string; open?: string; files?: ActionFile[] } & WidgetSay
+    type R = { ok: boolean; out?: string; error?: string; insert?: string; open?: string; send?: string; files?: ActionFile[] } & WidgetSay
     const r = await api.call<R>('widgetAction', { id: w.id, action: m.action, arg, ws: w.scope === 'workspace' ? ctx.ws : undefined, ctx }).catch((e): R => ({ ok: false, error: String(e?.message ?? e) }))
     if (!r.ok) return toast(`${m.title} failed: ${r.error}`)
     setNote(null)
@@ -1955,8 +1955,9 @@ export function App() {
     const text = withPaths(r.insert ?? '', (r.files ?? []).map(f => f.path))
     if (put) into ? into({ text: r.insert ?? '', files: r.files }) : ctx.ws ? await intoAgent(ctx.ws, text).catch(e => toast(String(e.message))) : copy(text)
     if (r.open) widgetApi.open(r.open)
+    if (r.send) void widgetDo(inWs(w, ctx.ws), { do: 'send', prompt: r.send }, m.title) // to the workspace's agent, asked first
     if (r.toast || r.modal) widgetApi.say(w.id, r, ctx.ws)
-    else if (!put && !r.open && !m.view) done(r.out || `${m.title}: done`)
+    else if (!put && !r.open && !r.send && !m.view) done(r.out || `${m.title}: done`)
     // a file opener's: its full view as a tab beside the file's in the preview, else a dialog
     if (m.view) ctx.file && ctx.ws && w.full ? openFile({ ws: ctx.ws, path: ctx.file, ext: w.id, ...(ctx.storage && { storage: true }) }) : setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
   }
@@ -1983,8 +1984,8 @@ export function App() {
       const what = label || action
       clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
-      return api.call<{ ok: boolean; out?: string; error?: string; open?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
-        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : (r.open && widgetApi.open(r.open), r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : r.open ? setNote(null) : done(r.out || `${what}: done`))), // #26: its link opened after it
+      return api.call<{ ok: boolean; out?: string; error?: string; open?: string; send?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
+        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : (r.open && widgetApi.open(r.open), r.send && (w => w && void widgetDo(inWs(w, ws ?? null), { do: 'send', prompt: r.send! }, what))(view?.widgets?.find(x => x.id === id)), r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : r.open || r.send ? setNote(null) : done(r.out || `${what}: done`))), // #26: its link opened after it; send: to the agent, asked first
         e => (toast(`${what} failed: ${(e as Error).message}`), false as const), // false: the kit's slider, pick or box goes back
       )
     },
@@ -2175,6 +2176,7 @@ export function App() {
       openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
     },
     allLogs: settings.widgetLogs === true,
+    hours: settings.widgetHours,
     logs: id => setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, tab: 'logs' }),
     log: {
       read: (id, o) => api.call<{ on: boolean; lines: WidgetLogLine[]; next: number }>('widgetLogs', { id, ...o }),
@@ -2543,7 +2545,7 @@ export function App() {
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
     ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
-    ...(settings.calendar || settings.notes || settings.todoList ? ['experimental'] : []), // one turned on; else seen through Go (below)
+    ...(settings.cloud === true ? ['experimental'] : []), // one turned on; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -2799,10 +2801,10 @@ export function App() {
     const flowWs = flowsOn && ws && flowMenu(ws).length ? ws : undefined
     if (flowsOn) for (const f of flowWs ? flowsHere(flowWs) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: flowWs ? wsName(flowWs) : 'workflow', run: () => runFlow(f, flowWs?.id) })
     if (settings.birdView !== false) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
-    if (settings.calendar === true) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
+    if (settings.calendar !== false) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
     if (settings.desk !== false) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
-    if (settings.notes === true) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
-    if (settings.todoList === true) a({ label: 'To-dos: your checklist', icon: 'listChecks', run: () => setDialog('todos') })
+    if (settings.notes !== false) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
+    if (settings.todoList !== false) a({ label: 'To-dos: your checklist', icon: 'listChecks', run: () => setDialog('todos') })
     if (aiOn(settings)) a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
@@ -3295,12 +3297,12 @@ export function App() {
   const toFlows = () => setDialog(d => (flowsOf(d) ? null : { workflows: '' }))
   const flowsAsk = (view?.flows ?? []).filter(r => r.status === 'waiting').length
   const FLOWS_TIP = `Workflows: blocks Laki runs for a task${flowsAsk ? ` · ${flowsAsk} ask${flowsAsk > 1 ? '' : 's'} you` : ''}`
-  const calOn = settings.calendar === true // experimental: Settings › General
+  const calOn = settings.calendar !== false // Settings › General › Pages
   const toCal = () => setDialog(d => (d === 'calendar' ? null : 'calendar'))
   const calSoon = (view?.reminders ?? []).filter(r => !r.done && r.fired).length // rung, not ticked off
   const deskOn = settings.desk !== false // Settings › General › Pages
-  const notesOn = settings.notes === true // experimental: Settings › General
-  const todosOn = settings.todoList === true // experimental: Settings › General
+  const notesOn = settings.notes !== false // Settings › General › Pages
+  const todosOn = settings.todoList !== false // Settings › General › Pages
   const toTodos = () => setDialog(d => (d === 'todos' ? null : 'todos'))
   const toDesk = () => setDialog(d => (d === 'desk' ? null : 'desk'))
   const toNotes = () => setDialog(d => (notesOf(d) ? null : { note: '' }))
@@ -3314,7 +3316,7 @@ export function App() {
     const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, todos: !todosOn, desk: !deskOn, ai: !aiOn(settings), device: !(view.projects.find(p => p.id === ws?.project)?.config?.simulator ?? settings.simulator === true) }
     const at = k === 'panel' ? arg : k // the Simulator tab: off unless Settings › Simulators (or the project's own) turns it on
     setDialog(null)
-    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: ['desk', 'workflows', 'specs'].includes(at) ? 'Pages' : 'Experimental' })
+    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: 'Pages' })
     else if (k === 'project') void openProject()
     else if (k === 'new') view.projects.some(p => !p.kind) ? newWs() : void openProject()
     else if (k === 'shells' || k === 'browsers') void quickNew(k)
@@ -3451,10 +3453,10 @@ export function App() {
     { key: 'schedules', icon: 'clock', label: 'Schedule', on: schedulesFor !== undefined, tip: `${schedTip}${runFailed ? ' · a run failed' : ''}`, run: toSchedules, mark: runFailed && <span className="rail-dot bad" /> },
     ...(specsOn ? [{ key: 'specs', icon: 'spec' as const, label: 'Specs', on: !!specsOf(dialog), tip: SPECS_TIP, run: toSpecs }] : []),
     ...(flowsOn ? [{ key: 'workflows', icon: 'flow' as const, label: 'Flows', on: !!flowsOf(dialog), tip: FLOWS_TIP, run: toFlows, n: flowsAsk }] : []),
-    ...(deskOn ? [{ key: 'desk', icon: 'desk' as const, label: 'My Desk', on: dialog === 'desk', tip: 'My Desk (experimental): your extensions as tiles', run: toDesk }] : []),
-    ...(notesOn ? [{ key: 'notes', icon: 'note' as const, label: 'Notes', on: !!notesOf(dialog), tip: 'Notes (experimental): yours, for any project', run: toNotes }] : []),
-    ...(todosOn ? [{ key: 'todos', icon: 'listChecks' as const, label: 'To-dos', on: dialog === 'todos', tip: 'To-dos (experimental): your checklist', run: toTodos }] : []),
-    ...(calOn ? [{ key: 'calendar', icon: 'calendar' as const, label: 'Calendar', on: dialog === 'calendar', tip: `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, run: toCal, n: calSoon }] : []),
+    ...(deskOn ? [{ key: 'desk', icon: 'desk' as const, label: 'My Desk', on: dialog === 'desk', tip: 'My Desk: your extensions as tiles', run: toDesk }] : []),
+    ...(notesOn ? [{ key: 'notes', icon: 'note' as const, label: 'Notes', on: !!notesOf(dialog), tip: 'Notes: yours, for any project', run: toNotes }] : []),
+    ...(todosOn ? [{ key: 'todos', icon: 'listChecks' as const, label: 'To-dos', on: dialog === 'todos', tip: 'To-dos: your checklist', run: toTodos }] : []),
+    ...(calOn ? [{ key: 'calendar', icon: 'calendar' as const, label: 'Calendar', on: dialog === 'calendar', tip: `Calendar: scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, run: toCal, n: calSoon }] : []),
     ...RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kind => ({ key: kind[0], kind })),
   ]
   // the user's order and the ones they put into More (Settings › Appearance › Rail), then the ones that don't fit

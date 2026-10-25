@@ -1,7 +1,7 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { emojiOf, ICONS, type IconName, isIconName } from '../../shared/icons'
+import { EMOJIS, emojiOf, ICONS, type IconName, isIconName } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
@@ -294,6 +294,12 @@ export const iconItems = (now: string | undefined, set: (icon?: string) => void)
     icon: isIconName(now) ? now : 'star',
     items: [{ filter: 'Find an icon, or type an emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => set(e) } : null))(emojiOf(q)) }, ...ICON_NAMES.map(n => ({ label: iconWords(n), icon: n, hint: now === n ? ON : undefined, run: () => set(n) }))],
   },
+  {
+    label: 'Emoji…',
+    icon: 'smile',
+    ...(emojiOf(now) && { hint: now }),
+    items: [{ filter: 'Find an emoji: rocket, bug, fire…', typed: q => (e => (e ? { label: `Use ${e}`, run: () => set(e) } : null))(emojiOf(q)) }, { emojis: EMOJIS, value: now, pick: e => set(e) }],
+  },
   ...(now ? [{ label: 'No icon', icon: 'x', run: () => set() } as MenuItem] : []),
 ]
 
@@ -369,6 +375,7 @@ export type MenuItem =
   | { head: string }
   | { filter: string; typed?: (q: string) => MenuItem } // typed: an item for what's typed itself, first (a Desk tab's emoji); null: none
   | { colors: string[]; value?: string; pick: (c: string) => void }
+  | { emojis: [string, string][]; value?: string; pick: (e: string) => void } // a grid of them, each with the words a filter matches
   | null
 type Act = Extract<MenuItem, { label: string }>
 const isAct = (it: MenuItem): it is Act => !!it && 'label' in it
@@ -392,7 +399,9 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
   const [q, setQ] = useState('')
   const words = q.toLowerCase().split(/\s+/).filter(Boolean)
   const typed = (q.trim() && filter?.typed?.(q.trim())) || null
-  const shown = [...(typed ? [typed] : []), ...all.filter(it => it !== filter && (!words.length || (isAct(it) && (it.foot || words.every(w => `${it.label} ${it.sub ?? ''}`.toLowerCase().includes(w))))))]
+  const grid = all.find(it => !!it && 'emojis' in it) as Extract<MenuItem, { emojis: unknown }> | undefined
+  const gridShown = grid ? grid.emojis.filter(([, w]) => words.every(x => w.includes(x))) : []
+  const shown = [...(typed ? [typed] : []), ...all.filter(it => it !== filter && (it === grid || !words.length || (isAct(it) && (it.foot || words.every(w => `${it.label} ${it.sub ?? ''}`.toLowerCase().includes(w))))))]
   const items = shown.filter(it => !isAct(it) || !it.foot)
   const foot = shown.filter((it): it is Act => isAct(it) && !!it.foot)
   const main = items.filter(isAct)
@@ -439,6 +448,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     else if (e.key === 'ArrowDown') setSel((sel + 1) % acts.length)
     else if (e.key === 'ArrowUp') setSel((sel <= 0 ? acts.length : sel) - 1)
     else if ((e.key === 'Enter' || (e.key === 'ArrowRight' && acts[sel]?.items)) && acts[sel]) pick(acts[sel], elOf(acts[sel]))
+    else if (e.key === 'Enter' && grid && gridShown.length) (onClose(), grid.pick(gridShown[0][0])) // the first emoji the filter left
     else if (colors && /^[0-9]$/.test(k) && +k <= colors.colors.length) {
       onClose()
       colors.pick(['none', ...colors.colors][+k])
@@ -470,6 +480,14 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
               <div key={i} className="menu-head">
                 {it.head}
               </div>
+            ) : 'emojis' in it ? (
+              <div key={i} className="menu-emojis">
+                {gridShown.map(([e, w]) => (
+                  <button key={e} type="button" className={`menu-emoji ${e === it.value ? 'on' : ''}`} data-tip={w.split(' ')[0]} aria-label={w} onClick={() => (onClose(), it.pick(e))}>
+                    {e}
+                  </button>
+                ))}
+              </div>
             ) : 'colors' in it ? (
               <div key={i} className="menu-colors">
                 {['none', ...it.colors].map((c, n) => (
@@ -489,7 +507,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
               isAct(it) && item(it, i)
             ),
           )}
-          {words.length > 0 && !main.length && <div className="menu-none">Nothing matches</div>}
+          {words.length > 0 && !main.length && !gridShown.length && <div className="menu-none">Nothing matches</div>}
         </div>
         {foot.length > 0 && <div className="menu-foot">{foot.map(item)}</div>}
       </div>

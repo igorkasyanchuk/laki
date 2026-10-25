@@ -384,7 +384,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_reminder',
-    description: "Laki's calendar (Calendar, experimental): follow-ups the user is reminded of at a moment, with a notification. act add (text, at: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30; ws: a workspace it's about, default yours), list (what's coming and recent, with ids), done or rm (by id). Only when the user asks for a reminder or a follow-up.",
+    description: "Laki's calendar (Calendar): follow-ups the user is reminded of at a moment, with a notification. act add (text, at: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30; ws: a workspace it's about, default yours), list (what's coming and recent, with ids), done or rm (by id). Only when the user asks for a reminder or a follow-up.",
     inputSchema: obj({ act: { type: 'string', enum: ['add', 'list', 'done', 'rm'] }, text: str('add: what to remind of'), at: str('add: when'), ws: str("add: a workspace's id"), id: str('done, rm: its id, from list') }, ['act']),
     run: async a => {
       if (a.act === 'add') {
@@ -393,7 +393,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       }
       if (a.act === 'done' || a.act === 'rm') return a.act === 'rm' ? (await rpc('reminderRm', { id: a.id }), { ok: true }) : rpc('reminderSet', { id: a.id, done: true })
       const v: View = await rpc('state')
-      if (!v.reminders) throw new Error('Calendar is off: Settings › General › Experimental')
+      if (!v.reminders) throw new Error('Calendar is off: Settings › General › Pages')
       const day = Date.now() - 86400000
       return v.reminders.filter(r => r.at > day || !r.done).map(r => ({ id: r.id, at: new Date(r.at).toString(), text: r.text, ws: r.ws, done: !!r.done }))
     },
@@ -433,9 +433,9 @@ Laki's own tools for the user, which you can explain and some of which you run: 
 export const skillTools = (rpc: Rpc): Tool[] => [
   {
     name: 'laki_ask',
-    description: 'Ask the user a question with 2-6 options, shown as buttons in the conversation; then end your turn without more words: their pick comes as the next message. Use it when unsure what they mean or which of several things they want.',
-    inputSchema: obj({ question: str('the question, short'), options: { type: 'array', items: { type: 'string' }, description: '2 to 6 short answers to pick from' } }, ['question', 'options']),
-    run: a => rpc('aiQuestion', { text: a.question, options: a.options }),
+    description: 'Ask the user a question with 2-6 options, shown as buttons in the conversation; then end your turn without more words: their pick comes as the next message. Use it when unsure what they mean or which of several things they want. Making an extension: give looks, so each option shows as it would look.',
+    inputSchema: obj({ question: str('the question, short'), options: { type: 'array', items: { type: 'string' }, description: '2 to 6 short answers to pick from' }, looks: { type: 'array', items: { type: 'object' }, description: 'One per option, in the same order ({}: none): { "ui": a UI kit element, "data": made-up data it shows, "size": [across, down] cells, e.g. [2, 1]; a bar\'s line [2, 0.5] }. The user sees each option drawn so (an icon alone, a row with words, a table…)' } }, ['question', 'options']),
+    run: a => rpc('aiQuestion', { text: a.question, options: a.options, looks: a.looks }),
   },
   {
     name: 'laki_remove',
