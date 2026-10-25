@@ -1,4 +1,4 @@
-// Notes (experimental, settings.notes; the rail's Notes, ⌘K; App's dialog { note: id ('': the first) }): your own notes,
+// Notes (settings.notes, on unless false; the rail's Notes, ⌘K; App's dialog { note: id ('': the first) }): your own notes,
 // one list for every project (daemon/notes.ts). The list on the left: search (every word, its title or text), a color to
 // show only those, pinned first, then the newest edit, each its title, a preview of its text and when; a right click pins,
 // colors or deletes one. The open one on the right: its title, color, pin, and the editor (SpecEditor: BlockNote, as

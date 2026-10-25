@@ -407,7 +407,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
       x => (setR(runsOf(x.files)), setHash(x.hash)),
       e => setErr(String(e?.message ?? e)),
     )
-  }, [w.id, w.rev])
+  }, [w.id, w.rev, w.net]) // net: its hash covers it (the switch below)
   const run = () => {
     setBusy(true)
     setErr('')
@@ -525,6 +525,7 @@ function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetVie
   // Everywhere's size: a sidebar cell and a bar's width in cells, its own not changed; auto: the bars as wide as their
   // words (Size › Auto), the sidebar at its own size
   const [pickCell, setCell] = useState<[number, number] | 'auto'>(w.fit && !w.js ? 'auto' : w.size)
+  useEffect(() => setCell(w.fit && !w.js ? 'auto' : w.size), [w.fit, w.size.join()]) // its Size changed in the card below
   const auto = pickCell === 'auto'
   const cell = auto ? w.size : pickCell
   const barW = (n: number, fit: boolean) => (fit ? { width: 'max-content', maxWidth: 'calc(4 * var(--widget-cell, 92px))' } : { width: `calc(${n} * var(--widget-cell, 92px))` })

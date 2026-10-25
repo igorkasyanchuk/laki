@@ -106,7 +106,7 @@ export const FACTS = {
   changed_files: 'each changed file, new ones too: [{ path, status (M changed, A new), add, del }], 500 at most',
   diff: 'the diff against its base as git writes it, 32 KB at most (then "… (cut)")',
   commits: "its branch's commits not in its base, newest first: [{ hash, subject, author, at (ISO) }], 50 at most",
-  agents: 'its agent tabs: [{ tab, name, agent, status (running, waiting, idle, done, limit, failed), last (its last answer, 2,000 characters at most) }]',
+  agents: 'its agent tabs: [{ tab, name, agent, status (running, waiting, idle or exited), last (its last answer, 2,000 characters at most) }]',
   ports: 'what listens in it (a dev server): [{ port, command }]',
 } as const
 export type Fact = keyof typeof FACTS

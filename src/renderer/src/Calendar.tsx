@@ -1,4 +1,4 @@
-// Calendar (experimental, settings.calendar; the rail's Calendar, ⌘K): a week or a month of what's coming and what was:
+// Calendar (settings.calendar, on unless false; the rail's Calendar, ⌘K): a week or a month of what's coming and what was:
 // scheduled tasks at their times (shared/when.ts' rules), their runs, and reminders (the daemon's, state.reminders: from
 // here, Laki AI, an agent's laki_reminder or `laki remind`). A click on a day adds a reminder then; each one ticks done,
 // opens its workspace or goes. App.tsx passes a CalendarApi.

@@ -1,4 +1,4 @@
-// To-dos (experimental, settings.todoList; the rail's To-dos, ⌘K; App's dialog 'todos'): one checklist of your own,
+// To-dos (settings.todoList, on unless false; the rail's To-dos, ⌘K; App's dialog 'todos'): one checklist of your own,
 // Notion's way, in SpecEditor (BlockNote): Enter makes the next to-do, "# " a heading, Tab nests one under the one
 // above, its handle (⋮⋮ on hover) drags it, and its nested ones, into place; / for any other block. Saved 600 ms after a
 // change and as it closes (daemon/notes.ts' todoListGet and todoListSave). No files: a pasted picture says so. Loaded
