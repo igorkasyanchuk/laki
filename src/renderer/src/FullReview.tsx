@@ -1,4 +1,4 @@
-// The full review (settings.fullReview, experimental): the tab bar's Review tab, first (⌘1) while a git workspace has
+// The full review (settings.fullReview, on unless false: Settings › Pull requests): the tab bar's Review tab, first (⌘1) while a git workspace has
 // changes. Three columns, the edges between them dragged (kept on this Mac): the files (a filter, words or a glob like
 // spec/**, whose matches one click marks viewed; each a Viewed box: the PR's on GitHub, else this Mac's by the file's
 // diff, so a change unticks it), every file's diff (one column or two, all folded or unfolded at once, Revert as in
@@ -8,16 +8,19 @@
 // (the threads, open and resolved, a click goes to the line; the conversation and the reviews' summaries). A click on a
 // line comments on it, a drag over lines on the range; a comment whose line is no longer in the diff says outdated. A
 // file's (or a line's) right click: blame, the file on the repo's site (the base's or the branch's), Mark viewed by
-// folder, Open in, Revert. Read again as the workspace's stat moves.
-// Keys: j/k the next or last file, v Viewed, b blame, c a comment (the line under the mouse, else the file's first
-// change), ⌘⏎ sends to the agent.
+// folder, Open in, Revert, Pin. Pinned files (kept on this Mac by workspace) go first in both lists. A hunk's arrows show
+// the unchanged lines above it, the file's end those below (GitHub's expand: the worktree's file, read on the first
+// click); the PR's own description is the comments column's PR tab. Read again as the workspace's stat moves.
+// Keys: j/k the next or last file, v Viewed, b blame, p pin, c a comment (the line under the mouse, else the file's
+// first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type PointerEvent } from 'react'
-import type { Blame } from '../../shared/types'
+import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
 import { changeLine, CommentBox, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
-import { Folded } from './MarkdownView'
+import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
+import { type Gap, gapsOf } from './text'
 import { Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
@@ -37,7 +40,9 @@ const VIEWED = 'laki.reviewed' // each workspace's files viewed here: path → i
 const FILES_W = 'laki.reviewFilesW' // the files' column's width
 const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
 const NOTES_OFF = 'laki.reviewNotesOff' // true: the comments hidden to a strip
-const SIDE = 'laki.reviewSide' // the comments' column: yours (mine) or GitHub's (gh)
+const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
+const PINS = 'laki.reviewPins' // each workspace's pinned files, in the order pinned
+const MORE = 20 // an expand arrow's lines
 const FILES_INIT = 220
 const NOTES_INIT = 300
 const STRIP = 28 // the hidden comments' strip
@@ -65,6 +70,9 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
+// a file's expanded lines: key, the diff they're for; lines, the worktree's file (none yet: read on the first click);
+// up, each hunk's lines shown above it; down, those after the last hunk; err, why it couldn't be read
+type Ctx = { key: string; lines?: string[]; up: Record<number, number>; down: number; err?: string }
 
 // an edge between two columns: dragged (to: the pointer's x in the columns' box), double-clicked back to its width
 function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {
@@ -82,7 +90,7 @@ function Edge({ x, to, done, reset }: { x: { left: number } | { right: number };
   )
 }
 
-export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: { number: number; url: string }; linked?: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
+export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
   const [whole, setWhole] = useState<boolean | null>(null)
   const all = !!pr && (whole ?? !!linked)
   const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${all}`, all ? 60000 : 15000)
@@ -100,7 +108,20 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   const filterBox = useRef<HTMLInputElement>(null)
   const query = q.trim()
   const matches = useMemo(() => (/[*?]/.test(query) ? globTest(query) : (p: string) => p.toLowerCase().includes(query.toLowerCase())), [query])
-  const listed = useMemo(() => files.filter(f => matches(f.path)), [files, matches])
+  // pinned files first, in the order pinned; one no longer in the diff stays pinned for when it's back
+  const [pins, setPinsNow] = useState<string[]>(() => readAll<string[]>(PINS)[ws] ?? [])
+  const pin = (p: string, on?: boolean) =>
+    setPinsNow(ps => {
+      const next = (on ?? !ps.includes(p)) ? [...ps.filter(x => x !== p), p] : ps.filter(x => x !== p) // ps: a second p before the render toggles back
+      keepFor(PINS, ws, next.length ? next : undefined)
+      return next
+    })
+  const listed = useMemo(() => {
+    const ls = files.filter(f => matches(f.path))
+    const at = (p: string) => pins.indexOf(p)
+    return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...ls.filter(f => at(f.path) < 0)]
+  }, [files, matches, pins])
+  const lastPin = listed.filter(f => pins.includes(f.path)).at(-1)?.path
 
   // Viewed: GitHub's for a file of the PR, else this Mac's while its diff is the one ticked
   const gh = useGhViewed(api, ws, pr?.number)
@@ -216,6 +237,62 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
     }
   }
 
+  // expand: the unchanged lines around the hunks, from the worktree's file (what the diff's new side is); not the PR's
+  // diff, whose head this worktree needn't be, nor an image or a file taken out
+  const [ctx, setCtx] = useState<Record<string, Ctx>>({})
+  const ctxOf = (p: string): Ctx => (ctx[p]?.key === hashOf(p) ? ctx[p] : { key: hashOf(p), up: {}, down: 0 }) // the diff moved: as new
+  const canExpand = (p: string) => !all && !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A') && !!byFile.get(p)?.hunks.length
+  const gapsFor = (p: string, fd: FileDiff): Gap[] => gapsOf(fd.hunks.map(h => h.split('\n', 1)[0]), ctxOf(p).lines?.length ?? Infinity)
+  const more = (p: string, where: number | 'down', n: number) => {
+    const c = ctxOf(p)
+    const grow = (x: Ctx): Ctx => (where === 'down' ? { ...x, down: x.down + n } : { ...x, up: { ...x.up, [where]: (x.up[where] ?? 0) + n } })
+    if (c.lines) return setCtx(m => ({ ...m, [p]: grow(c) }))
+    api.read(p).then(
+      fc => {
+        if (fc.text === undefined || fc.lossy) throw new Error(fc.text === undefined ? 'not a text file' : 'not UTF-8 text')
+        const lines = fc.text.split(/\r?\n/)
+        if (lines.at(-1) === '') lines.pop()
+        setCtx(m => ({ ...m, [p]: grow({ ...c, lines, err: undefined }) }))
+      },
+      (e: Error) => setCtx(m => ({ ...m, [p]: { ...c, err: String(e?.message ?? e) } })),
+    )
+  }
+  // a file's lines with the expanded ones: below each hunk's header, the gap's last lines; after the last hunk, the next
+  const expanded = (p: string, fd: FileDiff): FileDiff => {
+    const c = ctxOf(p)
+    if (!c.lines || !canExpand(p)) return fd
+    const gaps = gapsFor(p, fd)
+    const at = (n: number, g: Gap): DiffLine => ({ text: ` ${c.lines![n - 1]}`, old: n + g.shift, new: n, ctx: true })
+    const out: DiffLine[] = []
+    for (const l of fd.lines) {
+      out.push(l)
+      const g = l.text.startsWith('@@') && l.hunk !== undefined ? gaps[l.hunk] : undefined
+      if (g) for (let n = Math.max(g.from, g.to - (c.up[l.hunk!] ?? 0) + 1); n <= g.to; n++) out.push(at(n, g))
+    }
+    const t = gaps.at(-1)!
+    for (let n = t.from; n <= Math.min(t.to, t.from + c.down - 1); n++) out.push(at(n, t))
+    return { ...fd, lines: out }
+  }
+  // the lines still hidden above a hunk (h) or after the last ('down'); Infinity: the file isn't read yet
+  const hidden = (p: string, fd: FileDiff, h: number | 'down') => {
+    const gaps = gapsFor(p, fd)
+    const g = h === 'down' ? gaps.at(-1) : gaps[h]
+    const c = ctxOf(p)
+    return g ? Math.max(0, g.to - g.from + 1 - (h === 'down' ? c.down : (c.up[h] ?? 0))) : 0
+  }
+  const expander = (p: string, fd: FileDiff, h: number | 'down') => {
+    const n = hidden(p, fd, h)
+    if (!canExpand(p) || !n) return null
+    const up = h !== 'down'
+    const tip = n === Infinity ? `More of the file ${up ? 'above' : 'below'}, if there is any` /* not read yet */ : n <= MORE ? `The ${n} line${n === 1 ? '' : 's'} ${up ? 'above' : 'below'}` : `${MORE} more of the ${n} lines ${up ? 'above' : 'below'} · ⇧-click: all of them`
+    return (
+      <button type="button" className={`fr-expand ${up ? '' : 'down'}`} data-tip={ctxOf(p).err ? `Can't show the file: ${ctxOf(p).err}` : tip} onClick={e => (e.stopPropagation(), more(p, h, e.shiftKey ? Infinity : MORE))} onMouseDown={e => e.stopPropagation()}>
+        <Icon name={up ? 'chevronUp' : 'chevron'} size={12} />
+        {n !== Infinity && <span>{n}</span>}
+      </button>
+    )
+  }
+
   // the comments, kept until sent
   const [notes, setNotesNow] = useState<ReviewNote[]>(() => readAll<ReviewNote[]>(NOTES)[ws] ?? [])
   const setNotes = (f: (n: ReviewNote[]) => ReviewNote[]) =>
@@ -264,6 +341,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
     if (h) setCur(h.dataset.file!)
   }
   const go = (p: string) => (setCur(p), body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(p)}"]`)?.scrollIntoView({ block: 'start' }))
+  const pinGo = (p: string) => (pin(p), setTimeout(() => go(p), 0)) // the lists move: the file stays in view
   // a line of a file (a comment's, a thread's), unfolded and lit; the filter let go when it hides the file
   const goLine = (path: string, n?: number, side: 'LEFT' | 'RIGHT' = 'RIGHT') => {
     if (!matches(path)) setQ('')
@@ -314,6 +392,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
       ...webItems(api, p, baseName, branch, l),
       null,
       { label: viewed(p) ? 'Not viewed' : 'Viewed', icon: 'eye', key: 'v', run: () => mark([p], !viewed(p)) },
+      { label: pins.includes(p) ? 'Unpin' : 'Pin to the top', icon: 'pin', key: 'p', sub: pins.includes(p) ? undefined : 'first in both lists, kept on this Mac', run: () => pinGo(p) },
       {
         label: 'Mark viewed',
         icon: 'checks',
@@ -340,6 +419,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
     if (k === 'j' || k === 'k') listed[i + (k === 'j' ? 1 : -1)] && go(listed[i + (k === 'j' ? 1 : -1)].path)
     else if (k === 'v' && here) mark([here], !viewed(here))
     else if (k === 'b' && here && !all) blame(here)
+    else if (k === 'p' && here) pinGo(here)
     else if (k === 'c' && here) {
       const h = hover.current
       const l = h?.path === here ? h.l : byFile.get(here)?.lines.find(changeLine)
@@ -363,8 +443,8 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   const [nw, setNw] = useState(() => load(NOTES_W, NOTES_INIT))
   const [notesOff, setNotesOff] = useState(() => load(NOTES_OFF, false))
   const hideNotes = (off: boolean) => (setNotesOff(off), store(NOTES_OFF, off))
-  const [side, setSide] = useState<'mine' | 'gh'>(() => load<'mine' | 'gh' | ''>(SIDE, '') || (notes.length || !pr ? 'mine' : 'gh'))
-  const pickTab = (s: 'mine' | 'gh') => (setSide(s), store(SIDE, s))
+  const [side, setSide] = useState<'mine' | 'pr' | 'gh'>(() => load<'mine' | 'pr' | 'gh' | ''>(SIDE, '') || (notes.length || !pr ? 'mine' : 'gh'))
+  const pickTab = (s: 'mine' | 'pr' | 'gh') => (setSide(s), store(SIDE, s))
   const tab = pr ? side : 'mine'
   const right = notesOff ? STRIP : nw
 
@@ -383,6 +463,8 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
       onClick: (e: MouseEvent) => click(path, l, e),
       onContextMenu: (e: MouseEvent) => fileMenu(e, path, l),
     }) as HTMLAttributes<HTMLDivElement>
+  // an expanded line: its numbers (a thread's or a comment's jump), the file's right click; no comment or Revert
+  const ctxAttrs = (path: string, l: DiffLine) => ({ 'data-old': l.old, 'data-new': l.new, onContextMenu: (e: MouseEvent) => fileMenu(e, path, l) }) as HTMLAttributes<HTMLDivElement>
   return (
     <div className="full-review" ref={root} tabIndex={-1}>
       <div className="fr-head">
@@ -404,8 +486,8 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
             </>
           ) : err ? '' : 'Loading…'}
         </span>
-        <span className="fr-keys muted small" data-tip="j k: the next or last file · v: Viewed · b: blame · c: comment on the line under the mouse · ⌘⏎: send to the agent">
-          j k · v · b · c · ⌘⏎
+        <span className="fr-keys muted small" data-tip="j k: the next or last file · v: Viewed · b: blame · p: pin to the top · c: comment on the line under the mouse · ⌘⏎: send to the agent">
+          j k · v · b · p · c · ⌘⏎
         </span>
         {anyOpen ? (
           <IconButton icon="collapse" title="Collapse all" onClick={() => setShown(listed.map(f => f.path), false)} />
@@ -441,12 +523,15 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
             )}
           </div>
           {listed.map(f => (
-            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''}`} onClick={() => go(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
+            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} onClick={() => go(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
               <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f.path)}</span>
               </span>
               {(notes.some(n => n.path === f.path) || live.some(t => t.path === f.path)) && <Icon name="message" size={11} />}
+              <button type="button" className={`fr-pin ${pins.includes(f.path) ? 'on' : ''}`} aria-label={pins.includes(f.path) ? 'Unpin' : 'Pin to the top'} data-tip={pins.includes(f.path) ? 'Pinned: first in both lists · click: unpin' : 'Pin to the top (p)'} onClick={e => (e.stopPropagation(), pinGo(f.path))}>
+                <Icon name="pin" size={11} />
+              </button>
               <label className="sp-viewed" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={viewed(f.path)} onChange={e => mark([f.path], e.target.checked)} />
               </label>
@@ -461,6 +546,8 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
           {listed.map(f => {
             const fd = byFile.get(f.path) ?? NO_DIFF
+            const fdx = expanded(f.path, fd)
+            const tail = expander(f.path, fd, 'down')
             const box = boxFor(f.path)
             const fold = () => setShown([f.path], !shown(f.path))
             const blaming = !all && blamed.has(f.path)
@@ -478,6 +565,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                       <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
                     </span>
                   )}
+                  <IconButton icon="pin" title={pins.includes(f.path) ? 'Unpin (p)' : 'Pin to the top (p): first in both lists'} on={pins.includes(f.path)} onClick={e => (e.stopPropagation(), pinGo(f.path))} />
                   {!all && !IMAGE.test(f.path) && <IconButton icon="history" title={blaming ? 'Hide blame (b)' : "Blame (b): who last changed each line, the base's for lines taken out, the branch's for the rest"} on={blaming} onClick={e => (e.stopPropagation(), blame(f.path))} />}
                   {api.web && <IconButton icon="externalLink" title={`Open on remote: at ${baseName.replace(/^origin\//, '')} or at ${branch || 'the branch'}`} onClick={e => (e.stopPropagation(), openMenu(e, webSub(api, f.path, baseName, branch)))} />}
                   {f.status[0] !== 'D' && !all && <IconButton icon="file" title="Show the file" onClick={e => (e.stopPropagation(), api.preview(f.path))} />}
@@ -490,12 +578,17 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                 {shown(f.path) && (!IMAGE.test(f.path) || all) && (
                   <div className={`sp-diff ${split ? 'split' : ''} ${blaming ? 'blamed' : ''}`}>
                     <DiffRows
-                      fd={fd}
+                      fd={fdx}
                       split={split}
-                      cls={l => lineClass(l, rv.picked(f.path, l))}
-                      row={l => lineAttrs(f.path, l)}
-                      head={l => rv.hunkHead(f.path, l, fd.cut)}
-                      gutter={gutterOf(f.path, fd)}
+                      cls={l => (l.ctx ? 'dl dl-ctx' : lineClass(l, rv.picked(f.path, l)))}
+                      row={l => (l.ctx ? ctxAttrs(f.path, l) : lineAttrs(f.path, l))}
+                      head={l => (
+                        <>
+                          {l.hunk !== undefined && expander(f.path, fd, l.hunk)}
+                          {rv.hunkHead(f.path, l, fd.cut)}
+                        </>
+                      )}
+                      gutter={gutterOf(f.path, fdx)}
                       after={l => (
                         <>
                           {threadsAt(f.path, l).map(t => (
@@ -512,6 +605,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                         </>
                       )}
                     />
+                    {tail && <div className="fr-more">{tail}</div>}
                   </div>
                 )}
               </section>
@@ -524,6 +618,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
             <Icon name="messages" />
             <span className="fr-vert">
               Comments{notes.length > 0 && ` · ${notes.length}`}
+              {pr && ' · PR'}
               {pr && ghN > 0 && ` · GitHub ${ghN}`}
             </span>
           </button>
@@ -536,6 +631,9 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                   <span className="seg">
                     <button type="button" className={tab === 'mine' ? 'on' : ''} onClick={() => pickTab('mine')} data-tip="Your comments, not sent yet">
                       Yours{notes.length > 0 && ` ${notes.length}`}
+                    </button>
+                    <button type="button" className={tab === 'pr' ? 'on' : ''} onClick={() => pickTab('pr')} data-tip={`PR #${pr.number}: its title and description`}>
+                      PR
                     </button>
                     <button type="button" className={tab === 'gh' ? 'on' : ''} onClick={() => pickTab('gh')} data-tip={`Everyone's on PR #${pr.number}: the open threads, then the conversation`}>
                       GitHub{ghN > 0 && ` ${ghN}`}
@@ -600,6 +698,24 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                     )}
                   </div>
                 </>
+              ) : tab === 'pr' && pr ? (
+                <div className="fr-pr">
+                  <h3>{pr.title || `PR #${pr.number}`}</h3>
+                  <div className="fr-pr-meta muted small">
+                    <span>#{pr.number}</span>
+                    {pr.author && (
+                      <>
+                        <Avatar login={pr.author} size={14} />
+                        <span>{pr.author}</span>
+                      </>
+                    )}
+                    {pr.base && <span className="mono">{`${pr.head ?? branch ?? ''} → ${pr.base}`}</span>}
+                  </div>
+                  {pr.body?.trim() ? <Markdown src={pr.body} /> : <p className="muted small">No description.</p>}
+                  <button type="button" className="link small" onClick={() => onOpen(pr.url)}>
+                    Open on GitHub
+                  </button>
+                </div>
               ) : (
                 <>
                   {thErr && <div className="warn small">{thErr}</div>}

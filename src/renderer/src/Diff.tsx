@@ -45,8 +45,9 @@ export const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(
 const fileOf = (l: string) => l.match(/ b\/(.*)$/)?.[1] ?? ''
 
 // a diff line with its line numbers: old (the base's) and new (the branch's); a hunk header has neither. hunk: which
-// of the file's hunks it's in, at: its index in that hunk's body (the hunk header has none)
-export type DiffLine = { text: string; old?: number; new?: number; hunk?: number; at?: number }
+// of the file's hunks it's in, at: its index in that hunk's body (the hunk header has none); ctx: an unchanged line from
+// around the hunks the full review's expand shows (no hunk, no comments)
+export type DiffLine = { text: string; old?: number; new?: number; hunk?: number; at?: number; ctx?: boolean }
 // a file's diff lines and its hunks' raw text (the @@ line and its body, as Revert sends it); cut: the diff's size cap
 // ran into it
 export type FileDiff = { lines: DiffLine[]; hunks: string[]; cut?: boolean }

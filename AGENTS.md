@@ -165,7 +165,8 @@ address) and permanent ones (`settings.tunnel`, `tunnelStart` `host`, a tunnel's
 the worktree's, `git blame --incremental`; shared/types.ts `Blame`), `fileWeb` (`ws`, `path`, `at` base or branch,
 `line`: the file's page on origin's site, files.ts `webOf`: GitHub's, GitLab's `-/blob`, Bitbucket's `src`; a branch
 not on origin refused), `prThreads` `all` (everyone's comments, not only `trusted`'s: for you to read, never sent to an
-agent), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). A
+agent), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). 116: the Review tab on unless
+`settings.fullReview` is false, its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -753,7 +754,7 @@ the code, the seconds it ran, its last lines.
   stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it (a PR only linked
   stays: its branch's own replaces a guessed one once pushed), and scans PRs now.
   A turn's end scans PRs 2 s later too (`prSoon`, at most every 20 s): `gh pr create` shows up without the minute's wait.
-- Diff size (`scanStats`, every 10 s, `LAKI_STAT_SCAN_MS`; with `settings.diffStat === true`, off by default, and a race's
+- Diff size (`scanStats`, every 10 s, `LAKI_STAT_SCAN_MS`; with `settings.diffStat === true`, off by default, or the Review tab (`settings.fullReview` unless false), and a race's
   always, for Compare): each live git
   workspace's `git diff --numstat` against `diff`'s base, new files' lines (the first 100, up to 1 MB) and `git status`'s
   count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
@@ -2524,7 +2525,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/notes.ts` | notes (experimental): one JSON file each, their pasted files, the list with search |
-| `src/renderer/src/FullReview.tsx` | the full review (experimental, `settings.fullReview`): the tab bar's Review tab over the panes, files with Viewed boxes under a filter (words or `globMatch`'s glob; Mark viewed takes its matches, `useGhViewed`'s `mark` one file after another), every file's diff (Collapse/Expand all, blame per file: `blame` old and new, DiffRows' `gutter`), the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`), and everyone's on GitHub (`prThreads` `all`, `prTalk`); its columns' widths `laki.reviewFilesW`, `laki.reviewNotesW`, the comments hidden `laki.reviewNotesOff`, their tab `laki.reviewSide`; a file's right click: blame, `fileWeb` (Diff.tsx `webItems`, Changes' too), Mark viewed by folder, PanelApi's `fileItems` (App's `fileMenu`), Revert |
+| `src/renderer/src/FullReview.tsx` | the full review (`settings.fullReview`, on unless false: Settings › Pull requests' *Review tab*; `scanStats` runs for it): the tab bar's Review tab over the panes, files with Viewed boxes under a filter (words or `globMatch`'s glob; Mark viewed takes its matches, `useGhViewed`'s `mark` one file after another), every file's diff (Collapse/Expand all, blame per file: `blame` old and new, DiffRows' `gutter`), the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`), and everyone's on GitHub (`prThreads` `all`, `prTalk`); its columns' widths `laki.reviewFilesW`, `laki.reviewNotesW`, the comments hidden `laki.reviewNotesOff`, their tab `laki.reviewSide` (yours, `pr`: the PR's description, `gh`); pinned files first in both lists `laki.reviewPins` (p); a hunk's arrows (`expander`) show `MORE` lines of the worktree's file around it (`text.ts` `gapsOf` from the @@ heads, `DiffLine.ctx`; not for `PR #n`, an image, A, D or untracked); a file's right click: blame, `fileWeb` (Diff.tsx `webItems`, Changes' too), Mark viewed by folder, PanelApi's `fileItems` (App's `fileMenu`), Revert |
 | `src/renderer/src/Diff.tsx` | a diff's shared pieces (Changes, Review, the full review): `diffByFile`, `DiffRows`, `CommentBox`, `ImageDiff`, `useRevert`, `useGhViewed`, `ThreadCard`, `useSuggestions`, `useLoad` |
 | `src/renderer/src/Notes.tsx` | the Notes page: the list with search and colors, the open note in BlockNote (SpecEditor) |
 | `src/daemon/plans.ts` | specs and brainstorms: their folders, the editor's save, files, agents' output, a prototype's page |

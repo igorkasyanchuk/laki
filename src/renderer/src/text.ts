@@ -308,6 +308,28 @@ export function reviewedLines(hunk: string, n: number): string[] | null {
   return n > 0 && right.length >= n ? right.slice(-n) : null
 }
 
+// the unchanged lines between a file's hunks, as GitHub's expand shows them (the full review's arrows): before each hunk,
+// then after the last; lines from..to of the new file (none when to < from), the old file's number is the new one's +
+// shift. heads: each hunk's @@ line; total: the new file's lines (unknown: Infinity)
+export type Gap = { from: number; to: number; shift: number }
+export function gapsOf(heads: string[], total: number): Gap[] {
+  const out: Gap[] = []
+  let newEnd = 0
+  let shift = 0
+  for (const h of heads) {
+    const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(h)
+    if (!m) continue
+    const [a, b, c, d] = [+m[1], m[2] === undefined ? 1 : +m[2], +m[3], m[4] === undefined ? 1 : +m[4]]
+    const oldStart = b ? a : a + 1 // an empty side's number is the line before it
+    const newStart = d ? c : c + 1
+    out.push({ from: newEnd + 1, to: newStart - 1, shift: oldStart - newStart })
+    newEnd = newStart + d - 1
+    shift = oldStart + b - 1 - newEnd
+  }
+  out.push({ from: newEnd + 1, to: total, shift })
+  return out
+}
+
 // a review suggestion as an edit: lines start..end (from 1) were seen, become lines
 export type Suggestion = { start: number; end: number; seen: string[]; lines: string[] }
 const piecesOf = (text: string) => text.split(/(?<=\n)/) // each line with its own ending, the last one's maybe none

@@ -24,7 +24,7 @@ import { BoardPage } from './Board'
 import { AchievementsPage } from './Achievements'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
 import { StarterPicker, UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
@@ -1863,7 +1863,7 @@ export function App() {
   const [reviewing, setReviewing] = useState<Record<string, boolean>>({})
   const [reviewSeen, setReviewSeen] = useState<Record<string, string>>({})
   const statKey = ws?.stat ? JSON.stringify(ws.stat) : ''
-  const reviewTab = !!ws && settings.fullReview === true && git && !!ws.stat?.files && ws.browser === undefined && !isTerm(ws) && !ws.archived
+  const reviewTab = !!ws && settings.fullReview !== false && git && !!ws.stat?.files && ws.browser === undefined && !isTerm(ws) && !ws.archived
   const reviewOn = reviewTab && !!reviewing[ws!.id]
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
@@ -3427,6 +3427,8 @@ export function App() {
   const aiNames = view.workspaces.filter(w => !w.archived).flatMap(w => [...new Set([w.name || w.id, wsName(w)])].map(name => ({ id: w.id, name })))
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const ownWidgets = shownWidgets.filter(w => (!w.project || w.project === ws?.project) && !(w.on && w.hidden)) // a repo's (.laki/extensions): only while a workspace of its project is selected; hidden: its data says so
+  // the tab bar's ⋯: on a phone, the top bar's extensions too (no room for their strip), each as its button's click
+  const wsMore = (): MenuItem[] => (tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))
   const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
@@ -3672,12 +3674,12 @@ export function App() {
           {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
-          <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" />
+          {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
           {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
           {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
-              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
+              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMore(), 'right')} />
             </div>
           )}
           {ws && ws.browser === undefined && project?.kind !== 'shells' && (
@@ -3693,7 +3695,7 @@ export function App() {
               {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
               {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
-              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
+              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMore(), 'right')} />
               <RunButton
                 running={devRunning}
                 onRun={() => (ws.run ? run() : editScripts())}

@@ -7,7 +7,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
-import { changed, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
+import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 
 // ---------- the diff against the base
@@ -306,14 +306,19 @@ async function statOf(w: Workspace): Promise<Stat> {
   }
   return st
 }
+// a window's workspace for the Review tab: its view's ws, else (none, or null: a page over it, an SSH host's) its tab's
+export const viewWs = (v: Conn['view']) => v && (v.ws ?? state.tabs.find(t => t.id === v.tab)?.workspace)
+const onScreen = () => new Set([...clients].filter(c => c.view?.shown !== false).map(c => viewWs(c.view)))
 export async function scanStats(): Promise<void> {
   if (statting) return void (restat = true)
   statting = true
   try {
-    // the sidebar's (settings.diffStat, off by default) or the full review's tab (settings.fullReview: shown while
-    // there's a diff), and a race's always: Compare shows them
-    const on = state.settings?.diffStat === true || state.settings?.fullReview === true
-    const wanted = (w: Workspace) => !w.archived && !away(w) && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
+    // the sidebar's (settings.diffStat, off by default: every workspace), a race's always (Compare shows them), or the
+    // full review's tab (settings.fullReview, on unless false: shown while there's a diff), which needs only the
+    // workspaces a shown window has selected (core's setView scans again as that changes)
+    const all = state.settings?.diffStat === true
+    const seen = !all && state.settings?.fullReview !== false ? onScreen() : undefined
+    const wanted = (w: Workspace) => !w.archived && !away(w) && (all || !!w.race || !!seen?.has(w.id)) && state.projects.find(p => p.id === w.project)?.git !== false
     for (const id of stats.keys()) if (!state.workspaces.some(w => w.id === id && wanted(w))) (stats.delete(id), changed())
     for (const w of state.workspaces) {
       if (!wanted(w) || (!w.host && !existsSync(w.path))) continue

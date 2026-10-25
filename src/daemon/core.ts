@@ -29,7 +29,7 @@ import { asleep, isLive, restoredAt, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { meterRead, meterView, todayView } from './meters.ts'
-import { inside, scanStats, stats } from './files.ts'
+import { inside, scanStats, stats, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -604,12 +604,14 @@ const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(
 export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null }) {
   const hidden = c.view?.shown === false
   const wsWas = c.view && (c.view.ws === undefined ? state.tabs.find(t => t.id === c.view?.tab)?.workspace : c.view.ws)
+  const statWas = viewWs(c.view)
   c.view = v
   const here = v.ws === undefined ? state.tabs.find(t => t.id === v.tab)?.workspace : v.ws
   // a restart's tabs (restoreAll) in the workspace a window shows: now, ahead of the queue
   if (here && v.shown !== false && queued.size) for (const t of tabsOf(here)) restoreNow(t.id)
   if (hidden && v.shown !== false) widgetTick() // the window's back: what fell due meanwhile
   else if (v.shown !== false && here !== wsWas) widgetTick(undefined, 'select') // another workspace: its extensions' instances, if stale
+  if (v.shown !== false && (hidden || viewWs(v) !== statWas)) void scanStats() // the Review tab's diff size for the workspace now on screen
   if (!v.focused) return
   for (const id of shown(v)) {
     const r = rt.get(id)

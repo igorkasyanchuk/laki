@@ -185,7 +185,7 @@ export type AppSettings = Paint & {
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
   todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
-  fullReview?: boolean // experimental: the tab bar's Review tab (FullReview.tsx), off unless true
+  fullReview?: boolean // the tab bar's Review tab (FullReview.tsx), Settings › Pull requests, on unless false
   cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
@@ -387,9 +387,9 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
   ['widgets', 'More folders', 'extensions widgets'],
   ['widgets', 'Keep logs for every extension', 'extensions widgets log logs debug stderr errors'],
-  ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
-  ['general', 'Show progress', 'percent sidebar tab both'],
-  ['general', 'Progress in the sidebar', 'percent line bar row'],
+  ['terminal', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
+  ['terminal', 'Show progress', 'percent sidebar tab both'],
+  ['terminal', 'Progress in the sidebar', 'percent line bar row'],
   ['ai', 'Chat button in the corner', 'floating chat ask laki ai anywhere'],
   ['voice', 'Speech to text', 'voice dictation dictate microphone mic speak talk speech transcribe whisper cloud openrouter engine'],
   ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
@@ -399,7 +399,7 @@ const FIND: [string, string, string?][] = [
   ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
   ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
-  ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
+  ['terminal', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
@@ -417,7 +417,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
   ['general', 'To-dos', 'experimental todo todos to do checklist tasks list slack notion check off rail'],
-  ['general', 'Full review', 'experimental review diff changes files viewed comments pending post github pr tab code review'],
+  ['pr', 'Review tab', 'full review diff changes files viewed comments pending post github pr tab code review pin expand context description'],
   ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
@@ -439,6 +439,7 @@ const FIND: [string, string, string?][] = [
 const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
   { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
+  { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Laki' },
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
   { id: 'needs', label: 'Needs you', icon: 'inbox', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
@@ -450,7 +451,6 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'memory', label: 'Global memory', icon: 'bulb', group: 'Agents' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
   { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
-  { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
   { id: 'skill', label: 'Agent skill', icon: 'import', group: 'Agents' },
   { id: 'ai', label: 'AI', icon: 'ai', group: 'Agents' },
   { id: 'voice', label: 'Voice', icon: 'mic', group: 'Agents' },
@@ -1265,36 +1265,6 @@ export function SettingsPage(p: {
                   </label>
                 </div>
               </Group>
-              <Group title="Tabs">
-              <div className="setting-box">
-                <Switch className="switch-row" on={!!s.closeNoAsk} onChange={v => set({ closeNoAsk: v })}>
-                  <Says title="Close tabs without asking" hint="No question when a tab you close still runs something (an agent, a server): it's stopped at once" />
-                </Switch>
-                <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
-                  <Says title="Progress on tabs" hint="Claude and Codex estimate how far along their task is and report it every 20-30 seconds, shown on the tab; agents started from now on (other agents need the laki skill, Settings › Agent skill)" />
-                </Switch>
-                {s.progress && (
-                  <label className="switch-row">
-                    <select value={s.progressAt ?? 'tab'} onChange={e => set({ progressAt: e.target.value as AppSettings['progressAt'] })}>
-                      <option value="tab">On the tab</option>
-                      <option value="sidebar">In the sidebar</option>
-                      <option value="both">Both</option>
-                    </select>
-                    <Says title="Show progress" hint="Where an agent's percent shows: its tab, its workspace's row in the sidebar, or both" />
-                  </label>
-                )}
-                {s.progress && (s.progressAt === 'sidebar' || s.progressAt === 'both') && (
-                  <label className="switch-row">
-                    <select value={s.progressLook ?? 'pct'} onChange={e => set({ progressLook: e.target.value as AppSettings['progressLook'] })}>
-                      <option value="pct">42%</option>
-                      <option value="bar">A line</option>
-                      <option value="both">Both</option>
-                    </select>
-                    <Says title="Progress in the sidebar" hint="On a workspace's row: its percent, a line along the row's bottom that fills, or both" />
-                  </label>
-                )}
-              </div>
-              </Group>
               <Group title="Development">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
@@ -1354,9 +1324,6 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.todoList === true} onChange={v => set({ todoList: v })}>
                   <Says title="To-dos" hint="One checklist of your own, written like a Notion page: Enter for the next to-do, headings, ones nested under others, dragged into order. Shows the rail's To-dos (or in its ⋯ More: Appearance › Rail) and ⌘K" />
-                </Switch>
-                <Switch className="switch-row" on={s.fullReview === true} onChange={v => set({ fullReview: v })}>
-                  <Says title="Full review" hint="A Review tab first in the tab bar (⌘1) while a workspace has changes: every file's diff with Viewed boxes, comments you gather on lines, then sent to its agent or posted on the PR as one review" />
                 </Switch>
                 <Switch className="switch-row" on={s.cloud === true} onChange={v => set({ cloud: v })}>
                   <Says title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it" />
@@ -1863,6 +1830,32 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={!!s.splitNew} onChange={v => set({ splitNew: v })}>
                     <Says title="New tabs open as a split" hint="A new tab (⌘⇧N, the + menu, Laki AI's) goes beside the pane you're on, in the same tab, instead of a tab of its own" />
                   </Switch>
+                  <Switch className="switch-row" on={!!s.closeNoAsk} onChange={v => set({ closeNoAsk: v })}>
+                    <Says title="Close tabs without asking" hint="No question when a tab you close still runs something (an agent, a server): it's stopped at once" />
+                  </Switch>
+                  <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
+                    <Says title="Progress on tabs" hint="Claude and Codex estimate how far along their task is and report it every 20-30 seconds, shown on the tab; agents started from now on (other agents need the laki skill, Settings › Agent skill)" />
+                  </Switch>
+                  {s.progress && (
+                    <label className="switch-row">
+                      <select value={s.progressAt ?? 'tab'} onChange={e => set({ progressAt: e.target.value as AppSettings['progressAt'] })}>
+                        <option value="tab">On the tab</option>
+                        <option value="sidebar">In the sidebar</option>
+                        <option value="both">Both</option>
+                      </select>
+                      <Says title="Show progress" hint="Where an agent's percent shows: its tab, its workspace's row in the sidebar, or both" />
+                    </label>
+                  )}
+                  {s.progress && (s.progressAt === 'sidebar' || s.progressAt === 'both') && (
+                    <label className="switch-row">
+                      <select value={s.progressLook ?? 'pct'} onChange={e => set({ progressLook: e.target.value as AppSettings['progressLook'] })}>
+                        <option value="pct">42%</option>
+                        <option value="bar">A line</option>
+                        <option value="both">Both</option>
+                      </select>
+                      <Says title="Progress in the sidebar" hint="On a workspace's row: its percent, a line along the row's bottom that fills, or both" />
+                    </label>
+                  )}
                 </div>
               </Group>
               <Group title="Keyboard, mouse and clipboard">
@@ -2006,6 +1999,11 @@ export function SettingsPage(p: {
                 <code>{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
               <p className="muted small">Merge, merge when green, approve and close are each project's to allow: its section here, under Pull requests (merge when green is off until you turn it on).</p>
+              <Group title="Review tab">
+                <Switch className="switch-row" on={s.fullReview !== false} onChange={v => set({ fullReview: v })}>
+                  <Says title="Review tab" hint="A Review tab first in the tab bar (⌘1) while a workspace has changes: every file's diff with Viewed boxes, pinned files first, more lines around a change a click away, the PR's description, comments you gather on lines, then sent to its agent or posted on the PR as one review" />
+                </Switch>
+              </Group>
               <Group title="Checks">
               <div className="grid2">
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}

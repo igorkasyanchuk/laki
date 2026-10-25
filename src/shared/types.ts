@@ -481,7 +481,7 @@ export type Settings = {
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
-  fullReview?: boolean // experimental: the tab bar's Review tab, a workspace's whole diff in three columns (off unless true)
+  fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
@@ -850,5 +850,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 115
+export const API = 116
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

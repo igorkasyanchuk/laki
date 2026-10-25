@@ -741,7 +741,13 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const stat = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.stat
   await new Promise(r => setTimeout(r, 700))
-  assert.equal(await stat(), undefined) // off by default
+  assert.equal(await stat(), undefined) // the Review tab's, on by default: only for a workspace a window shows
+  const app = await connect(rig)
+  await app.call('view', { tab: null, ws: ws.id, focused: true })
+  await until(async () => (await stat())?.files === 0, 'a clean stat for the workspace on screen')
+  await rig.rpc('settingsSet', { fullReview: false })
+  await until(async () => (await stat()) === undefined, 'none with the Review tab off')
+  app.close()
   await rig.rpc('settingsSet', { diffStat: true })
   await until(async () => (await stat())?.files === 0, 'a clean stat')
   writeFileSync(join(ws.path, 'README.md'), 'hello\nmore\n') // +1 against the base

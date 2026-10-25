@@ -2,6 +2,17 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- The Review tab is on for everyone (Settings › *Pull requests* › *Review tab* turns it off), no longer experimental.
+- Review: the arrows by a change show more of the file around it, as on GitHub; pin files (p) to keep them at the top;
+  a *PR* tab beside the comments with the pull request's description.
+- On a phone: an extension's page puts its tabs in a ⋯ menu, the top bar's extensions are in the workspace's ⋯, and
+  the screen to start an agent no longer slides under the tab bar.
+- Settings: *Pull requests* sits after *Git & worktrees*; tab options (*Close tabs without asking*, *Progress on tabs*)
+  moved to *Terminal* › *Panes and tabs*.
+- About no longer links the security policy.
+
 ## 0.29.0 · Oct 25, 2026
 
 - A rail button's color (its right click) colors only its icon; a color you hover keeps its color, with a ring.

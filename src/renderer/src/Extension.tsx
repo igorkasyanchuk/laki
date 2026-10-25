@@ -12,7 +12,7 @@ import { AiPage } from './Ai'
 import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
 import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
-import { ask, escapes, Icon, IconButton, Page, Switch } from './ui'
+import { ask, escapes, Icon, IconButton, ON, Page, Switch, useMenu } from './ui'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
@@ -325,11 +325,24 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
 }
 
 // the inspector's head: its tabs, Run now and Reload, a dot while laki widget dev watches it, and why its files don't
-// read now (the last good version runs on)
+// read now (the last good version runs on); on a phone the tabs and buttons are one ⋯ menu (.ext-more)
 function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void; spots: { id: string; name: string }[]; setAt: (ws: string) => void }) {
+  const [menu, openMenu] = useMenu()
+  const runNow = () => void cfg.run(w.id, w.here ?? undefined).catch(() => {})
+  const more = () => [
+    ...TABS.map(([t, label]) => ({ label, hint: tab === t ? ON : undefined, run: () => setTab(t) })),
+    null,
+    ...(w.every !== undefined && w.on && !w.running && w.here !== null ? [{ label: 'Run now', icon: 'refresh' as const, run: runNow }] : []),
+    ...(w.agent && cfg.stop ? [{ label: 'Stop its agent', icon: 'stop' as const, run: () => void cfg.stop!(w.id).catch(() => {}) }] : []),
+    { label: 'Reload', run: () => void cfg.reload().catch(() => {}) },
+  ]
   return (
     <>
+      {menu}
       <div className="ext-tabs">
+        <button className="sm ext-more" aria-label="Its page: tabs and actions" onClick={e => openMenu(e, more())}>
+          {TABS.find(([t]) => t === tab)?.[1]} <Icon name="more" size={12} />
+        </button>
         <div className="seg" role="tablist" aria-label="Its page">
           {TABS.map(([t, label]) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
@@ -355,16 +368,16 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
         )}
         {w.mock && <span className="tag" data-tip="Data put there by hand: Live in Data fetches again">sample data: {w.mock}</span>}
         {w.every !== undefined && (
-          <button className="sm" disabled={!w.on || w.running || w.here === null} data-tip={w.here === null ? 'Per workspace: pick one' : w.on ? 'Fetch now' : 'Turn it on first'} onClick={() => void cfg.run(w.id, w.here ?? undefined).catch(() => {})}>
+          <button className="sm ext-btn" disabled={!w.on || w.running || w.here === null} data-tip={w.here === null ? 'Per workspace: pick one' : w.on ? 'Fetch now' : 'Turn it on first'} onClick={runNow}>
             <Icon name="refresh" size={12} /> {w.running ? 'Fetching…' : 'Run now'}
           </button>
         )}
         {w.agent && cfg.stop && (
-          <button className="sm" data-tip="Its agent's run ends now: its last data stays" onClick={() => void cfg.stop!(w.id).catch(() => {})}>
+          <button className="sm ext-btn" data-tip="Its agent's run ends now: its last data stays" onClick={() => void cfg.stop!(w.id).catch(() => {})}>
             <Icon name="stop" size={12} /> Stop
           </button>
         )}
-        <button className="sm" data-tip="Read every extension's folder again" onClick={() => void cfg.reload().catch(() => {})}>
+        <button className="sm ext-btn" data-tip="Read every extension's folder again" onClick={() => void cfg.reload().catch(() => {})}>
           Reload
         </button>
       </div>

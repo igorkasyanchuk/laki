@@ -1,7 +1,7 @@
 // Review's Apply: a comment's ```suggestion block, what the review saw, and the lines put in the file (text.ts)
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { applySuggestions, linesAt, reviewedLines, suggestionOf } from '../src/renderer/src/text.ts'
+import { applySuggestions, gapsOf, linesAt, reviewedLines, suggestionOf } from '../src/renderer/src/text.ts'
 
 test('suggestion fences: backticks or tildes, 3 or more, CRLF, empty, unclosed, the text around it', () => {
   assert.deepEqual(suggestionOf('Rename it:\r\n```suggestion\r\nconst total = 1\r\n```\r\nthanks'), { lines: ['const total = 1'], rest: 'Rename it:\nthanks' })
@@ -40,4 +40,17 @@ test('suggestions put in: bottom-up, the line endings kept, refused when the lin
   assert.throws(() => applySuggestions('a\n', [s(2, 2, ['b'], ['x'])]), /changed since the review/)
   assert.throws(() => applySuggestions('a\n', [s(1, 1, ['a', ''], ['x'])]), /changed since the review/)
   assert.deepEqual(linesAt('a\r\nb\nc', 2, 3), ['b', 'c'])
+})
+
+test("the full review's expand: the unchanged lines before each hunk and after the last, with the old file's numbers", () => {
+  // a change at 15 (+2), a line taken out after 40, a new file's whole
+  assert.deepEqual(gapsOf(['@@ -15,6 +15,8 @@ Rails.application.routes.draw do', '@@ -40,2 +42,1 @@'], 60), [
+    { from: 1, to: 14, shift: 0 },
+    { from: 23, to: 41, shift: -2 },
+    { from: 43, to: 60, shift: -1 },
+  ])
+  assert.deepEqual(gapsOf(['@@ -5,2 +4,0 @@'], 10), [{ from: 1, to: 4, shift: 0 }, { from: 5, to: 10, shift: 2 }]) // only taken out: after line 4
+  assert.deepEqual(gapsOf(['@@ -3,0 +4,2 @@'], 8), [{ from: 1, to: 3, shift: 0 }, { from: 6, to: 8, shift: -2 }]) // only added
+  assert.deepEqual(gapsOf(['@@ -0,0 +1,6 @@'], 6), [{ from: 1, to: 0, shift: 0 }, { from: 7, to: 6, shift: -6 }]) // a new file: nothing around
+  assert.deepEqual(gapsOf(['@@ -1 +1 @@'], Infinity), [{ from: 1, to: 0, shift: 0 }, { from: 2, to: Infinity, shift: 0 }])
 })

@@ -207,7 +207,7 @@ function useParked() {
 
 // a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
 // action, else opens its full view, else fetches it now (else its settings)
-const click = (w: WidgetView, api: WidgetApi) =>
+export const click = (w: WidgetView, api: WidgetApi) =>
   w.here === null ? undefined : w.click ? void api.action(w.id, w.click, '', w.name, wsOf(w)).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
 const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter

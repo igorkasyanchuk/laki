@@ -399,26 +399,30 @@ selected workspace's PR is in the status bar.
 - ⌘1…⌘9 switch tabs. Double click a tab to rename it. A workspace's first agent tab, made with a prompt, is named after the
   agent (the workspace's name says its task); any other agent tab gets its prompt's first words, `claude: fix the cart
   total`, or the first prompt you type in it.
-- *Full review* (Settings › General › Experimental): a *Review* tab first in the tab bar (⌘1, the sessions' tabs from ⌘2)
+- *Review* (on unless you turn it off: Settings › Pull requests › *Review tab*): a tab first in the tab bar (⌘1, the sessions' tabs from ⌘2)
   while a workspace has changes; its tooltip says how many files and lines, a dot that they changed since you looked.
   Three columns, each edge dragged wider or narrower (double-click: back to its width): the files, each with a *Viewed*
   box (a PR's file: GitHub's, as in Changes; any other: kept on this Mac until its diff changes) and *n of m viewed*,
   under a filter (words, or a glob: `spec/**`, `*.rb`, `**/*_test.go`) whose *Mark n viewed* ticks every file it shows;
   every file's diff (one column or two, *All changes vs <base>* or *PR #n*, Collapse all / Expand all, *Revert* and a
-  reviewer's *Apply* as in Changes and Review, a PR's open threads at their lines); and the comments, which » hides to
+  reviewer's *Apply* as in Changes and Review, a PR's open threads at their lines; the arrows by a hunk's head and
+  under the last one show 20 more lines of the file around the change, ⇧-click all of them, as GitHub's do: not in
+  *PR #n*, nor for a new, deleted or image file); and the comments, which » hides to
   a strip at the right edge (a click brings them back). A file's clock button (b) is its blame: who last changed each
   line and when, the base's commits for the lines taken out (the left column in two columns) and the branch's for the
   rest (*not committed* for yours); hover for the commit, click to copy its id. A file's ↗ (or its right click's
   *Open on remote*) opens it on origin's site, GitHub, GitLab or Bitbucket, at the base branch or at the branch as
   pushed; a line's right click opens it at that line. The right click also has *Mark viewed* › *Everything in
   <folder>/* for each folder above the file, *Open in* and *Copy path*, *Show the file*, *Open in the editor*. With a
-  PR, the comments have two tabs: *Yours* and *GitHub*: everyone's review threads (not only those an agent gets),
+  PR, the comments have three tabs: *Yours*, *PR* (its title, author, branches and description) and *GitHub*: everyone's review threads (not only those an agent gets),
   open ones first, resolved folded, a click goes to the line; then the PR's conversation and each review's summary
   (approved, changes requested). Click a line to comment on it, or drag over lines for a range; *Add to the review*
   (⌘⏎) puts it in *Yours*, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*.
   *Send to <agent>* gives them all to the workspace's agent as one message when its turn ends (▾: another agent);
   *Post on #n* posts them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing
-  goes. Keys: j / k the next or last file, v Viewed, b blame, c a comment on the line under the mouse, ⌘⏎ sends to the
+  goes. A file's pin (p, or its right click's *Pin to the top*) keeps it first in the list and in the diff, in the order
+  you pinned them, until you unpin it; kept on this Mac per workspace. Keys: j / k the next or last file, v Viewed, b
+  blame, p pin, c a comment on the line under the mouse, ⌘⏎ sends to the
   agent. It reads the diff again as the workspace's files change, keeping your place and comments.
 - A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
   quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
@@ -938,7 +942,7 @@ creator's guide. Only you start it (Claude never runs it on its own), and the `l
 (`ls`, `kit`, `check`, `what`, `logs`, `render`, `events`, `tools`) run without asking; making, linking, setting or
 turning one on asks you in Claude's prompt first.
 
-With *Progress on tabs* on (Settings › General), Claude and Codex tabs started from then on are told to report how
+With *Progress on tabs* on (Settings › Terminal), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
 the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends. *Show progress* puts it on the tab,
 in the sidebar (the workspace's row: `40%`, a line under it, or both) or both. Other agents get `LAKI_PROGRESS=1`
@@ -1579,15 +1583,14 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
 - *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, off by default: ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
-  kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
-  along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
+  kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
   making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Pick an
   element*: the rail's *Pick* (without the rail, the crosshair beside Help) or its hotkey, ⇧⌘C unless you record
   another, works on every page and over dialogs: point at anything in Laki's window, click, and it tells what it is
   (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
-  long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
+  long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json`, but env, presets' env, the phone webhook, remote access's and
   tunnels' emails and workflows' variables (set those again there; Import keeps the other Mac's); Import on the other
@@ -1710,7 +1713,9 @@ lit for a moment.
   ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
   Editing has them; on by default) and
   *Dim other panes* (in a split, the panes without the keyboard fade back; on by default) and *Focus the pane under
-  the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; on by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
+  the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; on by default), *New
+  tabs open as a split*, *Close tabs without asking* (off by default: closing a tab whose agent or server still runs
+  asks first), *Progress on tabs* (agents report how far along they are; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Keys*: the keys of Laki's own actions (new workspace and tab, close tab, sidebar, side panel, info, palette, find a
   file, find, the next tab that needs you, send later, artifacts, full screen, back and forward, settings, help):
   *Record*, then press others (⌘, ⌥ or ⌃ with a key, so typing in a terminal is never taken; ⌫ leaves none), the
@@ -1789,7 +1794,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   question waits (a day at most), and a tap counts only while the same menu is still on screen. A workflow's questions
   come too (its *Ask you*, a confirm before a PR or a merge, a stuck block, a decision it isn't sure of), with a button
   per choice the same way, counted only while the run still asks the same; a typed answer needs Laki.
-- *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
+- *Pull requests* (after *Git & worktrees*): the *Review tab* (on by default; off: no Review tab), how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
   conflicts* get (3), the review bots whose comments *review* sends (any app can be a bot: others are skipped), and the
   prompts the PR switches send (above, in
   *PRs*).
