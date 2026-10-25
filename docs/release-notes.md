@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.29.0 · Oct 25, 2026
 
 - A rail button's color (its right click) colors only its icon; a color you hover keeps its color, with a ring.
 - Settings › *Needs you*: the sidebar's list of agents waiting for you, on by default, and where else they reach you.
