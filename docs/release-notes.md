@@ -22,6 +22,7 @@ version it builds, with the date. -->
 - Calendar, Notes and To-dos are on for everyone (Settings › General › *Pages* turns them off), no longer experimental.
 - Settings: `{{variables}}` stand out in explanations; *Needs you* has a heading like the others; Tunnels and Remote
   access link to each other as cards; *Find an extension* no longer floats over the list.
+- Menus on Settings and Help stay inside the window at any text size (New ▾ in Extensions was cut off).
 
 ## 0.30.0 · Oct 25, 2026
 
