@@ -106,7 +106,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   const had = widgets.get(o.id)
   if (had && had.dir !== d) throw new Error(`${o.id} is ${had.builtin ? 'one that comes with Laki' : `in ${had.dir}`}: write a new one under another id`)
   const was = readStore(o.id)
-  const theirs = !!statOf(d) && was.by !== 'ai' // the user's own: only with a fresh Edit with Laki AI, and it stays theirs
+  const theirs = !!statOf(d) && was.by !== 'ai' // the user's own: only after a fresh ask in its page's chat, and it stays theirs
   if (theirs && !(was.aiMay && Date.now() - was.aiMay < AI_MAY)) throw new Error(`${o.id} is the user's own (Laki AI didn't make it): write a new one under another id`) // theirs isn't overwritten
   const json = files.find(([n]) => n === 'widget.json')?.[1] as string | undefined
   if (json === undefined && !statOf(join(d, 'widget.json'))) throw new Error('a new extension needs widget.json')

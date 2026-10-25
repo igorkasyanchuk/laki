@@ -146,7 +146,6 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 
 const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
-const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m.WidgetStudio }))) // Laki AI's: loaded as it opens
 const NotesPage = lazy(() => import('./Notes')) // experimental, and BlockNote with it: loaded as it opens
 const TodoListPage = lazy(() => import('./TodoList')) // experimental, and BlockNote with it: loaded as it opens
 // what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment
@@ -177,7 +176,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -191,16 +190,15 @@ const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ?
 const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && !!d && ('settings' in d || 'section' in d))
 // an extension's page (Extension.tsx): its id ('' a new one), and the page it goes back to
 const extOf = (d: Dialog) => (d && typeof d === 'object' && 'extension' in d ? d : undefined)
-const studioOf = (d: Dialog) => (d && typeof d === 'object' && 'studio' in d ? d : undefined)
-// a studio's key: a new one's its dialog's own, kept as its first ask names it (key), so it isn't drawn again then
-const studioKeys = new WeakMap<object, string>()
-const studioKey = (s: { studio: string; key?: string }) => s.key ?? (s.studio || studioKeys.get(s) || (k => (studioKeys.set(s, k), k))(`new-${Math.random().toString(36).slice(2)}`))
+// an extension page's key: a new one's its dialog's own, kept as its first ask names it (key), so it isn't drawn again then
+const extKeys = new WeakMap<object, string>()
+const extKey = (e: { extension: string; key?: string }) => e.key ?? (e.extension || extKeys.get(e) || (k => (extKeys.set(e, k), k))(`new-${Math.random().toString(36).slice(2)}`))
 // back and forward (settings.history, on unless false): a place is a page (or none: the workspace view) and the workspace
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 type Place = { d: Dialog; ws: string | null }
 const HISTORY_MAX = 25
 const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules'])
-const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'studio', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
+const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
 // the Extension page's way back, in words
 const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', todos: 'To-dos', calendar: 'Calendar', board: 'Board', achievements: 'Achievements', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
@@ -604,7 +602,7 @@ export function App() {
     const h = hist.current
     const by = j < h.i ? -1 : 1
     const s = view?.settings ?? {}
-    const off = (d: Dialog) => (d === 'desk' && s.desk === false) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView === false) || (d === 'ai' && !aiOn(s)) || (!!notesOf(d) && s.notes !== true) || (d === 'todos' && s.todoList !== true) || (!!specsOf(d) && !specsOnIn(s)) || (!!flowsOf(d) && !flowsOnIn(s)) || (!!studioOf(d) && !aiOn(s))
+    const off = (d: Dialog) => (d === 'desk' && s.desk === false) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView === false) || (d === 'ai' && !aiOn(s)) || (!!notesOf(d) && s.notes !== true) || (d === 'todos' && s.todoList !== true) || (!!specsOf(d) && !specsOnIn(s)) || (!!flowsOf(d) && !flowsOnIn(s))
     const gone = (p: Place) => off(p.d) || (p.d === null && !!p.ws && !live.some(w => w.id === p.ws))
     while (h.at[j] && gone(h.at[j])) j += by
     const p = h.at[j]
@@ -624,8 +622,7 @@ export function App() {
     const w = live.find(x => x.id === p.ws)
     if (d === null) return w ? wsName(w) : 'the workspace'
     if (typeof d === 'string') return d === 'settings' ? 'Settings' : PAGE_WORDS[d] ?? d
-    if ('extension' in d) return view?.widgets?.find(x => x.id === d.extension)?.name ?? 'an extension'
-    if ('studio' in d) return 'the extension studio'
+    if ('extension' in d) return d.extension ? (view?.widgets?.find(x => x.id === d.extension)?.name ?? 'an extension') : 'New extension'
     if ('uikit' in d) return 'the UI kit'
     if ('settings' in d || 'section' in d) return 'Settings'
     if ('project' in d) return view?.projects.find(x => x.id === d.project)?.name ?? 'a project'
@@ -646,14 +643,16 @@ export function App() {
   const here = titleAt.current === null ? [pe && `${pe} ${hereP!.name}`, ws && wsName(ws), tab?.name].filter(Boolean).join(' · ') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
   const winTitle = here ? `${here} — Laki` : 'Laki'
   useEffect(() => void (document.title = winTitle), [winTitle])
-  // a new studio's first ask names it: the dialog (and the place in the history) says which, so Back, ⌘K's way back and
-  // a reopen go to that chat, not a blank studio; its key stays, so it isn't drawn again
-  const nameStudio = (s: { studio: string; back?: Dialog; key?: string }, id: string) => {
-    const d: Dialog = { studio: id, back: s.back, key: studioKey(s) }
+  // a new extension's first ask names it: the dialog (and the place in the history) says which, so Back, ⌘K's way back
+  // and a reopen go to it and its chat, not a blank page; its key stays, so it isn't drawn again
+  const nameExt = (e: { extension: string; back?: Dialog; key?: string }, id: string) => {
+    const k = extKey(e)
+    const d: Dialog = { extension: id, back: e.back, key: k }
+    const it = (x: Dialog) => (e => !!e && extKey(e) === k)(extOf(x)) // that page still, not another extension's opened meanwhile
     const h = hist.current
-    if (h.at[h.i] && studioOf(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
+    if (h.at[h.i] && it(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
     h.going = JSON.stringify({ d, ws: ws?.id ?? null })
-    setDialog(x => (studioOf(x) ? d : x))
+    setDialog(x => (it(x) ? d : x))
   }
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
@@ -1306,7 +1305,7 @@ export function App() {
       setDialog('new')
     } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
     else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section, ...(l.spot && { spot: l.spot }) } : 'settings')
-    else if (l?.to === 'studio') aiOn(settings) ? setDialog({ studio: l.id, back: { section: 'widgets' } }) : setDialog(l.id ? { extension: l.id, back: { section: 'widgets' } } : { section: 'ai' })
+    else if (l?.to === 'studio') setDialog({ extension: l.id, back: { section: 'widgets' } })
     else if (l?.to === 'extension') view.widgets?.some(w => w.id === l.id) ? setDialog({ extension: l.id, back: { section: 'widgets' }, ...(l.inspect && { tab: 'data' as const }) }) : toast(`No extension ${l.id}`)
     else if (l?.to === 'help') setDialog('help')
     else if (l?.to === 'board') setDialog('board')
@@ -1813,8 +1812,8 @@ export function App() {
     tabWas.current = onTab
   }, [onTab, !view])
   useEffect(() => void bridge?.onEarn?.(id => earnRef.current(id)), []) // main's: the global hotkey, a bubble's click
-  // the extension studio's chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
-  // studio, again a moment after an ai event
+  // Laki AI's extension chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
+  // extension's page, again a moment after an ai event
   const [studioChats, setStudioChats] = useState<StudioChat[]>([])
   const studioOn = aiOn(settings)
   useEffect(() => {
@@ -2144,7 +2143,7 @@ export function App() {
         o = { ...o, seen }
       }
       const r = await call<WidgetView>('widgetSet', { id, ...o })
-      if (o.on && r?.missing?.length) setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, edit: r.missing[0] })
+      if (o.on && r?.missing?.length) setDialog((e => (e?.extension === id ? { extension: id, back: e.back, key: extKey(e), edit: r.missing![0] } : { extension: id, back: dialog, edit: r.missing![0] }))(extOf(dialog))) // its page already: kept (key), not drawn again
       return r
     },
     desk: settings.desk !== false,
@@ -2159,18 +2158,16 @@ export function App() {
       const r = await call<{ trash: string }>('widgetRm', { id })
       if (r) done(`Deleted ${name}`, () => void call('widgetRestore', { trash: r.trash }))
     },
-    // the studio's sessions: the ones with nothing made yet, and the one at work
-    chats: studioChats.filter(c => c.busy || !view?.widgets?.some(w => w.id === c.id)),
+    // Laki AI's extension chats where you left off: the ones with nothing made yet, and the one at work
+    chats: studioOn ? studioChats.filter(c => c.busy || !view?.widgets?.some(w => w.id === c.id)) : [],
     chatRm: async id => {
       if (!(await ask('Delete this session?', { text: 'Its chat with Laki AI goes; nothing was saved of the extension yet.', ok: 'Delete', danger: true }))) return
       await call('studioChatRm', { id })
       setStudioChats(cs => cs.filter(c => c.id !== id))
     },
     reload: () => call('widgetReload'),
-    page: id => setDialog(!id && aiOn(settings) ? { studio: '', back: dialog } : { extension: id, back: dialog }), // a new one: the studio while Laki AI is on
-    ...(aiOn(settings) && { studio: (id: string) => setDialog({ studio: id, back: dialog }) }),
-    // a copy to change: in the studio while Laki AI is on, else its page (Files)
-    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog(aiOn(settings) ? { studio: r.id, back: dialog } : { extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
+    page: id => setDialog({ extension: id, back: dialog }),
+    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))), // a copy to change, on its page
     undo: (id, after) => api.call('widgetUndo', { id, after }),
     tryOnce: (id, ws) => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true, ws }),
     folder: (id, e) => {
@@ -2810,7 +2807,7 @@ export function App() {
     if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
-    if (aiOn(settings)) a({ label: 'New extension…: make one with Laki AI in the studio', icon: 'plus', run: () => setDialog({ studio: '' }) })
+    a({ label: aiOn(settings) ? 'New extension…: make one with Laki AI, on its page' : 'New extension…: its page, the prompt for any AI chat', icon: 'plus', run: () => setDialog({ extension: '' }) })
     a({ label: 'New extension from a starter…: each one shown on its sample data', icon: 'plus', run: () => setDialog('starters') })
     a({ label: 'UI kit: the elements an extension is made of, each with its JSON', icon: 'panel', run: () => setDialog({ uikit: true }) })
     a({ label: 'Icons: every icon an extension can use, by name', icon: 'smile', run: () => setDialog({ uikit: true, icons: true }) })
@@ -3410,7 +3407,7 @@ export function App() {
     )
   }
   // the floating chat (Settings › AI's Chat button): Laki AI over any page but its own and those with a chat on them
-  const aiFab = aiOn(settings) && settings.ai?.float !== false && !narrow && dialog !== 'ai' && dialog !== 'help' && !specsOf(dialog) && !settingsOf(dialog) && !extOf(dialog) && !studioOf(dialog) /* its own chat */
+  const aiFab = aiOn(settings) && settings.ai?.float !== false && !narrow && dialog !== 'ai' && dialog !== 'help' && !specsOf(dialog) && !settingsOf(dialog) && !extOf(dialog) /* its own chat */
   // what it tells the model with each ask: the page open, the workspace and tab, as they are now, and the tab's screen
   const whereNow = async () => {
     const page = dialog === null ? 'the workspace below (no page over it)' : typeof dialog === 'string' ? `the ${dialog} page` : `the ${Object.keys(dialog)[0]} page`
@@ -3964,27 +3961,23 @@ export function App() {
         {(w => w && extModal && <WidgetModal key={extModal.n} w={w} ws={extModal.ws} m={extModal.m} api={widgetApi} onClose={m => setExtModal(x => (!m || x?.m === m ? null : x))} />)(extModal ? view.widgets?.find(x => x.id === extModal.wid) : undefined)}
         {(e => e && (
           <ExtensionPage
-            key={e.extension}
+            key={extKey(e)}
             id={e.extension}
             tab={e.tab}
             edit={e.edit}
+            start={e.start}
             widgets={view.widgets ?? []}
             cfg={extCfg}
             api={widgetApi}
             ai={settings.ai}
-            workspaces={aiNames}
             spots={order.filter(w => !w.host && !view.projects.find(p => p.id === w.project)?.kind).map(w => ({ id: w.id, name: wsName(w) }))}
             here={wsHere}
             back={backWord(e.back)}
+            onNamed={id => nameExt(e, id)}
             onAiSettings={() => setDialog({ section: 'ai' })}
             onClose={() => setDialog(e.back ?? null)}
           />
         ))(extOf(dialog))}
-        {(s => s && (
-          <Suspense fallback={<Waiting title="Extension studio" onClose={() => setDialog(s.back ?? null)} />}>
-            <WidgetStudio key={studioKey(s)} id={s.studio} first={s.first} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onNamed={id => nameStudio(s, id)} onClose={() => setDialog(s.back ?? null)} />
-          </Suspense>
-        ))(aiOn(settings) ? studioOf(dialog) : undefined)}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
         {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
@@ -3998,7 +3991,7 @@ export function App() {
             api={{
               ...widgetApi,
               place: (id, place, on) => (on ? extCfg.set(id, { place, on }) : call('widgetSet', { id, place, ...(on !== undefined && { on }) })), // on: a repo's sheet first
-              build: aiOn(settings) ? first => setDialog({ studio: '', back: 'desk', first }) : undefined, // the studio, its first ask Build with AI's: it writes one placed on the Desk
+              build: aiOn(settings) ? start => setDialog({ extension: '', back: 'desk', start }) : undefined, // a new extension's page, its first ask Build with AI's: it writes one placed on the Desk
               save: o => void call('settingsSet', { ...(o.tiles && { deskTiles: o.tiles }), ...(o.tabs && { deskTabs: o.tabs }) }).catch(() => {}),
             }}
             onClose={() => setDialog(null)}

@@ -25,7 +25,7 @@ export type WidgetApi = {
   do: (w: WidgetView, cmd: UiDo, label?: string) => Promise<unknown> | void // a Laki command (a button's do, laki.do): said and asked first; true once done
   settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: items' in a menu
-  items?: (w: WidgetView) => MenuItem[] // what its right click has anywhere: Fetch now, Inspect, Logs, Edit, on or off, places, size, the studio, Remix, Delete (the Desk's tiles add their own)
+  items?: (w: WidgetView) => MenuItem[] // what its right click has anywhere: Fetch now, Inspect, Logs, Edit, on or off, places, size, Remix, Delete (the Desk's tiles add their own)
   log?: (id: string, text: string, ws?: string) => void // a JS page's laki.log: its log (widgetLog; nothing while off)
 }
 
@@ -99,7 +99,7 @@ const NO_WS = uiHtml({ type: 'empty', icon: 'folder', text: 'Select a workspace'
 // says confirm), a copy, a toast or dialog, a fetch, the full view. Done when the action is
 function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: WidgetApi): Promise<unknown> | void {
   const { laki, url, action, arg, label, confirm, text } = m
-  // an off one's page (a preview, the studio's): no link, copy or dialog of its own, as no command (do, run: refused)
+  // an off one's page (a preview, its page's): no link, copy or dialog of its own, as no command (do, run: refused)
   if (!w.on && (laki === 'open' || laki === 'copy' || laki === 'say')) return void api.say(w.id, { toast: `${w.name} is off: turn it on first` }, wsOf(w))
   if (laki === 'open' && typeof url === 'string' && OPEN.test(url)) return api.open(url)
   if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? ''), wsOf(w)))
@@ -313,7 +313,7 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
   )
 }
 
-// a sidebar cell's width where an extension is previewed (Settings, the studio, the UI kit): the grid's 4 across the
+// a sidebar cell's width where an extension is previewed (Settings, its page, the UI kit): the grid's 4 across the
 // default 240 px sidebar
 export const CELL_W = 60
 

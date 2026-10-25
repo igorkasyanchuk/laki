@@ -46,7 +46,7 @@ export type Manifest = { name?: string; description?: string; size?: [number, nu
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // allowFor: aiKey as allow was given // fit: in a bar, as wide as it needs (Auto) // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; log?: boolean; trusted?: string; files?: Record<string, string>; changed?: boolean; source?: WidgetSource; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[]; allowFor?: string } // allowFor: aiKey as allow was given // fit: in a bar, as wide as it needs (Auto) // trusted: a repo's extension's folder as it was when you turned it on (dirHash), files: each of its files' (eachHash); changed: off because it changed since; log: keep a log (its Settings card's Keep a log, the user's only); allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when an ask in its page's chat let Laki AI rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string; tone?: Tone; hidden?: boolean } // tone: its data's own `tone`, one of the kit's (a row mark's color); hidden: its data's own `hidden: true`, shown nowhere until it isn't
 export type Entry = { id: string; dir: string; file?: string; project?: string; builtin: boolean; dev: boolean; devError?: string; agentDev?: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on); agentDev: one an agent linked (settings.widgetDevAgent): trusted as a repo's
@@ -793,7 +793,7 @@ export function widgetsOff() {
 
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
-export const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
+export const AI_MAY = 3600000 // ms: how long an ask in its page's chat lets Laki AI rewrite one of the user's
 // agent: an agent's change (MCP's laki_extension_set, Laki AI's too; laki widget set in an agent's tab): where it shows,
 // its size, every, view, hide and plain settings; never on, network access, its source or a secret: those are the user's
 export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?: WidgetSource | null; on?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; from?: { ws?: string; tab?: string }; agent?: boolean }) {
@@ -806,7 +806,7 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
     const steers = Object.keys(o.config ?? {}).find(k => steering(w).has(k))
     if (steers) throw new Error(`${steers} fills in its source or an AI action's prompt: only you change it (Settings › Extensions)`)
   }
-  // seen: the files hash of what the user was shown (the studio's Turn on): on only while it's still that
+  // seen: the files hash of what the user was shown (an extension page's Turn on): on only while it's still that
   if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
   // a repo's (an agent-linked one's): on only after a look (laki widget what's hash), and trusted as its files are now
   if (o.on === true && guarded(w) && !w.s.on && o.seen === undefined) throw new Error(`${w.m.name || w.id} ${whence(w)}: look at what it runs first (laki widget what ${w.id})`)
@@ -815,7 +815,7 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   const s = readStore(w.id)
   if (o.on === true && guarded(w) && o.seen !== undefined) Object.assign(s, { trusted: dirHash(w, true), files: eachHash(w), changed: undefined })
   if (o.ai) {
-    // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
+    // an ask in its page's chat (Extension.tsx): one of the user's in Laki's folder, which widgetWrite may then rewrite
     if (w.builtin || w.dir !== join(widgetHome(), w.id)) throw new Error(`${w.m.name ?? w.id} isn't in Laki's folder: Laki AI can't change it`)
     s.aiMay = Date.now()
   }
@@ -1027,7 +1027,7 @@ const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 const INSERT_MAX = 16 << 10 // what an action puts in the prompt
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
-// once: the studio's Try it live, the user's click on what will run: one fetch while it's off (an AI-written one too)
+// once: an extension page's Try it live, the user's click on what will run: one fetch while it's off (an AI-written one too)
 export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string; once?: boolean; from?: { ws?: string; tab?: string } }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
   const x = wsOf(w, o.ws)

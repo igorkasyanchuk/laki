@@ -1,5 +1,5 @@
-// Settings › Extensions: the list, each one's card (where it shows, updates, its settings, its tools) and the studio's
-// sessions. Settings.tsx re-exports it.
+// Settings › Extensions: the list, each one's card (where it shows, updates, its settings, its tools) and Laki AI's
+// extension chats where you left off. Settings.tsx re-exports it.
 import { placesOf, type StudioChat, type WidgetHide, type WidgetLogLine, type WidgetOption, type WidgetPlace, type WidgetRuns, type WidgetSize, type WidgetSource, type WidgetView } from '../../shared/types'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { ICONS } from '../../shared/icons'
@@ -23,7 +23,7 @@ export type WidgetsApi = {
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
   stop?: (id: string) => Promise<unknown> // its agents' runs (an AI source's, an AI action's) stopped: WidgetView.agent
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, to the trash (asked first; Undo brings it back)
-  chats?: StudioChat[] // the studio's sessions with nothing made yet, or at work: where you left off (Laki AI on)
+  chats?: StudioChat[] // Laki AI's extension chats with nothing made yet, or at work: where you left off (Laki AI on)
   chatRm?: (id: string) => Promise<unknown> // a session let go of (asked first)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
@@ -39,10 +39,9 @@ export type WidgetsApi = {
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
   revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
-  studio?: (id: string) => void // the extension studio (Laki AI on): '' a new one
-  remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened in the studio (Laki AI on) or on its page
-  undo?: (id: string, after?: number) => Promise<unknown> // the studio's Undo (after: Undo to here)
-  tryOnce?: (id: string, ws?: string) => Promise<{ ok: boolean; error?: string }> // the studio's Try it live: its fetch once while off
+  remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened on its page
+  undo?: (id: string, after?: number) => Promise<unknown> // its page's Undo (after: a chat turn's Undo to here)
+  tryOnce?: (id: string, ws?: string) => Promise<{ ok: boolean; error?: string }> // its page's Try it live: its fetch once while off
   wsName?: (ws: string) => string // a grant's workspace, by name ('': no workspace, Laki AI's)
 }
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
@@ -235,7 +234,7 @@ const WcRow = ({ title, hint, children }: { title: ReactNode; hint?: ReactNode; 
 const BARS: WidgetPlace[] = ['side', 'top', 'status']
 
 // every extension's right click (a cell, a rail or foot button, a Desk tile's head; App's widgetApi.menu, Desk's
-// tileMenu), after its own items: on or off, its places and size as its card has them, the studio, Remix, Delete
+// tileMenu), after its own items: on or off, its places and size as its card has them, Remix, Delete
 export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
   const places = placesOf(w)
   const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
@@ -246,7 +245,6 @@ export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
     { label: 'Show in', icon: 'layout', items: offered.map(([v, n, tip]) => ({ label: n, sub: tip, ...(places.includes(v) && { hint: ON }), run: () => flip(v) })) },
     ...(places.some(p => BARS.includes(p)) && (!w.button || fits(w)) ? [{ label: 'Size', icon: 'grid', items: [...(fits(w) ? [{ label: 'Auto: in a bar, as wide as it needs', ...(w.fit && { hint: ON }), run: () => void api.set(w.id, { fit: true }) }] : []), ...SIZES.map(([a, d]) => ({ label: `${a} across × ${d === 0.5 ? '½' : d} down`, ...(!(w.fit && fits(w)) && size === `${a}x${d}` && { hint: ON }), run: () => void api.set(w.id, { size: [a, d], fit: false }) }))] } as MenuItem] : []),
     null,
-    ...(api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` ? [{ label: 'Edit with Laki AI', icon: 'ai', sub: 'the studio', run: () => api.studio!(w.id) } as MenuItem] : []),
     ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),
     // a repo's goes with its repo, a dev link's is your folder: neither to the trash from here
     ...(api.rm && !w.builtin && !w.project && !w.dev ? [{ label: 'Delete…', icon: 'trash', danger: true, sub: 'to the trash: Undo brings it back', run: () => void api.rm!(w.id) } as MenuItem] : []),
@@ -296,7 +294,6 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           <span className="muted small">{w.on ? 'On' : 'Off: nothing of it runs until you turn it on'}</span>
         </div>
         <div className="wc-acts">
-          {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
           {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
           {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
           {api.logs && <IconButton icon="file" title={w.log ? 'Its log: what it did, its runs and stderr' : 'Its log (off: Keep a log turns it on)'} onClick={() => api.logs!(w.id)} />}
@@ -444,19 +441,19 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   )
 }
 
-// the studio's sessions where you left off (nothing made of them yet, or Laki AI at work): a click goes back to the
-// chat, ✕ lets one go; skip: the one open here
+// Laki AI's extension chats where you left off (nothing made of them yet, or Laki AI at work): a click goes back to
+// its page and chat, ✕ lets one go; skip: the one open here
 export function StudioSessions({ api, skip }: { api: WidgetsApi; skip?: string }) {
   const chats = (api.chats ?? []).filter(c => c.id !== skip)
-  if (!chats.length || !api.studio) return null
+  if (!chats.length) return null
   return (
-    <div className="sched-list studio-sessions">
+    <div className="sched-list">
       {chats.map(c => (
         <div key={c.id} className="sched-row">
           <span className="sched-icon">
             <Icon name="ai" />
           </span>
-          <button type="button" className="sched-main" data-tip="Back to its chat with Laki AI" onClick={() => api.studio!(c.id)}>
+          <button type="button" className="sched-main" data-tip="Back to its chat with Laki AI" onClick={() => api.page(c.id)}>
             <span className="sched-name">{api.list.find(w => w.id === c.id)?.name ?? c.title}</span>
             <span className="sched-tags">{c.busy ? <span className="tag tag-open">Laki AI is working…</span> : <span className="tag">{ago(c.at)}</span>}</span>
           </button>
@@ -488,11 +485,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   const repos = [...new Set(shown.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
   const [menu, openMenu] = useMenu()
   const [starters, setStarters] = useState(false)
-  // New ▾: Laki AI's page (the studio), or a starter picked from their previews (one that runs at once on sample data,
+  // New ▾: a new one's page (Laki AI's chat, or the prompt for any AI chat), or a starter picked from their previews (one that runs at once on sample data,
   // yours to change: laki widget new)
   const newMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'With Laki AI…', icon: 'ai', sub: api.studio ? 'in the studio: describe it, see it on sample data' : 'describe it; or the prompt for any AI chat', run: () => (api.studio ? api.studio('') : api.page('')) },
+      { label: 'With Laki AI…', icon: 'ai', sub: 'describe it, see it on sample data; or the prompt for any AI chat', run: () => api.page('') },
       ...(api.make ? [{ label: 'From a starter…', icon: 'panel' as const, sub: `${STARTER_KINDS.length} to pick from, each shown on its sample data`, run: () => setStarters(true) }] : []),
     ])
   return (
@@ -501,8 +498,8 @@ function WidgetList({ api }: { api: WidgetsApi }) {
       {starters && api.make && <StarterPicker onClose={() => setStarters(false)} onPick={k => (setStarters(false), void api.make!(k))} />}
       {api.list.length > 3 && <input type="search" className="theme-find" value={q} placeholder={`Find an extension by name, id, place or project (${api.list.length})`} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && q && (e.stopPropagation(), setQ(''))} />}
       {words.length > 0 && !shown.length && <p className="muted small">No extension has “{q}” in its name, id, places or project.</p>}
-      {!!api.chats?.length && api.studio && (
-        <Group title="In the studio" hint="What you're making with Laki AI that isn't saved yet, or that it works on now: a click goes back to the chat">
+      {!!api.chats?.length && (
+        <Group title="Where you left off" hint="What you're making with Laki AI that isn't saved yet, or that it works on now: a click goes back to its page and chat">
           <StudioSessions api={api} />
         </Group>
       )}
@@ -559,7 +556,6 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               </span>
             </button>
             <span className="sched-acts">
-              {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
               {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
               {w.on && w.every !== undefined && !w.scope && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
             </span>

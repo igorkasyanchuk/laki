@@ -2,6 +2,13 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Extensions: one page to make, change and set one up. *New ▾ › With Laki AI…* opens a new extension's page with
+  Laki AI's chat (its starters and examples, where you left off); once it's written the same page shows its preview,
+  settings, data, runs, logs and files beside the chat, with *Undo*, *Try it live* and *Turn on* at the top. The
+  separate studio is gone.
+
 ## 0.30.0 · Oct 25, 2026
 
 - The Review tab is on for everyone (Settings › *Pull requests* › *Review tab* turns it off), no longer experimental.

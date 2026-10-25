@@ -2,7 +2,7 @@
 // any number of places at once) as tiles on a page of their own, each with its full view when it has one: an overview
 // of what's going on. Drag a tile's head to put it in any cell of the grid (gaps stay; one in its way moves down; onto a
 // tab: to that tab), its corner to resize it; the cells, sizes and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with AI's dialog
-// (DeskBuild: what it should show, screenshots, files) opens the extension studio on it: Laki AI asks, then writes one
+// (DeskBuild: what it should show, screenshots, files) opens a new extension's page on it: Laki AI asks, then writes one
 // placed here, a tile with its sample data, off until you turn it on. App.tsx passes a DeskApi.
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { emojiOf } from '../../shared/icons'
@@ -16,7 +16,7 @@ import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 export type DeskApi = WidgetApi & {
   place(id: string, places: WidgetPlace[], on?: boolean): Promise<unknown> // its places (and on: turned on with it)
   save(o: { tiles?: DeskTile[]; tabs?: DeskTab[] }): void // the tiles' order, sizes and tabs, the tabs: saved at once
-  build?: (a: DeskAsk) => void // Build with AI: the extension studio, its first ask this (unset: Laki AI is off)
+  build?: (a: DeskAsk) => void // Build with AI: a new extension's page, its first ask this (unset: Laki AI is off)
 }
 export type DeskAsk = { want: string; text: string; images: Img[] } // what's wanted (its id's words), the ask, its screenshots
 const GAP = 10 // px between tiles, as styles.css' .desk-grid
@@ -385,7 +385,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
 }
 
 // Build with AI: what it should show and where from, with screenshots (pasted, dropped, attached, or taken: a part of
-// the screen) and files (text: each goes in the ask, cut at FILE_MAX); Build it opens the extension studio on it
+// the screen) and files (text: each goes in the ask, cut at FILE_MAX); Build it opens a new extension's page on it
 const FILE_MAX = 20_000 // characters of a file in the ask
 const FILE_BYTES = 1_000_000 // a file bigger than this isn't read
 const fence = (t: string) => '`'.repeat(Math.max(3, ...[...t.matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run of backticks in it
@@ -458,7 +458,7 @@ function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClos
           </div>
         )}
         {err && <p className="warn small">{err}</p>}
-        <p className="muted small">The extension studio opens with it: Laki AI asks a few questions, then puts it on My Desk with made-up data, off until you turn it on. Ask it for changes there until you like it.</p>
+        <p className="muted small">A new extension's page opens with it: Laki AI writes it (asking only what it can't tell), then puts it on My Desk with made-up data, off until you turn it on. Ask it for changes there until you like it.</p>
         <div className="buttons">
           <span className="muted small">⌘⏎</span>
           <span className="spacer" />

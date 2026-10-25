@@ -754,7 +754,7 @@ Its page's tabs show them:
 | Runs | the runs, newest first; a click shows one's stderr |
 | Logs | its [log](#logs), following as lines come; filters by level, source, words and workspace; *Copy*, *Clear*, *Show in Finder* |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
-| Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: *Remix it…* makes a copy to change |
+| Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and its page's *Undo* has the version before. One that comes with Laki: *Remix it…* makes a copy to change |
 | Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
@@ -779,29 +779,36 @@ Off by default. Settings › Extensions › *Keep logs for every extension*, or 
 
 Every secret's value, and every setting's whose name says token, secret, key or password, is `••••` before a line is
 written, and wherever what its command printed to stderr shows: its error, Runs, `laki widget dev`. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]
-[--level error] [--ws <id>] [--json]`, or MCP's `laki_extension_logs` (the studio's Laki AI gets the last warnings and
+[--level error] [--ws <id>] [--json]`, or MCP's `laki_extension_logs` (its page's Laki AI gets the last warnings and
 errors). Settings' list tags the ones that keep one (`log`, red after an error in the last hour). Turning it off keeps
 the file until *Clear*; *Delete* takes it to the trash with the extension (*Undo* brings it back); a remix starts
 without one.
 
-## The studio
+## Making one with Laki AI
 
 With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › With Laki AI…* (or ⌘K *New extension…*,
-`laki://settings/widgets/new`) opens the studio: a chat with Laki AI on the left, the extension on the right.
+`laki://settings/widgets/new`) opens a new extension's page: what happens on the left, a chat with Laki AI on the
+right. As soon as Laki AI saves it, the page shows it, as any extension's page does: its preview, its settings and the
+inspector's tabs, the chat still beside them. One page for making it, changing it and setting it up.
 
 - Say what it should show ("Show my open PRs as a list with CI status"), or pick a starter or an example. Laki AI
   writes it with the UI kit, with `fixtures/sample.json` and `fixtures/empty.json`, checks it and fixes what's wrong.
-- The preview shows it on its sample data, in each place (sidebar at any size, the bars, a button) and its full view;
-  Data, Runs, Check and Files are the inspector's. A check that fails shows as a chip in the head; Laki AI hears of it
-  at your next ask.
+- The preview shows it on its sample data, in its place and every other (sidebar at any size, the bars, a button,
+  My Desk) and its full view; Data, Runs, Logs, Env, Files and Check are the inspector's. A check that fails shows as
+  a chip in the head; Laki AI hears of it at your next ask.
 - Nothing runs by itself. **Try it live** shows exactly what will run (its fetch or script, each action's command, a
-  JS page's network switch), then runs its fetch once, while it's still off; *Back to sample* returns. **Turn on**
-  shows the same, then turns it on; turned on anywhere (Settings' switch too), it fetches its real data.
+  JS page's network switch), then runs its fetch once, while it's still off: the preview shows *Live*, its real data
+  (*Sample* again after Laki AI's next change). **Turn on** shows the same, then turns it on; turned on anywhere
+  (Settings' switch too), it fetches its real data. A repo's extension (or one in a folder an agent linked) has no
+  *Try it live*: its *Turn on* shows every file it runs first.
 - **Undo** puts the version before the last change back (the last 20 are kept); each turn's *Undo to here* goes back to
   how it was after that turn.
-- A row's ✨ (*Edit with Laki AI*, one of yours in Laki's folder) opens it in the studio. **Remix** (a row's, or Files'
-  *Remix it…*; any one, built-in too; `laki widget remix <id> [new-id]`) makes a copy that's yours, in Laki's folder,
-  off, and opens it: the studio with Laki AI on, else its page. Laki AI isn't needed for it.
+- Any extension's page has the chat: one of yours, Laki AI changes; one that isn't (built in, a repo's, a folder of
+  yours), it answers about, and the chat's *Remix it* makes a copy to change. **Remix** (a row's, the chat's, or Files'
+  *Remix it…*; any one, built-in too; `laki widget remix <id> [new-id]`) makes a copy that's yours,
+  in Laki's folder, off, and opens its page. Laki AI isn't needed for it.
+- Close the page while Laki AI builds and it goes on: Settings › Extensions › *Where you left off* (and a new
+  extension's chat) lists what you're making that isn't saved yet; a click goes back to its page and chat.
 
 Each extension's chat is kept beside its settings (`<data>/widget-data/widget:<id>.chat.json`) and goes when you delete
 it; an extension's page talks in the same chat. Without Laki AI, *New ▾ › With Laki AI…* opens a page whose *Copy the
@@ -862,7 +869,7 @@ and commit it. Folders and one-file extensions both work.
   for *plugin* finds it too.
 - Scheduled tasks (*New task* › the agent picker's *Extension*: fetch it, or run one of its actions) and workflows (an
   *Extension* block: fetched, its data as `{{steps.<id>.<field>}}`) use the ones that are turned on.
-- The Desk's *Build with AI*: a dialog (what it shows, screenshots, text files), then the extension studio, where Laki AI makes one for the Desk; it shows as a tile at once, with its
+- The Desk's *Build with AI*: a dialog (what it shows, screenshots, text files), then a new extension's page, where Laki AI makes one for the Desk; it shows as a tile at once, with its
   sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget what <id>` (what
   turning it on runs, and the hash `laki widget on <id> --seen <hash>` takes), `laki widget logs|log <id>` ([logs](#logs)), `laki widget render <id> [--full]`,
@@ -878,14 +885,14 @@ and commit it. Folders and one-file extensions both work.
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
-- One that's off runs nothing from its page (the studio's preview too): its actions, `do` buttons, links, copy and
+- One that's off runs nothing from its page (its preview): its actions, `do` buttons, links, copy and
   dialogs do nothing until you turn it on; a toast says so.
 - A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).
 - A repo's extension (`.laki/extensions`) is off until you look at what it runs, and off again when its files change
   there ([Share with your team](#share-with-your-team)).
 - An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
   *Always* in that workspace.
-- A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, the studio's *Turn on*, a tool's ask and its
+- A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, its page's *Turn on*, a tool's ask and its
   *Always* each keep a hash of everything the extension runs (its files, its source, its actions, events and stream,
   network access); if any of it changes before your Yes, nothing runs: Laki AI asks again with what it says now.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and

@@ -1,22 +1,31 @@
-// An extension's own page (Settings › Extensions' rows and New extension, a widget's ⚙ and right click, the Desk's
-// tiles, laki://settings/widgets/<id>/inspect): how it looks (live, or with widget.json's sample: made-up data), in its
-// place and as its full view, its settings, and Laki AI's chat beside them to make or change it; the inspector's tabs
-// (Data, Runs, Env, Files, Check) beside Overview; closing goes back where it was opened from. id '': a new one, which the
-// page follows once Laki AI writes it. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
+// An extension's own page, the one place to make and change one (Settings › Extensions' rows and New ▾, a widget's ⚙
+// and right click, the Desk's tiles and Build with AI, ⌘K's New extension…, laki://settings/widgets/<id>[/inspect],
+// /new and /<id>/studio): how it looks (live, or with its sample: made-up data) in its place and as its full view, its
+// settings, the inspector's tabs (Data, Runs, Logs, Env, Files, Check) beside Overview, and Laki AI's chat on the right
+// (widget:<id>, ai.ts' aboutWidget) to make or change it. id '': a new one, its Start beside the chat's starters; the
+// first ask names it (widgetSlug), and the page shows it as soon as Laki AI saves it. Nothing runs by itself: Try it
+// live says what will, then runs it once (widgetRun once); Turn on shows the same, then turns it on. Undo (and a turn's
+// Undo to here) puts a version back. start: the Desk's Build with AI, the first ask, sent as it opens. Closing goes
+// back where it was opened from. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
+import { type AiMsg, type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { widgetHere, widgetPrompt } from '../../shared/widgetGuide'
+import { widgetPrompt } from '../../shared/widgetGuide'
+import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
 import type { UiProblem } from '../../shared/widgetUi'
-import { AiPage } from './Ai'
+import { BACKENDS, Message, Tools, turns } from './Ai'
+import { api as daemon, bridge } from './api'
+import type { DeskAsk } from './Desk'
 import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
-import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
+import { Modal } from './panels'
+import { PromptInput, useDraft } from './PromptInput'
+import { extAgent, SourceField, StudioSessions, WidgetCard, type WidgetsApi } from './Settings'
 import { ask, escapes, Icon, IconButton, ON, Page, Switch, useMenu } from './ui'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
-export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
-export const half = (d: number) => (d === 0.5 ? '½' : String(d))
+const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
+const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
 export type ExtTab = 'overview' | 'data' | 'runs' | 'logs' | 'env' | 'files' | 'check'
 const TABS: [ExtTab, string][] = [
@@ -28,23 +37,20 @@ const TABS: [ExtTab, string][] = [
   ['files', 'Files'],
   ['check', 'Check'],
 ]
+type Pick = 'live' | 'sample' | undefined // the preview's data: unset, made-up while it's off or not fetched yet
 
 // spots, here: the workspaces a per-workspace one has an instance in (live, no terminal, browser or SSH host), the one on
-// screen (the picker's first)
-export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, workspaces, spots, here, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; edit?: string; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; spots: { id: string; name: string }[]; here: string | null; back: string; onAiSettings: () => void; onClose: () => void }) {
+// screen (the picker's first); onNamed: a new one's first ask named it, so Back and a reopen come back to it
+export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, ai, spots, here, back, onNamed, onAiSettings, onClose }: { id: string; tab?: ExtTab; edit?: string; start?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; spots: { id: string; name: string }[]; here: string | null; back: string; onNamed?: (id: string) => void; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
   const [draft, setDraft] = useState<Draft | null>(null) // a file being edited in Files: kept across its tabs
   const [spot, setSpot] = useState(0) // Edit: the settings' card scrolled to and lit, once per click
   // edit: a setting it needs (turned on with it empty, its cell's Set …): Overview, that field
   useEffect(() => void (edit && (setTab('overview'), setSpot(s => s + 1))), [edit])
-  // New extension: the first one that shows up meanwhile is the one Laki AI made
-  const known = useRef(new Set(widgets.map(w => w.id)))
-  const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
-  useEffect(() => void (made && setCur(made.id)), [made?.id])
   const [at, setAt] = useState(here ?? spots[0]?.id ?? null) // a per-workspace one: whose instance
   const w = (x => x && inWs(x, spots.some(s => s.id === at) ? at : null))(widgets.find(x => x.id === cur))
-  const seen = useRef(false) // one just made (New ▾) comes with the next view
+  const seen = useRef(false) // one just made (New ▾, Laki AI) comes with the next view
   if (w) seen.current = true
   useEffect(() => void (cur && !w && seen.current && onClose()), [cur, !w]) // deleted meanwhile
   // closing with a file's changes not saved asks first
@@ -59,13 +65,50 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
     return () => window.removeEventListener('keydown', f)
   }, [])
   const mine = !!w && !w.builtin && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
-  // each ask says which extension this is; one of yours, Laki AI may rewrite (widgetSet ai: an hour's leave)
-  const context = async () => {
-    if (w && mine) await cfg.set(w.id, { ai: true }).catch(() => {})
-    return widgetHere(w && { id: w.id, name: w.name, mine })
+  const guarded = !!(w?.project || w?.agentDev) // a repo's or an agent-linked folder's: turned on through App's repoSheet (every file it runs), never run once while off
+  const aiOn = ai?.on !== false
+  const [pick, setPick] = useState<Pick>()
+  // a rewrite: its sample again (Try it live's data was the version before)
+  const rev = useRef(w?.rev)
+  useEffect(() => void (w && rev.current !== w.rev && ((rev.current = w.rev), setPick(undefined))), [w?.rev])
+  // its check (no run) as its files change: the head's chip
+  const [problems, setProblems] = useState<UiProblem[]>([])
+  useEffect(() => {
+    if (!w) return setProblems([])
+    let on = true
+    cfg.check?.(w.id, false).then(r => on && setProblems(r.problems), () => {})
+    return () => void (on = false)
+  }, [w?.id, w?.rev])
+  const errors = problems.filter(p => p.level === 'error').length
+  const [sheet, setSheet] = useState<'try' | 'on' | null>(null)
+  const [oops, setOops] = useState('')
+  // an ask: a new one's id from its first words (named: from those); one of yours, Laki AI may rewrite (widgetSet ai: an hour's leave)
+  const askAi = async (text: string, images: string[] = [], named = text) => {
+    setOops('')
+    try {
+      let to = cur
+      if (!to) {
+        to = (await daemon.call<{ id: string }>('widgetSlug', { text: named })).id
+        setCur(to)
+        onNamed?.(to)
+      }
+      if (mine) await cfg.set(to, { ai: true })
+      await daemon.call('aiAsk', { chat: `widget:${to}`, text, images })
+      return true
+    } catch (e) {
+      setOops(String((e as Error)?.message ?? e))
+      return false
+    }
   }
-  const name = w?.name ?? (cur ? cur : 'New extension')
-  const [chat] = useState(id ? `widget:${id}` : undefined) // its own chat, the studio's too; a new one's: the AI page's, as it was made there
+  const undo = (after?: number) =>
+    void (
+      w &&
+      cfg.undo?.(w.id, after).then(
+        () => setPick(undefined),
+        e => setOops(String(e?.message ?? e)),
+      )
+    )
+  const name = w?.name ?? (cur || 'New extension')
   return (
     <Page
       title={name}
@@ -86,6 +129,13 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
               From {w.repo}'s .laki/extensions
             </span>
           )}
+          {w && !w.on && <span className="tag">off</span>}
+          {w?.byAi && <span className="tag" data-tip="Laki AI wrote it: look at what it runs before you turn it on">by Laki AI</span>}
+          {errors > 0 && (
+            <button className="tag tag-closed ext-problems" onClick={() => setTab('check')}>
+              {errors} {errors === 1 ? 'problem' : 'problems'}
+            </button>
+          )}
           {w && (
             <button className="sm ext-edit" data-tip="Its settings: where it shows, its size, its data, its options" onClick={() => (setTab('overview'), setSpot(n => n + 1))}>
               <Icon name="pencil" size={12} /> Edit
@@ -93,46 +143,47 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
           )}
         </>
       }
+      tools={
+        w && (
+          <span className="ext-acts">
+            {mine && (
+              <button className="sm" disabled={!w.history?.length} data-tip={w.history?.length ? 'Back to the version before the last change' : 'Nothing to undo yet'} onClick={() => undo()}>
+                Undo
+              </button>
+            )}
+            {!w.on && (
+              <button className="sm" disabled={(w.every === undefined && !w.js) || !!w.scope || guarded} data-tip={guarded ? 'Not before you turn it on: Turn on shows every file it runs' : w.scope ? 'Per workspace: turn it on, then look in a workspace' : 'See what it runs, then run it once: its real data here'} onClick={() => setSheet('try')}>
+                Try it live
+              </button>
+            )}
+            {!w.on && (
+              <button className="sm primary" onClick={() => (guarded ? void cfg.set(w.id, { on: true }).catch(e => setOops(String(e?.message ?? e))) : setSheet('on'))}>
+                Turn on
+              </button>
+            )}
+          </span>
+        )
+      }
     >
-      <div className="ext">
+      <div className={`ext ${w ? '' : 'new'}`}>
         <div className="ext-main">
           {w ? (
             <>
               <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
-              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : tab === 'logs' ? <Logs w={w} cfg={cfg} spots={spots} copy={api.copy} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} pick={pick} setPick={setPick} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : tab === 'logs' ? <Logs w={w} cfg={cfg} spots={spots} copy={api.copy} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
             </>
           ) : cur ? (
-            <p className="muted small">Reading…</p>
+            <div className="ext-wait muted">
+              <Icon name="panel" size={28} />
+              <p>Not saved yet: it shows here with made-up data as soon as it is, its settings with it.</p>
+            </div>
           ) : (
-            <Start ai={ai?.on !== false} home={cfg.home} onAiSettings={onAiSettings} />
+            <Start ai={aiOn} home={cfg.home} onAiSettings={onAiSettings} />
           )}
         </div>
         <aside className="ext-chat" aria-label="Laki AI">
-          {ai?.on !== false ? (
-            <AiPage
-              compact
-              embed
-              chat={chat}
-              settings={ai ?? {}}
-              workspaces={workspaces}
-              onClose={onClose}
-              context={context}
-              hello={
-                w
-                  ? {
-                      title: mine ? `Change ${w.name}` : `Ask about ${w.name}`,
-                      text: mine ? 'Say what to change: Laki AI rewrites it, and the preview shows it with its sample data. It stays off until you turn it on.' : "It comes with Laki or lives in a folder of yours: Laki AI makes a copy of it to change.",
-                      examples: mine ? ['Show the count in red when it is over 10', 'Add a refresh button to the full view', 'Make the full view a table with sorting'] : ['Make me a copy of it I can change'],
-                      placeholder: `What should change in ${w.name}?`,
-                    }
-                  : {
-                      title: 'What should it show?',
-                      text: 'Describe it: Laki AI asks a few questions, then writes it. It shows here with made-up data, off until you turn it on.',
-                      examples: ['My open Sentry issues, by count', 'Open PRs waiting for my review', "Today's calendar events", 'A world clock for my team'],
-                      placeholder: 'Describe the extension…',
-                    }
-              }
-            />
+          {aiOn ? (
+            <Chat chat={cur ? `widget:${cur}` : ''} w={w} mine={mine} ai={ai ?? {}} onAsk={askAi} undo={undo} err={oops} start={cur === id ? start : undefined} cfg={cfg} />
           ) : (
             <div className="ext-ai-off">
               <Icon name="ai" size={22} />
@@ -141,17 +192,295 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
               <button className="primary" onClick={onAiSettings}>
                 Turn on Laki AI
               </button>
+              {oops && <div className="ai-err">{oops}</div> /* the head's Turn on and Undo say why they failed here too */}
             </div>
           )}
         </aside>
       </div>
+      {sheet && w && (
+        <TrySheet
+          w={w}
+          on={sheet === 'on'}
+          cfg={cfg}
+          onClose={() => setSheet(null)}
+          onRan={() => (setPick('live'), setSheet(null), setTab('overview'))}
+          onOn={() => (setPick(undefined), setSheet(null))}
+        />
+      )}
     </Page>
+  )
+}
+
+type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number }
+const EXAMPLES = ['My Vercel deploys', 'Linear issues assigned to me', 'A focus timer on the rail']
+const started = new WeakSet<object>() // a first ask sent: never again as its page comes back (Back, a remount)
+
+// Laki AI's chat about it (widget:<id>; '': a new one's, until its first ask names it): the thread (a turn's tools
+// folded, with Undo to here once something was written after it) and the box; empty: the starters, examples and where
+// you left off (a new one), or what to ask (one of yours; one that isn't: a copy of it to change)
+function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: string; w?: WidgetView; mine: boolean; ai: AiSettings; onAsk: (text: string, images?: string[], named?: string) => Promise<boolean>; undo: (after?: number) => void; err: string; start?: DeskAsk; cfg: WidgetsApi }) {
+  const [d, setD] = useState<ChatData>()
+  const [text, setText, images, setImages] = useDraft(chat || 'widget:') // widget: a new one's, before its first ask names it
+  const [saving, setSaving] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const thread = useRef<HTMLDivElement>(null)
+  const load = () => (chat ? daemon.call<ChatData>('aiState', { chat }).then(setD, () => {}) : (setD(undefined), Promise.resolve()))
+  useEffect(() => {
+    void load()
+    if (!chat) return
+    return daemon.on(m => {
+      if (m.ev === 'open') void load()
+      else if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended })
+    })
+  }, [chat])
+  useEffect(() => {
+    const el = thread.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [d?.chat.length, d?.busy])
+  // in a page: its box takes the keyboard, without scrolling the page to it
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => void (matchMedia('(pointer: coarse)').matches || box.current?.querySelector('textarea')?.focus({ preventScroll: true })), []) // not on a touch screen: its keyboard would cover the page
+  const busy = asking || !!d?.busy
+  const go = (t: string, imgs: string[] = [], named?: string) => {
+    setAsking(true)
+    return onAsk(t, imgs, named).finally(() => setAsking(false))
+  }
+  // the Desk's ask, once: back in the box when it fails (no key, Laki AI at work in too many chats), to send again
+  useEffect(() => {
+    if (!start || started.has(start)) return
+    started.add(start)
+    void go(start.text, start.images.map(i => i.path), start.want).then(ok => ok || (setText(start.text), setImages(start.images)))
+  }, [])
+  const send = () => {
+    if (saving || busy || (!text.trim() && !images.length)) return
+    const sent = { text, images }
+    setText('')
+    setImages([])
+    void go(sent.text, sent.images.map(i => i.path)).then(ok => ok || (setText(sent.text), setImages(sent.images)))
+  }
+  const pick = (id: string, n: number) => daemon.call('aiAnswer', { id, n, chat }).catch(() => {})
+  const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
+  const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
+  const groups = d ? turns(d.chat) : []
+  const backend = ai.backend ?? 'openrouter'
+  const hello = !w
+    ? { title: 'What should it show?', text: 'Describe it, or start from a starter: Laki AI writes it with made-up data to look at. It stays off until you try it and turn it on.', examples: EXAMPLES }
+    : mine
+      ? { title: `Change ${w.name}`, text: 'Say what to change: Laki AI rewrites it, checks it, and the preview shows it with its sample data. Undo puts the last version back.', examples: ['Show the count in red when it is over 10', 'Add a refresh button to the full view', 'Make the full view a table with sorting'] }
+      : { title: `Ask about ${w.name}`, text: `It ${w.builtin ? 'comes with Laki' : w.project ? `comes with ${w.repo ?? 'its repo'}` : 'lives in a folder of yours'}, so Laki AI can't change it here: Remix makes a copy that's yours, with a chat of its own.`, examples: ['What does it run, and how often?', 'Where does its data come from?'] }
+  return (
+    <div className={`ext-ai ${d?.busy ? 'busy' : ''}`} ref={box}>
+      <div className="ai-win-head">
+        <span className="ai-mark">
+          <Icon name="ai" size={14} />
+        </span>
+        <span className="ai-title">
+          <b>Laki AI</b>
+          <span className="ai-sub">{d?.busy ? 'Working…' : `${BACKENDS[backend]}${backend !== 'openrouter' && ai.preset ? ` (${ai.preset})` : ''}`}</span>
+        </span>
+        <span className="grow" />
+        {chat && (
+          <button className="ai-new" disabled={!d?.chat.length || d.busy} data-tip="Start this chat over: what was said goes, the extension stays" onClick={() => void daemon.call('aiNew', { chat }).then(load, () => {})}>
+            <Icon name="plus" size={12} /> New chat
+          </button>
+        )}
+      </div>
+      <div className="ext-ai-thread" ref={thread} aria-live="polite">
+        {!d?.chat.length ? (
+          <div className="ext-ai-hello">
+            <Icon name="ai" size={22} />
+            <b>{hello.title}</b>
+            <p className="muted small">{hello.text}</p>
+            {!w && (
+              <div className="ext-ai-starters">
+                {STARTER_KINDS.map(k => (
+                  <button key={k} className="nw-chip" disabled={busy} data-tip={STARTERS[k].blurb} onClick={() => void go(`Start from the "${STARTERS[k].title}" starter (${STARTERS[k].blurb}), then make it mine: ask me what it should show.`)}>
+                    {STARTERS[k].title}
+                  </button>
+                ))}
+              </div>
+            )}
+            {hello.examples.map(e => (
+              <button key={e} className="ext-ai-example" disabled={busy} onClick={() => void go(e)}>
+                {e}
+              </button>
+            ))}
+            {w && !mine && cfg.remix && !w.oneFile && (
+              <button className="sm" onClick={() => void cfg.remix!(w.id)}>
+                <Icon name="copy" size={12} /> Remix it
+              </button>
+            )}
+            {!chat && !!cfg.chats?.length && (
+              <div className="ext-ai-left">
+                <b className="small">Where you left off</b>
+                <StudioSessions api={cfg} />
+              </div>
+            )}
+          </div>
+        ) : (
+          groups.map((g, i) => {
+            if (!Array.isArray(g)) return <Message key={i} m={g} link={same} busy={busy || !!d.ended || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />
+            const at = g[g.length - 1].at
+            const later = !d.busy && w?.history?.some(h => h > at)
+            return (
+              <div key={i} className="ext-ai-turn">
+                <Tools list={g} live={d.busy && i === groups.length - 1} />
+                {later && (
+                  <button className="link small" data-tip="Its files as they were after this" onClick={() => undo(at)}>
+                    Undo to here
+                  </button>
+                )}
+              </div>
+            )
+          })
+        )}
+        {d?.busy && (
+          <div className="ai-working">
+            <span className="ai-dots">
+              <i />
+              <i />
+              <i />
+            </span>
+            Working…
+            <button onClick={() => daemon.call('aiStop', { chat })}>Stop</button>
+          </div>
+        )}
+        {d?.ended && <p className="muted small">This chat ended after hours unused: what you type starts a new one.</p>}
+      </div>
+      <div className="ext-ai-dock">
+        <div className="nw-card nw-composer ai-composer">
+          <PromptInput
+            value={text}
+            onChange={setText}
+            images={images}
+            onImages={setImages}
+            save={(data, ext) => daemon.call<string>('imageSave', { data, ext })}
+            dictate={bridge?.dictate}
+            dictationSettings={bridge?.dictationSettings}
+            onSubmit={send}
+            enter
+            onBusy={setSaving}
+            rows={2}
+            placeholder={!w ? 'Describe the extension…' : mine ? `What should change in ${w.name}?` : `Ask about ${w.name}…`}
+            tools={
+              <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={busy || saving || (!text.trim() && !images.length)} onClick={send}>
+                <Icon name="arrowRight" size={14} />
+              </button>
+            }
+          />
+        </div>
+        {err && <div className="ai-err">{err}</div>}
+      </div>
+    </div>
+  )
+}
+const same = (t: string) => t
+
+// what will run, from its files: the fetch (or its script's text, or the one file), each action's command
+type Runs = { fetch?: string; script?: [string, string]; actions: [string, string][]; stream?: boolean }
+function runsOf(files: Record<string, string>): Runs {
+  let m: any = {}
+  try {
+    m = JSON.parse(files['widget.json'] ?? '{}')
+  } catch {}
+  const one = !files['widget.json'] ? Object.entries(files)[0] : undefined // a one-file extension: the file is it
+  const acts = Object.entries(m.actions && typeof m.actions === 'object' ? m.actions : {}).map(([k, v]: [string, any]) => [k, typeof v === 'string' ? v : typeof v?.ai === 'string' && v.run === undefined ? `an agent answers: ${v.ai}${v.tools ? ` (may use unasked: ${v.tools})` : ''}` : String(v?.run ?? '')] as [string, string])
+  return { fetch: typeof m.fetch === 'string' ? m.fetch : undefined, script: m.script ? [m.script, files[m.script] ?? '(not found)'] : one, actions: acts, stream: m.stream === true }
+}
+
+// Try it live and Turn on: exactly what will run (its fetch or script, each action's command, a JS page's network),
+// then one fetch while off (widgetRun once), or on
+function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boolean; cfg: WidgetsApi; onClose: () => void; onRan: () => void; onOn: () => void }) {
+  const [r, setR] = useState<Runs | null>(null)
+  const [hash, setHash] = useState<string>() // its files as shown: Turn on holds only for them (widgetSet seen)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ai = w.source?.kind === 'ai' ? w.source : undefined // an agent runs, not its fetch
+  useEffect(() => {
+    daemon.call<{ files: Record<string, string>; hash?: string }>('widgetFiles', { id: w.id }).then(
+      x => (setR(runsOf(x.files)), setHash(x.hash)),
+      e => setErr(String(e?.message ?? e)),
+    )
+  }, [w.id, w.rev])
+  const run = () => {
+    setBusy(true)
+    setErr('')
+    cfg.tryOnce?.(w.id, w.here ?? undefined).then(
+      x => (x.ok ? onRan() : setErr(x.error ?? 'it failed'), setBusy(false)),
+      e => (setErr(String(e?.message ?? e)), setBusy(false)),
+    )
+  }
+  const turnOn = () => void cfg.set(w.id, { on: true, seen: hash }).then(onOn, e => setErr(String(e?.message ?? e)))
+  return (
+    <Modal title={on ? `Turn on ${w.name}?` : `Try ${w.name} live?`} onClose={onClose}>
+      <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : `${ai ? 'Its agent' : 'It'} runs once, now, as you on this Mac: the preview then shows what it really gets. Nothing else runs.`}</p>
+      {!r ? (
+        <p className="muted small">{err || 'Reading its files…'}</p>
+      ) : (
+        <div className="ext-ai-runs">
+          {ai && (
+            <>
+              <b className="small">An agent, {ai.profile || extAgent(cfg)}, with your MCP servers{ai.tools ? `; it may use unasked: ${ai.tools}` : ''}</b>
+              <pre className="mono">{ai.prompt}</pre>
+            </>
+          )}
+          {r.fetch && !ai && (
+            <>
+              <b className="small">Its own script{r.stream ? ' (a stream: runs all along once on)' : ''}</b>
+              <pre className="mono">{r.fetch}</pre>
+            </>
+          )}
+          {r.script && (
+            <>
+              <b className="small">{r.script[0]}</b>
+              <pre className="mono">{r.script[1].slice(0, 4000)}</pre>
+            </>
+          )}
+          {!!r.actions.length && (
+            <>
+              <b className="small">Its actions (run when you click them{w.tools?.length ? ', or an agent calls one' : ''})</b>
+              {r.actions.map(([k, c]) => (
+                <pre key={k} className="mono">
+                  {k}: {c}
+                </pre>
+              ))}
+            </>
+          )}
+          {!r.fetch && !r.script && !ai && !r.actions.length && <p className="muted small">It runs nothing: what it shows is its own page.</p>}
+          {w.js && (
+            <Switch className="switch-row" on={!!w.net} onChange={net => void cfg.set(w.id, { net })}>
+              <span>Network access: its page may fetch() from https sites</span>
+            </Switch>
+          )}
+        </div>
+      )}
+      {err && r && <div className="ai-err">{err}</div>}
+      <div className="ext-ai-btns">
+        <button onClick={onClose}>Cancel</button>
+        {on ? (
+          <button className="primary" disabled={!r} onClick={turnOn}>
+            Turn it on
+          </button>
+        ) : (
+          <>
+            {busy && w.agent && cfg.stop && (
+              <button data-tip="Its agent's run ends now" onClick={() => void cfg.stop!(w.id).catch(() => {})}>
+                Stop
+              </button>
+            )}
+            <button className="primary" disabled={!r || busy || r.stream || w.every === undefined} data-tip={r?.stream ? 'A stream runs only once it is on' : undefined} onClick={run}>
+              {busy ? 'Running…' : 'Run it once'}
+            </button>
+          </>
+        )}
+      </div>
+    </Modal>
   )
 }
 
 // how it looks: in its first place (a cell of the sidebar's grid, a line of a bar, a button) and its full view, with
 // its data or its sample; then its settings
-export const CELLS: [number, number][] = [
+const CELLS: [number, number][] = [
   [1, 0.5],
   [1, 1],
   [2, 1],
@@ -160,7 +489,7 @@ export const CELLS: [number, number][] = [
   [4, 4],
 ]
 // as a Desk tile shows it: its full view when it has one (room for a long table or list), else its preview (sample: a fixture by name too)
-export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetApi; sample: boolean | string; note?: string }) {
+function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetApi; sample: boolean | string; note?: string }) {
   return (
     <div className="desk-tile ext-desk">
       <div className="desk-head">
@@ -172,8 +501,7 @@ export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetA
   )
 }
 
-function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; spot?: number; field?: string }) {
-  const [pick, setPick] = useState<'live' | 'sample'>()
+function Preview({ w, api, cfg, pick, setPick, spot = 0, field }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; pick: Pick; setPick: (p: Pick) => void; spot?: number; field?: string }) {
   // Edit: its settings scrolled to, lit (Settings' spot) and its first field focused
   const form = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -206,11 +534,8 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
       {w.byAi && !w.on && (
         <div className="ext-note">
           <Icon name="ai" />
-          <span className="grow">Laki AI wrote it, so it's off: its own script is a command a model wrote. Look at its folder, then turn it on.</span>
+          <span className="grow">Laki AI wrote it, so it's off: its own script is a command a model wrote. Turn on (at the top) shows what it runs first.</span>
           {cfg.folder && <button onClick={e => cfg.folder!(w.id, e)}>Its folder</button>}
-          <button className="primary" onClick={() => void cfg.set(w.id, { on: true })}>
-            Turn it on
-          </button>
         </div>
       )}
       <section className="ext-card">
@@ -524,9 +849,7 @@ const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).
 // the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
 // a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
 // data or files change, and every 2 s while Runs shows
-export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check' | 'logs'>; draft?: Draft | null; setDraft?: (d: Draft | null) => void }) {
-  const [own, setOwn] = useState<Draft | null>(null) // the studio's: no page to keep it across tabs
-  const [draft, setDraft] = kept.setDraft ? [kept.draft ?? null, kept.setDraft] : [own, setOwn]
+function Inspector({ w, cfg, tab, draft, setDraft }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check' | 'logs'>; draft: Draft | null; setDraft: (d: Draft | null) => void }) {
   const [x, setX] = useState<WidgetRuns | null>(null)
   const [files, setFiles] = useState<Record<string, string> | null>(null)
   const [sel, setSel] = useState('')
@@ -861,7 +1184,7 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
 // Check (laki widget check): widget.json, its templates, its ui against its sample and fixtures, read again as its files
 // change; Check with a fetch runs it once (never one Laki AI wrote while it's off)
 const MARK = { ok: '✓', warn: '!', error: '✗' }
-export function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
+function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
   const [r, setR] = useState<{ problems: UiProblem[]; run: boolean } | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -914,7 +1237,7 @@ function Start({ ai, home, onAiSettings }: { ai: boolean; home?: string; onAiSet
   const copy = () => navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 2000)))
   const steps: [string, string][] = [
     ['Describe it', ai ? 'In the chat: what it shows and where its data comes from.' : 'Turn Laki AI on, then describe it in the chat here.'],
-    ['Answer a few questions', 'Where it sits, what a click does, how often it refreshes.'],
+    ['Answer what it asks', "Only what it can't tell from what you said: where its data comes from, what it shows."],
     ['Look at it', 'It shows on this page with made-up data, its settings below it.'],
     ['Turn it on, or ask for changes', "It's saved off: you look first. Ask again until you like it."],
   ]

@@ -314,7 +314,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view; `sample`: filled with widget.json's `sample` and `sampleConfig` over its settings, `at` two minutes ago,
   `sample: true`), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes;
-  `name`: written in widget.json (`rename`: 60 characters, empty drops it; not a built-in's nor one file's; the studio's
+  `name`: written in widget.json (`rename`: 60 characters, empty drops it; not a built-in's nor one file's; the history's
   `snapshot` first, then `scanWidgets`, nothing fetched), `WidgetCard`'s name field;
   `ai`: the Extension page's chat sets it before each ask, one of the user's in `widgetHome()` (else refused) gets the
   store's `aiMay` (an hour), which lets `widgetWrite` rewrite it; `agent`, or `from` an agent's tab: MCP's and Laki AI's
@@ -939,7 +939,7 @@ chat's context names the tab) and run only what the user asked for, never what a
 it give a template of the user's that plainly fits the task when the group has none; `settings.ai.hideCost`: the AI page without money; `settings.ai.context` (Settings › AI › *Your instructions*, `AI_CONTEXT_MAX`): the user's words after `SYSTEM` and `SKILL`, in `system()`;
 its extension tools (`laki_extensions`: each one's places, size, settings too, `laki_extension_guide`: `widgetFormat`, `laki_extension_read`, `laki_extension_write`, `laki_extension_check`, `laki_extension_set`: where one shows, its size, every, view, hide and plain settings, never on (the skill's `laki_extension_on` asks);
 a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off, and change one it
-made or one the user let it (the Extension page's chat: `widgetSet` `ai`, then `aiAsk` with `context` `widgetHere`);
+made or one the user let it (the Extension page's chat: `widgetSet` `ai`, then `aiAsk` `chat` `widget:<id>`, whose brief is `aboutWidget`'s);
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask per chat, `AI_AT_ONCE` (4) chats at once (`busy`: each chat's stop; `refuseBusy`, set before the first await); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
@@ -959,16 +959,16 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   -c developer_instructions=… -c mcp_servers.laki.{command,args,env,tool_timeout_sec}`, `-i` per image; no cost.
 Chats (`Thread`, `thread(id)`): `''` the AI page's (`<data>/ai-chat.json`), `plan:<project>/<kind>/<slug>` a spec's or
 brainstorm's (`shared/plans.ts` `planChat`; `plans.ts` `planOfChat`: its folder's `.chat.json`, which `filesOf` hides and
-`planWrite` refuses), `widget:<id>` the extension studio's (`widgetFiles.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;
-`aboutWidget`, read at each ask into `t.about`: which one, the studio's rules, `widgetFormat()` with the kit's catalog,
+`planWrite` refuses), `widget:<id>` an extension page's (`Chat`, `widgetFiles.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;
+`aboutWidget`, read at each ask into `t.about`: which one, the page's rules, `widgetFormat()` with the kit's catalog,
 its files (`FILES_MAX`) and its check without a run), each with its messages, `resume` and `at`; `system(t)` names the spec or brainstorm. One ask per
 chat, `AI_AT_ONCE` at once ("Laki AI works in n chats already"); `aiQuestion` and `aiPermission` go to the chat their
 tools name (`aiRpc`'s `chat`: Laki AI's `laki mcp` gets it as `LAKI_AI_CHAT`; a thread's `asked`), else the only one at
-work (`asking`); a finished ask ends its own chat's `perms` only. The studio's chats: `studioChats` (`widget:<id>` files
-with a user message, newest `STUDIO_MAX` 30, `busy`; read, not kept in `threads`), `studioChatRm` (not while it works): the
-app's *In the studio* (Settings › Extensions, `StudioSessions`) and a new studio's *Where you left off* list those with
-no extension of the id yet, or at work; a new studio's first ask renames its dialog (`nameStudio`, `studioKey`: drawn
-once) and its history place. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
+work (`asking`); a finished ask ends its own chat's `perms` only. The extensions' chats: `studioChats` (`widget:<id>` files
+with a user message, newest `STUDIO_MAX` 30, `busy`; read, not kept in `threads`), `studioChatRm` (not while it works):
+Settings › Extensions' *Where you left off* (`StudioSessions`) and a new extension's chat list those with no extension
+of the id yet, or at work; a new one's first ask renames its dialog (`nameExt`, `extKey`: drawn once) and its history
+place. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
 what was said kept; the next ask starts it again empty (`fresh`), `aiContinue` keeps its session. `planRm` drops it
 (`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply. The AI page's earlier chats:
 `aiNew` on its chat keeps it first (`shelve`, once something was asked) as `<data>/ai-chats/<at>-<hex>.json` (its
@@ -1012,7 +1012,7 @@ none, empty); the page then loads README.md (`readmeBody`, `tryParseMarkdownToBl
 images; nothing out).
 
 The renderer's `Specs.tsx` (`SpecsPage`, App's `lazy` import with its `SpecEditor.tsx`, `diagram.tsx` and `plans.css`:
-BlockNote, Mantine and React Flow load only as it opens; meanwhile App's `Waiting`, the page's frame, as for Workflows and the studio:
+BlockNote, Mantine and React Flow load only as it opens; meanwhile App's `Waiting`, the page's frame, as for Workflows:
 a `null` fallback showed the workspace under it; dialog `{ specs: <project or ''>, kind?, slug? }`; the rail's
 *Specs* after Schedule, the foot's without the rail, ⌘K, a project page's *Specs* tab (`ProjectApi.specs`)): two
 levels as breadcrumbs in `Page`'s header (`head`; its `tools`: the app's full screen, `toggleFull`): the list (both kinds
@@ -1395,14 +1395,21 @@ project), the `failing` first in each group (a `devError`, or one that's on with
 Where it shows (places as pills, size, full view, the hide switches), Updates (every, network, the last fetch and Fetch
 now), Its settings (`WidgetOptionField` per
 setting, a list's `ChipsInput`), Tools for agents; its folder button is App's Open in menu with `widget`). `Extension.tsx`
-`ExtensionPage` (App's dialog `{ extension: id ('' a new one), back }`, `extOf`; closing, its crumb or Esc with nothing
-typed: `back`, so Settings › Extensions comes back; a widget's full view, `{ widget, back }`, and its logs do the same;
-`WidgetApi.settings(id)`: the page): `Preview` (its first place: a sidebar cell at its size, a bar, a button or a Desk
-tile; its full view under it; *Live* / *Sample*, sample by default while it's off or not fetched yet), `WidgetCard`,
-and Laki AI's chat beside them (`AiPage` `compact` `embed`: no close, no Esc, its box focused without scrolling;
-`hello`: the page's words; `context`: `widgetHere`, with `widgetSet` `ai` first for one of yours); a new one's page has
-`Start` (the steps, and *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as
-`widgetFormat`) and follows the first widget that appears (Laki AI's). App hides the floating chat there. The
+`ExtensionPage` (App's dialog `{ extension: id ('' a new one), back, start, key }`, `extOf`, keyed by `extKey`; the one
+place to make, change and set one up: Settings' rows and New ▾, ⌘K's *New extension…*, links.ts' `extension` and
+`studio` (`laki://settings/widgets/new`, `/<id>/studio`), Remix, the Desk's *Build with AI* (`start`: its first ask);
+closing, its crumb or Esc with nothing typed: `back`, so Settings › Extensions comes back; a widget's full view,
+`{ widget, back }`, and its logs do the same; `WidgetApi.settings(id)`: the page): `Preview` (its first place: a
+sidebar cell at its size, a bar, a button or a Desk tile; its full view under it; *Live* / *Sample*, the page's `pick`:
+sample by default while it's off or not fetched yet, again at each `rev`), `WidgetCard`, and Laki AI's chat beside
+them (`Chat`, `widget:<id>`; '' a new one's until its first ask: `widgetSlug` names it, `onNamed`, App's `nameExt`
+moves the dialog and its history place to it, `extKey` kept: not drawn again; one of yours: `widgetSet` `ai` first;
+its head *New chat* is `aiNew` on that chat; empty: `STARTERS`' chips, `EXAMPLES`, `StudioSessions`' *Where you left
+off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it opens, not on a touch screen); the head: *off*, *by Laki AI*, a failed check's chip (`cfg.check`, no run, each `rev`),
+*Undo* (yours: `widgetUndo`), *Try it live* and *Turn on* (off: `TrySheet`, below; a repo's or an agent-linked one's
+*Turn on* is `extCfg.set`'s `repoSheet`, every file it runs, and no *Try it live*: `widgetRun` `once` refuses it). A new one's page has `Start` (the
+steps, and *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as `widgetFormat`); with
+its name and no files yet, *Not saved yet* (a failed first ask, a starter's or Remix's before the next view). App hides the floating chat there. The
 ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
 browser; no fetch; 4×½),
 `widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
@@ -1467,7 +1474,7 @@ Live), `Examples` (the sample and each fixture: *Show it with this*, *Use as its
 while shown; Env; Files: `widgetFiles`' texts, editable (`FileView`: ⌘S, Esc, *Save anyway*; the draft is
 `ExtensionPage`'s, asked before it's lost) through `widgetFileSave` (`path` one of `widgetFiles`' names, `was`: refused
 as "changed since you opened it" unless `force`; JSON parsed first; never a built-in (Remix it), a link or a file over
-64 KB; the studio's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
+64 KB; the history's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
 widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then SettingsExtensions.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell, *Edit with Laki AI* (yours), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a built-in's, a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
 (links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
@@ -1634,7 +1641,7 @@ into the store's `allow` with `allowFor` (`aiKey`: the AI source's and AI action
 goes on without it; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
 in `ai-calls.jsonl` (`extension <id>: …`); `aiSystem` tells it to change nothing and answer in `sample`'s shape; the last
 ```json block is the data (none: `{ text }`). `everyOf`: `AI_SOURCE_EVERY` (60) unless set, 15 at least; `widgetCheck`
-doesn't run one. The studio's Try/Turn on sheet shows its prompt and tools instead of the fetch. Its runs and an AI
+doesn't run one. Its page's Try/Turn on sheet shows its prompt and tools instead of the fetch. Its runs and an AI
 action's go through `agentRun` (`agents`: an `AbortController` per run by extension, `aiOnce`'s `signal`, `execFile`'s, and
 `stop` `agent:<id>`, its Resources row's Stop: main.ts `resourceStop` → `stopAgents`, which also drops its `again`); the
 view's `agent` (the inspector's *Stop*, `WidgetsApi.stop`); `widgetSet` `on: false` and a new `source` stop them,
@@ -1659,7 +1666,7 @@ the grid's `minHeight` held meanwhile (a shrinking bottom tile would scroll the 
 `scroll` counted, its edges scroll it (`edge`, rAF). The Picker: `data-widget`/`data-view`/`data-sample` on an
 extension's body, frame and buttons (Widgets.tsx), a shadow root's own `elementsFromPoint`, `extOf` (its id, view, the
 kit's element by its root's class, `kitOf` from `UI_SAMPLES`, places, size, source, folder) in the dialog and
-`pickedText`. The studio's preview has a Desk tab (its full view, else its preview, as a tile).
+`pickedText`.
 
 Laki commands (`widgetUi.ts` `DO`, a button's `do`, `doOf`: `data-do`, its JSON filled; `uiBehave` sends `{ laki:
 'do', cmd, label }`, a JS page's `laki.do`): Widgets.tsx' `act` hands it to `WidgetApi.do`, App's `widgetDo`: `browse`
@@ -1747,7 +1754,7 @@ takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `lo
 source, its whole manifest as read, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`), after
 reading widget.json again (one the scan hasn't read yet: `scanWidgets` first, so its text is what the hash covers),
 `widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
-(the studio's TrySheet, `laki widget on --seen`), `toolAsk` carries it and `approve` compares it after the answer (*its
+(its page's TrySheet, `laki widget on --seen`), `toolAsk` carries it and `approve` compares it after the answer (*its
 files changed while you were asked*: not run, no Always).
 `approve` (the ask) is shared with `widgetAction`'s `from`: core's `agentCaller` (`from.tab` an agent tab, or a shell tab in
 `shellAgents`; `laki new`'s `byCaller` too) makes a tool's action a `widgetToolCall` (its arg as JSON input) and any other
@@ -1812,17 +1819,13 @@ returns its `<project>.<id>`. The renderer: App's `ownWidgets` (every place but 
 *From <project>* groups and a *changed* tag; the page's *From <project>'s .laki/extensions* tag, the changed banner
 (*Look…*), Files read-only with Remix.
 
-The studio (`WidgetStudio.tsx`, App's lazy dialog `{ studio: id ('' a new one), back }`, only while `aiOn`; `WidgetsApi`
-`studio`, `remix`, `undo`, `tryOnce`; entries: New ▾ › Make with Laki AI (`page('')` too), a row's and `WidgetCard`'s ✨
-(yours in `widgetHome()`) and Remix, ⌘K *New extension…*, links.ts' `studio`: `laki://settings/widgets/new` and
-`/<id>/studio`): `StudioChat` (Ai.tsx' `Message`, `Tools`, `turns`, `PromptInput`; empty: `STARTERS`' chips and
-`EXAMPLES`), its first ask's id from `widgetSlug` (its first words less filler, `freeId`: no widget, folder or chat of
-it), then `aiAsk` `chat: 'widget:<id>'` (one of yours: `widgetSet` `ai` first). `StudioPreview` (a place to look at, a
-size, the full view), Extension.tsx' `Inspector` and `Check`; sample first: `widgetMock` `fixture: 'sample'` at each
-`rev` (else widget.json's `sample`), never a fetch. `TrySheet` (`runsOf` over `widgetFiles`: the fetch, a script's text,
-the actions' commands, a JS page's `net`): `widgetRun` `once` (an off one, Laki AI's too: one fetch, `manual`, the run's
-`why` says so; not a stream; not a per-workspace one, whose preview is its sample on `SAMPLE_WS`) or `widgetSet` `on`
-(its mock dropped there; then it closes unless *Stay*). `widgetWrite` snapshots the folder first
+Making one with Laki AI (Extension.tsx' `ExtensionPage`, above; `WidgetsApi` `remix`,
+`undo`, `tryOnce`): `Chat`'s first ask's id from `widgetSlug` (its first words less filler, `freeId`: no widget, folder
+or chat of it), then `aiAsk` `chat: 'widget:<id>'`. The preview on its sample (widget.json's `sample` or a fixture),
+never a fetch. `TrySheet` (`runsOf` over `widgetFiles`: the fetch, a script's text, the actions' commands, a JS page's
+`net`): `widgetRun` `once` (an off one, Laki AI's too: one fetch, `manual`, the run's `why` says so; not a stream; not
+a per-workspace one: turn it on, then look in a workspace), the preview on *Live* after it; or `widgetSet` `on` with
+`seen` (its files as shown). `widgetWrite` snapshots the folder first
 (`snapshot`: `<data>/widget-data/<id>.history/<ms>/`, `.none` when there was none, `HISTORY` 20; never its top-level
 `node_modules` or `.git`, `KEPT`, which Undo leaves where they are), the view's `history`
 (Laki's folder's only); `widgetUndo` (`after`: the first taken after then, a turn's *Undo to here*; none: the newest)
@@ -1994,7 +1997,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
       the bar's end; its right click, or ⌘K where no status bar shows it, floats it again).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.aiDrafts`: Laki AI's composers' unsent text and images (paths, shown again through `aiImage`), by chat:
-      PromptInput.tsx `useDraft` (the AI page, floating chat and AI window share `ai:<chat>`; the studio's `widget:<id>`,
+      PromptInput.tsx `useDraft` (the AI page, floating chat and AI window share `ai:<chat>`; an extension page's `widget:<id>`,
       `widget:` a new one; a brainstorm's chat; `desk:build`); kept by Reset the interface (`UI_KEEP`).
     - `laki.newDraft`: the new-workspace page's draft (`Draft`: the form, images, race, template), saved as it changes
       while something's typed, dropped as it's made (back if that fails) or *Clear*ed; `laki.scheduleDraft`: Scheduled
@@ -2406,7 +2409,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
   `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskBuild`, a `Modal`: `PromptInput` with `files`, text files
   inlined by `deskAsk` (`FILE_MAX`), a screenshot through main's `shoot` IPC (`screenshot` with `then`); `DeskApi.build`:
-  App's `{ studio: '', back: 'desk', first }`, the studio's `StudioChat` sends `first` once (`started`), back in the box
+  App's `{ extension: '', back: 'desk', start }`, the page's `Chat` sends `start` once (`started`), back in the box
   if it fails); `whereNow` names the Desk's tiles by id. `pending`
   (and `pendingTabs`): the tiles and tabs just saved (`DeskApi.save`, one `settingsSet`), shown until the settings
   bring them back.
@@ -2519,7 +2522,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/widgetEvents.ts` | events and their handlers, gates before a ship, merge or archive, streams |
 | `src/daemon/widgetTools.ts` | tools for agents, the asks before they run, grants, an AI source's permission asks |
 | `src/daemon/widgetTrust.ts` | what a Yes holds for: `filesHash`, a repo extension's whole folder (`repoFiles`, `dirHash`), `widgetWhat` |
-| `src/daemon/widgetFiles.ts` | an extension's files read and written, the studio's history and undo, Remix, the trash |
+| `src/daemon/widgetFiles.ts` | an extension's files read and written, its history and undo, Remix, the trash |
 | `src/daemon/widgetDev.ts` | runs, mock data and fixtures, `laki widget dev`'s links, `widgetNew`, the checker |
 | `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page; the meters' `meterOf`: a transcript's context and tokens |
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
@@ -2545,8 +2548,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
-| `src/renderer/src/WidgetStudio.tsx` | the extension studio: Laki AI's chat, the preview on sample data, the inspector, Undo, Try it live, Turn on |
-| `src/renderer/src/Extension.tsx` | an extension's page: its preview (live or its sample), settings and Laki AI's chat; New extension |
+| `src/renderer/src/Extension.tsx` | an extension's page, the one place to make, change and set one up: its preview (live or its sample), settings, the inspector, Laki AI's chat (starters, Undo to here), Undo, Try it live, Turn on; New extension |
 | `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab and floated simulator windows (`?window=new`, `ai`, `tab`, `sim`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
 | `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |

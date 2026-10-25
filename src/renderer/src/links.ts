@@ -7,7 +7,7 @@ export type Link =
   | { to: 'schedules'; project?: string }
   | { to: 'settings'; section?: string; spot?: string } // spot: a group's title, lit (the app menu's Check for Updates…)
   | { to: 'extension'; id: string; inspect?: boolean } // laki://settings/widgets/<id>[/inspect]: its page, or its inspector
-  | { to: 'studio'; id: string } // laki://settings/widgets/new, laki://settings/widgets/<id>/studio: the extension studio ('': a new one)
+  | { to: 'studio'; id: string } // laki://settings/widgets/new, laki://settings/widgets/<id>/studio: its page with Laki AI's chat ('': a new one)
   | { to: 'help' }
   | { to: 'board' }
   | { to: 'achievements' }

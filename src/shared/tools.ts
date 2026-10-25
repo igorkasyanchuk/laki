@@ -267,7 +267,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_extension_write',
-    description: "Make an extension, or change one Laki AI made or the user let it edit (Edit with Laki AI): its files in Laki's extensions folder (never the user's other ones). Files left out stay as they are. Saved turned off (one that was on stays on when what it runs is the same: the note says): link its page, [its name](laki://settings/widgets/<id>), where the user turns it on, and say what its fetch runs.",
+    description: "Make an extension, or change one Laki AI made or the user let it edit (an ask in its page's chat): its files in Laki's extensions folder (never the user's other ones). Files left out stay as they are. Saved turned off (one that was on stays on when what it runs is the same: the note says): link its page, [its name](laki://settings/widgets/<id>), where the user turns it on, and say what its fetch runs.",
     inputSchema: obj(
       {
         id: str('a new id for a new one: lowercase letters, digits and dashes (e.g. ny-clock)'),

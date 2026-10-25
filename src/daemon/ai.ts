@@ -44,7 +44,7 @@ The user's extensions may give you tools: laki_extension_tools lists them (with 
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
 Workflows (unless the user turned them off): blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project (asked on the Workflows page, the ask says which workflow is open and gives its file as the editor has it, unsaved changes too: change that one). Blocks: agent (json: yes: its answer the JSON object or list it ends with), run, ask, choice, case (text, numbers, JS), action, wait, save, llm (an AI call; json: yes for JSON mode), decide (an AI decision: yes/no "how true", choice and score questions; route: <question> gives a line per answer), webhook, popup (Show you: a window with HTML or Markdown), end (notify: yes, phone: yes, its words as > lines). Before writing a new workflow, ask the user at least 2 questions, one at a time with laki_ask (options to tap): what starts it and what it works on, its steps, where it routes, what it keeps or posts, how it tells them it's done; for a change, ask when what they want isn't clear. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
-Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made or the user let you edit (Edit with Laki AI), yourself (the rest of the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off (one that was on stays on when only its looks changed: the result's note says which): tell the user what its fetch runs and link its page, [its name](laki://settings/widgets/<its id>), where they look at it, edit it and turn it on.
+Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made or the user let you edit (by asking you in its page's chat), yourself (the rest of the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off (one that was on stays on when only its looks changed: the result's note says which): tell the user what its fetch runs and link its page, [its name](laki://settings/widgets/<its id>), where they look at it, edit it and turn it on.
 Where any of the user's extensions shows (the Desk, the sidebar, a bar, a button), its size, how often it fetches and its settings: laki_extension_set changes them, no file to write; it never turns one on.
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
@@ -72,7 +72,7 @@ function aboutPlan(plan: ReturnType<typeof planOfChat>) {
     got?.files.length && `Files in its folder: ${got.files.slice(0, 60).map(f => f.path).join(', ')}.`,
   ].filter(Boolean).join('\n')
 }
-// a widget chat's (the studio's: widget:<id>), at each ask: which extension, the rules, the format with the UI kit's
+// a widget chat's (an extension page's: widget:<id>), at each ask: which extension, the rules, the format with the UI kit's
 // catalog, its files and its last check as they are now (the user undoes, edits, or the last ask wrote)
 const FILES_MAX = 40000
 async function aboutWidget(id: string) {
@@ -94,7 +94,7 @@ async function aboutWidget(id: string) {
     return `<file name="${n}">\n${s}${s.length < t.length ? '\n… (cut: laki_extension_read has all of it)' : ''}\n</file>`
   })
   return [
-    `This chat is Laki's extension studio for ${v ? `the extension "${v.name}" (id ${id})` : `a new extension: its id is ${id}`}. The user sees its preview, with its sample data, beside this chat: every ask in it is about it, even one that doesn't name it.${v && v.dir !== `${widgetHome()}/${id}` ? " It isn't in Laki's own folder (it comes with Laki, or it's in a folder of the user's): you can't write it; the user's Remix makes a copy you can." : ''}`,
+    `This chat is on the page of ${v ? `the Laki extension "${v.name}" (id ${id})` : `a new Laki extension: its id is ${id}`}. Beside it the user sees its preview (with its sample data), its settings and its inspector: every ask in it is about it, even one that doesn't name it.${v && v.dir !== `${widgetHome()}/${id}` ? " It isn't in Laki's own folder (it comes with Laki, or it's in a folder of the user's): you can't write it; the page's Remix makes a copy you can." : ''}`,
     `Rules here:
 1. Write only ${id}, with laki_extension_write.
 2. Prefer ui (the UI kit's elements); widget.html only for a look of its own.
@@ -281,8 +281,8 @@ export function aiChatRm(p: { id: string }) {
   rmSync(join(pastDir, `${p.id}.json`), { force: true })
   return { ok: true }
 }
-// the extension studio's chats (widget:<id>), newest first (STUDIO_MAX): the app shows the ones with no extension made
-// of them yet, and the one at work, so a studio closed mid-build is where you left it
+// the extension pages' chats (widget:<id>), newest first (STUDIO_MAX): the app shows the ones with no extension made
+// of them yet, and the one at work, so a page closed mid-build is where you left it
 const STUDIO_MAX = 30
 const STUDIO_FILE = /^widget:([a-z0-9][a-z0-9-]{0,39})\.chat\.json$/
 export function studioChats(): StudioChat[] {

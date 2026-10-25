@@ -1050,12 +1050,12 @@ or Esc, goes back where you came from (Settings, My Desk).
 *Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a
 file, a URL), shows the data, and its examples (its sample and each `fixtures/*.json`: *Show it with this*); the
 preview's *Sample* picks one. Its **Files** tab edits its files: *Edit*, then *Save* or ⌘S (JSON is checked first, it
-reloads at once, and the studio's *Undo* keeps the version before). One that comes with Laki: *Remix it…* there
+reloads at once, and *Undo* in its head keeps the version before). One that comes with Laki: *Remix it…* there
 makes a copy that's yours to change (`laki widget remix <id> [new-id]` too), with Laki AI on or off.
 Settings › Extensions › *Icons* shows every icon an extension can name, with a search; a click copies the name.
 
 To make one: Settings › Extensions › *Yours* › **New ▾**: *From a starter…* makes one on sample data and opens its
-page; *With Laki AI…* opens the studio (below). Without Laki AI it opens a new extension's page, where *Copy the
+page; *With Laki AI…* opens a new extension's page with Laki AI's chat (below). Without Laki AI that page's *Copy the
 prompt* gives any AI chat the whole format with what you typed;
 save the files it gives you in `<data>/widgets/<id>/` and press *Reload extensions*. Or install the *Extension
 creator* skill (Settings › Agent skill) and ask your agent ("an extension with my open issues"). An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
@@ -1131,14 +1131,15 @@ to ask): agents list them with `laki widget tools`, call one with `laki widget t
 MCP, and Laki shows you the command first (once per workspace, every time, or never, as the tool says). Settings ›
 Extensions lists each tool and where you allowed it always, with *Revoke*.
 
-With Laki AI on, *New ▾ › With Laki AI…* (⌘K *New extension…*) opens the **extension studio**: say what it
-should show and Laki AI writes it beside its preview on sample data (it asks you a couple of questions first);
-*Try it live* shows what it runs and runs it once, *Undo* takes a change back, *Turn on* turns it on. A row's ✨ opens
-one of yours there. *Remix* (a row's, any one's) makes a copy that's yours to change and opens it: in the studio with
-Laki AI on, else on its page. An extension's page keeps its own chat with Laki AI, apart from the AI page's.
-Close the studio while Laki AI builds and it goes on: Settings › Extensions › *In the studio* (and a new studio's
-*Where you left off*) lists what you're making that isn't saved yet, or that it works on now; a click goes back to
-that chat, the trash can lets one go. You can start another meanwhile: Laki AI works in up to 4 chats at once.
+With Laki AI on, *New ▾ › With Laki AI…* (⌘K *New extension…*) opens a **new extension's page**, Laki AI's chat on
+its right: say what it should show, or pick a starter, and Laki AI writes it (it asks only what it can't tell
+from what you said). The page then shows it as every extension's page does: its preview on sample data, its settings, its data,
+runs, logs and files, with the chat still beside them. *Try it live* shows what it runs and runs it once, *Undo* takes
+a change back, *Turn on* turns it on. *Remix* (a row's, any one's) makes a copy that's yours to change and opens its
+page. Each extension's page keeps its own chat with Laki AI, apart from the AI page's.
+Close the page while Laki AI builds and it goes on: Settings › Extensions › *Where you left off* (and a new
+extension's chat) lists what you're making that isn't saved yet, or that it works on now; a click goes back to its
+page, the trash can lets one go. You can start another meanwhile: Laki AI works in up to 4 chats at once.
 
 To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). The
 ones that come with Laki only turn off.
@@ -1443,7 +1444,7 @@ type to find one, or type or paste an emoji; *No icon*) or a color (its icon in 
 there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) opens a dialog: say what it should show, add screenshots (paste, drop, + or the
-crop button: a part of the screen) and text files, then *Build it*: the extension studio opens and Laki AI writes the
+crop button: a part of the screen) and text files, then *Build it*: a new extension's page opens and Laki AI writes the
 extension for My Desk. It shows as a tile right away, dashed, with its made-up data and
 *By Laki AI · off*: *Look* opens its page (what it runs, its settings), *Turn on* runs it. Ask the chat for changes
 and the tile follows; *Take it off My Desk* in a tile's ⋯ removes it.

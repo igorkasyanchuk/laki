@@ -432,7 +432,7 @@ test('extensions Laki AI writes: in its own folder only, saved off (one on stays
   mkdirSync(join(rig.data, 'widgets', 'mine'))
   writeFileSync(join(rig.data, 'widgets', 'mine', 'widget.json'), json)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.json': json } }), /the user's own/)
-  // Edit with Laki AI: rewrites for its hour (a write, a check, a fix), then it's theirs again
+  // an ask in its page's chat: rewrites for its hour (a write, a check, a fix), then it's theirs again
   await rig.rpc('widgetReload')
   await assert.rejects(rig.rpc('widgetSet', { id: 'links', ai: true }), /Laki's folder/, 'one that comes with Laki: never')
   await rig.rpc('widgetSet', { id: 'mine', ai: true })

@@ -36,7 +36,7 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   answers.push(reply({ content: '', tool_calls: [call('c1', 'laki_extension_write', { id, files: files('Open PRs') })] }), reply({ content: '', tool_calls: [call('c2', 'laki_extension_check', { id })] }), reply({ content: 'Made it: its fetch runs gh pr list.' }))
   assert.deepEqual(await rig.rpc('aiAsk', { chat: `widget:${id}`, text: 'Show my open PRs as a list with CI status' }), { text: 'Made it: its fetch runs gh pr list.' })
   const sys = hits[0].messages[0].content
-  assert.match(sys, /extension studio for a new extension: its id is open-prs-list/)
+  assert.match(sys, /page of a new Laki extension: its id is open-prs-list/)
   assert.match(sys, /Always write fixtures\/sample\.json/)
   assert.match(sys, /`list` \(/, 'the kit catalog')
   assert.match(hits[2].messages.at(-1).content, /ok|no problems|✓|\[\]/i, 'the check ran')

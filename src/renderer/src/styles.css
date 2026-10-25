@@ -1751,7 +1751,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-win-head { flex: none; display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 10px 0 14px; }
 .ai-win-head > .ai-mark { position: relative; width: 30px; height: 30px; }
 /* at work: a comet circles the mark */
-.ai-window.busy .ai-win-head > .ai-mark::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; background: conic-gradient(transparent 0 40%, var(--accent)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px)); animation: spin 1s linear infinite; } /* the bubbles' comet ring */
+:is(.ai-window, .ext-ai).busy .ai-win-head > .ai-mark::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; background: conic-gradient(transparent 0 40%, var(--accent)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px)); animation: spin 1s linear infinite; } /* the bubbles' comet ring */
 .ai-title { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .ai-title > b { font-size: 13.5px; font-weight: 600; letter-spacing: 0.01em; }
 .ai-sub { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1807,7 +1807,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-grip.l, .ai-grip.r { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; } .ai-grip.l { left: -4px; } .ai-grip.r { right: -4px; }
 .ai-grip:is(.tl, .tr, .bl, .br) { width: 16px; height: 16px; } .ai-grip.tl { top: -5px; left: -5px; cursor: nwse-resize; } .ai-grip.br { right: -5px; bottom: -5px; cursor: nwse-resize; } .ai-grip.tr { top: -5px; right: -5px; cursor: nesw-resize; } .ai-grip.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
 .ai-float[class*='sizing-'], .ai-float[class*='sizing-'] * { user-select: none; } .ai-float:is(.sizing-t, .sizing-b) * { cursor: ns-resize !important; } .ai-float:is(.sizing-l, .sizing-r) * { cursor: ew-resize !important; } .ai-float:is(.sizing-tl, .sizing-br) * { cursor: nwse-resize !important; } .ai-float:is(.sizing-tr, .sizing-bl) * { cursor: nesw-resize !important; }
-@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-fab-min, .ai-window::before { transition: none; } .ai-fab-wrap, .sb-ai, .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ai-fab, .ai-fab-min, .ai-window::before { transition: none; } .ai-fab-wrap, .sb-ai, .ai-float, .ai-shimmer, .ai-window .ai-mark::after, .ext-ai .ai-mark::after { animation: none; } }
 /* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
 @property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .ai-peek { position: fixed; z-index: 9; pointer-events: none; border-radius: var(--rs, 8px); box-shadow: inset 0 0 18px 3px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 48px 10px color-mix(in srgb, var(--tc-purple) 34%, transparent), inset 0 0 110px 24px color-mix(in srgb, var(--tc-pink) 16%, transparent); animation: ai-peek 2.6s ease-out forwards; }
@@ -2419,8 +2419,6 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-main { min-width: 0; overflow-y: auto; padding: 22px 24px 40px; display: flex; flex-direction: column; gap: 16px; }
 .ext-main > * { width: 100%; max-width: 860px; margin: 0 auto; }
 .ext-chat { min-height: 0; display: flex; border-left: 1px solid var(--line); background: var(--side); }
-.ai-window.ai-embed { position: relative; inset: auto; flex: 1; min-width: 0; min-height: 0; background: transparent; }
-.ai-embed .ai-win-head { height: 48px; }
 .ext-ai-off { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 280px; padding: 24px; text-align: center; color: var(--muted); }
 .ext-ai-off > b { color: var(--fg); }
 .ext-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 4px); background: var(--panel); }
@@ -2546,6 +2544,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
   .page-body > .ext { display: flex; flex-direction: column; overflow-y: auto; }
   .ext-main { overflow: visible; }
   .ext-chat { flex: none; height: 560px; border-left: none; border-top: 1px solid var(--line); }
+  .ext.new > .ext-chat { order: -1; border-top: none; border-bottom: 1px solid var(--line); } /* a new one: say what it should show first */
 }
 .narrow .ext-steps { grid-template-columns: minmax(0, 1fr); }
 /* Settings › Tunnels' setup: numbered, a command each where there is one */
@@ -2553,35 +2552,30 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .tunnel-steps > li { display: flex; gap: 10px; }
 .tunnel-steps > li > div { flex: 1; min-width: 0; }
 .tunnel-steps p { margin: 2px 0 0; }
-/* the extension studio (WidgetStudio.tsx): the chat left, the preview and the inspector right */
-.page-body > .studio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); }
-.studio-chat { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--side); }
-.studio-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
-.studio-thread .ai-working { margin-left: 0; }
-.studio-dock { padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
-.studio-hello { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 8px 4px; }
-.studio-hello > svg { color: var(--accent-ink); }
-.studio-hello p { margin: 0 0 4px; }
-.studio-starters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-.studio-left { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px; }
-.studio-left .sched-list { width: 100%; }
-.studio-example { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 2px); background: var(--panel); color: var(--fg); font-size: 12.5px; }
-.studio-example:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
-.studio-turn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.studio-turn > .link { padding: 0 2px 0 36px; }
-.studio-turn { min-width: 0; max-width: 100%; }
-.studio-turn > .ai-tools { max-width: calc(100% - 36px); }
-.studio-main { min-width: 0; overflow-y: auto; padding: 18px 22px 40px; display: flex; flex-direction: column; gap: 14px; }
-.studio-main > * { width: 100%; max-width: 860px; margin: 0 auto; }
-.studio-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; max-width: 380px; }
-.studio-chips { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
-.studio-chips button.tag { cursor: pointer; border: none; font: inherit; }
-.studio-acts { display: inline-flex; gap: 6px; }
-.studio-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; } .studio-btns > .ask-check { margin: 0; }
-.studio-runs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
-.studio-runs pre { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
-.narrow .page-body > .studio { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-.narrow .studio-chat { border-right: none; border-bottom: 1px solid var(--line); }
+/* an extension's page: Laki AI's chat in its right column (Extension.tsx' Chat), the head's buttons, Try it live's sheet */
+.ext-ai { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.ext-ai > .ai-win-head { height: 48px; }
+.ext-ai-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+.ext-ai-thread .ai-working { margin-left: 0; }
+.ext-ai-dock { padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.ext-ai-hello { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 8px 4px; }
+.ext-ai-hello > svg { color: var(--accent-ink); }
+.ext-ai-hello p { margin: 0 0 4px; }
+.ext-ai-starters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.ext-ai-left { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px; }
+.ext-ai-left .sched-list { width: 100%; }
+.ext-ai-example { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 2px); background: var(--panel); color: var(--fg); font-size: 12.5px; }
+.ext-ai-example:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.ext-ai-turn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ext-ai-turn > .link { padding: 0 2px 0 36px; }
+.ext-ai-turn { min-width: 0; max-width: 100%; }
+.ext-ai-turn > .ai-tools { max-width: calc(100% - 36px); }
+.ext-ai-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ext-ai-runs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+.ext-ai-runs pre { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
+.ext-acts { display: inline-flex; gap: 6px; }
+button.tag.ext-problems { cursor: pointer; border: none; font: inherit; }
+.ext-wait { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; max-width: 380px; }
 
 /* the Desk's Build with Laki AI, and a tile Laki AI made: off, with its sample, until you look */
 .desk-build .nw-composer { margin: 0; }

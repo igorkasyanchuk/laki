@@ -55,9 +55,6 @@ export function AiPage({
   onLater,
   compact,
   context,
-  embed,
-  hello,
-  chat,
   shot,
   inserts,
   complete,
@@ -69,17 +66,13 @@ export function AiPage({
   onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
   compact?: boolean // the bubbles' AI window: the chat alone under a head of its own (no Calls, Info or cost)
   context?: () => Promise<string> // where the user is as they ask (the floating chat's): for the model, not the conversation
-  embed?: boolean // compact, in a page of its own (the Extension page's): no close, Esc is the page's
-  hello?: { title: string; text: string; examples: string[]; placeholder: string } // what an empty chat says, its examples and the box's hint
-  chat?: string // a chat of its own (the Extension page's widget:<id>, the studio's too); none: the AI page's
   shot?: { n: number; png: string } // the AI window's Screenshot to Laki AI: each new one into the box, the mic on (PromptInput's)
   inserts?: Inserts // the box's Insert menu: extensions' actions, for the workspace selected
   complete?: Complete // # and / for the project in the context (no files)
 }) {
-  const c = chat ? { chat } : {}
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
-  const [text, setText, images, setImages] = useDraft(`ai:${chat ?? ''}`) // the AI page's, the floating chat's and the AI window's are one
+  const [text, setText, images, setImages] = useDraft('ai:') // the AI page's, the floating chat's and the AI window's are one
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const end = useRef<HTMLDivElement>(null)
@@ -89,16 +82,16 @@ export function AiPage({
   // the answers' links: made again only as the workspaces' names change (the app's view comes every few ms meanwhile)
   const names = workspaces.map(w => `${w.id}\n${w.name}`).join('\n')
   const link = useMemo(() => linkWorkspaces(workspaces), [names])
-  const load = () => api.call<AiData>('aiState', c).then(setD, e => setErr(e.message))
+  const load = () => api.call<AiData>('aiState').then(setD, e => setErr(e.message))
   // the earlier chats (the page's sidebar; an older daemon: none)
   const [past, setPast] = useState<AiPast[]>([])
-  const loadPast = () => !compact && !chat && void api.call<AiPast[]>('aiChats').then(setPast, () => {})
+  const loadPast = () => !compact && void api.call<AiPast[]>('aiChats').then(setPast, () => {})
   useEffect(() => {
     load()
     loadPast()
     return api.on(m => {
       if (m.ev === 'open') return void (load(), loadPast()) // a daemon started again: its conversation, not the busy one we had
-      if (m.ev !== 'ai' || (m.of ?? '') !== (chat ?? '')) return // another chat's (a spec's, an extension's, the AI page's)
+      if (m.ev !== 'ai' || m.of) return // another chat's (a spec's, an extension's)
       setD(x => x && { ...x, chat: m.chat, busy: m.busy })
       if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
@@ -122,7 +115,6 @@ export function AiPage({
     ;(context ? context().catch(() => '') : Promise.resolve(''))
       .then(where =>
         api.call('aiAsk', {
-          ...c,
           text: sent.text,
           images: sent.images.map(i => i.path),
           ...(where && { context: where }),
@@ -140,7 +132,7 @@ export function AiPage({
   const cost = !settings.hideCost // Settings › AI's Show costs
   const skill = settings.skill !== false
   // a question's button: its pick goes on as the next ask (a removal: done on Yes, by Laki)
-  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { ...c, id, n }).catch(e => setErr(e.message)))
+  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { id, n }).catch(e => setErr(e.message)))
   // the questions still open: none of yours after them (an older one's moment has passed)
   const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
   const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
@@ -163,7 +155,7 @@ export function AiPage({
     </>
   ) : null
 
-  const newChat = () => api.call('aiNew', c).then(() => (load(), loadPast()), e => setErr(e.message))
+  const newChat = () => api.call('aiNew').then(() => (load(), loadPast()), e => setErr(e.message))
   // an earlier chat taken up again: the one here goes in the list
   const openPast = (id: string) => (setErr(''), setTab('chat'), api.call('aiOpen', { id }).then(() => (load(), loadPast()), e => setErr(e.message)))
   const rmPast = (c: AiPast) => void confirm('Delete this chat?', { text: c.title, ok: 'Delete', danger: true }).then(y => y && api.call('aiChatRm', { id: c.id }).then(loadPast, e => setErr(e.message)))
@@ -179,10 +171,10 @@ export function AiPage({
                     <span className="ai-mark">
                       <Icon name="ai" size={22} />
                     </span>
-                    <h2>{hello?.title ?? 'What should Laki do?'}</h2>
-                    <p className="muted">{hello?.text ?? 'It looks at your workspaces and agents, starts new ones, sends them prompts and attaches PRs.'}</p>
+                    <h2>What should Laki do?</h2>
+                    <p className="muted">It looks at your workspaces and agents, starts new ones, sends them prompts and attaches PRs.</p>
                     <div className="ai-examples">
-                      {(hello?.examples ?? EXAMPLES).map(x => (
+                      {EXAMPLES.map(x => (
                         <button key={x} onClick={() => (setText(x), document.querySelector<HTMLTextAreaElement>('.ai-composer textarea')?.focus())}>
                           {x}
                           <Icon name="arrowRight" size={12} />
@@ -201,7 +193,7 @@ export function AiPage({
                       <i />
                     </span>
                     <span className="ai-shimmer">Working…</span>
-                    <button className="ai-stop" onClick={() => api.call('aiStop', { chat: chat ?? '' }).catch(e => setErr(e.message))}>
+                    <button className="ai-stop" onClick={() => api.call('aiStop', { chat: '' }).catch(e => setErr(e.message))}>
                       <Icon name="stop" size={10} /> Stop
                     </button>
                   </div>
@@ -221,14 +213,14 @@ export function AiPage({
                   dictate={bridge?.dictate}
                   dictationSettings={bridge?.dictationSettings}
                   onSubmit={ask}
-                  focus={!embed}
+                  focus
                   shot={shot}
                   inserts={inserts}
                   complete={complete}
                   enter
                   onBusy={setSaving}
                   rows={2}
-                  placeholder={hello?.placeholder ?? 'Ask Laki… or paste a screenshot of PR links'}
+                  placeholder="Ask Laki… or paste a screenshot of PR links"
                   tools={
                     <>
                       {onLater && (
@@ -253,10 +245,8 @@ export function AiPage({
             </div>
           </>
   )
-  // in a page: its box takes the keyboard without scrolling the page to it
-  useEffect(() => void (embed && box.current?.querySelector('textarea')?.focus({ preventScroll: true })), [])
   useEffect(() => {
-    if (!compact || embed) return
+    if (!compact) return
     // Esc in it, or with nothing focused and no page or dialog to close: the main window's floating chat stays while
     // Esc goes to a terminal, a page or a dialog
     const f = (e: KeyboardEvent) => escapes(e) && (!box.current || box.current.contains(document.activeElement) || (document.activeElement === document.body && !document.querySelector('.settings-page, .overlay'))) && closeRef.current()
@@ -265,7 +255,7 @@ export function AiPage({
   }, [compact])
   if (compact)
     return (
-      <div className={`ai-window ${embed ? 'ai-embed' : ''} ${d?.busy ? 'busy' : ''}`} role={embed ? 'region' : 'dialog'} aria-label="Laki AI" ref={box}>
+      <div className={`ai-window ${d?.busy ? 'busy' : ''}`} role="dialog" aria-label="Laki AI" ref={box}>
         <div className="ai-win-head drag">
           <span className="ai-mark">
             <Icon name="ai" size={14} />
@@ -278,7 +268,7 @@ export function AiPage({
           <button className="ai-new nodrag" disabled={!d?.chat.length || d.busy} data-tip="Start a new conversation" onClick={newChat}>
             <Icon name="plus" size={12} /> New chat
           </button>
-          {!embed && <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />}
+          <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />
         </div>
         <div className="ai-page">{thread}</div>
       </div>

@@ -211,21 +211,6 @@ ${examples()}
   HTML). Inline everything; draw a canvas at a fixed size.
 `
 
-// how Laki AI makes one (ai.ts' SYSTEM: questions first)
-const howMake = () =>
-  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from (a command, a file, a URL, or text I type), where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview). It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
-
-// the Extension page's Laki AI (its chat beside the preview and settings): where the user is, with each ask, for the
-// model. w: the one open there (mine: in Laki's folder, so it may rewrite it: widgetSet ai); none: New extension
-export const widgetHere = (w?: { id: string; name: string; mine: boolean }) =>
-  w
-    ? `On the page of my Laki extension "${w.name}" (id ${w.id}): its preview (live, and with its sample data) and its settings are beside this chat. "It" and "this" mean this extension. ${
-        w.mine
-          ? `To change it: laki_extension_read first (laki_extension_guide for the format), then laki_extension_write the files you change under the same id, its sample in widget.json kept in step with what the fetch prints. Keep what I didn't ask to change; tell me in a line what changed. It's saved off: I look at the preview, then turn it on.`
-          : "You can't rewrite this one (it comes with Laki, or it's in a folder of my own): to change it, make a copy under a new id."
-      }`
-    : `On the New extension page: I describe a Laki extension for you to make; it shows on this page, with its sample data, once written. ${howMake()}`
-
 // the prompt to paste into any AI chat: what's wanted, then all of the format, then how to answer; home: where the
 // files go
 export const widgetPrompt = (want: string, home: string) => `Make me a widget for Laki, a Mac app for running coding agents: a small live page in its sidebar, with a full view a click away, fed by a shell command or a JS script on a schedule.
