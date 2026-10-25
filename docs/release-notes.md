@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.28.0 · Oct 25, 2026
 
 - The *Review* tab: blame for each file (who last changed each line, the base's for lines taken out), every
   file on GitHub, GitLab or Bitbucket at the base or your branch, a filter (`spec/**`) whose matches one click marks
