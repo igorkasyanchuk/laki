@@ -249,7 +249,32 @@ export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: 
 // the daemon (tunnelCheck) with the command that does it
 export type TunnelCheck = { version?: string; cert: boolean; tunnel?: { id: string; name: string }; creds: boolean; why?: string; ok: boolean }
 const DOMAIN_OK = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/ // the daemon's
-export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; onNamed: (n: NamedTunnel) => void; check: (n: NamedTunnel) => Promise<TunnelCheck> }) {
+// Tunnels and Remote access, each at the top of the other's section: which one does what, and a way over
+function TwoWays({ here, other }: { here: 'tunnels' | 'remote'; other?: () => void }) {
+  return (
+    <div className="two-ways">
+      <div className={here === 'tunnels' ? 'on' : ''}>
+        <b>Tunnels</b>
+        <span className="muted small">A workspace&rsquo;s dev server (a port) on the internet, for whoever you send the link: a client, a teammate, your phone trying the app.</span>
+      </div>
+      <div className={here === 'remote' ? 'on' : ''}>
+        <b>Remote access</b>
+        <span className="muted small">Laki itself, its terminals and agents, for you alone from a phone or another computer.</span>
+      </div>
+      <p className="muted small">
+        Both run cloudflared on this Mac (Remote access can use Tailscale instead); each has its own link and its own lock.{' '}
+        {other && (
+          <button type="button" className="link" onClick={other}>
+            {here === 'tunnels' ? 'Remote access' : 'Tunnels'} ›
+          </button>
+        )}
+      </p>
+    </div>
+  )
+}
+
+// other: Settings › Remote access (none where that isn't shown)
+export function TunnelsSection({ named, onNamed, check, other }: { named: NamedTunnel; onNamed: (n: NamedTunnel) => void; check: (n: NamedTunnel) => Promise<TunnelCheck>; other?: () => void }) {
   const [c, setC] = useState<TunnelCheck | null>(null)
   const [busy, setBusy] = useState(true)
   const [err, setErr] = useState('')
@@ -299,6 +324,7 @@ export function TunnelsSection({ named, onNamed, check }: { named: NamedTunnel; 
   return (
     <>
       <h2>Tunnels</h2>
+      <TwoWays here="tunnels" other={other} />
       <p className="muted small">The globe beside a port in the status bar puts your dev server on the internet through Cloudflare&rsquo;s cloudflared.</p>
       <Group title="A random address" hint="Nothing to set up: a new trycloudflare.com address each time, for 1, 8 or 24 hours or until you stop it, for anyone or only some emails">
         <p className="muted small">
@@ -362,7 +388,8 @@ const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1
 type RemoteAuth = 'email' | 'pin' | 'tailscale'
 type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean }
 const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)'], ['tailscale', 'Tailscale']]
-export function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void }) {
+// other: Settings › Tunnels (none where that isn't shown)
+export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void; other?: () => void }) {
   const { mail, auth, tries, funnel } = opts
   const ts = auth === 'tailscale'
   const pin = auth === 'pin' || (ts && (opts.tsPin || funnel)) // Funnel: on the internet, so a PIN always
@@ -388,6 +415,7 @@ export function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: Remote
   return (
     <>
       <h2>Remote access</h2>
+      <TwoWays here="remote" other={other} />
       <p className="muted small">
         This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of

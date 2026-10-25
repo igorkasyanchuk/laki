@@ -200,7 +200,7 @@ export type AppSettings = Paint & {
   railHide?: string[] // its buttons in ⋯ More
   sideStyle?: SideStyle // the sidebar's rows
   memory?: Memory[] // Global memory: the user's rules for every project's agents
-  memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, off unless on (daemon/memory.ts)
+  memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, on unless false (daemon/memory.ts)
   imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
 }
@@ -326,7 +326,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
   ['appearance', 'Turn timers', 'elapsed time'],
   ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
-  ['appearance', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
+  ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
@@ -440,6 +440,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
   { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
+  { id: 'needs', label: 'Needs you', icon: 'inbox', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'keys', label: 'Keys', icon: 'keyboard', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
@@ -1005,6 +1006,7 @@ export function SettingsPage(p: {
         ...(p.projects ?? []).filter(x => hits(`${x.name} project`)).map(x => ({ sec: `project:${x.id}`, title: x.name, where: 'Project' })),
       ].slice(0, 12)
   const go = (r: { sec: string; title: string }) => (setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() }))
+  const nextKey = keyShow(keyMap(s.keys).next) // Needs you's words: ⌘J, or what Settings › Keys made it ('': none)
   return (
     <div className="settings-page" style={{ zoom: scale }}>
       <div className="settings-head">
@@ -1472,9 +1474,6 @@ export function SettingsPage(p: {
               </Group>
               <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.needsList !== false} onChange={v => set({ needsList: v })}>
-                  <Says title="Needs you list" hint="At the top of the sidebar: every agent waiting for you, its question and options to answer it there, then the ones done while you looked away (Review, Seen). ⌘J goes through the same list" />
-                </Switch>
                 <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
                   <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
                 </Switch>
@@ -1910,13 +1909,42 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} onLogs={widgetLogs => set({ widgetLogs })} />}
-          {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} />}
+          {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} other={p.remote && (() => openSec('remote'))} />}
           {sec === 'remote' && p.remote && (
             <RemoteSection
+              other={p.tunnels && (() => openSec('tunnels'))}
               api={p.remote}
               opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel }}
               set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
+          )}
+          {sec === 'needs' && (
+            <Group title="Needs you" hint="Agents waiting for your answer, then the ones done while you looked away: the Dock's count and the menu bar's list are the same ones">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.needsList !== false} onChange={v => set({ needsList: v })}>
+                  <Says title="Needs you list" hint={`At the top of the sidebar: every agent waiting for you, its question and options to answer it there, then the ones done while you looked away (Review, Seen). ${nextKey ? `${nextKey} goes` : 'Next tab that needs you goes'} through the same list`} />
+                </Switch>
+              </div>
+              <p className="muted small set-links">
+                Also where they reach you:{' '}
+                <button type="button" className="link" onClick={() => go({ sec: 'general', title: 'Notifications' })}>
+                  notifications
+                </button>
+                ,{' '}
+                <button type="button" className="link" onClick={() => go({ sec: 'webhook', title: 'Phone pushes' })}>
+                  phone pushes
+                </button>
+                ,{' '}
+                <button type="button" className="link" onClick={() => go({ sec: 'appearance', title: 'Floating bubbles' })}>
+                  floating bubbles
+                </button>{' '}
+                and{' '}
+                <button type="button" className="link" onClick={() => go({ sec: 'keys', title: 'Next tab that needs you' })}>
+                  {nextKey ? `${nextKey}'s key` : 'a key'}
+                </button>
+                . A workspace's or tab's menu mutes just it.
+              </p>
+            </Group>
           )}
           {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
           {sec === 'keys' && (
@@ -1945,13 +1973,13 @@ export function SettingsPage(p: {
               <MemoryList global memory={s.memory ?? []} save={memory => (set({ memory }), Promise.resolve())} />
               <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
                 <div className="setting-box">
-                  <Switch className="switch-row" on={s.memoryCompact?.on === true} onChange={on => set({ memoryCompact: { ...s.memoryCompact, on: on || undefined } })}>
+                  <Switch className="switch-row" on={s.memoryCompact?.on !== false} onChange={on => set({ memoryCompact: { ...s.memoryCompact, on } })}>
                     <Says title="On its own" hint={aiOn(s) ? `Sends each project's learned memories to Laki AI's model every few days, and as they reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
                   </Switch>
                   <label className="row">
                     <Says title="Every" hint="days since the last one (0: only when full)" />
                     <span className="grow" />
-                    <input type="number" min={0} max={365} style={{ width: 80 }} value={s.memoryCompact?.days ?? COMPACT_DAYS} onChange={e => e.target.value !== '' && set({ memoryCompact: { ...s.memoryCompact, days: Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))) } })} />
+                    <input type="number" min={0} max={365} style={{ width: 80 }} value={s.memoryCompact?.days ?? COMPACT_DAYS} onChange={e => e.target.value !== '' && set({ memoryCompact: { on: true, ...s.memoryCompact, days: Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))) } })} />
                   </label>
                 </div>
               </Group>

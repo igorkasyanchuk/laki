@@ -219,7 +219,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   AI's model through `ai.ts` `aiOnce` (OpenRouter's `aiComplete`, or `claude -p`/`codex exec` with no tools), back as
   `{memories: [{text, from}]}`; an answer that isn't one, empty or longer changes nothing; what changed meanwhile
   stays (learned since, pinned as yours, edited: only the ones still as given are replaced); the project's `compacted`, a line in `<data>/memory-compact.jsonl` with the texts before and after),
-  `memoryCompactLog`, `memoryTick` (every 30 minutes, only with `settings.memoryCompact.on` (off unless true, Settings › Global memory's *On its own*: it sends them to a model; an older `off` is ignored) and Laki AI on and able to answer (OpenRouter: a key): every
+  `memoryCompactLog`, `memoryTick` (every 30 minutes, unless `settings.memoryCompact.on` is false (Settings › Global memory's *On its own*, on by default: it sends them to Laki AI's model; `load` makes a choice saved before 0.29, 0.24's `off` or an object without `on`, off; Settings always saves `on`) and Laki AI on and able to answer (OpenRouter: a key): every
   `memoryCompact.days` (`COMPACT_DAYS`, 7; 0: only when full) since the last, or the oldest learned one, and as the learned
   ones reach `MEMORY_MAX`, unless the last run left them full: then by days); Project.tsx' Memory tab: *Compact now*, the last run, Log;
 - `wsPeek` (a worktree's `dirty`: `git status` lines, `ahead`: commits not in its base, `unpushed`: of those on no remote;

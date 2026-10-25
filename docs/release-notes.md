@@ -2,6 +2,16 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- A rail button's color (its right click) colors only its icon; a color you hover keeps its color, with a ring.
+- Settings › *Needs you*: the sidebar's list of agents waiting for you, on by default, and where else they reach you.
+- Settings › *Tunnels* and *Remote access* say how the two differ, each with a link to the other.
+- Memory's compaction is on by default (Settings › *Global memory* › *On its own*), with Laki AI on and able to answer.
+- Themes tuned: Dawn, Velvet, Nightfall, Fjord, Ember, Forest and Mist closer to Rosé Pine Dawn, Catppuccin, Tokyo Night,
+  Nord, Gruvbox and Everforest (the theme finder finds them by those names); Groovy, Phantom, Topo, Sakura and Vapor's
+  labels and buttons easier to read.
+
 ## 0.28.0 · Oct 25, 2026
 
 - The *Review* tab: blame for each file (who last changed each line, the base's for lines taken out), every

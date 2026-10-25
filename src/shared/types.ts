@@ -530,7 +530,7 @@ export type Settings = {
   imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
-  memoryCompact?: { on?: boolean; days?: number } // on (off unless true: it sends them to a model): agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; else only Compact now
+  memoryCompact?: { on?: boolean; days?: number } // on (unless false; it sends them to Laki AI's model): agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; else only Compact now
   flowVars?: Record<string, string> // workflows' global variables, {{vars.NAME}} in every one (a workflow's own var lines win)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)

@@ -154,6 +154,10 @@ export function load() {
   // ponytail: a project's terminal from before `term` (0.25's builds), known by quickMake's name and its shells only; a renamed one stays a workspace
   for (const w of state.workspaces) if (w.term === undefined && w.kind === 'local' && /^terminal-\d+$/.test(w.id) && /^terminal \d+$/.test(w.name ?? '') && state.tabs.every(t => t.workspace !== w.id || t.kind === 'shell')) w.term = true
   for (const w of state.workspaces) if (w.csState === 'Creating') Object.assign(w, { csState: 'Failed', csError: 'Laki stopped while gh made it: delete this workspace (gh codespace list says whether one was left)' }) // csMake's, gone with it
+  // memory's compaction, on by default since 0.29: a choice saved before keeps (0.24's `off`, then 0.25's switch, whose
+  // off dropped the key); Settings now always saves `on`
+  const mc = state.settings?.memoryCompact as { on?: boolean; off?: boolean } | undefined
+  if (mc && typeof mc === 'object' && typeof mc.on !== 'boolean') ((mc.on = false), delete mc.off)
   const hook = state.settings?.webhook
   if (hook?.answer && !answerOk(hook)) Object.assign(hook, { answer: false, answerOff: true }) // a public ntfy.sh topic's taps: off, Settings says why
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)

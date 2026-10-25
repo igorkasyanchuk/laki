@@ -32,10 +32,11 @@ export const THEMES: Theme[] = [
   {
     id: 'dawn',
     name: 'Dawn',
+    aka: 'rosé pine dawn rose pine',
     light: true,
     c: {
-      bg: '#faf4ed', side: '#f2e9e1', panel: '#fffaf3', raised: '#e7ddd4', line: '#dfd3c6', fg: '#3b3552', muted: '#807993',
-      accent: '#d7827e', accentFg: '#26233a', sel: '#e8d9cc', running: '#286983', waiting: '#bd7714', done: '#3f8a5a', error: '#b4637a',
+      bg: '#faf4ed', side: '#f2e9e1', panel: '#fffaf3', raised: '#e7ddd4', line: '#dfd3c6', fg: '#575279', muted: '#797593',
+      accent: '#d7827e', accentFg: '#26233a', sel: '#dfdad9', running: '#286983', waiting: '#bd7714', done: '#3f8a5a', error: '#b4637a',
       orange: '#d7827e', pink: '#c264a8', purple: '#907aa9',
     },
     ansi: ['#ece2d8', '#b4637a', '#3f8a5a', '#b3790f', '#286983', '#907aa9', '#3c8b97', '#575279',
@@ -55,39 +56,43 @@ export const THEMES: Theme[] = [
   {
     id: 'forest',
     name: 'Forest',
+    aka: 'everforest',
     c: {
-      bg: '#1e2420', side: '#191e1b', panel: '#232b26', raised: '#2d3730', line: '#36423a', fg: '#d8d3ba', muted: '#879083',
+      bg: '#1e2420', side: '#191e1b', panel: '#232b26', raised: '#2d3730', line: '#36423a', fg: '#d3c6aa', muted: '#879083',
       accent: '#a7c080', accentFg: '#1e2420', sel: '#39463c', running: '#7fbbb3', waiting: '#dbbc7f', done: '#a7c080', error: '#e67e80',
       orange: '#e69875', pink: '#d699b6', purple: '#a99bd9',
     },
-    ansi: ['#2d3730', '#e67e80', '#a7c080', '#dbbc7f', '#7fbbb3', '#d699b6', '#83c092', '#d8d3ba',
+    ansi: ['#2d3730', '#e67e80', '#a7c080', '#dbbc7f', '#7fbbb3', '#d699b6', '#83c092', '#d3c6aa',
       '#5c6a5f', '#f08e90', '#bcd498', '#e8cc94', '#95cbc4', '#e3acc6', '#9ad1a8', '#f0ecd8'],
   },
   {
     id: 'ember',
     name: 'Ember',
+    aka: 'gruvbox',
     c: {
-      bg: '#1d1a17', side: '#171411', panel: '#252019', raised: '#312a21', line: '#3c3329', fg: '#ebdbb2', muted: '#a08f78',
+      bg: '#1d1a17', side: '#171411', panel: '#252019', raised: '#312a21', line: '#3c3329', fg: '#ebdbb2', muted: '#a89984',
       accent: '#fe8019', accentFg: '#1d1a17', sel: '#4a3b2a', running: '#83a598', waiting: '#fabd2f', done: '#b8bb26', error: '#fb4934',
       orange: '#fe8019', pink: '#d3869b', purple: '#b4a0e5',
     },
-    ansi: ['#32302f', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#d5c4a1',
-      '#7c6f64', '#ff6b57', '#d0d23e', '#ffd25a', '#9fc1b4', '#e5a0b3', '#a6d494', '#fbf1c7'],
+    ansi: ['#32302f', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#a89984',
+      '#928374', '#ff6b57', '#d0d23e', '#ffd25a', '#9fc1b4', '#e5a0b3', '#a6d494', '#ebdbb2'],
   },
   {
     id: 'fjord',
     name: 'Fjord',
+    aka: 'nord',
     c: {
       bg: '#2e3440', side: '#272c36', panel: '#323946', raised: '#3b4252', line: '#434c5e', fg: '#d8dee9', muted: '#8a93a6',
       accent: '#88c0d0', accentFg: '#2e3440', sel: '#3c4454', running: '#81a1c1', waiting: '#ebcb8b', done: '#a3be8c', error: '#c1676f',
       orange: '#d08770', pink: '#e39fc2', purple: '#a093d9',
     },
     ansi: ['#3b4252', '#c1676f', '#a3be8c', '#ebcb8b', '#81a1c1', '#b48ead', '#88c0d0', '#e5e9f0',
-      '#687081', '#d06f79', '#b1d196', '#f0d399', '#8cafd2', '#c895bf', '#93ccdc', '#eceff4'],
+      '#687081', '#c1676f', '#a3be8c', '#ebcb8b', '#81a1c1', '#b48ead', '#8fbcbb', '#eceff4'],
   },
   {
     id: 'graphite',
     name: 'Graphite',
+    aka: 'macos dark apple',
     c: {
       bg: '#1c1c1e', side: '#18181a', panel: '#232325', raised: '#2c2c2e', line: '#3a3a3c', fg: '#e5e5e7', muted: '#8e8e93',
       accent: '#0975e3', accentFg: '#ffffff', sel: '#3a3a3c', running: '#64d2ff', waiting: '#ffd60a', done: '#30d158', error: '#ff453a',
@@ -99,28 +104,31 @@ export const THEMES: Theme[] = [
   {
     id: 'velvet',
     name: 'Velvet',
+    aka: 'catppuccin mocha',
     c: {
-      bg: '#1e1e2e', side: '#181825', panel: '#24243a', raised: '#313244', line: '#3b3d52', fg: '#cdd6f4', muted: '#9095b3',
+      bg: '#1e1e2e', side: '#181825', panel: '#24243a', raised: '#313244', line: '#3b3d52', fg: '#cdd6f4', muted: '#9399b2',
       accent: '#cba6f7', accentFg: '#1e1e2e', sel: '#45475a', running: '#89b4fa', waiting: '#f9e2af', done: '#a6e3a1', error: '#f38ba8',
       orange: '#fab387', pink: '#f5c2e7', purple: '#b4befe',
     },
-    ansi: ['#45475a', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#bac2de',
-      '#5a5d71', '#f5a3ba', '#bcebb8', '#fbebc4', '#a3c5fb', '#f9d3ee', '#ade9df', '#e2e8fa'],
+    ansi: ['#45475a', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#a6adc8',
+      '#5a5d71', '#f37799', '#89d88b', '#ebd391', '#74a8fc', '#f2aede', '#6bd7ca', '#bac2de'],
   },
   {
     id: 'nightfall',
     name: 'Nightfall',
+    aka: 'tokyo night',
     c: {
       bg: '#1a1b26', side: '#16161e', panel: '#1f2132', raised: '#292e42', line: '#2f3549', fg: '#c0caf5', muted: '#7a82ab',
-      accent: '#7aa2f7', accentFg: '#1a1b26', sel: '#2c3961', running: '#7dcfff', waiting: '#e0af68', done: '#9ece6a', error: '#f7768e',
+      accent: '#7aa2f7', accentFg: '#1a1b26', sel: '#283457', running: '#7dcfff', waiting: '#e0af68', done: '#9ece6a', error: '#f7768e',
       orange: '#ff9e64', pink: '#f39bd1', purple: '#bb9af7',
     },
     ansi: ['#292e42', '#f7768e', '#9ece6a', '#e0af68', '#7aa2f7', '#bb9af7', '#7dcfff', '#a9b1d6',
-      '#545c7e', '#ff8ea3', '#b3e07f', '#ecc184', '#94b6ff', '#cbb0ff', '#9dddff', '#c0caf5'],
+      '#545c7e', '#ff899d', '#9fe044', '#faba4a', '#8db0ff', '#c7a9ff', '#a4daff', '#c0caf5'],
   },
   {
     id: 'paper',
     name: 'Paper',
+    aka: 'github light',
     light: true,
     c: {
       bg: '#fbfaf7', side: '#f3f1ec', panel: '#ffffff', raised: '#ebe8e1', line: '#dedad1', fg: '#24292f', muted: '#6e7781',
@@ -133,14 +141,15 @@ export const THEMES: Theme[] = [
   {
     id: 'mist',
     name: 'Mist',
+    aka: 'catppuccin latte',
     light: true,
     c: {
       bg: '#eff1f5', side: '#e6e9ef', panel: '#f7f8fa', raised: '#dce0e8', line: '#ccd0da', fg: '#4c4f69', muted: '#767990',
       accent: '#8839ef', accentFg: '#ffffff', sel: '#dcd4f7', running: '#1e66f5', waiting: '#b8730c', done: '#3d9829', error: '#d20f39',
       orange: '#fe640b', pink: '#d55ab5', purple: '#8839ef',
     },
-    ansi: ['#dce0e8', '#d20f39', '#3d9829', '#b8730c', '#1e66f5', '#8839ef', '#179299', '#5c5f77',
-      '#9599a8', '#e64553', '#2f8a1f', '#9c6108', '#1550c7', '#7028d6', '#0f7a80', '#3a3d55'],
+    ansi: ['#dce0e8', '#d20f39', '#3d9829', '#b8730c', '#1e66f5', '#c563ab', '#179299', '#5c5f77',
+      '#9599a8', '#e64553', '#2f8a1f', '#9c6108', '#1550c7', '#b63a98', '#0f7a80', '#3a3d55'],
   },
   // Warp-style: a gradient behind everything
   {
@@ -824,7 +833,7 @@ export const THEMES: Theme[] = [
     id: 'phantom',
     name: 'Phantom',
     look: 'phantom',
-    c: { bg: '#0d0d0d', side: '#080808', panel: '#141414', raised: '#1e1e1e', line: '#3c0c10', fg: '#f5f5f5', muted: '#a09a9a', accent: '#e91829', accentFg: '#ffffff', sel: '#391619', running: '#ffd400', waiting: '#ff8a00', done: '#2be38b', error: '#ff1a2d', orange: '#ff8a00', pink: '#ff4f8a', purple: '#9a6bff' },
+    c: { bg: '#0d0d0d', side: '#080808', panel: '#141414', raised: '#1e1e1e', line: '#5a161b', fg: '#f5f5f5', muted: '#a09a9a', accent: '#e91829', accentFg: '#ffffff', sel: '#391619', running: '#ffd400', waiting: '#ff8a00', done: '#2be38b', error: '#ff1a2d', orange: '#ff8a00', pink: '#ff4f8a', purple: '#9a6bff' },
     ansi: ['#1e1e1e', '#ff1a2d', '#2be38b', '#ffd400', '#3a7bff', '#ff4f8a', '#28d7ff', '#e6e6e6',
       '#555555', '#ff5a66', '#6ff0b0', '#ffe45a', '#6a9cff', '#ff86ad', '#6ae4ff', '#ffffff'],
   },

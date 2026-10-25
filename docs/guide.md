@@ -241,7 +241,7 @@ selected workspace's PR is in the status bar.
   what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a click answers it
   there. A done one's shows its answer's first line and diff size, *Review* (the right panel's Changes) and *Seen*
   (clears its ●). A click anywhere else opens the tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes
-  through the same list. Settings › Appearance › Sidebar › *Needs you list* turns it off.
+  through the same list. Settings › *Needs you* turns it off.
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message
@@ -270,9 +270,9 @@ selected workspace's PR is in the status bar.
   Codex get both lists at every start in the project (after Settings › *Global memory*), with how to add to them (unless the preset's *Tell it about
   Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start. *Compact now*
   sends the learned list (never yours) to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped;
-  *Log* shows each run's list before and after. Settings › *Global memory* › *On its own* (off until you turn it on:
-  it sends every project's learned list) does it every 7 days and as a list fills up, and sets how often (or only when
-  full).
+  *Log* shows each run's list before and after. Settings › *Global memory* › *On its own* (on unless you turn it off;
+  it sends every project's learned list to Laki AI's model) does it every 7 days and as a list fills up, and sets how
+  often (or only when full).
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
   laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours (not in an agent's tab)
