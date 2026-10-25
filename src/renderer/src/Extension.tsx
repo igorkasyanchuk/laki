@@ -20,7 +20,7 @@ import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { PromptInput, useDraft } from './PromptInput'
-import { extAgent, SourceField, StudioSessions, WidgetCard, type WidgetsApi } from './Settings'
+import { extAgent, KitHero, SourceField, StudioSessions, WidgetCard, type WidgetsApi } from './Settings'
 import { ask, escapes, Icon, IconButton, ON, Page, Switch, useMenu } from './ui'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
@@ -184,7 +184,7 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
               <p>Not saved yet: it shows here with made-up data as soon as it is, its settings with it.</p>
             </div>
           ) : (
-            <Start ai={aiOn} home={cfg.home} onAiSettings={onAiSettings} />
+            <Start ai={aiOn} home={cfg.home} kit={cfg.kit} onAiSettings={onAiSettings} />
           )}
         </div>
         <aside className="ext-chat" aria-label="Laki AI">
@@ -1250,7 +1250,7 @@ function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
 }
 
 // New extension: what happens, and the prompt for any other AI chat
-function Start({ ai, home, onAiSettings }: { ai: boolean; home?: string; onAiSettings: () => void }) {
+function Start({ ai, home, kit, onAiSettings }: { ai: boolean; home?: string; kit?: (icons?: boolean) => void; onAiSettings: () => void }) {
   const [want, setWant] = useState('')
   const [copied, setCopied] = useState(false)
   const text = widgetPrompt(want, (home ?? '').replace(/^\/Users\/[^/]+(?=\/|$)/, '~')) // ~, not your account's name, to a chat elsewhere
@@ -1286,6 +1286,7 @@ function Start({ ai, home, onAiSettings }: { ai: boolean; home?: string; onAiSet
           </button>
         )}
       </section>
+      {kit && <KitHero kit={kit} /> /* what it can show: every element with a sample */}
       {!ai && ( // no chat beside it (Laki AI off): the prompt for another one
         <section className="ext-card">
           <div className="ext-card-head">

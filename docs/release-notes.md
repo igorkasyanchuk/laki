@@ -16,6 +16,8 @@ version it builds, with the date. -->
   fetched again as they change); and a message to the workspace's agent (`{"send": …}`, `laki.send()`), asked first.
 - Laki AI asks before it makes an extension (its data, its look, an icon or words, rich text), each answer drawn as it
   would look, and leaves short words beside icons out unless you ask.
+- A new extension's page shows the UI kit (every element an extension can be made of, with samples); the prompt for
+  another AI chat only while Laki AI is off.
 - *Icon…* menus have *Emoji…*: a grid of common ones, found by a word.
 - Calendar, Notes and To-dos are on for everyone (Settings › General › *Pages* turns them off), no longer experimental.
 - Settings: `{{variables}}` stand out in explanations; *Needs you* has a heading like the others; Tunnels and Remote

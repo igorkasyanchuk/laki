@@ -3980,7 +3980,7 @@ export function App() {
             onClose={() => setDialog(e.back ?? null)}
           />
         ))(extOf(dialog))}
-        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
+        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={extOf(dialog.back ?? null) ? placeName({ d: dialog.back!, ws: null }) : backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
         {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}

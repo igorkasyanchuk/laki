@@ -276,6 +276,27 @@ function PlaceMap({ on, hot }: { on: WidgetPlace[]; hot?: WidgetPlace }) {
 
 // every extension's right click (a cell, a rail or foot button, a Desk tile's head; App's widgetApi.menu, Desk's
 // tileMenu), after its own items: on or off, its places and size as its card has them, Remix, Delete
+// the UI kit, a card: what an extension can show (Settings › Extensions, a new extension's page)
+export const KitHero = ({ kit }: { kit: (icons?: boolean) => void }) => (
+  <div className="kit-hero">
+    <span className="ico">
+      <Icon name="panel" size={20} />
+    </span>
+    <div>
+      <b>The UI kit: browse {UI_TYPES.length} elements</b>
+      <span className="muted small">Lists, tables, charts, boards, logs, forms and more (widget.json's ui), each with a sample at a few sizes and its JSON to copy; {Object.keys(ICONS).length} icons, found by name. Laki AI and the Extension creator skill build with it.</span>
+    </div>
+    <div className="row">
+      <button type="button" onClick={() => kit(true)}>
+        <Icon name="bulb" size={12} /> Icons
+      </button>
+      <button type="button" className="primary" onClick={() => kit()}>
+        Browse {UI_TYPES.length} elements
+      </button>
+    </div>
+  </div>
+)
+
 export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
   const places = placesOf(w)
   const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
@@ -644,25 +665,7 @@ export function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent, onL
         Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 4 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one opens its page: a preview (with made-up data too), its settings and Laki AI to change it. New extension makes one with Laki AI, or gives you the prompt for any AI chat; an agent with the Extension creator skill (Agent skill) makes them too.
       </p>
-      {api.kit && (
-        <div className="kit-hero">
-          <span className="ico">
-            <Icon name="panel" size={20} />
-          </span>
-          <div>
-            <b>The UI kit: browse {UI_TYPES.length} elements</b>
-            <span className="muted small">Lists, tables, charts, boards, logs, forms and more (widget.json's ui), each with a sample at a few sizes and its JSON to copy; {Object.keys(ICONS).length} icons, found by name. Laki AI and the Extension creator skill build with it.</span>
-          </div>
-          <div className="row">
-            <button type="button" onClick={() => api.kit?.(true)}>
-              <Icon name="bulb" size={12} /> Icons
-            </button>
-            <button type="button" className="primary" onClick={() => api.kit?.()}>
-              Browse {UI_TYPES.length} elements
-            </button>
-          </div>
-        </div>
-      )}
+      {api.kit && <KitHero kit={api.kit} />}
       <WidgetList api={api} />
       {api.agents && (
         <Group title="Agent" hint="What an extension's AI source runs: it finds and sums up its data, with your MCP servers">

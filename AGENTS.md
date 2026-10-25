@@ -1421,7 +1421,7 @@ its head *New chat* is `aiNew` on that chat; empty: `STARTERS`' chips, `EXAMPLES
 off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it opens, not on a touch screen); the head: *off*, *by Laki AI*, a failed check's chip (`cfg.check`, no run, each `rev`),
 *Undo* (yours: `widgetUndo`), *Try it live* and *Turn on* (off: `TrySheet`, below; a repo's or an agent-linked one's
 *Turn on* is `extCfg.set`'s `repoSheet`, every file it runs, and no *Try it live*: `widgetRun` `once` refuses it). A new one's page has `Start` (the
-steps, and, with Laki AI off (no chat beside it), *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as `widgetFormat`); with
+steps, the UI kit's card (SettingsExtensions.tsx' `KitHero`, Settings › Extensions' too: `WidgetsApi.kit`, its crumb back the page's name), and, with Laki AI off (no chat beside it), *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as `widgetFormat`); with
 its name and no files yet, *Not saved yet* (a failed first ask, a starter's or Remix's before the next view). App hides the floating chat there. The
 ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
 browser; no fetch; 4×½),
