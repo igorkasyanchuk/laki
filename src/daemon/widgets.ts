@@ -281,8 +281,10 @@ async function readNow(w: Entry, x: Workspace) {
   facts.set(keyOf(w.id, x.id), now)
   return { now, was }
 }
-// fresh enough for a run (its $LAKI_FACTS): read again when older than a tick; 10 s at most (a stuck git: the last ones)
-export const factsFor = async (w: Entry, x?: Workspace) => void (x && factNames(w).length && Date.now() - (facts.get(keyOf(w.id, x.id))?.at ?? 0) > 9000 && (await Promise.race([readFacts(w, x).catch(() => undefined), new Promise(ok => setTimeout(ok, 10_000).unref())])))
+// a read, 10 s at most: a stuck git gives none (the last ones stay)
+const capped = (w: Entry, x: Workspace) => Promise.race([readFacts(w, x).catch(() => undefined), new Promise<undefined>(ok => void setTimeout(() => ok(undefined), 10_000).unref())])
+// fresh enough for a run (its $LAKI_FACTS): read again when older than a tick
+export const factsFor = async (w: Entry, x?: Workspace) => void (x && factNames(w).length && Date.now() - (facts.get(keyOf(w.id, x.id))?.at ?? 0) > 9000 && (await capped(w, x)))
 let factsGoing = false
 export async function factsTick() {
   if (!shown() || factsGoing) return
@@ -294,8 +296,9 @@ export async function factsTick() {
       for (const ws of shownIn(w)) {
         const x = state.workspaces.find(v => v.id === ws)
         if (!x || !widgets.has(w.id)) continue
-        const { now, was } = await readFacts(w, x)
-        if (!was || was.text === now.text) continue
+        const got = await capped(w, x) // none: stuck, the next tick tries again
+        if (!got?.was || got.was.text === got.now.text) continue
+        const { now, was } = got
         const cur = widgets.get(w.id) // a scan meanwhile makes a new entry
         if (!cur) continue
         const why = factNames(cur).filter(f => JSON.stringify(was.v[f]) !== JSON.stringify(now.v[f]))

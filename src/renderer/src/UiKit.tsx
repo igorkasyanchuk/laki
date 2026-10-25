@@ -4,12 +4,12 @@
 // an extension can name (a button's, a list row's, the icon element's), found by name, a click copies it.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ICON_GROUPS, ICONS, type IconName } from '../../shared/icons'
-import { render, uiBehave, WIDGET_CSS } from '../../shared/widget'
+import { render } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
 import { Modal } from './panels'
-import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
+import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, UI_GROUPS, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
-import { CELL_W, clean, KitBody } from './Widgets'
+import { CELL_W, KitBody } from './Widgets'
 
 const SIZES: [string, [number, number] | null][] = [
   ['1×1', [1, 1]],

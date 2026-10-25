@@ -467,8 +467,8 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     const px = (n: number) => `${n / z}px`
     el.style.bottom = '' // another anchor: placed again
     el.style.top = px(anchor.bottom + 4)
-    if (align === 'left') el.style.left = px(anchor.left)
-    else el.style.right = px(window.innerWidth - anchor.right)
+    if (align === 'left') (el.style.right = ''), (el.style.left = px(anchor.left)) // a flip before held it by the other edge
+    else (el.style.left = ''), (el.style.right = px(window.innerWidth - anchor.right))
     const r = el.getBoundingClientRect()
     // above it, held by its bottom: a filter that shrinks it keeps it by the button
     if (r.bottom > window.innerHeight - 6) beside ? (el.style.top = px(Math.max(6, window.innerHeight - r.height - 6))) : anchor.top - r.height - 4 < 6 ? (el.style.top = px(6)) : ((el.style.top = 'auto'), (el.style.bottom = px(window.innerHeight - anchor.top + 4)))

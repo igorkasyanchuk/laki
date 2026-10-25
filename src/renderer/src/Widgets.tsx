@@ -94,7 +94,7 @@ export function KitBody({ spec, data, cells, ws }: { spec: UiSpec; data: unknown
     style.textContent = WIDGET_CSS
     root.replaceChildren(style, clean(uiHtml(spec, { data, config: {}, at: Date.now() - 120_000, sample: true, ...(ws && { workspace: ws }) }, cells ? { cells } : { full: true })))
     return uiBehave(root, () => undefined)
-  }, [JSON.stringify(spec), JSON.stringify(data), cells?.join()]) // by value: a chat's looks come in new objects at each update
+  }, [JSON.stringify(spec), JSON.stringify(data), cells?.join(), JSON.stringify(ws)]) // by value: a chat's looks come in new objects at each update
   return <div ref={host} className="widget-body" />
 }
 
