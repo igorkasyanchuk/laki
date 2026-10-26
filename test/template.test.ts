@@ -147,6 +147,11 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.equal(preview(THEMES[0])[0], '#0e1014')
   assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined })
   assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null]')
+  // the icons' size: what CSS sizes (a sidebar row's marks) scales by; 14, none
+  applyTheme({ iconSize: 18 })
+  assert.equal(props.get('--icon-k'), String(18 / 14))
+  applyTheme({ iconSize: 14 })
+  assert.equal(props.get('--icon-k'), undefined)
 })
 
 test("the sidebar's video: YouTube links as embeds, anything else refused", () => {

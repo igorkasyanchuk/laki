@@ -1130,7 +1130,9 @@ export function applyTheme(p: string | Paint = '') {
   st.colorScheme = ''
   root.dataset.look = t.look ?? ''
   root.dataset.motion = o.motion ?? 'low'
-  setIconLook(lookOf(o))
+  const icons = lookOf(o)
+  setIconLook(icons)
+  if (icons.size !== 14) st.setProperty('--icon-k', String(icons.size / 14)) // the icons CSS sizes (a row's marks): as Icon's size scales (unset: 1)
   // the rail: the sidebar's color a shade darker (a light theme's less: 18% black is a muddy grey there), at pct
   const rail = (side: string, pct = 100) => `color-mix(in srgb, color-mix(in srgb, ${side} ${t.light ? 94 : 82}%, #000) ${pct}%, transparent)`
   root.classList.toggle('glass', !!o.glass)

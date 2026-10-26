@@ -1045,7 +1045,7 @@ kbd { font-family: var(--mono); }
 /* who reviewed it: a row per kind (Info.tsx Reviewers) */
 .pr-reviewers { display: flex; flex-direction: column; gap: 3px; font-size: 12px; margin-top: -4px; }
 .pr-rv { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }
-.pr-rv > .icon-svg { width: 12px; height: 12px; }
+.pr-rv > .icon-svg { width: calc(12px * var(--icon-k, 1)); height: calc(12px * var(--icon-k, 1)); }
 .pr-rv-approved > .icon-svg { color: var(--done); }
 .pr-rv-changes > .icon-svg { color: var(--error); }
 /* the status bar's Artifacts in the app (panels.tsx ArtifactsBar): a strip of previews over the status bar, a big one in a dialog */
@@ -1952,8 +1952,8 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 /* a row's marks, the PR's author and GitHub's mark alike: one size (Settings › Appearance › Icon size) */
 /* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, 👀 you commented */
 .ws-yes { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--done); }
-.ws-eyes { font-size: calc(var(--ws-icon, 13px) - 1px); line-height: 1; }
-.ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes) :is(.icon-svg, .avatar) { width: var(--ws-icon, 13px); height: var(--ws-icon, 13px); }
+.ws-eyes { font-size: calc(var(--ws-icon, calc(13px * var(--icon-k, 1))) - 1px); line-height: 1; }
+.ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes) :is(.icon-svg, .avatar) { width: var(--ws-icon, calc(13px * var(--icon-k, 1))); height: var(--ws-icon, calc(13px * var(--icon-k, 1))); } /* --icon-k: Appearance's icon size, unless the sidebar's own is set */
 .pr-by { display: inline-flex; align-items: center; gap: 4px; }
 /* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
    Approve plain with GitHub's green check; GitHub and ⋯ square */
