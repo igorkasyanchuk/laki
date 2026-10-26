@@ -4,8 +4,8 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
-import { inside } from './files.ts'
+import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { inside, MAX_TEXT, textOf } from './files.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
 import { isLive } from './resources.ts'
@@ -780,6 +780,31 @@ export async function prDiff(ref: string) {
     throw new Error(ghSays(e, `PR #${pr.number}`))
   })
   return { base: pr.base ?? 'its base', from: `PR #${pr.number}`, files: diffFiles(stdout), diff: stdout.length > 4 << 20 ? stdout.slice(0, 4 << 20) + '\n… (cut)' : stdout }
+}
+
+// prFile: a text file as the PR's head commit has it (the full review's expand arrows on PR #n: this worktree needn't be
+// at that commit). The commit fetched first when this clone hasn't it (origin's pull/<n>/head: a fork's PR too).
+// ponytail: origin only; a PR of another remote (an upstream) says so
+export async function prFile(ref: string, path: string) {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr?.head) throw new Error(`${ws.id} has no PR`)
+  if (typeof path !== 'string' || !path || path.startsWith('/') || path.startsWith('-') || path.split('/').includes('..')) throw new Error('a path in the repo')
+  const has = () => git(ws, 'cat-file', '-e', `${pr.head}^{commit}`).then(() => true, () => false)
+  if (!(await has())) {
+    await exec(ws, 'git', ['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr.number}/head`], { timeout: 60000 }).catch(() => {})
+    if (!(await has())) throw new Error(`PR #${pr.number}'s head isn't in this clone (git fetch it)`)
+  }
+  const show = `${pr.head}:${path}`
+  const buf = ws.host
+    ? Buffer.from((await exec(ws, 'sh', ['-c', `git cat-file -e "$1" && git show "$1" | head -c ${MAX_TEXT} | base64`, 'sh', show]).catch(() => { throw new Error(`not in PR #${pr.number}`) })).stdout, 'base64') // base64: text over ssh; cat-file first: a pipe's status is base64's
+    : (
+        await run('git', ['show', show], { cwd: ws.path, encoding: 'buffer', maxBuffer: 10 << 20 }).catch(e => {
+          throw new Error(/maxBuffer/i.test(String(e.message)) ? 'over 10 MB' : `not in PR #${pr.number}`)
+        })
+      ).stdout
+  if (buf.subarray(0, 8000).includes(0)) return { size: buf.length } // binary
+  return textOf(buf.subarray(0, MAX_TEXT), buf.length)
 }
 
 // a unified diff's files, each with its status (A, D, R, else M) and lines added and taken out

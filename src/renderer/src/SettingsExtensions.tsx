@@ -462,11 +462,18 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
               />
             </WcRow>
           )}
-          {w.js && (
-            <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
-              <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
-            </Switch>
-          )}
+          {/* always here, so it's never a mystery: only a page of its own (widget.html with a script) is cut off from the
+              network until this is on; it's yours to give, never widget.json's (an extension can't ask for it itself) */}
+          <Switch className="switch-row" on={!!w.js && !!w.net} disabled={!w.js} onChange={net => void api.set(w.id, { net })}>
+            <Says
+              title="Network access"
+              hint={
+                w.js
+                  ? "Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its fetch (a command or script) always has the network. Only you turn it on, here: widget.json can't"
+                  : "Nothing to turn on: its fetch (a command or script) runs on your Mac and always has the network, and its view is Laki's own drawing. Only a page with a <script> in widget.html is cut off, until you turn this on here (widget.json can't)"
+              }
+            />
+          </Switch>
           {fetches && (
             <div className={`wc-row wc-status ${w.error && !w.running ? 'bad' : ''}`}>
               <span className="small">{status}</span>
@@ -634,7 +641,6 @@ function WidgetList({ api }: { api: WidgetsApi }) {
                 {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}
                 {w.net && <span className="tag" data-tip="Its page may reach https sites">network</span>}
                 {w.on && w.hidden && <span className="tag" data-tip="Its data says hidden: true: it shows nowhere until its data changes">hidden</span>}
-                {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
                 {w.log && (bad => <span className={`tag ${bad ? 'tag-closed' : ''}`} data-tip={bad ? 'An error in its log in the last hour: its page’s Logs' : 'It keeps a log: its page’s Logs'}>log</span>)(!!w.logErr && Date.now() - w.logErr < 3600e3)}
                 <span className="tag">
                   {w.fit && fits(w) ? 'auto · ' : ''}{w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}

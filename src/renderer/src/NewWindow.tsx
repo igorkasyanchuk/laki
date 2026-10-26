@@ -5,7 +5,7 @@
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
 import { useEffect, useState } from 'react'
 import type { ActionFile, View, WorkspaceView } from '../../shared/types'
-import { api, bridge, openExternal, reportView } from './api'
+import { api, bridge, daemonBase, openExternal, reportView } from './api'
 import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
 import { type Inserts, VoiceBar } from './PromptInput'
@@ -15,7 +15,7 @@ import { FONT_SIZE, termLook } from './Settings'
 import { Term } from './Term'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
 import { ask, AskHost, askText, IconButton, load, Tips } from './ui'
-import { insertMenus } from './Widgets'
+import { imagesVia, insertMenus } from './Widgets'
 
 // no glass, no see-through sidebar: the window has no blur behind it
 const paint = (p: Paint) => applyTheme({ ...p, glass: false, sideClear: 0 })
@@ -27,7 +27,10 @@ if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim') {
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
 }
 
-// the state, and the theme as it changes
+// the state, and the theme as it changes; an extension's or Laki AI's https pictures through the daemon's /img, as the
+// app's window has them (none without its key: dropped)
+let base: string | null = null
+void daemonBase().then(b => (base = b), () => {})
 function useView() {
   const [view, setView] = useState<View | null>(null)
   useEffect(() => {
@@ -35,6 +38,7 @@ function useView() {
     api.connect()
     return off
   }, [])
+  imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   const theme = JSON.stringify(paintOf(view?.settings))
   useEffect(() => void (view && paint(paintOf(view.settings))), [theme])
   return view

@@ -2,6 +2,33 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- The new-workspace page in color: a heading that names the agent and project, tinted by the agent; the agent menu
+  links to *Manage agents…* (Settings › Agents & profiles).
+- A group's default agent: *New group…* and its settings pick a template and an agent; *+* in that group starts with it,
+  and Laki AI's new workspaces in the group use it too.
+- A new terminal tab opened from a shell (+, a split) starts in that shell's folder.
+- Review: a line's number shows `+` on hover to comment; a comment goes to the PR or to an agent you pick (the
+  arrow beside *Send*); every comment has a copy button. Changes has line numbers too, and the arrows that show more of
+  the file around a change, in both the workspace's diff and a PR's.
+- Every git action asks first: Merge and Approve show the PR's facts (checks, reviews, conflicts, size) like the
+  delete question; Ship says what it commits and pushes; Revert asks each time; *Pull main* asks before it pulls.
+- Laki AI knows the workspace you're in: its branch and base, the diff's size, the PR with its checks and reviews,
+  ports and tabs.
+- Laki AI sets up agent profiles ("add me 3 agents: …"), asking before it saves them.
+- Extensions: one that's on stays on after you or Laki AI change it (an agent's change, or an MCP client's, still turns
+  it off when what it runs changes); Network access always shows on its page, and says how to get it when it can't; the
+  Data tab says data can come any way (a command, a file, a URL, a push); no *by Laki AI* tag; bots' GitHub pictures
+  show, and pictures show in the new-task and AI windows too.
+- PR descriptions and comments read GitHub's HTML as GitHub shows it: dependabot's *Release notes* and *Commits* fold
+  open on a click, its lists and links are lists and links (no more raw tags); a repo's `.md` files too.
+- Bird view is no longer experimental.
+- Opening a workspace from outside the window (a bubble, a notification) scrolls the sidebar to it.
+- Fixed: after adding a folder, the new-workspace page showed the previous project; switching away from a workspace
+  you just made no longer jumps back to it.
+- The floating bubbles' circles no longer pulse in step.
+
 ## 0.31.0 · Oct 26, 2026
 
 - Extensions: one page to make, change and set one up. *New ▾ › With Laki AI…* opens a new extension's page with

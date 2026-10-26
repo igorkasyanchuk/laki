@@ -80,8 +80,11 @@ export function widgetFileSave(o: { id: string; path: string; text: string; was?
 }
 
 // an extension made or changed by Laki AI or an MCP client (laki_extension_write): its files in Laki's own folder only
-// (<data>/widgets/<id>, never another folder's, the user's own there, nor through a link), files left out kept. Saved off: its fetch runs shell
-// commands a model wrote, so the user turns it on in Settings › Extensions after a look
+// (<data>/widgets/<id>, never another folder's, the user's own there, nor through a link), files left out kept. A new
+// one is saved off: its fetch runs shell commands a model wrote, so the user turns it on in Settings › Extensions after
+// a look. One that's on stays on through an edit (the user's ask: Laki AI changing it on its page); agent: written from
+// an agent's tab (main.ts' FROM), which stays on only while what it runs is the same (its commands would run outside
+// that agent's own sandbox)
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/
 const FILE = /^\w[\w.-]{0,59}$/
 const FIXTURE = /^fixtures\/\w[\w.-]{0,59}\.json$/ // the one folder: sample data
@@ -92,7 +95,7 @@ export const statOf = (p: string) => {
     return null
   }
 }
-export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
+export function widgetWrite(o: { id: string; files: Record<string, unknown>; agent?: boolean }) {
   const repo = widgets.get(String(o.id))
   if (repo?.project) throw new Error(repoSays(repo, 'change it'))
   if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
@@ -139,11 +142,12 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     writeFileSync(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
-  const stays = !!was.on && !!runs && runs === runsOf(d) // on, and only its looks changed
-  writeStore(o.id, { ...readStore(o.id), on: stays, net: stays ? was.net : undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too: the user allows the network for the page they looked at, not a rewrite (a JS page is what it runs); the user's own: its hour's leave stays (a write, a check, a fix)
+  const same = !!runs && runs === runsOf(d) // only its looks changed
+  const stays = !!was.on && (same || !o.agent)
+  writeStore(o.id, { ...readStore(o.id), on: stays, net: stays ? was.net : undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too, as it was; the user's own: its hour's leave stays (a write, a check, a fix)
   scanWidgets()
-  wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; ${stays ? 'on still: what it runs is the same' : "off until it's turned on"}`)
-  return { ...widgetsView().find(w => w.id === o.id), note: stays ? 'Saved, still on: what it runs (its commands, scripts, prompts, handlers, settings) is the same as before' : 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
+  wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; ${stays ? (same ? 'on still: what it runs is the same' : 'on still: it runs the new version') : "off until it's turned on"}`)
+  return { ...widgetsView().find(w => w.id === o.id), note: stays ? (same ? 'Saved, still on: what it runs (its commands, scripts, prompts, handlers, settings) is the same as before' : 'Saved, still on: it runs the new version from its next fetch') : 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
 }
 
 // ---------- the studio (WidgetStudio.tsx): each write undoable, a copy to change, a name for a new one
@@ -178,7 +182,7 @@ export function snapshot(id: string, d: string) {
 }
 // Undo (after: the first one taken after then, a turn's Undo to here; none: the newest): that one back, it and the
 // newer ones gone. Laki's own folder only; off again, as a write leaves it, unless what it runs is the same
-export function widgetUndo(o: { id: string; after?: number }) {
+export function widgetUndo(o: { id: string; after?: number; agent?: boolean }) {
   if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
   const all = historyOf(o.id)
   const at = o.after === undefined ? all.at(-1) : all.find(n => n > Number(o.after))
@@ -197,7 +201,7 @@ export function widgetUndo(o: { id: string; after?: number }) {
   }
   for (const n of all.filter(n => n >= at)) rmSync(join(histDir(o.id), String(n)), { recursive: true, force: true })
   hist.delete(o.id)
-  if (existsSync(storePath(o.id))) (st => writeStore(o.id, { ...st, on: !!st.on && !!runs && runs === runsOf(d) }))(readStore(o.id))
+  if (existsSync(storePath(o.id))) (st => writeStore(o.id, { ...st, on: !!st.on && (!o.agent || (!!runs && runs === runsOf(d))) }))(readStore(o.id)) // on stays on (the user's Undo), an agent's only while what it runs is the same
   scanWidgets()
   wLog({ id: o.id }, `undone: back to before ${new Date(at).toLocaleTimeString()}`)
   return { ok: true, at, gone: !widgets.has(o.id) }

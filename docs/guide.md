@@ -605,7 +605,7 @@ something else: then that question is closed). It removes a memory item, a sched
 through such a question: *Yes, remove…* is yours to press, and Laki does it. A command for a shell too: it shows you
 the command and the tab, and *Yes, run it* runs it there. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
-so you look and turn it on in Settings › Extensions (*by Laki AI* on its row), or it asks you in the chat, with what it
+so you look and turn it on in Settings › Extensions, or it asks you in the chat, with what it
 runs, and *Yes, turn it on* does it; the chat on an extension's page has it rewrite one of yours the same way. It
 also arranges any extension for you: *put My PRs on My Desk*, a size, how often it fetches, a setting. It never archives or deletes
 workspaces, ships or merges, and it does nothing until you ask. With the claude backend, when it wants a tool it may not
@@ -1052,7 +1052,8 @@ Each extension has a **page of its own**: a click on its row in Settings › Ext
 on a My Desk tile or in its right click). It shows how it looks where it sits, and its full view, either live or with **made-up data**
 (*Sample*: what its `widget.json` gives as `sample`, so you see it before it ever runs; every one with a fetch has
 one), its settings under them, and Laki AI's chat beside them: say what to change and it rewrites the extension (one
-of yours, in Laki's folder), saved off until you turn it on, the preview showing each version. The crumb at the top,
+of yours, in Laki's folder), the preview showing each version; one that's on stays on (a new one is saved off until you
+turn it on). The crumb at the top,
 or Esc, goes back where you came from (Settings, My Desk).
 
 *Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a

@@ -8,7 +8,7 @@ import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
-import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
+import { AGENT_COLORS, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -582,8 +582,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const [p, setP] = useState<NewWsParams>(() => {
     const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
     const d = draft?.p
+    const group = view.projects.find(x => x.id === project)?.seps?.find(s => s.id === initial?.place)?.preset // opened from a group: its agent
     // the draft's agent, else the last one, unless Settings › New workspaces start changed since: then that one
-    const preset = initial?.preset ?? (d?.preset && names.includes(d.preset) ? d.preset : last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
+    const preset = initial?.preset ?? (group && names.includes(group) ? group : undefined) ?? (d?.preset && names.includes(d.preset) ? d.preset : last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
     const same = preset === last.preset // the model and effort are that agent's
     const there = d && view.projects.some(x => x.id === d.project) && (!project || project === d.project) // the draft's project: its base and group too
     const proj = project ?? (there ? d.project : view.projects.some(x => x.id === last.project) ? last.project! : (view.projects[0]?.id ?? ''))
@@ -734,7 +735,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         ...(view.projects.length > 6 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
         ...view.projects.flatMap(x => [
         { label: x.name, mark: <ProjectMark p={x} or={x.git === false ? 'folder' : 'fork'} size={14} />, hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
-        ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }) }) }) as MenuItem),
+        ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, sub: s.preset && `starts ${s.preset}`, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }), ...(s.preset && s.preset !== p.preset && view.presets.some(y => y.name === s.preset && !y.off) && { preset: s.preset, model: undefined, effort: undefined, perm: undefined, fast: undefined }) }) }) as MenuItem), // a group's agent comes with it
         ]),
       ],
     )
@@ -764,6 +765,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         null,
         ...OTHER_AGENTS.map(([x, label, icon, sub]) => ({ label, icon, sub, hint: p.preset === x ? ON : undefined, run: () => set({ preset: x, model: undefined, effort: undefined }) }) as MenuItem),
         ...(p.preset !== def && view.presets.some(x => x.name === p.preset) ? [{ label: `Make ${p.preset} the default for new workspaces`, icon: 'pin', foot: true, run: () => void api.call('settingsSet', { agent: p.preset }) } as MenuItem] : []),
+        { label: 'Manage agents…', icon: 'settings', foot: true, tip: 'Settings › Agents & profiles: add one, its model, flags and account', run: () => openExternal('laki://settings/presets') },
       ],
       'right',
     )
@@ -825,7 +827,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           <Icon name="chevron" size={11} />
         </button>
       )}
-      <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="What starts in its first tab" onClick={agentMenu}>
+      <button type="button" className="nw-pick nw-agent" aria-haspopup="menu" data-tip="What starts in its first tab" onClick={agentMenu}>
         <Icon name={other?.[2] ?? 'agent'} />
         <span>{other?.[1] ?? p.preset}</span>
         <Icon name="chevron" size={11} />
@@ -868,13 +870,31 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   )
   const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`, canSkip && p.noSetup && 'no setup'].filter(Boolean).join(' · ')
   const toggle = () => setAdv(o => !o)
+  // its colors: the project's (its own, else the accent) on its pick, the prompt's edge and the send; the agent's on its
+  // pick (a claude orange, a codex teal: the tabs'); a heading in both
+  const tint = proj?.color && proj.color !== 'none' ? `var(--tc-${proj.color})` : 'var(--accent)'
+  const agentTint = (a => (a ? `var(--tc-${a})` : tint))(AGENT_COLORS[starts ?? ''])
+  const who = other ? undefined : p.preset
   return (
     <Page title="New workspace" onClose={onClose}>
       {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
-      <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy}>
+      <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy} style={{ '--nw-tint': tint, '--nw-agent': agentTint } as CSSProperties}>
+        {proj && (
+          <h2 className="nw-hello">
+            {who ? (
+              <>
+                What should <span className="nw-hello-agent">{who}</span> do in <span className="nw-hello-proj">{proj.name}</span>?
+              </>
+            ) : (
+              <>
+                A new workspace in <span className="nw-hello-proj">{proj.name}</span>
+              </>
+            )}
+          </h2>
+        )}
         {/* the row over the prompt: where it's made on the left, what starts on the right */}
         <div className="nw-top">
-          <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its project, and where in the sidebar: first in it, or in one of its groups" onClick={placeMenu}>
+          <button type="button" className="nw-pick nw-proj" aria-haspopup="menu" data-tip="Its project, and where in the sidebar: first in it, or in one of its groups" onClick={placeMenu}>
             <ProjectMark p={proj} or={plain ? 'folder' : 'fork'} size={14} />
             <span>
               {proj?.name}
@@ -1083,10 +1103,10 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
   )
 }
 
-// pick: a select under the field (a group's default template), its value given with the text ('' none)
-export function Prompt({ title, hint, placeholder, initial = '', pick, busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; pick?: { label: string; none: string; options: string[]; value?: string }; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string) => Promise<void> }) {
+// picks: selects under the field (a group's default template and agent), their values given with the text ('' none)
+export function Prompt({ title, hint, placeholder, initial = '', picks = [], busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; picks?: { label: string; none: string; options: string[]; value?: string }[]; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string[]) => Promise<void> }) {
   const [v, setV] = useState(initial)
-  const [picked, setPicked] = useState(pick?.value ?? '')
+  const [picked, setPicked] = useState(() => picks.map(x => x.value ?? ''))
   return (
     <Modal title={title} onClose={onClose}>
       <form
@@ -1098,19 +1118,19 @@ export function Prompt({ title, hint, placeholder, initial = '', pick, busy, onC
       >
         <input value={v} autoFocus placeholder={placeholder} onFocus={e => e.target.select()} onChange={e => setV(e.target.value)} />
         {hint && <div className="muted small">{hint}</div>}
-        {pick && (
-          <label>
+        {picks.map((pick, i) => (
+          <label key={pick.label}>
             {pick.label}
-            <select value={picked} onChange={e => setPicked(e.target.value)}>
+            <select value={picked[i]} onChange={e => setPicked(x => x.map((y, j) => (j === i ? e.target.value : y)))}>
               <option value="">{pick.none}</option>
-              {[...new Set([...pick.options, picked])].filter(Boolean).map(o => ( // one gone since stays as it was
+              {[...new Set([...pick.options, picked[i]])].filter(Boolean).map(o => ( // one gone since stays as it was
                 <option key={o} value={o}>
                   {o}
                 </option>
               ))}
             </select>
           </label>
-        )}
+        ))}
         <div className="buttons">
           <span className="spacer" />
           <button type="button" onClick={onClose}>
@@ -1722,7 +1742,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if ('error' in c) return <span className="warn small">{c.error}</span>
     if (c.image) return <img src={c.image} alt={f.path} />
     if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
-    if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
+    if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} html /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
     return <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
   }
   return (

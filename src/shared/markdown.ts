@@ -1,7 +1,8 @@
 // Markdown to a tree the file preview renders as React nodes (never HTML): headings (# and underlined), paragraphs,
-// lists (nested, tasks), fenced code, quotes, tables, rules; inline code, bold, italic, strike, links, images, breaks.
-// ponytail: GitHub's common subset, not CommonMark's every corner (reference links, HTML blocks, footnotes: shown as
-// text); add one when a real README needs it
+// lists (nested, tasks), fenced code, quotes, tables, rules; inline code, bold, italic, strike, links, images, breaks;
+// with html, the HTML GitHub's own bodies use (dependabot's, release notes, READMEs: fromHtml), into the same tree.
+// ponytail: GitHub's common subset, not CommonMark's every corner (reference links, footnotes: shown as text; an HTML
+// table: its cells as text); add one when a real README needs it
 export type Inline = string | { t: 'code'; text: string } | { t: 'b' | 'i' | 's'; kids: Inline[] } | { t: 'a'; href: string; kids: Inline[] } | { t: 'img'; src: string; alt: string } | { t: 'br' }
 export type Align = 'left' | 'center' | 'right' | ''
 export type Block =
@@ -12,6 +13,7 @@ export type Block =
   | { t: 'list'; ordered: boolean; start: number; items: { task?: boolean; blocks: Block[] }[] }
   | { t: 'table'; align: Align[]; head: Inline[][]; rows: Inline[][][] }
   | { t: 'hr' }
+  | { t: 'details'; open: boolean; summary: Inline[]; blocks: Block[] }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*([^`\s]*)/
 const HEADING = /^ {0,3}(#{1,6})(?:\s+(.*?))?\s*$/
@@ -20,10 +22,84 @@ const QUOTE = /^ {0,3}>/
 const LIST = /^(\s*)([-*+]|\d{1,9}[.)])(?:\s+(.*)|$)/
 const DELIM = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/
 const indentOf = (l: string) => l.length - l.trimStart().length
-const starts = (l: string) => FENCE.test(l) || HEADING.test(l) || RULE.test(l) || QUOTE.test(l) || LIST.test(l)
+const starts = (l: string) => FENCE.test(l) || HEADING.test(l) || RULE.test(l) || QUOTE.test(l) || LIST.test(l) || l[0] === NUL
 
-export function markdown(src: string): Block[] {
-  return parse(src.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'))
+// html: GitHub's own text (a PR's body and comments, a repo's .md files), its HTML read as GitHub shows it; else (what
+// people and agents say) a tag stays text, as typed
+export function markdown(src: string, html = false): Block[] {
+  const md = src.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').replace(/\0/g, '')
+  return parse((html ? fromHtml(md) : md).split('\n'))
+}
+
+// ---------- GitHub's HTML: its tags as Markdown, outside fenced code; <details> and <blockquote> as NUL marker lines
+// that parse() reads as blocks (src has no NUL of its own). Comments, scripts and styles go whole; entities are
+// decoded (punctuation escaped, so &lt;b&gt; stays text)
+const NUL = '\0'
+const ENT: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', mdash: '—', ndash: '–', hellip: '…', copy: '©' }
+const decode = (s: string, md = true) =>
+  s.replace(/&(#x[\da-f]{1,6}|#\d{1,7}|[a-z]+);/gi, (e, n: string) => {
+    const c = n[0] !== '#' ? ENT[n.toLowerCase()] : (x => (x > 0 && x < 0x110000 ? String.fromCodePoint(x) : undefined))(/x/i.test(n[1]) ? parseInt(n.slice(2), 16) : +n.slice(1))
+    return c === undefined ? e : md && /[\\`*_~[\]<>]/.test(c) ? `\\${c}` : c // only what inline() would read as a mark: & or " stay as they are (a URL's)
+  })
+const attr = (attrs: string, name: string) => decode(attrs.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'))?.slice(1).find(x => x !== undefined) ?? '', false)
+const plain = (html: string) => decode(html.replace(/<[^>]*>/g, ''), false) // a <code>'s or <pre>'s text
+const ticks = (t: string) => !t.trim() ? t : (f => `${f}${/^`|`$/.test(t) ? ` ${t} ` : t}${f}`)('`'.repeat(Math.max(0, ...(t.match(/`+/g) ?? []).map(x => x.length)) + 1))
+const link = (u: string) => u.trim().replace(/[\s()<>]/g, c => `%${c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()}`) // whole inside (…)
+function fromHtml(src: string): string {
+  if (!/[<&]/.test(src)) return src
+  const out: string[] = []
+  let chunk: string[] = []
+  let fence = ''
+  const flush = () => chunk.length && (out.push(htmlMd(chunk.join('\n'))), (chunk = []))
+  for (const l of src.split('\n')) {
+    const m = l.match(FENCE)
+    if (fence) (out.push(l), l.trimStart().startsWith(fence) && (fence = ''))
+    else if (m) flush(), (fence = m[1]), out.push(l)
+    else chunk.push(l)
+  }
+  flush()
+  return out.join('\n')
+}
+// tags it knows: as Markdown below, or gone with their text kept; any other stays text as written (Vec<String> in prose)
+const DROP = new Set('span sup sub small big u ins mark abbr cite font center picture source section article header footer nav thead tbody tfoot caption figure figcaption dl input label time var samp q g-emoji'.split(' '))
+function htmlMd(s: string): string {
+  const kept: string[] = [] // code spans, as they are: no tag or entity of theirs is read
+  const keep = (t: string) => `\x01${kept.push(t) - 1}\x01`
+  s = s
+    .replace(/\x01/g, '')
+    .replace(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g, keep)
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+    .replace(/<(script|style|template)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
+    .replace(/<pre\b[^>]*>([\s\S]*?)<\/pre\s*>/gi, (_, b: string) => (t => (f => `\n\n${f}\n${t}\n${f}\n\n`)('`'.repeat(Math.max(3, ...(t.match(/`+/g) ?? []).map(x => x.length + 1)))))(plain(b).replace(/^\n|\n$/g, '')))
+    .replace(/<(code|kbd|tt)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi, (_, _t, b: string) => keep(ticks(plain(b).replace(/\n/g, ' '))))
+    .replace(/<summary\b[^>]*>([\s\S]*?)<\/summary\s*>/gi, (_, b: string) => `\n${NUL}summary ${b.replace(/\s*\n\s*/g, ' ').trim()}\n`)
+  const lists: { ordered: boolean; n: number }[] = []
+  const links: string[] = []
+  const TAG = /<(\/?)([a-z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|&(?:#x[\da-f]{1,6}|#\d{1,7}|[a-z]+);/gi
+  const out = s.replace(TAG, (m, close: string, name?: string, attrs = '') => {
+    if (!name) return decode(m)
+    const tag = name.toLowerCase()
+    const h = tag.match(/^h([1-6])$/)
+    if (h) return close ? '\n\n' : `\n\n${'#'.repeat(+h[1])} `
+    if (tag === 'a') {
+      if (!close) return (u => (links.push(u), u ? '[' : ''))(attr(attrs, 'href'))
+      return (u => (u ? `](${link(u)})` : ''))(links.pop())
+    }
+    if (tag === 'img') return (u => (u ? `![${attr(attrs, 'alt').replace(/[[\]]/g, '')}](${link(u)})` : ''))(attr(attrs, 'src'))
+    if (tag === 'b' || tag === 'strong') return '**'
+    if (tag === 'i' || tag === 'em') return '*'
+    if (tag === 's' || tag === 'del' || tag === 'strike') return '~~'
+    if (tag === 'br') return '<br>'
+    if (tag === 'hr') return '\n\n---\n\n'
+    if (tag === 'ul' || tag === 'ol') return close ? (lists.pop(), lists.length ? '\n' : '\n\n') : (lists.push({ ordered: tag === 'ol', n: 0 }), '\n')
+    if (tag === 'li') return close ? '' : (l => `\n${'    '.repeat(Math.max(0, lists.length - 1))}${l?.ordered ? `${++l.n}.` : '-'} `)(lists.at(-1))
+    if (['p', 'div', 'tr', 'table', 'dt', 'dd'].includes(tag)) return lists.length ? ' ' : '\n\n' // in a list item: its line goes on
+    if (tag === 'td' || tag === 'th') return ' '
+    if (tag === 'blockquote') return close ? `\n${NUL}/quote\n\n` : `\n\n${NUL}quote\n`
+    if (tag === 'details') return close ? `\n${NUL}/details\n\n` : `\n\n${NUL}details${/\bopen\b/i.test(attrs) ? ' open' : ''}\n`
+    return DROP.has(tag) ? '' : m
+  })
+  return out.replace(/\x01(\d+)\x01/g, (_, n: string) => kept[+n])
 }
 
 function parse(lines: string[]): Block[] {
@@ -34,6 +110,22 @@ function parse(lines: string[]): Block[] {
     let m: RegExpMatchArray | null
     if (!l.trim()) {
       i++
+    } else if (l[0] === NUL) {
+      // fromHtml's <details> or <blockquote> to its close (nested ones counted); a stray close or summary: nothing
+      const kind = l.slice(1).split(' ')[0]
+      i++
+      if (kind !== 'details' && kind !== 'quote') continue
+      const body: string[] = []
+      let summary = ''
+      for (let depth = 1; i < lines.length; i++) {
+        const k = lines[i][0] === NUL ? lines[i].slice(1).split(' ')[0] : ''
+        if (k === kind) depth++
+        else if (k === `/${kind}` && !--depth) break
+        if (kind === 'details' && depth === 1 && k === 'summary' && !summary) summary = lines[i].slice(9).trim() || ' '
+        else body.push(lines[i])
+      }
+      i++
+      out.push(kind === 'quote' ? { t: 'quote', blocks: parse(body) } : { t: 'details', open: / open$/.test(l), summary: inline(summary.trim() || 'Details'), blocks: parse(body) })
     } else if ((m = l.match(FENCE))) {
       const fence = m[1]
       const pad = indentOf(l)
@@ -187,6 +279,8 @@ function html(bs: Block[]): string {
           return `<blockquote>${html(b.blocks)}</blockquote>`
         case 'hr':
           return '<hr>'
+        case 'details':
+          return `<details${b.open ? ' open' : ''}><summary>${inl(b.summary)}</summary>${html(b.blocks)}</details>`
         case 'list': {
           const tag = b.ordered ? 'ol' : 'ul'
           const items = b.items.map(i => `<li>${i.task === undefined ? '' : `<input type="checkbox" disabled${i.task ? ' checked' : ''}> `}${html(i.blocks)}</li>`).join('')

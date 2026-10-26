@@ -260,7 +260,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, onClose }: { cli: string; 
           note: true,
           v: (
             <>
-              Scripts and agents drive the same daemon with <code>{cli}</code> (the README says how to put it on your PATH). Agents learn it from the agent skill (Settings › Agent skill).
+              Scripts and agents drive the same daemon with <code>{cli}</code> (Settings › General › Developer › <i>Install the laki command</i> puts it on your PATH). Agents learn it from the agent skill (Settings › Agent skill).
             </>
           ),
         },

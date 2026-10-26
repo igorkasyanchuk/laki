@@ -37,7 +37,8 @@ case "$1 $2" in
     # --author: that login's (any case, as GitHub's search); @me: anyone's here
     [ -n "$au" ] && [ "$au" != @me ] && out=$(printf '%s' "$out" | jq --arg a "$au" '[.[] | select((.author.login | ascii_downcase) == ($a | ascii_downcase))]')
     if [ -n "$j" ]; then printf '%s' "$out" | jq "$j"; else printf '%s\n' "$out"; fi ;;
-  "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
+  "pr view") # a branch's own ($FAKE_GH/pr-<branch>.json), else every branch's
+    f "pr-$(printf %s "$3" | tr / _).json" || f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
   "pr checks") f checks.json || echo '[]'; exit 8 ;;
   "pr review"|"pr close"|"pr merge"|"pr edit") f refuse >&2 && exit 1; exit 0 ;;
   "run view") # --log-failed: $FAKE_GH/run-<job>.log, else run.log, else gh's 404

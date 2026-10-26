@@ -51,7 +51,7 @@ coding agents and it's long: give it to yours, or search it for the part you're 
 ## A pull request
 
 - one change per PR, with its test where that's cheap;
-- a new command or key: `docs/guide.md`, the CLI's usage (`src/shared/usage.ts`), and `README.md` if it's a main one;
+- a new command or key: `docs/guide.md`, the CLI's usage (`src/shared/usage.ts`), `docs/features.md`, and `README.md` if it's a main one;
 - something users see: a line under `## Next` in `docs/release-notes.md`.
 
 Security problems: [SECURITY.md](SECURITY.md), not an issue. By sending a PR you agree it's under Laki's MIT license.

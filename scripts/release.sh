@@ -52,6 +52,8 @@ upload() {
     node --experimental-strip-types --no-warnings -e 'import("./src/shared/update.ts").then(m => { const [v, a, repo, notes] = process.argv.slice(1); console.log(m.feedOf(v, a, require("fs").readFileSync(notes, "utf8").trim(), new Date().toISOString(), repo)) })' \
       "$v" "$a" "$REPO" "$notes" > "$dir/update-mac-$a.json"
   done
+  # the release page's notes (not the app's feed above) end with the way to Laki's own repo: its source, guide and issues
+  printf '\n---\n\n[Laki on GitHub](https://github.com/%s): the source, the guide, issues and discussions.\n' "$(node -p "require('./package.json').repository.replace(/^github:/, '')")" >> "$notes"
   f=$(files "$v")
   (cd "$dir" && shasum -a 256 $f > SHA256SUMS.txt)
   f="$f SHA256SUMS.txt"

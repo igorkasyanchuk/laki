@@ -832,7 +832,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
     p.memory = m.length ? m : undefined
   }
   if (Array.isArray(o.seps)) {
-    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}) }))
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(typeof x.preset === 'string' && x.preset.trim() ? { preset: Array.from(x.preset.trim()).slice(0, 80).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}) }))
     p.seps = seps.length ? seps : undefined
     if (!p.seps) p.rows = undefined
   }
@@ -1201,7 +1201,8 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
 }
 
 // agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string } & Cause): Tab {
+// cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
   const ws = findWs(wsRef)
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!o.kind) presetCheck(o.preset, o.cmd)
@@ -1224,10 +1225,11 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
   const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }) }
+  const cwd = kind === 'shell' && !o.cmd ? o.cwd : undefined
   state.tabs.push(tab)
   save()
   try {
-    spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt })
+    spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt, cwd })
   } catch (e) {
     state.tabs = state.tabs.filter(t => t !== tab)
     save()
@@ -2115,6 +2117,17 @@ export function restoreNow(id: string) {
 }
 
 // ---------- shells across restarts
+
+// a shell tab's folder now (its shell's, where you cd'd; not what runs in front of it), for a new shell beside it (tabNew's
+// cwdOf): a local shell tab of that workspace only; none when it's gone or lsof can't say. lsof run async: it can take
+// a while, and the daemon serves every terminal meanwhile
+export async function shellCwd(wsRef: string, tabId: unknown): Promise<string | undefined> {
+  const ws = findWs(wsRef)
+  const s = typeof tabId === 'string' && !ws.host && state.tabs.some(t => t.id === tabId && t.workspace === ws.id && t.kind === 'shell') ? sessions.get(tabId) : undefined
+  if (!s || s.exited) return
+  if (process.platform === 'linux') return (() => { try { return readlinkSync(`/proc/${s.pty.pid}/cwd`) } catch { return undefined } })()
+  return run('lsof', ['-a', '-d', 'cwd', '-Fn', '-p', String(s.pty.pid)], { timeout: 2000 }).then(r => String(r.stdout).split('\n').find(l => l[0] === 'n')?.slice(1), () => undefined)
+}
 
 // ps's lines (pid, then the rest) by pid
 const psRows = (text: string) => new Map(text.split('\n').flatMap(l => (m => (m ? [[+m[1], m[2].trim()] as const] : []))(/^\s*(\d+)\s+(.*)$/.exec(l))))

@@ -422,7 +422,7 @@ export function artifactFile(id: string, rel: string) {
 }
 
 export const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
-const MAX_TEXT = 512 << 10
+export const MAX_TEXT = 512 << 10
 
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image
 // as it was where the workspace's changes start (diff's base, through git show), for Changes' before and after
@@ -467,7 +467,7 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
 }
 
 // a text file's answer; lossy: not UTF-8 (the text isn't its bytes: saving it would change them)
-function textOf(buf: Buffer, size: number) {
+export function textOf(buf: Buffer, size: number) {
   const text = buf.toString('utf8')
   return { size, text, cut: size > MAX_TEXT || undefined, lossy: (size <= MAX_TEXT && !Buffer.from(text).equals(buf)) || undefined }
 }

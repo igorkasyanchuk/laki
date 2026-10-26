@@ -1,4 +1,4 @@
-// Bird view (experimental, settings.birdView; the eye beside Help, ⌘K): every live session at once, grouped by
+// Bird view (settings.birdView, on unless false; the eye beside Help, ⌘K): every live session at once, grouped by
 // workspace (tiles in masonry columns), each a card with its screen as it is now (the daemon's `screen`, polled while
 // the page is open). A click opens that tab.
 import { useEffect, useState } from 'react'
@@ -78,7 +78,6 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
       head={
         <>
           <b>Bird view</b>
-          <span className="wf-beta">experimental</span>
         </>
       }
       onClose={onClose}

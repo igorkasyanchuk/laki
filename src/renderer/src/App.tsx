@@ -46,7 +46,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { AGENT_COLORS, ask, askText, AskHost, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -205,7 +205,6 @@ const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', todos: '
 const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 // a tab's color: its own, else its agent's ('none' turns that off)
-const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', gemini: 'blue', grok: 'purple', opencode: 'green' }
 const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 
 // where a folder opens: editors (one of them is ⌘E's), Finder, terminals
@@ -427,6 +426,9 @@ export function App() {
     return () => (window.removeEventListener('focus', f), window.removeEventListener('blur', f))
   }, [])
   const [dialog, setDialog] = useState<Dialog>(null)
+  // the new-workspace page gone any way (Esc, a row's or the rail's click, another page over it): what it was making
+  // comes as a toast, never a jump back to it from where you went
+  useEffect(() => void (dialog !== 'new' && made.current.page++), [dialog])
   const [picking, setPicking] = useState(false) // development mode's element picker (Picker.tsx)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   // #18: a page or dialog opened over an extension's or agent's ask puts it back in line (not a deny: its Esc would have
@@ -580,6 +582,15 @@ export function App() {
   const visible = tabsOf(group)
 
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
+  // the selected workspace's row in sight, however it was picked (a bubble, a notification, ⌘J, a link): a list scrolled
+  // away from it comes back to it, once (a folded one as it unfolds); one in sight doesn't move
+  const scrolledTo = useRef<string | null>(null)
+  useEffect(() => {
+    const id = ws?.id
+    if (!id || scrolledTo.current === id) return
+    const f = requestAnimationFrame(() => (el => el && (el.scrollIntoView({ block: 'nearest' }), (scrolledTo.current = id)))(document.querySelector(`.sidebar [data-row="ws:${CSS.escape(id)}"]`)))
+    return () => cancelAnimationFrame(f)
+  }, [ws?.id, folded])
   // back and forward: each new place after the one you're at (what was ahead of it goes, as in a
   // browser); a move of travel's own is that place again, not a new one
   const historyOn = !!view && view.settings?.history !== false
@@ -1268,7 +1279,8 @@ export function App() {
       }
     })
     api.connect()
-    bridge?.onFocusTab(id => (setDialog(null), selectTab(id))) // a notification's or the menu bar's: over any page, as ⌘J
+    // a notification's, a bubble's or the menu bar's: over any page, as ⌘J; its row unfolded into sight (below)
+    bridge?.onFocusTab(id => (setDialog(null), selectTab(id), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace)))
     bridge?.onDeepLink?.(setLink)
     onLakiLink(setLink) // a laki:// link in the app (the AI's to a workspace): routed here, as the Dock's
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
@@ -1374,11 +1386,13 @@ export function App() {
     (id, whole, over) => JSON.stringify(move(groups, id, whole, over)) !== JSON.stringify(groups), // a split where it is too
   )
 
-  const newTab = async (preset: string, cmd?: string, w: WorkspaceView | null = ws) => w && selectTab(await call<TabView>('tabNew', { ws: w.id, preset, cmd }))
+  // a new shell from a shell: in the folder that one is in now (cwdOf), as a terminal's new tab does
+  const cwdOf = (w: WorkspaceView | null, from = tab) => (from?.kind === 'shell' && from.workspace === w?.id ? { cwdOf: from.id } : undefined)
+  const newTab = async (preset: string, cmd?: string, w: WorkspaceView | null = ws) => w && selectTab(await call<TabView>('tabNew', { ws: w.id, preset, cmd, ...(preset === 'shell' && !cmd && cwdOf(w)) }))
   // a new shell next to the focused pane
   const split = async (edge: 'right' | 'bottom', next = tab?.id) => {
     if (!ws || !next) return
-    const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell', beside: next, edge }) // the daemon puts it there
+    const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell', beside: next, edge, ...cwdOf(ws, byId(next)) }) // the daemon puts it there
     if (!layoutsOn) setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: next, edge }))
     selectTab(t)
   }
@@ -1601,18 +1615,13 @@ export function App() {
     if (typeof how === 'object') panelApi(w).preview(how.rel)
     else if (how === 'missing') toast(`Not there: ${path}`)
   }
-  // Changes' Revert while an agent works there: asked once (yes holds until no agent runs there); a whole file: asked
-  // always, the agent in the same question
-  const revertYes = useRef(new Set<string>())
-  const revertOk = async (w: WorkspaceView, file?: string) => {
+  // Changes' Revert, a git action: always asked (a whole file, or what of it: a hunk, some lines), an agent at work there
+  // in the same question
+  const revertOk = async (w: WorkspaceView, file: string, part?: string) => {
     const busy = view?.tabs.find(t => t.workspace === w.id && t.kind === 'agent' && t.status === 'running')
-    if (!busy) revertYes.current.delete(w.id)
-    const warn = busy && `${busy.preset ?? busy.name} is working here: it may write ${file ? 'it' : 'this file'} again.`
-    if (file) return ask(`Revert ${file.split('/').pop()}?`, { text: [`Back to how it is on ${w.base ?? 'the base'}: every change in it goes. Undo is in the toast.`, warn].filter(Boolean).join(' '), ok: 'Revert', danger: true })
-    if (!busy || revertYes.current.has(w.id)) return true
-    const yes = await ask(`${warn} Revert anyway?`, { ok: 'Revert' })
-    if (yes) revertYes.current.add(w.id)
-    return yes
+    const warn = busy && `${busy.preset ?? busy.name} is working here: it may write it again.`
+    const name = file.split('/').pop()
+    return ask(part ? `Revert ${part} in ${name}?` : `Revert ${name}?`, { text: [`Back to how ${part ? 'it is' : 'the file is'} on ${w.base ?? 'the base'}${part ? '' : ': every change in it goes'}. Nothing is committed; Undo is in the toast.`, warn].filter(Boolean).join(' '), ok: 'Revert', danger: true })
   }
   const redo = (w: WorkspaceView, id: string, then?: () => void) => call('hunkRedo', { ws: w.id, id }).then(() => (then?.(), done('Back as it was')), () => {})
   const panelApi = (w: WorkspaceView): PanelApi => ({
@@ -1625,6 +1634,9 @@ export function App() {
     prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
+    prFile: path => api.call<FileContent>('prFile', { ws: w.id, path }),
+    // the workspace's live agent tabs, the focused one first: where a comment or the full review's go
+    agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
     // the file read again: its lines must still be what the review saw (applySuggestions), and fileWrite's was keeps an
     // agent's write meanwhile; Undo writes the text back the same way
@@ -1642,7 +1654,7 @@ export function App() {
       done(`Applied ${edits.length === 1 ? 'the suggestion' : `${edits.length} suggestions`} to ${path.split('/').pop()}`, () => void call('fileWrite', { ws: w.id, path, text: was, was: text }).then(() => (then?.(), done('Back as it was')), () => {}))
     },
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
-    toAgent: (text, line) => api.call('send', { target: w.id, text, whenIdle: true }).then(() => (line && earn('comment'), toast('Sent to the agent'))),
+    toAgent: (text, line, tab) => api.call('send', { target: tab ?? w.id, text, whenIdle: true }).then(() => (line && earn('comment'), toast(`Sent to ${(tab && view?.tabs.find(t => t.id === tab)?.name) || 'the agent'}`))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     sim: p => api.call('sim', p),
@@ -1652,7 +1664,7 @@ export function App() {
     fileItems: path => fileMenu(w, path, false),
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
     undoHunk: async (path, hunk, lines, then) => {
-      if (!(await revertOk(w))) return false
+      if (!(await revertOk(w, path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk'))) return false
       const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines })
       then?.()
       done(`Reverted ${lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : '1 hunk'} in ${path.split('/').pop()}`, () => void redo(w, id, then))
@@ -1679,7 +1691,6 @@ export function App() {
   // PR's review
   const reviewApi = (w: WorkspaceView): ReviewApi => ({
     ...panelApi(w),
-    agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
     send: (tab, text) => api.call('send', { target: tab, text, whenIdle: true }).then(() => done(`Sent the review to ${view?.tabs.find(t => t.id === tab)?.name ?? 'the agent'}`)),
     threadsAll: () => api.call<Thread[]>('prThreads', { ws: w.id, all: true }),
     talk: () => api.call<Talk[]>('prTalk', { ws: w.id }),
@@ -2238,13 +2249,13 @@ export function App() {
   })
   // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
   // template: the default prompt template of a new workspace under it ('' none)
-  const sepName = async (o: { sep: string; id?: string }, name: string, template: string) => {
+  const sepName = async (o: { sep: string; id?: string }, name: string, template: string, preset: string) => {
     const p = view!.projects.find(p => p.id === o.sep)
     if (!p) return
-    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, template } : x)) }))
+    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, template, preset } : x)) }))
     const id = `sep-${Math.random().toString(36).slice(2, 10)}`
     const ids = [id, ...rowsOf(p, view!.workspaces).map(x => x.id)]
-    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, template }], rows: ids })
+    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, template, preset }], rows: ids })
   }
   // Sort workspaces: a project's (unset: as dragged), or a group's (unset: the project's, its own way named)
   const SORTS: [WsSort, string][] = [['manual', 'As dragged'], ['created', 'Newest first'], ['activity', 'Last active first'], ['name', 'By name']]
@@ -2419,20 +2430,36 @@ export function App() {
   // right click on the status bar's PR
   // Approve / Close / Merge: gh as you, once you say so (merge: the checks and review in the question, and whether
   // GitHub deletes the branch)
+  // what a PR action's question shows, as a delete's: the PR's author, branches, size, checks, reviews, conflicts, labels
+  const prFacts = (w: WorkspaceView): Fact[] => {
+    const pr = w.pr!
+    const said = [pr.approved?.length && `approved by ${pr.approved.join(', ')}`, pr.changes?.length && `changes asked by ${pr.changes.join(', ')}`].filter(Boolean)
+    const told = (pr.review === 'APPROVED' && pr.approved?.length) || (pr.review === 'CHANGES_REQUESTED' && pr.changes?.length) // the names say the decision
+    const review = [told ? '' : (pr.review && REVIEW[pr.review]) || (said.length ? '' : 'none needed'), ...said].filter(Boolean).join(', ')
+    return [
+      pr.author && { label: 'Author', value: `${pr.author}${pr.mine ? ' (you)' : ''}` },
+      { label: 'Branch', value: `${w.branch || '?'} → ${pr.base ?? 'its base'}${pr.cross ? ' (from a fork)' : ''}` },
+      pr.additions !== undefined && { label: 'Size', value: `+${pr.additions} −${pr.deletions ?? 0}` },
+      { label: 'Checks', value: ciText(pr) },
+      { label: 'Review', value: review },
+      pr.conflict && { label: 'Conflicts', value: `merge conflicts with ${pr.base ?? 'its base'}` },
+      pr.ready === false && !pr.conflict && { label: 'GitHub', value: "wouldn't merge it now: blocked, behind or unstable" },
+      pr.draft && { label: 'Draft', value: 'still a draft' },
+      pr.labels?.length && { label: 'Labels', value: pr.labels.map(l => l.name).join(', ') },
+      pr.updated && { label: 'Updated', value: ago(pr.updated) },
+    ].filter(Boolean) as Fact[]
+  }
   const prAct = async (w: WorkspaceView, act: PRAct, method: MergeMethod = cfgOf(w)?.mergeMethod ?? 'squash') => {
     const pr = w.pr
     if (!pr) return
     if (act === 'merge') {
       const del = { label: 'Delete the branch on GitHub', on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
-      const review = (pr.review && REVIEW[pr.review]) || 'no review needed'
-      const text = [pr.title, `Checks: ${ciText(pr)} · ${review}${pr.conflict ? ' · merge conflicts' : ''}`].filter(Boolean).join('\n')
-      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, text, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del)) !== 1) return
+      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w))) !== 1) return
       return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged PR #${pr.number}`, undefined, undefined, true))
     }
     const close = act === 'close'
-    const facts = close ? 'Without merging; it can be reopened on GitHub.' : [pr.author && `By ${pr.author}`, `Checks: ${ciText(pr)}`, pr.conflict && 'merge conflicts'].filter(Boolean).join(' · ')
-    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, facts].filter(Boolean).join('\n'), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
+    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; it can be reopened on GitHub.'].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
@@ -3186,7 +3213,7 @@ export function App() {
         data-row={`ws:${s.id}`}
         data-group={p.id}
         data-head=""
-        data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'}${s.template ? ` · new ones start with the template ${s.template}` : ''} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
+        data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'}${s.template ? ` · new ones start with the template ${s.template}` : ''}${s.preset ? ` · new ones start ${s.preset}` : ''} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
         onPointerDown={e => rows.start(e, 'ws', s.id, p.id, true)}
         onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(s.id)}
         onDoubleClick={() => setDialog({ sep: p.id, id: s.id })}
@@ -3413,7 +3440,18 @@ export function App() {
   // what it tells the model with each ask: the page open, the workspace and tab, as they are now, and the tab's screen
   const whereNow = async () => {
     const page = dialog === null ? 'the workspace below (no page over it)' : typeof dialog === 'string' ? `the ${dialog} page` : `the ${Object.keys(dialog)[0]} page`
-    const w = ws && [`workspace "${wsName(ws)}" (id ${ws.id}) in project ${project?.name ?? ws.project}`, ws.branch && `branch ${ws.branch}`, ws.pr && `PR #${ws.pr.number} "${ws.pr.title}" ${ws.pr.state.toLowerCase()} ${ws.pr.url}`].filter(Boolean).join(', ')
+    // the selected workspace's facts, as Info shows them: where it is, its branch and base, its changes, its PR (checks,
+    // review, conflicts), what listens there, its other tabs
+    const w = ws && [
+      `workspace "${wsName(ws)}" (id ${ws.id}) in project ${project?.name ?? ws.project}`,
+      `${ws.kind === 'worktree' ? 'a worktree' : 'the folder itself'} at ${ws.host ? `${ws.host}:` : ''}${ws.path}`,
+      ws.branch && `branch ${ws.branch}${ws.base ? ` off ${ws.base}` : ''}`,
+      ws.stat && `changes: ${ws.stat.files} file${ws.stat.files === 1 ? '' : 's'} +${ws.stat.add} −${ws.stat.del}${ws.stat.dirty ? `, ${ws.stat.dirty} uncommitted` : ''}`,
+      ws.pr && `PR #${ws.pr.number} "${ws.pr.title}" ${prState(ws.pr)} ${ws.pr.url}, checks ${ciText(ws.pr)}${ws.pr.review && REVIEW[ws.pr.review] ? `, ${REVIEW[ws.pr.review]}` : ''}${ws.pr.conflict ? ', merge conflicts' : ''}`,
+      ws.ports.length && `listening on ${ws.ports.map(n => `localhost:${n}`).join(', ')}`,
+      ws.storage && `its storage folder ${ws.storage}`,
+      (ts => ts.length > 1 && `its tabs: ${ts.map(x => `"${x.name}" (${x.kind === 'agent' ? (x.preset ?? 'agent') : x.kind}, ${STATE_WORDS[x.status] ?? x.status})`).join(', ')}`)(tabs.filter(x => x.workspace === ws.id && x.status !== 'exited')),
+    ].filter(Boolean).join(', ')
     const t = tab && [`tab "${tab.name}" (id ${tab.id}, ${tab.kind === 'agent' ? tab.preset ?? 'agent' : tab.kind}) ${STATE_WORDS[tab.status] ?? tab.status}`, tab.progress && `${tab.progress.pct}% done`, tab.last && `its last answer: ${tab.last.trim().replace(/\s+/g, ' ').slice(0, 400)}`].filter(Boolean).join(', ')
     const flow = flowsOf(dialog) && pageNow.workflow?.() // the Workflows page: the workflow open there, and its file
     if (flow) return `On the Workflows page, with ${flow}`
@@ -4211,13 +4249,14 @@ export function App() {
           <NewWorkspace
             key={`${newFor}${JSON.stringify(newInit ?? '')}`} // another project asked for while it's open (＋, a dropped folder, a link)
             view={{ ...view, projects: view.projects.filter(p => !p.kind) } /* Terminals and Browsers make theirs with + */}
-            project={[newFor, ws?.project].find(id => view.projects.some(p => p.id === id && !p.kind))}
+            // newFor: a project just added may not be in the view yet (projectAdd answers first): the page starts there
+            // anyway, not in the selected workspace's project
+            project={newFor && !view.projects.find(p => p.id === newFor)?.kind ? newFor : [ws?.project].find(id => view.projects.some(p => p.id === id && !p.kind))}
             agent={settings.agent}
             initial={newInit}
             images={newImages}
             inserts={project => extInserts({}, project)}
             onClose={() => {
-              made.current.page++
               setDialog(null)
               setNewFor(undefined)
               setNewInit(undefined)
@@ -4494,7 +4533,8 @@ export function App() {
         <Prompt
           title={`Ship ${ws.id}`}
           busy={checking === `ship:${ws.id}` ? 'Checking…' : undefined}
-          hint={`git add -A, commit, git push -u origin ${ws.branch}, gh pr create --fill — in a ship tab`}
+          // what it does, said before it does it (a git action: this is its confirmation): the changes, the push, the PR
+          hint={`${ws.stat ? `${ws.stat.files} file${ws.stat.files === 1 ? '' : 's'} changed (+${ws.stat.add} −${ws.stat.del})${ws.stat.dirty ? `, ${ws.stat.dirty} not committed yet` : ''}: ` : ''}git add -A and commit, push ${ws.branch} to origin (git push -u), then a PR into ${ws.base ?? 'its base'} (gh pr create --fill), in a ship tab`}
           placeholder="Commit message"
           onClose={() => setDialog(null)}
           onSubmit={async message => {
@@ -4646,10 +4686,14 @@ export function App() {
           title={dialog.id ? 'Edit group' : 'New group'}
           hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
           initial={s?.name}
-          pick={tpls.length || s?.template ? { label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template } : undefined}
+          picks={[
+            ...(tpls.length || s?.template ? [{ label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template }] : []),
+            { label: 'Default agent: a new workspace here starts it', none: 'None: the last one used', options: view.presets.filter(x => !x.off).map(x => x.name), value: s?.preset },
+          ]}
           onClose={() => setDialog(null)}
-          onSubmit={async (name, template) => {
-            await sepName(dialog, name, template)
+          onSubmit={async (name, picked) => {
+            const [template, preset] = tpls.length || s?.template ? picked : ['', picked[0]]
+            await sepName(dialog, name, template, preset)
             setDialog(null)
           }}
         />

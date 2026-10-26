@@ -11,9 +11,9 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AI_ACTS, AI_PERM, AI_MODEL, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
+import { broadcast, cliArgv, dir, execGroup, modelCheck, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
 import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetLogs, widgetsView, widgetWhat } from './widgets.ts'
@@ -761,25 +761,25 @@ function lookOf(v: unknown): AiLook | null {
 }
 export function aiQuestion(p: { text?: string; options?: unknown[]; looks?: unknown[]; act?: AiAct; chat?: string }) {
   const t = asking(p.chat) // the chat whose ask is at work
-  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }) } : undefined
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '', ...(p.act.kind === 'run' && { text: String(p.act.text ?? '').slice(0, RUN_MAX) }), ...(p.act.kind === 'profile' && { text: JSON.stringify(profilesOf(p.act.text)) }) } : undefined
   if (act?.kind === 'run' && !act.text?.trim()) throw new Error('what to run? the command is empty')
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
   if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
-  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  const text = act ? (on ? turnOn(act, on.text) : act.kind === 'run' ? runIn(act) : act.kind === 'profile' ? profilesAsk(act) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   // each option with its look (an extension's chat: how it would show), the same option once
   const given = (Array.isArray(p.options) ? p.options : []).map((o, i) => [String(o).trim().slice(0, 200), lookOf(Array.isArray(p.looks) ? p.looks[i] : undefined)] as const).filter(([o], i, all) => o && all.findIndex(x => x[0] === o) === i).slice(0, 6)
-  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : act.kind === 'run' ? ['Yes, run it', "No, don't"] : act.kind === 'profile' ? ['Yes, save them', "No, don't"] : [`Yes, remove ${act.label}`, 'No, keep it']) : given.map(([o]) => o)
   if (options.length < 2) throw new Error('2 to 6 options')
   const looks = act || !given.some(([, l]) => l) ? undefined : given.map(([, l]) => l)
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act, ...(looks && { looks }) } })
   t.asked = true
   changed(t)
-  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : act.kind === 'run' ? 'runs it, Laki does' : act.kind === 'profile' ? 'saves them, Laki does' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -809,7 +809,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   m.ask.picked = pick
   say(t, 'user', pick)
   const on = act.kind === 'widget'
-  if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : act.kind === 'run' ? 'Not run.' : `Kept ${act.label}.`), { kept: true }
+  if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : act.kind === 'run' ? 'Not run.' : act.kind === 'profile' ? 'Not saved.' : `Kept ${act.label}.`), { kept: true }
   // only what they were shown: its files may have changed since (an agent's write, a save, a source set). Then the
   // question again, as it reads now
   const now = on ? widgetWhat(act.id) : undefined
@@ -829,6 +829,11 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
       await runAct(act, rpc)
       say(t, 'ai', `Ran it in ${act.label}.`)
       return { ran: true }
+    }
+    if (act.kind === 'profile') {
+      await saveProfiles(act, rpc)
+      say(t, 'ai', `Saved ${act.label}: Settings › Agents & profiles has them, and every agent menu.`)
+      return { saved: true }
     }
     await remove(act, rpc)
     say(t, 'ai', `Removed ${act.label}.`)
@@ -854,9 +859,57 @@ async function runAct(a: AiAct, rpc: Rpc) {
   await rpc('input', { tab: t.id, data: '\x05\x15' })
   await rpc('send', { target: t.id, text: a.text })
 }
+// laki_profiles: agent profiles Laki AI would add or change by name (the user's Yes saves them): an agent with its
+// model, effort, permission mode and fast mode; never a command, args or env of its own (what runs is the agent)
+const PROFILES_MAX = 10
+function profilesOf(text?: string): Preset[] {
+  let list: unknown
+  try {
+    list = JSON.parse(String(text ?? ''))
+  } catch {
+    throw new Error('the profiles: a JSON list')
+  }
+  if (!Array.isArray(list) || !list.length || list.length > PROFILES_MAX) throw new Error(`1 to ${PROFILES_MAX} profiles`)
+  const out: Preset[] = []
+  for (const x of list as Record<string, unknown>[]) {
+    if (!x || typeof x !== 'object') throw new Error('each profile: { "name", "agent", … }')
+    const name = String(x?.name ?? '').trim().slice(0, 40)
+    const agent = String(x?.agent ?? '').trim()
+    if (!name || ['shell', 'custom', 'none'].includes(name)) throw new Error(`a profile's name: ${name || 'none given'}`)
+    if (!(AGENTS as readonly string[]).includes(agent)) throw new Error(`${name}: agent ${agent || '?'}: one of ${AGENTS.join(', ')}`)
+    const [model, effort, perm] = [x.model, x.effort, x.perm].map(v => (typeof v === 'string' && v.trim()) || undefined)
+    const fast = x.fast === true || undefined
+    modelCheck(agent, model, effort, perm, fast)
+    if (out.some(p => p.name.toLowerCase() === name.toLowerCase())) continue
+    out.push({ name, agent: agent as Preset['agent'], ...(model && { model }), ...(effort && { effort }), ...(perm && { perm }), ...(fast && { fast }) })
+  }
+  return out
+}
+// the question: each profile as it would start, and which of the user's it replaces
+function profilesAsk(a: AiAct) {
+  const have = presets()
+  const lines = profilesOf(a.text).map(p => {
+    const mode = p.perm && PERMS[p.agent as keyof typeof PERMS]?.find(m => m[0] === p.perm)
+    const says = [p.agent, p.model && `model ${p.model}`, p.effort && `${p.effort} effort`, mode && `${mode[1].toLowerCase()} (${mode[2].toLowerCase()})`, p.fast && 'fast mode'].filter(Boolean).join(', ')
+    return `- **${p.name}**: ${says}${have.some(h => h.name.toLowerCase() === p.name.toLowerCase()) ? ' · replaces yours' : ''}`
+  })
+  return `Save ${lines.length === 1 ? 'this agent profile' : 'these agent profiles'}? They show in every agent menu (Settings › Agents & profiles).\n\n${lines.join('\n')}`
+}
+// the user's Yes: added, or one of the same name changed (its env and account kept; its args and command only while
+// it stays the same agent: another's flags would break its start)
+async function saveProfiles(a: AiAct, rpc: Rpc) {
+  const add = profilesOf(a.text)
+  const same = (x: Preset, y: Preset) => x.name.toLowerCase() === y.name.toLowerCase()
+  const have = presets()
+  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast })
+  const next = [...have.map(h => (n => (n ? changed(h, n) : h))(add.find(n => same(n, h)))), ...add.filter(n => !have.some(h => same(n, h)))]
+  await rpc('settingsSet', { presets: next })
+}
+
 // what a removal would take, in words, from Laki's own state
 function whatOf(a: AiAct) {
   const cut = (t: string) => `“${t.length > 80 ? `${t.slice(0, 79)}…` : t}”`
+  if (a.kind === 'profile') return (ps => `the profile${ps.length === 1 ? '' : 's'} ${ps.map(p => p.name).join(', ')}`)(profilesOf(a.text))
   if (a.kind === 'schedule') {
     const x = state.schedules?.find(x => x.id === a.id)
     return x && `the scheduled task ${cut(x.name || x.prompt)}`

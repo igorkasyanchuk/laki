@@ -223,11 +223,12 @@ const api: Record<string, Handler> = {
   browseDone: p => core.browseDone(p),
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
-  tabNew: ({ caller, from, run: _run, hops: _hops, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's
+  tabNew: async ({ caller, from, run: _run, hops: _hops, cwd: _cwd, cwdOf, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's; cwd: only cwdOf's shell's
     const by = core.agentCaller(caller) ?? core.saidFrom(from) // as wsNew's (byCaller)
     if (by) core.agentNoCmd(p) // an agent's: no command of its own
+    const cwd = cwdOf === undefined ? undefined : await core.shellCwd(p.ws, cwdOf)
     // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
-    const t = core.addTab(p.ws, { ...p, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
+    const t = core.addTab(p.ws, { ...p, cwd, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
     return t
   },
@@ -310,6 +311,7 @@ const api: Record<string, Handler> = {
   blame: p => core.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
   fileWeb: p => core.fileWeb(p), // a file's page on origin's site, at the base or the branch
   prDiff: p => core.prDiff(p.ws),
+  prFile: p => core.prFile(p.ws, p.path), // a file at the PR's head: the full review's expand arrows on PR #n
   prFiles: p => core.prFiles(p.ws),
   prViewed: p => core.prViewed(p),
   run: p => core.runDev(p.ws, p.script, core.callerAgent(p.caller)), // an agent's: its tab.new the agent's
@@ -373,7 +375,7 @@ const api: Record<string, Handler> = {
   widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete: to the trash (Undo: widgetRestore); never MCP's nor Laki AI's; its studio chat with it, once it's gone
   widgetRestore: p => widgetRestore(p), // Undo of a delete, laki widget restore
   widgetTrash: () => widgetTrash(), // laki widget trash
-  widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
+  widgetUndo: ({ from, ...p }) => widgetUndo({ ...p, agent: !!core.agentCaller(from) }), // the studio's Undo and Undo to here
   widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
   widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id
   studioChats: () => studioChats(), // the studio's chats, newest first: the app shows where you left off
@@ -382,7 +384,7 @@ const api: Record<string, Handler> = {
   widgetReload: () => widgetReload(),
   widgetFiles: p => widgetFiles(p),
   widgetFileSave: p => widgetFileSave(p),
-  widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
+  widgetWrite: ({ from, by, ...p }) => widgetWrite({ ...p, agent: by !== 'ai' || !!core.agentCaller(from) }), // Laki AI's (aiRpc's by) and MCP's: a new one saved off; agent: any other writer (an agent's tab, an MCP client outside Laki)
   widgetTick: p => widgetTick(p.now), // tests move the clock
   factsTick: () => factsTick(), // tests: workspace facts read now
   widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
@@ -463,7 +465,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prThreads', 'widgetWrite', 'widgetUndo'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -501,7 +503,8 @@ const notAgent = (p: any, what: string) => {
 // into a tab whose agent asks something (they'd answer it). N15: a project's trust and its config (setup, teardown, run,
 // env, actions, PR switches: what runs in every new workspace, outside the agent's mode) and the memory list every
 // agent starts with (an agent adds learned ones through memoryAdd, never the user's: --mine); its notes, name, groups
-// and looks stay an agent's to change, and projectTrust's read (no hash)
+// and looks stay an agent's to change, and projectTrust's read (no hash). prThreads' all: everyone's comments, for you
+// to read; an agent gets only trusted reviewers' (autoPR's rule)
 const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you' }
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
@@ -510,6 +513,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
   else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)
+  else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }

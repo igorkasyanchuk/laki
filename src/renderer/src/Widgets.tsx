@@ -221,7 +221,7 @@ function useParked() {
 // a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
 // action, else opens its full view, else fetches it now (else its settings)
 export const click = (w: WidgetView, api: WidgetApi) =>
-  w.here === null ? undefined : w.click ? void api.action(w.id, w.click, '', w.name, wsOf(w)).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
+  w.here === null ? undefined : w.click ? void (w.clickAsk ? ask(w.clickAsk.slice(0, 300), { ok: (w.label ?? w.name).slice(0, 40) }) : Promise.resolve(true)).then(yes => yes && api.action(w.id, w.click!, '', w.name, wsOf(w))).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
 // its tooltip; none when its user (or widget.json's "tip": false) said so
 const tipOf = (w: WidgetView) => (w.hide?.tip ? undefined : tipText(w))
 const tipText = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`

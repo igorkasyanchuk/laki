@@ -781,6 +781,7 @@ export const widgetsView = (): WidgetView[] =>
     icon: iconOf(w),
     ...w.face,
     click: clickOf(w),
+    clickAsk: (a => (a && typeof a === 'object' && typeof (a as { confirm?: unknown }).confirm === 'string' && String((a as { confirm: string }).confirm).trim()) || undefined)(clickOf(w) && w.m.actions?.[clickOf(w)!]), // its click action's confirm: asked first
   }))
 
 // a scope workspace one's instances in the view: each live workspace's that has fetched (or fetches now), its last fetch

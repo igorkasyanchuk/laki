@@ -790,6 +790,20 @@ html.away .voice-bar { animation-play-state: running !important; } /* paused at 
 .nw-top .nw-pick.quiet:hover { background: none; color: var(--muted); }
 .nw-top .nw-pick.on { background: var(--hover); color: var(--fg); }
 .nw-top-end { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; min-width: 0; }
+/* its colors (panels.tsx' --nw-tint: the project's, else the accent; --nw-agent: the agent's): the project and agent
+   picks lit in theirs, a heading from one to the other, the prompt's edge and glow, the send */
+.nw-hello { margin: 0 0 4px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.25; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nw-hello :is(.nw-hello-agent, .nw-hello-proj) { background: linear-gradient(90deg, var(--nw-agent), var(--nw-tint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.nw-hello .nw-hello-proj { background: linear-gradient(90deg, var(--nw-tint), color-mix(in srgb, var(--nw-tint) 55%, var(--accent))); -webkit-background-clip: text; background-clip: text; }
+.new-window .nw-hello { display: none; } /* the bubbles' compact window: the prompt only */
+.nw-top .nw-pick.nw-proj, .nw-top .nw-pick.nw-agent { color: var(--fg); background: color-mix(in srgb, var(--nw-tint) 13%, transparent); }
+.nw-top .nw-pick.nw-agent { background: color-mix(in srgb, var(--nw-agent) 14%, transparent); }
+.nw-top .nw-pick.nw-agent > .icon-svg:first-child { color: var(--nw-agent); }
+.nw-top .nw-pick.nw-proj:hover { background: color-mix(in srgb, var(--nw-tint) 22%, transparent); }
+.nw-top .nw-pick.nw-agent:hover { background: color-mix(in srgb, var(--nw-agent) 24%, transparent); }
+.new-ws .nw-composer { border-color: color-mix(in srgb, var(--nw-tint) 28%, var(--line)); box-shadow: 0 14px 40px -22px color-mix(in srgb, var(--nw-tint) 70%, transparent); }
+.new-ws .nw-composer:focus-within { border-color: color-mix(in srgb, var(--nw-tint) 65%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--nw-tint) 14%, transparent), 0 14px 40px -20px color-mix(in srgb, var(--nw-tint) 75%, transparent); }
+.new-ws .nw-send:not(:disabled) { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--nw-tint) 70%, var(--accent))); }
 /* one row, never a lonely second one: the project, the name and the base give way, their words cut with … (the name's
    first); the short picks, the template and the agent keep theirs */
 .nw-top { flex-wrap: nowrap; }
@@ -1186,6 +1200,15 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .dl-picks button.primary { height: 24px; padding: 0 10px; }
 .sp-diff > button { margin: 4px 6px 0; }
 .sp-diff .dl-line { cursor: pointer; }
+.sp-diff .dl-n { display: inline-block; min-width: 2ch; margin-right: 8px; text-align: right; color: var(--muted); opacity: .7; user-select: none; }
+.sp-diff .dl-n + .dl-n { margin-left: -2px; }
+.sp-diff .dl-plus { display: inline-block; width: 14px; height: 14px; margin: 0 4px 0 -4px; vertical-align: -2px; border-radius: 4px; user-select: none; }
+.sp-diff .dl-line:hover .dl-plus { background: var(--accent); }
+.sp-diff .dl-line:hover .dl-plus::before { content: '+'; display: block; text-align: center; line-height: 14px; font-weight: 700; color: var(--accent-fg, #fff); }
+.dl-comment .split { display: inline-flex; }
+.dl-comment .row button { white-space: nowrap; } /* a narrow panel wraps whole buttons, never their words */
+.dl-comment .split > button:first-child:not(:only-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.dl-comment .split .ib { width: 24px; height: auto; border: 1px solid var(--line); border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .sp-diff .dl-line:hover { box-shadow: inset 2px 0 var(--accent); }
 /* two columns (Changes' split view): rows line up, long lines wrap in their half */
 .sp-diff.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); overflow-x: hidden; }
@@ -1251,6 +1274,9 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-comment + .sp-comment { border-top: 1px solid var(--line); }
 .sp-comment-by { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .sp-comment-by .avatar { vertical-align: 0; }
+.sp-comment-by .sp-copy { margin-left: auto; width: 22px; height: 22px; opacity: 0; }
+.sp-comment:hover .sp-copy, .sp-comment .sp-copy:focus-visible { opacity: 1; }
+.fr-talk .sp-comment-by .sp-copy { margin-left: 0; }
 .sp-sugg { display: flex; flex-direction: column; gap: 6px; }
 .sp-sugg .sp-diff { border: 1px solid var(--line); border-radius: var(--rs, 6px); padding: 2px 0; }
 .sp-sugg button:not(.link) { height: 24px; padding: 0 10px; }
@@ -1413,6 +1439,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .md pre { padding: 10px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); overflow-x: auto; line-height: 1.45; }
 .md pre code { padding: 0; background: none; font-size: 12px; white-space: pre; }
 .md hr { border: 0; border-top: 1px solid var(--line); margin: 1.4em 0; }
+.md details { margin: 0 0 1em; } .md details > :not(summary) { margin-left: 1.1em; } /* GitHub's folds: a PR's release notes, commits */
+.md summary { cursor: pointer; margin-bottom: .4em; }
 .md a { color: var(--accent-ink); text-decoration: none; cursor: pointer; }
 .md a:hover { text-decoration: underline; }
 .md a:not([href]) { cursor: default; }
@@ -2463,6 +2491,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-ai-off > b { color: var(--fg); }
 .ext-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 4px); background: var(--panel); }
 .ext-card-head { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.ext-src-any { margin: 2px 0 8px; line-height: 1.5; }
+.ext-src-any code { font-size: 11px; }
 .ext-card-head > .small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ext-card-head > button { flex: none; white-space: nowrap; }
 .ext-card-head.sub { margin-top: 4px; }
 .ext-card .widget-card { padding: 0; border: none; background: none; }

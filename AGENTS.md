@@ -1,8 +1,8 @@
 # AGENTS.md
 
 Notes for coding agents working on **Laki** (CLI `laki`): how the code works and how to change it
-safely. User-facing docs: `README.md` (the short version: features, install, quick start) and `docs/guide.md` (the
-full guide); the product, in `requirements/`. Laki is a successor to wb
+safely. User-facing docs: `README.md` (the short version: a demo GIF, TL;DR, install, quick start, a table of the docs),
+`docs/features.md` (every feature, a few lines each), `docs/install.md` and `docs/guide.md` (the full guide); the product, in `requirements/`. Laki is a successor to wb
 (a tmux + iTerm workbench; its repo, if you have it, is read-only from here); ideas and code are ported
 from it (limits, hooks).
 
@@ -165,7 +165,7 @@ address) and permanent ones (`settings.tunnel`, `tunnelStart` `host`, a tunnel's
 the worktree's, `git blame --incremental`; shared/types.ts `Blame`), `fileWeb` (`ws`, `path`, `at` base or branch,
 `line`: the file's page on origin's site, files.ts `webOf`: GitHub's, GitLab's `-/blob`, Bitbucket's `src`; a branch
 not on origin refused), `prThreads` `all` (everyone's comments, not only `trusted`'s: for you to read, never sent to an
-agent), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). 116: the Review tab on unless
+agent; an agent's call refused, main.ts' `agentNo`), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). 116: the Review tab on unless
 `settings.fullReview` is false, its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). 117:
 workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`: a per-workspace one's `{{facts.…}}`, `$LAKI_FACTS`, a script's
 `facts`; `factsTick`, an instance's `fx`), `widgetSet` `hours` (an extension's own working hours, `always`; the view's `hours`) and
@@ -325,7 +325,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
   never `on: true`, `net: true`, `source`, `ai`, a secret setting or one a source or an AI action's prompt reads (`steering`: its `{{config.x}}`); a place it doesn't know is refused), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on; Widgets.tsx' `act` likewise
 refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
-  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off (one that was on stays on while `widgetTrust.ts` `runsOf` is the same: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (`agent`: any writer but Laki AI, whose `aiRpc` says `by: 'ai'`: an agent's tab, main.ts' `FROM`, or an MCP client outside Laki; only while `widgetTrust.ts` `runsOf` is the same: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on; `from` an agent: off, nothing run, a `note`),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
@@ -1418,7 +1418,7 @@ sample by default while it's off or not fetched yet, again at each `rev`), `Widg
 them (`Chat`, `widget:<id>`; '' a new one's until its first ask: `widgetSlug` names it, `onNamed`, App's `nameExt`
 moves the dialog and its history place to it, `extKey` kept: not drawn again; one of yours: `widgetSet` `ai` first;
 its head *New chat* is `aiNew` on that chat; empty: `STARTERS`' chips, `EXAMPLES`, `StudioSessions`' *Where you left
-off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it opens, not on a touch screen); the head: *off*, *by Laki AI*, a failed check's chip (`cfg.check`, no run, each `rev`),
+off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it opens, not on a touch screen); the head: *off*, a failed check's chip (`cfg.check`, no run, each `rev`),
 *Undo* (yours: `widgetUndo`), *Try it live* and *Turn on* (off: `TrySheet`, below; a repo's or an agent-linked one's
 *Turn on* is `extCfg.set`'s `repoSheet`, every file it runs, and no *Try it live*: `widgetRun` `once` refuses it). A new one's page has `Start` (the
 steps, the UI kit's card (SettingsExtensions.tsx' `KitHero`, Settings › Extensions' too: `WidgetsApi.kit`, its crumb back the page's name), and, with Laki AI off (no chat beside it), *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as `widgetFormat`); with
@@ -2254,7 +2254,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
   text edit. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
   (`securityLevel: strict`).
-- **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset), which
+- **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset; `html`: GitHub's text and a repo's files, `fromHtml` reads its tags into the same tree, `<details>` a `details` block, unknown tags and code left as text; never for what people and agents say), which
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw). Tested in `test/markdown.test.ts`.

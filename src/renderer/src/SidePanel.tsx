@@ -6,7 +6,7 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
-import { CommentBox, diffByFile, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
+import { CommentBox, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -33,10 +33,12 @@ export type PanelApi = {
   prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
   setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
   read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
+  prFile: (path: string) => Promise<FileContent> // as the PR's head commit has it (the PR's diff's expand arrows)
+  agents: { id: string; name: string }[] // the workspace's live agent tabs, the one to send to first
   threads: () => Promise<Thread[]>
   apply: (path: string, edits: Suggestion[], then?: () => void) => Promise<unknown> // Review's suggestions put in the file, Undo in the toast; then: after it and after its Undo
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
-  toAgent: (text: string, line?: boolean) => Promise<unknown> // to the workspace's agent, when its turn ends; line: a comment on a line (an achievement)
+  toAgent: (text: string, line?: boolean, tab?: string) => Promise<unknown> // to the workspace's agent (tab: that one), when its turn ends; line: a comment on a line (an achievement)
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
@@ -249,6 +251,8 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   const [split, setSplit] = useState(() => localStore('laki.diffSplit') === 'split') // side by side, as GitHub's split view; the last one picked
   const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
   const files = d?.files ?? []
+  // expand arrows (the full review's): the worktree's file, or the PR head's for the PR's diff
+  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), (_, fd) => `${all}#${fd.hunks.join('\n')}`)
   // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims
   const vw = useGhViewed(api, ws, pr?.number)
   const viewedOf = vw.viewedOf
@@ -314,16 +318,26 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             {open.has(f.path) && (!IMAGE.test(f.path) || all) /* the PR's images: GitHub has them */ && (
               <div className={`sp-diff ${split ? 'split' : ''}`}>
                 {(fd => {
-                  const box = boxAt(f.path, fd.lines)
+                  const fdx = xp.expanded(f.path, fd)
+                  const box = boxAt(f.path, fdx.lines)
+                  const tail = xp.expander(f.path, fd, 'down')
                   return (
-                    <DiffRows
-                      fd={fd}
-                      split={split}
-                      cls={l => lineClass(l, rv.picked(f.path, l))}
-                      row={l => ({ onMouseDown: rv.noSelect, onClick: e => pick(f.path, l, e) })}
-                      head={l => rv.hunkHead(f.path, l, fd.cut)}
-                      after={l => at && l === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />}
-                    />
+                    <>
+                      <DiffRows
+                        fd={fdx}
+                        split={split}
+                        cls={l => (l.ctx ? 'dl dl-ctx' : lineClass(l, rv.picked(f.path, l)))}
+                        row={l => (l.ctx ? {} : { onMouseDown: rv.noSelect, onClick: e => pick(f.path, l, e) })}
+                        head={l => (
+                          <>
+                            {l.hunk !== undefined && xp.expander(f.path, fd, l.hunk)}
+                            {rv.hunkHead(f.path, l, fd.cut)}
+                          </>
+                        )}
+                        after={l => at && l === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />}
+                      />
+                      {tail && <div className="fr-more">{tail}</div>}
+                    </>
                   )
                 })(byFile.get(f.path) ?? NO_DIFF)}
                 {f.status[0] !== 'D' && !all /* this workspace's copy needn't be the PR's */ && (
@@ -1299,7 +1313,7 @@ export function FilePreview(p: {
             <img src={f.image} alt={p.path} />
           </div>
         )}
-        {rendered && (table ? <CsvTable path={p.path} text={f.text!} edit={false} onText={() => {}} /> : <Markdown src={f.text!} />)}
+        {rendered && (table ? <CsvTable path={p.path} text={f.text!} edit={false} onText={() => {}} /> : <Markdown src={f.text!} html />)}
         {f?.text !== undefined &&
           lines.map((l, i) => (
             <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>

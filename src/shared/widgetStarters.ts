@@ -271,7 +271,7 @@ one short line each. Never put secrets in a note.
             how: { type: 'choice', label: 'How', choices: ['agent', 'git', 'ai'], default: 'agent', hint: "agent: the workspace's agent does it all · git: git merges, claude -p only for conflicts · ai: claude -p does it all" },
             branch: { type: 'text', label: 'Branch', hint: "The one to pull in; empty: the workspace's base", default: '' },
           },
-          actions: { pull: 'sh pull.sh' },
+          actions: { pull: { run: 'sh pull.sh', confirm: 'Merge the base branch into this workspace’s branch (How: its agent, git or claude -p)?' } },
           notify: '{{last}}',
           sample: at,
         }),

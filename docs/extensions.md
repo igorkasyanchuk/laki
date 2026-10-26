@@ -173,6 +173,10 @@ source's or action's prompt as `{{facts.diff}}`. A preview with its sample gets 
 every 10 seconds for the workspaces on screen (the git ones only as the workspace's changes or HEAD move); a fetch they
 start says *changed: changed_files* in its runs.
 
+What it reads is what you'd see yourself: the diff (32 KB), the PR's description, commit messages and your agents'
+last answers. An extension of yours (in Laki's extensions folder, not a repo's) runs in every project's workspaces, so it
+sees every project's; a repo's own (`.laki/extensions`) only its project's. Turn on only what you'd let read your code.
+
 ## Events (`on`)
 
 `"on": { "<event>": "<action>" | "refresh" }` answers what happens in Laki: as it happens, an extension that's on runs
@@ -651,7 +655,7 @@ click that does something.
 | `label` | its words, a template over its data: `"{{open}} open"`; none: its name |
 | `badge` | a short count on the icon: `"{{#if failing}}{{failing}}{{/if}}"`; empty: none |
 | `tip` | its tooltip, a template too; none: its name; `false`: no tooltip at all |
-| `click` | one of its `actions`, run on a click (its toast or dialog as any action's), then it fetches again; none: its full view, else a fetch now |
+| `click` | one of its `actions`, run on a click (its toast or dialog as any action's; that action's `confirm`, `{ "run": …, "confirm": "Merge main in?" }`, asked first), then it fetches again; none: its full view, else a fetch now |
 
 ```json
 {
@@ -928,13 +932,15 @@ and commit it. Folders and one-file extensions both work.
   restore <trash-id>`.
 - Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`,
   `laki_extension_check`; `fixtures/<name>.json` is the one folder they may write):
-  they make or change extensions in Laki's own folder, saved off: its fetch runs commands, so you look, then turn it on.
-  They never delete one.
+  they make or change extensions in Laki's own folder. A new one is saved off: its fetch runs commands, so you look, then
+  turn it on. One that's on stays on as Laki AI changes it; any other writer's change (an agent in a tab, an MCP client
+  outside Laki) turns it off when what it runs changes (its commands would run outside that agent's sandbox). They
+  never delete one.
 
 ## Safety
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
-  Laki AI wrote is saved off and tagged *by Laki AI*.
+  Laki AI wrote is saved off.
 - One that's off runs nothing from its page (its preview): its actions, `do` buttons, links, copy and
   dialogs do nothing until you turn it on; a toast says so.
 - A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).

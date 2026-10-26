@@ -534,7 +534,7 @@ function OutFile({ at, dir, f, api, pageKey }: { at: Ref; dir: string; f: PlanFi
       {page && big && src && <BigPage title={f.path} src={src} onClose={() => setBig(false)} />}
       {ext === '.md' && body?.text !== undefined && (
         <div className="out-md">
-          <Markdown src={body.text} />
+          <Markdown src={body.text} html />
         </div>
       )}
       {(ext === '.txt' || ext === '.mmd') && body?.text !== undefined && <pre className="out-text">{body.text}</pre>}

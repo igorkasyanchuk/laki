@@ -90,12 +90,12 @@ export function CiMark({ pr }: { pr: PRInfo }) {
   )
 }
 
-// a PR author's GitHub picture (the CSP lets avatars.githubusercontent.com in); a bot's (app/…) has none, nor a
-// failed one, nor any with Settings' GitHub pictures off (App sets avatarsOn)
+// a PR author's GitHub picture (the CSP lets avatars.githubusercontent.com in), a bot's too (gh's app/dependabot is
+// GitHub's dependabot[bot]); none for a failed one, nor any with Settings' GitHub pictures off (App sets avatarsOn)
 let avatarsOn = true
 export const showAvatars = (on: boolean) => void (avatarsOn = on)
 export const Avatar = ({ login, size = 14 }: { login?: string; size?: number }) =>
-  avatarsOn && login && /^[\w-]+$/.test(login) ? <img className="avatar" src={`https://avatars.githubusercontent.com/${login}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null
+  (m => (avatarsOn && m ? <img className="avatar" src={`https://avatars.githubusercontent.com/${m[2]}${m[1] || m[3] ? '%5Bbot%5D' : ''}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null))(login ? /^(app\/)?([\w-]+)(\[bot\])?$/.exec(login) : null)
 
 export const prState = (pr: PRInfo) => (pr.draft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase())
 export const REVIEW: Record<string, string> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' }
@@ -414,7 +414,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
               <Icon name="more" />
             </button>
           </div>
-          {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} />}
+          {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} html />}
           {open && <Checks pr={pr} onOpen={onOpen} onLog={onLog} />}
           {open && (
             <div className="pr-block">

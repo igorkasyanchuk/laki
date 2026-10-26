@@ -136,7 +136,6 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
               <i /> {w.on ? 'On' : 'Off'}
             </button>
           )}
-          {w?.byAi && <span className="tag" data-tip="Laki AI wrote it: look at what it runs before you turn it on">by Laki AI</span>}
           {errors > 0 && (
             <button className="tag tag-closed ext-problems" onClick={() => setTab('check')}>
               {errors} {errors === 1 ? 'problem' : 'problems'}
@@ -913,8 +912,12 @@ function Inspector({ w, cfg, tab, draft, setDraft }: { w: WidgetView; cfg: Widge
           <section className="ext-card">
             <div className="ext-card-head">
               <b>Source</b>
-              <span className="muted small">where its data comes from</span>
+              <span className="muted small">where its data comes from: any way you like</span>
             </div>
+            {/* every way data gets in, so none is a secret: a source below, or pushed from outside */}
+            <p className="muted small ext-src-any">
+              Any JSON it can draw: its own command or script{w.ownFetch ? '' : ' (widget.json’s fetch)'}, text you type, a file, a URL, or an AI agent that looks it up (pick one below, read each time it fetches). Or push it from anywhere, a cron job, a git hook, a CI step: <code>laki widget push {w.id} '{'{"open": 3}'}'</code> (<code>--merge</code> adds to what it has{w.scope ? ', --ws for a workspace' : ''}). An action that prints <code>{'{"data": …}'}</code> sets it too.
+            </p>
             <SourceField w={w} api={cfg} />
           </section>
         )}

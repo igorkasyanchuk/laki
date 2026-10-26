@@ -124,7 +124,7 @@ export type CompactLogLine = CompactRun & { project: string; was?: string[]; now
 export const COMPACT_DAYS = 7 // settings.memoryCompact.days unset
 // the colors a tab, workspace, group, project, note or Desk tab can have (CSS --tc-<name>; ui.tsx colorVar)
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
-export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
+export type Sep = { id: string; name: string; color?: string; template?: string; preset?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; preset: an agent profile's name, likewise (its default agent); sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
 export type WsSort = (typeof WS_SORTS)[number]
@@ -461,10 +461,10 @@ export type Settings = {
   specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
   workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)
   birdView?: boolean // Settings › General › Pages: the eye beside Help, every live session's screen at once, on unless false
-  calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
+  calendar?: boolean // Settings › General › Pages: the rail's Calendar, scheduled tasks and reminders by week or month, on unless false
   desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
-  notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
-  todoList?: boolean // experimental (Settings › General): the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), off unless true
+  notes?: boolean // Settings › General › Pages: the rail's Notes, your own notes (daemon/notes.ts), on unless false
+  todoList?: boolean // Settings › General › Pages: the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), on unless false
   cloud?: boolean // experimental (Settings › General): Cloud workspaces, a workspace in a GitHub Codespace (core.ts, daemon/codespace.ts), off unless true
   simulator?: boolean // Settings › Simulators: the side panel's Simulator tab, off unless true
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
@@ -591,8 +591,8 @@ export type AiAsk = { id: string; options: string[]; looks?: (AiLook | null)[]; 
 // an option's look: a UI kit element over its own data (size: cells across × down; none: as a full view)
 export type AiLook = { ui: Record<string, unknown>; data?: unknown; size?: [number, number] }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
-export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget', 'run', 'profile'] as const // widget: turning an extension on; run: a command in a shell (id: its tab); profile: agent profiles saved (text: them as JSON); the rest a removal
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string; text?: string } // hash: an extension's files as asked about (widgetTrust.ts filesHash): a Yes needs them still; text: run's command, profile's profiles
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
@@ -621,11 +621,11 @@ export type SideLook = { guide?: string; divider?: string; indent?: string; rows
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number; images?: string[] } // images: pasted ones (<data>/images), their paths after the text as it starts
-// a follow-up on the calendar (Calendar, experimental): a note for a moment, from you, Laki AI or an agent (by), maybe about a
+// a follow-up on the calendar (Calendar): a note for a moment, from you, Laki AI or an agent (by), maybe about a
 // workspace or a project; it rings once as it's due (fired) while the app is open, done: ticked off
 export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean }
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
-// a tile on the Desk (experimental): an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
+// a tile on the Desk: an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
 // x, y: its cell, columns from the left and rows from the top, 0 first (none: the first spot it fits, deskLayout)
 export type DeskTile = { id: string; w: number; h: number; tab?: string; x?: number; y?: number } // tab: a DeskTab's id (none, or one gone: the first tab)
 // a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk); icon: one of the app's by name or an emoji, before its name
@@ -804,7 +804,7 @@ export type WidgetHide = { refresh?: boolean; at?: boolean; tip?: boolean } // t
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 export type LogLevel = (typeof LOG_LEVELS)[number]
 export type WidgetLogLine = { n: number; at: number; level: LogLevel; src: string; text: string; ws?: string }
-export type WidgetView = { id: string; key?: string; name: string; oneFile?: boolean; allowed?: string[]; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; hidden?: boolean; size: [number, number]; fit?: boolean; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; menus?: WidgetMenu[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; tipOff?: boolean; fx?: number; click?: string; hours?: string; stream?: boolean; facts?: string[]; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[]; log?: boolean; keepLog?: boolean; logErr?: number; gates?: Gate[]; project?: string; repo?: string; agentDev?: boolean; changed?: boolean } // tipOff: widget.json's "tip": false (hide.tip set with it); hours: its own working hours over Settings'; facts: the workspace facts it reads (FACTS); hidden: its data says hidden: true, so the app shows it nowhere (its page and Settings still list it); fit: in a bar, as wide as it needs (Auto, not a JS page's); project: a repo's (its .laki/extensions), shown and run only in that project's workspaces, repo its name; agentDev: in a folder an agent linked, trusted the same way; changed: off since its files changed there; gates: the steps its actions can hold; keepLog: its own Keep a log; log: it keeps a log now (its own switch, Settings' for all, or dev-linked); logErr: its last error line's time; oneFile: <id>.<n><s|m|h>.<ext>, renamed in its tag; allowed: claude tools its agent may use unasked, allowed when it asked; history: the studio's Undo, when each kept version was taken (ms), oldest first
+export type WidgetView = { id: string; key?: string; name: string; oneFile?: boolean; allowed?: string[]; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; hidden?: boolean; size: [number, number]; fit?: boolean; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; menus?: WidgetMenu[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; tipOff?: boolean; fx?: number; click?: string; clickAsk?: string; hours?: string; stream?: boolean; facts?: string[]; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[]; log?: boolean; keepLog?: boolean; logErr?: number; gates?: Gate[]; project?: string; repo?: string; agentDev?: boolean; changed?: boolean } // tipOff: widget.json's "tip": false (hide.tip set with it); clickAsk: its click action's confirm, asked before a click runs it; hours: its own working hours over Settings'; facts: the workspace facts it reads (FACTS); hidden: its data says hidden: true, so the app shows it nowhere (its page and Settings still list it); fit: in a bar, as wide as it needs (Auto, not a JS page's); project: a repo's (its .laki/extensions), shown and run only in that project's workspaces, repo its name; agentDev: in a folder an agent linked, trusted the same way; changed: off since its files changed there; gates: the steps its actions can hold; keepLog: its own Keep a log; log: it keeps a log now (its own switch, Settings' for all, or dev-linked); logErr: its last error line's time; oneFile: <id>.<n><s|m|h>.<ext>, renamed in its tag; allowed: claude tools its agent may use unasked, allowed when it asked; history: the studio's Undo, when each kept version was taken (ms), oldest first
 // an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
 export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
 // an action offered where you work (widget.json's title, show, match, key, ask, confirm, insert, view: widgetSchema.ts actionMenu)
@@ -852,5 +852,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 117
+export const API = 118
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

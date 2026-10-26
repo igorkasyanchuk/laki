@@ -1,8 +1,10 @@
 // A throwaway demo world for trying the UI: temp LAKI_HOME and HOME, a temp git repo, fake claude/codex/gh
 // (test/fakes) first on PATH, and a daemon serving the dev renderer origin. Prints the URL to open.
 //   node --experimental-strip-types scripts/demo.ts [dir]      stop: LAKI_HOME=<dir>/data laki stop
+// LAKI_DEMO_RICH=1: more to show (the README's GIF): three projects in colors, groups, a PR per workspace with its
+// checks, reviewers and authors' pictures (GitHub's own octocat and hubot, dependabot)
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -101,4 +103,44 @@ await rpc('run', { ws: a.id })
 const kept = (await rpc<{ workspaces: { id: string; storage?: string }[] }>('state')).workspaces.find(w => w.id === a.id)?.storage
 if (kept) for (const [f, text] of [['smoke/report.md', '# Smoke test\n\nAll pages load.\n'], ['smoke/home.txt', 'home ok\n'], ['links.md', '- https://example.invalid/artifact\n']]) mkdirSync(dirname(join(kept, f)), { recursive: true }), writeFileSync(join(kept, f), text)
 await rpc('send', { target: c.id, text: 'ask before deleting' })
+if (process.env.LAKI_DEMO_RICH) {
+  type W = { id: string; branch: string; path: string }
+  const pr = (branch: string, o: Record<string, unknown>) => writeFileSync(join(home, 'gh', `pr-${branch.replace(/\//g, '_')}.json`), JSON.stringify({ state: 'OPEN', isDraft: false, headRefOid: 'def456', reviewDecision: '', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', updatedAt: ago(1800), reviews: [], body: '', ...o }))
+  const pass = [check('lint', 'SUCCESS', 'COMPLETED', 21), check('test', 'SUCCESS', 'COMPLETED', 95), check('build', 'SUCCESS', 'COMPLETED', 130)]
+  const repoOf = (name: string, file: string) => {
+    const dir = join(home, name)
+    mkdirSync(dir, { recursive: true })
+    for (const a of [['init', '-q', '-b', 'main'], ['remote', 'add', 'origin', `git@github.com:acme/${name}.git`]]) execFileSync('git', a, { cwd: dir })
+    writeFileSync(join(dir, file), `// ${name}\n`)
+    execFileSync('git', ['add', '-A'], { cwd: dir })
+    execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir })
+    return dir
+  }
+  const ws = async (project: string, name: string, preset: string, prompt?: string) => rpc<W>('wsNew', { project, preset, name, ...(prompt && { prompt }) })
+  // shop: the PRs to look at, a group each way
+  await rpc('projectSet', { id: p.id, color: 'orange', icon: 'cart' })
+  const d = await ws(p.id, 'deps-bump', 'none')
+  pr(a.branch, { ...JSON.parse(readFileSync(join(home, 'gh/pr.json'), 'utf8')), author: { login: 'octocat' }, reviews: [{ author: { login: 'hubot' }, state: 'CHANGES_REQUESTED' }] })
+  pr(b.branch, { number: 57, url: 'https://github.com/acme/shop/pull/57', title: 'Dark mode for the storefront', author: { login: 'octocat' }, reviewDecision: 'APPROVED', reviews: [{ author: { login: 'hubot' }, state: 'APPROVED' }], additions: 342, deletions: 61, statusCheckRollup: pass })
+  pr(d.branch, { number: 61, url: 'https://github.com/acme/shop/pull/61', title: 'Bump vite from 6.2 to 6.3', author: { login: 'app/dependabot', is_bot: true }, additions: 12, deletions: 12, statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 19), check('test', '', 'IN_PROGRESS')] })
+  pr(c.branch, { number: 63, url: 'https://github.com/acme/shop/pull/63', title: 'One-page checkout', author: { login: 'hubot' }, isDraft: true, additions: 88, deletions: 9, statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 17)] })
+  const sep = (name: string, color: string) => ({ id: `sep-${name.toLowerCase().replace(/\W/g, '')}`, name, color })
+  const [review, build] = [sep('In review', 'blue'), sep('Building', 'green')]
+  await rpc('projectSet', { id: p.id, seps: [review, build], rows: [review.id, a.id, b.id, d.id, build.id, c.id] })
+  // api and mobile: two more projects, an agent at work in each
+  const api = await rpc<{ id: string }>('projectAdd', { path: repoOf('api', 'server.js') })
+  await rpc('projectSet', { id: api.id, color: 'teal', icon: 'server' })
+  const rl = await ws(api.id, 'rate-limiter', 'claude', 'add a rate limiter to the public API')
+  const wh = await ws(api.id, 'webhook-retries', 'codex', 'retry failed webhooks with backoff')
+  pr(rl.branch, { number: 108, url: 'https://github.com/acme/api/pull/108', title: 'Rate limit the public API', author: { login: 'octocat' }, reviewDecision: 'APPROVED', reviews: [{ author: { login: 'hubot' }, state: 'APPROVED' }, { author: { login: 'octocat' }, state: 'COMMENTED' }], additions: 214, deletions: 30, statusCheckRollup: pass })
+  pr(wh.branch, { number: 111, url: 'https://github.com/acme/api/pull/111', title: 'Retry failed webhooks with backoff', author: { login: 'hubot' }, reviewDecision: 'REVIEW_REQUIRED', additions: 97, deletions: 4, statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 20), check('test', 'FAILURE', 'COMPLETED', 64), check('build', 'SUCCESS', 'COMPLETED', 120)] })
+  const mob = await rpc<{ id: string }>('projectAdd', { path: repoOf('mobile', 'App.tsx') })
+  await rpc('projectSet', { id: mob.id, color: 'purple', icon: 'smartphone' })
+  const ob = await ws(mob.id, 'onboarding-screens', 'claude', 'build the three onboarding screens')
+  const pn = await ws(mob.id, 'push-notifications', 'codex', 'ask before adding push notifications')
+  pr(ob.branch, { number: 24, url: 'https://github.com/acme/mobile/pull/24', title: 'Onboarding: three screens', author: { login: 'octocat' }, isDraft: true, additions: 410, deletions: 2, statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 25), check('test', '', 'IN_PROGRESS')] })
+  pr(pn.branch, { number: 27, url: 'https://github.com/acme/mobile/pull/27', title: 'Push notifications', author: { login: 'hubot' }, reviewDecision: 'APPROVED', reviews: [{ author: { login: 'octocat' }, state: 'APPROVED' }], additions: 156, deletions: 18, statusCheckRollup: pass })
+  for (const w of [api, mob]) await rpc('projectTrust', { id: w.id, hash: (await rpc<{ hash: string }>('projectTrust', { id: w.id })).hash }).catch(() => {})
+  await rpc('prRefresh', {}).catch(() => {})
+}
 console.log(JSON.stringify({ home, url: `${origins.split(',')[0]}/#port=${info.port}&token=${info.token}` }))

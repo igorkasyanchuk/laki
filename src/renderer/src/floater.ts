@@ -197,12 +197,16 @@ else {
     document.body.dataset.done = doneAlert === false ? '' : 'on' // a finished one you haven't seen: green, pulsing
     const was = bar.querySelector<HTMLElement>('.hot')?.dataset // lit again below, made anew
     bar.querySelectorAll('.fl-dot, .fl-btns').forEach(d => d.remove())
+    // each circle's animations at a phase of its own (not all in step), by the clock: one made anew (each update) goes
+    // on where it was, as a negative delay into its loop
+    const phase = (tab: string) => `-${(((Date.now() + [...tab].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 9973) / 1000) % 3600).toFixed(3)}s`
     const labels = initials(items.map(f => f.name))
     for (const [i, f] of items.entries()) {
       const d = document.createElement('div')
       d.className = `fl-dot ${WORDS[f.status] ? f.status : 'running'}`
       d.textContent = labels[i]
       d.dataset.tab = f.tab
+      d.style.setProperty('--fl-d', phase(f.tab))
       if (f.color && /^[a-z]+$/.test(f.color)) d.style.setProperty('--ink', `var(--tc${f.color})`)
       d.onmouseenter = () => !drag?.moved && hover(f.tab, along(d))
       d.onmouseleave = () => !drag?.moved && hover('')

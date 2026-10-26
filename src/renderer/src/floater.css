@@ -34,5 +34,7 @@
 [data-fstyle='wave'] .fl-dot.running::before, [data-fstyle='wave'] .fl-dot.running::after { content: ''; position: absolute; z-index: -1; left: -50%; width: 200%; height: 200%; top: 48%; border-radius: 42%; background: color-mix(in srgb, var(--c) 30%, var(--bg)); animation: fl-spin 6s linear infinite, fl-tide 4s ease-in-out infinite; }
 [data-fstyle='wave'] .fl-dot.running::after { top: 56%; border-radius: 38%; background: color-mix(in srgb, var(--c) 50%, var(--bg)); animation-duration: 4.5s, 5s; animation-direction: reverse, normal; }
 @keyframes fl-tide { 50% { translate: 0 -12%; } }
+/* floater.ts' --fl-d: each circle's own phase, so they don't pulse in step (after every animation shorthand above) */
+.fl-dot::before, .fl-dot::after { animation-delay: var(--fl-d, 0s) !important; }
 /* still: the ring, nothing moving */
 @media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::before, .fl-dot::after { animation: none !important; } }

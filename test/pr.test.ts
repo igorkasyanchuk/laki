@@ -364,6 +364,23 @@ test("a PR's author: yours (gh api user) is mine; its whole diff (gh pr diff) fo
     { path: 'y', status: 'R', add: 0, del: 0 },
   ])
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr diff --color=never -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+
+  // a file at the PR's head (prFile: the full review's arrows on a PR's diff); a head not here is fetched, else refused
+  writeFileSync(join(ws.path, 'a.ts'), 'one\ntwo\n')
+  execFileSync('git', ['add', '-A'], { cwd: ws.path })
+  execFileSync('git', ['commit', '-qm', 'a.ts'], { cwd: ws.path })
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ws.path, encoding: 'utf8' }).trim()
+  writeFileSync(join(ws.path, 'a.ts'), 'changed since\n') // the worktree's, not the PR's
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, author: { login: 'me' }, headRefOid: head }))
+  await rig.rpc('prRefresh', { ws: ws.id })
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr.head === head, 'its head')
+  assert.equal((await rig.rpc('prFile', { ws: ws.id, path: 'a.ts' })).text, 'one\ntwo\n')
+  await assert.rejects(rig.rpc('prFile', { ws: ws.id, path: '../x' }), /a path in the repo/)
+  await assert.rejects(rig.rpc('prFile', { ws: ws.id, path: 'none.ts' }), /not in PR #9/)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, headRefOid: 'f'.repeat(40) }))
+  await rig.rpc('prRefresh', { ws: ws.id })
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr.head === 'f'.repeat(40), 'a head not here')
+  await assert.rejects(rig.rpc('prFile', { ws: ws.id, path: 'a.ts' }), /PR #9's head isn't in this clone/)
 })
 
 test('approve or close the PR: gh as you, by its URL; refused with none, when not open, or as gh says', async t => {

@@ -16,18 +16,16 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type PointerEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
-import { changeLine, CommentBox, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
+import { changeLine, CommentBox, CopyComment, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
-import { type Gap, gapsOf } from './text'
 import { Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
 export type Talk = { author: string; body: string; at: string; url?: string; state?: string }
 export type ReviewApi = PanelApi & {
-  agents: { id: string; name: string }[] // the workspace's live agent tabs, the one to send to first
   send: (tab: string, text: string) => Promise<unknown>
   post: (comments: Omit<ReviewNote, 'id' | 'quote'>[]) => Promise<unknown> // prReview
   threadsAll: () => Promise<Thread[]> // the PR's review threads with everyone's comments (prThreads all)
@@ -42,7 +40,6 @@ const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
 const NOTES_OFF = 'laki.reviewNotesOff' // true: the comments hidden to a strip
 const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
 const PINS = 'laki.reviewPins' // each workspace's pinned files, in the order pinned
-const MORE = 20 // an expand arrow's lines
 const FILES_INIT = 220
 const NOTES_INIT = 300
 const STRIP = 28 // the hidden comments' strip
@@ -70,9 +67,6 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
-// a file's expanded lines: key, the diff they're for; lines, the worktree's file (none yet: read on the first click);
-// up, each hunk's lines shown above it; down, those after the last hunk; err, why it couldn't be read
-type Ctx = { key: string; lines?: string[]; up: Record<number, number>; down: number; err?: string }
 
 // an edge between two columns: dragged (to: the pointer's x in the columns' box), double-clicked back to its width
 function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {
@@ -237,61 +231,9 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
     }
   }
 
-  // expand: the unchanged lines around the hunks, from the worktree's file (what the diff's new side is); not the PR's
-  // diff, whose head this worktree needn't be, nor an image or a file taken out
-  const [ctx, setCtx] = useState<Record<string, Ctx>>({})
-  const ctxOf = (p: string): Ctx => (ctx[p]?.key === hashOf(p) ? ctx[p] : { key: hashOf(p), up: {}, down: 0 }) // the diff moved: as new
-  const canExpand = (p: string) => !all && !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A') && !!byFile.get(p)?.hunks.length
-  const gapsFor = (p: string, fd: FileDiff): Gap[] => gapsOf(fd.hunks.map(h => h.split('\n', 1)[0]), ctxOf(p).lines?.length ?? Infinity)
-  const more = (p: string, where: number | 'down', n: number) => {
-    const c = ctxOf(p)
-    const grow = (x: Ctx): Ctx => (where === 'down' ? { ...x, down: x.down + n } : { ...x, up: { ...x.up, [where]: (x.up[where] ?? 0) + n } })
-    if (c.lines) return setCtx(m => ({ ...m, [p]: grow(c) }))
-    api.read(p).then(
-      fc => {
-        if (fc.text === undefined || fc.lossy) throw new Error(fc.text === undefined ? 'not a text file' : 'not UTF-8 text')
-        const lines = fc.text.split(/\r?\n/)
-        if (lines.at(-1) === '') lines.pop()
-        setCtx(m => ({ ...m, [p]: grow({ ...c, lines, err: undefined }) }))
-      },
-      (e: Error) => setCtx(m => ({ ...m, [p]: { ...c, err: String(e?.message ?? e) } })),
-    )
-  }
-  // a file's lines with the expanded ones: below each hunk's header, the gap's last lines; after the last hunk, the next
-  const expanded = (p: string, fd: FileDiff): FileDiff => {
-    const c = ctxOf(p)
-    if (!c.lines || !canExpand(p)) return fd
-    const gaps = gapsFor(p, fd)
-    const at = (n: number, g: Gap): DiffLine => ({ text: ` ${c.lines![n - 1]}`, old: n + g.shift, new: n, ctx: true })
-    const out: DiffLine[] = []
-    for (const l of fd.lines) {
-      out.push(l)
-      const g = l.text.startsWith('@@') && l.hunk !== undefined ? gaps[l.hunk] : undefined
-      if (g) for (let n = Math.max(g.from, g.to - (c.up[l.hunk!] ?? 0) + 1); n <= g.to; n++) out.push(at(n, g))
-    }
-    const t = gaps.at(-1)!
-    for (let n = t.from; n <= Math.min(t.to, t.from + c.down - 1); n++) out.push(at(n, t))
-    return { ...fd, lines: out }
-  }
-  // the lines still hidden above a hunk (h) or after the last ('down'); Infinity: the file isn't read yet
-  const hidden = (p: string, fd: FileDiff, h: number | 'down') => {
-    const gaps = gapsFor(p, fd)
-    const g = h === 'down' ? gaps.at(-1) : gaps[h]
-    const c = ctxOf(p)
-    return g ? Math.max(0, g.to - g.from + 1 - (h === 'down' ? c.down : (c.up[h] ?? 0))) : 0
-  }
-  const expander = (p: string, fd: FileDiff, h: number | 'down') => {
-    const n = hidden(p, fd, h)
-    if (!canExpand(p) || !n) return null
-    const up = h !== 'down'
-    const tip = n === Infinity ? `More of the file ${up ? 'above' : 'below'}, if there is any` /* not read yet */ : n <= MORE ? `The ${n} line${n === 1 ? '' : 's'} ${up ? 'above' : 'below'}` : `${MORE} more of the ${n} lines ${up ? 'above' : 'below'} · ⇧-click: all of them`
-    return (
-      <button type="button" className={`fr-expand ${up ? '' : 'down'}`} data-tip={ctxOf(p).err ? `Can't show the file: ${ctxOf(p).err}` : tip} onClick={e => (e.stopPropagation(), more(p, h, e.shiftKey ? Infinity : MORE))} onMouseDown={e => e.stopPropagation()}>
-        <Icon name={up ? 'chevronUp' : 'chevron'} size={12} />
-        {n !== Infinity && <span>{n}</span>}
-      </button>
-    )
-  }
+  // expand arrows: the unchanged lines around the hunks, from the worktree's file (what the diff's new side is), or for
+  // the PR's diff the PR head's (prFile: this worktree needn't be at it); not an image or a file added or taken out
+  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), p => `${all}#${hashOf(p)}`)
 
   // the comments, kept until sent
   const [notes, setNotesNow] = useState<ReviewNote[]>(() => readAll<ReviewNote[]>(NOTES)[ws] ?? [])
@@ -546,8 +488,8 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
           {listed.map(f => {
             const fd = byFile.get(f.path) ?? NO_DIFF
-            const fdx = expanded(f.path, fd)
-            const tail = expander(f.path, fd, 'down')
+            const fdx = xp.expanded(f.path, fd)
+            const tail = xp.expander(f.path, fd, 'down')
             const box = boxFor(f.path)
             const fold = () => setShown([f.path], !shown(f.path))
             const blaming = !all && blamed.has(f.path)
@@ -584,7 +526,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                       row={l => (l.ctx ? ctxAttrs(f.path, l) : lineAttrs(f.path, l))}
                       head={l => (
                         <>
-                          {l.hunk !== undefined && expander(f.path, fd, l.hunk)}
+                          {l.hunk !== undefined && xp.expander(f.path, fd, l.hunk)}
                           {rv.hunkHead(f.path, l, fd.cut)}
                         </>
                       )}
@@ -711,7 +653,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                     )}
                     {pr.base && <span className="mono">{`${pr.head ?? branch ?? ''} → ${pr.base}`}</span>}
                   </div>
-                  {pr.body?.trim() ? <Markdown src={pr.body} /> : <p className="muted small">No description.</p>}
+                  {pr.body?.trim() ? <Markdown src={pr.body} html /> : <p className="muted small">No description.</p>}
                   <button type="button" className="link small" onClick={() => onOpen(pr.url)}>
                     Open on GitHub
                   </button>
@@ -759,9 +701,10 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                         {c.state && STATES[c.state] && <span className={`tag ${STATES[c.state][1]}`}>{STATES[c.state][0]}</span>}
                         {c.at && <span className="muted">{ago(c.at)}</span>}
                         <span className="grow" />
+                        {c.body.trim() && <CopyComment text={c.body} />}
                         {c.url && <IconButton icon="externalLink" title="On GitHub" onClick={() => onOpen(c.url!)} />}
                       </div>
-                      {c.body.trim() && <Folded text={c.body} lines={10} />}
+                      {c.body.trim() && <Folded text={c.body} lines={10} html />}
                     </div>
                   ))}
                 </>

@@ -4,8 +4,8 @@
 import { Fragment, useEffect, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
-import { linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
-import { escapes, Icon, type MenuItem } from './ui'
+import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
+import { escapes, Icon, IconButton, type MenuItem, useMenu } from './ui'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 
 // what load gives, again every few seconds while the window is in front, and on reload()
@@ -91,12 +91,25 @@ export const lineClass = (l: DiffLine, picked = false) => `dl ${l.text.startsWit
 // under a line (its comment box, a review's threads); gutter: before a line's text (the full review's blame), side: the
 // column it's in (both: one column)
 export type Side = 'old' | 'new' | 'both'
-export function DiffRows({ fd, split, cls, row, head, after, gutter }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode; gutter?: (l: DiffLine, side: Side) => ReactNode }) {
+export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true }: { fd: FileDiff; split: boolean; cls: (l: DiffLine) => string; row: (l: DiffLine) => HTMLAttributes<HTMLDivElement>; head: (l: DiffLine) => ReactNode; after?: (l: DiffLine) => ReactNode; gutter?: (l: DiffLine, side: Side) => ReactNode; nums?: boolean }) {
+  // the line numbers, as GitHub's (one column: old and new; two: each side's), as wide as the file's biggest; then the
+  // + a commentable line (.dl-line) shows on hover: a click anywhere on it opens the box
+  const w = nums ? `${String(fd.lines.reduce((m, l) => Math.max(m, l.old ?? 0, l.new ?? 0), 0)).length}ch` : ''
+  const num = (n?: number) => <span className="dl-n" style={{ width: w }}>{n ?? ''}</span>
+  const numbers = (l: DiffLine, side: Side) =>
+    nums && (
+      <>
+        {side !== 'new' && num(l.old)}
+        {side !== 'old' && num(l.new)}
+        <span className="dl-plus" aria-hidden />
+      </>
+    )
   const line = (l: DiffLine, more = '', side: Side = 'both') => (
     <div className={`${cls(l)}${more}`} {...row(l)}>
       {l.text.startsWith('@@') ? head(l) : (
         <>
           {gutter?.(l, side)}
+          {numbers(l, side)}
           {more ? l.text.slice(1) || ' ' : l.text || ' '}
         </>
       )}
@@ -123,6 +136,71 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter }: { fd: Fil
   ))
 }
 
+export const MORE = 20 // an expand arrow's lines
+// a file's expanded lines: key, the diff they're for; lines, the file (none yet: read on the first click); up, each
+// hunk's lines shown above it; down, those after the last hunk; err, why it couldn't be read
+type Ctx = { key: string; lines?: string[]; up: Record<number, number>; down: number; err?: string }
+// expand arrows, as GitHub's: the unchanged lines around a file's hunks (Changes and the full review), read once from
+// read: the worktree's file (what the diff's new side is), or the PR head's for the PR's diff. ok: a file that has any
+// (not an image, nor added, taken out or untracked); keyOf: the diff they're for (another: as new)
+export function useExpand(read: (p: string) => Promise<FileContent>, ok: (p: string, fd: FileDiff) => boolean, keyOf: (p: string, fd: FileDiff) => string) {
+  const [ctx, setCtx] = useState<Record<string, Ctx>>({})
+  const ctxOf = (p: string, fd: FileDiff): Ctx => (k => (ctx[p]?.key === k ? ctx[p] : { key: k, up: {}, down: 0 }))(keyOf(p, fd)) // the diff moved: as new
+  const can = (p: string, fd: FileDiff) => ok(p, fd) && !!fd.hunks.length
+  const gapsFor = (p: string, fd: FileDiff): Gap[] => gapsOf(fd.hunks.map(h => h.split('\n', 1)[0]), ctxOf(p, fd).lines?.length ?? Infinity)
+  const more = (p: string, fd: FileDiff, where: number | 'down', n: number) => {
+    const c = ctxOf(p, fd)
+    const grow = (x: Ctx): Ctx => (where === 'down' ? { ...x, down: x.down + n } : { ...x, up: { ...x.up, [where]: (x.up[where] ?? 0) + n } })
+    if (c.lines) return setCtx(m => ({ ...m, [p]: grow(c) }))
+    read(p).then(
+      fc => {
+        if (fc.text === undefined || fc.lossy) throw new Error(fc.text === undefined ? 'not a text file' : 'not UTF-8 text')
+        const lines = fc.text.split(/\r?\n/)
+        if (lines.at(-1) === '') lines.pop()
+        setCtx(m => ({ ...m, [p]: grow({ ...c, lines, err: undefined }) }))
+      },
+      (e: Error) => setCtx(m => ({ ...m, [p]: { ...c, err: String(e?.message ?? e) } })),
+    )
+  }
+  // a file's lines with the expanded ones: below each hunk's header, the gap's last lines; after the last hunk, the next
+  const expanded = (p: string, fd: FileDiff): FileDiff => {
+    const c = ctxOf(p, fd)
+    if (!c.lines || !can(p, fd)) return fd
+    const gaps = gapsFor(p, fd)
+    const at = (n: number, g: Gap): DiffLine => ({ text: ` ${c.lines![n - 1]}`, old: n + g.shift, new: n, ctx: true })
+    const out: DiffLine[] = []
+    for (const l of fd.lines) {
+      out.push(l)
+      const g = l.text.startsWith('@@') && l.hunk !== undefined ? gaps[l.hunk] : undefined
+      if (g) for (let n = Math.max(g.from, g.to - (c.up[l.hunk!] ?? 0) + 1); n <= g.to; n++) out.push(at(n, g))
+    }
+    const t = gaps.at(-1)!
+    for (let n = t.from; n <= Math.min(t.to, t.from + c.down - 1); n++) out.push(at(n, t))
+    return { ...fd, lines: out }
+  }
+  // the lines still hidden above a hunk (h) or after the last ('down'); Infinity: the file isn't read yet
+  const hidden = (p: string, fd: FileDiff, h: number | 'down') => {
+    const gaps = gapsFor(p, fd)
+    const g = h === 'down' ? gaps.at(-1) : gaps[h]
+    const c = ctxOf(p, fd)
+    return g ? Math.max(0, g.to - g.from + 1 - (h === 'down' ? c.down : (c.up[h] ?? 0))) : 0
+  }
+  const expander = (p: string, fd: FileDiff, h: number | 'down') => {
+    const n = can(p, fd) ? hidden(p, fd, h) : 0
+    if (!n) return null
+    const up = h !== 'down'
+    const tip = n === Infinity ? `More of the file ${up ? 'above' : 'below'}, if there is any` /* not read yet */ : n <= MORE ? `The ${n} line${n === 1 ? '' : 's'} ${up ? 'above' : 'below'}` : `${MORE} more of the ${n} lines ${up ? 'above' : 'below'} · ⇧-click: all of them`
+    const err = ctxOf(p, fd).err
+    return (
+      <button type="button" className={`fr-expand ${up ? '' : 'down'}`} data-tip={err ? `Can't show the file: ${err}` : tip} onClick={e => (e.stopPropagation(), more(p, fd, h, e.shiftKey ? Infinity : MORE))} onMouseDown={e => e.stopPropagation()}>
+        <Icon name={up ? 'chevronUp' : 'chevron'} size={12} />
+        {n !== Infinity && <span>{n}</span>}
+      </button>
+    )
+  }
+  return { expanded, expander }
+}
+
 // a comment on one diff line (or lines: from), as it was when the box opened: to the PR on GitHub, or to the
 // workspace's agent; onAdd (the full review's): onto its list of comments instead. The text lives in the caller: a
 // refresh can move the line, and the box with it.
@@ -138,8 +216,20 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
     f().then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
   }
   const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: text }))
-  const toAgent = () => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`, true))
+  // to an agent of the workspace: the focused one first, another from the ▾ (agents: the workspace's live agent tabs)
+  const [to, setTo] = useState(api.agents[0]?.id)
+  const agent = api.agents.find(a => a.id === to) ?? api.agents[0]
+  const [menu, openMenu] = useMenu()
+  const toAgent = (tab = agent?.id) => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`, true, tab))
   const add = () => text.trim() && onAdd!()
+  const sendButton = (
+    <span className="split">
+      <button disabled={busy || !text.trim()} onClick={() => toAgent()} data-tip={agent ? `When its turn ends: ${agent.name}` : 'When its turn ends'}>
+        Send to {agent?.name ?? 'the agent'}
+      </button>
+      {api.agents.length > 1 && <IconButton icon="chevron" title="Another agent of this workspace" disabled={busy} onClick={e => openMenu(e, api.agents.map(a => ({ label: a.name, icon: 'send', hint: a.id === agent?.id ? '✓' : undefined, run: () => setTo(a.id) }) as MenuItem))} />}
+    </span>
+  )
   return (
     <div className="dl-comment" onClick={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
       <textarea
@@ -151,15 +241,18 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
         onKeyDown={e => {
           e.stopPropagation() // the full review's keys: not while typing
           if (e.key === 'Escape') onClose()
-          else if (e.key === 'Enter' && e.metaKey) onAdd ? add() : pr ? toPR() : toAgent()
+          else if (e.key === 'Enter' && e.metaKey) onAdd ? add() : pr ? toPR() : agent && toAgent()
         }}
       />
       {err && <div className="warn small">{err}</div>}
       <div className="row">
         {onAdd ? (
-          <button className="primary" disabled={!text.trim()} onClick={add}>
-            Add to the review
-          </button>
+          <>
+            <button className="primary" disabled={!text.trim()} onClick={add}>
+              Add to the review
+            </button>
+            {!!api.agents.length && sendButton}
+          </>
         ) : (
           <>
             {pr ? (
@@ -169,9 +262,7 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
             ) : (
               <span className="muted small">No PR yet</span>
             )}
-            <button disabled={busy || !text.trim()} onClick={toAgent}>
-              Send to the agent
-            </button>
+            {api.agents.length ? sendButton : <span className="muted small">No agent running here</span>}
           </>
         )}
         <span className="grow" />
@@ -179,6 +270,7 @@ export function CommentBox({ path, line, from, text, setText, pr, api, onAdd, on
           Cancel
         </button>
       </div>
+      {menu}
     </div>
   )
 }
@@ -405,6 +497,12 @@ export function useSuggestions(api: PanelApi, open: Thread[], ws: string, thread
 
 // a review thread: where (a click shows the file at that line; noHead: drawn at its line already), then each comment
 // as Markdown, a suggestion as a diff
+// a comment's copy button, at the end of its head (shown on hover, styles.css): its Markdown as written
+export function CopyComment({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+  return <IconButton icon={done ? 'check' : 'copy'} className="sp-copy" title={done ? 'Copied' : 'Copy the comment'} onClick={() => void navigator.clipboard.writeText(text).then(() => (setDone(true), setTimeout(() => setDone(false), 1500)), () => {})} />
+}
+
 export function ThreadCard({ t, api, noHead, ...a }: { t: Thread; api: PanelApi; noHead?: boolean } & ApplyProps) {
   return (
     <div className="sp-thread">
@@ -424,15 +522,16 @@ export function ThreadCard({ t, api, noHead, ...a }: { t: Thread; api: PanelApi;
             <Avatar login={c.author} size={16} />
             <b>{c.author}</b>
             {c.at && <span className="muted">{ago(c.at)}</span>}
+            <CopyComment text={c.body} />
           </div>
           {(s =>
             s ? (
               <>
-                {s.rest && <Folded text={s.rest} lines={10} />}
+                {s.rest && <Folded text={s.rest} lines={10} html />}
                 <Suggested t={t} lines={s.lines} {...a} />
               </>
             ) : (
-              <Folded text={c.body} lines={10} />
+              <Folded text={c.body} lines={10} html />
             ))(suggestionOf(c.body))}
         </div>
       ))}

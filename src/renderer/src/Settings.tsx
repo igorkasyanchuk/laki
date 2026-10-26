@@ -181,10 +181,10 @@ export type AppSettings = Paint & {
   specs?: boolean // Specs & Brainstorms (Specs.tsx), on unless false
   workflows?: boolean // Workflows (Workflows.tsx), on unless false
   birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
-  calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
+  calendar?: boolean // Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, on unless false
   desk?: boolean // My Desk (Desk.tsx), extensions on a page of their own, resized there, on unless false
-  notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
-  todoList?: boolean // experimental: To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, off unless true
+  notes?: boolean // Notes (Notes.tsx), your own notes, the rail's Notes, on unless false
+  todoList?: boolean // To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, on unless false
   fullReview?: boolean // the tab bar's Review tab (FullReview.tsx), Settings › Pull requests, on unless false
   cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true

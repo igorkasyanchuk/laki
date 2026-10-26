@@ -8,13 +8,14 @@ import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
 // open in the browser, images show as links (a preview fetches nothing)
-export function Markdown({ src }: { src: string }) {
-  const tree = useMemo(() => markdown(src), [src])
+// html: GitHub's text or a repo's file, its HTML (<details>, <a>, <ul>…) read as GitHub shows it (markdown.ts)
+export function Markdown({ src, html }: { src: string; html?: boolean }) {
+  const tree = useMemo(() => markdown(src, html), [src, html])
   return <div className="md">{tree.map(mdBlock)}</div>
 }
 
 // Markdown in a few lines (a PR's description, a review comment), Show more for the rest
-export function Folded({ text, lines }: { text: string; lines: number }) {
+export function Folded({ text, lines, html }: { text: string; lines: number; html?: boolean }) {
   const el = useRef<HTMLDivElement>(null)
   const [whole, setWhole] = useState(false)
   const [long, setLong] = useState(false) // taller than the fold
@@ -30,7 +31,7 @@ export function Folded({ text, lines }: { text: string; lines: number }) {
   return (
     <div className="folded">
       <div ref={el} className={whole ? 'fold-body' : `fold-body fold${long ? ' cut' : ''}`} style={{ '--lines': lines } as React.CSSProperties}>
-        <Markdown src={text} />
+        <Markdown src={text} html={html} />
       </div>
       {(long || whole) && (
         <button className="link fold-more" aria-expanded={whole} onClick={() => setWhole(!whole)}>
@@ -79,6 +80,13 @@ function mdBlock(b: Block, k: number): React.ReactNode {
       return <hr key={k} />
     case 'quote':
       return <blockquote key={k}>{b.blocks.map(mdBlock)}</blockquote>
+    case 'details':
+      return (
+        <details key={k} open={b.open || undefined}>
+          <summary>{b.summary.map(mdInline)}</summary>
+          {b.blocks.map(mdBlock)}
+        </details>
+      )
     case 'code':
       if (b.lang === 'mermaid') return <Mermaid key={k} text={b.text} />
       return (
