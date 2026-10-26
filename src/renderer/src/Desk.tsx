@@ -5,7 +5,7 @@
 // (DeskBuild: what it should show, screenshots, files) opens a new extension's page on it: Laki AI asks, then writes one
 // placed here, a tile with its sample data, off until you turn it on. App.tsx passes a DeskApi.
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
-import { emojiOf } from '../../shared/icons'
+import { emojiOf, iconLook } from '../../shared/icons'
 import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, deskLayout, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
@@ -310,7 +310,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
                 style={colorVar(t.color)}
               >
                 {t.color && !isIconName(t.icon) && <span className="desk-dot" aria-hidden />}
-                {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden>{t.icon}</span>}
+                {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden style={{ fontSize: `${iconLook().size / 14}em` }}>{t.icon}</span>}
                 {t.name}
               </button>
             ),

@@ -409,10 +409,12 @@ export function setIconLook(l: IconLook) {
 }
 // a name as drawn: its viewBox's side, its shapes as markup, its stroke's width, filled or not
 export function iconOf(name: IconName, l: IconLook = look) {
-  const own = l.pack === 'laki' ? undefined : PACKS[l.pack][name]
+  const own = l.pack !== 'laki' && Object.hasOwn(PACKS[l.pack], name) ? PACKS[l.pack][name] : undefined // hasOwn: a name off an extension's widget.json is any string
   if (own) return { box: 24, inner: own, sw: l.width, fill: false }
   return { box: 16, inner: `<path d="${ICONS[name]}"/>`, sw: +(((name === 'more' ? 2.4 : 1.4) * l.width) / 2).toFixed(3), fill: name === 'github' }
 }
+// an icon (or an emoji in its place) as big as the look's size makes one drawn at size, its 14
+export const iconPx = (size: number, l: IconLook = look) => Math.round((size * l.size) / 14)
 // an icon as SVG markup, for HTML built as text (the UI kit)
 export const iconSvg = (name: IconName, size = 14, l = look) =>
   (i => `<svg class="k-icon" width="${size}" height="${size}" viewBox="0 0 ${i.box} ${i.box}" fill="${i.fill ? 'currentColor' : 'none'}" stroke="${i.fill ? 'none' : 'currentColor'}" stroke-width="${i.sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i.inner}</svg>`)(iconOf(name, l))

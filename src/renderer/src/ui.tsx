@@ -1,7 +1,7 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, isIconName, onIconLook } from '../../shared/icons'
+import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
@@ -31,7 +31,7 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
   const now = useSyncExternalStore(onIconLook, iconLook)
   const l = look ?? now
   const i = iconOf(name, l)
-  const px = Math.round((size * l.size) / 14)
+  const px = iconPx(size, l)
   return <svg className="icon-svg" width={px} height={px} viewBox={`0 0 ${i.box} ${i.box}`} fill={i.fill ? 'currentColor' : 'none'} stroke={i.fill ? 'none' : 'currentColor'} strokeWidth={i.sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: i.inner }} />
 }
 
@@ -278,10 +278,10 @@ export function ProjectMark({ p, size = 12, or }: { p?: { icon?: string; color?:
   const i = p?.icon
   const e = emojiOf(i)
   const name = isIconName(i) ? i : or
-  const scale = useSyncExternalStore(onIconLook, iconLook).size / 14 // an emoji as big as an icon would be
+  const l = useSyncExternalStore(onIconLook, iconLook) // an emoji as big as an icon would be
   if (!e && !name) return null
   return (
-    <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: Math.round(size * scale) }) }} aria-hidden>
+    <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: iconPx(size, l) }) }} aria-hidden>
       {e ?? <Icon name={name!} size={size} />}
     </span>
   )

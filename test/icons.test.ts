@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { PACKS } from '../src/shared/iconPacks.ts'
-import { ICONS, iconLook, iconOf, iconSvg, iconTurns, lookOf, setIconLook } from '../src/shared/icons.ts'
+import { ICONS, iconLook, iconOf, iconPx, iconSvg, iconTurns, lookOf, setIconLook } from '../src/shared/icons.ts'
 
 test('icon packs: a look from settings, Tabler by default, a bad value its default', () => {
   assert.deepEqual(lookOf(), { pack: 'tabler', width: 2, size: 14 })
@@ -28,6 +28,9 @@ test('icon packs: only Laki names, only shapes; a name a pack lacks is drawn by 
   assert.equal(iconOf('plus', lookOf({ iconPack: 'laki', iconWidth: 1 })).sw, 0.7)
   assert.equal(iconOf('more', lookOf({ iconPack: 'laki' })).sw, 2.4)
   assert.equal(iconOf('plus', lookOf({ iconPack: 'lucide', iconWidth: 1.5 })).sw, 1.5)
+  // a name from an extension is any string: never a pack's prototype
+  assert.equal(iconOf('constructor' as never, lookOf()).box, 16)
+  assert.deepEqual([iconPx(14, lookOf()), iconPx(18, lookOf({ iconSize: 18 })), iconPx(11, lookOf({ iconSize: 12 }))], [14, 23, 9])
 })
 
 test('icon packs: iconSvg draws the look set; a change counts once', async () => {
