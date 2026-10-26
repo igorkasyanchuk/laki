@@ -896,12 +896,12 @@ function profilesAsk(a: AiAct) {
   return `Save ${lines.length === 1 ? 'this agent profile' : 'these agent profiles'}? They show in every agent menu (Settings › Agents & profiles).\n\n${lines.join('\n')}`
 }
 // the user's Yes: added, or one of the same name changed (its env and account kept; its args and command only while
-// it stays the same agent: another's flags would break its start)
+// it stays the same agent: another's flags would break its start; one turned off, on again)
 async function saveProfiles(a: AiAct, rpc: Rpc) {
   const add = profilesOf(a.text)
   const same = (x: Preset, y: Preset) => x.name.toLowerCase() === y.name.toLowerCase()
   const have = presets()
-  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast })
+  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast, off: undefined })
   const next = [...have.map(h => (n => (n ? changed(h, n) : h))(add.find(n => same(n, h)))), ...add.filter(n => !have.some(h => same(n, h)))]
   await rpc('settingsSet', { presets: next })
 }

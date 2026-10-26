@@ -170,7 +170,10 @@ agent; an agent's call refused, main.ts' `agentNo`), `prTalk` (the PR's conversa
 workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`: a per-workspace one's `{{facts.…}}`, `$LAKI_FACTS`, a script's
 `facts`; `factsTick`, an instance's `fx`), `widgetSet` `hours` (an extension's own working hours, `always`; the view's `hours`) and
 `hide.tip` (widget.json's `tip: false` too: the view's `tipOff`), an action's JSON `send` (App's `widgetDo` send), `aiQuestion`
-`looks` (an `AiAsk`'s, laki_ask's), Calendar, Notes and To-dos on unless false. A
+`looks` (an `AiAsk`'s, laki_ask's), Calendar, Notes and To-dos on unless false. 118: `prFile` (`ws`, `path`: a text file at the
+PR's head commit, `pull/<n>/head` fetched when this clone hasn't it: the expand arrows on *PR #n*), a sep's `preset` (a
+group's default agent, kept by `projectSet`; MCP's state's `groupAgents`), `tabNew` `cwdOf` (a shell tab of the workspace:
+the new shell starts in its folder, core's `shellCwd`), Laki AI's `profile` act (`laki_profiles`), `prTalk` refused from an agent. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);

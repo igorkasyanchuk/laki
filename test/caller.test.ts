@@ -55,6 +55,8 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
     curl('prComment', { ws: 'x', path: 'a', line: 1, body: 'b' }),
     curl('prAct', { ws: 'x', act: 'approve' }),
     curl('prAct', { ws: 'x', act: 'close' }),
+    curl('prThreads', { ws: 'x', all: true }),
+    curl('prTalk', { ws: 'x' }),
   )
   for (const [i, what] of ['answer what Laki asks', "answer Laki AI's questions", "answer an agent's question", "edit an extension's files", 'start remote access', 'change that setting', 'compact memories (they go to a model)'].entries())
     assert.equal(said[i].error, `an agent can't ${what}: it's the user's (ask them)`)
@@ -63,6 +65,8 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   assert.equal(said[9].error, "an agent can't comment on a PR as you: it's the user's (ask them)")
   assert.equal(said[10].error, "an agent can't approve a PR as you: it's the user's (ask them)")
   assert.equal(said[11].error, "an agent can't close a PR as you: it's the user's (ask them)")
+  assert.equal(said[12].error, "an agent can't read everyone's PR comments (only trusted reviewers' go to agents): it's the user's (ask them)")
+  assert.equal(said[13].error, "an agent can't read everyone's PR conversation (only trusted reviewers' go to agents): it's the user's (ask them)")
   assert.equal((await rig.rpc('state')).settings.env, undefined)
 
   // keys: into its own tab while it asks something, refused; another workspace's tab asks first, as a send does

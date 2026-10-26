@@ -784,7 +784,8 @@ export async function prDiff(ref: string) {
 
 // prFile: a text file as the PR's head commit has it (the full review's expand arrows on PR #n: this worktree needn't be
 // at that commit). The commit fetched first when this clone hasn't it (origin's pull/<n>/head: a fork's PR too).
-// ponytail: origin only; a PR of another remote (an upstream) says so
+// ponytail: origin only; a PR of another remote (an upstream) says so. The head is the last scan's (a minute at most): a
+// push since gives gh pr diff's new hunks this older file's lines until the next scan
 export async function prFile(ref: string, path: string) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
@@ -797,7 +798,7 @@ export async function prFile(ref: string, path: string) {
   }
   const show = `${pr.head}:${path}`
   const buf = ws.host
-    ? Buffer.from((await exec(ws, 'sh', ['-c', `git cat-file -e "$1" && git show "$1" | head -c ${MAX_TEXT} | base64`, 'sh', show]).catch(() => { throw new Error(`not in PR #${pr.number}`) })).stdout, 'base64') // base64: text over ssh; cat-file first: a pipe's status is base64's
+    ? Buffer.from((await exec(ws, 'sh', ['-c', `git cat-file -e "$1" && git show "$1" | head -c ${MAX_TEXT + 1} | base64`, 'sh', show]).catch(() => { throw new Error(`not in PR #${pr.number}`) })).stdout, 'base64') // base64: text over ssh; a byte past the cut: textOf says cut; cat-file first: a pipe's status is base64's
     : (
         await run('git', ['show', show], { cwd: ws.path, encoding: 'buffer', maxBuffer: 10 << 20 }).catch(e => {
           throw new Error(/maxBuffer/i.test(String(e.message)) ? 'over 10 MB' : `not in PR #${pr.number}`)

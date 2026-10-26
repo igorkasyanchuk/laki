@@ -151,13 +151,15 @@ export function useExpand(read: (p: string) => Promise<FileContent>, ok: (p: str
   const more = (p: string, fd: FileDiff, where: number | 'down', n: number) => {
     const c = ctxOf(p, fd)
     const grow = (x: Ctx): Ctx => (where === 'down' ? { ...x, down: x.down + n } : { ...x, up: { ...x.up, [where]: (x.up[where] ?? 0) + n } })
-    if (c.lines) return setCtx(m => ({ ...m, [p]: grow(c) }))
+    const now = (m: Record<string, Ctx>) => (m[p]?.key === c.key ? m[p] : c) // two clicks before a render: both count
+    if (c.lines) return setCtx(m => ({ ...m, [p]: grow(now(m)) }))
     read(p).then(
       fc => {
-        if (fc.text === undefined || fc.lossy) throw new Error(fc.text === undefined ? 'not a text file' : 'not UTF-8 text')
+        // cut: its first 512 KB only, so a hunk past them has no lines to show
+        if (fc.text === undefined || fc.lossy || fc.cut) throw new Error(fc.text === undefined ? 'not a text file' : fc.cut ? 'the file is over 512 KB' : 'not UTF-8 text')
         const lines = fc.text.split(/\r?\n/)
         if (lines.at(-1) === '') lines.pop()
-        setCtx(m => ({ ...m, [p]: grow({ ...c, lines, err: undefined }) }))
+        setCtx(m => ({ ...m, [p]: grow({ ...now(m), lines, err: undefined }) }))
       },
       (e: Error) => setCtx(m => ({ ...m, [p]: { ...c, err: String(e?.message ?? e) } })),
     )

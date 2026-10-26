@@ -221,7 +221,9 @@ function useParked() {
 // a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
 // action, else opens its full view, else fetches it now (else its settings)
 export const click = (w: WidgetView, api: WidgetApi) =>
-  w.here === null ? undefined : w.click ? void (w.clickAsk ? ask(w.clickAsk.slice(0, 300), { ok: (w.label ?? w.name).slice(0, 40) }) : Promise.resolve(true)).then(yes => yes && api.action(w.id, w.click!, '', w.name, wsOf(w))).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
+  w.here === null ? undefined : w.click ? runClick(w, api, wsOf(w)) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
+// its click action, its confirm asked first (clickAsk), wherever it's clicked: a button, a row's mark
+const runClick = (w: WidgetView, api: WidgetApi, ws?: string) => void (w.clickAsk ? ask(w.clickAsk.slice(0, 300), { ok: (w.label ?? w.name).slice(0, 40) }) : Promise.resolve(true)).then(yes => yes && api.action(w.id, w.click!, '', w.name, ws)).catch(() => {})
 // its tooltip; none when its user (or widget.json's "tip": false) said so
 const tipOf = (w: WidgetView) => (w.hide?.tip ? undefined : tipText(w))
 const tipText = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
@@ -316,7 +318,7 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
     <>
       {on.map(w => {
         const i = w.inst![ws]
-        const go = w.click ? () => void api.action(w.id, w.click!, '', w.name, ws).catch(() => {}) : w.full ? () => api.full(w.id, ws) : undefined
+        const go = w.click ? () => runClick(w, api, ws) : w.full ? () => api.full(w.id, ws) : undefined
         return (
           <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={w.hide?.tip && !i.error ? undefined : `${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={go && (e => (e.stopPropagation(), go()))}>
             <Glyph w={w} size={10} />

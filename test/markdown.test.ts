@@ -118,5 +118,7 @@ test("GitHub's HTML in Markdown (dependabot's bodies, READMEs): its tags as the 
   assert.deepEqual(markdown('<a href="https://x.dev/a b(c)">x</a>', true)[0], { t: 'p', inl: [{ t: 'a', href: 'https://x.dev/a%20b%28c%29', kids: ['x'] }] })
   assert.deepEqual(markdown('see https://x.dev/?a=1&amp;b=2 &amp; <a data-href="no" href="https://y.dev">y</a><code></code>', true), [{ t: 'p', inl: ['see ', { t: 'a', href: 'https://x.dev/?a=1&b=2', kids: ['https://x.dev/?a=1&b=2'] }, ' & ', { t: 'a', href: 'https://y.dev', kids: ['y'] }] }])
   assert.deepEqual(markdown('a\0b', true), [{ t: 'p', inl: ['ab'] }]) // a NUL of its own is no marker
+  // a stray backtick is no code span past its paragraph: the HTML after it still reads
+  assert.deepEqual(markdown("don't ` here\n\n<details><summary>N</summary>\n\n<a href=\"https://x.dev\">x</a> `c`\n</details>", true)[1], { t: 'details', open: false, summary: ['N'], blocks: [{ t: 'p', inl: [{ t: 'a', href: 'https://x.dev', kids: ['x'] }, ' ', { t: 'code', text: 'c' }] }] })
   assert.deepEqual(markdown('</details> <summary>x</summary>\n\ntext', true), [{ t: 'p', inl: ['text'] }]) // strays: nothing
 })

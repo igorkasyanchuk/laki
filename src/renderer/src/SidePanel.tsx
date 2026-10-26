@@ -252,7 +252,8 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
   const files = d?.files ?? []
   // expand arrows (the full review's): the worktree's file, or the PR head's for the PR's diff
-  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), (_, fd) => `${all}#${fd.hunks.join('\n')}`)
+  const keys = useMemo(() => new Map([...byFile].map(([p, fd]) => [p, `${all}#${fd.hunks.join('\n')}`])), [byFile, all]) // once per diff: the arrows ask it often
+  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), p => keys.get(p) ?? '')
   // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims
   const vw = useGhViewed(api, ws, pr?.number)
   const viewedOf = vw.viewedOf

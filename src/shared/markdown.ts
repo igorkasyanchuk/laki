@@ -67,7 +67,7 @@ function htmlMd(s: string): string {
   const keep = (t: string) => `\x01${kept.push(t) - 1}\x01`
   s = s
     .replace(/\x01/g, '')
-    .replace(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g, keep)
+    .replace(/(`+)(?!`)(?:(?!\n[ \t]*\n)[\s\S])*?[^`]\1(?!`)/g, keep) // within a paragraph: a stray ` never takes the HTML after it
     .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
     .replace(/<(script|style|template)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
     .replace(/<pre\b[^>]*>([\s\S]*?)<\/pre\s*>/gi, (_, b: string) => (t => (f => `\n\n${f}\n${t}\n${f}\n\n`)('`'.repeat(Math.max(3, ...(t.match(/`+/g) ?? []).map(x => x.length + 1)))))(plain(b).replace(/^\n|\n$/g, '')))

@@ -584,13 +584,15 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
   // the selected workspace's row in sight, however it was picked (a bubble, a notification, ⌘J, a link): a list scrolled
   // away from it comes back to it, once (a folded one as it unfolds); one in sight doesn't move
+  // scrollAsk: from outside the window (a bubble, a notification), the one selected already too
   const scrolledTo = useRef<string | null>(null)
+  const [scrollAsk, setScrollAsk] = useState(0)
   useEffect(() => {
     const id = ws?.id
     if (!id || scrolledTo.current === id) return
     const f = requestAnimationFrame(() => (el => el && (el.scrollIntoView({ block: 'nearest' }), (scrolledTo.current = id)))(document.querySelector(`.sidebar [data-row="ws:${CSS.escape(id)}"]`)))
     return () => cancelAnimationFrame(f)
-  }, [ws?.id, folded])
+  }, [ws?.id, folded, scrollAsk])
   // back and forward: each new place after the one you're at (what was ahead of it goes, as in a
   // browser); a move of travel's own is that place again, not a new one
   const historyOn = !!view && view.settings?.history !== false
@@ -1280,7 +1282,7 @@ export function App() {
     })
     api.connect()
     // a notification's, a bubble's or the menu bar's: over any page, as ⌘J; its row unfolded into sight (below)
-    bridge?.onFocusTab(id => (setDialog(null), selectTab(id), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace)))
+    bridge?.onFocusTab(id => (setDialog(null), selectTab(id), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace), (scrolledTo.current = null), setScrollAsk(n => n + 1)))
     bridge?.onDeepLink?.(setLink)
     onLakiLink(setLink) // a laki:// link in the app (the AI's to a workspace): routed here, as the Dock's
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
