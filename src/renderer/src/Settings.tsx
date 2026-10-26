@@ -12,6 +12,7 @@ import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
+import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch } from './ui'
 import { PICKER_KEY } from './Picker'
 import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
@@ -74,6 +75,8 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
 // Appearance's corners (--radius) and where the tabs go
+// Appearance's Icons: each pack drawn by these
+const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
 const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'None']]
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
@@ -339,6 +342,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
+  ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
   ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
   ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
@@ -1420,6 +1424,47 @@ export function SettingsPage(p: {
                   </select>
                 </label>
               </div>
+              </Group>
+              <Group title="Icons" hint="The app's line icons, and the ones in extensions. A project's or an extension's icon is a name, the same in every pack, so it follows the one you pick; a name a pack lacks is drawn by Laki's own">
+                {(look => (
+                  <>
+                    <div className="setting-box">
+                      <div className="switch-row icon-packs" role="radiogroup" aria-label="Icon pack">
+                        {ICON_PACKS.map(([id, name]) => (
+                          <button key={id} role="radio" aria-checked={look.pack === id} className={look.pack === id ? 'on' : ''} onClick={() => paint({ iconPack: id })}>
+                            <span className="icon-pack-strip">
+                              {PACK_SAMPLE.map(n => (
+                                <Icon key={n} name={n} size={16} look={{ ...look, pack: id, size: 14 }} />
+                              ))}
+                            </span>
+                            {name}
+                            {id === 'tabler' ? ' (default)' : ''}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="setting-row icon-look">
+                      <Says title="Line width" hint="Each pack's own is 2" />
+                      <span className="seg" role="radiogroup" aria-label="Line width">
+                        {ICON_WIDTHS.map(w => (
+                          <button key={w} type="button" role="radio" aria-checked={look.width === w} className={look.width === w ? 'on' : ''} onClick={() => paint({ iconWidth: w })}>
+                            <Icon name="settings" size={16} look={{ ...look, width: w, size: 14 }} /> {w}
+                          </button>
+                        ))}
+                      </span>
+                    </div>
+                    <div className="setting-row icon-look">
+                      <Says title="Size" hint="Of every icon in the app, 14 as it comes; the others grow or shrink with it" />
+                      <span className="seg" role="radiogroup" aria-label="Icon size">
+                        {ICON_SIZES.map(z => (
+                          <button key={z} type="button" role="radio" aria-checked={look.size === z} className={look.size === z ? 'on' : ''} onClick={() => paint({ iconSize: z })}>
+                            <Icon name="folder" look={{ ...look, size: z }} /> {z}
+                          </button>
+                        ))}
+                      </span>
+                    </div>
+                  </>
+                ))(lookOf(s))}
               </Group>
               <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
                 <div className="setting-row rail-buttons">

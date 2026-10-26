@@ -2,8 +2,8 @@
 // draws an extension (a shadow root, `clean`, uiBehave), at a size picked per card and as a status bar item, its JSON
 // a click from the clipboard. Its samples are the AI guide's, the starters' and the tests'. Icons: every icon of Laki's
 // an extension can name (a button's, a list row's, the icon element's), found by name, a click copies it.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ICON_GROUPS, ICONS, type IconName } from '../../shared/icons'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { ICON_GROUPS, ICON_PACKS, iconLook, iconOf, ICONS, type IconName, onIconLook } from '../../shared/icons'
 import { render } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
 import { Modal } from './panels'
@@ -130,6 +130,9 @@ const wordsOf = (n: string) => `${n} ${n.replace(/([a-z])([A-Z])/g, '$1 $2')} ${
 function IconGallery({ copy }: { copy: (text: string) => void }) {
   const [q, setQ] = useState('')
   const [pick, setPick] = useState<IconName>('check')
+  const look = useSyncExternalStore(onIconLook, iconLook) // Settings › Appearance › Icons' pack: what's drawn here
+  const pack = ICON_PACKS.find(([p]) => p === look.pack)?.[1]
+  const own = (n: IconName) => look.pack !== 'laki' && iconOf(n, look).box === 16 // the pack lacks it: Laki's own
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const shown = NAMES.filter(n => words.every(w => wordsOf(n).includes(w)))
   const has = new Set(shown)
@@ -143,7 +146,9 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
     <div className="kit-icons">
       <div className="kit-icons-head">
         <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder={`Find one of ${NAMES.length} icons: check, weather, arrow…`} spellCheck={false} autoFocus />
-        <span className="muted small">A click copies its name. Any emoji works too: {'"icon": "🚀"'}.</span>
+        <span className="muted small">
+          A click copies its name. Drawn in {pack} (Settings › Appearance › Icons): a name is the same in every pack, so it follows the one picked. Any emoji works too: {'"icon": "🚀"'}.
+        </span>
       </div>
       <div className="kit-icons-body">
         <div className="kit-icon-groups">
@@ -152,7 +157,7 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
               <h3 className="kit-h">{g} · {l.length}</h3>
               <div className="kit-icon-grid" role="listbox" aria-label={`${g} icons`}>
                 {l.map(n => (
-                  <button key={n} type="button" role="option" aria-selected={pick === n} className={`kit-icon${pick === n ? ' on' : ''}`} data-tip={`Copy “${n}”`} onClick={() => pickIt(n)}>
+                  <button key={n} type="button" role="option" aria-selected={pick === n} className={`kit-icon${pick === n ? ' on' : ''}`} data-tip={`Copy “${n}”${own(n) ? ` · ${pack} has none: Laki's own` : ''}`} onClick={() => pickIt(n)}>
                     <Icon name={n} size={20} />
                     <span className="mono">{n}</span>
                   </button>
@@ -173,7 +178,7 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
           <div className="kit-icon-sizes">
             {[12, 16, 22, 32].map(px => (
               <span key={px}>
-                <Icon name={pick} size={px} />
+                <Icon name={pick} size={px} look={{ ...look, size: 14 }} />
                 <span className="muted small">{px}</span>
               </span>
             ))}

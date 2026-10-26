@@ -1,3 +1,4 @@
+import { PACKS } from './iconPacks.ts'
 // Laki's line icons: 16×16 stroke paths (currentColor; github filled), the app's (ui.tsx' Icon) and extensions' (an
 // icon by name: a button's face, the UI kit's elements, drawn as SVG by widgetUi.ts); past the app's, generic ones for
 // extensions (ICON_GROUPS), drawn by hand on the same grid
@@ -378,6 +379,38 @@ export const isIconName = (s: unknown): s is IconName => typeof s === 'string' &
 // the Icon… menus' Emoji picker: common ones, each with the words its filter finds it by
 export const EMOJIS: [string, string][] = '🚀 rocket launch ship release|🔥 fire hot|⚡ zap lightning fast|🐛 bug|🧪 test experiment|🔧 wrench fix tool|🛠 tools hammer build|⚙️ gear settings|🧩 puzzle plugin extension|📦 package box|📁 folder|🗂 folders index|📝 memo note write|📌 pin|📎 paperclip attach|🔍 search find|🔒 lock secure|🔑 key|🛡 shield security|🧠 brain think ai|🤖 robot bot ai agent|💻 laptop computer code|🖥 desktop screen|📱 phone mobile app|⌨️ keyboard|🌐 globe web|🔗 link|📡 antenna signal|☁️ cloud|🗄 database cabinet|💾 disk save|📊 chart bar stats|📈 chart up growth|📉 chart down|🧮 abacus count|🧾 receipt invoice|💰 money bag|💳 card payment|🛒 cart shop|🏷 tag label|📣 megaphone announce|📬 mailbox mail|✉️ envelope email|💬 speech chat comment|🔔 bell notify|⏰ alarm clock|⏱ stopwatch timer|📅 calendar date|✅ check done|❌ cross no|⚠️ warning|🚧 construction wip|🚦 traffic light status|🎯 target goal|🏁 finish flag|🏆 trophy win|⭐ star|🌟 glowing star|💡 bulb idea|📚 books docs|📖 book read|🎨 palette design art|✏️ pencil edit|🖌 brush paint|🎬 clapper film video|🎵 music note|🎧 headphones|📷 camera photo|🖼 picture image|🗺 map|🧭 compass|🏠 house home|🏢 office building work|🏗 crane construction|🌱 seedling new grow|🌳 tree|🍀 clover luck|🌈 rainbow|☀️ sun|🌙 moon night|❄️ snowflake cold|🌊 wave ocean|🐳 whale docker|🐍 snake python|🦀 crab rust|🐘 elephant php postgres|🦊 fox gitlab firefox|🐙 octopus github|🐧 penguin linux|🍎 apple mac|☕ coffee java|💎 gem ruby|🍕 pizza|🍩 donut|🎉 party tada celebrate|🎁 gift present|🧹 broom clean|♻️ recycle|🗑 trash delete|🔄 arrows refresh sync|➕ plus add|🔴 red circle|🟠 orange circle|🟡 yellow circle|🟢 green circle|🔵 blue circle|🟣 purple circle|⚫ black circle|⚪ white circle|🟥 red square|🟩 green square|🟦 blue square|❤️ heart red love|💜 purple heart|👀 eyes look review|👍 thumbs up ok|👋 wave hello|💪 muscle strong|🧑‍💻 developer technologist|👥 people team|🐶 dog|🐱 cat|🦄 unicorn|🐝 bee busy|🦋 butterfly|🎲 dice random|🧲 magnet|🔋 battery|🔌 plug|🛰 satellite|🧬 dna|🔬 microscope|🔭 telescope|⚖️ scale law balance|🏥 hospital health|🎓 graduation learn school|✈️ plane travel|🚗 car|🚢 ship boat'.split('|').map(x => (i => [x.slice(0, i), x.slice(i + 1)] as [string, string])(x.indexOf(' ')))
 export const emojiOf = (s: unknown) => (t => (t && t.length <= 16 && !/[\p{L}\s]/u.test(t) && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(t) ? t : undefined))(typeof s === 'string' ? s.trim() : undefined)
+// the icons' look (Settings › Appearance › Icons): a pack (Tabler unset), its stroke's width as at a 24 grid (2, unset: each
+// pack's own; Laki's 1.4 at 16 is its 2) and the app's icon size (14, unset: as the app has it; others scale with it).
+// The app's windows set it from their settings (themes.ts applyTheme), the daemon from its own (the UI kit's icons in an
+// extension); a name stays the name in any pack (a project's, an extension's), one a pack lacks is drawn by Laki's own
+export type IconPack = 'laki' | keyof typeof PACKS
+export const ICON_PACKS: [IconPack, string][] = [['tabler', 'Tabler'], ['lucide', 'Lucide'], ['laki', 'Laki']]
+export const ICON_WIDTHS = [1, 1.25, 1.5, 1.75, 2, 2.5]
+export const ICON_SIZES = [12, 13, 14, 15, 16, 18]
+export type IconLook = { pack: IconPack; width: number; size: number }
+export const lookOf = (s?: { iconPack?: string; iconWidth?: number; iconSize?: number }): IconLook => ({
+  pack: ICON_PACKS.find(([p]) => p === s?.iconPack)?.[0] ?? 'tabler',
+  width: ICON_WIDTHS.find(w => w === s?.iconWidth) ?? 2,
+  size: ICON_SIZES.find(z => z === s?.iconSize) ?? 14,
+})
+let look = lookOf()
+let turns = 0 // each change: the daemon's widgets' rev, so the app draws their icons again
+const heard = new Set<() => void>()
+export const iconLook = () => look
+export const iconTurns = () => turns
+export const onIconLook = (f: () => void) => (heard.add(f), () => void heard.delete(f))
+export function setIconLook(l: IconLook) {
+  if (l.pack === look.pack && l.width === look.width && l.size === look.size) return
+  look = l
+  turns++
+  queueMicrotask(() => heard.forEach(f => f())) // not as it's set: App sets it while it renders
+}
+// a name as drawn: its viewBox's side, its shapes as markup, its stroke's width, filled or not
+export function iconOf(name: IconName, l: IconLook = look) {
+  const own = l.pack === 'laki' ? undefined : PACKS[l.pack][name]
+  if (own) return { box: 24, inner: own, sw: l.width, fill: false }
+  return { box: 16, inner: `<path d="${ICONS[name]}"/>`, sw: +(((name === 'more' ? 2.4 : 1.4) * l.width) / 2).toFixed(3), fill: name === 'github' }
+}
 // an icon as SVG markup, for HTML built as text (the UI kit)
-export const iconSvg = (name: IconName, size = 14) =>
-  `<svg class="k-icon" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${name === 'github' ? 'currentColor' : 'none'}" stroke="${name === 'github' ? 'none' : 'currentColor'}" stroke-width="${name === 'more' ? 2.4 : 1.4}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`
+export const iconSvg = (name: IconName, size = 14, l = look) =>
+  (i => `<svg class="k-icon" width="${size}" height="${size}" viewBox="0 0 ${i.box} ${i.box}" fill="${i.fill ? 'currentColor' : 'none'}" stroke="${i.fill ? 'none' : 'currentColor'}" stroke-width="${i.sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i.inner}</svg>`)(iconOf(name, l))

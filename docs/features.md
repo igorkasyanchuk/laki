@@ -76,7 +76,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
-- **Looks**: six Dock icons to pick from; 100 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
+- **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 100 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
 - **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often, or any you make with Laki AI on the extension's own page, an agent's

@@ -2,6 +2,7 @@
 // <html>; 'default' keeps the app's own (:root in its stylesheet). The terminal's 16 colors are --ansi-0…15
 // and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (look.css,
 // <html data-look>). Glass makes the window see-through, as much as its sliders say.
+import { lookOf, setIconLook } from '../../shared/icons.ts'
 
 type Colors = {
   bg: string
@@ -1063,8 +1064,9 @@ export const preview = (t: Theme) => {
 // what paints the window (Settings → Appearance): the theme, the interface's font ('system': the Mac's), glass
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
-export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none' }
-const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion'] as const
+// iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
+export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number }
+const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1128,6 +1130,7 @@ export function applyTheme(p: string | Paint = '') {
   st.colorScheme = ''
   root.dataset.look = t.look ?? ''
   root.dataset.motion = o.motion ?? 'low'
+  setIconLook(lookOf(o))
   // the rail: the sidebar's color a shade darker (a light theme's less: 18% black is a muddy grey there), at pct
   const rail = (side: string, pct = 100) => `color-mix(in srgb, color-mix(in srgb, ${side} ${t.light ? 94 : 82}%, #000) ${pct}%, transparent)`
   root.classList.toggle('glass', !!o.glass)

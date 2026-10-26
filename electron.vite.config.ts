@@ -54,8 +54,10 @@ const notices = (last: boolean) => ({
     const rule = `\n\n${'='.repeat(78)}\n`
     const groups = [...byText].map(([text, names]) => `${names.sort().join('\n')}\n\n${text}`).sort()
     const fonts = ['NOTICE.md', 'OFL.txt', 'HACK-LICENSE.md'].map(f => readFileSync(resolve('src/renderer/src/fonts', f), 'utf8').trim())
+    // the icon packs' icons Laki carries (scripts/icon-packs.ts: copied in, no package of theirs)
+    fonts.push(`Icons from Tabler Icons and Lucide (src/shared/iconPacks.ts):\n\n${readFileSync(resolve('src/shared/icon-licenses.txt'), 'utf8').trim()}`)
     const n = [...byText.values()].reduce((n, names) => n + names.length, 0)
-    const head = `Laki bundles the open-source packages and fonts below, each under its own license. Laki itself is MIT.\n${n} packages; each license text follows the packages it covers.`
+    const head = `Laki bundles the open-source packages, fonts and icons below, each under its own license. Laki itself is MIT.\n${n} packages; each license text follows the packages it covers.`
     this.emitFile({ type: 'asset', fileName: 'THIRD_PARTY_NOTICES.txt', source: [head, ...groups, ...fonts].join(rule) + '\n' })
   },
 })

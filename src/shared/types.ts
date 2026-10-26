@@ -493,6 +493,9 @@ export type Settings = {
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
+  iconPack?: string // Appearance's Icons (icons.ts lookOf, ICON_PACKS): tabler (unset), lucide or laki; iconWidth: its stroke as at a 24 grid (ICON_WIDTHS, unset: 2, each pack's own); iconSize: the app's icons (ICON_SIZES, unset: 14)
+  iconWidth?: number
+  iconSize?: number
   motion?: 'high' | 'low' | 'none' // Appearance's Animations (themes.ts' Paint, html[data-motion]): more of them, the usual (unset), or none
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)

@@ -2266,6 +2266,12 @@ button.board-name:hover { background: none; }
 .setting-box > .dock-icons.switch-row { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
 .dock-icons button { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 10px 6px; border-radius: 12px; font-size: 12px; }
 .dock-icons button.on { border-color: var(--accent); color: var(--fg); box-shadow: 0 0 0 1px var(--accent); }
+.setting-box > .icon-packs.switch-row { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+.icon-packs button { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px 6px; border-radius: 12px; font-size: 12px; }
+.icon-packs button.on { border-color: var(--accent); color: var(--fg); box-shadow: 0 0 0 1px var(--accent); }
+.icon-pack-strip { display: flex; gap: 8px; }
+.icon-look .seg { flex-wrap: wrap; row-gap: 4px; }
+.icon-look .seg button { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
 /* a project's notes (panels.tsx ProjectNotes; Settings' field) */
 .notes-view { max-height: 60vh; overflow: auto; padding: 2px 2px 8px; }
 .notes-edit { width: 100%; box-sizing: border-box; min-height: 320px; max-height: 60vh; resize: vertical; font-size: 12px; line-height: 1.5; }

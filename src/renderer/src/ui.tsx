@@ -1,7 +1,7 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { EMOJIS, emojiOf, ICONS, type IconName, isIconName } from '../../shared/icons'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
@@ -22,16 +22,17 @@ export const keep = (key: string, v: unknown) => {
 // IME's word
 export const escapes = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && !e.isComposing
 
-const paths = ICONS
 export type { IconName }
 export { isIconName } // an extension's icon
 
-export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
-  return (
-    <svg className="icon-svg" width={size} height={size} viewBox="0 0 16 16" fill={name === 'github' ? 'currentColor' : 'none'} stroke={name === 'github' ? 'none' : 'currentColor'} strokeWidth={name === 'more' ? 2.4 : 1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d={paths[name]} />
-    </svg>
-  )
+// in the pack, width and size Settings › Appearance › Icons picked (icons.ts' look; look: Settings' previews of another);
+// size is at the default 14, scaled with it
+export function Icon({ name, size = 14, look }: { name: IconName; size?: number; look?: IconLook }) {
+  const now = useSyncExternalStore(onIconLook, iconLook)
+  const l = look ?? now
+  const i = iconOf(name, l)
+  const px = Math.round((size * l.size) / 14)
+  return <svg className="icon-svg" width={px} height={px} viewBox={`0 0 ${i.box} ${i.box}`} fill={i.fill ? 'currentColor' : 'none'} stroke={i.fill ? 'none' : 'currentColor'} strokeWidth={i.sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden dangerouslySetInnerHTML={{ __html: i.inner }} />
 }
 
 // label: words beside the icon (the sidebar's foot)

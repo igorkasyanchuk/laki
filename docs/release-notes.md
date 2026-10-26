@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Icons from Tabler, Lucide or Laki's own (Settings › Appearance › *Icons*, Tabler by default), with a line width and
+  a size; the icon picker and extensions' icons follow it, and an icon you picked keeps its name in any pack.
 - The new-workspace page in color: a heading that names the agent and project, tinted by the agent; the agent menu
   links to *Manage agents…* (Settings › Agents & profiles).
 - A group's default agent: *New group…* and its settings pick a template and an agent; *+* in that group starts with it,

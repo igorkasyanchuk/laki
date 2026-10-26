@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
 import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Sep, type Settings, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
-import { emojiOf, isIconName } from '../shared/icons.ts'
+import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
@@ -145,6 +145,7 @@ export function load() {
   state.todos ??= []
   state.reminders ??= []
   state.flows ??= []
+  setIconLook(lookOf(state.settings)) // the UI kit's icons in an extension: the pack the app has
   for (const [ws, g] of Object.entries(state.widgetGrants ?? {})) {
     const keep = g.filter(k => k.includes('#')) // an Always from before its hash (widgetTools.ts grantKey): asked again, once
     if (keep.length) state.widgetGrants![ws] = keep
@@ -1461,6 +1462,7 @@ export function settingsSet(o: Settings, own = false) {
   o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
   state.settings = { ...state.settings, ...o }
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
+  setIconLook(lookOf(state.settings)) // a change: the widgets' rev, so the app asks for their HTML again
   save()
   changed()
   if ('diffStat' in o || 'fullReview' in o) void scanStats() // its numbers now, not at the next scan
@@ -1475,6 +1477,7 @@ export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
   widgetsOff() // every extension off
+  setIconLook(lookOf(state.settings))
   save()
   changed()
   return state.settings

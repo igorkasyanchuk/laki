@@ -16,6 +16,7 @@ import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError,
 import { type Tone, TONES, uiHtml, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, actionMenu, aiActOf, type Fact, FACT_NAMES, gateOf, SAMPLE_FACTS, SIZES_ACROSS, toolOf } from '../shared/widgetSchema.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
+import { iconTurns } from '../shared/icons.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
 import { dir } from './dir.ts'
@@ -776,7 +777,7 @@ export const widgetsView = (): WidgetView[] =>
     mock: w.s.mock,
     sample: w.m.sample !== undefined || (!fetches(w) && w.m.sampleConfig !== undefined) || undefined, // a preview with made-up data
     fixtures: w.fixtures.length ? w.fixtures : undefined, // more of it: widgetRender's sample by name
-    rev,
+    rev: rev + iconTurns(), // and each change of the icons' pack, width or size: drawn again
     ...((placesOf(w).every(p => BUTTON_PLACES.includes(p)) || !w.preview) && { button: true }), // a tile elsewhere: its preview
     icon: iconOf(w),
     ...w.face,
