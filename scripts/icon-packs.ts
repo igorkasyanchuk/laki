@@ -3,7 +3,7 @@
 // node --experimental-strip-types scripts/icon-packs.ts
 // Another pack: its package and a column in MAP; a name a pack lacks (null, or no file) is drawn by Laki's own.
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -84,7 +84,7 @@ try {
   for (const [i, [pack, { pkg, name, dir }]] of Object.entries(PKGS).entries()) {
     const tgz = execFileSync('npm', ['pack', pkg, '--silent', '--ignore-scripts', '--pack-destination', tmp], { encoding: 'utf8' }).trim().split('\n').at(-1)!
     const at = join(tmp, pack)
-    execFileSync('mkdir', [at])
+    mkdirSync(at)
     execFileSync('tar', ['-xzf', join(tmp, tgz), '-C', at])
     const root = join(at, 'package')
     licenses.push(`${name} (${pkg}): ${JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).license}\n\n${readFileSync(join(root, 'LICENSE'), 'utf8').trim()}`)

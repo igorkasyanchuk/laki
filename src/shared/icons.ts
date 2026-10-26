@@ -382,7 +382,9 @@ export const emojiOf = (s: unknown) => (t => (t && t.length <= 16 && !/[\p{L}\s]
 // the icons' look (Settings › Appearance › Icons): a pack (Tabler unset), its stroke's width as at a 24 grid (2, unset: each
 // pack's own; Laki's 1.4 at 16 is its 2) and the app's icon size (14, unset: as the app has it; others scale with it).
 // The app's windows set it from their settings (themes.ts applyTheme), the daemon from its own (the UI kit's icons in an
-// extension); a name stays the name in any pack (a project's, an extension's), one a pack lacks is drawn by Laki's own
+// extension); a name stays the name in any pack (a project's, an extension's), one a pack lacks is drawn by Laki's own.
+// ponytail: the bubbles' and the screenshot editor's own icons (floater.ts, annotate.ts) stay Laki's, and a JS page's
+// laki.ui icons change as it loads again; no Phosphor (fills, not lines: no width to pick)
 export type IconPack = 'laki' | keyof typeof PACKS
 export const ICON_PACKS: [IconPack, string][] = [['tabler', 'Tabler'], ['lucide', 'Lucide'], ['laki', 'Laki']]
 export const ICON_WIDTHS = [1, 1.25, 1.5, 1.75, 2, 2.5]
@@ -394,7 +396,7 @@ export const lookOf = (s?: { iconPack?: string; iconWidth?: number; iconSize?: n
   size: ICON_SIZES.find(z => z === s?.iconSize) ?? 14,
 })
 let look = lookOf()
-let turns = 0 // each change: the daemon's widgets' rev, so the app draws their icons again
+let turns = 0 // each change: the daemon's widgets' icons, so the app draws their kit HTML again
 const heard = new Set<() => void>()
 export const iconLook = () => look
 export const iconTurns = () => turns

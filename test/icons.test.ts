@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { PACKS } from '../src/shared/iconPacks.ts'
 import { ICONS, iconLook, iconOf, iconSvg, iconTurns, lookOf, setIconLook } from '../src/shared/icons.ts'
@@ -40,4 +42,22 @@ test('icon packs: iconSvg draws the look set; a change counts once', async () =>
   assert.ok(svg.includes(PACKS.lucide.x))
   assert.match(iconSvg('x', 12, lookOf({ iconPack: 'laki' })), /viewBox="0 0 16 16"/)
   setIconLook(was)
+})
+
+test('icon packs: the daemon draws an extension kit in the pack Settings picked, and says so in its view', async t => {
+  const { fresh } = await import('./helpers.ts')
+  const rig = await fresh(t)
+  const d = join(rig.data, 'widgets', 'ok')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'OK', ui: { type: 'icon', name: 'check' } }))
+  await rig.rpc('widgetReload')
+  const ok = async () => ((await rig.rpc('state')).widgets ?? []).find((w: { id: string }) => w.id === 'ok')
+  const drawn = () => rig.rpc('widgetRender', { id: 'ok' }) as Promise<string>
+  assert.equal((await ok()).icons, undefined) // Tabler unset: nothing changed yet
+  assert.ok((await drawn()).includes(`viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PACKS.tabler.check}`))
+  await rig.rpc('settingsSet', { iconPack: 'laki', iconWidth: 1 })
+  assert.equal((await ok()).icons, 1)
+  assert.ok((await drawn()).includes(`viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS.check}"/>`))
+  await rig.rpc('settingsSet', { iconPack: 'laki', iconWidth: 1, theme: 'kraft' }) // the same look: not drawn again
+  assert.equal((await ok()).icons, 1)
 })

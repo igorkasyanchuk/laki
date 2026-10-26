@@ -162,7 +162,7 @@ export function WidgetBody({ w, full, api, sample, cells, onSize }: { w: WidgetV
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.fx, w.rev, w.net, w.here, none, full, config, w.key, theme, sample, size, hide]) // fx: its facts changed; net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
+  }, [w.id, w.js, w.at, w.fx, w.rev, w.icons, w.net, w.here, none, full, config, w.key, theme, sample, size, hide]) // fx: its facts changed; icons: the pack, width or size Settings picked (the daemon draws a template's); net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
   // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything (a button
   // clicked is done at once: uiBehave waits on what this returns)
   useEffect(() => {

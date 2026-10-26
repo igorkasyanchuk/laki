@@ -359,7 +359,8 @@ The quickest way to draw one: `widget.json`'s `"ui"`, elements as JSON that foll
 copy: Settings › Extensions › *UI kit*, or `laki widget kit [element] [--json]` in a terminal. Every icon an
 `icon` can name (Laki's own and 252 generic ones: arrows, files, messages, people, media, devices, weather, money,
 time, places, tools, shapes), found by name or group, a click to copy it: Settings › Extensions › *Icons* (`laki widget
-kit icons`); any emoji works too.
+kit icons`); any emoji works too. Each is drawn in the icon pack the person picked (Settings › Appearance › *Icons*:
+Tabler by default, Lucide, or Laki's own, which draws a name a pack lacks): a name looks at home in each.
 
 `ui` is one element (the preview and the full view alike; the full view shows every row) or `{ "preview": …, "full": … }`.
 An element is `{ "type": "<name>", …props }`, and each also takes `if` / `unless` (a path or a template: shown when

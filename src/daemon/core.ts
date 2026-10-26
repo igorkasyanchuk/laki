@@ -1462,7 +1462,7 @@ export function settingsSet(o: Settings, own = false) {
   o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
   state.settings = { ...state.settings, ...o }
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
-  setIconLook(lookOf(state.settings)) // a change: the widgets' rev, so the app asks for their HTML again
+  setIconLook(lookOf(state.settings)) // a change: the widgets' icons, so the app asks for their HTML again
   save()
   changed()
   if ('diffStat' in o || 'fullReview' in o) void scanStats() // its numbers now, not at the next scan

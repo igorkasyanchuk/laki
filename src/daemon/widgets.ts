@@ -777,7 +777,8 @@ export const widgetsView = (): WidgetView[] =>
     mock: w.s.mock,
     sample: w.m.sample !== undefined || (!fetches(w) && w.m.sampleConfig !== undefined) || undefined, // a preview with made-up data
     fixtures: w.fixtures.length ? w.fixtures : undefined, // more of it: widgetRender's sample by name
-    rev: rev + iconTurns(), // and each change of the icons' pack, width or size: drawn again
+    rev,
+    icons: iconTurns() || undefined, // each change of the icons' pack, width or size: the app draws it again
     ...((placesOf(w).every(p => BUTTON_PLACES.includes(p)) || !w.preview) && { button: true }), // a tile elsewhere: its preview
     icon: iconOf(w),
     ...w.face,
