@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.32.0 · Oct 27, 2026
 
 - Icons from Tabler, Lucide or Laki's own (Settings › Appearance › *Icons*, Tabler by default), with a line width and
   a size; the icon picker and extensions' icons follow it, and an icon you picked keeps its name in any pack.
