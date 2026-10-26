@@ -7,7 +7,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ICONS } from '../src/shared/icons.ts'
 
 const PKGS = {
   tabler: { pkg: '@tabler/icons@3.49.0', name: 'Tabler Icons', dir: 'icons/outline' },
@@ -76,6 +75,10 @@ function inner(svg: string, file: string) {
     .join('')
 }
 
+// the names from icons.ts' text, not an import: icons.ts imports the file this writes, which may be missing or broken
+const src = readFileSync(fileURLToPath(new URL('../src/shared/icons.ts', import.meta.url)), 'utf8')
+const NAMES = [...src.slice(src.indexOf('export const ICONS = {'), src.indexOf('\n}\n', src.indexOf('export const ICONS = {'))).matchAll(/^  (\w+):/gm)].map(m => m[1])
+if (NAMES.length < 300) throw new Error(`icons.ts: ${NAMES.length} names read, its ICONS block moved?`)
 const tmp = mkdtempSync(join(tmpdir(), 'laki-icons-'))
 try {
   const kebab = (n: string) => n.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
@@ -90,7 +93,7 @@ try {
     licenses.push(`${name} (${pkg}): ${JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).license}\n\n${readFileSync(join(root, 'LICENSE'), 'utf8').trim()}`)
     const lines: string[] = []
     const lacks: string[] = []
-    for (const n of Object.keys(ICONS)) {
+    for (const n of NAMES) {
       const word = n in MAP ? MAP[n][i] : kebab(n)
       const file = word && join(root, dir, `${word}.svg`)
       if (!file || !existsSync(file)) {
@@ -100,7 +103,7 @@ try {
       lines.push(`    ${n}: '${inner(readFileSync(file, 'utf8'), file)}',`)
     }
     out.push(`  ${pack}: {\n${lines.join('\n')}\n  },`)
-    console.log(`${name}: ${lines.length} of ${Object.keys(ICONS).length}; Laki's own for ${lacks.join(', ') || 'none'}`)
+    console.log(`${name}: ${lines.length} of ${NAMES.length}; Laki's own for ${lacks.join(', ') || 'none'}`)
   }
   const at = (f: string) => fileURLToPath(new URL(`../src/shared/${f}`, import.meta.url))
   writeFileSync(

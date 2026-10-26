@@ -387,7 +387,7 @@ export const emojiOf = (s: unknown) => (t => (t && t.length <= 16 && !/[\p{L}\s]
 // laki.ui icons change as it loads again; no Phosphor (fills, not lines: no width to pick)
 export type IconPack = 'laki' | keyof typeof PACKS
 export const ICON_PACKS: [IconPack, string][] = [['tabler', 'Tabler'], ['lucide', 'Lucide'], ['laki', 'Laki']]
-export const ICON_WIDTHS = [1, 1.25, 1.5, 1.75, 2, 2.5]
+export const ICON_WIDTHS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5]
 export const ICON_SIZES = [12, 13, 14, 15, 16, 18]
 export type IconLook = { pack: IconPack; width: number; size: number }
 export const lookOf = (s?: { iconPack?: string; iconWidth?: number; iconSize?: number }): IconLook => ({

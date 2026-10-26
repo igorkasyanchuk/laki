@@ -74,9 +74,9 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['cards', 'Cards', 'a card each, with the agent’s last answer'],
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
-// Appearance's corners (--radius) and where the tabs go
 // Appearance's Icons: each pack drawn by these
 const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
+// Appearance's corners (--radius) and where the tabs go
 const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'None']]
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
@@ -1431,7 +1431,7 @@ export function SettingsPage(p: {
                     <div className="setting-box">
                       <div className="switch-row icon-packs" role="radiogroup" aria-label="Icon pack">
                         {ICON_PACKS.map(([id, name]) => (
-                          <button key={id} role="radio" aria-checked={look.pack === id} className={look.pack === id ? 'on' : ''} onClick={() => paint({ iconPack: id })}>
+                          <button key={id} type="button" role="radio" aria-checked={look.pack === id} className={look.pack === id ? 'on' : ''} onClick={() => paint({ iconPack: id })}>
                             <span className="icon-pack-strip">
                               {PACK_SAMPLE.map(n => (
                                 <Icon key={n} name={n} size={16} look={{ ...look, pack: id, size: 14 }} />
@@ -1445,7 +1445,7 @@ export function SettingsPage(p: {
                     </div>
                     <div className="setting-row icon-look">
                       <Says title="Line width" hint="Each pack's own is 2" />
-                      <span className="seg" role="radiogroup" aria-label="Line width">
+                      <span className="seg wrap" role="radiogroup" aria-label="Line width">
                         {ICON_WIDTHS.map(w => (
                           <button key={w} type="button" role="radio" aria-checked={look.width === w} className={look.width === w ? 'on' : ''} onClick={() => paint({ iconWidth: w })}>
                             <Icon name="settings" size={16} look={{ ...look, width: w, size: 14 }} /> {w}
@@ -1454,8 +1454,8 @@ export function SettingsPage(p: {
                       </span>
                     </div>
                     <div className="setting-row icon-look">
-                      <Says title="Size" hint="Of every icon in the app, 14 as it comes; the others grow or shrink with it" />
-                      <span className="seg" role="radiogroup" aria-label="Icon size">
+                      <Says title="Size" hint="The app's icons, 14 as they come; the smaller and bigger ones grow or shrink with them" />
+                      <span className="seg wrap" role="radiogroup" aria-label="Icon size">
                         {ICON_SIZES.map(z => (
                           <button key={z} type="button" role="radio" aria-checked={look.size === z} className={look.size === z ? 'on' : ''} onClick={() => paint({ iconSize: z })}>
                             <Icon name="folder" look={{ ...look, size: z }} /> {z}

@@ -278,9 +278,10 @@ export function ProjectMark({ p, size = 12, or }: { p?: { icon?: string; color?:
   const i = p?.icon
   const e = emojiOf(i)
   const name = isIconName(i) ? i : or
+  const scale = useSyncExternalStore(onIconLook, iconLook).size / 14 // an emoji as big as an icon would be
   if (!e && !name) return null
   return (
-    <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: size }) }} aria-hidden>
+    <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: Math.round(size * scale) }) }} aria-hidden>
       {e ?? <Icon name={name!} size={size} />}
     </span>
   )
