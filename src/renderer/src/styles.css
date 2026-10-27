@@ -62,6 +62,7 @@ button:hover { background: var(--hover); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 button.on { border-color: var(--accent); color: var(--accent-ink); }
 button:disabled { opacity: 0.5; cursor: default; }
+.icon-svg { vertical-align: -0.125em; } /* an icon before words in a box that isn't flex (+ Add…, Build with AI): centred on the text, not sat on its baseline; flex rows ignore it */
 button.icon { background: none; border: none; font-size: 17px; line-height: 1; padding: 2px 7px; color: var(--muted); }
 button.icon:hover { color: var(--fg); background: var(--hover); }
 button.icon.small { font-size: 14px; padding: 0 5px; min-width: 20px; min-height: 20px; }
@@ -219,8 +220,9 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 :not(.xterm-viewport)::-webkit-scrollbar-thumb:hover, :not(.xterm-viewport)::-webkit-scrollbar-thumb:active { background-color: color-mix(in srgb, var(--fg) 34%, transparent); }
 .side-foot { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; height: 34px; padding: 0 6px; border-top: 1px solid var(--line); overflow: hidden; }
 /* the foot in one row: App's fit drops the last data-bare buttons' words (Settings' first) until it fits */
-:is(.side-foot[data-bare='1'] > button:nth-last-of-type(-n + 1), .side-foot[data-bare='2'] > button:nth-last-of-type(-n + 2), .side-foot[data-bare='3'] > button:nth-last-of-type(-n + 3), .side-foot[data-bare='4'] > button:nth-last-of-type(-n + 4), .side-foot[data-bare='5'] > button:nth-last-of-type(-n + 5), .side-foot[data-bare='6'] > button:nth-last-of-type(-n + 6)).labeled { width: 24px; padding: 0; }
-:is(.side-foot[data-bare='1'] > button:nth-last-of-type(-n + 1), .side-foot[data-bare='2'] > button:nth-last-of-type(-n + 2), .side-foot[data-bare='3'] > button:nth-last-of-type(-n + 3), .side-foot[data-bare='4'] > button:nth-last-of-type(-n + 4), .side-foot[data-bare='5'] > button:nth-last-of-type(-n + 5), .side-foot[data-bare='6'] > button:nth-last-of-type(-n + 6)) .ib-label { display: none; }
+.side-foot > button[data-bare].labeled { width: 24px; padding: 0; }
+.side-foot > button[data-bare] .ib-label { display: none; }
+.side-foot[data-wrap] { flex-wrap: wrap; height: auto; min-height: 34px; padding: 4px 6px; }
 /* Get started (panels.tsx Onboarding): a step per row, its circle ticked as it's done; its bar at the sidebar's foot */
 .onboard { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .ob-steps { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; } /* a short window: the steps scroll, the buttons stay */
@@ -894,6 +896,12 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .find { position: absolute; top: 8px; right: 16px; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
 .find input { width: 210px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 4px); padding: 3px 7px; font: 12px var(--mono); outline: none; }
 .find input:focus { border-color: var(--accent); }
+/* ⌘F in a diff (Diff.tsx DiffFind): over its scroller's top right as it scrolls; matches by the CSS Custom Highlight API */
+.diff-find-at { position: sticky; top: 0; height: 0; z-index: 6; }
+.diff-find-at .find { top: 6px; right: 10px; }
+.diff-find-at .find input { width: 170px; }
+::highlight(laki-find) { background-color: var(--find); color: #000; }
+::highlight(laki-find-on) { background-color: var(--find-active); color: #000; }
 .find-count { min-width: 64px; text-align: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .find button { background: none; border: 1px solid transparent; color: var(--muted); border-radius: var(--rs, 4px); padding: 1px 6px; font: 12px var(--mono); cursor: pointer; }
 .find button:hover { color: var(--fg); background: var(--hover); }
@@ -1706,6 +1714,9 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .note-meta { margin: 6px 0 18px; }
 .note-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 420px; margin: 0 auto; padding: 24px; text-align: center; }
 .note-empty > .icon-svg { color: var(--accent-ink); }
+.note-empty.todo-empty { flex: none; padding: 32px 24px 12px; } /* over the list's first, empty to-do */
+.note-empty .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.note-empty.plans-none { flex: none; padding: 40px 24px; }
 .narrow .page-body > .notes { flex-direction: column; }
 .narrow .notes-side { width: auto; max-height: 38%; border-right: none; border-bottom: 1px solid var(--line); }
 .narrow .note-edit { padding: 16px 16px 60px; }
@@ -2061,7 +2072,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .welcome-checks .check-why { display: inline-flex; color: var(--muted); cursor: help; }
 .welcome-checks .check-why:hover, .welcome-checks .check-why:focus-visible { color: var(--fg); }
 /* Find a setting */
-.settings-find { margin: 0 2px 8px; }
+.settings-find { margin: 0 2px 8px; width: auto; } /* stretched by its column: 100% plus the margins made Help's nav scroll sideways */
 .find-hit { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; color: var(--fg); }
 .spot { animation: spot 2.6s ease-out; border-radius: var(--rs, 6px); }
 .set-group.spot { border-radius: calc(var(--radius) + 4px); }
@@ -2135,7 +2146,9 @@ button.board-name { min-width: 0; padding: 0; border: none; background: none; co
 button.board-name:hover { background: none; }
 .board-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: hidden; }
 .board-last { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.board-pr { display: flex; align-items: center; gap: 4px; font-size: 11.5px; } /* with .ws-pr: its colors */
+.board-pr { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); } /* the PR's mark in its state's colors (.ws-pr), its checks and conflicts in theirs: failing red, as everywhere */
+.board-pr { flex-wrap: wrap; } .board-pr > span { white-space: nowrap; }
+.board-pr .ci-fail { color: var(--error); } .board-pr .ci-pass { color: var(--done); } .board-pr .ci-pending { color: var(--waiting); }
 .board-add { display: flex; flex-direction: column; gap: 6px; }
 .board-add textarea { resize: none; field-sizing: content; min-height: 64px; max-height: 12em; font: inherit; }
 /* a browser without field-sizing (remote access in another one): the prompts can't grow, so they keep the grip (after the rules it undoes) */
@@ -2763,3 +2776,19 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .ws.drop-on, .rail-pin.drop-on { outline: 1.5px dashed var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ws-drop { flex: none; font-size: 11px; color: var(--accent-ink, var(--accent)); white-space: nowrap; }
 .narrow .two-ways { grid-template-columns: 1fr; }
+/* ui.tsx' Boundary: what a throw while drawing leaves, a page's in its frame, the root's over the whole window */
+.boom { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 460px; margin: 12vh auto 0; padding: 0 16px; text-align: center; overflow-wrap: anywhere; }
+.boom > .icon-svg { color: var(--error); }
+.boom .row { display: flex; gap: 8px; margin-top: 6px; }
+.boom-root { position: fixed; inset: 0; background: var(--bg); color: var(--fg); -webkit-app-region: drag; }
+.boom-root .boom { -webkit-app-region: no-drag; }
+/* the full review's GitHub tab: a reply on the PR's conversation */
+.fr-reply { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-top: 10px; padding-bottom: 56px; } /* room for the floating Laki AI button: scrolled down, Comment is clear of it */
+.fr-reply textarea { resize: vertical; min-height: 64px; font: inherit; }
+/* the sidebar's picked workspaces (⌘-click, ⇧-click) and their bar over the list: archive, mute, move, delete at once */
+.sidebar .ws.ws-picked { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pick-bar { flex: none; display: flex; align-items: center; gap: 2px; margin: 4px 8px; padding: 3px 4px 3px 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--rs, 8px); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-size: 12px; }
+/* Laki AI: what you sent while it answered, over the composer (Ai.tsx: the next ask as it ends) */
+.ai-queue { display: flex; flex-direction: column; gap: 4px; margin: 0 0 6px; }
+.ai-queued { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border: 1px dashed var(--line); border-radius: var(--rs, 8px); background: var(--panel); font-size: 12.5px; }
+.ai-queued-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

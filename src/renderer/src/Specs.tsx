@@ -165,11 +165,22 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
           ) : shown.length ? (
             <div className="plans-rows">{shown.map(row)}</div>
           ) : (
-            <div className="plans-empty muted small">
-              {words.length || project || matching.length
-                ? `No ${only ? KIND_WORDS[only][0].toLowerCase() : 'specs or brainstorms'} here.`
-                : `${KIND_SAYS.spec} ${KIND_SAYS.brainstorm} Each is a folder outside your repo with a README.md agents can read; nothing goes in a worktree.`}
-            </div>
+            (words.length || project || matching.length ? (
+              <div className="plans-empty muted small">{`No ${only ? KIND_WORDS[only][0].toLowerCase() : 'specs or brainstorms'} here.`}</div>
+            ) : (
+              <div className="note-empty plans-none">
+                <Icon name={only ? kindIcon(only) : 'spec'} size={28} />
+                <b>{only ? `Your ${KIND_WORDS[only][0].toLowerCase()}` : 'Your specs and brainstorms'}</b>
+                <p className="muted small">{only ? KIND_SAYS[only] : `${KIND_SAYS.spec} ${KIND_SAYS.brainstorm}`}</p>
+                <div className="row">
+                  {(only ? [only] : PLAN_KINDS).map(k => (
+                    <button key={k} type="button" className={k === (only || 'spec') ? 'primary' : ''} disabled={!projects.length} data-tip={`In ${where}`} onClick={() => create(k)}>
+                      <Icon name="plus" size={12} /> New {KIND_WORDS[k][1]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}

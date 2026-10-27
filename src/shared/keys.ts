@@ -19,7 +19,7 @@ export const KEYS = [
   { id: 'info', label: 'Workspace info', key: '⌘I' },
   { id: 'palette', label: 'Palette', key: '⌘K' },
   { id: 'files', label: 'Find a file', key: '⌘P' },
-  { id: 'find', label: 'Find in the terminal', key: '⌘F' },
+  { id: 'find', label: 'Find in the terminal or a diff', key: '⌘F' },
   { id: 'next', label: 'Next tab that needs you', key: '⌘J' },
   { id: 'later', label: 'Send a message later', key: '⌘L' },
   { id: 'artifacts', label: 'Show / hide artifacts', key: '⇧⌘A' },

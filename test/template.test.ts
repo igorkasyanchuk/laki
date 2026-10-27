@@ -384,6 +384,10 @@ test("the palette's groups: suggestions, needs you, recent, then workspaces, tab
   assert.deepEqual(heads(paletteGroups(items, 'cart', [])), ['Workspaces: cart', 'Tabs: cart / claude'])
   assert.deepEqual(heads(paletteGroups(items, 'fix', []))[0], 'For this workspace: Fix CI: send #42')
   assert.deepEqual(paletteGroups(items, 'zzz', []), [])
+  // a page named as typed beats a workspace (needs you, even) whose name holds the word, and a longer action
+  const pages = [{ label: 'onboarding-screens is done', kind: 'needs' as const }, { label: 'onboarding-screens', kind: 'ws' as const }, { label: 'Board: every workspace by where it is', kind: 'action' as const }, { label: 'Ask Laki AI later…' }, { label: 'Laki AI: ask Laki to work your agents' }]
+  assert.equal(paletteGroups(pages, 'Board', [])[0].items[0].label, 'Board: every workspace by where it is')
+  assert.equal(paletteGroups(pages, 'laki ai', ['Ask Laki AI later…'])[0].items[0].label, 'Laki AI: ask Laki to work your agents')
   // a PR link pasted: the workspace that has it, whatever its tail; a PR number that only starts the same, none
   const ws = [{ label: 'review', kind: 'ws' as const, find: ['https://github.com/o/r/pull/15046'] }, { label: 'other', kind: 'ws' as const, find: ['https://github.com/o/r/pull/150'] }, ...items]
   assert.deepEqual(heads(paletteGroups(ws, ' https://github.com/o/r/pull/15046 ', [])), ['Workspaces: review'])

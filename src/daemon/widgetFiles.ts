@@ -95,7 +95,7 @@ export const statOf = (p: string) => {
     return null
   }
 }
-export function widgetWrite(o: { id: string; files: Record<string, unknown>; agent?: boolean }) {
+export function widgetWrite(o: { id: string; files: Record<string, unknown>; agent?: boolean; page?: boolean }) {
   const repo = widgets.get(String(o.id))
   if (repo?.project) throw new Error(repoSays(repo, 'change it'))
   if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
@@ -143,7 +143,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown>; age
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
   const same = !!runs && runs === runsOf(d) // only its looks changed
-  const stays = !!was.on && (same || !o.agent)
+  const stays = !!was.on && (same || (!o.agent && !!o.page)) // a new command stays on only from its page's chat (the user's): Laki AI elsewhere reads text it doesn't control
   writeStore(o.id, { ...readStore(o.id), on: stays, net: stays ? was.net : undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too, as it was; the user's own: its hour's leave stays (a write, a check, a fix)
   scanWidgets()
   wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; ${stays ? (same ? 'on still: what it runs is the same' : 'on still: it runs the new version') : "off until it's turned on"}`)

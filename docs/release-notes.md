@@ -15,6 +15,19 @@ version it builds, with the date. -->
   Simulators › *Emulator window* brings it back); a floated device leaves the panel instead of showing twice; an
   Android screen about 3 times quicker (a JPEG from Android 14 on, two frames on their way).
 - An Android emulator an agent starts no longer fills the status bar with its ports (5554, 5555, 8554, netsimd's).
+- *New worktree, no setup* in the new-workspace page's where menu (it was *More* › *Skip the setup script*).
+- ⌘F in Changes and the Review tab finds words in the diff.
+- Select several workspaces in the sidebar (⌘-click, ⇧-click): archive, mute, move to a group or delete them at once,
+  or drag them together.
+- Laki AI: what you send while it answers waits over the box and goes as one message when the answer ends.
+- Reply on a PR's conversation from the Review tab's GitHub side (*Comment*, posted as you).
+- Security: when Laki AI changes what an extension runs, it stays on only if you asked in that extension's own chat;
+  from any other chat it turns off until you look (0.32 kept it on).
+- A drawing error shows a message with *Reload* instead of a blank window, and a crashed window reloads itself.
+- The Board's failing checks and conflicts are red; the plan-limits ring hides until there is a reading; Get started
+  waits for your first project; the achievements trophy shows from the first one.
+- ⌘K: a page named as typed comes first (*Board*, *Laki AI*); the rail says *Workflows*.
+- Empty To-dos and Specs say what they are for, with a button to start.
 - *Check for updates* is on for everyone: one turned off before is on again, once.
 
 ## 0.32.0 · Oct 27, 2026

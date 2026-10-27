@@ -14,7 +14,7 @@ import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
 import type { UiSpec } from '../../shared/widgetUi'
 import { CELL_W, KitBody } from './Widgets'
 
-type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
+type AiData = { chat: AiMsg[]; busy: boolean; queue?: string[]; key: boolean; calls: AiCall[]; totals: AiTotals } // queue: what you sent while it answered, the next ask as it ends
 
 // what it can do, as you'd say it: a click puts it in the box
 const EXAMPLES = [
@@ -94,7 +94,7 @@ export function AiPage({
     return api.on(m => {
       if (m.ev === 'open') return void (load(), loadPast()) // a daemon started again: its conversation, not the busy one we had
       if (m.ev !== 'ai' || m.of) return // another chat's (a spec's, an extension's)
-      setD(x => x && { ...x, chat: m.chat, busy: m.busy })
+      setD(x => x && { ...x, chat: m.chat, busy: m.busy, queue: m.queue })
       if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
     })
@@ -106,7 +106,7 @@ export function AiPage({
   }, [d?.chat.length, d?.busy, tab])
   const backend = settings.backend ?? 'openrouter'
   const ready = settings.on !== false && (backend !== 'openrouter' || !!d?.key)
-  const can = ready && !d?.busy && !saving && (!!text.trim() || !!images.length)
+  const can = ready && !saving && (!!text.trim() || !!images.length) // while it answers: queued (the daemon says when too many wait), all of it the next ask
   const ask = () => {
     if (!can) return
     setErr('')
@@ -120,10 +120,11 @@ export function AiPage({
           text: sent.text,
           images: sent.images.map(i => i.path),
           ...(where && { context: where }),
+          queue: true,
         }),
       )
       .catch(e => {
-        if (!/^(Laki AI is off|Laki AI is busy|Laki AI works in|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
+        if (!/^(Laki AI is off|Laki AI is busy|Laki AI works in|ask something|the AI is still|no OpenRouter API key|not connected|\d+ messages wait already)/.test(e.message)) return
         setErr(e.message)
         setText(sent.text)
         setImages(sent.images)
@@ -205,6 +206,17 @@ export function AiPage({
             </div>
 
             <div className="ai-dock">
+              {!!d?.queue?.length && (
+                <div className="ai-queue" aria-label="Waiting to be sent">
+                  <span className="muted small">{d.busy ? 'Sent together when this answer ends:' : 'Sending…'}</span>
+                  {d.queue.map((q, i) => (
+                    <div key={i} className="ai-queued">
+                      <span className="ai-queued-text">{q}</span>
+                      <IconButton icon="x" title="Don't send it" onClick={() => api.call('aiUnqueue', { chat: '', i, text: q }).catch(e => setErr(e.message))} />
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className={`nw-card nw-composer ai-composer ${ready ? '' : 'off'}`}>
                 <PromptInput
                   value={text}
@@ -230,7 +242,7 @@ export function AiPage({
                           <Icon name="timer" />
                         </button>
                       )}
-                      <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={!can} onClick={ask}>
+                      <button className="primary ai-send" aria-label="Ask (⏎)" data-tip={d?.busy ? 'Queue it (⏎): sent with any others when this answer ends' : 'Ask (⏎) · ⇧⏎ a new line'} disabled={!can} onClick={ask}>
                         <Icon name="arrowRight" size={14} />
                       </button>
                     </>

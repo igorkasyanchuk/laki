@@ -108,7 +108,7 @@ export type Project = {
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
   trusted?: string // its .laki.json as you trusted it (projectTrust: sha256 of its JSON); one that isn't that gives its port names only
   cfgWait?: string // the view's: its .laki.json's hash while it has more than port names and you haven't trusted it as it is
-  hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's Skip the setup script
+  hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's New worktree, no setup
   color?: string // TAB_COLORS': an accent (its icon, its workspaces' bar where they have none of their own, rail pins, bubbles)
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
 }
@@ -858,5 +858,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 120
+export const API = 121
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

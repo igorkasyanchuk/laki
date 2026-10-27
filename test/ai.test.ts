@@ -323,6 +323,28 @@ test("ai: chats ask at once, one ask each (AI_AT_ONCE in all); a question goes t
   await assert.rejects(rig.rpc('studioChatRm', { id: '../ai-key' }), /no chat/)
 })
 
+test('ai: what you send while it answers waits (queue), and goes as one ask when the answer ends; ✕ takes one back', async t => {
+  const or = await openrouter(t, [{ slow: true }, reply({ content: 'both done' })])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const first = rig.rpc('aiAsk', { text: 'my open PRs' }).catch(e => e)
+  await until(() => or.hits.length === 1, 'the first ask')
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'and the drafts', queue: true }), { queued: 1 })
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'nope', queue: true }), { queued: 2 })
+  await assert.rejects(rig.rpc('aiAsk', { text: 'no queue: refused as before' }), /still on the last ask/)
+  await rig.rpc('aiUnqueue', { i: 1 })
+  await rig.rpc('aiAsk', { text: 'only mine', queue: true })
+  assert.deepEqual((await rig.rpc('aiState')).queue, ['and the drafts', 'only mine'])
+  await rig.rpc('aiStop') // any end of the answer: what waits goes
+  assert.match(String(await first), /stopped/)
+  await until(async () => (await rig.rpc('aiState')).chat.at(-1)?.text === 'both done', 'the queued ask answered')
+  const st = await rig.rpc('aiState')
+  assert.deepEqual(st.queue, [])
+  assert.equal(st.chat.findLast((m: any) => m.role === 'user').text, 'and the drafts\n\nonly mine')
+  assert.equal(or.hits.length, 2)
+})
+
 test("ai: Laki's skill asks with options, writes memory, and removes only on the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [

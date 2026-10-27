@@ -46,7 +46,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
-import { AGENT_COLORS, ask, askText, AskHost, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { AGENT_COLORS, ask, askText, AskHost, Boundary, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -148,11 +148,17 @@ const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React 
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
 const NotesPage = lazy(() => import('./Notes')) // BlockNote with it: loaded as it opens
 const TodoListPage = lazy(() => import('./TodoList')) // experimental, and BlockNote with it: loaded as it opens
-// what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment
+// what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment;
+// its code failing to load, or the page throwing, its own message (Boundary), the window kept
 const Waiting = ({ title, onClose }: { title: string; onClose: () => void }) => (
   <Page title={title} wide esc={false} onClose={onClose}>
     {null}
   </Page>
+)
+const Lazy = ({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) => (
+  <Boundary title={title} onClose={onClose}>
+    <Suspense fallback={<Waiting title={title} onClose={onClose} />}>{children}</Suspense>
+  </Boundary>
 )
 
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
@@ -396,6 +402,8 @@ export function App() {
   const [problem, setProblem] = useState<string | undefined>() // the remote page: why it can't connect
   const [pinAsk, setPinAsk] = useState<{ left?: number } | null>(null) // the remote page: Laki's PIN, asked for on the splash
   const [going, setGoing] = useState<Record<string, string>>({}) // workspaces being archived or deleted: a spinner on their rows
+  const [picked, setPicked] = useState<string[]>([]) // the sidebar's ⌘-click and ⇧-click: workspaces to archive, mute, move or delete at once
+  const anchor = useRef<string | null>(null) // ⇧-click's other end
   const [making, setMaking] = useState<{ key: number; project: string; place?: string; name: string }[]>([]) // new ones on their way: a row each
   const made = useRef({ key: 0, page: 0 }) // making's keys; page: the new-workspace page's closes (one closed mid-create isn't the one open now)
   const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
@@ -644,7 +652,7 @@ export function App() {
     if ('schedules' in d) return 'Schedule'
     if ('compare' in d) return 'Compare'
     if ('specs' in d) return 'Specs'
-    if ('workflows' in d) return (n => (n.startsWith('run:') ? 'A workflow run' : n ? 'A workflow' : 'Flows'))(d.nav ?? (d.run ? 'run:' : d.wf ? 'wf:' : ''))
+    if ('workflows' in d) return (n => (n.startsWith('run:') ? 'A workflow run' : n ? 'A workflow' : 'Workflows'))(d.nav ?? (d.run ? 'run:' : d.wf ? 'wf:' : ''))
     if ('note' in d) return 'Notes'
     return 'a page'
   }
@@ -944,11 +952,13 @@ export function App() {
   const fit = () => {
     const el = footRef.current
     if (!el) return
-    const n = el.querySelectorAll('.ib-label').length
-    for (let bare = 0; bare <= n; bare++) {
-      el.dataset.bare = String(bare)
-      if (el.scrollWidth <= el.clientWidth + 1) break
+    const bs = [...el.querySelectorAll<HTMLElement>(':scope > button')]
+    delete el.dataset.wrap
+    for (let bare = 0; bare <= bs.length; bare++) {
+      bs.forEach((b, i) => b.toggleAttribute('data-bare', i >= bs.length - bare))
+      if (el.scrollWidth <= el.clientWidth + 1) return
     }
+    el.dataset.wrap = '' // icons alone still too wide (a phone's drawer, every page's button): a second row, none cut off
   }
   const fitFoot = useCallback((el: HTMLDivElement | null) => {
     footRef.current = el
@@ -1506,6 +1516,52 @@ export function App() {
     }
     done(`Archived ${wsName(w)}`, () => restore(w.id))
   }
+  // several picked in the sidebar (⌘-click, ⇧-click): archive, mute, move to a group, delete, drag, all at once
+  const pickable = (w: WorkspaceView) => rawKind(w) === 'projects' && !w.term && !w.archived
+  const pickedWs = () => order.filter(w => picked.includes(w.id) && pickable(w))
+  const pickRow = (w: WorkspaceView, e: { metaKey: boolean; shiftKey: boolean }) => {
+    const base = picked.length ? picked : ws && ws.id !== w.id && pickable(ws) ? [ws.id] : [] // the open one starts it
+    if (e.shiftKey && (anchor.current ?? ws?.id)) {
+      const ids = order.filter(pickable).map(x => x.id)
+      const [a, b] = [ids.indexOf(anchor.current ?? ws!.id), ids.indexOf(w.id)].sort((x, y) => x - y)
+      if (a >= 0) return setPicked([...new Set([...base, ...ids.slice(a, b + 1)])])
+    }
+    anchor.current = w.id
+    setPicked(base.includes(w.id) ? base.filter(x => x !== w.id) : [...base, w.id])
+  }
+  useEffect(() => {
+    if (!picked.length) return
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !dialog && !document.querySelector('.menu, .overlay') /* a menu's or an ask's Esc is theirs */ && (e.preventDefault(), e.stopPropagation(), setPicked([]))
+    window.addEventListener('keydown', f, true) // before the terminal: Esc here isn't the agent's
+    return () => window.removeEventListener('keydown', f, true)
+  }, [picked.length > 0, !!dialog])
+  useEffect(() => setPicked(p => (p.some(id => !live.some(w => w.id === id)) ? p.filter(id => live.some(w => w.id === id)) : p)), [live]) // archived or deleted meanwhile
+  const pickedArchive = async () => {
+    const ws_ = pickedWs()
+    setPicked([])
+    const res = await busyWith(ws_.map(w => w.id), 'archiving', () => Promise.all(ws_.map(w => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean: true }).then(r => ({ w, r }), () => ({ w, r: undefined })))))
+    const dirty = res.filter(x => x.r?.dirty).map(x => x.w)
+    const held = res.filter(x => x.r?.held).map(x => x.w)
+    let gone = res.filter(x => x.r && !x.r.dirty && !x.r.held).map(x => x.w)
+    if (dirty.length && (await ask(`Archive ${dirty.length === 1 ? wsName(dirty[0]) : `${dirty.length} more`} with uncommitted changes?`, { text: `${dirty.map(wsName).join(', ')}: their changes go with the worktrees (the branches stay).`, ok: 'Archive', danger: true }))) {
+      const more = await busyWith(dirty.map(w => w.id), 'archiving', () => Promise.all(dirty.map(w => call<{ held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean: false }).then(r => (r?.held ? (held.push(w), null) : w), () => null))))
+      gone = [...gone, ...more.filter((w): w is WorkspaceView => !!w)]
+    }
+    if (gone.length) done(`Archived ${gone.length === 1 ? wsName(gone[0]) : `${gone.length} workspaces`}${held.length ? `; ${held.map(wsName).join(', ')} held by an extension (archive it alone to see why)` : ''}`, () => gone.forEach(w => restore(w.id)))
+    else if (held.length) toast(`${held.map(wsName).join(', ')} held by an extension: archive it alone to see why`)
+  }
+  const pickedRm = async () => {
+    const ws_ = pickedWs()
+    if (!(await ask(`Delete ${ws_.length} workspaces?`, { text: `${ws_.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay). Uncommitted changes go with them.`, ok: 'Delete', danger: true }))) return
+    setPicked([])
+    const ok = await busyWith(ws_.map(w => w.id), 'deleting', () => Promise.all(ws_.map(w => call('wsRm', { id: w.id }).then(() => true, () => false))))
+    done(`Deleted ${ok.filter(Boolean).length} workspaces: their branches stay`)
+  }
+  const pickedMute = () => {
+    const ws_ = pickedWs()
+    const muted = !ws_.every(w => w.muted)
+    Promise.all(ws_.map(w => call('wsSet', { id: w.id, muted }))).then(() => done(`${muted ? 'Muted' : 'Unmuted'} ${ws_.length} workspaces`), () => {})
+  }
   // a Browsers page closes (⌘W) as a browser's tab does: no question, the next one of its project selected, Undo opens it again
   const closePage = async (w: WorkspaceView) => {
     if (going[w.id]) return // a held ⌘W: it's on its way
@@ -1700,6 +1756,7 @@ export function App() {
     send: (tab, text) => api.call('send', { target: tab, text, whenIdle: true }).then(() => done(`Sent the review to ${view?.tabs.find(t => t.id === tab)?.name ?? 'the agent'}`)),
     threadsAll: () => api.call<Thread[]>('prThreads', { ws: w.id, all: true }),
     talk: () => api.call<Talk[]>('prTalk', { ws: w.id }),
+    say: body => api.call<{ url?: string }>('prSay', { ws: w.id, body }).then(r => toast(`Commented on PR #${w.pr?.number}`, r.url ? () => openExternal(r.url!) : undefined, 'Open', true)),
     blame: (path, side) => api.call<Blame>('blame', { ws: w.id, path, side }),
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
@@ -2248,7 +2305,8 @@ export function App() {
     // a folded sep takes the workspaces it hides along, up to the next sep
     const at = ids.indexOf(d.id)
     const next = ids.findIndex((x, i) => i > at && !!p.seps?.some(s => s.id === x))
-    const moved = moveId(ids, d, folded.includes(d.id) ? (next < 0 ? ids.length : next) - at : 1)
+    const many = d.kind === 'ws' && picked.length > 1 && picked.includes(d.id) ? ids.filter(x => picked.includes(x)) : [] // the picked ones of this project, as one
+    const moved = many.length > 1 ? moveIds(ids, many, d) : moveId(ids, d, folded.includes(d.id) ? (next < 0 ? ids.length : next) - at : 1)
     call('reorder', { workspaces: moved })
     // a workspace moved within a sorted group: its sort puts it back, so say why it didn't move
     const groupOf = (l: string[]) => l.slice(0, l.indexOf(d.id)).findLast(x => p.seps?.some(s => s.id === x)) ?? ''
@@ -2371,23 +2429,25 @@ export function App() {
 
   // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
   // of its group (last before the first one); no groups: nothing (they're made from the project's ⋯)
-  const groupItems = (w: WorkspaceView): MenuItem[] => {
-    const p = view?.projects.find(p => p.id === w.project)
-    if (!p?.seps?.length) return []
+  // Move to group: a workspace's, or several picked ones of one project (groupMoves: [] when they aren't)
+  const groupMoves = (ws_: WorkspaceView[]): MenuItem[] => {
+    const p = view?.projects.find(p => p.id === ws_[0]?.project)
+    if (!p?.seps?.length || ws_.some(w => w.project !== p.id)) return []
     const ids = rowsOf(p, view!.workspaces).map(x => x.id)
     const seps = p.seps ?? []
     const isSep = (x: string) => seps.some(s => s.id === x)
-    const inSep = ids.slice(0, ids.indexOf(w.id)).reverse().find(isSep)
+    const groupOf = (id: string) => ids.slice(0, ids.indexOf(id)).reverse().find(isSep)
+    const inSep = ws_.length === 1 ? groupOf(ws_[0].id) : undefined
     const to = (target: string, into: boolean) => {
-      call('reorder', { workspaces: moveId(ids, { kind: 'ws', id: w.id, target, after: into, into }) }).catch(() => {})
+      call('reorder', { workspaces: moveIds(ids, ws_.map(w => w.id), { kind: 'ws', id: ws_[0].id, target, after: into, into }) }).catch(() => {})
       if (into && folded.includes(target)) fold(target) // as a drop does: it opens, to show it there
     }
-    const items = [
+    return [
       ...seps.filter(s => s.id !== inSep).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', run: () => to(s.id, true) }) as MenuItem),
-      ...(inSep ? [{ label: 'Out of its group', icon: 'minus', run: () => to(ids.find(isSep)!, false) } as MenuItem] : []),
+      ...(ws_.some(w => groupOf(w.id)) ? [{ label: 'Out of its group', icon: 'minus', run: () => to(ids.find(isSep)!, false) } as MenuItem] : []),
     ]
-    return items.length ? [{ label: 'Move to group', icon: 'sep', key: 'g', items }] : []
   }
+  const groupItems = (w: WorkspaceView): MenuItem[] => (items => (items.length ? [{ label: 'Move to group', icon: 'sep', key: 'g', items }] : []))(groupMoves([w]))
   // Run workflow ›: the project's workflows and yours, a pick its Run sheet in this workspace (Workflows on; not a
   // terminal's, a browser's, a host's or an archived one)
   const flowsHere = (w: WorkspaceView) => flowItems.filter(f => f.source === 'yours' || f.project === w.project)
@@ -2590,11 +2650,34 @@ export function App() {
   useEffect(() => {
     if (view && onboardDone.size > onboard.done.length) setOnboard(o => ({ ...o, done: [...onboardDone] })) // kept: a project removed later doesn't undo it
   }, [onboardKey])
+  // what Get started ticks (a project there, a workspace, Settings seen) its achievement has too, quietly (no toast: it
+  // was done before): the two lists agree
   useEffect(() => {
-    if (!view || onboard.seen || dialog) return // a link's page first: it comes as that closes
+    const a = achRef.current
+    if (!view || a.off) return
+    const ids = [...onboardDone].filter(id => !a.got?.[id] && !a.hidden?.includes(id) && ACHIEVEMENTS.some(x => x.id === id && x.group === 'Getting started')) // the same step in both: a project, a workspace, Settings
+    if (ids.length) achSet({ got: { ...a.got, ...Object.fromEntries(ids.map(id => [id, Date.now()])) } }).catch(() => {})
+  }, [onboardKey, !!view])
+  const hasProject = onboardDone.has('project')
+  // ⌘F: a diff's find bar (Diff.tsx DiffFind) when the pointer was last in one (Changes, the full review), or the full
+  // review covers the terminals; else the terminal's
+  const lastDown = useRef<Element | null>(null)
+  useEffect(() => {
+    const f = (e: PointerEvent) => void (lastDown.current = e.target as Element)
+    window.addEventListener('pointerdown', f, true)
+    return () => window.removeEventListener('pointerdown', f, true)
+  }, [])
+  const findIn = () => {
+    const last = lastDown.current?.closest?.<HTMLElement>('[data-find]')
+    const host = last?.isConnected && last.offsetParent ? last : reviewOn ? document.querySelector<HTMLElement>('.full-review[data-find]') : null
+    host?.dispatchEvent(new Event('laki-find'))
+    return !!host
+  }
+  useEffect(() => {
+    if (!view || onboard.seen || dialog || !hasProject) return // a link's page first: it comes as that closes; Welcome (its git, gh and agent checks) before any project
     setOnboard(o => ({ ...o, seen: true }))
-    setDialog('onboard') // once, as it opens: everyone, this update's users too
-  }, [!!view, !dialog])
+    setDialog('onboard') // once, after the first project: everyone, this update's users too
+  }, [!!view, !dialog, hasProject])
   // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on). Once the first view
   // is in (the socket is open: Workflows are on before the settings come), and quietly: a list in the background
   const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
@@ -2662,7 +2745,7 @@ export function App() {
       info: () => showInfo(),
       palette: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       files: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
-      find: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
+      find: () => dialog || findIn() || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog; a diff's own (findIn) first
       next: nextNeed,
       later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
       artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
@@ -2842,7 +2925,7 @@ export function App() {
     if (settings.desk !== false) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
     if (settings.notes !== false) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
     if (settings.todoList !== false) a({ label: 'To-dos: your checklist', icon: 'listChecks', run: () => setDialog('todos') })
-    if (aiOn(settings)) a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
+    if (aiOn(settings)) a({ label: 'Laki AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
@@ -2976,7 +3059,7 @@ export function App() {
     return (
       <div
         key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
@@ -2985,7 +3068,7 @@ export function App() {
         onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
         onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
         onPointerLeave={() => peekAt()}
-        onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
+        onClick={e => ((e.metaKey || e.shiftKey) && !narrow && pickable(w) ? pickRow(w, e) : (setWsId(w.id), (!pin && !find && rows.dragged()) || (setPicked([]), setDialog(null)), narrow && setSideOpen(false))) /* ⌘ and ⇧: picked; a page over the main area (Settings, the new-workspace page…) gives way to it, and the picks go, not at a drag's end */}
         onContextMenu={e => openMenu(e, wsMenu(w))}
         {...dropProps(w)}
       >
@@ -3500,7 +3583,7 @@ export function App() {
     { key: 'board', icon: 'board', label: 'Board', on: dialog === 'board', tip: BOARD_TIP, run: toBoard },
     { key: 'schedules', icon: 'clock', label: 'Schedule', on: schedulesFor !== undefined, tip: `${schedTip}${runFailed ? ' · a run failed' : ''}`, run: toSchedules, mark: runFailed && <span className="rail-dot bad" /> },
     ...(specsOn ? [{ key: 'specs', icon: 'spec' as const, label: 'Specs', on: !!specsOf(dialog), tip: SPECS_TIP, run: toSpecs }] : []),
-    ...(flowsOn ? [{ key: 'workflows', icon: 'flow' as const, label: 'Flows', on: !!flowsOf(dialog), tip: FLOWS_TIP, run: toFlows, n: flowsAsk }] : []),
+    ...(flowsOn ? [{ key: 'workflows', icon: 'flow' as const, label: 'Workflows', on: !!flowsOf(dialog), tip: FLOWS_TIP, run: toFlows, n: flowsAsk }] : []),
     ...(deskOn ? [{ key: 'desk', icon: 'desk' as const, label: 'My Desk', on: dialog === 'desk', tip: 'My Desk: your extensions as tiles', run: toDesk }] : []),
     ...(notesOn ? [{ key: 'notes', icon: 'note' as const, label: 'Notes', on: !!notesOf(dialog), tip: 'Notes: yours, for any project', run: toNotes }] : []),
     ...(todosOn ? [{ key: 'todos', icon: 'listChecks' as const, label: 'To-dos', on: dialog === 'todos', tip: 'To-dos: your checklist', run: toTodos }] : []),
@@ -3587,6 +3670,17 @@ export function App() {
                 </button>
               ))}
             </span>
+          </div>
+        )}
+        {picked.length > 0 && (
+          <div className="pick-bar" role="toolbar" aria-label={`${picked.length} picked`}>
+            <b>{picked.length} picked</b>
+            <span className="grow" />
+            <IconButton icon="archive" title="Archive them" onClick={pickedArchive} />
+            <IconButton icon="bellOff" title="Mute or unmute them" onClick={pickedMute} />
+            <IconButton icon="sep" title="Move to group" onClick={e => (items => (items.length ? openMenu(e, items) : toast('Pick workspaces of one project with groups to move them')))(groupMoves(pickedWs()))} />
+            <IconButton icon="trash" title="Delete them…" onClick={pickedRm} />
+            <IconButton icon="x" title="Clear (Esc)" onClick={() => setPicked([])} />
           </div>
         )}
         <div className="side-scroll">
@@ -3696,7 +3790,7 @@ export function App() {
               <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={labels ? 'Schedule' : undefined} onClick={toSchedules} />
               <IconButton icon="board" title={BOARD_TIP} label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
               {specsOn && <IconButton icon="spec" title={SPECS_TIP} label={labels ? 'Specs' : undefined} on={!!specsOf(dialog)} onClick={toSpecs} />}
-              {flowsOn && <IconButton icon="flow" title={FLOWS_TIP} label={labels ? 'Flows' : undefined} on={!!flowsOf(dialog)} className={flowsAsk ? 'dot' : ''} onClick={toFlows} />}
+              {flowsOn && <IconButton icon="flow" title={FLOWS_TIP} label={labels ? 'Workflows' : undefined} on={!!flowsOf(dialog)} className={flowsAsk ? 'dot' : ''} onClick={toFlows} />}
               {aiOn(settings) && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
             </>
           )}
@@ -4051,14 +4145,14 @@ export function App() {
         {(o =>
           o &&
           notesOn && (
-            <Suspense fallback={<Waiting title="Notes" onClose={() => setDialog(null)} />}>
+            <Lazy title="Notes" onClose={() => setDialog(null)}>
               <NotesPage id={o.note} api={{ call: (m, p) => api.call(m, p) }} onOpen={note => setDialog({ note })} onClose={() => setDialog(null)} />
-            </Suspense>
+            </Lazy>
           ))(notesOf(dialog))}
         {dialog === 'todos' && todosOn && (
-          <Suspense fallback={<Waiting title="To-dos" onClose={() => setDialog(null)} />}>
+          <Lazy title="To-dos" onClose={() => setDialog(null)}>
             <TodoListPage api={{ call: (m, p) => api.call(m, p) }} onClose={() => setDialog(null)} />
-          </Suspense>
+          </Lazy>
         )}
         {dialog === 'calendar' && calOn && (
           <CalendarPage
@@ -4116,7 +4210,7 @@ export function App() {
         {(o =>
           o &&
           specsOn && (
-            <Suspense fallback={<Waiting title="Specs & Brainstorms" onClose={() => setDialog(null)} />}>
+            <Lazy title="Specs & Brainstorms" onClose={() => setDialog(null)}>
               <SpecsPage
                 key={`${o.specs}/${o.kind}/${o.slug}`}
                 projects={view.projects.filter(p => !p.kind)}
@@ -4136,12 +4230,12 @@ export function App() {
                   ...(rail && { pinned: r => (settings.railPlans ?? []).some(x => samePlan(x, r)), pin: pinPlan }),
                 }}
               />
-            </Suspense>
+            </Lazy>
           ))(specsOf(dialog))}
         {(o =>
           o &&
           flowsOn && (
-            <Suspense fallback={<Waiting title="Workflows" onClose={() => setDialog(null)} />}>
+            <Lazy title="Workflows" onClose={() => setDialog(null)}>
               <WorkflowsPage
                 key={o.run ?? (o.start ? JSON.stringify(o.start) : o.wf ? JSON.stringify(o.wf) : '')}
                 view={view}
@@ -4165,7 +4259,7 @@ export function App() {
                   setGlobals: flowVars => call('settingsSet', { flowVars }),
                 }}
               />
-            </Suspense>
+            </Lazy>
           ))(flowsOf(dialog))}
         {dialog === 'bird' && settings.birdView !== false && (
           <BirdPage
@@ -4459,7 +4553,7 @@ export function App() {
             </button>
           )}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
-          {!achKept.off && (
+          {!achKept.off && achN > 0 /* none yet: no 0/54 from the first second (⌘K and Settings › Achievements open it) */ && (
             <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
               <Icon name="trophy" size={11} />
               {achN}/{achAll.length}

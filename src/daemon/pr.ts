@@ -887,6 +887,20 @@ export async function prThreads(ref: string, all = false) {
   }))
 }
 
+// prSay: a comment on the PR's conversation, as you (the full review's GitHub tab): gh pr comment by the PR's URL
+export async function prSay(o: { ws: string; body: string }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  const body = String(o.body ?? '')
+  if (!body.trim()) throw new Error('the comment is empty')
+  if (body.length > 65000) throw new Error("too long for a GitHub comment (65,000 characters at most)")
+  const { stdout } = await exec(ws, 'gh', ['pr', 'comment', pr.url, `--body=${body}`], { timeout: 20000 }).catch(e => {
+    throw new Error(`gh couldn't comment: ${String(e.stderr || e.stdout || '').trim().split('\n')[0] || 'it failed'}`)
+  })
+  return { url: /https:\/\/\S+/.exec(String(stdout))?.[0] }
+}
+
 const TALK_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
     comments(last: 100) { nodes { author { login } body createdAt url } }

@@ -1,6 +1,6 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 
@@ -243,6 +243,44 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
   )
 }
 
+// What a throw while drawing leaves (React unmounts everything under the nearest boundary): a page's (title, onClose)
+// keeps the rest of the window, the root's says so over it all; Reload (⌘R) loads the build again: a lazy page whose
+// code is gone (a newer build behind remote access) needs it
+export class Boundary extends Component<{ title?: string; onClose?: () => void; children: ReactNode }, { error?: Error }> {
+  state: { error?: Error } = {}
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  componentDidCatch(error: Error) {
+    console.error('Laki:', error)
+  }
+  render() {
+    const { error } = this.state
+    if (!error) return this.props.children
+    const body = (
+      <div className="boom">
+        <Icon name="alertCircle" size={22} />
+        <b>{this.props.title ? `${this.props.title} couldn't open` : 'Laki hit an error'}</b>
+        <span className="muted small">{error.message || String(error)}</span>
+        <span className="muted small">Your agents keep running. Reload (⌘R) draws the window again.</span>
+        <div className="row">
+          <button className="primary" onClick={() => location.reload()}>
+            Reload
+          </button>
+          {this.props.onClose && <button onClick={() => (this.setState({ error: undefined }), this.props.onClose!())}>Close</button>}
+        </div>
+      </div>
+    )
+    return this.props.onClose ? (
+      <Page title={this.props.title ?? 'Error'} onClose={this.props.onClose}>
+        {body}
+      </Page>
+    ) : (
+      <div className="boom-root">{body}</div>
+    )
+  }
+}
+
 // The daemon outlives the app, so after an update it can be an older one that lacks what this app asks of
 // it. The status bar says so; restarting it (a second click to confirm) ends the agents, which resume.
 export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
@@ -355,6 +393,13 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   return { start, at, dragged: () => dragged.current }
 }
 
+// several ids (the sidebar's picked ones, in their order) moved next to d.target as one block; onto one of them: as they were
+export const moveIds = (ids: string[], block: string[], d: RowDrop) => {
+  if (!block.length || block.includes(d.target)) return ids
+  const rest = ids.filter(x => !block.includes(x))
+  rest.splice(rest.indexOf(d.target) + (d.after ? 1 : 0), 0, ...ids.filter(x => block.includes(x)))
+  return rest
+}
 // ids with d.id, and the n - 1 after it (a folded sep's workspaces), moved next to d.target; onto itself: as they were
 export const moveId = (ids: string[], d: RowDrop, n = 1) => {
   const block = ids.slice(Math.max(0, ids.indexOf(d.id)), ids.indexOf(d.id) + n)

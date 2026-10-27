@@ -67,12 +67,12 @@ const FLOATER_STYLES: [FloaterStyle, string, string][] = [
 ]
 // the sidebar's rows (App.tsx wsRow, styles.css [data-style]): how much each says
 export const SIDE_STYLES: [SideStyle, string, string][] = [
-  ['compact', 'Compact', 'one short line: its state and name'],
-  ['default', 'Default', 'a line with its marks: PR, author, timers'],
-  ['extended', 'Extended', 'a second line: branch, what the agent is doing, the PR, the diff'],
-  ['words', 'Words', 'a second line that says what needs doing; one PR pill instead of the marks'],
-  ['cards', 'Cards', 'a card each, with the agent’s last answer'],
-  ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
+  ['compact', 'Compact', 'One short line: its state and name'],
+  ['default', 'Default', 'A line with its marks: PR, author, timers'],
+  ['extended', 'Extended', 'A second line: branch, what the agent is doing, the PR, the diff'],
+  ['words', 'Words', 'A second line that says what needs doing; one PR pill instead of the marks'],
+  ['cards', 'Cards', 'A card each, with the agent’s last answer'],
+  ['status', 'Status', 'An edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
 // Appearance's Icons: each pack drawn by these
 const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
@@ -504,7 +504,7 @@ export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s
   { key: 'board', label: 'Board', icon: 'board' },
   { key: 'schedules', label: 'Schedule', icon: 'clock' },
   { key: 'specs', label: 'Specs', icon: 'spec', when: s => specsOn(s) },
-  { key: 'workflows', label: 'Flows', icon: 'flow', when: s => flowsOn(s) },
+  { key: 'workflows', label: 'Workflows', icon: 'flow', when: s => flowsOn(s) },
   { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk !== false },
   { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes !== false },
   { key: 'todos', label: 'To-dos', icon: 'listChecks', when: s => s.todoList !== false },
@@ -1478,7 +1478,7 @@ export function SettingsPage(p: {
                   </>
                 ))(lookOf(s))}
               </Group>
-              <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
+              <Group title="Rail" hint="A column of buttons on the left: Projects, then the pages below in your order, each with what needs you there; the list beside it shows the one you pick">
                 <div className="setting-row rail-buttons">
                   <Says title="Its buttons" hint="Tick the ones to show and drag them into an order; the others go into ⋯ More. A right click on the rail does it too" />
                   <RailField s={s} set={set} />

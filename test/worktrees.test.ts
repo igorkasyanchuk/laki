@@ -140,7 +140,7 @@ test("noSetup: a worktree without its setup script, its agent at once, .worktree
   writeFileSync(join(rig.repo, '.env'), 'A=1\n')
   writeFileSync(join(rig.repo, '.worktreeinclude'), '/.env\n')
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  assert.equal((await rig.rpc('state')).projects[0].hasSetup, true) // the new-workspace page shows Skip the setup script
+  assert.equal((await rig.rpc('state')).projects[0].hasSetup, true) // the new-workspace page's where menu shows New worktree, no setup
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'go', noSetup: true })
   assert.equal(ws.noSetup, true)
   assert.equal(readFileSync(join(ws.path, '.env'), 'utf8'), 'A=1\n')

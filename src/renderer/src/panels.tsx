@@ -288,7 +288,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
   { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
   { id: 'widgets', title: 'Turn on an extension', hint: 'Small live pages in the sidebar or on the Desk: your PRs, your links, or one you make', go: 'Extensions' },
-  { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
+  { id: 'actions', title: 'Set up actions', hint: 'The Run menu: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
   { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: cloud workspaces in GitHub Codespaces', go: 'Experimental' },
@@ -512,7 +512,7 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (More's; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -851,7 +851,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     ])
   const whereMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'New worktree', icon: 'fork', sub: 'A git worktree of its own, off the base branch', hint: !p.local && !inCs ? ON : undefined, run: () => set({ local: false, codespace: undefined }) },
+      { label: 'New worktree', icon: 'fork', sub: 'A git worktree of its own, off the base branch', hint: !p.local && !inCs && !(canSkip && p.noSetup) ? ON : undefined, run: () => set({ local: false, codespace: undefined, noSetup: undefined }) },
+      ...(!plain && proj?.hasSetup ? [{ label: 'New worktree, no setup', icon: 'fork', sub: "Without the project's setup script: a quick look or experiment (the Run menu runs it later)", hint: canSkip && p.noSetup ? ON : undefined, run: () => set({ local: false, codespace: undefined, noSetup: true }) } as MenuItem] : []),
       { label: 'Local', icon: 'folder', sub: `In the repo itself, on ${current || 'the branch it’s on'}`, hint: p.local ? ON : undefined, run: () => set({ local: true, codespace: undefined }) },
       ...(view.settings.cloud === true && !proj?.host ? [{ label: 'In a codespace', icon: 'cloud', sub: 'A GitHub Codespace of its own, off the base branch (GitHub bills it)', hint: inCs ? ON : undefined, run: () => set({ local: false, codespace: p.codespace ?? '' }) } as MenuItem] : []),
     ])
@@ -920,7 +921,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       {fan && !busy && <span className="nw-send-n">{fan.length}</span>}
     </button>
   )
-  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`, canSkip && p.noSetup && 'no setup'].filter(Boolean).join(' · ')
+  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`].filter(Boolean).join(' · ')
   const toggle = () => setAdv(o => !o)
   // its colors: the project's (its own, else the accent) on its pick, the prompt's edge and the send; the agent's on its
   // pick (a claude orange, a codex teal: the tabs'); a heading in both
@@ -961,7 +962,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           ) : (
             <>
               <button type="button" className="nw-pick" aria-haspopup="menu" data-tip={view.settings.cloud === true ? 'A worktree of its own, the repo itself, or a codespace' : 'A worktree of its own, or the repo itself'} onClick={whereMenu}>
-                <span>{p.local ? 'Local' : inCs ? 'In a codespace' : 'New worktree'}</span>
+                <span>{p.local ? 'Local' : inCs ? 'In a codespace' : canSkip && p.noSetup ? 'New worktree, no setup' : 'New worktree'}</span>
                 <Icon name="chevron" size={11} />
               </button>
               {p.local ? (
@@ -997,8 +998,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               <input className="nw-chip-input" value={p.name ?? ''} placeholder={prompting && p.prompt?.trim() ? 'name: from the prompt' : 'name'} aria-label="Name" spellCheck={false} onChange={e => set({ name: e.target.value })} />
             </label>
           )}
-          {(modelRow || canRace || canSkip) && (
-            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race; the setup script" onClick={toggle}>
+          {(modelRow || canRace) && (
+            <button type="button" className={`nw-pick ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race" onClick={toggle}>
               <span>More{more && <span className="muted"> · {more}</span>}</span>
               <Icon name={adv ? 'chevronUp' : 'chevron'} size={11} />
             </button>
@@ -1045,7 +1046,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           )}
         </div>
         {tpl && prompting && <div className="template-preview muted small">{filled || ' '}</div>}
-        {adv && (modelRow || canRace || canSkip) && (
+        {adv && (modelRow || canRace) && (
           <div className="nw-card nw-more">
             {modelRow && (
               <label className="nw-line">
@@ -1069,15 +1070,6 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                   ))}
                 </div>
                 <span className="muted small">the same prompt to each, a worktree each; Compare keeps the best</span>
-              </div>
-            )}
-            {canSkip && (
-              <div className="nw-line">
-                <span>Setup</span>
-                <Switch on={!!p.noSetup} onChange={noSetup => set({ noSetup })}>
-                  Skip the setup script
-                </Switch>
-                <span className="muted small">the files .worktreeinclude names are still copied; Run ▾ runs it later</span>
               </div>
             )}
           </div>

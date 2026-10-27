@@ -247,6 +247,9 @@ selected workspace's PR is in the status bar.
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message
   says so, with Undo), and a workspace with no agent running starts one with them. Hold ⌥ as you drop to add a line
   first. Terminals', Browsers' and archived rows take none.
+- ⌘-click picks a workspace, ⇧-click every one between it and the last picked: a bar over the list then archives them
+  (the ones with uncommitted changes asked once; Undo brings them all back), mutes them, moves them to a group or
+  deletes them (asked first), and dragging one of them moves them all. Esc or a plain click lets them go.
 - A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
   a guide line beside them; none by default).
 - *Diff size in the sidebar* (Settings › Appearance › Sidebar, off by default) puts each workspace's diff size on its row
@@ -416,7 +419,7 @@ selected workspace's PR is in the status bar.
   <folder>/* for each folder above the file, *Open in* and *Copy path*, *Show the file*, *Open in the editor*. With a
   PR, the comments have three tabs: *Yours*, *PR* (its title, author, branches and description) and *GitHub*: everyone's review threads (not only those an agent gets),
   open ones first, resolved folded, a click goes to the line; then the PR's conversation and each review's summary
-  (approved, changes requested). Click a line to comment on it, or drag over lines for a range; *Add to the review*
+  (approved, changes requested), with a box under it whose *Comment* (⌘⏎) replies there, as you. Click a line to comment on it, or drag over lines for a range; *Add to the review*
   (⌘⏎) puts it in *Yours*, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*.
   *Send to <agent>* gives them all to the workspace's agent as one message when its turn ends (▾: another agent);
   *Post on #n* posts them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing
@@ -449,7 +452,8 @@ selected workspace's PR is in the status bar.
 **Menus:** every item has a key, shown on its right: press it while the menu is open (e.g. right click a
 workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 pick a color (brown and gray by a click).
 
-**Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow.
+**Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow. In Changes or the Review
+tab (the last place you clicked), ⌘F finds words in the diff's lines instead: ⏎ next, ⇧⏎ previous, Esc closes.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
@@ -612,7 +616,8 @@ workspaces, ships or merges, and it does nothing until you ask. With the claude 
 use on its own (reading a file outside its folder), it asks in the chat while it works: *Allow once*, *Always in this
 chat* (that tool, until *New chat*) or *Deny*; no answer in about 5 minutes is a no. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
-over. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
+over. What you send while it answers waits over the box (✕ takes one back) and goes as one message once the answer
+ends. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
 goes on), the trash deletes it. A workspace or tab it names is a link: a click
 opens it in Laki (from the bubbles' window too); a tool line's *Open* goes to the workspace it worked on. The *Calls* tab
 lists every ask with its backend and model, tokens in and out, cost and time; *Info* says how it runs and how it's paid
@@ -849,11 +854,11 @@ It starts from your last choices (project, its group, agent, model, effort, perm
 never the last prompt.
 - The row over the prompt, as words with a ⌄ (a hover shows they're menus): the project and its group in one menu (with
   a filter past six projects; a group puts it first in that group; the project alone, first in the project), *New
-  worktree* or *Local* (in the repo itself, on its current branch), the base branch (the repo's main one; its ⌄ lists
-  every branch, with a filter), the name (from the prompt when blank) and *More*: *Race*, a box for a model typed by
-  hand (like a full name) once you pick *Another model…*, and, for a project with a setup script, *Skip the setup
-  script* (off each time: the files `.worktreeinclude` names are still copied, the agent starts at once; Run ▾'s *Run
-  the setup script* runs it later). At its right end: *Template* and the agent (a preset, *Shell*,
+  worktree*, *Local* (in the repo itself, on its current branch) or, for a project with a setup script, *New worktree,
+  no setup* (for a quick look or experiment: the files `.worktreeinclude` names are still copied, the agent starts at
+  once; Run ▾'s *Run the setup script* runs it later; never remembered), the base branch (the repo's main one; its ⌄
+  lists every branch, with a filter), the name (from the prompt when blank) and *More*: *Race* and a box for a model
+  typed by hand (like a full name) once you pick *Another model…*. At its right end: *Template* and the agent (a preset, *Shell*,
   *Custom command…* or *No agent*); the agent menu marks your default and, for another agent, offers *Make … the
   default for new workspaces*.
 - The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
@@ -1573,7 +1578,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘D | changes (the side panel) |
 | ⌥⌘B | side panel: info, files, changes, review, preview |
 | ⌘I | workspace info (the side panel on *Info*) |
-| ⌘F | find in the terminal |
+| ⌘F | find in the terminal, or in the diff (Changes, the Review tab) |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
 | ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's. A link behind words (Claude Code's) opens on ⌘-click only; hovering shows where any link goes |

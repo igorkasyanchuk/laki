@@ -176,7 +176,12 @@ group's default agent, kept by `projectSet`; MCP's state's `groupAgents`), `tabN
 the new shell starts in its folder, core's `shellCwd`), Laki AI's `profile` act (`laki_profiles`), `prTalk` refused from an agent; 119: a widget's `icons` (icons.ts `iconTurns`: settings' `iconPack`, `iconWidth`,
 `iconSize` drawn by the daemon's kit too); 120: `scriptLogs` (development mode's setup and teardown runs, core.ts
 `scriptLog`: `<data>/script-logs/<ws>.jsonl`, the newest `SCRIPT_LOGS` 30 workspaces', kept after a delete;
-Settings › General › Development's *Setup & teardown*, panels.tsx `ScriptLogs`). A
+Settings › General › Development's *Setup & teardown*, panels.tsx `ScriptLogs`); 121: `prSay` (`ws`, `body`: `gh pr comment
+<url> --body=` as you, the full review's GitHub tab's *Comment*; an agent's refused, `AGENT_NO`), `aiAsk` `queue` (while
+the chat works: kept in `Thread.queue`, `QUEUE_MAX` 10, the view's and the `ai` event's `queue`; as the answer ends, any
+end, all of it one ask; refused before it asks: said in the chat, not lost) and `aiUnqueue` (`i`), `aiAsk` in `FROM` (an
+agent's in a `widget:` chat refused: `agentNo`), `widgetWrite` `chat` (aiRpc's: a write that changes what an extension
+runs keeps it on, and its `net`, only from `widget:<its id>`, the page chat; any other Laki AI chat turns it off). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -280,7 +285,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is
   skipped; failures go to `daemon.log`, never fail the workspace;
-- `wsNew` `noSetup` (a worktree; the new-workspace page's More › *Skip the setup script*, shown for the project view's
+- `wsNew` `noSetup` (a worktree; the new-workspace page's where menu › *New worktree, no setup*, shown for the project view's
   `hasSetup`: `projectConfig`'s setup; off each time, never in `LastNew` or a draft; `laki new --no-setup`, MCP's
   `no_setup`; a race's and a PR's too): no `runSetup`, so no marker (`settingUp` false: agents start at once),
   `copyIncludes` still, the creation log's `setup: skipped`; untrusted, `setupWait` as before (`projectTrust` copies
@@ -331,7 +336,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
   never `on: true`, `net: true`, `source`, `ai`, a secret setting or one a source or an AI action's prompt reads (`steering`: its `{{config.x}}`); a place it doesn't know is refused), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on; Widgets.tsx' `act` likewise
 refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
-  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (`agent`: any writer but Laki AI, whose `aiRpc` says `by: 'ai'`: an agent's tab, main.ts' `FROM`, or an MCP client outside Laki; only while `widgetTrust.ts` `runsOf` is the same: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (Laki AI from its own page's chat, `page`: `aiRpc`'s `by: 'ai'` and `chat` `widget:<id>`, whatever changed; any other writer, `agent` (an agent's tab, main.ts' `FROM`, or an MCP client outside Laki) or Laki AI in another chat, only while `widgetTrust.ts` `runsOf` is the same, else off and its `net` dropped: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on; `from` an agent: off, nothing run, a `note`),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
@@ -2037,7 +2042,10 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
       `SETTINGS_KEPT`.
     - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
-      `seen` (it opened once by itself), `off` (Don't show again: no `OnboardBar` at the sidebar's foot either).
+      `seen` (it opened once by itself, after the first project: Welcome's checks come first), `off` (Don't show again:
+      no `OnboardBar` at the sidebar's foot either). What it ticks that Achievements' Getting started has too (a project,
+      a workspace, Settings) is earned there quietly (no toast), so the two agree; the status bar's trophy shows from
+      the first unlock.
     - `laki.newWs`: the new-workspace page's last choices (`LastNew`: project, preset, cmd, local, model, effort,
       base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); its More starts closed.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
@@ -2074,6 +2082,10 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     the row's PR mark and in the PR section, unless it's `mine`; `settings.avatars === false` (Settings › Appearance's
     *GitHub pictures*, `showAvatars`): none loaded.
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
+  - Picked rows (`picked`, ⌘-click and ⇧-click, `pickRow`, `anchor`; `pickable`: a project's live workspaces, not
+    terminals' or browsers'; not on a phone): `.ws.ws-picked`, `.pick-bar` over the list (Archive: `wsArchive` `ifClean`
+    each, the dirty ones asked once, Undo restores all; Mute; Move to group, `pickedGroups`, when they share a project
+    with groups; Delete, asked once), a drag of a picked row moves them all (`moveIds`); Esc or a plain click clears.
   - Back and forward (`settings.history`, on unless false; Settings › Appearance › Rail): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
     back) gets each new place (`isPlace`: a page, `PAGES`/`PAGE_KEYS`, or none; a dialog over them isn't one), what was
     ahead dropped (Workflows' index, a workflow and a run are places too: its dialog's `nav`, `WorkflowsPage` `onNav`); `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
@@ -2225,7 +2237,15 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   `shot`: added as a pasted image (`add`), then the mic on (cloud's `voiceStart`, else macOS dictation) as the window gets
   the focus (5 s at most).
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
-  terminal's `minimumContrastRatio` keeps their text readable.
+  terminal's `minimumContrastRatio` keeps their text readable. In a diff (Changes' `sp-body`, the full review's
+  `.full-review`, each `data-find`), Diff.tsx' `DiffFind` instead: App's `findIn` sends `laki-find` to the `[data-find]`
+  the pointer went down in last (`lastDown`), or the full review while it's shown; the lines' text found by a
+  TreeWalker (not `.dl-n` or `.dl-blame`), marked by the CSS Custom Highlight API (`laki-find`, `laki-find-on`),
+  found again as the diff changes (a MutationObserver); a folded file's lines aren't drawn, so aren't found.
+- **Errors** (ui.tsx `Boundary`): main.tsx wraps every window's root and App's `Lazy` each lazy page (`Waiting` its
+  Suspense fallback): a throw while drawing, or a page's code gone (remote access after an update), says so with
+  *Reload* (and *Close* for a page) instead of a blank window. Main's `render-process-gone` reloads the window, at most
+  once a minute.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
   Go used; `default` leaves the
   stylesheet's), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a

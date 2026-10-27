@@ -246,6 +246,15 @@ function create() {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', e => e.preventDefault())
+  // its renderer crashed or was killed (not a quit): loaded again, at most once a minute (a page that dies as it loads
+  // isn't reloaded for good; View › Reload is still there)
+  let gone = 0
+  win.webContents.on('render-process-gone', (_, d) => {
+    console.error(`laki: the window's renderer is gone (${d.reason}, ${d.exitCode})`)
+    if (quitting || d.reason === 'clean-exit' || !win || win.isDestroyed() || Date.now() - gone < 60_000) return
+    gone = Date.now()
+    win?.webContents.reload()
+  })
   // closing hides: the renderer keeps posting notifications for agents while the app runs windowless
   win.on('close', e => {
     saveWin() // a move just before quitting isn't lost to the timer

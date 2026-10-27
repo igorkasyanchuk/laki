@@ -5,7 +5,7 @@
 // only as it opens (App's lazy import), BlockNote with it. App.tsx passes a TodoListApi.
 import { useEffect, useRef, useState } from 'react'
 import { SpecEditor } from './SpecEditor'
-import { Page } from './ui'
+import { Icon, Page } from './ui'
 
 export type TodoListApi = { call<T = any>(method: string, params?: object): Promise<T> }
 type List = { blocks: unknown[]; md: string; at: number }
@@ -35,11 +35,22 @@ export default function TodoListPage({ api, onClose }: { api: TodoListApi; onClo
     <Page title="To-dos" esc={false} /* a page to stay on, as the rail's others: Esc is the editor's */ onClose={onClose} tools={all > 0 && <span className="muted small">{done} of {all} done</span>}>
       <div className="todo-list">
         {err && <p className="warn small">{err}</p>}
+        {list && !md.replace(/^\s*- \[[ x]\]\s*$/gm, '').trim() /* nothing written yet (an empty to-do aside) */ && (
+          <div className="note-empty todo-empty">
+            <Icon name="listChecks" size={28} />
+            <b>Your to-dos</b>
+            <p className="muted small">One checklist of your own, for any project. Enter makes the next to-do, Tab puts one under the one above, # a heading; a tick keeps it until you delete it.</p>
+            <button type="button" className="primary" onClick={() => document.querySelector<HTMLElement>('.todo-list [contenteditable="true"]')?.focus()}>
+              <Icon name="plus" size={12} /> Write the first one
+            </button>
+          </div>
+        )}
         {!list ? (
           !err && <p className="muted small">Loading…</p>
         ) : (
           <SpecEditor
             initial={{ blocks: list.blocks.length ? list.blocks : FIRST }}
+            placeholders={{ checkListItem: 'A to-do', default: "A to-do, or type '/' for a heading, a list…" }}
             files={{ upload: () => Promise.reject(new Error('to-dos keep text: put files in a note')), resolve: p => Promise.resolve(p) }}
             onChange={(blocks, text) => {
               pending.current = { blocks, md: text }

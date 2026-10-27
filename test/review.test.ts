@@ -96,4 +96,12 @@ test("everyone's comments for the full review: prThreads all keeps them, the age
     { author: 'ann', body: '', at: '2026-10-06T11:00:00Z', url: 'https://example.invalid/r1', state: 'APPROVED' },
     { author: 'passerby', body: 'nice one', at: '2026-10-06T12:00:00Z', url: 'https://example.invalid/c1' },
   ])
+  // a reply on the conversation (the GitHub tab's box), as you: gh pr comment by the PR's URL; never an agent's
+  assert.deepEqual(await rig.rpc('prSay', { ws: ws.id, body: '-- thanks, fixed' }), { url: 'https://example.invalid/pr/7#issuecomment-1' })
+  await assert.rejects(rig.rpc('prSay', { ws: ws.id, body: '  ' }), /the comment is empty/)
+  const agent = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'two' })
+  const from = { tab: (await until(() => rig.tab(agent.id))).id, ws: agent.id }
+  await assert.rejects(rig.rpc('prSay', { ws: ws.id, body: 'hi', from }), /an agent can't comment on a PR as you/)
+  writeFileSync(join(gh, 'refuse'), 'GraphQL: Resource not accessible by integration')
+  await assert.rejects(rig.rpc('prSay', { ws: ws.id, body: 'hi' }), /gh couldn't comment: GraphQL: Resource not accessible/)
 })

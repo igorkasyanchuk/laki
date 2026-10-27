@@ -105,6 +105,7 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
+      "minimumSystemVersion": "13.0",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice).",
         "ElectronSquirrelPreventDowngrades": true

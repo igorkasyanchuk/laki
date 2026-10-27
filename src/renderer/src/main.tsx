@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { AiWindow, NewWindow, SimWindow, TabWindow } from './NewWindow'
+import { Boundary } from './ui'
 import './styles.css'
 import './look.css'
 
@@ -18,5 +19,5 @@ Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter'
   .finally(() => {
     const w = new URLSearchParams(location.search).get('window') // main's new-workspace, AI and floating tab windows: the page alone
     if (w === 'new' || w === 'ai') document.title = w === 'new' ? 'New workspace — Laki' : 'Laki AI' // the window's title: a screen share's picker, the Window menu
-    createRoot(document.getElementById('root')!).render(w === 'new' ? <NewWindow /> : w === 'ai' ? <AiWindow /> : w === 'tab' ? <TabWindow /> : w === 'sim' ? <SimWindow /> : <App />)
+    createRoot(document.getElementById('root')!).render(<Boundary>{w === 'new' ? <NewWindow /> : w === 'ai' ? <AiWindow /> : w === 'tab' ? <TabWindow /> : w === 'sim' ? <SimWindow /> : <App />}</Boundary>) // a throw while drawing: a message and Reload, not a black window
   })

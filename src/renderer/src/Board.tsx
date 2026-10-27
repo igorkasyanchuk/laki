@@ -162,10 +162,12 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                     </div>
                     {last && <div className="board-last">{last}</div>}
                     {w.pr && (
-                      <div className={`ws-pr board-pr ${prState(w.pr)}`}>
-                        <Icon name="github" size={11} /> #{w.pr.number}
-                        {w.pr.checks ? <> · <CiMark pr={w.pr} /></> : ''}
-                        {w.pr.conflict && w.pr.state === 'OPEN' ? ' · conflicts' : ''}
+                      <div className="board-pr">
+                        <span className={`ws-pr ${prState(w.pr)}`}>
+                          <Icon name="github" size={11} /> #{w.pr.number}
+                        </span>
+                        {w.pr.checks ? <> · <span className={`ci-${w.pr.checks}`}><CiMark pr={w.pr} /></span></> : ''}
+                        {w.pr.conflict && w.pr.state === 'OPEN' ? <> · <span className="ci-fail">conflicts</span></> : ''}
                       </div>
                     )}
                   </div>

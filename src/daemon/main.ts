@@ -9,7 +9,7 @@ import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, studioChatRm, studioChats, voiceText } from './ai.ts'
+import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
@@ -274,7 +274,8 @@ const api: Record<string, Handler> = {
   uiReset: () => core.uiReset(),
   portKill: p => core.portKill(p),
   meme: () => meme(),
-  aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
+  aiAsk: ({ from: _, ...p }) => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here; from: whoCalls'
+  aiUnqueue: p => aiUnqueue(p), // a message sent while it answered, taken back before it goes
   aiState: p => aiState(p), // chat: a spec's or brainstorm's (planChat), else the AI page's
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
   aiPermission: p => (p.ext ? widgetPermission(p) : aiPermission(p)), // laki mcp's laki_permission (claude -p's permission prompt): Allow / Deny in the chat (an extension's: the app's dialog), waited for
@@ -313,6 +314,7 @@ const api: Record<string, Handler> = {
   prLabel: p => core.prLabel(p),
   prThreads: p => core.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
   prTalk: p => core.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
+  prSay: p => core.prSay(p), // a comment on the PR's conversation, as you (the full review's GitHub tab)
   blame: p => core.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
   fileWeb: p => core.fileWeb(p), // a file's page on origin's site, at the base or the branch
   prDiff: p => core.prDiff(p.ws),
@@ -389,7 +391,7 @@ const api: Record<string, Handler> = {
   widgetReload: () => widgetReload(),
   widgetFiles: p => widgetFiles(p),
   widgetFileSave: p => widgetFileSave(p),
-  widgetWrite: ({ from, by, ...p }) => widgetWrite({ ...p, agent: by !== 'ai' || !!core.agentCaller(from) }), // Laki AI's (aiRpc's by) and MCP's: a new one saved off; agent: any other writer (an agent's tab, an MCP client outside Laki)
+  widgetWrite: ({ from, by, chat, ...p }) => widgetWrite({ ...p, agent: by !== 'ai' || !!core.agentCaller(from), page: by === 'ai' && chat === `widget:${p.id}` }), // Laki AI's (aiRpc's by and chat) and MCP's: a new one saved off; agent: any other writer (an agent's tab, an MCP client outside Laki); page: Laki AI in its page's chat, the user's
   widgetTick: p => widgetTick(p.now), // tests move the clock
   factsTick: () => factsTick(), // tests: workspace facts read now
   widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
@@ -470,7 +472,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -510,7 +512,7 @@ const notAgent = (p: any, what: string) => {
 // agent starts with (an agent adds learned ones through memoryAdd, never the user's: --mine); its notes, name, groups
 // and looks stay an agent's to change, and projectTrust's read (no hash). prThreads' all and prTalk: everyone's
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule)
-const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)" }
+const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)" }
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
@@ -519,6 +521,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
   else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)
   else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
+  else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }

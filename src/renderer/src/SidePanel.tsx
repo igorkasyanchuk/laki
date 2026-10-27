@@ -6,7 +6,7 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
-import { CommentBox, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
+import { CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -237,6 +237,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, all])
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
   const rv = useRevert(api, byFile, all, reload, `${ws}#${all}`)
+  const findAt = useRef<HTMLDivElement>(null) // ⌘F's bar and what it searches (Diff.tsx DiffFind)
   const [menu, openMenu] = useMenu()
   const fileMenu = (e: MouseEvent, path: string) => (m => m.length && openMenu(e, m))([...webItems(api, path, d?.base ?? '', undefined), ...(all ? [] : [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) } as MenuItem])])
   // a click (not a drag that selects text) on a line opens its comment box
@@ -292,7 +293,8 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
         {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title={viewed ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setOpen(new Set(files.filter(f => viewedOf(f.path) !== 'VIEWED').map(f => f.path)))} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
-      <div className="sp-body">
+      <div className="sp-body" ref={findAt} data-find>
+        <DiffFind at={findAt} />
         {err && <div className="warn small pad">{err}</div>}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
         {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}

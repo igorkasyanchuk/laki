@@ -6,3 +6,6 @@ dist/
 
 # signing and notarizing (scripts/release.sh): your own, never committed
 .env
+
+# your own tools' folders: never committed
+.artifacto/

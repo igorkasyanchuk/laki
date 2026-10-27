@@ -5,6 +5,7 @@
 import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems, insertOrUpdateBlockForSlashMenu } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/mantine/style.css'
+import { en } from '@blocknote/core/locales'
 import { createReactBlockSpec, getDefaultReactSlashMenuItems, SuggestionMenuController, useCreateBlockNote } from '@blocknote/react'
 import { type DragEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -131,9 +132,10 @@ const scheme = () => (getComputedStyle(document.documentElement).colorScheme.inc
 
 // initial: spec.json's blocks, or README.md's text (an agent's, or a new one's headings) parsed
 // onReady: what it holds as it opens (a title change saves it before any edit)
-export function SpecEditor({ initial, files, onReady, onChange }: { initial: { blocks?: unknown[]; markdown?: string }; files: SpecFiles; onReady?: (d: { blocks: unknown[]; markdown: string }) => void; onChange: (blocks: unknown[], markdown: string) => void }) {
+export function SpecEditor({ initial, files, onReady, onChange, placeholders }: { initial: { blocks?: unknown[]; markdown?: string }; files: SpecFiles; onReady?: (d: { blocks: unknown[]; markdown: string }) => void; onChange: (blocks: unknown[], markdown: string) => void; placeholders?: Record<string, string> }) {
   const editor = useCreateBlockNote({
     schema,
+    ...(placeholders && { dictionary: { ...en, placeholders: { ...en.placeholders, ...placeholders } } }), // an empty block's words (To-dos': not BlockNote's "List")
     initialContent: initial.blocks?.length ? (initial.blocks as never) : undefined,
     uploadFile: f => files.upload(f),
     // ponytail: only images show (planFile's data URL); a video, audio or other file block keeps its files/ path, opened

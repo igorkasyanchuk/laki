@@ -643,5 +643,6 @@ export async function extCall(rpc: Rpc, tool: string, input: unknown, from?: str
 // Laki AI's looks at what the user sees (a tab's screen, the agent browser): said as its own (by: 'ai'), so the app can
 // light what it looked at (Settings › AI › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']
-// chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once)
-export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) || method === 'widgetWrite' /* Laki AI's: one that's on stays on */ ? { ...params, by: 'ai' } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)
+// chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once);
+// a write names it too: one that's on stays on only from its own page's chat (widget:<id>, the user's), else off
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : method === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)

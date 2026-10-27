@@ -526,6 +526,7 @@ export function paletteGroups<T extends { label: string; hint?: string; kind?: P
   }
   const score = new Map<T, number>()
   const link = linkKey(q)
+  const name = q.trim().toLowerCase()
   for (const x of items) {
     if (link) {
       if (x.find?.some(u => linkKey(u) === link)) score.set(x, 1)
@@ -534,11 +535,12 @@ export function paletteGroups<T extends { label: string; hint?: string; kind?: P
     const all = `${x.label} ${x.hint ?? ''}`
     const s = fuzzy(q, all) && fuzzy(q, x.label) + 0.5 * fuzzy(q, all)
     const r = recent.indexOf(x.label)
-    if (s > 0) score.set(x, s + (r < 0 ? 0 : PAL_RECENT - r) * 0.1) // a recent one wins a close call, not a much better match
+    const named = x.label.split(': ')[0].toLowerCase() === name // its name as typed: Board, not onboarding-screens
+    if (s > 0) score.set(x, s + (r < 0 ? 0 : PAL_RECENT - r) * 0.1 + (named ? 100 : 0)) // a recent one wins a close call, not a much better match
   }
   const hits = [...score.keys()].sort((a, b) => score.get(b)! - score.get(a)!)
-  const rest = (['ws', 'tab', 'action'] as const).map(k => of(k, hits)).filter(g => g.items.length).sort((a, b) => score.get(b.items[0])! - score.get(a.items[0])!)
-  return [of('for', hits), of('needs', hits), ...rest].filter(g => g.items.length)
+  // the best match's group first (Enter picks it); the suggestions ahead of an equal one
+  return (['for', 'needs', 'ws', 'tab', 'action'] as const).map(k => of(k, hits)).filter(g => g.items.length).sort((a, b) => score.get(b.items[0])! - score.get(a.items[0])!)
 }
 
 // q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and

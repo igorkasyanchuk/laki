@@ -1,7 +1,7 @@
 // A diff's pieces that the side panel's Changes and Review and the full review (FullReview.tsx) share: the diff read
 // into each file's lines, a file's lines drawn in one column or two, a line's comment box, an image's before and
 // after, Revert's picked lines, GitHub's Viewed boxes, and review threads with their suggestions.
-import { Fragment, useEffect, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
@@ -577,6 +577,102 @@ function Suggested({ t, lines, text, pending = [], busy, onApply }: { t: Thread;
       )}
       {state === 'applied' && <span className="muted small">Applied: it goes in with your next commit</span>}
       {state === 'changed' && <span className="muted small">Changed since the review: these lines aren't what it saw</span>}
+    </div>
+  )
+}
+
+// ⌘F in a diff (Changes, the full review): App sends 'laki-find' to the [data-find] the pointer was in last (the full
+// review's when it's shown). Its words found in the lines' text (not their numbers or buttons), marked with the CSS
+// Custom Highlight API: nothing in the diff is redrawn. ⏎ next, ⇧⏎ previous, Esc closes; found again as files open and
+// close. ponytail: a folded file's lines aren't drawn, so they aren't found; a match within one line's text only
+const FIND_MAX = 2000
+let finding: object | null = null // the bar whose marks the highlights are: the last to search (Changes' and the review's share them)
+export function DiffFind({ at, within = at }: { at: RefObject<HTMLElement | null>; within?: RefObject<HTMLElement | null> }) {
+  const [seq, setSeq] = useState(0) // 0: closed; each ⌘F: focused again
+  const [q, setQ] = useState('')
+  const [hit, setHit] = useState({ i: 0, n: 0 })
+  const inp = useRef<HTMLInputElement>(null)
+  const ranges = useRef<Range[]>([])
+  const cur = useRef(0)
+  const me = useRef({}).current
+  const unmark = () => finding === me && (CSS.highlights?.delete('laki-find'), CSS.highlights?.delete('laki-find-on'), (finding = null))
+  useEffect(() => {
+    const el = at.current
+    const f = () => setSeq(n => n + 1)
+    el?.addEventListener('laki-find', f)
+    return () => el?.removeEventListener('laki-find', f)
+  }, [])
+  useLayoutEffect(() => void (seq && (inp.current?.focus(), inp.current?.select())), [seq])
+  const show = (i: number, scroll = true) => {
+    const all = ranges.current
+    cur.current = all.length ? (i + all.length) % all.length : 0
+    setHit({ i: cur.current, n: all.length })
+    if (finding !== me) return
+    CSS.highlights?.delete('laki-find-on')
+    const r = all[cur.current]
+    if (!r) return
+    CSS.highlights?.set('laki-find-on', new Highlight(r))
+    if (scroll) r.startContainer.parentElement?.scrollIntoView({ block: 'center' })
+  }
+  const search = (scroll: boolean) => {
+    const el = within.current
+    const all: Range[] = []
+    const word = q.toLowerCase()
+    if (seq && word && el) {
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: t => (t.parentElement?.closest('.dl-n, .diff-find, button, input, textarea, .dl-blame') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) })
+      for (let t = walk.nextNode(); t && all.length < FIND_MAX; t = walk.nextNode()) {
+        const text = (t.textContent ?? '').toLowerCase()
+        for (let j = text.indexOf(word); j >= 0 && all.length < FIND_MAX; j = text.indexOf(word, j + word.length)) {
+          const r = new Range()
+          r.setStart(t, j)
+          r.setEnd(t, j + word.length)
+          all.push(r)
+        }
+      }
+    }
+    ranges.current = all
+    if (seq && word) finding = me
+    else unmark()
+    if (finding === me) CSS.highlights?.delete('laki-find'), all.length && CSS.highlights?.set('laki-find', new Highlight(...all))
+    show(Math.min(cur.current, Math.max(0, all.length - 1)), scroll)
+  }
+  useEffect(() => {
+    cur.current = 0
+    search(true)
+  }, [q, seq > 0])
+  // files opened, folded or read again: the same words found again, where it was
+  useEffect(() => {
+    const el = within.current
+    if (!seq || !q || !el) return
+    let t: ReturnType<typeof setTimeout>
+    const mine = (n: Node) => !!(n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement)?.closest('.diff-find-at') // the bar's own count: not the diff
+    const mo = new MutationObserver(m => m.some(x => !mine(x.target)) && (clearTimeout(t), (t = setTimeout(() => search(false), 250))))
+    mo.observe(el, { childList: true, subtree: true, characterData: true })
+    return () => (mo.disconnect(), clearTimeout(t))
+  }, [seq > 0, q])
+  useEffect(() => () => void unmark(), [])
+  if (!seq) return null
+  const close = () => (setSeq(0), setQ(''), unmark())
+  return (
+    <div className="diff-find-at">
+    <div className="find diff-find">
+      <input
+        ref={inp}
+        value={q}
+        placeholder="Find in the diff"
+        spellCheck={false}
+        aria-label="Find in the diff"
+        onChange={e => setQ(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') e.preventDefault(), show(cur.current + (e.shiftKey ? -1 : 1))
+          else if (e.key === 'Escape') e.preventDefault(), e.stopPropagation(), close()
+        }}
+      />
+      <span className="find-count">{!q ? '' : hit.n ? `${hit.i + 1}/${hit.n}${hit.n >= FIND_MAX ? '+' : ''}` : 'no results'}</span>
+      <button title="Previous (⇧⏎)" onClick={() => show(cur.current - 1)}>↑</button>
+      <button title="Next (⏎)" onClick={() => show(cur.current + 1)}>↓</button>
+      <button title="Close (esc)" onClick={close}>×</button>
+    </div>
     </div>
   )
 }

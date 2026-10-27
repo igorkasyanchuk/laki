@@ -73,7 +73,8 @@ export function UsageButton({ load, onUse, today }: { load: () => Promise<AgentU
   const used = rows.filter(r => r.default !== false) // the ring: each agent's default account (an older daemon's: its one)
   const tops = used.map(r => topOf(r, now))
   const known = tops.filter(p => p !== undefined)
-  const top = known.length ? Math.max(...known) : undefined
+  if (!known.length) return null // no agent has given a reading yet (a first run, signed out): no empty ring that looks like a spinner
+  const top = Math.max(...known)
   const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}`
   return (
     <>

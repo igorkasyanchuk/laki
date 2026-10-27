@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type PointerEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
-import { changeLine, CommentBox, CopyComment, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
+import { changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -30,6 +30,7 @@ export type ReviewApi = PanelApi & {
   post: (comments: Omit<ReviewNote, 'id' | 'quote'>[]) => Promise<unknown> // prReview
   threadsAll: () => Promise<Thread[]> // the PR's review threads with everyone's comments (prThreads all)
   talk: () => Promise<Talk[]> // prTalk
+  say: (body: string) => Promise<unknown> // prSay: a comment on the conversation, as you
   blame: (path: string, side: 'old' | 'new') => Promise<Blame>
 }
 
@@ -159,7 +160,16 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   const resolved = said.filter(t => t.resolved)
   const props = useSuggestions(api, open, ws, threads)
   const threadsAt = (path: string, l: DiffLine) => open.filter(t => t.path === path && t.line !== undefined && numOf(l, t.side ?? 'RIGHT') === t.line && (t.side === 'LEFT' ? l.new === undefined : l.new !== undefined))
-  const [talk, talkErr] = useLoad<Talk[] | null>(pr ? api.talk : () => Promise.resolve(null), `${ws}#${pr?.number ?? ''}`, 60000)
+  const [talk, talkErr, talkAgain] = useLoad<Talk[] | null>(pr ? api.talk : () => Promise.resolve(null), `${ws}#${pr?.number ?? ''}`, 60000)
+  const [reply, setReply] = useState(() => localStore(`laki.reviewReply.${ws}`) ?? '') // the conversation's box: kept as it's typed, until it's sent
+  const [replying, setReplying] = useState(false)
+  const keepReply = (t: string) => (setReply(t), localStore(`laki.reviewReply.${ws}`, t))
+  const sayIt = () => {
+    if (!reply.trim() || replying) return
+    setReplying(true)
+    const sent = reply
+    api.say(sent).then(() => (setReply(r => (r === sent ? (localStore(`laki.reviewReply.${ws}`, ''), '') : r)), talkAgain()), () => {}).finally(() => setReplying(false)) // what's typed meanwhile stays
+  }
   const ghN = live.length + (talk?.length ?? 0)
 
   // blame, a file at a time: the base's for its old lines, the worktree's for its new ones
@@ -408,7 +418,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   // an expanded line: its numbers (a thread's or a comment's jump), the file's right click; no comment or Revert
   const ctxAttrs = (path: string, l: DiffLine) => ({ 'data-old': l.old, 'data-new': l.new, onContextMenu: (e: MouseEvent) => fileMenu(e, path, l) }) as HTMLAttributes<HTMLDivElement>
   return (
-    <div className="full-review" ref={root} tabIndex={-1}>
+    <div className="full-review" ref={root} tabIndex={-1} data-find>
       <div className="fr-head">
         {pr && (
           <span className="seg">
@@ -483,6 +493,7 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
         </div>
         <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} />
         <div className="fr-diff" ref={body} onScroll={() => requestAnimationFrame(spy)}>
+          <DiffFind at={root} within={body} />
           {err && <div className="warn small pad">{err}</div>}
           {gh.err && <div className="warn small pad">{gh.err}</div>}
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
@@ -707,6 +718,14 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
                       {c.body.trim() && <Folded text={c.body} lines={10} html />}
                     </div>
                   ))}
+                  {talk && (
+                    <div className="fr-reply">
+                      <textarea value={reply} rows={3} placeholder={`Reply on PR #${pr!.number}, as you (Markdown)`} aria-label="Reply on the PR's conversation" onChange={e => keepReply(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), e.stopPropagation(), sayIt())} />
+                      <button type="button" className="primary" disabled={!reply.trim() || replying} data-tip="Posted on GitHub as you · ⌘⏎" onClick={sayIt}>
+                        {replying ? 'Posting…' : 'Comment'}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>

@@ -173,8 +173,12 @@ const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map
 
 // resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
-type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
+type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean; queue?: Queued[] } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
 const threads = new Map<string, Thread>()
+// what you send while it answers (aiAsk queue): kept in memory, all of it the next ask as the answer ends (any end, Stop
+// too); aiUnqueue drops one first. ponytail: a restart forgets them
+type Queued = { text: string; images: string[]; context?: string }
+const QUEUE_MAX = 10
 // the chats whose ask is at work, each its stop: one ask per chat, AI_AT_ONCE chats at a time (a new extension starts
 // while another builds); laki_ask's aiQuestion and aiPermission find theirs by the chat its tools pass (laki mcp's
 // LAKI_AI_CHAT, aiRpc's chat). A thread's asked: its ask's turn asked the user something, the pick comes as the next ask
@@ -207,8 +211,9 @@ function changed(t: Thread) {
   try {
     writeFileSync(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), { mode: 0o600 })
   } catch {}
-  broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended })
+  broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t) })
 }
+const queueOf = (t: Thread) => t.queue?.map(q => q.text || `(${q.images.length} image${q.images.length === 1 ? '' : 's'})`) ?? []
 const say = (t: Thread, role: AiMsg['role'], text: string, images?: string[]) => (t.chat.push({ role, text, at: (t.at = Date.now()), ...(images?.length && { images }) }), changed(t))
 const fresh = (t: Thread) => ((t.chat = []), (t.resume = {}), (t.ended = undefined), (t.at = Date.now()), (t.allowed = undefined))
 
@@ -351,7 +356,7 @@ export function aiForget(id: string) {
 export function aiState(p: { chat?: string } = {}) {
   const t = thread(p.chat)
   const calls = readCalls()
-  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
+  return { chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
 }
 
 // ---------- asking
@@ -363,13 +368,19 @@ type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortS
 // chat: a spec's or brainstorm's (planChat), else the AI page's; one that ended starts again, empty
 // context: where the user is as they ask (the floating chat's: the page, workspace and tab), for the model only: the
 // conversation keeps their words alone
-export async function aiAsk(p: { text?: string; images?: string[]; chat?: string; context?: string }, rpc: Rpc) {
+export async function aiAsk(p: { text?: string; images?: string[]; chat?: string; context?: string; queue?: boolean }, rpc: Rpc): Promise<{ text?: string; queued?: number }> {
   const s = state.settings?.ai ?? {}
   if (!aiOn(state.settings)) throw new Error('Laki AI is off: Settings › AI')
   const ask = (p.text ?? '').trim()
   const images = (p.images ?? []).filter(imageOk)
   if (!ask && !images.length) throw new Error('ask something')
   const t = thread(p.chat)
+  if (p.queue && busy.has(t.id)) {
+    if ((t.queue ??= []).length >= QUEUE_MAX) throw new Error(`${QUEUE_MAX} messages wait already: let it answer first`)
+    t.queue.push({ text: ask, images, context: typeof p.context === 'string' ? p.context : undefined })
+    changed(t)
+    return { queued: t.queue.length }
+  }
   refuseBusy(t)
   const backend: AiBackend = s.backend ?? 'openrouter'
   if (backend === 'openrouter' && !hasKey()) throw new Error('no OpenRouter API key: Settings › AI')
@@ -408,8 +419,21 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
     try {
       appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
     } catch {}
+    const next = t.queue?.splice(0) ?? []
     changed(t)
+    if (next.length) {
+      // what was sent meanwhile, all of it as one ask; refused before it asked (Laki AI off, too many chats at work): said, not lost
+      const text = next.map(q => q.text).filter(Boolean).join('\n\n')
+      setImmediate(() => aiAsk({ chat: p.chat, text, images: next.flatMap(q => q.images), context: next.findLast(q => q.context)?.context }, rpc).catch(e => t.chat.findLast(m => m.role === 'user')?.text === text || say(t, 'error', `Not sent (${(e as Error).message}): ${text}`)))
+    }
   }
+}
+// a message waiting for the answer to end, taken back (the composer's ✕)
+export function aiUnqueue(p: { chat?: string; i: number; text?: string }) {
+  const t = thread(p.chat)
+  if (!t.queue?.[p.i] || (p.text !== undefined && queueOf(t)[p.i] !== p.text)) throw new Error('that one went already, or the list changed: look again') // text: the one you saw there
+  t.queue.splice(p.i, 1)
+  changed(t)
 }
 
 // a pasted image is the daemon's own (imageSave: <data>/images): nothing else of the Mac goes to a model

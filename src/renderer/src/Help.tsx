@@ -34,7 +34,7 @@ const keysOf = (m: KeyMap): [string, string][] => {
     [k('full'), 'full screen: just the tab, or back (also the tab bar’s ⤢)'],
     [k('palette'), "the palette: every workspace (by its PR's number too: 123 or #123), tab and action"],
     [k('files'), 'find a file in the workspace'],
-    [k('find'), 'find in the terminal (here: the filter)'],
+    [k('find'), 'find in the terminal or a diff (here: the filter)'],
     ['⌘S', "save the file you're editing in the preview"],
     ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
     ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes"],
