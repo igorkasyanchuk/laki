@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.33.0 · Oct 28, 2026
 
 - A faster start after a restart: agents unused for longer than *Sleep idle agents after* (8 hours) stay asleep until you open
   them, type in them or send them something.
