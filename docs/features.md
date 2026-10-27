@@ -54,7 +54,7 @@ time and AI money per run (`budget: 60 min, $5`).
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
   this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
   a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
-  every app. A *Review* tab puts every changed file's diff in one page, with comments gathered and
+  every app; an emulator it starts has no window but Laki's. A *Review* tab puts every changed file's diff in one page, with comments gathered and
   posted as one PR review. One-click layouts put the agent beside the preview, the diff or a shell.
 - **Expose to the world**: a dev server's port as a public link (Cloudflare), for anyone or only some emails; it
   comes back if cloudflared drops, and with your own Cloudflare domain keeps an address like `shop.example.com`.

@@ -67,14 +67,14 @@ exec /usr/sbin/lsof "$@"
   assert.ok(none.daemon.rss > 0 && none.daemon.heap > 0)
   rmSync(join(d, 'ps-none'))
 
-  // a port of the agent itself and a browser's (theirs, not in ports), and a ghost its shell tool started: a pid in the
-  // tree that's no process (Linux's and macOS's pids stay below it)
+  // a port of the agent itself, a browser's and an Android emulator's (theirs, not in ports), and a ghost its shell tool
+  // started: a pid in the tree that's no process (Linux's and macOS's pids stay below it)
   const ghost = 4194304
-  writeFileSync(join(d, 'ps-kids'), `${ghost} ${pty} -zsh\n${ghost + 1} ${ghost} node\n`)
-  writeFileSync(join(d, 'lsof-scan'), `p${pty}\ncclaude\nn*:5555\np${ghost}\ncghost\nn127.0.0.1:4567\np${ghost + 1}\ncGoogle Chrome\nn127.0.0.1:9222\n`)
-  await until(async () => (await wsOf(rig, ws.id)).procs?.[9222], 'ports scanned')
+  writeFileSync(join(d, 'ps-kids'), `${ghost} ${pty} -zsh\n${ghost + 1} ${ghost} node\n${ghost + 2} ${ghost} emulator\n${ghost + 3} ${ghost} netsimd\n`)
+  writeFileSync(join(d, 'lsof-scan'), `p${pty}\ncclaude\nn*:5555\np${ghost}\ncghost\nn127.0.0.1:4567\np${ghost + 1}\ncGoogle Chrome\nn127.0.0.1:9222\np${ghost + 2}\ncqemu-system-aarch64\nn127.0.0.1:5554\nn127.0.0.1:8554\np${ghost + 3}\ncnetsimd\nn127.0.0.1:6402\n`)
+  await until(async () => (await wsOf(rig, ws.id)).procs?.[6402], 'ports scanned')
   assert.deepEqual((await wsOf(rig, ws.id)).ports, [4567])
-  assert.deepEqual((await wsOf(rig, ws.id)).procs, { 4567: { pid: ghost, cmd: 'ghost' }, 5555: { pid: pty, cmd: 'claude', own: true }, 9222: { pid: ghost + 1, cmd: 'Google Chrome', own: true } })
+  assert.deepEqual((await wsOf(rig, ws.id)).procs, { 4567: { pid: ghost, cmd: 'ghost' }, 5554: { pid: ghost + 2, cmd: 'qemu-system-aarch64', own: true }, 5555: { pid: pty, cmd: 'claude', own: true }, 6402: { pid: ghost + 3, cmd: 'netsimd', own: true }, 8554: { pid: ghost + 2, cmd: 'qemu-system-aarch64', own: true }, 9222: { pid: ghost + 1, cmd: 'Google Chrome', own: true } })
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 1234 }), new RegExp(`nothing of ${ws.id}'s listens on :1234`))
   writeFileSync(join(d, 'gone'), '')
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 4567 }), new RegExp(`ghost \\(pid ${ghost}\\) no longer listens on :4567`))

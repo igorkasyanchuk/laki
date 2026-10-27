@@ -174,7 +174,9 @@ workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`: a per-workspace
 PR's head commit, `pull/<n>/head` fetched when this clone hasn't it: the expand arrows on *PR #n*), a sep's `preset` (a
 group's default agent, kept by `projectSet`; MCP's state's `groupAgents`), `tabNew` `cwdOf` (a shell tab of the workspace:
 the new shell starts in its folder, core's `shellCwd`), Laki AI's `profile` act (`laki_profiles`), `prTalk` refused from an agent; 119: a widget's `icons` (icons.ts `iconTurns`: settings' `iconPack`, `iconWidth`,
-`iconSize` drawn by the daemon's kit too). A
+`iconSize` drawn by the daemon's kit too); 120: `scriptLogs` (development mode's setup and teardown runs, core.ts
+`scriptLog`: `<data>/script-logs/<ws>.jsonl`, the newest `SCRIPT_LOGS` 30 workspaces', kept after a delete;
+Settings › General › Development's *Setup & teardown*, panels.tsx `ScriptLogs`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -399,7 +401,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
   App's `runScript`, Deploy after `ask`);
-- `sim` (`daemon/device.ts`, `SIM_OPS`; the side panel's Simulator, SidePanel.tsx `DeviceTab`): `list` (booted iOS
+- `sim` (`daemon/device.ts`, `SIM_OPS`; the side panel's Simulator, SidePanel.tsx `DeviceTab`: two frames on their way;
+  an Android frame `screencap -j`, a JPEG sized by `jpegSize`, `-p` from then on for a device without it, `noJpeg`; an AVD started
+  `-no-window` unless `settings.emuWindow`; a device floated, main's `sim-floating`, leaves the tab, `away`: *Show it*,
+  *Bring it back*): `list` (booted iOS
   Simulators by `simctl`, on a Mac, and `adb devices -l`'s ready ones (an emulator named by its AVD, `emu avd name`: the name then OK, within 5 s, else its model), `ios:<udid>` / `android:<serial>`; `why`: what
   keeps a kind out), `frame` (simctl's JPEG or adb's `screencap -p`, through `sips` to a JPEG at most `FRAME_MAX` tall on
   a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden: `visibilitychange` starts them again), `shot` (`imageSave`'s path, for
@@ -716,7 +721,9 @@ they work).
 reads as `state.json.bak`, and moves one that doesn't to `state.json.broken-<ms>`, then loads the `.bak`: never
 empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts. Starting the daemon brings every tab back:
 `claude --resume <id>`, `codex resume <id>`, a few at a time (`restoreAll`: each in `queued`, as `asleep` meanwhile, the
-oldest first, `RESTORE_GAP` 2.5 s apart, a shell's a tenth; the view's `queued`, the tab's tooltip; `restoreNow` for one a look, a key or a message wakes,
+oldest first; a tracked agent whose `usedAt` (a tab's: made, or `turn()`'s every state but start; `keepShells` saves it at
+shutdown) is older than `sleepAfter` is `dormant`: queued, never started by `nextRestore`, only by `restoreNow`, its view
+`asleep` without `queued`; `RESTORE_GAP` 2.5 s apart, a shell's a tenth; the view's `queued`, the tab's tooltip; `restoreNow` for one a look, a key or a message wakes,
 and every one of a workspace a window shows, `setView`; `LAKI_RESTORE_GAP` 0: all at once, tests'; shutdown clears it). Shells come back with what ran in them: `keepShells`, in `main.ts`'s
 `shutdown` before the sessions are killed, gives each local shell tab `again` (state.json): its front program's
 folder (`lsof -d cwd`) and `rerun`'s command. An agent resumes and runs: claude by `~/.claude/sessions/<pid>.json`'s
@@ -754,7 +761,7 @@ the code, the seconds it ran, its last lines.
 - Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN -Fpcn`, every 5s
   (`procs`: each port's pid and command, `WorkspaceView.procs`; `.laki.json` `ports`, strings only, as `portNames`).
   An agent tab's own processes (its pid and what it runs with no shell between: `ps`'s `comm`, `SHELLS`; its browser
-  bridge, an MCP server, the browser that drives) and any `BROWSER` listen for the agent: `own` in `procs` (sleep still
+  bridge, an MCP server, the browser that drives) and any of `THEIRS` (a browser, an Android emulator's qemu-system and netsimd) listen for the agent: `own` in `procs` (sleep still
   sees them), left out of `ports`; what its shell tool starts (a dev server) is the workspace's.
   `portKill` (the status bar's ✕, after `ask`): that pid, if it still listens there and is yours (uid), gets SIGTERM,
   and SIGKILL 3 s later if `ps`'s uid and start time are the same. First,
@@ -2271,7 +2278,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
   `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files and https: scripts, styles, fonts and pictures,
-  no `connect-src`; 50 MB a file), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
+  `connect-src 'self'`: its JSON beside it, CORS null; 50 MB a file); *Open file* and the right click's *Open the file*
+  (App's `asFile`, main's `open-file`: an HTML file inside the storage folder as `file://` in the browser, asked for), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
   *Open in the browser* (App's `inBrowser`, the gallery's and the right click's too), *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
   its right click has *Open* (the viewer) and *Open in the browser*.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,

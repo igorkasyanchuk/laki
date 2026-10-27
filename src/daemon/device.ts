@@ -10,7 +10,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
 import { DEVICE_OPS, SIM_OPS, type SimCheck, type SimDev } from '../shared/types.ts'
-import { imageSave, onPath } from './core.ts'
+import { imageSave, onPath, state } from './core.ts'
 
 const run = promisify(execFile)
 const said = (e: unknown) => String((e as { stderr?: string }).stderr || (e as Error).message || e).trim().split('\n').slice(-3).join(' ')
@@ -130,7 +130,7 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
 // hands (as above); Android: adb's screencap and input. A device is ios:<udid> or android:<serial>; a spot comes as a
 // fraction of the picture, made points (iOS: simPoints) or pixels (Android: the last
 // frame's). On a Mac sips makes each frame a JPEG at most FRAME_MAX tall; elsewhere it goes as it came
-// ponytail: a frame per call (the panel asks for the next as one comes, ~3 a second) and input at 0.3-0.6 s a call, a
+// ponytail: a frame per call (the panel keeps two on their way, ~5 a second from an emulator) and input at 0.3-0.6 s a call, a
 // drag one swipe at its release; a stream (serve-sim, idb or axe video-stream, scrcpy's server) and live touches next
 const FRAME_MAX = 1000
 const SIM_ID = /^(ios|android):(\w[\w.:-]{0,199})$/ // no leading -: it goes to simctl, idb and adb as an argument
@@ -213,7 +213,8 @@ const avdsOf = (emu: string) => run(emu, ['-list-avds'], { timeout: 15000 }).the
 // Settings › Simulators' Devices: every iOS Simulator this Mac has (simctl's available ones, iPhones and iPads, iOS
 // runtimes only) and every Android virtual device, each running or not, running first, then the newest iOS; start boots
 // one (simctl boot: no Simulator window, the panel shows it; the emulator -avd, left running on its own, as Android
-// Studio's), stop shuts it down (simctl shutdown; adb emu kill)
+// Studio's: -no-window, the panel's screen its only one, unless settings.emuWindow), stop shuts it down (simctl
+// shutdown; adb emu kill)
 const AVD_ID = /^avd:(\w[\w.-]{0,199})$/
 const verOf = (r = '') => r.replace(/^\D+/, '').split('.').map(Number)
 async function simDevices(): Promise<{ devices: SimDev[]; why: string[] }> {
@@ -252,7 +253,7 @@ async function power(op: 'start' | 'stop', id: string) {
     if (op === 'start') {
       const emu = sdkTool('emulator/emulator')
       if (!emu) throw new Error("the Android emulator isn't installed: Android Studio › Settings › Languages & Frameworks › Android SDK › SDK Tools")
-      spawn(emu, ['-avd', avd[1]], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
+      spawn(emu, ['-avd', avd[1], ...(state.settings?.emuWindow ? [] : ['-no-window'])], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
       return { ok: true }
     }
     const name = avd[1].replace(/_/g, ' ')
@@ -277,6 +278,31 @@ const deviceOf = (id: unknown) => {
 }
 const droidPx = new Map<string, { width: number; height: number }>() // an Android screen's pixels, as its last frame
 const pngSize = (b: Buffer) => (b.length > 24 && b.readUInt32BE(12) === 0x49484452 ? { width: b.readUInt32BE(16), height: b.readUInt32BE(20) } : undefined)
+// a JPEG's pixels: its first SOF segment's (not DHT C4, JPG C8, DAC CC), walking the segments from SOI
+function jpegSize(b: Buffer) {
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return
+  for (let i = 2; i + 9 < b.length && b[i] === 0xff; i += 2 + b.readUInt16BE(i + 2)) {
+    const m = b[i + 1]
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) }
+  }
+}
+// a frame: Android's screencap -j (a JPEG, 2-5x quicker than its PNG: it's encoded on the device), else -p: a device
+// whose -j fails while -p works has none (before Android 14), and gets -p for NO_JPEG (an emulator's serial is taken by
+// the next one started). A shot (the agent's prompt) stays a PNG
+const noJpeg = new Map<string, number>() // by device: when its -j failed
+const NO_JPEG = 10 * 60_000
+async function droidFrame(d: { id: string; key: string }, jpeg = true) {
+  if (jpeg && !(Date.now() - (noJpeg.get(d.key) ?? -Infinity) < NO_JPEG)) {
+    const jpg = await adb(d.id, ['exec-out', 'screencap', '-j']).then(r => r.stdout as Buffer, () => undefined)
+    const px = jpg && jpegSize(jpg)
+    if (px) return { buf: jpg, px, ext: 'jpg' }
+  }
+  const png = (await adb(d.id, ['exec-out', 'screencap', '-p'])).stdout as Buffer
+  const px = pngSize(png)
+  if (!px) throw new Error("adb screencap gave no picture: is the screen on?")
+  if (jpeg) noJpeg.set(d.key, Date.now())
+  return { buf: png, px, ext: 'png' }
+}
 const frac = (v: unknown, what: string) => {
   const n = Number(v)
   if (v === undefined || v === '' || !Number.isFinite(n) || n < 0 || n > 1) throw new Error(`${what}: a fraction of the picture, 0 to 1`)
@@ -314,19 +340,17 @@ export async function sim(p: { op: string; device?: string; x?: unknown; y?: unk
   if (op === 'frame' || op === 'shot') {
     const tmp = mkdtempSync(join(tmpdir(), 'laki-sim-'))
     try {
-      const raw = join(tmp, d.os === 'ios' ? 'raw.jpg' : 'raw.png')
+      let raw = join(tmp, 'raw.jpg')
       if (d.os === 'ios') await simctl(['io', d.id, 'screenshot', '--type=jpeg', raw]).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)}`)))
       else {
-        const png = (await adb(d.id, ['exec-out', 'screencap', '-p'])).stdout as Buffer
-        const px = pngSize(png)
-        if (!px) throw new Error("adb screencap gave no picture: is the screen on?")
-        droidPx.set(d.key, px)
-        writeFileSync(raw, png)
+        const f = await droidFrame(d, op === 'frame')
+        droidPx.set(d.key, f.px)
+        writeFileSync((raw = join(tmp, `raw.${f.ext}`)), f.buf)
       }
-      if (op === 'shot') return { path: imageSave({ data: readFileSync(raw).toString('base64'), ext: 'png' }) } // for an agent's prompt: as it came
+      if (op === 'shot') return { path: imageSave({ data: readFileSync(raw).toString('base64'), ext: raw.endsWith('.png') ? 'png' : 'jpg' }) } // for an agent's prompt: as it came
       const out = join(tmp, 'frame.jpg')
       const small = process.platform === 'darwin' && (await run('sips', ['-Z', String(FRAME_MAX), '-s', 'format', 'jpeg', '-s', 'formatOptions', '70', raw, '--out', out], { timeout: 15000 }).then(() => true, () => false))
-      const type = small || d.os === 'ios' ? 'jpeg' : 'png'
+      const type = small || raw.endsWith('.jpg') ? 'jpeg' : 'png'
       return { frame: `data:image/${type};base64,${readFileSync(small ? out : raw).toString('base64')}` }
     } finally {
       rmSync(tmp, { recursive: true, force: true })

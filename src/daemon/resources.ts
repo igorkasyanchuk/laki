@@ -10,11 +10,12 @@ import { syncBranches } from './pr.ts'
 import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
 
-// what an agent runs without a shell between (its browser bridge, an MCP server, the browser that one drives) and any
-// browser listen for the agent, not as the workspace's servers: kept in procs (sleep sees them), left out of ports (the
-// status bar's ↗, the menus). What it starts through its shell tool (a dev server) is the workspace's
+// what an agent runs without a shell between (its browser bridge, an MCP server, the browser that one drives), any
+// browser and an Android emulator (its console, adb, gRPC and netsimd's ports: none is the workspace's server) listen
+// for the agent, not as the workspace's servers: kept in procs (sleep sees them), left out of ports (the status bar's
+// ↗, the menus). What it starts through its shell tool (a dev server) is the workspace's
 const SHELLS = /^-?(?:ba|z|fi|da|k|tc|c)?sh$/
-const BROWSER = /chrom|firefox|webkit|msedge|headless/i
+const THEIRS = /chrom|firefox|webkit|msedge|headless|^qemu-system|^netsimd$/i // browsers, an emulator
 // a port of a tab brought back at start, in its first minute: noted, no port.open (it listened before the restart).
 // ponytail: a minute; a server that takes longer to come back is new to extensions
 export const restoredAt = new Map<string, number>()
@@ -67,7 +68,7 @@ export async function scanPorts() {
         const port = Number(l.slice(l.lastIndexOf(':') + 1))
         const ws = owner.get(pid)
         if (!ws || !port) continue
-        const inner = own.has(pid) || BROWSER.test(cmd)
+        const inner = own.has(pid) || THEIRS.test(cmd)
         if (!inner && !next.get(ws)?.includes(port)) next.set(ws, [...(next.get(ws) ?? []), port].sort((a, b) => a - b))
         nextProcs.set(ws, { ...nextProcs.get(ws), [port]: { pid, cmd, ...(inner && { own: true }) } })
       }
@@ -259,7 +260,7 @@ export async function resources(): Promise<Resources> {
 // (it frees what it holds, and a long one grows), its screen stays, and a look (attach), a key or a message resumes
 // its chat (wake). Not one with a queue or a usage limit, without a chat to resume, on an SSH host, in a workspace
 // whose PR feedback goes to it (autoFix…), nor one with a port listening under it (a dev server it started).
-// ponytail: in memory; a daemon restart resumes every tab, asleep or not, in turn (core.ts restoreAll)
+// ponytail: in memory; a daemon restart resumes every tab in turn, but those unused for sleepAfter (core.ts restoreAll)
 export const asleep = new Set<string>()
 export const isLive = (t: Tab) => asleep.has(t.id) || !!(sessions.get(t.id) && !sessions.get(t.id)!.exited)
 // why a tab can't sleep even when asked: a chat it can resume, here, idle with nothing waiting for it
@@ -320,6 +321,7 @@ export function wake(id: string) {
   if (!queued.has(id)) spawnTab(tab, { resume: true })
   else if (!restoreNow(id)) return false
   Object.assign(rtOf(id), { status: 'running', done })
+  tab.usedAt = Date.now() // looked at, typed in, sent to: back at once after the next restart
   changed()
   return true
 }

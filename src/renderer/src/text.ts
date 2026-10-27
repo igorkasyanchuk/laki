@@ -508,11 +508,13 @@ export function fuzzy(q: string, s: string): number {
 // the palette's groups (⌘K), each under a heading: with nothing typed, what the focused workspace needs next (for),
 // every other tab that needs you, the last few picked, then workspaces, tabs and actions as given; typing matches
 // everything as before (fuzzy over the label and hint, a recent pick a little ahead), the suggestions first when they
-// match, then each kind under its heading, the best match's group first
+// match, then each kind under its heading, the best match's group first. A PR or issue link pasted matches only the items
+// whose find has that link (a workspace's PR, issue and related ones), its /files or #comment tail aside
 export type PalKind = 'for' | 'needs' | 'ws' | 'tab' | 'action'
 const PAL_HEADS: Record<Exclude<PalKind, 'for'>, string> = { needs: 'Needs you', ws: 'Workspaces', tab: 'Tabs', action: 'Actions' }
 export const PAL_RECENT = 30 // laki.recent's length
-export function paletteGroups<T extends { label: string; hint?: string; kind?: PalKind }>(items: T[], q: string, recent: string[], forName = 'this workspace', recentMax = 8): { head: string; items: T[] }[] {
+export const linkKey = (s: string) => /^\s*(https?:\/\/\S+?\/(?:pull|issues|merge_requests|pull-requests)\/\d+)(?:[/?#]\S*)?\s*$/i.exec(s)?.[1].toLowerCase() // GitHub's, GitLab's, Bitbucket's
+export function paletteGroups<T extends { label: string; hint?: string; kind?: PalKind; find?: string[] }>(items: T[], q: string, recent: string[], forName = 'this workspace', recentMax = 8): { head: string; items: T[] }[] {
   const kind = (x: T): PalKind => x.kind ?? 'action'
   const head = (k: PalKind) => (k === 'for' ? `For ${forName}` : PAL_HEADS[k])
   const of = (k: PalKind, xs: T[]) => ({ head: head(k), items: xs.filter(x => kind(x) === k) })
@@ -523,7 +525,12 @@ export function paletteGroups<T extends { label: string; hint?: string; kind?: P
     return [of('for', items), of('needs', items), { head: 'Recent', items: rec }, of('ws', rest), of('tab', rest), of('action', rest)].filter(g => g.items.length)
   }
   const score = new Map<T, number>()
+  const link = linkKey(q)
   for (const x of items) {
+    if (link) {
+      if (x.find?.some(u => linkKey(u) === link)) score.set(x, 1)
+      continue
+    }
     const all = `${x.label} ${x.hint ?? ''}`
     const s = fuzzy(q, all) && fuzzy(q, x.label) + 0.5 * fuzzy(q, all)
     const r = recent.indexOf(x.label)

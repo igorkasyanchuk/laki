@@ -384,6 +384,12 @@ test("the palette's groups: suggestions, needs you, recent, then workspaces, tab
   assert.deepEqual(heads(paletteGroups(items, 'cart', [])), ['Workspaces: cart', 'Tabs: cart / claude'])
   assert.deepEqual(heads(paletteGroups(items, 'fix', []))[0], 'For this workspace: Fix CI: send #42')
   assert.deepEqual(paletteGroups(items, 'zzz', []), [])
+  // a PR link pasted: the workspace that has it, whatever its tail; a PR number that only starts the same, none
+  const ws = [{ label: 'review', kind: 'ws' as const, find: ['https://github.com/o/r/pull/15046'] }, { label: 'other', kind: 'ws' as const, find: ['https://github.com/o/r/pull/150'] }, ...items]
+  assert.deepEqual(heads(paletteGroups(ws, ' https://github.com/o/r/pull/15046 ', [])), ['Workspaces: review'])
+  assert.deepEqual(heads(paletteGroups(ws, 'https://GitHub.com/o/r/pull/15046/files#diff-1', [])), ['Workspaces: review'])
+  assert.deepEqual(paletteGroups(ws, 'https://github.com/o/r/pull/1504', []), [])
+  assert.deepEqual(heads(paletteGroups([{ label: 'bb', kind: 'ws' as const, find: ['https://bitbucket.org/o/r/pull-requests/7'] }], 'https://bitbucket.org/o/r/pull-requests/7/overview', [])), ['Workspaces: bb'])
 })
 
 test('prompt completion: @ and # after a space, / at a line\'s start; the rows; what a pick puts in', () => {

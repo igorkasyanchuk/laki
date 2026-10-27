@@ -5,15 +5,15 @@
 // the data folder is dir.ts', out of it.
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { chmod, copyFile, rm, symlink } from 'node:fs/promises'
+import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type Sep, type Settings, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
@@ -164,6 +164,9 @@ export function load() {
   // .laki.json's trust: projects from before it keep working, trusted as their file is now (a host's as it's first read)
   if (!state.cfgTrust) for (const p of state.projects) if (!p.kind) p.trusted = p.host ? 'as-read' : cfgHash(fileCfg(p))
   state.cfgTrust = true
+  // Check for updates (on unless false): one saved off before 0.33 is back on, once; turned off after that, it stays off
+  if (!state.updatesOn && state.settings?.updateCheck === false) delete state.settings.updateCheck
+  state.updatesOn = true
   slugActions() // actions from before slugs
 }
 
@@ -528,7 +531,8 @@ export function view(): View {
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
+    return { ...t, usedAt: undefined, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
     projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
@@ -1147,7 +1151,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   r.since = undefined // a turn started by a prompt, not by Enter (input): it always notifies
   r.done = false
   s.onExit = code => {
-    if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
+    if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true }), s.term.write('', () => scriptLog(ws, 'setup', tab.cmd ?? '', born, code, s.allText().replace(/\s*\[process exited[^\]]*\]\s*$/, ''))) // less the session's own exit line
     // one we ended (close, restart, wake, archive, shutdown) is no longer in sessions: not this tab's end any more
     if (sessions.get(tab.id) !== s) return
     if (asleep.has(tab.id)) return changed() // put to sleep (sleepTick): it stays, and says so
@@ -1225,7 +1229,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const agentName = pr?.name || (kind === 'agent' ? (preset === 'custom' ? cmdName(o.cmd!) : preset) : kind)
   const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }), ...(kind === 'agent' && { usedAt: Date.now() }) }
   const cwd = kind === 'shell' && !o.cmd ? o.cwd : undefined
   state.tabs.push(tab)
   save()
@@ -1824,6 +1828,36 @@ export function startCheck(at: unknown, preset: string, agent: string, codespace
   if (at < Date.now() - 60_000) throw new Error(`${new Date(at).toLocaleString()} has passed`)
 }
 
+// setup's and teardown's output in development mode (Settings › General › Development's Setup & teardown): a line per
+// run in <data>/script-logs/<ws>.jsonl, kept after the workspace goes; the newest SCRIPT_LOGS workspaces' files stay,
+// each run its output's last SCRIPT_TEXT, a file past 1 MB its last 10 runs
+const scriptDir = join(dir, 'script-logs')
+const SCRIPT_LOGS = 30
+const SCRIPT_TEXT = 64 << 10
+function scriptLog(ws: Workspace, kind: ScriptRun['kind'], cmd: string, at: number, code: number | null, text: string) {
+  if (!state.settings?.devMode) return
+  try {
+    mkdirSync(scriptDir, { recursive: true, mode: 0o700 })
+    const f = join(scriptDir, `${ws.id}.jsonl`)
+    const run: ScriptRun = { ws: ws.id, name: ws.name ?? ws.id, project: state.projects.find(p => p.id === ws.project)?.name ?? ws.project, kind, cmd, at, secs: Math.round((Date.now() - at) / 1000), code, text: text.length > SCRIPT_TEXT ? `…\n${text.slice(-SCRIPT_TEXT)}` : text }
+    appendFileSync(f, `${JSON.stringify(run)}\n`, { mode: 0o600 })
+    if (statSync(f).size > 1 << 20) writeFileSync(f, `${readFileSync(f, 'utf8').trimEnd().split('\n').slice(-10).join('\n')}\n`)
+    const files = readdirSync(scriptDir).filter(x => x.endsWith('.jsonl')).map(x => [x, statSync(join(scriptDir, x)).mtimeMs] as const)
+    for (const [x] of files.sort((a, b) => b[1] - a[1]).slice(SCRIPT_LOGS)) rmSync(join(scriptDir, x), { force: true })
+  } catch (e) {
+    log(`script log ${ws.id}: ${(e as Error).message}`)
+  }
+}
+// every kept run, newest first; read async: up to 30 files of 1 MB, the terminals go on meanwhile
+export async function scriptLogs(): Promise<ScriptRun[]> {
+  if (!existsSync(scriptDir)) return []
+  const texts = await Promise.all(readdirSync(scriptDir).filter(x => x.endsWith('.jsonl')).map(x => readFile(join(scriptDir, x), 'utf8').catch(() => '')))
+  return texts
+    .flatMap(t => t.split('\n').flatMap(l => { try { return l ? [JSON.parse(l) as ScriptRun] : [] } catch { return [] } }))
+    .sort((a, b) => b.at - a.at)
+}
+const ranOf = (r: { stdout?: unknown; stderr?: unknown; killed?: boolean; message?: string }) => [String(r.stdout ?? '').trimEnd(), r.stderr && `--- stderr\n${String(r.stderr).trimEnd()}`, r.killed && '[stopped after 60 s]', !r.stdout && !r.stderr && r.message].filter(Boolean).join('\n') // execFile's result or error
+
 function runSetup(ws: Workspace, setup: string, agent?: string, cause: Cause = {}) {
   writeFileSync(setupMarker(ws), String(Date.now()))
   return addTab(ws.id, { kind: 'setup', name: 'setup', cmd: setup, agent, ...cause })
@@ -1921,12 +1955,14 @@ async function teardown(ws: Workspace) {
   const cfg = projectConfig(ws)
   const none: Tab = { id: '', workspace: ws.id, name: '', kind: 'shell' }
   // a worktree's, as setup is: a local workspace is the project's own folder, which other sessions (and you) still use
+  const at = Date.now()
+  const ran = (code: number | null, text: string) => scriptLog(ws, 'teardown', cfg.teardown!, at, code, text)
   if (cfg.teardown && ws.kind === 'worktree' && ws.host && ws.codespace === undefined) // a codespace's: its stop or delete
     await hostUp(ws.host)
       .then(h => sshIn(ws.host!, 'sh -s', hostScript(ws, lakiEnv(ws, none, {}, h.dir), `exec "$SHELL" -lc ${q(cfg.teardown!)}`)))
-      .catch(() => {})
+      .then(out => ran(0, out), e => ran(typeof e.code === 'number' ? e.code : null, ranOf(e)))
   else if (cfg.teardown && ws.kind === 'worktree' && existsSync(ws.path))
-    await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, none), timeout: 60000 }).catch(() => {})
+    await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, none), timeout: 60000 }).then(r => ran(0, ranOf(r)), e => ran(typeof e.code === 'number' ? e.code : null, ranOf(e)))
   if (ws.kind === 'worktree' && ws.codespace === undefined) {
     const proj = state.projects.find(p => p.id === ws.project)
     if (proj) await git(proj, 'worktree', 'remove', '--force', ws.path).catch(() => {})
@@ -2077,19 +2113,29 @@ export async function wsFork(ref: string) {
 // back with what they ran (keepShells), a Run tab that was running starts again. Not all at once (twenty claudes
 // starting together stall the Mac): each waits in `queued`, as asleep (the view's dimmed tab), and starts in turn,
 // RESTORE_GAP apart (a shell a tenth of it); one a look (attach), a key or a message wants (wake), or in a workspace a
-// window shows (setView), starts at once. LAKI_RESTORE_GAP 0: all at once (tests')
+// window shows (setView), starts at once. LAKI_RESTORE_GAP 0: all at once (tests'). An agent unused (usedAt) for
+// settings.sleepAfter (sleepy's minutes; 0: never) is dormant: it stays asleep until one of those wants it, as it would
+// have slept had the daemon stayed up; one made before usedAt counts as unused. Not one with messages waiting for it
 const RESTORE_GAP = Number(process.env.LAKI_RESTORE_GAP ?? 2500)
 export const queued = new Set<string>()
+const dormant = new Set<string>() // queued ones nextRestore skips
 export function restoreAll() {
   for (const f of readdirSync(runDir)) if (/\.(setup|go|err)$/.test(f)) rmSync(join(runDir, f), { force: true }) // hostTab's too
   state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell' || (t.kind === 'dev' && t.again))
-  for (const ws of state.workspaces) if (!ws.archived) for (const t of tabsOf(ws.id)) queued.add(t.id), asleep.add(t.id)
-  if (!RESTORE_GAP) for (const id of [...queued]) restoreNow(id)
+  const after = (Number(state.settings?.sleepAfter ?? SLEEP_AFTER) || 0) * 60_000
+  for (const ws of state.workspaces)
+    if (!ws.archived)
+      for (const t of tabsOf(ws.id)) {
+        queued.add(t.id), asleep.add(t.id)
+        if (after && tracked(t) && !t.queue?.length && Date.now() - (t.usedAt ?? 0) > after) dormant.add(t.id)
+      }
+  if (dormant.size) log(`asleep since the restart (unused ${after / 60_000} min): ${[...dormant].join(', ')}`)
+  if (!RESTORE_GAP) for (const id of [...queued]) if (!dormant.has(id)) restoreNow(id)
   save()
   nextRestore()
 }
 function nextRestore() {
-  const t = state.tabs.find(x => queued.has(x.id)) // the oldest first
+  const t = state.tabs.find(x => queued.has(x.id) && !dormant.has(x.id)) // the oldest first
   if (!t) return
   restoreNow(t.id)
   setTimeout(nextRestore, tracked(t) ? RESTORE_GAP : RESTORE_GAP / 10).unref()
@@ -2097,6 +2143,7 @@ function nextRestore() {
 // a queued tab now (its `again` kept until then: a shutdown meanwhile keeps it for the next start). An agent's counts
 // as woken (wake: what's sent waits for its turn)
 export function restoreNow(id: string) {
+  dormant.delete(id)
   if (!queued.delete(id)) return false
   asleep.delete(id)
   const t = state.tabs.find(x => x.id === id)
@@ -2165,7 +2212,7 @@ export function keepShells() {
       t.again = { cwd: cwd.get(f), ...(f !== p && args.get(f) && rerun(f, args.get(f)!)) }
     }
   }
-  if (live.length) save()
+  save() // each agent's usedAt too
 }
 
 // how a program comes back: an agent resumes its chat (claude by its session file, else its last chat in that folder;
@@ -2228,6 +2275,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
   const r = rtOf(tab.id)
   const pl = p.payload ?? {}
   const was = r.status
+  if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
   switch (p.state) {
     case 'start':

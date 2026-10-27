@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type AgentUsage, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type AgentUsage, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -131,6 +131,58 @@ export function Logs({ title, load, copy, onClose }: { title: string; load: () =
         <span className="muted small grow">Kept in the daemon's memory, the last 500 lines; a restart starts over.</span>
         <button disabled={!lines?.length} onClick={() => copy(lines!.map(text).join('\n'))}>
           <Icon name="copy" /> Copy
+        </button>
+        <button className="primary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+// development mode's setup and teardown runs (Settings › General › Development): a row per workspace (the last 30,
+// deleted ones too), its newest run first; each opens to its runs, what they printed
+export function ScriptLogs({ load, copy, onClose }: { load: () => Promise<ScriptRun[]>; copy: (text: string) => void; onClose: () => void }) {
+  const [runs, setRuns] = useState<ScriptRun[] | null>(null)
+  const [err, setErr] = useState('')
+  const get = () => load().then(r => (setRuns(r), setErr('')), e => setErr(String(e?.message ?? e)))
+  useEffect(() => void get(), [])
+  const when = (at: number) => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const ended = (r: ScriptRun) => (r.code === 0 ? 'ok' : r.code === null ? 'stopped' : `exit ${r.code}`)
+  const line = (r: ScriptRun) => `${r.kind} · ${ended(r)} · ${r.secs} s · ${when(r.at)}`
+  const byWs = useMemo(() => {
+    const m = new Map<string, ScriptRun[]>() // newest first, as the runs come
+    for (const r of runs ?? []) (m.get(r.ws) ?? m.set(r.ws, []).get(r.ws)!).push(r)
+    return [...m.values()]
+  }, [runs])
+  return (
+    <Modal title="Setup & teardown logs" onClose={onClose} wide>
+      <div className="logs">
+        {err && <div className="warn small">{err}</div>}
+        {byWs.map(rs => (
+          <details key={rs[0].ws} className="log-run">
+            <summary className={rs.some(r => r.code !== 0) ? 'warn' : ''}>
+              {rs[0].name} · {rs[0].project} · {rs.map(r => `${r.kind} ${ended(r)}`).join(', ')} · {when(rs[0].at)}
+            </summary>
+            {rs.map(r => (
+              <div key={`${r.at}${r.kind}`} className="log-step">
+                <div className="row">
+                  <b className={`small grow ${r.code === 0 ? '' : 'warn'}`}>{line(r)}</b>
+                  <button className="ghost small" onClick={() => copy(`${rs[0].name} · ${line(r)}\n$ ${r.cmd}\n${r.text}`)}>
+                    <Icon name="copy" /> Copy
+                  </button>
+                </div>
+                <div className="log-line">{`$ ${r.cmd}\n${r.text.trimEnd() || '(no output)'}`}</div>
+              </div>
+            ))}
+          </details>
+        ))}
+        {runs && !runs.length && <div className="muted small">Nothing yet: setup and teardown are kept from when development mode went on, for the last 30 workspaces.</div>}
+      </div>
+      <div className="row">
+        <span className="muted small grow">Kept after a workspace is deleted, in Laki's data folder (script-logs).</span>
+        <button onClick={() => void get()}>
+          <Icon name="refresh" /> Refresh
         </button>
         <button className="primary" onClick={onClose}>
           Close
@@ -1318,7 +1370,7 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
   )
 }
 
-export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void; kind?: PalKind; more?: () => MenuItem[] } // mark: before the hint (its project's); kind: its group (text.ts paletteGroups; none: an action); more: ⇥'s actions (its ⋯ menu)
+export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; mark?: ReactNode; run: () => void; kind?: PalKind; more?: () => MenuItem[]; find?: string[] } // mark: before the hint (its project's); kind: its group (text.ts paletteGroups; none: an action); more: ⇥'s actions (its ⋯ menu); find: links a pasted one matches (a workspace's PRs)
 
 export { fuzzy } from './text' // the palette's matching
 
@@ -1631,7 +1683,7 @@ export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these 
 
 // an HTML or Markdown artifact in the app (Settings › General › Storage: Open artifacts in Laki): HTML in a sandboxed
 // frame (the daemon's /artifact/…: its CSS, scripts and pictures beside it load), Markdown rendered
-export function ArtifactView({ path, page, read, onExternal, onReveal, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onReveal?: () => void; onClose: () => void }) {
+export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const html = HTML.test(path)
   useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path])
@@ -1654,6 +1706,11 @@ export function ArtifactView({ path, page, read, onExternal, onReveal, onClose }
         <span className="muted small grow">{html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
         {onReveal && <button onClick={onReveal}>Show in Finder</button>}
         {onExternal && <button onClick={onExternal}>Open in the browser</button>}
+        {onFile && (
+          <button onClick={onFile} data-tip="The file itself (file://) in your browser: it reads the files beside it, and its scripts can read your other files">
+            Open file
+          </button>
+        )}
         <button className="primary" onClick={onClose}>
           Close
         </button>

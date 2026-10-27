@@ -127,8 +127,9 @@ function page(path: string, res: ServerResponse) {
 
 // GET /artifact/<key>/<ws>/<path>: a file of a workspace's Artifacts for the app's viewer (an HTML report, its CSS,
 // scripts and pictures beside it: the key is in the path, so its relative links carry it). Sandboxed, an origin of its
-// own: it reads nothing of the daemon's or other files; https: for a CDN's script, style, font or picture (no fetch or
-// XHR: connect-src; a picture's URL can still carry words out, as any page's can). ponytail: 50 MB a file
+// own: it reads nothing of the daemon's or other files; https: for a CDN's script, style, font or picture. fetch and
+// XHR only to its own folder here (connect-src by path), so a report reads the JSON beside it, never the workspace's
+// other artifacts (a picture's URL can still carry words out, as any page's can). ponytail: 50 MB a file
 // ponytail: https: scripts and pictures stay, agents' reports load Chart.js and the like from a CDN; 'unsafe-inline'
 // lets a page do inline whatever a CDN's script would, so dropping https: from script-src alone keeps nothing out
 const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf' }
@@ -169,7 +170,8 @@ async function imgPage(q: URLSearchParams, res: ServerResponse) {
   }
 }
 
-function artifactPage(path: string, origin: string | undefined, res: ServerResponse) {
+const ART_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:"
+function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/artifact\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
   if (!m || !urlKeyOk(m[1], `artifact:${m[2]}`)) return no(401, 'bad key') // that workspace's key only
@@ -184,7 +186,9 @@ function artifactPage(path: string, origin: string | undefined, res: ServerRespo
   }
   res.writeHead(200, {
     'content-type': ART_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
-    'content-security-policy': "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:",
+    // fetch: its own folder and under it (hostOk checked the host; a raw ; or , in the path can't add a directive), not
+    // the rest of the storage folder
+    'content-security-policy': host ? `${ART_CSP}; connect-src ${host}${path.slice(0, path.lastIndexOf('/') + 1).replace(/[;,\s]/g, encodeURIComponent)}` : ART_CSP,
     'cache-control': 'no-store',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
@@ -259,6 +263,7 @@ const api: Record<string, Handler> = {
   prFix: p => core.prFix(p), // { ws, what, job? }: job: only that check's
   prLog: p => core.prLog(p), // { ws, job }: a failing check's log, its steps named (Info's Log)
   logs: p => core.logs(p), // development mode's: ws:<id> or widget:<id>
+  scriptLogs: () => core.scriptLogs(), // development mode's setup and teardown runs, the last 30 workspaces'
   progress: p => core.progress(p),
   prAttach: p => core.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
   prDetach: p => core.prDetach(p), // { ws }: its linked PR to related (not its own)
@@ -574,7 +579,7 @@ const server = createServer(async (req, res) => {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
-    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, res) // an artifact in the app's viewer: the key in its path
+    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
     if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
     const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)

@@ -1028,7 +1028,7 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   writeFileSync(join(dir, 'site', 'a.css'), 'h1 { color: red }')
   const page = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/index.html`)
   assert.equal(page.status, 200)
-  assert.match(page.headers.get('content-security-policy')!, /^sandbox allow-scripts; default-src 'none'/)
+  assert.match(page.headers.get('content-security-policy')!, new RegExp(`^sandbox allow-scripts; default-src 'none'.*; connect-src 127\\.0\\.0\\.1:${port}/artifact/${widgetKey}/${w.id}/site/$`)) // its fetch('data.json'): its own folder only
   assert.equal(await page.text(), '<link rel="stylesheet" href="a.css"><h1>hi</h1>')
   const css = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`)
   assert.equal(css.headers.get('content-type'), 'text/css')

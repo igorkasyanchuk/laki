@@ -2,6 +2,21 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- A faster start after a restart: agents unused for longer than *Sleep idle agents after* (8 hours) stay asleep until you open
+  them, type in them or send them something.
+- ⌘K finds a workspace by its PR link pasted whole (a `/files` or `#comment` tail too).
+- Development mode keeps what setup and teardown printed for the last 30 workspaces, deleted ones too: Settings ›
+  General › Development › *Setup & teardown*.
+- Artifacts: an HTML report reads the files beside it (its JSON) in Laki's viewer; *Open file* opens the file itself
+  in your browser.
+- The Simulator: an Android emulator Laki starts has no window of its own, the side panel is its screen (Settings ›
+  Simulators › *Emulator window* brings it back); a floated device leaves the panel instead of showing twice; an
+  Android screen about 3 times quicker (a JPEG from Android 14 on, two frames on their way).
+- An Android emulator an agent starts no longer fills the status bar with its ports (5554, 5555, 8554, netsimd's).
+- *Check for updates* is on for everyone: one turned off before is on again, once.
+
 ## 0.32.0 · Oct 27, 2026
 
 - Icons from Tabler, Lucide or Laki's own (Settings › Appearance › *Icons*, Tabler by default), with a line width and

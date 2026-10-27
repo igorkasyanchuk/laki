@@ -225,6 +225,9 @@ exit 0
   png.writeUInt32BE(1080, 16)
   png.writeUInt32BE(2400, 20)
   writeFileSync(join(rig.home, 'screen.png'), png)
+  // screencap -j's JPEG (Android 14+), 1440 by 3200: SOI, an APP0, then SOF0 (its height, then its width)
+  const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x0c, 0x80, 0x05, 0xa0, 0x01, 0x01, 0x11, 0x00, 0xff, 0xd9])
+  writeFileSync(join(rig.home, 'screen.jpg'), jpg)
   script(
     join(sdk, 'platform-tools/adb'),
     `#!/bin/sh
@@ -232,6 +235,8 @@ echo "adb $*" >> "$HOME/sim.log"
 case "$*" in
   "devices -l") printf 'List of devices attached\\nemulator-5554          device product:sdk_gphone64 model:sdk_gphone64_arm64 transport_id:1\\nR58M  offline\\nZX1  unauthorized usb:1-1 transport_id:2\\n' ;;
   *"exec-out screencap -p") cat "$HOME/screen.png" ;;
+  "-s emulator-5554 exec-out screencap -j") echo "screencap: invalid option -- 'j'" >&2; exit 1 ;;
+  *"exec-out screencap -j") cat "$HOME/screen.jpg" ;;
   "-s emulator-5554 emu avd name") if [ -f "$HOME/avd-ko" ]; then printf 'KO: unknown command\\r\\n'; else printf 'Pixel_9\\r\\nOK\\r\\n'; fi ;;
 esac
 exit 0
@@ -267,6 +272,15 @@ exit 0
   await rig.rpc('sim', { op: 'key', device: droid, key: 'left' }) // the Mac's arrows, on the screen
   for (const l of ['adb -s emulator-5554 shell input tap 540 1200', 'adb -s emulator-5554 shell input swipe 0 0 1079 2399 300', "adb -s emulator-5554 shell input text 'it'\\''s%sa%stest'", 'adb -s emulator-5554 shell input keyevent KEYCODE_BACK', 'adb -s emulator-5554 shell input keyevent KEYCODE_DPAD_LEFT'])
     assert.ok(log().includes(`${l}\n`), `${l} in\n${log()}`)
+  // an Android before 14 has no screencap -j: PNG from then on, -j not asked again
+  await rig.rpc('sim', { op: 'frame', device: droid })
+  assert.equal(log().split('\n').filter(l => l === 'adb -s emulator-5554 exec-out screencap -j').length, 1, 'asked once')
+  // one that has it: its JPEG, its size from the JPEG for taps
+  const fast = 'android:R58M'
+  assert.match((await rig.rpc('sim', { op: 'frame', device: fast })).frame, /^data:image\/jpeg;base64,/)
+  assert.ok(!log().includes('adb -s R58M exec-out screencap -p'), 'no PNG asked for')
+  await rig.rpc('sim', { op: 'tap', device: fast, x: 0.5, y: 0.5 })
+  assert.ok(log().includes('adb -s R58M shell input tap 720 1600\n'), 'mapped by the JPEG\'s 1440 x 3200')
   // Settings › Simulators' devices: running first, then the newest iOS; iOS runtimes only; an AVD running by its name
   const devs = (await rig.rpc('sim', { op: 'devices' })).devices as SimDev[]
   assert.deepEqual(
@@ -274,7 +288,10 @@ exit 0
     [...(ios ? [['ios:U-1', true, 'iOS 26.0']] : []), ['avd:Pixel_9', true, undefined], ...(ios ? [['ios:U-2', false, 'iOS 26.0']] : [])],
   )
   await rig.rpc('sim', { op: 'start', device: 'avd:Pixel_9' })
-  await until(() => log().includes('emulator -avd Pixel_9\n'), 'the emulator started')
+  await until(() => log().includes('emulator -avd Pixel_9 -no-window\n'), 'the emulator started, the panel its only screen')
+  await rig.rpc('settingsSet', { emuWindow: true })
+  await rig.rpc('sim', { op: 'start', device: 'avd:Pixel_9' })
+  await until(() => log().includes('emulator -avd Pixel_9\n'), 'with its own window, asked for')
   await rig.rpc('sim', { op: 'stop', device: 'avd:Pixel_9' })
   assert.ok(log().includes('adb -s emulator-5554 emu kill\n'), 'stopped by its serial')
   await assert.rejects(rig.rpc('sim', { op: 'start', device: 'avd:-x' }), /which device\?/, 'no option for the emulator')

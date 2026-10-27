@@ -84,6 +84,49 @@ test("a restart's tabs start in turn: the rest wait as asleep, a look, a message
   assert.equal(claudes(), 6, 'each once')
 })
 
+test("a restart leaves agents unused past sleepAfter asleep, not queued, until something wants them", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const wss = []
+  for (const name of ['old', 'new']) wss.push(await rig.rpc('wsNew', { project: p.id, name, preset: 'claude', prompt: `hi ${name}` }))
+  const ids: string[] = []
+  for (const ws of wss) ids.push((await until(async () => (t => t?.resumeId && t)(await rig.tab(ws.id, 'claude')), 'session id')).id)
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  const old = st.tabs.find((x: any) => x.id === ids[0])
+  assert.ok(Date.now() - old.usedAt < 60_000, 'its turns kept usedAt')
+  old.usedAt = Date.now() - 9 * 3600_000 // past the default 8 hours
+  writeFileSync(file, JSON.stringify(st))
+  await rig.start()
+  const claudes = () => rig.fakeLog().filter(l => l.bin === 'claude').length
+  await until(() => claudes() === 3, 'the one used lately resumed')
+  await sleep(500)
+  assert.equal(claudes(), 3, 'the old one waits')
+  const tab = (await rig.rpc('state')).tabs.find((x: any) => x.id === ids[0])
+  assert.equal(tab.asleep, true)
+  assert.equal(tab.queued, undefined, 'its tooltip: asleep, not waiting its turn')
+  await rig.rpc('tabWake', { tab: ids[0] }) // a look
+  await until(() => claudes() === 4, 'resumed as it was wanted')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[3].args.slice(4, 6), ['--resume', old.resumeId])
+})
+
+test('Check for updates saved off before 0.33 is on again, once: off after that stays off', async t => {
+  const rig = await fresh(t)
+  await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  st.settings = { ...st.settings, updateCheck: false }
+  delete st.updatesOn
+  writeFileSync(file, JSON.stringify(st))
+  await rig.start()
+  assert.equal((await rig.rpc('state')).settings.updateCheck, undefined, 'on: unset')
+  await rig.rpc('settingsSet', { updateCheck: false })
+  await rig.stop()
+  await rig.start()
+  assert.equal((await rig.rpc('state')).settings.updateCheck, false, 'your off now stays')
+})
+
 test('shells come back after a daemon restart: their folder, an agent resumed, a command typed back, a Run tab again', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

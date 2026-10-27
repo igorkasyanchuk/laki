@@ -191,6 +191,7 @@ export type AppSettings = Paint & {
   fullReview?: boolean // the tab bar's Review tab (FullReview.tsx), Settings › Pull requests, on unless false
   cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
+  emuWindow?: boolean // Simulators: an emulator Laki starts gets its own window too (off unless true: -no-window)
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // Laki AI's glow (App's PeekGlow) over what it looks at, on unless false
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
@@ -429,11 +430,13 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
+  ['general', 'Setup & teardown', 'setup teardown script logs output deleted workspaces development'],
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
   ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
+  ['simulator', 'Emulator window', 'android emulator window headless no-window one instance avd'],
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
@@ -793,6 +796,7 @@ export function SettingsPage(p: {
   cli?: CliApi // General › Developer: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
+  scriptLogs?: () => void // development mode's setup and teardown runs
   presets: Preset[] // the daemon's: the settings', or its defaults
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
@@ -1285,6 +1289,14 @@ export function SettingsPage(p: {
                   <div className="row">
                     <span className="muted small grow">Creation log: what making a workspace ran (what was asked, git, the setup, the agent) or why it failed</span>
                     <button onClick={() => p.logs!('new', 'Logs · new workspaces')}>
+                      <Icon name="file" /> Open
+                    </button>
+                  </div>
+                )}
+                {s.devMode && p.scriptLogs && (
+                  <div className="row">
+                    <span className="muted small grow">Setup & teardown: what each one printed and how it ended, for the last 30 workspaces, deleted ones too</span>
+                    <button onClick={p.scriptLogs}>
                       <Icon name="file" /> Open
                     </button>
                   </div>
@@ -1988,7 +2000,7 @@ export function SettingsPage(p: {
             </Group>
             </>
           )}
-          {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
+          {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} emuWindow={s.emuWindow === true} onEmuWindow={emuWindow => set({ emuWindow })} />}
           {sec === 'keys' && (
             <KeysSection
               over={s.keys}

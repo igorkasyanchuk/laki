@@ -241,7 +241,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: Resou
           </>
         )}
       </Group>
-      <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host.">
+      <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host. After a restart, one unused this long stays asleep until you open it.">
         <label>
           Sleep idle agents after
           <select value={sleepAfter} onChange={e => onSleepAfter(Number(e.target.value))}>

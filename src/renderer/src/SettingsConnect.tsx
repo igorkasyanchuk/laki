@@ -192,7 +192,7 @@ function SimDevices({ sim }: { sim: SimApi }) {
   )
 }
 
-export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: (v: boolean) => void }) {
+export function SimSection({ sim, on, onOn, emuWindow, onEmuWindow }: { sim: SimApi; on: boolean; onOn: (v: boolean) => void; emuWindow: boolean; onEmuWindow: (v: boolean) => void }) {
   const [checks, setChecks] = useState<SimCheck[] | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(true)
@@ -239,6 +239,11 @@ export function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: 
       </Group>
       <Group title="Android" hint="adb from Android Studio's SDK (Laki finds it there, no PATH needed), and an emulator or a phone with USB debugging on">
         {list('android') ?? (busy && <p className="muted small">Checking…</p>)}
+        <div className="setting-box">
+          <Switch className="switch-row" on={emuWindow} onChange={onEmuWindow}>
+            <Says title="Emulator window" hint="An emulator started here gets the emulator's own window too. Off: no window, the side panel's Simulator is its only screen (one started from Android Studio keeps its window). Takes effect at its next start" />
+          </Switch>
+        </div>
       </Group>
     </>
   )

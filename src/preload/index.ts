@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('laki', {
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard
+  openFile: (path: string, root: string): Promise<'opened' | 'missing'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
@@ -39,7 +40,9 @@ contextBridge.exposeInMainWorld('laki', {
   },
   floatTab: (tab: string, on = true) => ipcRenderer.send('tab-float', tab, on), // a tab in a window of its own over every app, or back
   floating: (): Promise<string[]> => ipcRenderer.invoke('floating'), // the tabs in windows of their own
-  floatSim: (device: string, ws?: string) => ipcRenderer.send('sim-float', device, ws ?? ''), // a simulator in a window of its own
+  floatSim: (device: string, ws?: string, on = true) => ipcRenderer.send('sim-float', device, ws ?? '', on), // a simulator in a window of its own, or back
+  simFloating: (): Promise<string[]> => ipcRenderer.invoke('sim-floating'),
+  onSimFloating: (cb: (devices: string[]) => void) => ipcRenderer.on('sim-floating', (_e, d: string[]) => cb(d)),
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),

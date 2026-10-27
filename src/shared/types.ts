@@ -371,6 +371,7 @@ export type Tab = {
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
+  usedAt?: number // made, or its agent's last turn or ask (ms): one unused past sleepAfter stays asleep after a restart (restoreAll)
   script?: RunScript // a script tab's (kind script): which RUN_SCRIPTS one, whatever it's named
 }
 
@@ -467,6 +468,7 @@ export type Settings = {
   todoList?: boolean // Settings › General › Pages: the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), on unless false
   cloud?: boolean // experimental (Settings › General): Cloud workspaces, a workspace in a GitHub Codespace (core.ts, daemon/codespace.ts), off unless true
   simulator?: boolean // Settings › Simulators: the side panel's Simulator tab, off unless true
+  emuWindow?: boolean // Settings › Simulators: an Android emulator Laki starts gets its own window too (off unless true: -no-window, the side panel its only screen)
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
   deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)
@@ -620,6 +622,7 @@ export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'up
 export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
+export type ScriptRun = { ws: string; name: string; project: string; kind: 'setup' | 'teardown'; cmd: string; at: number; secs: number; code: number | null; text: string } // scriptLogs': a setup's or teardown's run (development mode)
 export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
@@ -692,7 +695,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; tunnels?: SavedTunnel[] } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once; flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[]; flowTrust?: Record<string, string>; flowStats?: Record<string, FlowStats>; cfgTrust?: boolean; updatesOn?: boolean; tunnels?: SavedTunnel[] } // cfgTrust: projects from before .laki.json's trust were trusted as they were, once; updatesOn: an updateCheck saved off turned back on, once (load, 0.33); flowTrust: a project's workflows as you trusted them (workflow.ts), sha256 by source:project:id
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -855,5 +858,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 119
+export const API = 120
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

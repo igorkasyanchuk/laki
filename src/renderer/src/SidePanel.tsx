@@ -44,6 +44,8 @@ export type PanelApi = {
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
   setup?: () => void // Settings › Simulators: what a simulator needs on this Mac, the devices to start
   float?: (device: string) => void // the Simulator tab's device in a window of its own (Electron's)
+  floated?: string[] // the devices in windows of their own: the tab says so instead of a second screen
+  unfloat?: (device: string) => void // one back from its window
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   fileItems?: (path: string) => MenuItem[] // that menu's items for a file, in another menu (the full review's right click)
   web?: (path: string, at: 'base' | 'branch', line?: number) => void // the file's page on origin's site (the daemon's fileWeb), in the browser
@@ -463,10 +465,10 @@ export function SidePanel(p: {
 // SimWindow, which shows that device only)
 // ponytail: a few frames a second and a third of a second for a tap; a stream with live touches is the next step
 type SimDevice = { id: string; name: string; os: 'ios' | 'android' }
-export type SimTabApi = Pick<PanelApi, 'sim' | 'setup' | 'float'> & { toPrompt?: PanelApi['toPrompt'] }
+export type SimTabApi = Pick<PanelApi, 'sim' | 'setup' | 'float' | 'floated' | 'unfloat'> & { toPrompt?: PanelApi['toPrompt'] }
 const SIM_PICK = 'laki.sim' // the device picked last
 const SIM_PICKS = 'laki.sims' // each workspace's
-const SIM_GAP = 250 // ms at least between frames
+const SIM_GAP = 250 // ms at least between a frame's ask and the next of its pair (two on their way)
 const SIM_KEYS: Record<string, string> = { Enter: 'enter', Backspace: 'delete', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } // the Mac's keys, the daemon's
 const SIM_KEY_WORDS: [key: string, label: string, icon: IconName, android?: boolean][] = [
   ['home', 'Home', 'home'],
@@ -513,29 +515,48 @@ export function DeviceTab({ api, ws, only }: { api: SimTabApi; ws?: string; only
     return () => ((on = false), clearTimeout(t))
   }, [])
   const dev = list?.devices.find(d => d.id === pick) ?? (only ? undefined : list?.devices[0])
+  const away = !only && !!dev && !!api.floated?.includes(dev.id) // in a window of its own: one screen of it, not two
+  // two frames on their way, each asking for the next as it comes (a screenshot takes longer than its trip); one is
+  // shown only when it's newer than the one on screen
   useEffect(() => {
-    if (!dev) return
+    if (!dev || away) return
     let on = true
-    let t: ReturnType<typeof setTimeout> | undefined
+    let asked = 0
+    let shown = 0
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    const wakes = new Set<() => void>()
     setFrame('')
     const next = async () => {
       if (!on) return
       // back in sight: now (a hidden page's timers run once a minute after five)
-      if (document.hidden) return void document.addEventListener('visibilitychange', next, { once: true })
+      if (document.hidden) {
+        const back = () => (wakes.delete(back), void next())
+        wakes.add(back)
+        return void document.addEventListener('visibilitychange', back, { once: true })
+      }
       const at = Date.now()
+      const n = ++asked
       let wait = SIM_GAP
       try {
         const r = await api.sim<{ frame: string }>({ op: 'frame', device: dev.id })
-        if (on) (setFrame(r.frame), setErr(''))
+        if (on && n > shown) ((shown = n), setFrame(r.frame), setErr(''))
       } catch (e) {
-        if (on) setErr(String((e as Error)?.message ?? e))
+        if (on && n > shown) setErr(String((e as Error)?.message ?? e))
         wait = 2000 // gone, or not ready: again in a while
       }
-      if (on) t = setTimeout(next, Math.max(0, wait - (Date.now() - at)))
+      if (!on) return
+      const t = setTimeout(() => (timers.delete(t), void next()), Math.max(0, wait - (Date.now() - at)))
+      timers.add(t)
     }
     void next()
-    return () => ((on = false), clearTimeout(t), document.removeEventListener('visibilitychange', next))
-  }, [dev?.id])
+    const second = setTimeout(() => (timers.delete(second), void next()), SIM_GAP / 2) // the second, half a gap behind
+    timers.add(second)
+    return () => {
+      on = false
+      for (const t of timers) clearTimeout(t)
+      for (const w of wakes) document.removeEventListener('visibilitychange', w)
+    }
+  }, [dev?.id, away])
   const choose = (id: string) => {
     setLast(id)
     localStore(SIM_PICK, id)
@@ -647,42 +668,61 @@ export function DeviceTab({ api, ws, only }: { api: SimTabApi; ws?: string; only
         ))}
         {api.toPrompt && <IconButton icon="camera" title="Screenshot into the agent's prompt" onClick={() => void toAgent()} />}
         <IconButton icon="refresh" title="Look for devices again" onClick={() => void look()} />
-        {api.float && <IconButton icon="popOut" title="Float it in its own window, over every app" onClick={() => api.float!(dev.id)} />}
+        {api.float && !away && <IconButton icon="popOut" title="Float it in its own window, over every app" onClick={() => api.float!(dev.id)} />}
         {api.setup && <IconButton icon="tablet" title="Start another device: an iPhone, an iPad or an Android emulator…" onClick={api.setup} />}
       </div>
-      <div
-        className={`sim-screen ${busy ? 'busy' : ''}`}
-        tabIndex={0}
-        aria-label={`${dev.name}'s screen: click, then type`}
-        onKeyDown={onKey}
-        onPaste={e => {
-          const t = e.clipboardData.getData('text')
-          if (t) (e.preventDefault(), put({ op: 'type', text: t }))
-        }}
-        onFocus={() => setKeys(true)}
-        onBlur={() => setKeys(false)}
-      >
-        {frame ? (
-          <img
-            ref={img}
-            src={frame}
-            alt={`${dev.name}'s screen`}
-            draggable={false}
-            onPointerDown={e => e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), (down.current = spot(e)))}
-            onPointerUp={up}
-            onPointerCancel={() => (down.current = null)}
-          />
-        ) : (
-          !err && <span className="muted small">Its screen…</span>
-        )}
-      </div>
-      {(err || said) && <div className="warn small pad">{err || said}</div>}
-      {sent && !(err || said) ? <div className="muted small pad sim-keys">The screenshot is in the agent's prompt</div> : keys && !(err || said) && <div className="muted small pad sim-keys">Your keys go to {dev.name} · Esc lets go</div>}
-      <div className="sp-tools sim-type">
-        <input value={text} placeholder="Type into it · Enter sends" spellCheck={false} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (text ? type() : send({ op: 'key', key: 'enter' }))} />
-        <IconButton icon="enter" title="Return" onClick={() => send({ op: 'key', key: 'enter' })} />
-        <IconButton icon="eraser" title="Delete (backspace)" onClick={() => send({ op: 'key', key: 'delete' })} />
-      </div>
+      {away ? (
+        <div className="sim-none">
+          <Icon name="popOut" size={22} />
+          <b>{dev.name} is in its own window</b>
+          <div className="row-buttons">
+            <button type="button" onClick={() => api.float!(dev.id)}>
+              Show it
+            </button>
+            {api.unfloat && (
+              <button type="button" onClick={() => api.unfloat!(dev.id)}>
+                <Icon name="popIn" size={12} /> Bring it back
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
+            className={`sim-screen ${busy ? 'busy' : ''}`}
+            tabIndex={0}
+            aria-label={`${dev.name}'s screen: click, then type`}
+            onKeyDown={onKey}
+            onPaste={e => {
+              const t = e.clipboardData.getData('text')
+              if (t) (e.preventDefault(), put({ op: 'type', text: t }))
+            }}
+            onFocus={() => setKeys(true)}
+            onBlur={() => setKeys(false)}
+          >
+            {frame ? (
+              <img
+                ref={img}
+                src={frame}
+                alt={`${dev.name}'s screen`}
+                draggable={false}
+                onPointerDown={e => e.button === 0 && (e.currentTarget.setPointerCapture(e.pointerId), (down.current = spot(e)))}
+                onPointerUp={up}
+                onPointerCancel={() => (down.current = null)}
+              />
+            ) : (
+              !err && <span className="muted small">Its screen…</span>
+            )}
+          </div>
+          {(err || said) && <div className="warn small pad">{err || said}</div>}
+          {sent && !(err || said) ? <div className="muted small pad sim-keys">The screenshot is in the agent's prompt</div> : keys && !(err || said) && <div className="muted small pad sim-keys">Your keys go to {dev.name} · Esc lets go</div>}
+          <div className="sp-tools sim-type">
+            <input value={text} placeholder="Type into it · Enter sends" spellCheck={false} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (text ? type() : send({ op: 'key', key: 'enter' }))} />
+            <IconButton icon="enter" title="Return" onClick={() => send({ op: 'key', key: 'enter' })} />
+            <IconButton icon="eraser" title="Delete (backspace)" onClick={() => send({ op: 'key', key: 'delete' })} />
+          </div>
+        </>
+      )}
     </>
   )
 }

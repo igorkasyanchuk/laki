@@ -70,6 +70,25 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   assert.equal((await proj()).cfgWait, undefined)
 })
 
+test('development mode keeps what setup and teardown printed, after the workspace is deleted too', async t => {
+  const rig = await fresh(t, { config: { setup: 'echo setting-up-now', teardown: 'echo tearing-down; echo oops >&2; exit 3' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const quiet = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'quiet' })
+  await until(async () => !(await rig.rpc('state')).workspaces.find((w: any) => w.id === quiet.id).setup, 'its setup done')
+  await rig.rpc('wsRm', { id: quiet.id })
+  assert.deepEqual(await rig.rpc('scriptLogs'), [], 'off: nothing kept')
+  await rig.rpc('settingsSet', { devMode: true })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'logged' })
+  await until(async () => (await rig.rpc('scriptLogs')).length === 1, 'its setup kept')
+  await rig.rpc('wsRm', { id: ws.id })
+  const runs = await rig.rpc('scriptLogs')
+  assert.deepEqual(runs.map((r: any) => [r.ws, r.kind, r.code]), [[ws.id, 'teardown', 3], [ws.id, 'setup', 0]]) // newest first
+  assert.match(runs[1].text, /setting-up-now/)
+  assert.doesNotMatch(runs[1].text, /process exited/, "the session's own exit line left out")
+  assert.match(runs[0].text, /tearing-down\n--- stderr\noops/)
+  assert.equal(runs[0].cmd, 'echo tearing-down; echo oops >&2; exit 3')
+})
+
 test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch', async t => {
   const rig = await fresh(t, { config: { setup: 'echo setting-up; sleep 1; echo setup-ok > .setup-ran', teardown: 'echo bye > "$LAKI_TEARDOWN_MARK"' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

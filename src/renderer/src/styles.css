@@ -2203,6 +2203,10 @@ button.board-name:hover { background: none; }
 /* development mode's logs (panels.tsx Logs) */
 .logs { height: min(60vh, 520px); overflow: auto; padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font: 11.5px/1.5 var(--mono); }
 .log-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+.log-run { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.log-run > summary { cursor: pointer; }
+.log-step { margin: 6px 0 10px 14px; }
+.log-step > .log-line { margin-top: 4px; max-height: 360px; overflow: auto; }
 .ci-log { margin-top: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* a CSV file's Table (SidePanel.tsx CsvTable) */
 .csv { min-width: max-content; }

@@ -21,6 +21,7 @@ type Bridge = {
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
   onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
   copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
+  openFile?(path: string, root: string): Promise<'opened' | 'missing'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
@@ -35,7 +36,9 @@ type Bridge = {
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)
   floating?(): Promise<string[]> // the tabs floated out
-  floatSim?(device: string, ws?: string): void // the side panel's simulator in a window of its own over every app (main's simWins)
+  floatSim?(device: string, ws?: string, on?: boolean): void // the side panel's simulator in a window of its own over every app (main's simWins), or back (false)
+  simFloating?(): Promise<string[]> // the devices in windows of their own
+  onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)

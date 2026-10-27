@@ -747,7 +747,9 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
   A click on the screen also gives it your keyboard: letters, a paste, Return, Delete and the arrows go to the device
   (⌘ keys stay Laki's; Esc lets go). With several running, pick one in its menu: each workspace keeps its own, so two
   worktrees can watch two simulators. The window button floats it in a window of its own, over every app (one per
-  device; its camera goes to that workspace's agent). The tablet button opens **Settings › Simulators › Devices**:
+  device; its camera goes to that workspace's agent); the panel then says where it went (*Show it*, *Bring it back*)
+  instead of showing it twice. An Android emulator started here has no window of its own: the panel is its screen
+  (Settings › Simulators › *Emulator window* gives it one again). The tablet button opens **Settings › Simulators › Devices**:
   every iPhone and iPad simulator this Mac has and every Android virtual device, running first, each with *Start* or
   *Stop* (more of them: Xcode › Window › Devices and Simulators, or Android Studio's Device Manager). It's off until **Settings › Simulators** turns it on, for every project;
   a project's settings (*Simulator*) can turn it on or off for that project alone. Settings › Simulators also checks what this Mac has, each missing piece with the command to run (*Check again* after):
@@ -1596,7 +1598,9 @@ lit for a moment.
   kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
-  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Pick an
+  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Setup &
+  teardown*: what the setup and teardown scripts printed and how they ended, a row per workspace for the last 30, kept
+  after a workspace is deleted (Laki's data folder, `script-logs`); *Pick an
   element*: the rail's *Pick* (without the rail, the crosshair beside Help) or its hotkey, ⇧⌘C unless you record
   another, works on every page and over dialogs: point at anything in Laki's window, click, and it tells what it is
   (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
@@ -1790,6 +1794,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   *In the browser*): HTML sandboxed, its scripts run and the CSS and pictures beside it load, it can’t read Laki or your files; Markdown
   rendered; with *Open in the browser* and *Show in Finder*. *In the browser*, and every *Open in the browser*
   (the viewer's, the gallery's, a right click's), open an HTML one as Laki's sandboxed page of it, never the file itself.
+  That page can `fetch()` the files beside it (a report's JSON), nothing from the internet. *Open file* (the viewer's, a
+  right click's *Open the file*) opens the file itself, `file://`, in your browser: your call, as its scripts then run
+  as a local file and can read your other files.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
@@ -2144,6 +2151,8 @@ old build until it restarts. When the app relies on something that daemon lacks,
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
 come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`), a
 few seconds apart so the Mac stays quick; the rest wait dimmed (*asleep*), and the workspace you open starts at once.
+An agent unused for longer than Settings › Resources' *Sleep idle agents after* (8 hours unless you change it; *Never*: all come
+back) stays asleep: it resumes as you open it, type in it, or something is sent to it (a message, *fix CI*, a workflow).
 Shells come back in the folder they were in. An agent you started in one comes back too: claude resumes its own chat,
 codex its last one in that folder. Any other program that was running (a dev server, a watcher) is typed back at the
 prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was
@@ -2173,7 +2182,7 @@ a log out). After a crash, shells start fresh, and nothing comes back over SSH.
   so Laki reads its screen and window title: Enter or a prompt starts a turn, *Action Required* is waiting, a few
   quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Gemini without hooks works the same way. Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
 - **Snapshots** keep 5,000 lines of scrollback.
-- **Sleeping agents** live in the daemon's memory: a daemon restart resumes every tab, asleep or not. A process that
+- **Sleeping agents** live in the daemon's memory: a daemon restart resumes every tab used within *Sleep idle agents after*, asleep or not. A process that
   left its tab's tree (a double fork) shows nowhere in Resources.
 - **Fork** copies commits only; uncommitted changes stay behind.
 - **SSH hosts**: a dropped connection (the Mac asleep) ends the host's tabs, as nothing holds them there; Enter

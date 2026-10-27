@@ -824,14 +824,19 @@ ipcMain.on('tab-float', (e, tab: unknown, on: unknown) => {
 
 // the side panel's simulator floated out (its window button): that device alone (?window=sim), one window per device,
 // its screenshots to the workspace it was floated from
+// meanwhile the panel shows no second copy of it (simFloating): it says where it went, Show it, Bring it back (on false)
 const simWins = new Map<string, BrowserWindow>()
-ipcMain.on('sim-float', (e, device: unknown, ws: unknown) => {
+const simFloating = () => win && !win.isDestroyed() && win.webContents.send('sim-floating', [...simWins.keys()]) // quitting: the app's window may be gone first
+ipcMain.handle('sim-floating', e => (from(e) ? [...simWins.keys()] : []))
+ipcMain.on('sim-float', (e, device: unknown, ws: unknown, on: unknown) => {
   if (e.sender !== win?.webContents || typeof device !== 'string' || !/^(ios|android):\w[\w.:-]{0,199}$/.test(device) || typeof ws !== 'string' || !/^[\w-]{0,64}$/.test(ws)) return
   const had = simWins.get(device)
+  if (on === false) return void had?.close()
   if (had && !had.isDestroyed()) return void had.focus()
   const w = panelWin({ window: 'sim', device, ws }, 400, 820, { minWidth: 240, minHeight: 320 })
   simWins.set(device, w)
-  w.on('closed', () => simWins.get(device) === w && simWins.delete(device))
+  w.on('closed', () => simWins.get(device) === w && (simWins.delete(device), simFloating()))
+  simFloating()
 })
 
 // a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the
@@ -1092,6 +1097,17 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   if (st.isFile() && top && real.startsWith(`${top}/`)) return { rel: real.slice(top.length + 1) }
   if (st.isDirectory() ? !BUNDLE.test(real) : st.isFile() && DOCS.test(real)) await shell.openPath(real)
   else shell.showItemInFolder(real)
+  return 'opened'
+})
+
+// an HTML artifact as itself, a file:// page in the default browser (its viewer's and right click's Open file): the app
+// window's only, a file inside root (the workspace's storage folder), links followed first. The user's call, asked for
+// by name: unlike the daemon's /artifact/ page (L11), its scripts run as a local file and may read others
+ipcMain.handle('open-file', async (e, path: unknown, root: unknown) => {
+  if (!win || e.sender !== win.webContents || typeof path !== 'string' || typeof root !== 'string' || !path.startsWith('/') || !root.startsWith('/')) return 'missing'
+  const [real, top] = await Promise.all([realpath(path).catch(() => ''), realpath(root).catch(() => '')])
+  if (!real || !top || !real.startsWith(`${top}/`) || !/\.html?$/i.test(real) || !(await stat(real).catch(() => null))?.isFile()) return 'missing'
+  await shell.openExternal(pathToFileURL(real).href)
   return 'opened'
 })
 

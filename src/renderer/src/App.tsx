@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame } from '../../shared/types'
+import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, QueueStrip, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, QueueStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
@@ -176,7 +176,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -457,6 +457,8 @@ export function App() {
   const [floated, setFloated] = useState<string[]>([]) // tabs in windows of their own (main's tabWin): their panes say so
   const floatTab = (id: string, on = true) => bridge?.floatTab?.(id, on) // a tab in a window of its own over every app (on false: back)
   useEffect(() => void (bridge?.onFloating?.(setFloated), bridge?.floating?.().then(setFloated)), [])
+  const [simFloated, setSimFloated] = useState<string[]>([]) // simulators in windows of their own: the panel shows them no more
+  useEffect(() => void (bridge?.onSimFloating?.(setSimFloated), bridge?.simFloating?.().then(setSimFloated)), [])
   // tabs (of panes) per workspace: the daemon's (view.layouts, API 60: every window, the phone, Laki AI see one), kept
   // here too for the first paint and an older daemon
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {}))
@@ -1662,6 +1664,8 @@ export function App() {
     sim: p => api.call('sim', p),
     setup: () => setDialog({ section: 'simulator' }),
     float: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id)),
+    floated: simFloated,
+    unfloat: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id, false)),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     fileItems: path => fileMenu(w, path, false),
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
@@ -1706,12 +1710,16 @@ export function App() {
   // in the browser: an HTML one as the daemon's sandboxed page (L11: never a file: page), anything else by main's open-path
   const inBrowser = (w: WorkspaceView, path: string) => (/\.html?$/i.test(path) && artPage(w, path) ? void bridge?.openExternal?.(artPage(w, path)!) : void bridge?.openPath?.(`${w.storage}/${path}`))
   const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : inBrowser(w, path))
+  // the file itself (file://), when you ask: its scripts run as a local page (the viewer's Open file, the right click's)
+  const asFile = (w: WorkspaceView, path: string) => (bridge?.openFile && w.storage && /\.html?$/i.test(path) ? () => void bridge!.openFile!(`${w.storage}/${path}`, w.storage!).then(r => r === 'missing' && toast(`Not there: ${path}`), fail) : undefined)
   // an artifact's right click (Files' Artifacts, the status bar's strip and its big view): open it, Finder, the clipboard
   const artMenu = (w: WorkspaceView, path: string): MenuItem[] => {
     const full = `${w.storage}/${path}`
     return [
       ...(inViewer(path) ? [{ label: 'Open', icon: 'file', run: () => openArt(w, path) } as MenuItem] : []),
-      ...(bridge?.openPath ? [{ label: inViewer(path) ? 'Open in the browser' : 'Open', icon: inViewer(path) ? 'globe' : 'file', run: () => inBrowser(w, path) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
+      ...(bridge?.openPath ? [{ label: inViewer(path) ? 'Open in the browser' : 'Open', icon: inViewer(path) ? 'globe' : 'file', run: () => inBrowser(w, path) } as MenuItem] : []),
+      ...((f => (f ? [{ label: 'Open the file', icon: 'file', sub: 'As file:// in your browser: its scripts can read your files', run: f } as MenuItem] : []))(asFile(w, path))),
+      ...(bridge?.openPath ? [{ label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
       ...(bridge?.copyFile ? [{ label: 'Copy', icon: 'copy', key: 'c', sub: PICTURE.test(path) ? 'The picture' : 'The file: paste it in Finder, Slack or mail', run: () => void bridge!.copyFile!(full).then(k => (k === 'missing' ? toast(`${path} is gone`) : done(k === 'image' ? 'Picture copied' : 'File copied')), fail) } as MenuItem] : []),
       ...(PLAIN.test(path) ? [{ label: 'Copy text', icon: 'copy', key: 't', run: () => void api.call<FileContent>('fileRead', { ws: w.id, path, storage: true }).then(c => (c.text === undefined ? toast(`${path} isn't text`) : c.cut ? toast(`${path} is too big to copy as text: Copy puts the file itself there`) : copy(c.text)), fail) } as MenuItem] : []),
       { label: 'Copy path', icon: 'copy', key: 'p', run: () => copy(full) },
@@ -2798,7 +2806,7 @@ export function App() {
       if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
     }
     if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
-    for (const w of order) items.push({ kind: 'ws', more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, run: () => setWsId(w.id) })
+    for (const w of order) items.push({ kind: 'ws', more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
       if (w) items.push({ kind: 'tab', more: () => tabMenu([t.id]), label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t.id) })
@@ -3977,6 +3985,7 @@ export function App() {
             remote={{ state: view.remote, start: (hours, mail, open, pin, via, funnel) => api.call('remoteStart', { hours, mail, open, pin, via, funnel }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={extCfg}
             logs={(key, title) => setDialog({ logs: key, title })}
+            scriptLogs={() => setDialog('scriptLogs')}
             section={settingsFor ? `project:${settingsFor.id}` : section}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
             spot={typeof dialog === 'object' && dialog && 'spot' in dialog ? dialog.spot : undefined}
@@ -4078,6 +4087,7 @@ export function App() {
             onTheme={theme => call('settingsSet', { theme }).catch(() => {})}
           />
         )}
+        {dialog === 'scriptLogs' && <ScriptLogs load={() => api.call<ScriptRun[]>('scriptLogs')} copy={copy} onClose={() => setDialog({ section: 'general' })} />}
         {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.back ?? (dialog.logs === 'new' ? { section: 'general' } : null))} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog === 'starters' && <StarterPicker onClose={() => setDialog(null)} onPick={k => (setDialog(null), void extCfg.make!(k))} />}
@@ -4324,6 +4334,7 @@ export function App() {
             page={artPage(w, artView.path)}
             read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
             onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
+            onFile={asFile(w, artView.path)}
             onReveal={bridge?.openPath && (() => revealArt(w, artView.path))}
             onClose={() => setArtView(null)}
           />
