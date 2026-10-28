@@ -22,6 +22,12 @@ test('/laki:new and /laki:extension: claude tabs get Laki’s plugin (its comman
   assert.match(ext, /\ndisable-model-invocation: true\n/)
   assert.match(ext, /\$ARGUMENTS\n\n# Making a Laki extension/)
   assert.match(ext, /Run the laki CLI as `\/usr\/bin\/env .*`\. Below/)
+  const orch = readFileSync(join(plugin, 'commands', 'orchestrate.md'), 'utf8') // the laki-orchestrate skill's guide, as /laki:orchestrate
+  assert.match(orch, /allowed-tools: Bash\(.* ls:\*\), Bash\(.* new:\*\), /)
+  assert.match(orch, /\ndisable-model-invocation: true\n[\s\S]*\$ARGUMENTS\n\n# Orchestrating agents in Laki/)
+  // and in Laki's OpenCode tabs (its OPENCODE_CONFIG_DIR's command/): /laki-orchestrate
+  const oc = readFileSync(join(plugin, '..', 'opencode', 'command', 'laki-orchestrate.md'), 'utf8')
+  assert.match(oc, /^---\ndescription: Split work across several Laki agents[\s\S]*\$ARGUMENTS\n\n# Orchestrating agents in Laki[\s\S]*Run the laki CLI as `\/usr\/bin\/env /)
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'claude'), 'claude')
   assert.equal(run.args[run.args.indexOf('--plugin-dir') + 1], plugin)
   // in a tab: . is its project; elsewhere it says so
@@ -231,5 +237,23 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
     await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'it went on', 30000)
     assert.match(readFileSync(out, 'utf8'), said)
   }
+  // one this workspace started (a worker: laki new from its tab): no question, as for its own (laki-orchestrate)
+  const kid = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'kid', from: ws.id })
+  const kidShell = (await rig.rpc('tabNew', { ws: kid.id })).id
+  rmSync(out, { force: true })
+  const asks = app.events.filter(m => m.ev === 'toolAsk').length
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} screen ${kid.id}/${kidShell} > ${out} 2>&1; echo done >> ${out}` })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'read unasked', 30000)
+  assert.doesNotMatch(readFileSync(out, 'utf8'), /another workspace/)
+  assert.equal(app.events.filter(m => m.ev === 'toolAsk').length, asks)
+  // a new agent tab with a prompt in another workspace asks as a send does
+  rmSync(out, { force: true })
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} tab ${other.id} --preset claude --prompt hello > ${out} 2>&1; echo done >> ${out}` })
+  const tabAsk = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'send' && !m.seen), 'a tab asked for', 30000)
+  assert.deepEqual([tabAsk.to, tabAsk.target, tabAsk.text], ['other', 'a new agent tab', 'hello'])
+  await rig.rpc('widgetToolAnswer', { req: tabAsk.req, allow: 'deny' })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'refused', 30000)
+  assert.match(readFileSync(out, 'utf8'), /another workspace: the user said no/)
+  assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === other.id && x.kind === 'agent'))
   app.close()
 })

@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, QueueStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, LaterStrip, QueueStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
@@ -42,7 +42,7 @@ import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
+import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
@@ -232,7 +232,7 @@ const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'wo
 const clip = (s: string, n = 60) => (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ')) // a message on one line
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 // …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's
-const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon' } as const
+const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon', head: '--ph-h', gap: '--proj-gap', rowGap: '--ws-gap' } as const
 const sideVars = (sl?: SideLook) => Object.fromEntries((Object.keys(SIDE_VARS) as (keyof typeof SIDE_VARS)[]).flatMap(k => (sl?.[k] && sl[k] !== 'theme' ? [[SIDE_VARS[k], sl[k]]] : []))) as CSSProperties
 
 // the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
@@ -871,6 +871,7 @@ export function App() {
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
+  userCss(view?.settings.customCss) // Appearance › Custom CSS
   // L7: no https picture straight from the window: an extension's through the daemon's /img, GitHub's avatars by the switch
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
@@ -1616,8 +1617,8 @@ export function App() {
   const editScripts = () => project && setDialog({ settings: project.id, script: 'run', spot: 'Scripts' }) // opened at its Scripts, lit
   // an action from Run ▾: a prompt to its agent's tab (queued while it works), a command to a shell (a new one if none)
   const runAction = async (w: WorkspaceView, a: RunAction, tab?: string) => {
-    // a new tab goes in whole: the view doesn't have it yet
-    const t = tab ? byId(tab) : await call<TabView>('tabNew', { ws: w.id, preset: 'shell' }).catch(() => null)
+    // a new tab goes in whole: the view doesn't have it yet. Any workspace's (a sidebar row's Run ›): not byId, the shown one's
+    const t = tab ? view?.tabs.find(x => x.id === tab) : await call<TabView>('tabNew', { ws: w.id, preset: 'shell' }).catch(() => null)
     if (!t) return
     selectTab(t)
     const r = await call<{ queued?: number }>('send', { target: t.id, text: stamp(a.text, Date.now()), whenIdle: a.target !== 'shell', vars: true }).catch(() => null) // its {{HH:mm}}-style dates: now's; its {{branch}}…: the daemon's
@@ -1627,7 +1628,7 @@ export function App() {
   const actionItems = (w: WorkspaceView): MenuItem[] => {
     const live = (view?.tabs ?? []).filter(t => t.workspace === w.id && t.status !== 'exited').map(t => ({ id: t.id, agent: t.kind === 'agent' ? t.preset : undefined, shell: t.kind === 'shell', busy: t.status !== 'idle' || !!t.runs }))
     const cfg = view?.projects.find(p => p.id === w.project)?.config
-    return actionMenu(actionsFor(settings.actions, cfg?.actions, live, w.id === ws?.id ? tab?.id : undefined), id => byId(id)?.name, (a, t) => runAction(w, a, t))
+    return actionMenu(actionsFor(settings.actions, cfg?.actions, live, w.id === ws?.id ? tab?.id : undefined), id => view?.tabs.find(t => t.id === id)?.name, (a, t) => runAction(w, a, t))
   }
   // Run ▾: the toolbar's, and a sidebar row's right click (Run ›) for any workspace
   const runMenu = (w = ws): MenuItem[] => {
@@ -1677,11 +1678,11 @@ export function App() {
   }
   // Changes' Revert, a git action: always asked (a whole file, or what of it: a hunk, some lines), an agent at work there
   // in the same question
-  const revertOk = async (w: WorkspaceView, file: string, part?: string) => {
+  const revertOk = async (w: WorkspaceView, file: string, part?: string, uncommitted?: boolean) => {
     const busy = view?.tabs.find(t => t.workspace === w.id && t.kind === 'agent' && t.status === 'running')
     const warn = busy && `${busy.preset ?? busy.name} is working here: it may write it again.`
     const name = file.split('/').pop()
-    return ask(part ? `Revert ${part} in ${name}?` : `Revert ${name}?`, { text: [`Back to how ${part ? 'it is' : 'the file is'} on ${w.base ?? 'the base'}${part ? '' : ': every change in it goes'}. Nothing is committed; Undo is in the toast.`, warn].filter(Boolean).join(' '), ok: 'Revert', danger: true })
+    return ask(part ? `Revert ${part} in ${name}?` : `Revert ${name}?`, { text: [`Back to how ${part ? 'it is' : 'the file is'} ${uncommitted ? 'in the last commit' : `on ${w.base ?? 'the base'}`}${part ? '' : ': every change in it goes'}. Nothing is committed; Undo is in the toast.`, warn].filter(Boolean).join(' '), ok: 'Revert', danger: true })
   }
   const redo = (w: WorkspaceView, id: string, then?: () => void) => call('hunkRedo', { ws: w.id, id }).then(() => (then?.(), done('Back as it was')), () => {})
   const panelApi = (w: WorkspaceView): PanelApi => ({
@@ -1689,11 +1690,11 @@ export function App() {
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
     preview: (path, line) => openFile({ ws: w.id, path, line }),
-    changes: () => api.call<Changes>('diff', { ws: w.id }),
+    changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
     prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
-    read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
+    read: (path, base, uncommitted) => api.call<FileContent>('fileRead', { ws: w.id, path, base, uncommitted }),
     prFile: path => api.call<FileContent>('prFile', { ws: w.id, path }),
     // the workspace's live agent tabs, the focused one first: where a comment or the full review's go
     agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
@@ -1725,16 +1726,16 @@ export function App() {
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     fileItems: path => fileMenu(w, path, false),
     web: (path, at, line) => void call<{ url: string }>('fileWeb', { ws: w.id, path, at, line }).then(r => openExternal(r.url), fail),
-    undoHunk: async (path, hunk, lines, then) => {
-      if (!(await revertOk(w, path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk'))) return false
-      const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines })
+    undoHunk: async (path, hunk, lines, then, uncommitted) => {
+      if (!(await revertOk(w, path, lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : 'this hunk', uncommitted))) return false
+      const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines, uncommitted })
       then?.()
       done(`Reverted ${lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : '1 hunk'} in ${path.split('/').pop()}`, () => void redo(w, id, then))
       return true
     },
-    undoFile: async (path, then) => {
-      if (!(await revertOk(w, path))) return false
-      const { id } = await call<{ id: string }>('fileUndo', { ws: w.id, path })
+    undoFile: async (path, then, uncommitted) => {
+      if (!(await revertOk(w, path, undefined, uncommitted))) return false
+      const { id } = await call<{ id: string }>('fileUndo', { ws: w.id, path, uncommitted })
       then?.()
       done(`Reverted ${path.split('/').pop()}`, () => void redo(w, id, then))
       return true
@@ -1757,7 +1758,7 @@ export function App() {
     threadsAll: () => api.call<Thread[]>('prThreads', { ws: w.id, all: true }),
     talk: () => api.call<Talk[]>('prTalk', { ws: w.id }),
     say: body => api.call<{ url?: string }>('prSay', { ws: w.id, body }).then(r => toast(`Commented on PR #${w.pr?.number}`, r.url ? () => openExternal(r.url!) : undefined, 'Open', true)),
-    blame: (path, side) => api.call<Blame>('blame', { ws: w.id, path, side }),
+    blame: (path, side, uncommitted) => api.call<Blame>('blame', { ws: w.id, path, side, uncommitted }),
     post: comments => api.call<{ url?: string; n: number }>('prReview', { ws: w.id, comments }).then(r => (r.url ? toast(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`, () => openExternal(r.url!), 'Open', true) : done(`Posted ${r.n} comment${r.n === 1 ? '' : 's'} on PR #${w.pr?.number}`))),
   })
   // an artifact opened: HTML and Markdown in the app's viewer (Settings › General › Storage, unless In the browser), the
@@ -1977,19 +1978,25 @@ export function App() {
     toast(says.join('; '))
     return rows
   }
-  const editor = settings.editor || 'cursor'
+  // ⌘E's: the project's own (Open in's last pick for its folder), else Settings' (the daemon's openIn 'editor' alike)
+  const editorOf = (pid?: string) => (pid && settings.editors?.[pid]) || settings.editor || 'cursor'
+  const projectOf = (where: Where) => where.project ?? view?.workspaces.find(x => x.id === where.ws)?.project
+  const editor = editorOf(project?.id)
   const targets: AppInfo[] = [...apps.filter(a => !a.browser), ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
   const editorName = targets.find(a => a.id === editor && a.id !== 'custom')?.name ?? 'editor'
   const openIn = (app: string, where: Where = { ws: ws?.id }) => {
     call('openIn', { ...where, app }).catch(() => {})
-    // an editor picked from the list is ⌘E's from now on (for a folder: a file's pick is just for it)
-    if (EDITOR_IDS.includes(app) && app !== editor && !where.file) call('settingsSet', { editor: app }).catch(() => {})
+    // an editor picked for a project's folder is ⌘E's there from now on (a file's pick is just for it; Settings › Open
+    // in keeps the default, and each project's)
+    const pid = where.file || where.widget ? undefined : projectOf(where)
+    if (pid && EDITOR_IDS.includes(app) && app !== editorOf(pid)) call('settingsSet', { editors: { ...settings.editors, [pid]: app } }).catch(() => {})
   }
   // Open in: every app, ⌘E's first
   const openInItems = (where: Where = { ws: ws?.id }): MenuItem[] =>
-    [...targets]
-      .sort((a, b) => Number(b.id === editor) - Number(a.id === editor))
-      .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === editor && !where.file ? '⌘E' : undefined, run: () => openIn(a.id, where) }))
+    (ed =>
+      [...targets]
+        .sort((a, b) => Number(b.id === ed) - Number(a.id === ed))
+        .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === ed && !where.file ? '⌘E' : undefined, run: () => openIn(a.id, where) })))(editorOf(projectOf(where)))
   // right click in Files: a file in its default app, a browser (for what they show), or any app (Finder reveals it,
   // a terminal opens its folder)
   const fileMenu = (w: WorkspaceView, file: string, dir: boolean): MenuItem[] => [
@@ -3898,7 +3905,16 @@ export function App() {
                     onFile={path => openPath(id, path)}
                   />
                 )}
-                foot={id => (t => t?.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null)(byId(id))}
+                foot={id =>
+                  (t =>
+                    t && (
+                      <>
+                        {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
+                        {/* Send later's for this tab: its timers, also over the sidebar's foot */}
+                        <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />
+                      </>
+                    ))(byId(id))
+                }
                 onFocus={id => id !== tab?.id && selectTab(id)}
                 hoverFocus={settings.hoverFocus !== false}
                 onClose={id => byId(id) && closeTabs([byId(id)!])}
@@ -3926,7 +3942,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} />] : []
             })}
-            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
+            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
           {tabsAt === 'right' && tabStrip}
           {previewed && ws && (
@@ -4547,7 +4563,7 @@ export function App() {
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
           {upd?.latest && ( // a newer release: here until you update (Settings › General › Updates: its notes, Update)
-            <button className={`sb-update ${upd.status === 'ready' ? 'ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
+            <button className={`sb-update ${upd.status === 'ready' ? 'sb-ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
               <Icon name="download" size={11} />
               {upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
             </button>

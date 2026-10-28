@@ -346,6 +346,7 @@ export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (ag
 const SKILL_KINDS: [string, string, string][] = [
   ['laki', 'Laki', 'list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all through the command line'],
   ['laki-widget', 'Extension creator', "make and change the sidebar's extensions: the files, the template language, JS ones, actions, checking them with laki widget"],
+  ['laki-orchestrate', 'Orchestrator', 'split work across several agents at once, a workspace each: plan it, start them, follow them up and bring their results together (in Laki’s Claude tabs also /laki:orchestrate, in its OpenCode tabs /laki-orchestrate)'],
 ]
 
 // the skill that teaches the agents about the app, in each one's folder in the user's home

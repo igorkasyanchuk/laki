@@ -29,6 +29,42 @@ export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
   return [d, err, () => setN(x => x + 1)] as const
 }
 
+// which changes a diff shows (Changes', the full review's): the branch's (against its base, with what isn't committed
+// yet), only what isn't committed (against HEAD: a worktree's; a folder's own Branch is that already), or the PR's
+// (gh pr diff; a linked PR's first). Branch or Uncommitted is kept per view (store), the PR's for this look only
+export type Scope = 'branch' | 'uncommitted' | 'pr'
+export function useScope(store: string, pr: boolean, linked: boolean, worktree: boolean) {
+  const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the view opens)
+  const [head, setHead] = useState(() => localStore(store) === 'uncommitted')
+  const scope: Scope = pr && (whole ?? linked) ? 'pr' : worktree && head ? 'uncommitted' : 'branch'
+  const set = (s: Scope) => (setWhole(s === 'pr'), s !== 'pr' && (setHead(s === 'uncommitted'), localStore(store, s)))
+  return [scope, set] as const
+}
+// the api as Uncommitted reads and reverts: against HEAD
+export const atHead = <T extends PanelApi>(api: T, on: boolean): T =>
+  on ? { ...api, changes: () => api.changes(true), read: (p, base) => api.read(p, base, true), undoHunk: (p, h, l, then) => api.undoHunk(p, h, l, then, true), undoFile: (p, then) => api.undoFile(p, then, true) } : api
+// the switch: Branch (its words: branch), Uncommitted (a worktree's), PR #n
+export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch' }: { scope: Scope; onScope: (s: Scope) => void; pr?: { number: number }; worktree: boolean; branch?: string }) {
+  if (!pr && !worktree) return null
+  return (
+    <span className="seg">
+      <button type="button" className={scope === 'branch' ? 'on' : ''} data-tip="This workspace's changes: its branch against its base, and what isn't committed" onClick={() => onScope('branch')}>
+        {branch}
+      </button>
+      {worktree && (
+        <button type="button" className={scope === 'uncommitted' ? 'on' : ''} data-tip="Only what isn't committed yet: the files against the last commit (HEAD)" onClick={() => onScope('uncommitted')}>
+          Uncommitted
+        </button>
+      )}
+      {pr && (
+        <button type="button" className={scope === 'pr' ? 'on' : ''} data-tip={`All of PR #${pr.number}, as GitHub has it (gh pr diff)`} onClick={() => onScope('pr')}>
+          PR #{pr.number}
+        </button>
+      )}
+    </span>
+  )
+}
+
 // localStorage, or nothing (a private window, blocked storage)
 export function localStore(k: string, v?: string) {
   try {

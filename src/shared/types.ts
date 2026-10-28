@@ -420,6 +420,8 @@ export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
 export type Settings = {
   editor?: string
+  editors?: Record<string, string> // a project's own (by its id): Open in's last pick for its folder, ⌘E's there; none: editor
+  customCss?: string // Appearance › Custom CSS, every window's (themes.ts userCss); not over remote access or from an agent (REMOTE_KEYS); Reset the interface clears it
   editorCmd?: string
   agent?: string // the preset new workspaces start
   branchPrefix?: string
@@ -623,7 +625,7 @@ export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' |
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type ScriptRun = { ws: string; name: string; project: string; kind: 'setup' | 'teardown'; cmd: string; at: number; secs: number; code: number | null; text: string } // scriptLogs': a setup's or teardown's run (development mode)
-export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }
+export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; head?: string; gap?: string; rowGap?: string; labels?: boolean } // head: a project's row height; gap: between projects; rowGap: between rows
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number; images?: string[] } // images: pasted ones (<data>/images), their paths after the text as it starts
@@ -858,5 +860,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 121
+export const API = 122
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

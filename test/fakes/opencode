@@ -3,7 +3,9 @@
 // events (a subagent's too), as the real one does
 const fs = require('fs'), path = require('path'), { pathToFileURL } = require('url')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'opencode', tab: process.env.LAKI_TAB, args }) + '\n')
+// a TUI that refuses -m, as some versions do ("Unrecognized flag"): the model goes in OPENCODE_CONFIG_CONTENT
+if (args.includes('-m')) process.stdout.write('Unrecognized flag: -m in command opencode\r\n'), process.exit(1)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'opencode', tab: process.env.LAKI_TAB, args, config: process.env.OPENCODE_CONFIG_CONTENT }) + '\n')
 const val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
 const session = val('--session') ?? 'ses_' + Math.random().toString(36).slice(2, 8)
 if (session.startsWith('gone-')) {

@@ -102,7 +102,7 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })
   const states = (s: { state: string }[]) => s.map(x => x.state)
-  assert.deepEqual(states(await rig.rpc('skills')), Array(10).fill('missing')) // laki's, then laki-widget's
+  assert.deepEqual(states(await rig.rpc('skills')), Array(15).fill('missing')) // laki's, laki-widget's, then laki-orchestrate's
   assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: true })).slice(0, 2)), ['installed', 'missing'])
   const at = join(rig.home, '.claude/skills/laki')
   assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)
@@ -133,6 +133,16 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   assert.deepEqual([wid.state, wid.mcp], ['installed', ''])
   assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/SKILL.md'), 'utf8'), /^---\nname: laki-widget\n[\s\S]*laki widget reload/)
   assert.ok(!existsSync(join(rig.home, '.claude/skills/laki/SKILL.md')), 'laki stays out')
+  // the orchestrator: its own too, the coordinator's protocol over laki new, screen and send
+  await rig.rpc('skillSet', { agent: 'codex', on: true, skill: 'laki-orchestrate' })
+  const orch = readFileSync(join(rig.home, '.codex/skills/laki-orchestrate/SKILL.md'), 'utf8')
+  assert.match(orch, /^---\nname: laki-orchestrate\n[\s\S]*LAKI_WORKER_DONE[\s\S]*laki screen <ws>/)
+  assert.match(orch, /through this launcher \(an absolute path; keep the quotes\): `"\/\S+\/laki-orchestrate\/laki"`/)
+  await rig.rpc('skillSet', { agent: 'codex', on: false, skill: 'laki-orchestrate' })
+  // OpenCode reads {skill,skills}/**/SKILL.md in its config folder
+  await rig.rpc('skillSet', { agent: 'opencode', on: true, skill: 'laki-orchestrate' })
+  assert.match(readFileSync(join(rig.home, '.config/opencode/skills/laki-orchestrate/SKILL.md'), 'utf8'), /^---\nname: laki-orchestrate\n/)
+  await rig.rpc('skillSet', { agent: 'opencode', on: false, skill: 'laki-orchestrate' })
   await assert.rejects(rig.rpc('skillSet', { agent: 'claude', on: true, skill: 'nope' }), /no skill/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key

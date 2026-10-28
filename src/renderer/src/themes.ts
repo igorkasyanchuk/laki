@@ -1120,6 +1120,16 @@ let seeThrough = false
 // allowTransparency, which costs some text quality)
 export const transparent = () => seeThrough
 
+// Settings › Appearance › Custom CSS: the user's own rules, last in <head> so they win over the app's at the same
+// specificity (a lazy page's sheet loads later: over it, !important). Each window's own; the CSP keeps url()s to 'self'
+export function userCss(css?: unknown) {
+  let el = document.getElementById('laki-css')
+  if (typeof css !== 'string' || !css.trim()) return void el?.remove() // none, or not text (a file from elsewhere)
+  if (!el) (el = document.createElement('style')), (el.id = 'laki-css')
+  if (document.head.lastElementChild !== el) document.head.append(el)
+  if (el.textContent !== css) el.textContent = css
+}
+
 // paints <html> with a theme (an unknown id is the default), or a whole Paint
 export function applyTheme(p: string | Paint = '') {
   const o: Paint = { ...(typeof p === 'string' ? { theme: p } : p), ...(asked(LESS_CLEAR) && { glass: false, sideClear: 0 }) }

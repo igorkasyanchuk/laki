@@ -261,7 +261,12 @@ test('apps and open in: Finder, an app, a file, the editor; errors', async t => 
   assert.deepEqual(readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open ')).slice(-2), [`open -R ${join(ws.path, 'go.command')}`, `open -R ${join(ws.path, 'build')}`])
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'zed', file: 'gone.txt' }), /The file \S+gone\.txt does not exist\./)
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'emacs' }), /no app emacs/)
-  await rig.rpc('settingsSet', { editor: 'custom' })
+  // a project's own editor (Open in's pick for its folder) over Settings': its workspaces' and the project's folder
+  await rig.rpc('settingsSet', { editors: { [p.id]: 'xcode' } })
+  await rig.rpc('openIn', { ws: ws.id, app: 'editor' })
+  await rig.rpc('openIn', { project: p.id, app: 'editor' })
+  assert.deepEqual(readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open ')).slice(-2), [`open -a Xcode ${ws.path}`, `open -a Xcode ${p.path}`])
+  await rig.rpc('settingsSet', { editor: 'custom', editors: {} })
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'editor' }), /set the editor command in Settings/)
 })
 
@@ -623,7 +628,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   // a phone has what it needs, not what outlives its session or opens Laki wider (M4)
   const far = (method: string, params = {}) =>
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
-  for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }]] as const)
+  for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
   assert.equal((await far('settingsSet', { remoteMail: 'me@x.dev', notify: false })).result.notify, false) // Settings sends them all back: unchanged is fine

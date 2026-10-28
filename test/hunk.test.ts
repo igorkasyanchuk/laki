@@ -221,3 +221,26 @@ test("a folder without git can't revert", async t => {
   await assert.rejects(rig.rpc('hunkUndo', { ws: ws.id, path: 'f.txt', hunk: '@@ -1 +1 @@' }), /not a git repo/)
   await assert.rejects(rig.rpc('fileUndo', { ws: ws.id, path: 'f.txt' }), /not a git repo/)
 })
+
+test("Uncommitted: only what isn't committed (against HEAD), its hunks and files revert to the last commit", async t => {
+  const rig = await fresh(t)
+  const ws = await setup(rig, { 'a.txt': lines(30), 'b.txt': 'b\n' })
+  // a commit on the branch, then an edit over it and a new file
+  writeFileSync(join(ws.path, 'a.txt'), lines(30, i => (i === 3 ? 'three!' : `line ${i}`)))
+  gitIn(rig, ws, 'commit', '-qam', 'on the branch')
+  writeFileSync(join(ws.path, 'a.txt'), lines(30, i => (i === 3 ? 'three!' : i === 5 ? 'five!' : `line ${i}`)))
+  writeFileSync(join(ws.path, 'b.txt'), 'b!\n')
+  const all = await rig.rpc('diff', { ws: ws.id })
+  const now = await rig.rpc('diff', { ws: ws.id, uncommitted: true })
+  assert.match(all.diff, /\+three!\n.*\n\+five!/s, 'the branch: its commit and what is not committed, one hunk')
+  assert.equal(now.from, 'HEAD')
+  assert.deepEqual([now.diff.includes('+three!'), now.diff.includes(' three!'), now.diff.includes('+five!')], [false, true, true])
+  const h = now.diff.split('\n').slice(now.diff.split('\n').findIndex((l: string) => l.startsWith('@@'))).join('\n').split('\ndiff --git')[0]
+  // a hunk of Uncommitted isn't one of the branch's view: refused there, reverted here to HEAD (the commit stays)
+  await assert.rejects(rig.rpc('hunkUndo', { ws: ws.id, path: 'a.txt', hunk: h }), /changed since you looked/)
+  await rig.rpc('hunkUndo', { ws: ws.id, path: 'a.txt', hunk: h, uncommitted: true })
+  assert.equal(read(ws, 'a.txt'), lines(30, i => (i === 3 ? 'three!' : `line ${i}`)))
+  await rig.rpc('fileUndo', { ws: ws.id, path: 'b.txt', uncommitted: true })
+  assert.equal(read(ws, 'b.txt'), 'b\n')
+  assert.deepEqual((await rig.rpc('diff', { ws: ws.id, uncommitted: true })).files, [])
+})

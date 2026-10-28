@@ -6,7 +6,7 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
-import { CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems } from './Diff'
+import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
@@ -28,11 +28,11 @@ export type PanelApi = {
   newFile: (path: string, dir: boolean) => Promise<string> // the path made
   openFile: (path: string) => void // in the editor
   preview: (path: string, line?: number) => void // in the app
-  changes: () => Promise<Changes>
+  changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
   setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
-  read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
+  read: (path: string, base?: boolean, uncommitted?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image; uncommitted: HEAD's)
   prFile: (path: string) => Promise<FileContent> // as the PR's head commit has it (the PR's diff's expand arrows)
   agents: { id: string; name: string }[] // the workspace's live agent tabs, the one to send to first
   threads: () => Promise<Thread[]>
@@ -51,8 +51,8 @@ export type PanelApi = {
   web?: (path: string, at: 'base' | 'branch', line?: number) => void // the file's page on origin's site (the daemon's fileWeb), in the browser
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
-  undoHunk: (path: string, hunk: string, lines?: number[], then?: () => void) => Promise<boolean> // false: you said no
-  undoFile: (path: string, then?: () => void) => Promise<boolean>
+  undoHunk: (path: string, hunk: string, lines?: number[], then?: () => void, uncommitted?: boolean) => Promise<boolean> // false: you said no; uncommitted: back to HEAD (Uncommitted's hunks)
+  undoFile: (path: string, then?: () => void, uncommitted?: boolean) => Promise<boolean>
   redo: (id: string) => Promise<unknown>
   // the workspace's Artifacts (its storage folder) as Files' other root: list, show one in the app, open it in its app,
   // its right click (Finder, copy path); none: no storage folder yet
@@ -227,16 +227,18 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
   )
 }
 
-// whole: the PR's diff (gh pr diff) instead of the workspace's; first for a workspace that only links its PR
-function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; onOpen: (url: string) => void }) {
-  const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the panel opens)
-  const all = !!pr && (whole ?? !!linked)
-  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${all}`, all ? 60000 : 8000) // gh's: once a minute
+// scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
+// instead of the workspace's, first for a workspace that only links its PR
+function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; worktree: boolean; onOpen: (url: string) => void }) {
+  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree)
+  const all = scope === 'pr'
+  const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
+  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${scope}`, all ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
-  useEffect(() => (setOpen(new Set()), setAt(null)), [ws, all])
+  useEffect(() => (setOpen(new Set()), setAt(null)), [ws, scope])
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
-  const rv = useRevert(api, byFile, all, reload, `${ws}#${all}`)
+  const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}`)
   const findAt = useRef<HTMLDivElement>(null) // ⌘F's bar and what it searches (Diff.tsx DiffFind)
   const [menu, openMenu] = useMenu()
   const fileMenu = (e: MouseEvent, path: string) => (m => m.length && openMenu(e, m))([...webItems(api, path, d?.base ?? '', undefined), ...(all ? [] : [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) } as MenuItem])])
@@ -266,22 +268,13 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   return (
     <>
       <div className="sp-tools">
-        {pr && (
-          <span className="seg">
-            <button type="button" className={all ? '' : 'on'} data-tip="This workspace's changes: its branch against its base, and what isn't committed" onClick={() => setWhole(false)}>
-              Here
-            </button>
-            <button type="button" className={all ? 'on' : ''} data-tip={`All of PR #${pr.number}, as GitHub has it (gh pr diff)`} onClick={() => setWhole(true)}>
-              PR #{pr.number}
-            </button>
-          </span>
-        )}
+        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} />
         {(sum => (
           <span className="sp-sum muted small grow" data-tip={sum && files.length ? `${sum} · click a line to comment` : undefined}>
             {sum || (err ? '' : 'Loading…')}
             {sum && files.length > 0 && <span className="sp-sum-more"> · click a line to comment</span>}
           </span>
-        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}` : '')}
+        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : scope === 'uncommitted' ? ' not committed' : ` changed vs ${d.base}`}` : '')}
         {inPR.length > 0 && (
           <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
             {viewed}/{inPR.length}
@@ -297,7 +290,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
         <DiffFind at={findAt} />
         {err && <div className="warn small pad">{err}</div>}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
-        {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
+        {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {files.map(f => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
             <div className="sp-row" onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
@@ -448,7 +441,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
-      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} worktree={p.w.kind === 'worktree'} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
       {tab === 'device' && <DeviceTab api={p.api} ws={p.w.id} />}

@@ -336,8 +336,9 @@ selected workspace's PR is in the status bar.
   or Laki AI is on): pick who gets it (the agent tab in front first, or *Laki AI*), the message (or one of Run ▾'s
   agent actions, a click: *Review the code*) and when: in a length (10m, 2h, 1h 30m; or 15 min, 30 min, 1 h, 2 h) or
   at a time (15:30, 3pm: today, or tomorrow once it's past). The AI page's clock does the same for what's typed
-  there. Until then it's a timer bar over the bottom buttons with the message (its whole text on hover); its menu:
-  *Send now*, *Edit…* (the message, who gets it, the time), *Cancel it*. As it's due the message goes in, or waits in
+  there. Until then it's a timer bar over the bottom buttons with the message (its whole text on hover), and a strip
+  at the foot of the tab it goes to (*Send later to claude*: each one's time left and text); its menu and the strip's
+  buttons: *Send now*, *Edit…* (the message, who gets it, the time), *Cancel it*. As it's due the message goes in, or waits in
   the agent's queue while it's busy (Laki AI: asked once it's free), and a notification says so (Laki AI's: once it
   answers). Laki must be running: one due while it was closed isn't sent, and a message says so as it opens.
 - The funnel at the top filters the workspaces: words in a name, branch, PR title, author or the PR's number (`14466`
@@ -452,6 +453,9 @@ selected workspace's PR is in the status bar.
 **Menus:** every item has a key, shown on its right: press it while the menu is open (e.g. right click a
 workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 pick a color (brown and gray by a click).
 
+**Selecting:** a double-click in a terminal selects a word without the punctuation after it (`it.` is `it`; `file.ts`
+and a link stay whole).
+
 **Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow. In Changes or the Review
 tab (the last place you clicked), ⌘F finds words in the diff's lines instead: ⏎ next, ⇧⏎ previous, Esc closes.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
@@ -460,7 +464,9 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
 **Tab bar icons** (right side; hover for a tooltip):
 - info (⌘I): the side panel on *Info* (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
-  Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
+  Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the project's editor: the last one you picked in
+  *Open in* for one of its folders (Xcode for the iOS repo, Cursor for the web one), else Settings › Open in's
+  default; Settings › Open in › *Per project* shows and changes each project's;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
 - ship: commit, push and open a PR, in a *ship* tab;
 - search: the command palette (⌘K);
@@ -707,7 +713,9 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
   *Collapse all* closes them); the button beside it shows the diffs in two columns, old and new side by side like
-  GitHub's split view, and Laki remembers it. With a PR, *Here* / *PR #n* switch to the
+  GitHub's split view, and Laki remembers it. *Branch* / *Uncommitted* (a worktree's) switch between everything
+  against the base and only what isn't committed yet (against the last commit; its Revert puts a file or hunk back
+  to that commit); Changes and the Review tab each remember theirs. With a PR, *PR #n* switches to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
   its *Files changed* there. Each file in the PR has a *Viewed* box, in both views, the same one as on GitHub's
   *Files changed* (ticked here, it's ticked there): a viewed file folds and dims, *Expand all* skips it, and the bar
@@ -947,7 +955,9 @@ installed (Settings › Agent skill) take `/laki:new …` in a prompt the same w
 `/laki:extension <what it shows or does>`, from the same plugin, makes or changes a Laki extension: the extension
 creator's guide. Only you start it (Claude never runs it on its own), and the `laki widget` commands that only read
 (`ls`, `kit`, `check`, `what`, `logs`, `render`, `events`, `tools`) run without asking; making, linking, setting or
-turning one on asks you in Claude's prompt first.
+turning one on asks you in Claude's prompt first. `/laki:orchestrate <the work>` splits work across several agents in
+parallel, a workspace each, and coordinates them to one result (the orchestrator skill's guide); only you start it,
+and its `laki` commands (`ls`, `new`, `tab`, `send`, `screen`, `diff`, `progress`) run without asking.
 
 With *Progress on tabs* on (Settings › Terminal), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
@@ -1608,7 +1618,7 @@ lit for a moment.
   after a workspace is deleted (Laki's data folder, `script-logs`); *Pick an
   element*: the rail's *Pick* (without the rail, the crosshair beside Help) or its hotkey, ⇧⌘C unless you record
   another, works on every page and over dialogs: point at anything in Laki's window, click, and it tells what it is
-  (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
+  (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, Custom CSS, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
   long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json`, but env, presets' env, the phone webhook, remote access's and
@@ -1637,12 +1647,15 @@ lit for a moment.
   name, drawn by whichever pack is on, Laki's own where a pack lacks it), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
   keeps them on top), *Animations* (*Low* by default; *High*: pages, dialogs, menus and lists come in with a little
   motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *Project names in the sidebar* (font,
-  case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: none by
+  case, letter spacing, size 10-20 and weight, each the theme's unless you pick one), *The sidebar* (its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,
-  double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:
+  double or nothing; the indent, row height, the space between rows, text size (11-18), icon size, a project's row
+  height and the space between projects, each the theme's unless you pick one; the style:
   Compact, Default, Extended, Cards or Status (the row's edge in the color of what its agent is doing, and a line under
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
   beside Schedule, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
+  *Custom CSS* (at the end: your own rules over the app's, in every window as you type, for anything the pickers
+  don't reach; pictures and fonts from the web stay blocked; Reset the interface clears it),
   *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
@@ -1854,7 +1867,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   *Extension creator* (`skills/laki-widget`, installed on its own) teaches them to make extensions: the files, the
-  template language, JS extensions, actions, and checking one with `laki widget`.
+  template language, JS extensions, actions, and checking one with `laki widget`. *Orchestrator*
+  (`skills/laki-orchestrate`, on its own too) teaches an agent to split work across several agents at once, a
+  workspace each: plan the tasks and what waits on what, start them (`laki new`), read and follow them up (`laki
+  screen`, `laki send`), take each one's `LAKI_WORKER_DONE` / `LAKI_WORKER_BLOCKED` report and bring the results
+  together; in Laki's Claude Code tabs it's also `/laki:orchestrate <the work>`, in its OpenCode tabs `/laki-orchestrate <the work>`. An agent reads and messages the
+  workspaces it started without Laki asking you; any other workspace, Laki asks first.
   It holds the app's path: update it after moving the app. A skill installed with other text than this Laki's (an
   older Laki's, or edited) says *out of date*, with *Update* (*Update all* for several); the app shows a bar with
   *Update* too, until *Not now*. One set up by another Laki (another data folder) says so, with *Use this one*. *Remove* takes only its own files. Below it, *MCP
@@ -1960,6 +1978,9 @@ laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's 
 laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki new app --no-setup --prompt "…"                    # without the setup script (laki run <ws> setup: later)
+laki new app --perm acceptEdits --fast --prompt "…"     # its permission mode (auto, acceptEdits, plan, bypassPermissions) and fast mode
+laki new app --template review --group Reviews --prompt "#57"  # through a prompt template, under a sidebar group (its template and agent too)
+laki new app --action "PR+audit" --prompt "the login page"     # an agent action's prompt, then these words
 laki new app --at "tomorrow 9am" --prompt "…"            # made now, its agent starts at 9 (Laki must be running then)
 laki new app --after-limit --prompt "…"                 # its agent once the plan limit resets (claude, codex)
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
@@ -1967,7 +1988,7 @@ laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 laki screen fix-the-login/claude
-laki diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
+laki diff fix-the-login [--uncommitted] | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki run fix-the-login test                             # the project's test script (lint, format, deploy, setup) in its tab
 laki screen shot                                        # the booted iOS Simulator's screen: a PNG's path
 laki screen shot Safari | windows                       # an app's frontmost window | the windows open
@@ -2101,6 +2122,9 @@ open "http://localhost:$(laki ls --json | jq '.workspaces[] | select(.id == "fix
 
 # a tab that runs the tests on every change
 laki tab fix-login --cmd "npm test -- --watch"
+
+# a second agent in a workspace that exists, on its own prompt (--name, --model, --effort, --perm, --fast)
+laki tab fix-login --preset codex --name "codex review" --prompt "Review what claude changed here"
 
 # try another approach without losing this one: a new branch with the same chat
 laki fork fix-login

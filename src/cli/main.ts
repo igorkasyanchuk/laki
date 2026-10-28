@@ -8,7 +8,7 @@ import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
-import { state } from '../shared/tools.ts'
+import { newWsKit, state } from '../shared/tools.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
@@ -19,8 +19,8 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -243,21 +243,29 @@ async function main() {
       return out(projects, projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--at when | --after-limit] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--perm mode] [--fast] [--template t] [--action a] [--group g] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--at when | --after-limit] [--prompt text]')
       // .: the project of the workspace this tab is in (an agent's /laki:new)
       const v = process.env.LAKI_WORKSPACE ? ((await rpc('state')) as View) : undefined
       const here = rest[0] === '.' && v?.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
       if (rest[0] === '.' && !here) throw new Error("laki new .: only in a Laki tab ($LAKI_WORKSPACE): name the project")
+      const project = here || rest[0]
+      // a group (the sidebar's heading it goes under: its template and agent too), a prompt template, an agent action
+      const str = (f: string) => (flags[f] as string | undefined) || undefined // a valued flag's: always a string
+      const k = await newWsKit(rpc, { project, prompt: str('prompt') || rest.slice(1).join(' ') || undefined, group: str('group'), template: str('template'), action: str('action'), pr: str('pr'), base: str('base') })
       const o = {
-        project: here || rest[0],
+        project,
         base: flags.base,
-        preset: flags.preset,
+        preset: flags.preset || k.preset,
         cmd: flags.cmd,
-        prompt: flags.prompt || rest.slice(1).join(' ') || undefined,
+        prompt: k.prompt,
         name: flags.name,
         local: !!flags.local,
         model: flags.model,
         effort: flags.effort,
+        perm: flags.perm, // its permission mode (claude's, codex's); none: its profile's
+        fast: flags.fast ? true : undefined,
+        place: k.place,
+        vars: k.vars,
         issue: flags.issue || undefined,
         pr: flags.pr || undefined,
         link: flags.link || undefined, // the PR it's about (a review), not checked out: its primary
@@ -351,7 +359,11 @@ async function main() {
       return out({ ok: true }, cmd === 'rename' ? `renamed ${ws}` : `attached ${words[0]} to ${ws}`)
     }
     case 'tab': {
-      const t = await rpc('tabNew', { ws: rest[0], preset: flags.preset, cmd: flags.cmd, caller: caller() })
+      // with a prompt: an agent started on it, as the app's + does (--name, --model, --effort, --perm, --fast its own);
+      // no --preset then: your default agent, as MCP's laki_new_tab
+      const prompt = (flags.prompt as string | undefined) || rest.slice(1).join(' ') || undefined
+      const preset = flags.preset || (prompt && !flags.cmd ? ((await rpc('state')) as View).settings?.agent || 'claude' : undefined)
+      const t = await rpc('tabNew', { ws: rest[0], preset, cmd: flags.cmd, prompt, name: flags.name, model: flags.model, effort: flags.effort, perm: flags.perm, fast: flags.fast ? true : undefined, caller: caller() })
       return out(t, `${t.name} (${t.id})`)
     }
     case 'send': {
@@ -380,7 +392,7 @@ async function main() {
       return out(text, text)
     }
     case 'diff': {
-      const d = await rpc('diff', { ws: rest[0] })
+      const d = await rpc('diff', { ws: rest[0], uncommitted: !!flags.uncommitted }) // --uncommitted: against HEAD
       return out(d, d.diff)
     }
     case 'run': {

@@ -290,7 +290,7 @@ export const LAKI_CLI = `/usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliAr
 export const pluginFiles: (() => Record<string, string>)[] = []
 const claudePlugin = (): Record<string, string> => ({
   ...Object.assign({}, ...pluginFiles.map(f => f())),
-  'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new, /laki:extension", author: { name: 'Laki' } }, null, 2),
+  'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new, /laki:extension, /laki:orchestrate", author: { name: 'Laki' } }, null, 2),
   'claude-plugin/commands/new.md': `---
 description: A new Laki session for a task, in a workspace of its own in this project, with codex, claude or another agent
 argument-hint: <the task> [with codex | claude | gemini | grok | opencode]
@@ -1092,7 +1092,16 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // a profile's model and effort when the workspace picked none
   const model = tab.model || pr?.model?.trim()
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
-  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
+  // opencode's model goes in its inline config: some versions' TUI refuses -m ("Unrecognized flag"), every one reads
+  // OPENCODE_CONFIG_CONTENT, over a preset's own of it. ponytail: one in settings' or the project's env is replaced
+  if (model && tab.preset === 'opencode') {
+    let own: unknown = {}
+    try {
+      own = JSON.parse(pr?.env?.OPENCODE_CONFIG_CONTENT ?? '{}')
+    } catch {}
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
+  }
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
 }
@@ -1476,7 +1485,7 @@ export function settingsSet(o: Settings, own = false) {
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editors', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
@@ -1534,7 +1543,8 @@ export async function openIn(o: { ws?: string; project?: string; widget?: string
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
   const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
   const s = state.settings ?? {}
-  const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
+  const pid = o.ws ? findWs(o.ws).project : o.widget ? undefined : findProject(o.project ?? '').id // editors are by id
+  const app = o.app === 'editor' ? (pid && s.editors?.[pid]) || s.editor || 'cursor' : o.app // the project's, else Settings'
   const fail = (e: any) => {
     throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
   }

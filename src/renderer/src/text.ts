@@ -176,7 +176,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object' }
+const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object', editors: 'object', customCss: 'string' }
 // what Export leaves out and Import never takes (this Mac's stay): secrets (env and presets' env: API keys; the phone
 // webhook's URL: its token) and what's private (remote access's and tunnels' emails, workflows' variables)
 const PRIVATE = ['env', 'webhook', 'remoteMail', 'tunnelMails', 'flowVars']
@@ -231,6 +231,10 @@ export function parseSize(s: string): [number, number] | null {
   const [w, h] = [Number(m[1]), Number(m[2])]
   return w >= 200 && h >= 200 && w <= 4000 && h <= 4000 ? [w, h] : null
 }
+
+// how many of a double-clicked word's last characters are punctuation after it (Term.tsx): "it." 1, "e.g.," 2, "file.ts" 0;
+// all punctuation: none (a "..." stays)
+export const wordTrim = (w: string) => (n => (n < w.length ? n : 0))(/[.,:;!?]*$/.exec(w)![0].length)
 
 // the floating bubbles' labels: two letters per bubble, none the same: a name's words without pr, issue and numbers (pr-14176-bound-regen: BR),
 // the first two words' initials first (fix-cart-total: FC), then other pairs, then a word's first two letters, then

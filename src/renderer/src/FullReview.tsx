@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type PointerEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
-import { changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useSuggestions, webItems, webSub } from './Diff'
+import { atHead, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
@@ -31,7 +31,7 @@ export type ReviewApi = PanelApi & {
   threadsAll: () => Promise<Thread[]> // the PR's review threads with everyone's comments (prThreads all)
   talk: () => Promise<Talk[]> // prTalk
   say: (body: string) => Promise<unknown> // prSay: a comment on the conversation, as you
-  blame: (path: string, side: 'old' | 'new') => Promise<Blame>
+  blame: (path: string, side: 'old' | 'new', uncommitted?: boolean) => Promise<Blame> // old: at the base, or HEAD (uncommitted)
 }
 
 const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet
@@ -85,15 +85,17 @@ function Edge({ x, to, done, reset }: { x: { left: number } | { right: number };
   )
 }
 
-export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
-  const [whole, setWhole] = useState<boolean | null>(null)
-  const all = !!pr && (whole ?? !!linked)
-  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${all}`, all ? 60000 : 15000)
+export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
+  const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree) // Diff.tsx: Branch, Uncommitted, PR #n
+  const all = scope === 'pr'
+  const unc = scope === 'uncommitted'
+  const api = atHead(wsApi, unc) // its reads and reverts against HEAD
+  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${scope}`, all ? 60000 : 15000)
   const first = useRef(true)
   useEffect(() => (first.current ? void (first.current = false) : reload()), [stat]) // its files moved: read again, the scroll and comments kept
   const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
   const files = d?.files ?? []
-  const rv = useRevert(api, byFile, all, reload, `${ws}#${all}`)
+  const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}`)
   const [split, setSplit] = useState(() => localStore('laki.diffSplit') === 'split')
   const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
   const baseName = d?.base ?? base
@@ -176,10 +178,12 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   // ponytail: not in the PR's diff (this worktree needn't be the PR's head); blame at the PR's head commit when asked
   const [blamed, setBlamed] = useState<Set<string>>(new Set())
   const [blames, setBlames] = useState<Record<string, Blamed>>({})
+  // a commit moves stat, not the diff: its lines aren't 'not committed' any more; its old side is the base's or HEAD's
+  const blameKey = (p: string) => `${hashOf(p)}#${stat}#${unc}`
   const readBlame = (p: string) => {
     const st = files.find(f => f.path === p)?.status[0]
-    const key = `${hashOf(p)}#${stat}` // a commit moves stat, not the diff: its lines aren't 'not committed' any more
-    const get = (side: 'old' | 'new') => api.blame(p, side).then(b => b, (e: Error) => String(e?.message ?? e))
+    const key = blameKey(p)
+    const get = (side: 'old' | 'new') => api.blame(p, side, unc).then(b => b, (e: Error) => String(e?.message ?? e))
     void Promise.all([st === 'A' || st === '?' ? undefined : get('old'), st === 'D' ? undefined : get('new')]).then(([o, n]) => setBlames(b => ({ ...b, [p]: { key, old: o, new: n } })))
   }
   const blame = (p: string, on = !blamed.has(p)) => {
@@ -187,10 +191,10 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
     setBlamed(s => new Set(on ? [...s, p] : [...s].filter(x => x !== p)))
     if (!on) return
     setShown([p], true)
-    if (blames[p]?.key !== `${hashOf(p)}#${stat}`) readBlame(p)
+    if (blames[p]?.key !== blameKey(p)) readBlame(p)
   }
   useEffect(() => {
-    for (const p of blamed) if (blames[p] && blames[p].key !== `${hashOf(p)}#${stat}`) readBlame(p) // its diff or its commits moved (a stat change reads the diff again: then)
+    for (const p of blamed) if (blames[p] && blames[p].key !== blameKey(p)) readBlame(p) // its diff or its commits moved (a stat change reads the diff again: then)
   }, [byFile])
   const blameWhy = (p: string) => {
     const b = blames[p]
@@ -420,21 +424,12 @@ export function FullReview({ ws, base, branch, pr, linked, api, stat, onOpen }: 
   return (
     <div className="full-review" ref={root} tabIndex={-1} data-find>
       <div className="fr-head">
-        {pr && (
-          <span className="seg">
-            <button type="button" className={all ? '' : 'on'} data-tip="This workspace's changes: its branch against its base, and what isn't committed" onClick={() => setWhole(false)}>
-              All changes vs {baseName}
-            </button>
-            <button type="button" className={all ? 'on' : ''} data-tip={`All of PR #${pr.number}, as GitHub has it (gh pr diff)`} onClick={() => setWhole(true)}>
-              PR #{pr.number}
-            </button>
-          </span>
-        )}
+        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} branch={`All changes vs ${baseName}`} />
         <span className="muted small grow">
           {d ? (
             <>
               {files.length} file{files.length === 1 ? '' : 's'} · <span className="add">+{add_}</span> <span className="del">−{del_}</span>
-              {!pr && ` vs ${d.base}`}
+              {unc ? ' not committed' : !pr && !worktree ? ` vs ${d.base}` : ''}
             </>
           ) : err ? '' : 'Loading…'}
         </span>

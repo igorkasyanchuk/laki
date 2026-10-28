@@ -230,6 +230,7 @@ const api: Record<string, Handler> = {
   tabNew: async ({ caller, from, run: _run, hops: _hops, cwd: _cwd, cwdOf, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's; cwd: only cwdOf's shell's
     const by = core.agentCaller(caller) ?? core.saidFrom(from) // as wsNew's (byCaller)
     if (by) core.agentNoCmd(p) // an agent's: no command of its own
+    if (p.prompt) await crossAsk({ ws: p.ws, from: caller }, 'send', null, p.prompt) // a prompt into another workspace: asked, as a send is
     const cwd = cwdOf === undefined ? undefined : await core.shellCwd(p.ws, cwdOf)
     // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
     const t = core.addTab(p.ws, { ...p, cwd, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
@@ -295,7 +296,7 @@ const api: Record<string, Handler> = {
   queueSet: async p => (await crossAsk(p, 'send', p.tab, Array.isArray(p.queue) ? p.queue.join('\n\n') : ''), core.queueSet(p)), // the queue strip's edit, reorder, remove
   queueNow: async p => (await crossAsk(p, 'send', p.tab, ''), core.queueNow(p.tab)), // its Send now: the turn stopped, the first one typed
   hook: p => core.hook(p),
-  diff: p => core.diff(p.ws),
+  diff: p => core.diff(p.ws, p.uncommitted === true), // uncommitted: against HEAD (Changes' and Review's Uncommitted)
   files: p => core.files(p.ws, p.project),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
@@ -457,7 +458,7 @@ const api: Record<string, Handler> = {
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
 const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin'])
-const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel)$/ // settings it may send back unchanged (Settings saves them all), not change
+const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button)
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
@@ -546,14 +547,23 @@ function typed(p: any, tab: string, data: string) {
 }
 // keys (input) ask as a send does, a terminal attached to as a screen read; an event (emit, #3) with another workspace's
 // ws: its workflows and extensions run there, so it asks as a send does (target: the event, text: its data)
-async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target = p.target, text = p.text) {
+// a workspace as findWs takes it (an id's start too), else by its name: the one the call goes to
+const wsRef = (ref: string) => {
+  try {
+    return core.findWs(ref).id
+  } catch {
+    return core.state.workspaces.find(w => w.name === ref)?.id
+  }
+}
+async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string | null = p.target, text = p.text) {
   const by = core.agentCaller(p.from)
   if (!by) return
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
-  const tab = kind === 'emit' ? undefined : core.resolveTarget(String(target ?? ''))
-  const to = tab ? tab.workspace : core.state.workspaces.find(w => w.id === p.ws || w.name === p.ws)?.id
-  if (!to || to === by || crossOk.has(`${kind}:${by}>${to}`)) return
-  const what = tab ? tab.name : `custom.${String(p.name ?? '').replace(/^custom\./, '')}`
+  const tab = kind === 'emit' || target === null ? undefined : core.resolveTarget(String(target ?? '')) // null: a new tab (tabNew's prompt)
+  const to = tab ? tab.workspace : wsRef(String(p.ws ?? ''))
+  // its own, or one it started (a worker: laki new from its tab, from), whose prompt it wrote anyway: no question
+  if (!to || to === by || (kind !== 'emit' && core.state.workspaces.find(w => w.id === to)?.from === by) || crossOk.has(`${kind}:${by}>${to}`)) return
+  const what = tab ? tab.name : kind === 'emit' ? `custom.${String(p.name ?? '').replace(/^custom\./, '')}` : 'a new agent tab'
   if (!core.clients.size) throw new Error(`${name(to)} is another workspace: the user allows that in Laki's window, and it isn't open`)
   const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
   const said = kind === 'send' ? String(text ?? '') : kind === 'emit' ? JSON.stringify(p.data ?? {}) : undefined

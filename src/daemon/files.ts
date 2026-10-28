@@ -13,13 +13,14 @@ import { away, hostUp, sshIn } from './hosts.ts'
 // ---------- the diff against the base
 
 // what a workspace's changes are against: a worktree's merge base with its base branch, else HEAD
-const diffBase = (ws: Workspace) => (ws.kind === 'worktree' ? git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
+// uncommitted: Changes' and Review's Uncommitted, what isn't committed yet (against HEAD)
+const diffBase = (ws: Workspace, uncommitted?: boolean) => (ws.kind === 'worktree' && !uncommitted ? git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
 
 // the text as git wrote it but its last newline (git() trims: a last line's trailing spaces would go, and a hunk to
 // revert would no longer match the file)
-export async function diff(ref: string) {
+export async function diff(ref: string, uncommitted?: boolean) {
   const ws = findWs(ref)
-  const from = await diffBase(ws)
+  const from = await diffBase(ws, uncommitted)
   const [text, numstat, untracked] = await Promise.all([
     exec(ws, 'git', ['diff', '--no-color', '--no-ext-diff', '-M', from]).then(r => r.stdout.replace(/\n$/, '')),
     git(ws, 'diff', '--numstat', '-M', from),
@@ -62,14 +63,14 @@ const CUT = '\n… (cut)'
 
 // who last changed each line: at the diff's base (old) or as the worktree has it (new: a line not committed yet is the
 // zero commit's). --incremental: no file text, each commit's words once
-export async function blame(o: { ws: string; path: string; side?: 'old' | 'new' }): Promise<Blame> {
+export async function blame(o: { ws: string; path: string; side?: 'old' | 'new'; uncommitted?: boolean }): Promise<Blame> {
   const ws = findWs(o.ws)
   if (state.projects.find(p => p.id === ws.project)?.git === false) throw new Error(`${ws.name}: not a git repo`)
   const rel = inside(ws, String(o.path ?? '')).slice(ws.path.length + 1)
-  const at = o.side === 'old' ? [await diffBase(ws)] : []
+  const at = o.side === 'old' ? [await diffBase(ws, o.uncommitted === true)] : []
   const { stdout } = await exec(ws, 'git', ['blame', '--incremental', ...at, '--', rel], { timeout: 30000 }).catch(e => {
     const why = firstLine(String(e.stderr || e.message))
-    throw new Error(/no such path/i.test(why) ? (at.length ? `not in ${ws.base}` : 'not committed yet') : `git blame: ${why}`)
+    throw new Error(/no such path/i.test(why) ? (at.length ? `not in ${o.uncommitted ? 'the last commit' : ws.base}` : 'not committed yet') : `git blame: ${why}`)
   })
   const commits: Blame['commits'] = []
   const idx = new Map<string, number>()
@@ -159,12 +160,12 @@ async function apply(ws: Workspace, patch: string, reverse = false) {
 // hunkUndo: one hunk of Changes back to the base: the diff read again (diff's own: a pathspec would break -M's renames,
 // and the hunk wouldn't be what Changes showed), the hunk found by its text (the @@ line and its body, \r kept), then a
 // forward patch from the worktree to the base. lines: indexes into its body (0: the line after @@), none: all of it
-export async function hunkUndo(o: { ws: string; path: string; hunk: string; lines?: number[] }) {
+export async function hunkUndo(o: { ws: string; path: string; hunk: string; lines?: number[]; uncommitted?: boolean }) {
   const ws = gitWs(o.ws)
   inside(ws, String(o.path ?? ''))
   if (typeof o.hunk !== 'string' || !o.hunk.startsWith('@@')) throw new Error('which hunk?')
   const changed = new Error(`${o.path} changed since you looked: refresh Changes`)
-  const { diff: text } = await diff(ws.id)
+  const { diff: text } = await diff(ws.id, o.uncommitted === true) // the view's: Uncommitted's hunks are against HEAD
   const all = text.split('\n')
   const start = all.findIndex(l => l.startsWith('diff --git a/') && l.endsWith(` b/${o.path}`))
   if (start < 0) throw changed
@@ -240,11 +241,11 @@ async function rmFile(ws: Workspace, path: string) {
 
 // fileUndo: a whole file back to the base (binaries and images too); what it was kept for Undo. Nothing is staged:
 // git restore --worktree, never checkout. ponytail: Undo doesn't put back mode bits
-export async function fileUndo(o: { ws: string; path: string }) {
+export async function fileUndo(o: { ws: string; path: string; uncommitted?: boolean }) {
   const ws = gitWs(o.ws)
   const path = String(o.path ?? '')
   inside(ws, path)
-  const from = await diffBase(ws)
+  const from = await diffBase(ws, o.uncommitted === true)
   const { status, old } = await statusOf(ws, from, path)
   if (old) inside(ws, old)
   const touched = [path, ...(old ? [old] : [])]
@@ -426,7 +427,7 @@ export const MAX_TEXT = 512 << 10
 
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image
 // as it was where the workspace's changes start (diff's base, through git show), for Changes' before and after
-export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean }) {
+export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean }) {
   let ws = findWs(o.ws)
   if (o.storage) {
     // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own
@@ -438,7 +439,7 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
     const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
     if (!mime) throw new Error(`${o.path} isn't an image`)
     const rel = abs.slice(ws.path.length + 1)
-    const show = `${await diffBase(ws)}:${rel}`
+    const show = `${await diffBase(ws, o.uncommitted === true)}:${rel}`
     const stdout = ws.host
       ? Buffer.from((await exec(ws, 'sh', ['-c', 'git show "$1" | head -c 10485761 | base64', 'sh', show])).stdout, 'base64') // base64: text over ssh
       : (

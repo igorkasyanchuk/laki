@@ -7,6 +7,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
   laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
+            [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode
+            [--template <name>]     the prompt through one of your prompt templates
+            [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
+            [--group <name>]        under that group of the project in the sidebar (its template and agent too)
             [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
@@ -23,14 +27,16 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki memory rm <project>|. <id>             forget one agents learned
   laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
-  laki tab <ws> [--preset p] [--cmd c]        a new tab
+  laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
+                                              a new tab; with a prompt, its agent starts on it
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
                                               the simulator's hands, in points (needs idb); describe: its elements
-  laki diff <ws> | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--force]
+  laki diff <ws> [--uncommitted] | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--force]
+                                              diff: against its base (--uncommitted: only what isn't committed);
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
                                               a hidden browser on the workspace's localhost (the app must be open);
@@ -104,7 +110,10 @@ script (laki run <ws> setup runs it later). --at starts its agent later, --after
   laki new shop --at "tomorrow 9am" --prompt "…"  made now, its agent starts at 9
   laki new shop --pr 118 --prompt "Fix the failing test"
   laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
-  laki new shop --fan claude,codex --prompt "…"        a race: one worktree each`,
+  laki new shop --fan claude,codex --prompt "…"        a race: one worktree each
+  laki new shop --no-setup --perm acceptEdits --fast --prompt "…"   no setup script; edits without asking, fast
+  laki new shop --group Reviews --template review --prompt "#118"   under Reviews, through your review template
+  laki new shop --action "PR+audit" --prompt "the login page"        your agent action's prompt, then these words`,
   send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or
 number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). While the agent asks
 something (status waiting: a permission prompt), the text would answer it: leave those to the user, or --when-idle.
@@ -119,11 +128,14 @@ PNG's path: read it). From an agent's tab, a tab in another workspace: the user 
   laki screen a1b2 --lines 80
   laki screen shot                              the booted simulator
   laki screen shot Safari                       Safari's front window`,
-  tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither). From an agent's tab: no
---cmd and no command preset (the user starts commands).
+  tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither). With a prompt (--prompt,
+or the words after <ws>) its agent starts on it, as a new workspace's does; --name, --model, --effort, --perm and
+--fast are its own. From an agent's tab: no --cmd and no command preset (the user starts commands).
 
   laki tab a1b2 --preset codex
-  laki tab a1b2 --cmd "npm run storybook"`,
+  laki tab a1b2 --cmd "npm run storybook"
+  laki tab a1b2 --preset codex --name "codex review" --prompt "Review what claude changed here"
+  for w in a1b2 c3d4; do laki tab "$w" --preset claude --prompt "$(cat "$w.md")"; done   a brief each, one call`,
   progress: `In an agent's tab: how far along the whole task is (0-100) and what you're on, shown on the tab until the turn
 ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
 

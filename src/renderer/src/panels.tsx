@@ -1891,6 +1891,45 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   )
 }
 
+// Send later's messages for a tab (App's timers with then 'send'), at its foot like the queue: each one's time left
+// and text; Send now, Edit, Cancel as its timer bar's menu has them
+export function LaterStrip({ tab, later, onNow, onEdit, onCancel }: { tab: TabView; later: { id: string; end: number; left?: number; text?: string }[]; onNow: (id: string) => void; onEdit: (id: string) => void; onCancel: (id: string) => void }) {
+  const [, tick] = useState(0)
+  const any = later.length > 0
+  useEffect(() => {
+    if (!any) return
+    const t = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [any])
+  if (!any) return null
+  const at = (end: number) => new Date(end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className="queue-strip later-strip" role="region" aria-label={`Sent later to ${tab.name}`}>
+      <div className="queue-head">
+        <Icon name="timer" size={13} />
+        <span className="queue-what">
+          Send later to <b>{tab.name}</b> · {later.length}
+        </span>
+      </div>
+      <ol className="queue-list">
+        {[...later].sort((a, b) => a.end - b.end).map(t => (
+          <li key={t.id}>
+            <span className="queue-n later-left" data-tip={t.left !== undefined ? 'Paused' : `At ${at(t.end)}`}>
+              {clock(t.left ?? t.end - Date.now())}
+            </span>
+            <span className="queue-text" data-tip={(t.text ?? '').slice(0, 2000)} onDoubleClick={() => onEdit(t.id)}>
+              {(t.text ?? '').split('\n')[0]}
+            </span>
+            <IconButton icon="arrowRight" title="Send now" onClick={() => onNow(t.id)} />
+            <IconButton icon="pencil" title="Edit: the text, when" onClick={() => onEdit(t.id)} />
+            <IconButton icon="x" title="Cancel it" onClick={() => onCancel(t.id)} />
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 // a tab's queue: what goes as its turn ends, in a strip under its terminal (Panes' foot: the terminal gets shorter, the
 // TUI is never covered). Each one edited in place (⌘⏎ saves, Esc cancels), removed (App's toast has Undo) or dragged
 // into another place, all through onSave (the daemon's queueSet, with the list it started from); Send now stops the

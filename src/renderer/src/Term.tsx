@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
+import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
@@ -97,6 +98,15 @@ export function Term({
       e.stopPropagation()
       e.preventDefault()
       term.focus()
+    })
+    // a double-clicked word without the punctuation after it ("it." is it): xterm's word breaks leave . : ; ! ? in, so
+    // file.ts and a URL stay whole; the trailing ones go (one cell each). ponytail: a leading one stays
+    term.element?.addEventListener('dblclick', () => {
+      const at = term.getSelectionPosition()
+      const n = wordTrim(term.getSelection())
+      if (!at || !n) return
+      const cells = (at.end.y - at.start.y) * term.cols + at.end.x - at.start.x
+      term.select(at.start.x, at.start.y, cells - n)
     })
     try {
       const gl = new WebglAddon()

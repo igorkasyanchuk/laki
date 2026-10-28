@@ -148,6 +148,28 @@ test('cli: help, usage errors, open', async t => {
   assert.match(r.err, /Laki\.app not found: build it with `npm run pack`/)
 })
 
+test("cli: laki new's permission and fast mode, template, action and group; laki tab with a prompt", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { templates: [{ name: 'review', text: 'Review: {{prompt}}' }], actions: [{ name: 'audit', target: 'claude', text: 'Audit it' }] })
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-rv', name: 'Reviews' }], rows: ['sep-rv'] })
+  let r = await rig.cli('new', p.id, '--name', 'a', '--no-setup', '--perm', 'acceptEdits', '--fast', '--group', 'reviews', '--template', 'review', 'the', 'login')
+  assert.equal(r.code, 0, r.err)
+  const a = await rig.tab('a')
+  assert.deepEqual([a.perm, a.fast, (await rig.rpc('state')).projects[0].rows], ['acceptEdits', true, ['sep-rv', 'a']]) // first under Reviews
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'claude' && l.args.includes('Review: the login')), 'through the template')
+  r = await rig.cli('new', p.id, '--name', 'b', '--action', 'audit', '--prompt', 'the footer')
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'claude' && l.args.includes('Audit it\n\nthe footer')), "the action's prompt, then the words")
+  assert.match((await rig.cli('new', p.id, '--group', 'nope', 'x')).err, /no group nope/)
+  assert.match((await rig.cli('new', p.id, '--perm', 'yolo', 'x')).err, /permission mode yolo\?/)
+  // a tab with a prompt: its agent on it, named and in its own mode
+  r = await rig.cli('tab', 'a', '--preset', 'codex', '--name', 'codex review', '--perm', 'plan', 'review', 'it')
+  assert.match(r.out, /^codex review \(\w+\)\n$/)
+  const cx = (await rig.rpc('state')).tabs.find((t: any) => t.name === 'codex review')
+  assert.equal(cx.perm, 'plan')
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'codex' && l.tab === cx.id && l.args.at(-1) === 'review it'), 'codex on the prompt')
+})
+
 test('cli: every command, as text', async t => {
   const rig = await fresh(t, { config: { setup: 'true', run: LISTEN } })
   let r = await rig.cli('project', 'add', rig.repo)

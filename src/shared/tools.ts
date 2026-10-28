@@ -49,6 +49,16 @@ async function groupOf(rpc: Rpc, project: string, group: string) {
   return { id: s.id, template: s.template, preset: s.preset && v.presets.some(x => x.name === s.preset && !x.off) ? s.preset : undefined, project: p!.id } // its agent while that profile is there and on
 }
 
+// a new workspace's group, template and action (laki_new_workspace's, the CLI's laki new): where it goes (wsNew's
+// place), its prompt through them, the group's agent; vars: a template's or an action's {{branch}}…, the daemon's
+export async function newWsKit(rpc: Rpc, a: { project: string; prompt?: string; group?: string; template?: string; action?: string; pr?: string; base?: string }) {
+  const sep = a.group ? await groupOf(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
+  // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
+  const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
+  const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
+  return { place: sep?.id, preset: sep?.preset, prompt, vars: template || a.action ? true : undefined }
+}
+
 // where a new tab goes: beside a pane (a split in its tab), else as the user's setting says
 const PLACE = { beside: str("a tab id: the new one opens beside it, in its tab (a split; default: a tab of its own, or beside the user's pane when their setting says so)"), edge: { type: 'string', enum: ['right', 'left', 'bottom', 'top'], description: 'which side of it (default right)' } }
 
@@ -86,13 +96,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       ['project'],
     ),
     run: async a => {
-      const sep = a.group ? await groupOf(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
-      const place = sep?.id
-      // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
-      const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
-      const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset || sep?.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, startAt: a.start_at === undefined || a.start_at === '' ? undefined : a.start_at === 'limit' ? ('limit' as const) : atOrThrow(a.start_at), from, place, agent: who ?? 'agent', ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
-      if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
+      const k = await newWsKit(rpc, a)
+      const o = { project: a.project, prompt: k.prompt, preset: a.preset || k.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, startAt: a.start_at === undefined || a.start_at === '' ? undefined : a.start_at === 'limit' ? ('limit' as const) : atOrThrow(a.start_at), from, place: k.place, agent: who ?? 'agent', vars: k.vars }
+      if (!k.prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
   },
@@ -187,9 +193,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_diff',
-    description: "A workspace's changes against its base branch, as a unified diff.",
-    inputSchema: obj({ ws: str('a workspace id') }, ['ws']),
-    run: async a => (await rpc('diff', { ws: a.ws })).diff || 'no changes',
+    description: "A workspace's changes against its base branch, as a unified diff (uncommitted: only what isn't committed yet).",
+    inputSchema: obj({ ws: str('a workspace id'), uncommitted: { type: 'boolean', description: 'only what isn’t committed yet (against HEAD)' } }, ['ws']),
+    run: async a => (await rpc('diff', { ws: a.ws, uncommitted: a.uncommitted === true })).diff || 'no changes',
   },
   {
     name: 'laki_schedules',
@@ -403,7 +409,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
 // a project's prompt templates and Run ▾'s actions, as the app has them (templatesFor, mergeActions)
 async function kit(rpc: Rpc, project?: string, view?: View) {
   const v: View = view ?? (await rpc('state'))
-  const p = project ? v.projects.find(x => x.id === project || x.name === project) : undefined
+  const p = project ? v.projects.find(x => x.id === project || x.name === project || x.path === project || `${x.host}:${x.path}` === project) : undefined // as findProject takes it
   if (project && !p) throw new Error(`no project ${project}`)
   const templates = templatesFor(v.settings.templates, p?.config?.templates).filter(t => t.name?.trim() && t.text?.trim())
   return { v, p, templates, actions: mergeActions(v.settings.actions, p?.config?.actions) }

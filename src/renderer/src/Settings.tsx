@@ -41,18 +41,21 @@ export type { Preset }
 const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
   ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
   ['case', 'Case', [['theme', "Theme's"], ['upper', 'UPPERCASE'], ['none', 'As named']]],
-  ['spacing', 'Letter spacing', [['theme', "Theme's"], ['0', 'None'], ['0.4px', 'Tight'], ['1px', 'Normal'], ['2px', 'Wide']]],
-  ['size', 'Size', [['theme', "Theme's"], ['10px', '10'], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14']]],
-  ['weight', 'Weight', [['theme', "Theme's"], ['400', 'Regular'], ['600', 'Semibold'], ['800', 'Bold']]],
+  ['spacing', 'Letter spacing', [['theme', "Theme's"], ['0', 'None'], ['0.4px', 'Tight'], ['1px', 'Normal'], ['2px', 'Wide'], ['3px', 'Wider']]],
+  ['size', 'Size', [['theme', "Theme's"], ...[10, 11, 12, 13, 14, 15, 16, 18, 20].map((n): [string, string] => [`${n}px`, String(n)])]],
+  ['weight', 'Weight', [['theme', "Theme's"], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Heavy']]],
 ]
 // the sidebar's lines and rows (SideLook): CSS values, App.tsx puts them on the sidebar as the variables looks set
 const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]][] = [
   ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['2px solid var(--line)', 'Thick'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['2px dotted var(--muted)', 'Big dots'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['2px dotted var(--accent)', 'Accent dots'], ['none', 'None']]],
   ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['3px double var(--line)', 'Double'], ['none', 'Nothing']]],
   ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
-  ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Snug'], ['28px', 'Normal'], ['32px', 'Roomy']]],
-  ['text', 'Text size', [['theme', "Theme's"], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14'], ['15px', '15']]],
+  ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Snug'], ['28px', 'Normal'], ['32px', 'Roomy'], ['36px', 'Large'], ['40px', 'Huge']]],
+  ['rowGap', 'Space between rows', [['theme', "Theme's"], ['0px', 'None'], ['1px', 'Normal'], ['3px', 'More'], ['6px', 'Lots']]],
+  ['text', 'Text size', [['theme', "Theme's"], ...[11, 12, 13, 14, 15, 16, 17, 18].map((n): [string, string] => [`${n}px`, String(n)])]],
   ['icons', 'Icon size', [['theme', 'Default (13)'], ['11px', '11'], ['12px', '12'], ['14px', '14'], ['16px', '16'], ['18px', '18']]],
+  ['head', 'Project row height', [['theme', "Theme's"], ['24px', 'Compact'], ['28px', 'Normal'], ['32px', 'Roomy'], ['36px', 'Large']]],
+  ['gap', 'Space between projects', [['theme', "Theme's"], ['0px', 'None'], ['3px', 'Small'], ['6px', 'Normal'], ['12px', 'Large'], ['20px', 'Huge']]],
 ]
 // the floating bubbles' look while an agent works (floater.css draws them, here as previews too)
 type FloaterStyle = 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still'
@@ -88,6 +91,8 @@ export type AppSettings = Paint & {
   achievements?: AchievementsKept // App's own (earn): App's onSave leaves it out, so an unlock while this page is open stays
   favThemes?: string[] // Appearance's starred themes: a group of their own, first
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
+  editors?: Record<string, string> // a project's own editor, by its id (App's editorOf)
+  customCss?: string // Appearance › Custom CSS: the user's rules over the app's (App's <style>)
   editorCmd?: string
   agent?: string // the preset new workspaces start
   branchPrefix?: string
@@ -348,7 +353,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
   ['appearance', 'Browsers', 'rail browser web button show hide list'],
-  ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
+  ['appearance', 'Sidebar', 'status guide line divider indent row height space spacing gap between rows projects project row height font size bigger dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
@@ -376,6 +381,8 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'New tabs open as a split', 'pane panel nested inside tab beside'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
   ['open', 'Custom command', 'editor'],
+  ['appearance', 'Custom CSS', 'css style styles stylesheet own rules customize anything font size spacing colors'],
+  ['open', 'Per project', 'editor xcode project own each per project ⌘e'],
   ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
@@ -389,6 +396,7 @@ const FIND: [string, string, string?][] = [
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
   ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
+  ['skill', 'Orchestrator', 'agent skill laki-orchestrate parallel agents workers fan out coordinate superset'],
   ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
   ['widgets', 'More folders', 'extensions widgets'],
   ['widgets', 'Keep logs for every extension', 'extensions widgets log logs debug stderr errors'],
@@ -681,7 +689,7 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
     : 'Not checked yet'
   return (
     <div className="setting-box">
-      <div className="row">
+      <div className="row cli-row">
         <Says title={`Laki ${u.version}`} hint={says} />
         <span className="grow" />
         {u.status === 'ready' ? (
@@ -1811,6 +1819,9 @@ export function SettingsPage(p: {
                 ) : null,
               )}
               </Group>
+              <Group title="Custom CSS" hint="Anything the pickers above don't reach: your own rules over the app's, in every window, as you type. Pictures and fonts from the web stay blocked">
+                <textarea className="mono custom-css" rows={6} spellCheck={false} value={s.customCss ?? ''} placeholder={'.sidebar .ws { font-size: 15px; }\n.project-name { color: var(--accent); }'} onChange={e => set({ customCss: e.target.value })} />
+              </Group>
             </>
           )}
           {sec === 'terminal' && (
@@ -1955,6 +1966,28 @@ export function SettingsPage(p: {
                 <input className="mono" value={s.editorCmd ?? ''} placeholder='idea "$1"' onChange={e => set({ editorCmd: e.target.value })} />
               </label>
               </Group>
+              {!!p.projects?.length && (
+                <Group title="Per project" hint="A project's own editor for ⌘E: picking an editor in Open in for one of its folders sets it">
+                  <div className="grid2">
+                    {p.projects.map(x => (
+                        <label key={x.id}>
+                          {x.name}
+                          <select value={s.editors?.[x.id] ?? ''} onChange={e => set({ editors: (({ [x.id]: _, ...rest }) => (e.target.value ? { ...rest, [x.id]: e.target.value } : rest))(s.editors ?? {}) })}>
+                            <option value="">Default ({apps.find(a => a.id === editor)?.name ?? (editor === 'custom' ? 'Custom command' : editor)})</option>
+                            {apps
+                              .filter(a => a.id !== 'custom' && !a.browser)
+                              .map(a => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name}
+                                </option>
+                              ))}
+                            {s.editorCmd?.trim() && <option value="custom">Custom command</option>}
+                          </select>
+                        </label>
+                      ))}
+                  </div>
+                </Group>
+              )}
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}

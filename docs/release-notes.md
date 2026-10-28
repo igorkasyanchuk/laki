@@ -2,6 +2,25 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Send later's messages show under the tab they go to, each with its time left: *Send now*, *Edit*, *Cancel*.
+- Changes and the Review tab: *Branch* / *Uncommitted* switch between everything against the base and only what isn't
+  committed yet (its Revert goes back to the last commit); each remembers yours. `laki diff --uncommitted` too.
+- Each project its own editor: the one you pick in *Open in* for a project's folder is ⌘E's there (Xcode for the iOS
+  repo); Settings › Open in › *Per project*.
+- The sidebar: more text and project name sizes, the space between rows and between projects, a project's row height;
+  and *Custom CSS* (Settings › Appearance) for anything else.
+- The *Orchestrator* skill (Settings › Agent skill) and `/laki:orchestrate` in Claude Code (`/laki-orchestrate` in OpenCode): one agent splits work across
+  several, a workspace each, follows them up and brings their reports together.
+- The CLI: `laki new` takes `--perm`, `--fast`, `--template`, `--action` and `--group`; `laki tab` a `--prompt`
+  (with `--name`, `--model`, `--effort`, `--perm`, `--fast`): an agent in a workspace that exists, in one call.
+- Fixed: an agent action from a workspace's right click (Run ›) when that workspace isn't the selected one did nothing.
+- Fixed: OpenCode with a model (`--model openrouter/…`) exited at once on versions whose TUI refuses `-m`.
+- Fixed: the *Restart to update* button filled half the status bar, and Settings › Updates' buttons grew with the text.
+- Fixed: `laki new --link <pr>` put the flag into the prompt.
+- A double-click in a terminal selects a word without the punctuation after it (`it.` is `it`).
+
 ## 0.33.0 · Oct 28, 2026
 
 - A faster start after a restart: agents unused for longer than *Sleep idle agents after* (8 hours) stay asleep until you open

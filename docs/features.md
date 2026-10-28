@@ -8,7 +8,7 @@ short version.
   agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
-  messages sent later (in 2h, at 3pm; to Laki AI too). *Needs you* at the top of the sidebar answers a waiting agent
+  messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card; what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
@@ -32,6 +32,8 @@ time and AI money per run (`budget: 60 min, $5`).
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
+- **Orchestrate**: the orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
+  a workspace each, follow them up and bring their reports together.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; their dev servers' ports in the status bar (not
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
@@ -48,7 +50,7 @@ time and AI money per run (`budget: 60 min, $5`).
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (one column or two side by side; comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; one column or two side by side; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
@@ -77,7 +79,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 100 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
-  accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
+  accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), and your own CSS for
+  the rest; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
 - **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
   PRs counted and grouped, links you open often, or any you make with Laki AI on the extension's own page, an agent's
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and in the sidebar's foot (an icon, a label,

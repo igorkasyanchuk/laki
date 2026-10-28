@@ -181,8 +181,12 @@ Settings › General › Development's *Setup & teardown*, panels.tsx `ScriptLog
 the chat works: kept in `Thread.queue`, `QUEUE_MAX` 10, the view's and the `ai` event's `queue`; as the answer ends, any
 end, all of it one ask; refused before it asks: said in the chat, not lost) and `aiUnqueue` (`i`), `aiAsk` in `FROM` (an
 agent's in a `widget:` chat refused: `agentNo`), `widgetWrite` `chat` (aiRpc's: a write that changes what an extension
-runs keeps it on, and its `net`, only from `widget:<its id>`, the page chat; any other Laki AI chat turns it off). A
-setting the renderer adds needs no bump: `settingsSet` keeps any field.
+runs keeps it on, and its `net`, only from `widget:<its id>`, the page chat; any other Laki AI chat turns it off). 122:
+`uncommitted` on `diff`, `hunkUndo`, `fileUndo`, `blame` and `fileRead` (files.ts `diffBase`: HEAD instead of the
+merge base: Changes' and the Review tab's *Uncommitted*, Diff.tsx `useScope`/`atHead`/`ScopeSeg`, `laki diff
+--uncommitted`, MCP's `laki_diff`), settings' `editors` (a project's own editor by its id: `openIn` `editor` takes it
+first; App's `editorOf`, a folder's Open in pick sets it), `customCss` in `REMOTE_KEYS`. A setting the renderer adds
+needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
@@ -339,7 +343,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (Laki AI from its own page's chat, `page`: `aiRpc`'s `by: 'ai'` and `chat` `widget:<id>`, whatever changed; any other writer, `agent` (an agent's tab, main.ts' `FROM`, or an MCP client outside Laki) or Laki AI in another chat, only while `widgetTrust.ts` `runsOf` is the same, else off and its `net` dropped: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on; `from` an agent: off, nothing run, a `note`),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
-- the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
+- the agent skill (Settings): `skills` (each with `skill`, laki, laki-widget or laki-orchestrate (the coordinator's protocol over `laki new`, `screen`, `send`: skill.ts
+  `orchestrateGuide`, also claude's `/laki:orchestrate`, only you start it, `ORCH_CMDS` unasked, and opencode's `/laki-orchestrate`: `<data>/opencode/command/`, its `OPENCODE_CONFIG_DIR`), and `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
   (claude, codex, gemini, grok, opencode: `skill.ts` `AGENTS`, each one's home and `mcp add`), `on` and `skill`
   (`SKILLS`: laki, the default, or laki-widget: the widget creator's guide, its own folder and launcher, no MCP; it says
@@ -606,7 +611,8 @@ those on PATH):
   (the lowest layer; hook lists add up with the user's): SessionStart (session_id), BeforeAgent/AfterTool (running),
   Notification (waiting), AfterAgent (idle, `prompt_response`); each prints `{}` (gemini wants JSON back). Superset
   puts the same hooks in `~/.gemini/settings.json`; Laki may not. Laki doesn't trust folders for it.
-- **OpenCode**: `opencode --prompt <p>`, `--session <id>`. `OPENCODE_CONFIG_DIR=<data>/opencode` (on top of the
+- **OpenCode**: `opencode --prompt <p>`, `--session <id>`; a model in `OPENCODE_CONFIG_CONTENT` (`{"model": …}` over a
+  profile's own of it), never `-m` (some versions' TUI refuses it). `OPENCODE_CONFIG_DIR=<data>/opencode` (on top of the
   user's config) loads `plugin/laki.js` (`OPENCODE_PLUGIN`): session.created (not a subagent's: `parentID`) →
   start, session.status busy/idle (idle with the last answer, from `client.session.messages`),
   permission.asked/question.asked → waiting, session.error → failed (an Esc's `MessageAbortedError`: interrupted), and
@@ -702,7 +708,7 @@ preset < Laki's own vars.
 
 A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` before a worktree is made: a name, an
 effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
-model_reasoning_effort="…"`, the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
+model_reasoning_effort="…"`, opencode its inline config (above), the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
 `--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json`, the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
@@ -1303,10 +1309,11 @@ before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `s
 `answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
-asks something (`core.asking`), and `send`/`screen`, `input` (as a send) and a WebSocket's `attach` (as a screen) into
+asks something (`core.asking`), and `send`/`screen`, `input` (as a send), `tabNew` with a `prompt` (as a send, `target` *a new agent tab*) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
 its data) (`crossAsk`: widgetTools.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
-App's dialog and notification; `always`: `crossOk`, in memory). `state` gives each project's `groups` (its seps' names) and `groupTemplates`
+App's dialog and notification; `always`: `crossOk`, in memory; a send or screen of a workspace whose `from` is the
+caller's (a worker it started: laki-orchestrate's) doesn't ask: it wrote that prompt anyway). `state` gives each project's `groups` (its seps' names) and `groupTemplates`
 (a group's prompt template by the group's name), and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused
 when there's none of it) is `wsNew` `place`, its template the one used when none is given (one still in `kit`'s
@@ -2005,6 +2012,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     - `laki.zoom`: each tab's ⌘± text size, in points over `settings.fontSize` (App's `sizeOf`; ⌘0 drops it; closed tabs'
       go); Settings and Help zoom with `pageZoom` instead.
     - `laki.diffSplit`: Changes in two columns (`split`, `text.ts` `splitRows`) or one (`unified`, the default).
+    - `laki.changesScope`, `laki.reviewScope`: Changes' and the Review tab's *Branch* or *Uncommitted* (Diff.tsx `useScope`).
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`, `left`: paused, its ms left, kept as it is;
       `note`: its message, Go out: on its bar, the end dialog's title, the notification's); ones that ended while the
@@ -2012,7 +2020,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
       Send later (⌘L, the toolbar's clock and ⋯, a tab's right click, ⌘K, the AI page's clock (`onLater`, dialog `back`);
       `SendLaterDialog` in panels.tsx, `text.ts` `parseLater`: a length or a time of day; `picks`: Run ▾'s agent actions,
       `mergeActions`) is one with `then: 'send'`, `ws`, `tab`, `text`: `send` `whenIdle` as it rings (Send now, Edit,
-      Cancel in its menu); `tab: 'ai'` is Laki AI (`askLater`: `aiAsk` with the text stamped, tried every 15 s for an hour
+      Cancel in its menu, and in its tab's pane foot: panels.tsx `LaterStrip`, beside the `QueueStrip`); `tab: 'ai'` is Laki AI (`askLater`: `aiAsk` with the text stamped, tried every 15 s for an hour
       while it's busy, a notification as it answers); one due while the app was closed is dropped with a toast (`missed`).
     - `laki.watches`: the stopwatches (the timer menu's *Stopwatch*, `StopwatchBar` in panels.tsx): `ms` counted before,
       `from` running since.

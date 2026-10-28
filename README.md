@@ -51,6 +51,7 @@ Windows (WSL 2): [docs/install.md](docs/install.md).
 ```bash
 laki new app --prompt "fix the login redirect"        # a worktree with claude on it
 laki new app --issue 42 --fan claude,codex           # a GitHub issue, raced by two agents
+laki new app --no-setup --perm acceptEdits --prompt "…"  # no setup script; it edits without asking
 laki send fix-the-login --when-idle "now add tests"  # typed in when its turn ends
 laki ship fix-the-login -m "Fix the login redirect"
 ```

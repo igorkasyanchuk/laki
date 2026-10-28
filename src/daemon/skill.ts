@@ -20,8 +20,9 @@ const AGENTS = {
   opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
 }
 export type SkillAgent = keyof typeof AGENTS
-// the skills, each installed on its own: laki (drive Laki) and laki-widget (make widgets)
-const SKILLS = ['laki', 'laki-widget'] as const
+// the skills, each installed on its own: laki (drive Laki), laki-widget (make widgets) and laki-orchestrate (several
+// agents on one piece of work, a workspace each)
+const SKILLS = ['laki', 'laki-widget', 'laki-orchestrate'] as const
 export type SkillName = (typeof SKILLS)[number]
 // mcp: what adds Laki as the agent's MCP server (laki's rows), which the user runs or pastes (we never write the
 // agents' config): a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
@@ -39,11 +40,12 @@ function files(at: string, k: SkillName): Record<string, string> {
   const cli = join(at, 'laki')
   const laki = `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`
   if (k === 'laki-widget') return { laki, 'SKILL.md': widgetSkill(cli) }
+  if (k === 'laki-orchestrate') return { laki, 'SKILL.md': orchestrateSkill(cli) }
   return {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill.
 ---
 
 # Laki
@@ -98,7 +100,9 @@ ${USAGE}
 2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode|<profile>] [--name short-name] [--base <branch>]\`:
    a new worktree on a new branch, set up by the project's setup script, with the agent started on the
    prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
-   \`--effort\` pick the agent's (blank: its own).
+   \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode; \`--no-setup\` skips the setup script;
+   \`--template\`, \`--action\` and \`--group\` use the user's prompt templates, agent actions and sidebar groups.
+   Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.
 3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
    permission, idle).
 4. Follow up: \`laki send <ws> "<text>"\`, or \`--when-idle\` to queue it for when the agent's turn ends.
@@ -290,6 +294,103 @@ its page's Data, Runs, Env and Files tabs show the rest. It runs until Ctrl-C: s
 A new widget in Laki's folder is found at once and starts off: the user turns it on in Settings › Extensions. Tell the user which settings to fill in (Settings ›
 Extensions) and what it fetches how often: each fetch may call an API. To show one somewhere else, resize it or change
 a plain setting of any extension, \`laki widget set\` (no file to write; never a secret, its source or network access).
+`
+
+// laki-orchestrate: a coordinator's protocol over Laki's workspaces (Superset's orchestrate, in Laki's commands), a skill
+// of its own; in Laki's claude tabs also /laki:orchestrate, only you start it, its laki commands unasked (another
+// workspace's screen or a message to it: Laki asks you, unless this workspace started it)
+const orchestrateSkill = (cli: string) => `---
+name: laki-orchestrate
+description: Coordinate several coding agents in parallel through Laki, each in a workspace of its own (a git worktree on its own branch), with follow-ups, progress reads, dependencies between tasks and a structured result from each. Use when the user asks to delegate, parallelize, fan out or split up coding work across agents or workspaces, hand work from one agent to another, or check on workers ("spin up agents for each of these", "run these in parallel", "what are my workers doing"). Not for one task in one workspace (the laki skill's laki new).
+argument-hint: the work to split up and coordinate
+---
+
+${orchestrateGuide(`Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`.`)}`
+const ORCH_CMDS = ['ls', 'new', 'tab', 'send', 'screen', 'diff', 'progress']
+pluginFiles.push(() => ({
+  'claude-plugin/commands/orchestrate.md': `---
+description: Split work across several Laki agents in parallel, a workspace each, and coordinate them to one result
+argument-hint: <the work to split up>
+allowed-tools: ${ORCH_CMDS.map(c => `Bash(${LAKI_CLI} ${c}:*)`).join(', ')}
+disable-model-invocation: true
+---
+Coordinate this work across Laki agents: $ARGUMENTS
+
+${orchestrateGuide(`Run the laki CLI as \`${LAKI_CLI}\`.`)}`,
+  // Laki's OpenCode tabs too (OPENCODE_CONFIG_DIR, core's: <data>/opencode): /laki-orchestrate
+  'opencode/command/laki-orchestrate.md': `---
+description: Split work across several Laki agents in parallel, a workspace each, and coordinate them to one result
+---
+Coordinate this work across Laki agents: $ARGUMENTS
+
+${orchestrateGuide(`Run the laki CLI as \`${LAKI_CLI}\`.`)}`,
+}))
+const orchestrateGuide = (run: string) => `# Orchestrating agents in Laki
+
+You are the coordinator: Laki runs the workers (each a workspace with an agent in it) and tells you their state; you
+own the plan, the order and what counts as done. ${run} Below, \`laki\` stands for it.
+
+## The control surface
+
+    laki ls --json                                        # projects (ids), workspaces, tabs: status running | waiting | idle | exited, done, last (its last answer)
+    laki new <project|.> --name <task-id> --prompt '…'    # a worker: a new worktree and branch, its agent on the prompt; prints its workspace id
+         [--preset claude|codex|gemini|grok|opencode|<profile>] [--model m] [--effort e] [--perm acceptEdits (claude's: codex's never asks, not yours to start)] [--base <branch>] [--no-setup]
+    laki tab <ws> --preset codex --name review --prompt '…'  # a second agent in a workspace that exists (a review of what the first did)
+    laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
+    laki send <ws>[/<tab>] --when-idle '…'                # a follow-up, queued until its turn ends (without --when-idle: now)
+    laki diff <ws> [--uncommitted]                        # what it changed
+
+\`.\` is your own tab's project (\`$LAKI_WORKSPACE\`). Workers you start come from your workspace (Laki shows it): reading or
+messaging them needs no question; any other workspace, Laki asks the user first. A worker's turn ends when its tab is
+\`idle\` (Laki knows from the agent's own hooks, not from guessing); \`waiting\` means it asks something: read its
+screen, then answer it if it's yours to answer (\`laki send\`), else tell the user. Never ship, merge, archive or delete
+a workspace unless the user asked for it.
+
+## Plan
+
+Keep a table in your own context, one row per task: id, depends on, workspace, status (pending, ready, running, done,
+blocked, failed) and result. Prefer independent tasks and short chains. Parallel edits get a workspace each (their own
+branches); two agents in one workspace only for reading, or work in files that don't overlap. Tell the user the plan
+in a few lines before you start workers.
+
+## Each worker's prompt
+
+Write it for a colleague who hasn't seen this conversation: the task id and goal, the files it may change and the ones
+it must not, how to check it (the commands), what it needs from tasks before it, not to widen the scope nor undo
+others' work, and that its last answer must end with one of these:
+
+    LAKI_WORKER_DONE
+    task: <task-id>
+    summary: <one line>
+    files: <paths, or none>
+    checks: <commands and how they went>
+    handoff: <what the next task needs, or none>
+
+    LAKI_WORKER_BLOCKED
+    task: <task-id>
+    reason: <what stops it>
+    needs: <a decision, access or another task's result>
+
+## Run and watch
+
+Start every task that's ready before watching any. Then, every minute or two, \`laki ls --json\` and, for each tab that's
+idle or waiting, \`laki screen <ws> --lines 200\` (its \`last\` has the answer's start): look for the envelope and check
+that what's above it backs it (tests run, files there; \`laki diff <ws>\`). Short passes, not one long blocking loop, so
+you can tell the user how it goes in between. A missing or malformed envelope: read the whole screen and ask the worker
+(\`laki send <ws> --when-idle\`).
+
+- DONE and checked: done. Hand its handoff to the tasks that wait on it: in their prompt as they start, or sent to one
+  that runs.
+- BLOCKED: give it what it needs, or ask the user, then send it on.
+- A task's turn ended without the envelope, or failed: send it what's missing; start it again only with a changed prompt
+  or another agent, and stop after two tries: report it.
+- A task is ready when every task it depends on is done.
+
+## Finish
+
+Check the risky or overlapping changes yourself before you report. Then a short report: each task's outcome, its
+workspace and branch, files, checks, and the order to merge them; say which of it the workers claimed and which you
+checked. Leave the workspaces as they are (the user reviews, ships or archives them) unless asked otherwise.
 `
 
 function info(a: SkillAgent, k: SkillName): SkillInfo {

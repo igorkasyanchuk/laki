@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -419,4 +419,8 @@ test('prompt completion: @ and # after a space, / at a line\'s start; the rows; 
   assert.deepEqual(completeInto('@ca', { ch: '@', q: 'ca', from: 0 }, 3, 'src/cart.js'), { value: 'src/cart.js ', caret: 12 })
   assert.deepEqual(completeInto('/rev', { ch: '/', q: 'rev', from: 0 }, 4, templates[0].text, true), { value: 'Review  carefully', caret: 7 })
   assert.deepEqual(completeInto('a\n/te', { ch: '/', q: 'te', from: 2 }, 5, 'Write tests', true), { value: 'a\nWrite tests', caret: 13 })
+})
+
+test('a double-clicked word drops the punctuation after it, not inside it', () => {
+  assert.deepEqual(['it.', 'it', 'file.ts', 'e.g.,', 'done!?', 'https://x.com/a.', '...', ''].map(wordTrim), [1, 0, 0, 2, 2, 1, 0, 0])
 })

@@ -369,10 +369,10 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .video-head { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 10px; color: var(--muted); }
 .video iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; background: #000; }
 .video iframe[hidden] { display: none; }
-.project { padding: 6px 0; }
+.project { padding: var(--proj-gap, 6px) 0; } /* Settings › Appearance › The sidebar: Between projects */
 /* the sidebar's lines and rows: looks set these variables, Settings › Appearance › The sidebar overrides them */
 .project + .project { border-top: var(--proj-divider, 1px solid var(--line)); } /* a line between projects */
-.project-head { display: flex; align-items: center; gap: 1px; height: 28px; padding: 0 6px 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg); font-weight: 700; }
+.project-head { display: flex; align-items: center; gap: 1px; height: var(--ph-h, 28px); padding: 0 6px 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg); font-weight: 700; }
 .project-ws { margin-left: var(--ws-indent, 11px); border-left: var(--ws-guide, none); } /* its workspaces: indented under the chevron; a guide line only where a look draws one (look.css), or Settings' */
 .project-ws:empty { display: none; }
 /* the Needs you list (Needs.tsx) above Pinned: a card each, waiting ones edged in --waiting, done ones in --done */
@@ -415,7 +415,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
    left in its color or the accent (--ws-bar), a workspace's color (--tab-c, set inline) that bar dimmer and a tint, its
    project's (--proj-c) the bar alone where it has none of its own; one that needs you (.needs: waiting, or done unseen)
    has its name in bold */
-.ws { --ws-bar: color-mix(in srgb, var(--tab-c, var(--proj-c, transparent)) 70%, transparent); display: flex; align-items: center; gap: 6px; height: var(--ws-h, 28px); margin: 1px 6px 1px 4px; padding: 0 8px 0 10px; border-radius: min(var(--radius), 10px); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
+.ws { --ws-bar: color-mix(in srgb, var(--tab-c, var(--proj-c, transparent)) 70%, transparent); display: flex; align-items: center; gap: 6px; height: var(--ws-h, 28px); margin: var(--ws-gap, 1px) 6px var(--ws-gap, 1px) 4px; padding: 0 8px 0 10px; border-radius: min(var(--radius), 10px); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
 .ws.sel { --ws-bar: var(--tab-c, var(--proj-c, var(--accent))); background-color: var(--sel); }
@@ -1814,7 +1814,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .tab-win-body { position: relative; flex: 1; min-height: 0; background: var(--term-bg, var(--bg)); }
 .sim-win-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); } /* a floated simulator: the panel's tab alone */
 /* Settings › General › Developer: the CLI's links under its row */
-.cli-row { align-items: center; }
+.custom-css { width: 100%; min-height: 96px; resize: vertical; font-size: 12px; tab-size: 2; } /* Appearance › Custom CSS */
+.cli-row { align-items: center; } /* its buttons as tall as a button, not as the words beside them (Updates' too) */
 .cli-links { display: flex; gap: 14px; margin-top: 3px; }
 .cli-links a { color: var(--accent-ink); }
 /* Settings › General › Updates: the newest release's notes, scrolled past a few lines */
@@ -2723,7 +2724,7 @@ button.tag.ext-problems { cursor: pointer; border: none; font: inherit; }
 .status .sb-trophy:hover, .status .sb-trophy.on { color: var(--fg); background: none; }
 .status .sb-update { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 7px; border: none; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); font: 500 11px/18px var(--ui-font); min-height: 18px; } /* a newer release: until you update */
 .status .sb-update:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
-.status .sb-update.ready { background: var(--accent); color: var(--accent-fg); }
+.status .sb-update.sb-ready { background: var(--accent); color: var(--accent-fg); } /* not .ready: Ready's card (a workspace with no tabs) would make it a 680px column */
 .ach-toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 31; /* over a page (30) */ display: flex; align-items: center; gap: 10px; max-width: min(480px, calc(100vw - 32px)); padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--tc-yellow) 45%, var(--line)); border-radius: 999px; background: var(--panel); color: var(--fg); font: inherit; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); cursor: pointer; animation: ach-in 0.25s ease-out; }
 .ach-toast.up { bottom: 84px; } /* over a toast shown with it */
 .ach-toast > svg { flex: none; color: var(--tc-yellow); }
