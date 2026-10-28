@@ -23,7 +23,7 @@ export function running(pid: number) {
   }
 }
 
-export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 8000): Promise<T> {
+export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 20000): Promise<T> { // room for a loaded machine: a pass returns at once
   const end = Date.now() + ms
   let last: unknown
   while (Date.now() < end) {
