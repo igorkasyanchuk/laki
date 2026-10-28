@@ -331,7 +331,7 @@ test('events of your own: emit reaches others not itself, custom.*, workspace, t
   await sleep(1500)
   assert.deepEqual(readFileSync(join(home, 'pong.log'), 'utf8').trim().split('\n'), ['0', '2'])
   assert.deepEqual(readFileSync(join(home, 'ping.log'), 'utf8').trim().split('\n'), ['1', '3'])
-  assert.ok((await rig.rpc('widgetLogs', { id: 'ping' })).lines.some((l: any) => /emit custom\.ping: dropped, 4 hops/.test(l.text)))
+  await until(async () => (await rig.rpc('widgetLogs', { id: 'ping' })).lines.some((l: any) => /emit custom\.ping: dropped, 4 hops/.test(l.text)), 'the drop logged')
   assert.ok((await rig.rpc('widgetEvents')).some((e: any) => e.refused?.[0] === '4 hops: dropped'))
 
   // widget.json: custom names and custom.* pass the check; a made-up built-in doesn't

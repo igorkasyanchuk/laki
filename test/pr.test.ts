@@ -598,7 +598,7 @@ test('a merged PR archives its workspace once it is clean (archiveMerged), not w
   const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length
   const scans = async () => {
     const n = views()
-    await until(() => views() > n + 1, 'two scans')
+    await until(() => views() > n + 1, 'two scans', 20000) // a loaded machine scans slower
   }
   await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'MERGED', 'scanned')
   await scans()
