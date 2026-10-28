@@ -361,7 +361,8 @@ test('daemon HTTP and WebSocket: only POST /rpc, a body over 16 MB, a bad body, 
       let s = ''
       res.on('data', d => (s += d)).on('end', () => ok([res.statusCode!, s]))
     })
-    req.on('error', no)
+    // the daemon answers at 16 MB and closes: the rest of our write may hit EPIPE first; its 413 is on its way
+    req.on('error', (e: NodeJS.ErrnoException) => (e.code === 'EPIPE' || e.code === 'ECONNRESET' ? setTimeout(() => no(e), 2000) : no(e)))
     req.end(JSON.stringify({ method: 'ping', params: { x: 'x'.repeat(17 << 20) } }))
   })
   assert.deepEqual(big, [413, '{"error":"too big"}'])
