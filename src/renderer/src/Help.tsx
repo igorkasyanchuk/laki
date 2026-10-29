@@ -39,6 +39,7 @@ const keysOf = (m: KeyMap): [string, string][] => {
     ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
     ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes"],
     ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
+    ['⌥-double-click · ⌥-drag', "select in a terminal where the app takes the mouse (Claude Code's fullscreen mode): Laki's selection, copied without the dot after a word"],
     ['⌘D', 'changes against the base branch'],
     [k('panel'), 'side panel: info, files, changes, review, preview, simulator'],
     [k('info'), 'workspace info, the side panel’s first tab: PR, checks, what each agent said last'],

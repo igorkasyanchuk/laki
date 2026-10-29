@@ -2,6 +2,11 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- ⌥-click and ⌥-drag select in a terminal even where the app has the mouse (Claude Code's fullscreen mode, whose own
+  double-click keeps the dot): ⌥-double-click `it.` and `it` is copied.
+
 ## 0.34.0 · Oct 29, 2026
 
 - Send later's messages show under the tab they go to, each with its time left: *Send now*, *Edit*, *Cancel*.

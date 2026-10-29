@@ -454,7 +454,8 @@ selected workspace's PR is in the status bar.
 workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 pick a color (brown and gray by a click).
 
 **Selecting:** a double-click in a terminal selects a word without the punctuation after it (`it.` is `it`; `file.ts`
-and a link stay whole).
+and a link stay whole). Where an app has the mouse (Claude Code's fullscreen mode, vim, htop), a click is the app's,
+and so is what it selects: hold ⌥ to select in Laki instead (⌥-double-click a word, ⌥-drag a range).
 
 **Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow. In Changes or the Review
 tab (the last place you clicked), ⌘F finds words in the diff's lines instead: ⏎ next, ⇧⏎ previous, Esc closes.

@@ -69,6 +69,9 @@ export function Term({
       allowProposedApi: true,
       allowTransparency: transparent(),
       macOptionIsMeta: true,
+      // ⌥-click and ⌥-drag select even while an app has the mouse (claude's fullscreen TUI picks its own words, the dot
+      // in): xterm's selection, trimmed and copied as any. ponytail: ⌥-drag's block selection goes with it
+      macOptionClickForcesSelection: true,
       theme: termTheme(),
       // OSC 8 links (text over an address, claude's PR links and paths): on ⌘-click only (L13: the words may not be where
       // it goes), its address on hover; a file:// one also on ⌃-click unless an app has the mouse. In a browser elsewhere
@@ -108,6 +111,9 @@ export function Term({
       const cells = (at.end.y - at.start.y) * term.cols + at.end.x - at.start.x
       term.select(at.start.x, at.start.y, cells - n)
     })
+    // a quick ⌥-click moves a shell's cursor there (arrow keys); with the mouse an app's, that click is a forced
+    // selection's (above), and ↑ would be claude's last prompt: off then
+    term.element?.addEventListener('mousedown', () => (term.options.altClickMovesCursor = !tracked()), true)
     try {
       const gl = new WebglAddon()
       gl.onContextLoss(() => gl.dispose())
