@@ -100,7 +100,9 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   await until(() => !/shop/.test(ingress()), 'shop taken off')
 
   // cloudflared ends on its own: down, then up again at the same address
-  await until(() => log().split('cloudflared named stopped').length === 3 && kids(rig.data).length === 1, 'the new connector noted, the old one gone')
+  // a stopped one may still be listed while the new one's start time is read: never kill that one (no down would come)
+  const stopped = () => new Set([...log().matchAll(/cloudflared named stopped (\d+)/g)].map(m => +m[1]))
+  await until(() => log().split('cloudflared named stopped').length === 3 && kids(rig.data).length === 1 && !stopped().has(kids(rig.data)[0].pid), 'the new connector noted, the old one gone')
   process.kill(kids(rig.data)[0].pid, 'SIGTERM')
   // down lasts AGAIN's first 2 s: a busy Mac's view may miss it, so its log line (connDown says it as it sets down)
   await until(async () => /cloudflared ended/.test((await tunnels())[0].down ?? '') || /permanent tunnels: cloudflared ended/.test(rig.out) /* the rig's daemon says it on stdout, no daemon.log */, 'down')

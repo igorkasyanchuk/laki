@@ -28,7 +28,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
     actions: { got: `cat > "${home}/got.json"; cp "$LAKI_EVENT_FILE" "${home}/file.json"; printf '{"data": {"said": "%s"}, "toast": "seen", "close": "prog"}' "$LAKI_EVENT"` },
   })
   make(rig, 'mine', { name: 'Mine', scope: 'workspace', fetch: 'echo "{}"', on: { 'turn.done': 'mark' }, actions: { mark: `touch "${home}/mark-$LAKI_WORKSPACE"` } })
-  make(rig, 'slow', { name: 'Slow', on: { 'turn.done': 'q' }, actions: { q: `sleep 0.3; cat >> "${home}/q.log"; echo >> "${home}/q.log"` } })
+  make(rig, 'slow', { name: 'Slow', on: { 'turn.done': 'q' }, actions: { q: `i=0; while [ ! -f "${home}/go" ] && [ $i -lt 400 ]; do sleep 0.05; i=$((i+1)); done; cat >> "${home}/q.log"; echo >> "${home}/q.log"` } }) // the first waits for go: every event queued behind it first, however slow the Mac
   await on(rig, 'ev', 'mine')
   const app = await rig.connect()
   t.after(() => app.ws.close())
@@ -63,6 +63,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
   // the queue: one at a time, 20 waiting at most: the oldest past it dropped
   await on(rig, 'slow')
   await Promise.all(Array.from({ length: 25 }, () => rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'x' } })))
+  writeFileSync(join(home, 'go'), '')
   await until(() => existsSync(join(home, 'q.log')) && readFileSync(join(home, 'q.log'), 'utf8').trim().split('\n').length === 21, '21 handled', 15000)
   await sleep(800)
   assert.equal(readFileSync(join(home, 'q.log'), 'utf8').trim().split('\n').length, 21, '4 dropped')

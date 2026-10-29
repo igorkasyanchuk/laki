@@ -19,7 +19,7 @@ case "$1 $2" in
 esac
 case "$*" in *" run "*) port=named ;; *) port=$(printf '%s\n' "$*" | sed -nE 's/.*(localhost|127\.0\.0\.1):([0-9]+).*/\2/p') ;; esac
 # before any output: a stop the moment it says it's up is still logged
-trap 'echo "cloudflared $port stopped" >> "${FAKE_LOG:-/dev/null}"; kill $! 2>/dev/null; exit 0' TERM INT
+trap 'echo "cloudflared $port stopped $$" >> "${FAKE_LOG:-/dev/null}"; kill $! 2>/dev/null; exit 0' TERM INT # $$: which one
 case "$*" in
 *" run "*)
   echo "2026-10-03T10:00:00Z INF Starting tunnel tunnelID=6f1e0c1a-0000-4000-8000-000000000001" >&2
