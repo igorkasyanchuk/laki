@@ -23,7 +23,7 @@ npm run dev                       # Electron + renderer dev server on :5199
 
 - **Tests** are `node --test` with type stripping (`test/*.test.ts`), no framework.
   - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_HOME` and `HOME`, its own daemon, and the
-    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), a shell `tsh`,
+    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), `caffeinate` (records its starts and stops), a shell `tsh`,
     `ssh` (every host is this machine) and `da-probe` (counts terminal query replies). No network.
   - `test/cloudflared` is a fake that's off PATH: a test links it into `$HOME/bin` (first on PATH) to install it.
   - Never let a test touch the real `~/.laki` (or `~/.laki-electron`), `~/.claude` or `~/.codex`. The rig also
@@ -185,9 +185,21 @@ runs keeps it on, and its `net`, only from `widget:<its id>`, the page chat; any
 `uncommitted` on `diff`, `hunkUndo`, `fileUndo`, `blame` and `fileRead` (files.ts `diffBase`: HEAD instead of the
 merge base: Changes' and the Review tab's *Uncommitted*, Diff.tsx `useScope`/`atHead`/`ScopeSeg`, `laki diff
 --uncommitted`, MCP's `laki_diff`), settings' `editors` (a project's own editor by its id: `openIn` `editor` takes it
-first; App's `editorOf`, a folder's Open in pick sets it), `customCss` in `REMOTE_KEYS`. A setting the renderer adds
+first; App's `editorOf`, a folder's Open in pick sets it), `customCss` in `REMOTE_KEYS`. 123: `presetSave` (`laki
+preset`: one profile by name, `add`, `rm`, `set`; an agent's asked in the app first, main.ts' `presetAsk`, a `toolAsk`
+`cross: 'preset'`), `storageInfo` and `storageTidy` (settings' `storageDays`, `STORAGE_DAYS` 90: a storage folder's
+file not changed for so long goes, hourly, only `ws.storage` folders), links in one hidden `.laki-links.json` per storage
+folder (artifacts.ts `LINKS`: a `.url` file moved into it, `fileUrls`; a `Link`'s `path` is `link:<url>`, not a file;
+`artifactList` files only; `linkRm`), `show`/`showDone` (`laki show`: a tab's `card`, `Card`), `prDetach` of a branch's
+own PR (a workspace's `prOff`: the scan leaves it out until `prAttach`). 124: `ghCard` (`url`: a GitHub PR's or
+issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link, a failure not kept; shared/types.ts
+`GhCard`): a terminal link's hover card (LinkPeek.tsx). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
+- keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
+  `keepAwake` at each view (`changed()`): while a tab of an agent (`tracked`, or a shell's `runs`) is running or waiting,
+  one `caffeinate -i -w <daemon pid>` (the screen may sleep; it ends with the daemon, a crash too); none found (not a
+  Mac): said once. Tested with `test/fakes/caffeinate` in `test/resources.test.ts`;
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
   and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
@@ -323,8 +335,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `job`: that check's section only, `that check isn't failing … now` once it isn't), `prAttach` (`ws`, `pr`: a URL or number; the app's *Attach a PR…*, the status bar's *+ PR*, the right
   panel's Info: a git workspace on a branch, no PR found, and related's *Make it this workspace's PR*): `prHead`, then `prUrl`,
   and `prLinked` when its head isn't the workspace's branch, the one before (`prUrl`, else the branch's) to `related`; a scan follows), `prDetach`
-  (`ws`: a linked `prUrl` to `related`, the PR ⋯'s *Not this workspace's PR*; its branch's own is refused: the scan
-  would find it again), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
+  (`ws`: a linked `prUrl` to `related`, the PR ⋯'s *Not this workspace's PR*, the workspace menu's *PR #n ›* (App's `prSub`: `prMenu`, the status bar PR's right click) › *Detach PR*, `laki pr .
+  --detach`; its branch's own too, kept off as `prOff`: the scan leaves it out until `prAttach`), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
   lines; Changes' *PR #n*), `prFiles` (GraphQL: the PR's node id and each file's `viewerViewedState`, VIEWED, UNVIEWED,
   DISMISSED; owner and repo from the PR's URL) and `prViewed` (`path`, `viewed`, `id`: `markFileAsViewed` /
   `unmarkFileAsViewed`; Changes' Viewed boxes, in both views, a ticked file folded and dimmed, *n/m viewed*), `prLabels` (the PR's repo's, `gh label list -R`, kept a minute per repo; a color only as GitHub's 6 hex digits: `labelOf`) and `prLabel` (`label`, `on`: `gh pr edit --add-label=` / `--remove-label=` `-R` by the PR's URL, shown at once, then a scan; a name with a comma refused: gh splits there): `PRSection`'s tag button (`LabelApi`), a PR's `labels` from the scan (`PR_FIELDS`), `prAct` (`act` approve or close: `gh pr review --approve` / `gh pr close` by the PR's URL, after the
@@ -573,7 +585,7 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
 - `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`;
 - `LAKI_STORAGE_FOLDER` (`storageOf`; `STORAGE_NOTE`, the start note's and the laki skill's words: files, and a
-  `<title>.url` Internet shortcut for each thing an agent publishes, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
+  link for each thing an agent publishes, kept in its `LINKS`, `.laki-links.json`; a `.url` file it saves is moved in, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
   for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
 
@@ -761,10 +773,9 @@ the code, the seconds it ran, its last lines.
   counted, one scan at a time, as `WorkspaceView.artifacts`: the status bar's *Artifacts: n* (a menu: Finder, or *Show here*: panels.tsx
   `ArtifactsBar`, a strip of previews over the status bar from `artifactList` (newest first, 500 at most) and `fileRead`
   `storage` (the folder as the root, `inside`'s checks), a click shows one big, ← → the others; the folder's folders first,
-  a click goes in (`dir`), the head's path or ← back out), none at 0. Its `.url` files
-  (`urlOf`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): Info's *links* rows, and first in the gallery,
-  where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files; an HTML artifact *in the browser*, `inBrowser`: the daemon's sandboxed `/artifact/` page, never a `file:` page, L11). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
-  `<title>.url` for each link the agent published and the folder hasn't (`sameUrl`): its publish tools' (`publishedBy`, from
+  a click goes in (`dir`), the head's path or ← back out), none at 0. Its links (`LINKS`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): Info's *links* rows, and first in the gallery,
+  where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files; an HTML artifact *in the browser*, `inBrowser`: the daemon's sandboxed `/artifact/` page, never a `file:` page, L11). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), keeps
+  a link for each one the agent published and the folder hasn't (`sameUrl`): its publish tools' (`publishedBy`, from
   claude's PostToolUse payload, buffered as `Runtime.published`: the Artifact tool's publish, not its read/list/asset, or an
   `mcp__` tool named publish/deploy/upload/share: the first https link it returned, named by its `title`/`name`/file) and
   its last answer's (`publishedIn`: `PUBLISHED`'s hosts, claude.ai artifacts, gists, vercel.app, netlify.app, pages.dev,
@@ -1139,8 +1150,8 @@ blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `L
 `CI=1`), each `{{var}}` an env reference (`shared/workflow.ts` `shellFill`: bare `"$LAKI_V_n"`, in double quotes `$LAKI_V_n""`; in single quotes a `check` problem), its own process group (`kill`), `timeout` (10 min); output's last 80 lines. Actions:
 `ship` (its tab's `onExit`), `prAct`, `runDev`, `wsArchive`; outward ones (`OUTWARD`) `ask` `confirm` first unless
 `ask first: no`, a dry run says them. Extension blocks (`extension`: an id): `widgetUse` (reason `workflow`, the run's workspace for a scoped one), its data as
-`steps.<id>.data` and each top field `steps.<id>.<field>` (`ANSWER_MAX` each), an off one or a failed fetch the error exit. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),
-`<file>.url`), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, 5 minutes at most with
+`steps.<id>.data` and each top field `steps.<id>.<field>` (`ANSWER_MAX` each), an off one or a failed fetch the error exit. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s): `linkAdd`, its `file` the
+title), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, 5 minutes at most with
 `aiDecide` (`waitOf`, `LAKI_AI_WAIT_MS`: tests'), memory's compaction too, `model` or
 Settings' OpenRouter model, logged in `ai-calls.jsonl` as `<workflow> · <block>`), the answer `steps.<id>.answer`.
 Webhook blocks (`hook`): `fill` the URL (https; http only to 127.0.0.1, localhost, [::1]) and `header:` lines with the run's variables and `env.NAME` (Settings'
@@ -1317,7 +1328,8 @@ caller's (a worker it started: laki-orchestrate's) doesn't ask: it wrote that pr
 (a group's prompt template by the group's name), and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused
 when there's none of it) is `wsNew` `place`, its template the one used when none is given (one still in `kit`'s
-templates), and Laki AI's `SYSTEM` has it pick the group that fits. Each workspace's
+templates), and Laki AI's `SYSTEM` has it pick the group that fits (`shared/tools.ts` `groupRule`: by what the names
+mean, a general one last, none when none plainly fits; the laki skill's `laki new --group` too). Each workspace's
 `related` and `from` too; `laki_new_workspace` `link` is `wsNew`'s, and `tools(rpc, from)`'s `from` (the CLI's
 `$LAKI_WORKSPACE`; the daemon drops its own at start, so Laki AI's have none) its `from`. Tested in `test/cli.test.ts`.
 
@@ -2155,7 +2167,15 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
   xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
-- **`Term.tsx`**: one xterm per pane. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
+- **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own when one
+  runs in it, else its workspace's live agent tabs): a pill (`.term-reply`) where the mouse let go of a selection, gone
+  at a key, a press, a scroll or an empty selection; it opens panels.tsx' `ReplyPop` (the quote, your words, a pick of
+  agents; ⏎ `send` `enter: false` into the prompt, ⌘⏎ `send` (`whenIdle` for an agent tab), text.ts `replyText`: *From
+  <tab>:* (*your output* from its own), the quote fenced, the words). A link's hover card (`LinkPeek.tsx`, 400 ms on,
+  250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension): from the OSC 8 handler, the
+  WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
+  workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
+  ones only); an https one through `/img` (Widgets.tsx `imgVia`). No native title over a link that peeks. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
   codex's and opencode's prompt, where xterm would send ⏎. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
@@ -2238,7 +2258,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`
   through `bindKey`, `keys.open`; it shows the app's window), Settings' `HotkeyField` too, which says when another app (or
   the other hotkey: `grab` never puts both on the same keys, and gives one the keys it asked for once the other lets go,
-  `wants`) has it (`register` false). Screenshot to Laki AI (`settings.shotAsk`, off unless true, only while `aiOn`;
+  `wants`) has it (`register` false); the Keys page shows the same group (`globalKeys`), and Help the keys in use
+  (`GlobalKeys`: App's `hotkey` and `shotKey` once main took them, `held`). Screenshot to Laki AI (`settings.shotAsk`, on unless false, only while `aiOn`, a Mac only: preload's `shotKey`;
   `shotKey`, unset `SHOT_KEY` ⌃⌥⌘S): App's `shotKey` to main's `shot-hotkey` (false: off, `shotOn`; `keys.shot`), and the
   menu bar's *Screenshot to Laki AI…* while on: `shotAsk`, `screenshot` `-i` (one at a time: `shooting`), then `aiWin`
   with the PNG (`ai-shot`, or `aiShots` until the page's `ai-shot-ready`, `did-navigate` its reset: preload's `onAiShot`); `AiWindow` hands it through `AiPage` to PromptInput's
@@ -2565,7 +2586,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/files.ts` | the diff against the base and its size, Changes' revert and redo, the side panel's files |
 | `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
 | `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
-| `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links kept as `.url` files |
+| `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links, kept in its `.laki-links.json` (`.url` files moved in) |
 | `src/daemon/meters.ts` | transcripts read as they grow: the context and usage meters, today's spend |
 | `src/daemon/phone.ts` | phone pushes and the taps that answer them |
 | `src/daemon/schedule.ts` | the board's to-dos, reminders, scheduled tasks, `flowHooks` |

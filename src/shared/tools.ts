@@ -39,6 +39,10 @@ export async function state(rpc: Rpc = conn) {
   }
 }
 
+// which sidebar group a new workspace goes in, by what the groups' names mean (Laki AI's SYSTEM, the tool's group, the
+// laki skill's laki new): where: how the caller reads the groups
+export const groupRule = (where: string) =>
+  `A project's groups (${where}: the sidebar's headings) sort its workspaces: put a new one in the group its task belongs to, judged by what each group's name means, not by matching words: reviewing a pull request (anyone's) goes in a group for reviews (On review, To review, Reviews, PRs); a spike, prototype or experiment in one like POC or Experiments; a group for general work (Work, Main, Dev) takes only ordinary tasks no other group fits. When no group plainly fits, or two fit equally, leave the group out: no group. Say which group it went in.`
 // a group of a project by its name (any case) or id: its id (wsNew's place), its prompt template and agent, if any
 async function groupOf(rpc: Rpc, project: string, group: string) {
   const v: View = await rpc('state')
@@ -89,7 +93,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
         template: str("a prompt template's name (laki_templates): the prompt goes into it. Left out with a group that has one (laki_state's groupTemplates): the group's"),
         action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
-        group: str("one of the project's groups (laki_state's groups), the sidebar's heading it goes under: the one whose name fits the task best (a PR review under Reviews); leave it out when none fits"),
+        group: str("one of the project's groups (laki_state's groups), the sidebar's heading it goes under: the one whose name means the kind of task this is (a PR review in On review or Reviews, a spike in POC; a general one like Work only when no other fits); leave it out when none plainly fits"),
         no_setup: { type: 'boolean', description: "skip the project's setup script (a worktree only; files .worktreeinclude names are still copied): when the user asks for it" },
         start_at: str('start its agent later, the workspace now: a time (tomorrow at 9am, in 2h, 2026-10-20 14:30, or ms) or "limit" (claude and codex: once the plan limit resets); only when the user asks for a later start'),
       },

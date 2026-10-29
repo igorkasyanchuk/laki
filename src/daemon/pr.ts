@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { type Check, fillTemplate, type FixWhat, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
+import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
@@ -133,6 +133,7 @@ export async function prAttach(o: { ws: string; pr: string }, said = false) {
   unrelate(w, pr.url)
   w.prLinked = head === w.branch ? undefined : true
   w.prSaid = said || undefined // yours stays; one its agent named gives way to its branch's
+  w.prOff = undefined // detached before: yours again
   prs.delete(w.id)
   wsLog(w, `PR: #${pr.number} attached${w.prLinked ? `, only linked (its branch is ${head})` : ''}`)
   save()
@@ -141,16 +142,18 @@ export async function prAttach(o: { ws: string; pr: string }, said = false) {
   return { number: pr.number, url: pr.url, linked: !!w.prLinked }
 }
 
-// its primary PR isn't its own (a prompt's that was only where it came from, an old guess): to related, and its
-// branch's PR, if any, is the one followed. Its branch's own (not linked) stays: the scan would find it again
+// its primary PR isn't its own (a prompt's that was only where it came from, an old guess, or its branch's you don't
+// want followed): to related. A linked one: its branch's PR, if any, is the one followed; its branch's own: kept off
+// (prOff) until you attach it again, or the branch has another
 export function prDetach(o: { ws: string }) {
   const w = findWs(o.ws)
-  if (!w.prUrl || !w.prLinked) throw new Error(w.prUrl || prs.get(w.id) ? `its PR is its branch's: it stays` : `${w.id} has no PR`)
-  const was = w.prUrl
+  const was = w.prUrl ?? prs.get(w.id)?.url
+  if (!was) throw new Error(`${w.id} has no PR`)
+  if (!w.prLinked) w.prOff = was // the branch's: the scan would find it again
   w.prUrl = w.prLinked = w.prSaid = undefined
   relate(w, was)
   prs.delete(w.id)
-  wsLog(w, `PR: ${was} only related now`)
+  wsLog(w, `PR: ${was} only related now${w.prOff ? ' (its branch\'s, kept off)' : ''}`)
   save()
   changed()
   void scanPRs()
@@ -308,6 +311,7 @@ async function scanPR(ws: Workspace) {
     if (!ws.prUrl) await prFromSaid(ws)
     return
   }
+  if (!ws.prUrl && ws.prOff && sameRef(pr.url, ws.prOff)) return void (prs.delete(ws.id) && changed()) // detached (prDetach): not followed
   const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0
   wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)
   if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
@@ -721,6 +725,34 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
 const repoOf = (pr: PR) => (u => `${u.host}/${u.pathname.split('/').slice(1, 3).join('/')}`)(new URL(pr.url))
 const LABEL_COLOR = /^[0-9a-f]{6}$/i // GitHub's; anything else isn't put in the page's CSS
 const labelOf = (l: { name?: unknown; color?: unknown; description?: unknown }): PRLabel => ({ name: String(l.name ?? ''), ...(LABEL_COLOR.test(String(l.color)) && { color: String(l.color) }), ...(typeof l.description === 'string' && l.description && { description: l.description }) })
+// ghCard: a GitHub PR's or issue's card, for its link hovered in a terminal (Term's LinkPeek): gh pr|issue view by the
+// URL (any repo, no checkout needed), kept a minute per link
+const ghCards = new Map<string, { at: number; card: Promise<GhCard> }>()
+export function ghCard(o: { url: string }): Promise<GhCard> {
+  const m = GH_LINK.exec(String(o.url ?? ''))
+  if (!m) throw new Error('not a link to a GitHub pull request or issue')
+  const [, owner, repo, kind, n] = m
+  const url = `https://github.com/${owner}/${repo}/${kind}/${n}`
+  const kept = ghCards.get(url)
+  if (kept && Date.now() - kept.at < 60e3) return kept.card
+  if (ghCards.size > 200) ghCards.clear() // ponytail: a terminal's links, a minute each: none kept long
+  const pr = kind === 'pull'
+  const fields = pr ? 'number,title,state,isDraft,author,additions,deletions,changedFiles,updatedAt,labels,reviewDecision' : 'number,title,state,author,labels,updatedAt,comments'
+  const card = run('gh', [pr ? 'pr' : 'issue', 'view', url, '--json', fields], { timeout: 20000 }).then(
+    ({ stdout }): GhCard => {
+      const j = JSON.parse(stdout)
+      const labels = Array.isArray(j.labels) ? (j.labels as object[]).map(labelOf).filter(l => l.name) : []
+      return { kind: pr ? 'pr' : 'issue', repo: `${owner}/${repo}`, url, number: Number(j.number) || Number(n), title: String(j.title ?? ''), state: String(j.state ?? '').toLowerCase(), ...(j.isDraft === true && { draft: true }), ...(j.author?.login && { author: String(j.author.login) }), ...(j.updatedAt && { at: String(j.updatedAt) }), ...(labels.length && { labels }), ...(pr && { add: Number(j.additions) || 0, del: Number(j.deletions) || 0, files: Number(j.changedFiles) || 0 }), ...(j.reviewDecision && { review: String(j.reviewDecision) }), ...(Array.isArray(j.comments) && { comments: j.comments.length }) }
+    },
+    e => {
+      ghCards.delete(url) // a failure isn't kept: Retry asks again
+      throw new Error(ghSays(e, `${pr ? 'PR' : 'Issue'} #${n}`))
+    },
+  )
+  ghCards.set(url, { at: Date.now(), card })
+  return card
+}
+
 const repoLabels = new Map<string, { at: number; list: PRLabel[] }>() // by repo: the PR section's Labels menu, kept a minute (one made on GitHub shows soon)
 // prLabels: the labels of the PR's repo (gh label list), for the PR section's Labels menu
 export async function prLabels(ref: string) {

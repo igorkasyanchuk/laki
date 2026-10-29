@@ -274,6 +274,27 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.match(r.err, /usage: laki schedule/)
 })
 
+test('cli: preset ls, add, set, off, rm; bad fields refused', async t => {
+  const rig = await fresh(t)
+  let r = await rig.cli('preset', 'add', 'claude-ask', '--perm', 'auto', '--model', 'opus', '--env', 'A=1', '--env', 'B=x=y')
+  assert.equal(r.code, 0, r.err)
+  assert.equal(r.out.trim(), 'added claude-ask')
+  const v = await rig.rpc('state')
+  assert.deepEqual(v.presets.find((p: any) => p.name === 'claude-ask'), { name: 'claude-ask', agent: 'claude', perm: 'auto', model: 'opus', env: { A: '1', B: 'x=y' } })
+  r = await rig.cli('preset', 'set', 'claude-ask', '--model', '', '--effort', 'high', '--name', 'ask')
+  assert.equal(r.code, 0, r.err)
+  r = await rig.cli('preset', 'off', 'ask')
+  assert.equal(r.out.trim(), 'turned off ask')
+  r = await rig.cli('preset')
+  assert.match(r.out, /^ask {15}claude {4}high · perm auto · A=… B=… {2}\(off\)$/m)
+  assert.equal((await rig.cli('preset', 'add', 'ask')).err.trim(), 'laki: there\'s a profile ask already: laki preset set ask …')
+  assert.match((await rig.cli('preset', 'set', 'ask', '--effort', 'huge')).err, /effort: low, medium/)
+  assert.match((await rig.cli('preset', 'add', 'x', '--agent', 'command')).err, /needs --cmd/)
+  assert.match((await rig.cli('preset', 'set', 'nope', '--model', 'm')).err, /no profile nope/)
+  assert.equal((await rig.cli('preset', 'rm', 'ask')).out.trim(), 'removed ask')
+  assert.ok(!(await rig.rpc('state')).presets.some((p: any) => p.name === 'ask'))
+})
+
 test('cli: new --fan, --issue, browser', async t => {
   const rig = await fresh(t)
   const proj = JSON.parse((await rig.cli('project', 'add', rig.repo, '--json')).out)

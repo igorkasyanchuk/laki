@@ -103,7 +103,7 @@ test('a permanent tunnel: set up in Settings, its DNS record, one cloudflared fo
   await until(() => log().split('cloudflared named stopped').length === 3 && kids(rig.data).length === 1, 'the new connector noted, the old one gone')
   process.kill(kids(rig.data)[0].pid, 'SIGTERM')
   // down lasts AGAIN's first 2 s: a busy Mac's view may miss it, so its log line (connDown says it as it sets down)
-  await until(async () => /cloudflared ended/.test((await tunnels())[0].down ?? '') || /permanent tunnels: cloudflared ended/.test(readFileSync(join(rig.data, 'daemon.log'), 'utf8')), 'down')
+  await until(async () => /cloudflared ended/.test((await tunnels())[0].down ?? '') || /permanent tunnels: cloudflared ended/.test(rig.out) /* the rig's daemon says it on stdout, no daemon.log */, 'down')
   await until(async () => !(await tunnels())[0].down, 'up again')
   assert.equal((await tunnels())[0].url, 'https://api.example.com')
 

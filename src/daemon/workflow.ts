@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, linkAdd, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { copyTree, move, readCapped, readJson } from '../shared/conn.ts'
@@ -674,15 +674,21 @@ function js(expr: string, vars: Record<string, string>) {
   }
 }
 
-// a save block: text, a file or folder of the workspace, or a link (<file>.url), into its storage folder (its Artifacts)
-function keep(r: FlowRun, b: Block, vars: Record<string, string>) {
+// a save block: text, a file or folder of the workspace into its storage folder (its Artifacts), or a link into its links
+async function keep(r: FlowRun, b: Block, vars: Record<string, string>) {
   const ws = wsOf(r)
   const root = ws && storageOf(ws)
   if (!ws || !root) throw new Error('this workspace has no storage folder')
   const link = b.link && fill(b.link, vars).trim()
   if (b.link && !/^https?:\/\/\S+$/i.test(link || '')) throw new Error(`${b.link}${link !== b.link ? ` (${link})` : ''}: not an http(s) link`)
   const name = fill(b.file ?? '', vars).trim()
-  const path = resolve(root, link && !/\.url$/i.test(name) ? `${name}.url` : name)
+  if (link) {
+    mkdirSync(root, { recursive: true })
+    await linkAdd(root, link, basename(name).replace(/\.url$/i, ''))
+    r.vars[`steps.${b.id}.output`] = link
+    return leave(r, b, 'ok', `linked ${link}`)
+  }
+  const path = resolve(root, name)
   if (!path.startsWith(root + sep)) throw new Error(`${b.file}: a path in the storage folder`)
   mkdirSync(resolve(path, '..'), { recursive: true })
   if (b.from) {
@@ -692,10 +698,9 @@ function keep(r: FlowRun, b: Block, vars: Record<string, string>) {
     const real = realpathSync(src) // a link out of the workspace isn't its file
     if (real === top || !within(top, real)) throw new Error(`${b.from}: a file or folder in the workspace (not all of it)`)
     copyTree(real, path) // a log or build its agent still writes
-  } else if (link) writeFileSync(path, `[InternetShortcut]\r\nURL=${link}\r\n`)
-  else writeFileSync(path, fill(b.text ?? '', vars))
+  } else writeFileSync(path, fill(b.text ?? '', vars))
   r.vars[`steps.${b.id}.output`] = path
-  return leave(r, b, 'ok', `${b.from ? 'copied' : link ? 'linked' : 'wrote'} ${basename(path)}`)
+  return leave(r, b, 'ok', `${b.from ? 'copied' : 'wrote'} ${basename(path)}`)
 }
 
 // ---------- agent blocks: a prompt to a tab, then its turn's end (core's turnEnds)

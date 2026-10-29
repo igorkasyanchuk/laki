@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -145,8 +145,8 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, uiSize: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null,null]')
   // the icons' size: what CSS sizes (a sidebar row's marks) scales by; 14, none
   applyTheme({ iconSize: 18 })
   assert.equal(props.get('--icon-k'), String(18 / 14))
@@ -423,4 +423,9 @@ test('prompt completion: @ and # after a space, / at a line\'s start; the rows; 
 
 test('a double-clicked word drops the punctuation after it, not inside it', () => {
   assert.deepEqual(['it.', 'it', 'file.ts', 'e.g.,', 'done!?', 'https://x.com/a.', '...', ''].map(wordTrim), [1, 0, 0, 2, 2, 1, 0, 0])
+})
+
+test("replyText: where the quote is from, the text fenced past its own backticks, then the words", () => {
+  assert.equal(replyText('\n  error: x   \nat y\n\n', ' fix this ', 'shell'), 'From shell:\n```\n  error: x\nat y\n```\n\nfix this')
+  assert.equal(replyText('run ```npm i```', ''), 'From your output:\n````\nrun ```npm i```\n````')
 })

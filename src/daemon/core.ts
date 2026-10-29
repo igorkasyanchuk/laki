@@ -3,7 +3,7 @@
 // modules that import it and that it re-exports: hosts, pr, files, remote, resources, artifacts, meters, phone,
 // schedule. None of the modules in this cycle reads another's const or let as it loads (test/load-order.test.ts);
 // the data folder is dir.ts', out of it.
-import { execFile, execFileSync } from 'node:child_process'
+import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
@@ -24,7 +24,7 @@ import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { type GateBy, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
-import { artifacts, keepPublished, links, type Published, publishedBy } from './artifacts.ts'
+import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
@@ -317,7 +317,7 @@ another session in it) with an agent started on the task. This session goes on a
 })
 
 // the storage folder, for the start note and the laki skill (skill.ts): files, and links to what an agent publishes
-export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for what you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it, and Laki shows it as the workspace's Artifacts. Group related files in a subfolder (\`screenshots/\`, \`review-1234/\`): Laki shows each folder, and the user opens it. Save there when the user asks for such files or mentions the storage folder. Whatever you publish for the user (a Claude artifact, a deployed site, a gist, a hosted page or file) gets a link there, without being asked: give its link in your last answer, as \`[a few words](link)\`, and Laki keeps Claude artifacts and sites on the usual hosts (vercel.app, netlify.app, pages.dev, github.io, gists…) on its own; anything else, save yourself as \`<a few words>.url\` holding \`[InternetShortcut]\` and, on the next line, \`URL=<the link>\` (\`printf '[InternetShortcut]\\nURL=%s\\n' "<link>" > "$LAKI_STORAGE_FOLDER/<a few words>.url"\`): https, or \`file:///<path>\` for a page you made on this Mac outside the folder. Laki lists links first and opens them in the browser.`
+export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for what you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it, and Laki shows it as the workspace's Artifacts. Group related files in a subfolder (\`screenshots/\`, \`review-1234/\`): Laki shows each folder, and the user opens it. Save there when the user asks for such files or mentions the storage folder. Whatever you publish for the user (a Claude artifact, a deployed site, a gist, a hosted page or file) gets a link there, without being asked: give its link in your last answer, as \`[a few words](link)\`, and Laki keeps Claude artifacts and sites on the usual hosts (vercel.app, netlify.app, pages.dev, github.io, gists…) on its own; anything else, save yourself as \`<a few words>.url\` holding \`[InternetShortcut]\` and, on the next line, \`URL=<the link>\` (\`printf '[InternetShortcut]\\nURL=%s\\n' "<link>" > "$LAKI_STORAGE_FOLDER/<a few words>.url"\`): https, or \`file:///<path>\` for a page you made on this Mac outside the folder. Laki files it with the workspace's links (the file goes; its name is the link's title), lists links first and opens them in the browser.`
 
 // What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
 const LAKI_NOTE = () =>
@@ -326,7 +326,38 @@ const LAKI_NOTE = () =>
 - \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
+- \`laki show "<what to look at>" --open <folder|file|url>\`: a card under your tab in Laki with a button that opens it (a folder in Finder, a file in its app, a page in the browser), instead of asking the user to run \`open …\`; \`--open\` again for more (4 at most).
 - ${STORAGE_NOTE}${widgetTools().length ? TOOLS_NOTE : ''}`
+// laki show: an agent's card under its tab (Card), one a tab (a newer one replaces it), kept in memory until you close
+// it or the tab goes; its buttons only open what they name, and only on your click (App's ShowStrip)
+const cards = new Map<string, Card>()
+export function show(p: { tab?: unknown; title?: unknown; text?: unknown; open?: unknown }) {
+  const tab = findTab(String(p.tab ?? ''))
+  const text = String(p.text ?? '').trim().slice(0, 4000)
+  const title = String(p.title ?? '').trim().slice(0, 120) || undefined
+  const targets = (Array.isArray(p.open) ? p.open : p.open ? [p.open] : []).map(String).slice(0, 4)
+  if (!text && !targets.length) throw new Error('usage: laki show "<what to look at>" [--open <folder|file|url>]')
+  const open = targets.map(t => {
+    if (/^https?:\/\/\S+$/i.test(t)) return { label: `Open ${t.replace(/^https?:\/\/(www\.)?/i, '').split(/[/?#]/)[0]}`, target: t, kind: 'url' as const }
+    if (!isAbsolute(t)) throw new Error(`${t}: an absolute path or an http(s) link`)
+    const st = (() => {
+      try {
+        return statSync(t)
+      } catch {
+        throw new Error(`${t}: not there`)
+      }
+    })()
+    return st.isDirectory() ? { label: 'Show in Finder', target: t, kind: 'folder' as const } : { label: `Open ${basename(t)}`, target: t, kind: 'file' as const }
+  })
+  const c: Card = { id: randomBytes(4).toString('hex'), title, text, open, at: Date.now() }
+  for (const id of cards.keys()) if (!state.tabs.some(t => t.id === id)) cards.delete(id) // ponytail: a closed tab's goes at the next show
+  cards.set(tab.id, c)
+  changed()
+  return c
+}
+export function showDone(tab: string) {
+  if (cards.delete(tab)) changed()
+}
 // the user's extensions give tools (an action's tool): said only while one is on
 const TOOLS_NOTE = `
 - \`laki widget tools\`: tools the user's Laki extensions give you (a deploy, a ticket, a note…) and when to use them; \`laki widget tool <id> <action> '<json>'\` runs one (Laki may ask the user first). MCP: their ext_ tools.`
@@ -532,7 +563,7 @@ export function view(): View {
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
     projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
@@ -577,6 +608,7 @@ export function changed() {
     const v = view()
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
     for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
+    keepAwake(v.tabs.some(t => (t.status === 'running' || t.status === 'waiting') && (tracked(t) || !!t.runs)))
     if (!clients.size) return void (sent = '') // nobody to send it to
     const json = JSON.stringify({ ev: 'state', view: v }) // once for every client
     if (json === sent) return
@@ -586,6 +618,21 @@ export function changed() {
 }
 
 export const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
+
+// settings.keepAwake: the Mac doesn't sleep while an agent works or waits for you (caffeinate -i: the screen may still
+// sleep and lock, the lid still sleeps it; -w: it ends with the daemon, a crash too). Set at each view (changed()).
+// ponytail: macOS's caffeinate only; elsewhere none is found, said once
+let awake: ChildProcess | undefined
+let noCaffeinate = false
+function keepAwake(on: boolean) {
+  on &&= state.settings?.keepAwake === true && !noCaffeinate
+  if (on === !!awake) return
+  if (!on) return void (awake?.kill(), (awake = undefined))
+  const p = spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' })
+  p.on('error', e => ((noCaffeinate = true), log(`keep awake: ${e.message}`)))
+  p.on('exit', () => awake === p && (awake = undefined))
+  awake = p
+}
 
 // when each workspace's agents worked (the last 50 stretches): comments under your name made then are the agent's
 // ponytail: in memory, so a daemon restart forgets them; a comment the agent left just before one may start a round
@@ -888,14 +935,70 @@ function worktreesOf(proj: Project) {
 const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
 export const settingUp = (ws: Workspace) => existsSync(setupMarker(ws)) // its setup script runs (agents wait for it)
 
+// where storage folders go: settings.storageDir (~ is home), else <data>/storage
+export const storageRoot = () => (root => (root ? resolve(homedir(), tilde(root)) : join(dir, 'storage')))(typeof state.settings?.storageDir === 'string' ? state.settings.storageDir.trim() : '')
+// Settings › General › Storage: the folder and what's in it (du: its size; folders: one a workspace)
+export async function storageInfo() {
+  const root = storageRoot()
+  const kb = await run('du', ['-sk', root], { timeout: 20000 }).then(r => Number(r.stdout.split(/\s/)[0]) || 0, () => 0)
+  let folders = 0
+  try {
+    folders = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory()).length
+  } catch {}
+  return { dir: root, bytes: kb * 1024, folders, days: state.settings?.storageDays ?? STORAGE_DAYS }
+}
+// files in workspaces' storage folders not changed for settings.storageDays (unset: STORAGE_DAYS; 0: never) go, then the
+// folders left empty under them: hourly (main.ts). Only the folders Laki made (each workspace's own, live or
+// archived), never anything else in storageDir; a link is removed, not followed. ponytail: a sync walk, hourly; async if folders get huge
+export function storageTidy(now = Date.now()) {
+  const days = Number(state.settings?.storageDays ?? STORAGE_DAYS)
+  if (!(days > 0)) return 0
+  const before = now - days * 86400e3
+  let n = 0
+  const walk = (d: string, top: boolean) => {
+    const had = n
+    const old = (statSafe(d)?.mtimeMs ?? now) < before // as it was before this walk changed it
+    let names: string[] = []
+    try {
+      names = readdirSync(d)
+    } catch {
+      return
+    }
+    for (const f of names) {
+      if (top && f === LINKS) continue // its kept links: a list, not a file of yours to age out
+      const p = join(d, f)
+      const st = statSafe(p)
+      if (!st) continue
+      if (st.isDirectory()) walk(p, false)
+      else if (st.mtimeMs < before) rmSync(p, { force: true }), n++
+    }
+    if (!top && (old || n > had) && !readdirSafe(d).length) rmSync(d, { recursive: true, force: true }) // emptied now, or long empty: an empty one just made stays
+  }
+  for (const ws of state.workspaces) if (ws.storage && basename(ws.storage).includes(ws.id)) walk(ws.storage, true)
+  if (n) log(`storage: ${n} file${n === 1 ? '' : 's'} older than ${days} days deleted`)
+  return n
+}
+const statSafe = (d: string) => {
+  try {
+    return lstatSync(d)
+  } catch {
+    return undefined
+  }
+}
+const readdirSafe = (d: string) => {
+  try {
+    return readdirSync(d)
+  } catch {
+    return ['?'] // unreadable: kept
+  }
+}
 // a workspace's storage folder ($LAKI_STORAGE_FOLDER): <storageDir>/<name>-<id>, named and made at its first tab and kept
 // (a rename doesn't move it); none for Terminals and Browsers. ponytail: on this Mac only, a host's workspaces get none
 export function storageOf(ws: Workspace) {
   if (ws.host || state.projects.find(p => p.id === ws.project)?.kind) return undefined
   if (!ws.storage) {
-    const root = typeof state.settings?.storageDir === 'string' ? state.settings.storageDir.trim() : ''
     const name = slug(ws.name ?? '')
-    const at = join(root ? resolve(homedir(), tilde(root)) : join(dir, 'storage'), name && name !== ws.id ? `${name}-${ws.id}` : ws.id)
+    const at = join(storageRoot(), name && name !== ws.id ? `${name}-${ws.id}` : ws.id)
     ws.storage = existsSync(at) ? `${at}-${randomBytes(3).toString('hex')}` : at // never a folder that's there already: wsRm deletes it
     save()
   }
@@ -1483,9 +1586,44 @@ export function settingsSet(o: Settings, own = false) {
   return state.settings
 }
 
+// laki preset (Settings › Agents & profiles, one profile by name, the others as they are): add a new name (agent claude
+// unless given), set its fields ('' or null drops one; name: a new name), off/on, rm (one stays). An agent's is asked
+// first in the app (main.ts' presetAsk): its args and env run in every tab of it
+const PRESET_TEXT = ['args', 'cmd', 'model', 'effort', 'perm', 'account'] as const
+export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set?: Record<string, unknown> }) {
+  const name = String(p.name ?? '').trim()
+  if (!name) throw new Error("a profile's name")
+  const list = presets()
+  const i = list.findIndex(x => x.name === name)
+  if (p.add ? i >= 0 : i < 0) throw new Error(p.add ? `there's a profile ${name} already: laki preset set ${name} …` : `no profile ${name}: laki preset ls lists them`)
+  const def = state.settings?.agent === name // the default agent: follows a rename, unset by a removal
+  if (p.rm) {
+    if (list.length < 2) throw new Error('the last profile stays')
+    return settingsSet({ presets: list.filter((_, j) => j !== i), ...(def && { agent: undefined }) }).presets!
+  }
+  const set = p.set && typeof p.set === 'object' ? p.set : {}
+  const next: Record<string, unknown> = { ...(i >= 0 ? list[i] : { name, agent: 'claude' }) }
+  for (const [k, v] of Object.entries(set)) {
+    if (v === '' || v === null) delete next[k]
+    else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
+    else if (k === 'fast' || k === 'off' || k === 'laki') next[k] = !!v
+    else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
+    else throw new Error(`a profile has no ${k}`)
+  }
+  const pr = next as Preset
+  if (!pr.name) throw new Error("a profile's name")
+  if (pr.name !== name && list.some(x => x.name === pr.name)) throw new Error(`there's a profile ${pr.name} already`)
+  if (pr.agent !== 'command' && !isAgent(pr.agent)) throw new Error(`agent: ${AGENTS.join(', ')} or command`)
+  if (pr.agent === 'command' && !pr.cmd) throw new Error('a command profile needs --cmd')
+  if (pr.effort && !EFFORTS[pr.agent as Agent]?.includes(pr.effort)) throw new Error(`effort: ${EFFORTS[pr.agent as Agent]?.join(', ') ?? `none for ${pr.agent}`}`)
+  if (pr.perm && !PERMS[pr.agent as Agent]?.some(x => x[0] === pr.perm)) throw new Error(`perm: ${PERMS[pr.agent as Agent]?.map(x => x[0]).join(', ') ?? `none for ${pr.agent}`}`)
+  if (pr.fast && !FAST[pr.agent as Agent]) delete pr.fast
+  return settingsSet({ presets: i >= 0 ? list.map((x, j) => (j === i ? pr : x)) : [...list, pr], ...(def && pr.name !== name && { agent: pr.name }) }).presets!
+}
+
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editors', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'storageDays', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editors', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
@@ -1593,7 +1731,7 @@ export function ghSays(e: any, what: string) {
   if (e.code === 'ENOENT') return `gh isn't installed: ${process.platform === 'darwin' ? 'brew' : 'sudo apt'} install gh, then gh auth login`
   if (/exec: gh: not found|gh: command not found|command not found: gh/.test(err)) return "gh isn't installed on the SSH host: install it there, then gh auth login" // exec's
   if (/gh auth login|not logged in|authenticat/i.test(err)) return "gh isn't signed in: run gh auth login"
-  if (/could not resolve to a pull ?request|no pull requests found|not found/i.test(err)) return `${what} not found`
+  if (/could not resolve to (a pull ?request|an issue)|no pull requests found|not found/i.test(err)) return `${what} not found`
   return `gh: ${err.trim().split('\n')[0]}`
 }
 

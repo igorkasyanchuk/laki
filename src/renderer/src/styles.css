@@ -404,6 +404,12 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .sidebar[data-ph-spacing] .project-name { letter-spacing: var(--ph-spacing) !important; }
 .sidebar[data-ph-size] .project-name { font-size: var(--ph-size) !important; }
 .sidebar[data-ph-weight] .project-name { font-weight: var(--ph-weight) !important; }
+.sidebar[data-ph-font='custom'] .project-name { font-family: var(--ph-font) !important; } /* a font picked by name (Appearance › Sidebar) */
+.sidebar[data-side-font] { font-family: var(--side-font); } /* the sidebar's own font, over the interface's */
+/* Appearance › Interface › Text size (themes.ts' --ui-size): tabs, menus, dropdowns, the status bar, tooltips and the
+   side panel's tabs as one, their small print a step under it; unset, each keeps its own */
+html[data-ui-size] :is(.tab, .menu-item, .menu .menu-label, .menu .menu-label.mono, .menu-filter, .status, .tip, .sp-tabs > button, .nw-pick) { font-size: var(--ui-size) !important; }
+html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-size: calc(var(--ui-size) - 1.5px) !important; }
 .row-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .button-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; } /* a setting's words, its button at the end, like a switch-row's */
 .button-row > button { flex: none; }
@@ -451,6 +457,18 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 html.away *, html.away *::before, html.away *::after { animation-play-state: paused !important; } /* Laki in the background (App's away): nothing animates */
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* Appearance › Interface › Full-width status bar (App's wideBar): the bar under the rail, the sidebar and the main
+   area, over pages too (they cover the main area only); the sidebar's foot buttons first (.sb-foot), with their words,
+   and without the rail its AI and Settings at the end */
+.app.wide-status { padding-bottom: 24px; }
+.status.wide { position: absolute; left: 0; right: 0; bottom: 0; z-index: 31; height: 24px; padding-left: 8px; }
+.app.full .status.wide { display: none; }
+.app.wide-status.full { padding-bottom: 0; }
+.status .sb-foot { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.status .sb-foot .ib { width: 22px; height: 20px; min-height: 0; }
+.status .sb-foot .ib.labeled { width: auto; gap: 4px; padding: 0 6px 0 4px; font-size: inherit; }
+.status.wide > .sb-foot:first-child { padding-right: 6px; border-right: 1px solid var(--line); } /* apart from the workspace's */
+.status .sb-foot .spacer { display: none; }
 /* full screen (⌘⇧⏎): the tab's content alone; ⤡ in the corner, faint until the mouse is on it */
 .app.full :is(.rail, .sidebar, .side-backdrop, .side-handle, .sp-handle, .tabbar, .tabstrip, .status, .artifacts, .stale-bar, .body > .side-panel, .body > .info) { display: none !important; }
 .full-exit { position: absolute; top: 6px; right: 10px; z-index: 20; opacity: 0.25; background: var(--panel); }
@@ -923,6 +941,9 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .pane-body { flex: 1; position: relative; min-height: 0; }
 /* a tab's queue (panels.tsx' QueueStrip) under its terminal: its own height, at most a third of the pane, the rest scrolls */
 .queue-strip { flex: none; max-height: 34%; padding-right: 48px; /* clear of the floating AI button */ display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--side); font-size: 12px; }
+.show-strip .show-text { padding: 2px 12px 6px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: 12.5px; } /* laki show's card (panels.tsx ShowStrip) */
+.show-strip .show-open { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
+.show-strip .show-open button { display: inline-flex; align-items: center; gap: 6px; }
 .queue-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; color: var(--muted); }
 .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-what b { color: var(--fg); font-weight: 600; }
@@ -1389,6 +1410,34 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .preview-head { display: flex; gap: 8px; margin-top: 6px; }
 .term-preview { height: 190px; padding: 8px 10px; background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .term-preview .xterm { height: 100%; }
+/* Appearance › Interface's and Sidebar's previews (SettingsLook.tsx): the app's own classes, so its settings show as they are */
+.ui-preview { display: flex; flex-direction: column; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); pointer-events: none; }
+.ui-preview .tabbar { align-items: flex-end; }
+.ui-preview .tab { margin-bottom: -1px; }
+.ui-preview .tab.sel { color: var(--fg); background: var(--bg); border-color: var(--line); }
+.ui-preview-mid { display: flex; align-items: flex-start; gap: 18px; padding: 12px 14px; min-height: 92px; }
+.ui-preview .menu { position: static; min-width: 220px; max-height: none; }
+.ui-preview .tip { position: static; margin: 4px 0 0; }
+.ui-preview .status { gap: 14px; }
+.side-preview.sidebar { width: 240px; max-width: 100%; margin-bottom: 10px; padding: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); pointer-events: none; }
+.storage-use { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; } /* General › Storage's size, Refresh, Show in Finder */
+.set-sub { margin: 14px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+/* Appearance › Custom CSS's guide (SettingsLook.tsx CssGuide) */
+.css-guide { margin-top: 10px; }
+.css-guide > summary { cursor: pointer; color: var(--accent-ink); font-size: 12.5px; }
+.css-guide code { font: 11.5px var(--mono); }
+.css-vars { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 2px 10px; }
+.css-var { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 3px 6px; border: none; background: none; text-align: left; font-size: 12px; }
+.css-var:hover { background: var(--hover); }
+.css-var > code { flex: none; min-width: 74px; white-space: nowrap; }
+.css-var > .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.css-swatch { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); background: repeating-linear-gradient(45deg, var(--line) 0 2px, transparent 2px 4px); }
+.css-where { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; }
+.css-examples { display: flex; flex-direction: column; gap: 4px; }
+.css-example { display: grid; grid-template-columns: 190px 1fr auto; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.css-example > code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.narrow .css-example { grid-template-columns: 1fr auto; }
+.narrow .css-example > code { grid-column: 1 / -1; grid-row: 2; }
 /* Settings › Terminal: the preview on top, its summary and Reset beside the title; a segment's glyph (the cursor's shape) */
 .term-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .term-top-head button { flex: none; display: inline-flex; align-items: center; gap: 6px; }
@@ -2379,6 +2428,30 @@ button.board-name:hover { background: none; }
 .shown-pop-foot { display: flex; align-items: center; gap: 12px; }
 @media (prefers-reduced-motion: reduce) { .shown-pop { animation: none; } }
 .share-pop { top: 64px; left: 50%; transform: translateX(-50%); width: 420px; }
+/* Reply on a terminal's selected text: Term's pill, then panels.tsx' ReplyPop */
+.term-reply { position: fixed; z-index: 9; /* over the terminal (xterm's layers go to 8), under dialogs and pages */ display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: 500 12px var(--ui-font); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); cursor: pointer; }
+.term-reply:hover { border-color: var(--accent); color: var(--accent-ink); }
+.reply-pop { width: 420px; z-index: 9; }
+.reply-quote { margin: 0; max-height: 120px; overflow: auto; padding: 6px 8px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--fg) 5%, transparent); font: 11.5px/1.4 var(--mono); white-space: pre-wrap; color: var(--muted); }
+.reply-pop textarea { width: 100%; box-sizing: border-box; resize: vertical; font: 13px/1.4 var(--ui-font); }
+.reply-pop .row { display: flex; align-items: center; gap: 8px; }
+.reply-pop select { max-width: 170px; }
+/* a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, or a picture */
+.link-peek { position: fixed; z-index: 9; max-width: 360px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 12px/1.4 var(--ui-font); color: var(--fg); }
+.link-peek.img img { display: block; max-width: 336px; max-height: 240px; object-fit: contain; border-radius: 4px; background: repeating-conic-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
+.lp-gh { all: unset; display: flex; flex-direction: column; gap: 5px; min-width: 260px; cursor: pointer; }
+.lp-head { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.lp-repo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-state { padding: 0 7px; border-radius: 999px; font-size: 11px; text-transform: capitalize; border: 1px solid currentColor; color: var(--done); }
+.lp-state.draft { color: var(--muted); }
+.lp-state.closed { color: var(--error); }
+.lp-state.merged { color: var(--tc-purple); }
+.lp-title { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lp-labels { display: flex; flex-wrap: wrap; gap: 4px; }
+.lp-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-meta .add { color: var(--add); }
+.lp-meta .del { color: var(--del); }
+.lp-err { color: var(--error); }
 .prompt-peek > summary { cursor: pointer; margin: 4px 0; }
 .prompt-peek[open] > summary { margin-bottom: 6px; }
 

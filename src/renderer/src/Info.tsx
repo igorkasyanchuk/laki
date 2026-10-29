@@ -184,7 +184,7 @@ export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (
   if (!pr) return null
   return (
     <span className="pr-status" onContextMenu={onMenu}>
-      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={[pr.title, prState(pr), reviewersText(pr)].filter(Boolean).join(' · ')} onClick={() => onOpen(pr.url)}>
+      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={[pr.title, prState(pr), reviewersText(pr), onMenu && 'right click: refresh, merge, detach…'].filter(Boolean).join(' · ')} onClick={() => onOpen(pr.url)}>
         #{pr.number}
       </button>
       {pr.state === 'OPEN' && (
@@ -305,7 +305,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
     : [
         { label: 'Open its checks', icon: 'link', run: () => onOpen(`${pr.url}/checks`) },
         { label: 'Open its files', icon: 'diff', run: () => onOpen(`${pr.url}/files`) },
-        ...(w.prLinked && onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: 'Only related: its own PR, once opened, shows here', run: onDetach } as MenuItem] : []),
+        ...(onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: w.prLinked ? 'Only related: its own PR, once opened, shows here' : 'Only related, kept off: its branch’s PR until you attach it again', run: onDetach } as MenuItem] : []),
         ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
       ]
   // Labels: the repo's, the PR's ticked; a click puts one on or takes it off (the menu opens once they're in)

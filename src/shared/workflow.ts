@@ -100,7 +100,7 @@ export type Block = {
   for?: string // wait
   file?: string // save: a path in the workspace's storage folder
   from?: string // save: a file or folder of the workspace, copied there (instead of text); webhook: a file of it, sent as the body
-  link?: string // save: a link, kept as <file>.url (the workspace's Artifacts list links first)
+  link?: string // save: a link, kept in the storage folder's links as <file> (the workspace's Artifacts list links first)
   extension?: string // extension: its id, fetched now (an on one only), then its data as variables
   result?: (typeof RESULTS)[number] // end
   notify?: boolean // end, popup: a macOS notification too

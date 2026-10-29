@@ -1,7 +1,7 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
@@ -994,14 +994,45 @@ test('what an agent publishes is kept as a link: its publish tool, the hosts its
   await used('Artifact', { file_path: '/tmp/.notes.html', title: { not: 'a string' } }, 'https://claude.ai/artifact/Dot123') // no hidden file, no [object Object]
   writeFileSync(join(dir, 'Mine.url'), '[InternetShortcut]\nURL=https://gist.github.com/me/abc/\n') // the agent saved this one itself
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'Done. I published [the notes](https://claude.ai/artifact/SyQ5g1JA), the gist is https://gist.github.com/me/abc and the shop is live at https://shop.vercel.app/. Docs: https://docs.example.com' } })
-  const urls = async () => Object.fromEntries(readdirSync(dir).filter(f => f.endsWith('.url')).map(f => [f, /URL=(\S+)/.exec(readFileSync(join(dir, f), 'utf8'))![1]]))
+  // one hidden file, .laki-links.json, not .url files: the agent's own is moved into it
+  const urls = async () => (existsSync(join(dir, '.laki-links.json')) ? Object.fromEntries(JSON.parse(readFileSync(join(dir, '.laki-links.json'), 'utf8')).map((l: any) => [l.title, l.url])) : {})
   await until(async () => Object.keys(await urls()).length === 5, 'five links')
-  assert.deepEqual(await urls(), { 'site-notes.url': 'https://claude.ai/artifact/SyQ5g1JA', 'notes.url': 'https://claude.ai/artifact/Dot123', 'Q3 report.url': 'https://artifacto.example/p/9f', 'Mine.url': 'https://gist.github.com/me/abc/', 'the shop is live.url': 'https://shop.vercel.app/' })
+  assert.deepEqual(await urls(), { 'site-notes': 'https://claude.ai/artifact/SyQ5g1JA', notes: 'https://claude.ai/artifact/Dot123', 'Q3 report': 'https://artifacto.example/p/9f', Mine: 'https://gist.github.com/me/abc/', 'the shop is live': 'https://shop.vercel.app/' })
+  assert.ok(!readdirSync(dir).some(f => f.endsWith('.url')), 'no .url file left')
   // the same link again, another turn: nothing new
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'Still at https://shop.vercel.app' } })
   await new Promise(r => setTimeout(r, 300))
   assert.equal(Object.keys(await urls()).length, 5)
   await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).links?.length === 5, 'in the view')
+  // taken off: the gallery's right click
+  await rig.rpc('linkRm', { ws: w.id, url: 'https://shop.vercel.app/' })
+  assert.equal(Object.keys(await urls()).length, 4)
+  assert.equal((await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).links.length, 4)
+})
+
+test('storage: its size, and files not changed for storageDays go (only the folders Laki made; 0: never)', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const dir: string = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).storage, 'its storage folder')
+  const old = Date.now() / 1000 - 40 * 86400
+  mkdirSync(join(dir, 'shots'))
+  for (const f of ['old.png', 'shots/old.png']) writeFileSync(join(dir, f), 'x'), utimesSync(join(dir, f), old, old)
+  writeFileSync(join(dir, 'new.md'), 'fresh')
+  mkdirSync(join(dir, 'empty-now')) // an agent's, its files still to come
+  writeFileSync(join(dir, '.laki-links.json'), '[]\n'), utimesSync(join(dir, '.laki-links.json'), old, old)
+  const other = join(dirname(dir), 'not-lakis')
+  mkdirSync(other)
+  writeFileSync(join(other, 'old.txt'), 'x'), utimesSync(join(other, 'old.txt'), old, old)
+  const info = await rig.rpc('storageInfo')
+  assert.equal(info.dir, dirname(dir))
+  assert.ok(info.bytes > 0 && info.folders === 2, JSON.stringify(info))
+  await rig.rpc('settingsSet', { storageDays: 0 })
+  assert.equal(await rig.rpc('storageTidy', {}), 0)
+  await rig.rpc('settingsSet', { storageDays: 30 })
+  assert.equal(await rig.rpc('storageTidy', {}), 2)
+  assert.deepEqual(readdirSync(dir).sort(), ['.laki-links.json', 'empty-now', 'new.md']) // the emptied folder too; its links and a folder just made stay
+  assert.ok(existsSync(join(other, 'old.txt')), 'another folder of storageDir: never')
 })
 
 test('Artifacts: the files in a workspace storage folder, hidden ones not counted', async t => {
@@ -1051,24 +1082,27 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${bKey}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/plan/${p.id}/spec/x/p.html?key=${bKey}`)).status, 401)
   rmSync(join(dir, 'site'), { recursive: true })
-  // a link an agent kept (a .url file): in the view for the info panel, first in the gallery; only http(s)
+  // a link an agent kept (a .url file): moved into the links file, in the view for the info panel, first in the
+  // gallery (the app's: not a file); only http(s); one that isn't a link stays a file
   writeFileSync(join(dir, 'Project page.url'), '[InternetShortcut]\r\nURL=https://claude.ai/artifact/SyQ5\r\n')
   writeFileSync(join(dir, 'bad.url'), '[InternetShortcut]\nURL=javascript:alert(1)\n')
   const links = await until(async () => (await ws()).links, 'its link')
   assert.deepEqual(links.map((l: any) => [l.title, l.url]), [['Project page', 'https://claude.ai/artifact/SyQ5']])
-  assert.deepEqual((await rig.rpc('artifactList', { ws: w.id })).slice(0, 2).map((f: any) => f.path).sort(), ['Project page.url', 'bad.url']) // .url files first
+  assert.ok(!existsSync(join(dir, 'Project page.url')))
+  assert.deepEqual((await rig.rpc('artifactList', { ws: w.id })).map((f: any) => f.path).sort(), ['bad.url', 'report.md', 'shots/home.png'])
   // a local page's (file:///, as codex keeps its own artifacts; a space in its path too): a link too; a file:// with a host isn't
   mkdirSync(join(dir, 'reviews'))
   writeFileSync(join(dir, 'reviews', 'Review 14438.url'), '[InternetShortcut]\nURL=file:///Users/me/Library/Application Support/codex/14438/review.html\n')
   writeFileSync(join(dir, 'host.url'), '[InternetShortcut]\nURL=file://evil/share/x.html\n')
   await until(async () => (await ws()).links?.length === 2, 'the local link')
-  assert.deepEqual((await ws()).links.map((l: any) => [l.path, l.url]).sort(), [['Project page.url', 'https://claude.ai/artifact/SyQ5'], ['reviews/Review 14438.url', 'file:///Users/me/Library/Application Support/codex/14438/review.html']])
+  assert.deepEqual((await ws()).links.map((l: any) => [l.title, l.url]).sort(), [['Project page', 'https://claude.ai/artifact/SyQ5'], ['Review 14438', 'file:///Users/me/Library/Application Support/codex/14438/review.html']])
+  assert.equal((await ws()).artifacts, 6) // 4 files (bad.url, host.url, report.md, shots/home.png) and 2 links
   rmSync(join(dir, 'reviews'), { recursive: true })
   rmSync(join(dir, 'host.url'))
   rmSync(join(dir, 'bad.url'))
   rmSync(join(dir, 'shots'), { recursive: true })
   rmSync(join(dir, 'report.md'))
-  rmSync(join(dir, 'Project page.url'))
+  rmSync(join(dir, '.laki-links.json'))
   await until(async () => (await ws()).artifacts === undefined, 'none again')
 })
 

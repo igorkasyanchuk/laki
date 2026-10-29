@@ -1,0 +1,7 @@
+#!/bin/sh
+# fake caffeinate: says it started and stopped in $FAKE_LOG; meanwhile waits like the real one, until it's killed or -w's pid goes
+log=${FAKE_LOG:-/dev/null}
+echo "caffeinate $*" >> "$log"
+trap 'echo "caffeinate stopped" >> "$log"; exit 0' TERM
+pid=; while [ $# -gt 0 ]; do [ "$1" = -w ] && pid=$2; shift; done
+while [ -z "$pid" ] || kill -0 "$pid" 2>/dev/null; do sleep 0.2; done

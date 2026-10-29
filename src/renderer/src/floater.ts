@@ -1,7 +1,7 @@
 // The floating bubbles (floater.html, small windows main keeps over every app while Laki isn't in front). #bar: a drop
 // on the screen's edge with a circle per workspace whose agent works (floater.css: a glow, a gradient, an arc,
 // bricks, a comet, a wave or still, Settings' pick), waits for you (a pulse), or was used last (dimmer), its initials inside; a click opens its tab
-// in Laki, a hover asks main for its card, a drag (from anywhere on it, past 4px) moves it and main sticks it to the
+// in Laki, a right click marks a done one seen (as a look would), a hover asks main for its card, a drag (from anywhere on it, past 4px) moves it and main sticks it to the
 // edge nearest where it's let go (top or bottom: a row, body[data-side]). Under the circles, a + (Settings' switch) whose click shows ACTS: stacked in the drop
 // over it (floaterMenu stack, a hover's name in the card's window) or #menu, a window beside it (card). #card: that card
 // (name, project, what the agent asked or last said) in a window of its own beside the drop, so the drop never moves
@@ -34,6 +34,7 @@ type Bridge = {
     size: (len: number, up?: boolean) => void
     hover: (tab: string, top: number) => void
     open: (tab: string) => void
+    seen: (tab: string) => void
     act: (what: Act) => void
     tip: (name: string, hint: string, top: number) => void
     menuAt: (top: number) => void
@@ -90,7 +91,7 @@ if (mode === 'card')
     if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
     card.style.setProperty('--c', `var(--${f.status})`)
     const meta = el('div', '', 'meta')
-    meta.append(el('i', WORDS[f.status] ?? f.status), ` · ${f.project} · click to open`)
+    meta.append(el('i', WORDS[f.status] ?? f.status), ` · ${f.project} · click to open${f.status === 'done' ? ' · right click: seen' : ''}`)
     const pr = f.pr && el('div', '', 'pr')
     if (pr && f.pr) pr.append(el('span', f.pr.state, `st ${/^[a-z]+$/.test(f.pr.state) ? f.pr.state : ''}`), el('span', f.pr.text, 'title'), ...(f.pr.meta ? [el('div', f.pr.meta, 'sub')] : []))
     card.replaceChildren(
@@ -172,6 +173,10 @@ else {
   })
   bridge?.onVoiceOpen(() => page('voice'))
   bar.onpointerup = () => done(true)
+  bar.oncontextmenu = e => {
+    const tab = (e.target as HTMLElement).closest<HTMLElement>('.fl-dot.done')?.dataset.tab // a finished one only: a waiting one still needs you
+    if (tab) e.preventDefault(), bridge?.seen(tab) // seen without opening it: done turns idle, no longer lit
+  }
   bar.onpointercancel = () => done(false)
   // hidden (Laki in front): the circle under the mouse then isn't under it as it comes back
   document.addEventListener('visibilitychange', () => document.hidden && (hovered = ''))

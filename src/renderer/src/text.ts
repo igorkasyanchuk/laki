@@ -12,6 +12,14 @@ export const nameOf = (prompt: string) => taskTitle(prompt, 4) || undefined // i
 // the prompt an agent gets: the text, then each pasted image's or attached file's path on a line of its own, in quotes
 // (JSON's) when it has a space, a quote or a backslash: the agent reads it whole
 export const pathText = (p: string) => (/[\s"'\\]/.test(p) ? JSON.stringify(p) : p)
+// Reply's message (a terminal's selected text quoted to an agent): where it's from (none: its own output), the text
+// fenced (longer than any run of backticks in it; each line's trailing spaces and the blank lines around it dropped),
+// then your words
+export function replyText(quote: string, words: string, from?: string) {
+  const q = quote.split('\n').map(l => l.trimEnd()).join('\n').replace(/^\n+|\n+$/g, '')
+  const fence = '`'.repeat(Math.max(3, ...[...q.matchAll(/`+/g)].map(m => m[0].length + 1)))
+  return `${from ? `From ${from}:` : 'From your output:'}\n${fence}\n${q}\n${fence}${words.trim() ? `\n\n${words.trim()}` : ''}`
+}
 export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.map(pathText).join('\n')].filter(Boolean).join('\n\n')
 
 // a workspace's name as shown: one that numbers its PR (pr-14885-sq3-…, Review PR 14810 …, #14810) shows the PR's title,

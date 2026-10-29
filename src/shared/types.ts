@@ -182,6 +182,7 @@ export type Workspace = {
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
   prUrl?: string // its primary PR, by URL (a fork's, another repo's): laki new --pr's, a prompt's, one attached or its agent named; else its branch's
   prLinked?: boolean // prUrl isn't its branch's (a prompt's, one attached): no auto switches (fix and push)
+  prOff?: string // its branch's own PR, detached (prDetach): the scan leaves it out until it's attached again (a new one on the branch is its PR)
   prSaid?: boolean // prUrl a guess, a PR its prompt or its agent (prFromSaid) named, not one attached or asked for (--link): a worktree's branch's own PR, once pushed, replaces it
   related?: string[] // GitHub PRs and issues it's about, not its primary: its prompt's (a session an agent started), a primary its own PR replaced, one you moved off
   from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
@@ -215,6 +216,8 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
 export const jobOf = (url = '') => /\/actions\/runs\/\d+\/job\/(\d+)/.exec(url)?.[1]
 // the first GitHub PR a prompt names ("review https://github.com/o/r/pull/12"): the new workspace is named after it
 // and linked to it
+// a GitHub pull request's or issue's link: owner, repo, pull|issues, number (ghCard's, a terminal's hover card)
+export const GH_LINK = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(pull|issues)\/(\d+)(?![\w])/
 export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/.exec(text)?.[0]
 // every GitHub PR and issue a text names, each once (any case: GitHub's names are), as first written: a workspace's related
 export const refsIn = (text = '') => {
@@ -453,6 +456,8 @@ export type Settings = {
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
   sideClear?: number // without glass: how see-through the sidebar and the rail are, the rest solid: % (unset: 0)
   uiFont?: string // the interface's font
+  statusBar?: 'main' | 'wide' // the status bar under the main area (unset), or full width under the sidebar too, over every page (Appearance › Interface)
+  uiSize?: number // tabs, menus, dropdowns, the status bar, tooltips and the side panel's tabs as one: px (unset: theirs; Appearance › Interface)
   accent?: string // #rrggbb over the theme's accent (unset: the theme's)
   radius?: string // corners, a CSS length over the theme's (unset: the theme's)
   templates?: Template[] // prompt templates ({{prompt}}…), for new workspaces; a project's own come first
@@ -494,6 +499,7 @@ export type Settings = {
   pageZoom?: number // Settings and Help's size (0.9–1.5, renderer's PAGE_ZOOMS; unset: 1)
   storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
   keepStorage?: boolean // a deleted workspace's storage folder stays (unset: removed with it)
+  storageDays?: number // a file in a workspace's storage folder not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
@@ -504,6 +510,7 @@ export type Settings = {
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
+  keepAwake?: boolean // the Mac doesn't sleep while an agent works or waits for you (core's keepAwake: caffeinate -i; unset: off)
   copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
@@ -548,7 +555,7 @@ export type Settings = {
   pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
-  shotAsk?: boolean // Screenshot to Laki AI: a global hotkey and a menu bar item, a part of the screen to the AI window with the mic on (off unless true; needs Laki AI)
+  shotAsk?: boolean // Screenshot to Laki AI: a global hotkey and a menu bar item, a part of the screen to the AI window with the mic on (on unless false; needs Laki AI)
   shotKey?: string // its keys (unset: ui.tsx SHOT_KEY; '': none, the menu bar's item only)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
@@ -618,14 +625,14 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
 export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean; detail?: 'titles' } // detail titles: who needs you only, nothing off the screen (no question, choices or buttons); answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
-export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
+export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* any other: a font's name */ case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
 export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type ScriptRun = { ws: string; name: string; project: string; kind: 'setup' | 'teardown'; cmd: string; at: number; secs: number; code: number | null; text: string } // scriptLogs': a setup's or teardown's run (development mode)
-export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; head?: string; gap?: string; rowGap?: string; labels?: boolean } // head: a project's row height; gap: between projects; rowGap: between rows
+export type SideLook = { font?: string; /* the sidebar's font: a name (unset: the interface's) */ guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; head?: string; gap?: string; rowGap?: string; labels?: boolean } // head: a project's row height; gap: between projects; rowGap: between rows
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number; images?: string[] } // images: pasted ones (<data>/images), their paths after the text as it starts
@@ -676,6 +683,7 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
+export const STORAGE_DAYS = 90 // Settings › General › Storage's Delete files after (core.ts storageTidy)
 export const IMAGE_DAYS = 30 // days a pasted image or an attached file is kept (<data>/images, <data>/files: Laki AI's chats, prompts) unless Settings › AI says otherwise
 export const FILE_MAX = 25 << 20 // an attached file's bytes at most (fileSave; PromptInput checks first: past the socket's maxPayload, its connection drops)
 // an earlier chat of the AI page's (New chat keeps the one it ends): its file's name, its first ask, its last message, its messages
@@ -705,6 +713,8 @@ export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip';
 
 // a GitHub label: color as GitHub keeps it, 6 hex digits (none: anything else)
 export type PRLabel = { name: string; color?: string; description?: string }
+// ghCard's: a GitHub PR or issue for a hover card (state: open, closed, merged; at: updatedAt; add, del, files: a PR's size; review: its reviewDecision; comments: an issue's count)
+export type GhCard = { kind: 'pr' | 'issue'; repo: string; url: string; number: number; title: string; state: string; draft?: boolean; author?: string; at?: string; labels?: PRLabel[]; add?: number; del?: number; files?: number; review?: string; comments?: number }
 // checks: all of them in one word; list: each one. head: the commit the checks ran on.
 export type PR = {
   number: number
@@ -738,7 +748,10 @@ export type PR = {
 export type Ask = { options: { n: number; label: string }[]; at: number; question?: string } // at: the marked option's n; question: the line or two above the menu
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+// laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a
+// page in the browser); kind: what a target is (url: http(s); folder, file: an absolute path on this Mac)
+export type Card = { id: string; title?: string; text: string; open: { label: string; target: string; kind: 'url' | 'folder' | 'file' }[]; at: number }
+export type TabView = Tab & { card?: Card; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -860,5 +873,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 122
+export const API = 124
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

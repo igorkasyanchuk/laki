@@ -1,6 +1,6 @@
 // Resources: memory by tab; idle agents put to sleep (settings.sleepAfter) and resumed by a message or a look.
 import assert from 'node:assert/strict'
-import { symlinkSync } from 'node:fs'
+import { readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, running, sleep, until } from './helpers.ts'
@@ -82,4 +82,30 @@ test("resources lists what the daemon runs besides tabs, named, and Stop ends a 
   await rig.rpc('resourceStop', { key: tn.stop })
   assert.deepEqual((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).tunnels ?? [], [])
   await until(async () => !row(await rig.rpc('resources')), 'its cloudflared gone')
+})
+
+test('keepAwake: caffeinate while an agent works or waits for you, stopped once none does or the switch goes off', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', local: true })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.resumeId && x.status === 'idle' && x
+  }, 'first turn')
+  const log = () => readFileSync(join(rig.home, 'fake.log'), 'utf8').split('\n').filter(l => l.startsWith('caffeinate'))
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
+  await sleep(300)
+  assert.deepEqual(log(), []) // off unless turned on
+  await rig.rpc('settingsSet', { keepAwake: true })
+  await until(() => log().length === 1, 'started')
+  assert.match(log()[0], /^caffeinate -i -w \d+$/)
+  await rig.rpc('hook', { tab: tab.id, state: 'waiting' })
+  await sleep(300)
+  assert.equal(log().length, 1) // waiting for you keeps it
+  await rig.rpc('hook', { tab: tab.id, state: 'idle' })
+  await until(() => log().at(-1) === 'caffeinate stopped', 'stopped as the turn ends')
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
+  await until(() => log().length === 3, 'again')
+  await rig.rpc('settingsSet', { keepAwake: false })
+  await until(() => log().at(-1) === 'caffeinate stopped', 'stopped as the switch goes off')
 })

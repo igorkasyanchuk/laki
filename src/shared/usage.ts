@@ -21,16 +21,22 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--after-limit]         its agent once the plan limit resets (claude, codex)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
-  laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
+  laki pr <ws|.> <url|number> | --detach      attach a GitHub PR to a workspace | detach its PR (only related, kept off)
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
   laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours, not in an agent's tab)
   laki memory rm <project>|. <id>             forget one agents learned
+  laki preset [ls]                            the agent profiles (Settings › Agents & profiles), your default marked
+  laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast]
+            [--cmd c] [--env KEY=value…] [--account id] [--name new]   a new profile, or change one ('' drops a field)
+  laki preset on|off|rm <name>                show it in the pickers or not | delete it
   laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
                                               a new tab; with a prompt, its agent starts on it
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
+  laki show <text> [--open <folder|file|url>…] [--title t]   in a tab: a card under it in Laki, a button per --open
+                                              (a folder in Finder, a file in its app, a page in the browser)
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
@@ -140,6 +146,12 @@ or the words after <ws>) its agent starts on it, as a new workspace's does; --na
 ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
 
   laki progress 40 "Parser done, writing tests"`,
+  show: `In a Laki tab: a card under it in the app with your words and a button per --open the user clicks: a folder
+opens in Finder, a file in its app, an http(s) link in the browser (4 at most; a path: absolute, or from where you
+are). Use it instead of asking the user to run open: for evidence, a report, a page to check. A newer card replaces it.
+
+  laki show "Smoke test evidence: 2 screenshots, the report" --open "$LAKI_STORAGE_FOLDER/smoke_tests"
+  laki show "The preview deploy" --open https://shop-git-fix.vercel.app --title "Ready to check"`,
   memory: `A project's memory: what every session in it is told (claude and codex get it at their start). . is this tab's
 project. Add something general and lasting (an approach that works or doesn't, a gotcha, how to run or test it),
 never task notes, progress or secrets. rm takes an id laki memory prints, a learned one only.
@@ -147,6 +159,15 @@ never task notes, progress or secrets. rm takes an id laki memory prints, a lear
   laki memory .
   laki memory add . "Run the e2e tests with npm run e2e -- --headed; they need port 5173 free"
   laki memory rm . m3k9`,
+  preset: `Agent profiles (presets): how a tab's agent starts (its agent, args, model, effort, permission mode, fast
+mode, env, account). laki new --preset <name> and laki tab --preset start one. From an agent's tab, add, set, on, off
+and rm ask the user in the app first (its args and env run in every tab of it), and need the app open.
+
+  laki preset ls
+  laki preset add claude-ask --agent claude --perm auto
+  laki preset set claude-ask --model opus --effort high
+  laki preset set claude-ask --args ''           drop its args
+  laki preset off codex                          out of the pickers, its tabs still start`,
   rename: `Names a workspace (the sidebar's row). . is this tab's.
 
   laki rename . csv-export`,

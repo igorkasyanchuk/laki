@@ -257,3 +257,31 @@ test('cli: an agent is the tab its process is in, whatever its env says; outside
   assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === other.id && x.kind === 'agent'))
   app.close()
 })
+
+test("cli: laki show puts a card under the agent's tab (a folder, a file, a link); an agent's laki preset asks the user, none there: refused", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }] })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id))
+  const as = async (...args: string[]) => {
+    Object.assign(rig.env, { LAKI_WORKSPACE: ws.id, LAKI_TAB: tab.id })
+    try {
+      return await rig.cli(...args)
+    } finally {
+      delete rig.env.LAKI_WORKSPACE
+      delete rig.env.LAKI_TAB
+    }
+  }
+  let r = await as('show', 'Smoke', 'test', 'evidence', '--open', rig.repo, '--open', join(rig.repo, 'README.md'), '--open', 'https://example.com/x', '--title', 'Look')
+  assert.equal(r.code, 0, r.err)
+  const card = (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id).card
+  assert.deepEqual([card.title, card.text, card.open.map((o: any) => [o.kind, o.label])], ['Look', 'Smoke test evidence', [['folder', 'Show in Finder'], ['file', 'Open README.md'], ['url', 'Open example.com']]])
+  assert.match((await as('show', 'x', '--open', '/nope/here')).err, /not there/)
+  assert.match((await rig.cli('show', 'x')).err, /only in a Laki tab/)
+  await rig.rpc('showDone', { tab: tab.id })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id).card, undefined)
+  r = await as('preset', 'add', 'claude-ask', '--perm', 'auto')
+  assert.match(r.err, /says yes in Laki's window, and it isn't open/)
+  assert.ok(!(await rig.rpc('state')).presets.some((x: any) => x.name === 'claude-ask'))
+})

@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { newWsKit, state } from '../shared/tools.ts'
@@ -19,8 +19,10 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
+const envs: string[] = [] // laki preset's --env KEY=value, again and again
+const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -32,6 +34,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
+  else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
+  else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
@@ -347,13 +351,45 @@ async function main() {
       const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }) })
       return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}`)
     }
+    case 'show': {
+      // laki show "<text>" [--open <folder|file|url>…] [--title t]: a card under this tab in Laki, its buttons opening
+      // each (a path: absolute, from here)
+      const tab = process.env.LAKI_TAB
+      if (!tab) throw new Error('laki show: only in a Laki tab ($LAKI_TAB)')
+      const open = opens.map(o => (/^https?:\/\//i.test(o) ? o : resolve(o.replace(/^~(?=\/|$)/, process.env.HOME ?? '~'))))
+      const c = await rpc('show', { tab, text: rest.join(' '), title: flags.title, open })
+      return out(c, `shown in Laki${c.open.length ? `: ${c.open.map((o: { label: string }) => o.label).join(', ')}` : ''}`)
+    }
+    case 'preset':
+    case 'presets': {
+      // Settings › Agents & profiles: laki preset [ls] | add|set <name> [--agent a] [--args "…"] [--model m] [--effort e]
+      // [--perm p] [--fast] [--cmd c] [--env K=V…] [--account id] [--name new] | on|off|rm <name>. '' drops a field
+      const [sub = 'ls', name] = rest
+      if (sub === 'ls') {
+        const v: View = await rpc('state')
+        const def = v.settings?.agent
+        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
+        return out(v.presets, v.presets.map(line).join('\n'))
+      }
+      if (!['add', 'set', 'on', 'off', 'rm'].includes(sub) || !name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] | on|off|rm <name>')
+      const set: Record<string, unknown> = {}
+      for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
+      if (flags.fast) set.fast = true
+      const noEq = envs.find(e => !e.includes('='))
+      if (noEq !== undefined) throw new Error(`--env ${noEq}: KEY=value`)
+      if (envs.length) set.env = Object.fromEntries(envs.map(e => [e.slice(0, e.indexOf('=')), e.slice(e.indexOf('=') + 1)]))
+      if (sub === 'on' || sub === 'off') set.off = sub === 'off' || null
+      const r: Preset[] = await rpc('presetSave', { name, add: sub === 'add', rm: sub === 'rm', set, from: caller() }, 150000) // an agent's: the user says yes in the app first
+      return out(r, sub === 'rm' ? `removed ${name}` : `${sub === 'add' ? 'added' : sub === 'set' ? 'saved' : `turned ${sub}`} ${set.name ?? name}`)
+    }
     case 'rename':
     case 'pr': {
       // laki rename <ws|.> <name> | laki pr <ws|.> <url|number>: `.` is the tab's own workspace ($LAKI_WORKSPACE)
       const [ref, ...words] = rest
       const ws = ref === '.' ? process.env.LAKI_WORKSPACE : ref
       if (ref === '.' && !ws) throw new Error(`laki ${cmd} .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace`)
-      if (!ws || !words.length) throw new Error(cmd === 'rename' ? 'usage: laki rename <ws|.> <name>' : 'usage: laki pr <ws|.> <url|number>')
+      if (cmd === 'pr' && flags.detach && ws) return out(await rpc('prDetach', { ws }), `detached ${ws}'s PR: only related now`)
+      if (!ws || !words.length) throw new Error(cmd === 'rename' ? 'usage: laki rename <ws|.> <name>' : 'usage: laki pr <ws|.> <url|number> | --detach')
       if (cmd === 'rename') await rpc('wsSet', { id: ws, name: words.join(' ') })
       else await rpc('prAttach', { ws, pr: words[0] }, 60000)
       return out({ ok: true }, cmd === 'rename' ? `renamed ${ws}` : `attached ${words[0]} to ${ws}`)

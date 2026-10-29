@@ -1,7 +1,8 @@
 // The sidebar's Needs you list (settings.needsList, on unless false): every tab App's needsYou matches (the Dock count's
 // and ⌘J's rule), waiting ones first, then done ones, the oldest first in each (the view's needAt). A waiting agent's
 // card answers it (its menu's options, or Allow / Deny for a permission prompt with none read); a done one's says what
-// it answered, Review opens Changes, Seen clears its ●. A click elsewhere on a card opens the tab; with a card focused,
+// it answered, Review opens Changes (only with changes to look at: the scan's stat, else an agent's tab that isn't a
+// shell's), Seen clears its ●. A click elsewhere on a card opens the tab; with a card focused,
 // 1–9 answer and Enter opens.
 import type { KeyboardEvent, MouseEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
@@ -63,6 +64,7 @@ function NeedCard({ t, w, api, next }: Need & { api: NeedsApi; next: boolean }) 
   }
   const last = t.last?.trim().split('\n').find(l => l.trim())?.trim()
   const stat = w.stat && (w.stat.add > 0 || w.stat.del > 0) ? w.stat : undefined
+  const changed = w.stat ? w.stat.files > 0 || w.stat.dirty > 0 : t.kind === 'agent' && !t.runs // no scan yet: a shell (or an agent typed in one) has none to show
   return (
     <div className={`need ${waiting ? 'need-wait' : 'need-done'}`} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={() => api.open(t)} onKeyDown={key}>
       <div className="need-head">
@@ -101,7 +103,7 @@ function NeedCard({ t, w, api, next }: Need & { api: NeedsApi; next: boolean }) 
               </span>
             )}
             <span className="spacer" />
-            {!!w.branch && <button onClick={() => api.review(t)}>Review</button>}
+            {!!w.branch && changed && <button onClick={() => api.review(t)}>Review</button>}
             <button onClick={() => api.seen(t)}>Seen</button>
           </div>
         </>

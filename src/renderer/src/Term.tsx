@@ -9,9 +9,11 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
+import { LinkPeek, type Peek, peekOf } from './LinkPeek'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
+import { Icon } from './ui'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 
@@ -25,6 +27,9 @@ const filePath = (uri: string) => {
     return ''
   }
 }
+// a picture's path in plain text (claude's Read(src/a.png), a pasted screenshot's): a link that shows it on hover
+// ponytail: a wide character (CJK) before it shifts the cells; a path broken over two lines isn't one
+const PIC = /(?<=^|[\s'"`(\[<])\.{0,2}\/?(?:[\w@%+.-]+\/)*[\w@%+-][\w@%+.-]*\.(?:png|jpe?g|gif|webp|svg|bmp|avif)(?![\w/])/gi
 
 export function Term({
   tab,
@@ -37,6 +42,9 @@ export function Term({
   theme = '',
   look = termLook({}),
   onFile,
+  onReply,
+  image,
+  cwd,
 }: {
   tab: string
   active?: boolean
@@ -48,6 +56,9 @@ export function Term({
   theme?: string // the app's (themes.ts): the colors come from its CSS
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
   onFile?: (path: string) => void // a ⌘-clicked file:// link's path
+  onReply?: (text: string, at: { x: number; y: number }) => void // Reply on selected text (none: no Reply)
+  image?: (path: string) => Promise<string | undefined> // a hovered picture's data URL (an absolute path)
+  cwd?: string // the workspace's folder: a relative picture path's
 }) {
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
@@ -56,6 +67,27 @@ export function Term({
   const box = useRef<HTMLDivElement>(null)
   const file = useRef(onFile)
   file.current = onFile
+  const props = useRef({ onReply, image, cwd })
+  props.current = { onReply, image, cwd }
+  // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both
+  const [peek, setPeek] = useState<Peek | null>(null)
+  const peekT = useRef(0)
+  // a path as an absolute one: a relative one under the workspace's folder ('' with none: a floated tab's)
+  const absOf = (p: string) => (p.startsWith('/') ? p : props.current.cwd ? `${props.current.cwd}/${p.replace(/^\.\//, '')}` : '')
+  const peekOn = (e: MouseEvent, uri: string) => {
+    clearTimeout(peekT.current)
+    const path = filePath(uri) || (/^[a-z]+:/i.test(uri) ? '' : uri)
+    const abs = path && absOf(path)
+    const at = abs || uri
+    // a file's picture needs a reader; a web one, https (the daemon's /img)
+    if ((path && !abs) || !peekOf(at) || (abs ? !props.current.image : !/^https:/i.test(at))) return false
+    const { clientX: x, clientY: y } = e
+    peekT.current = window.setTimeout(() => setPeek({ uri: at, x, y, image: abs ? () => props.current.image!(abs) : undefined }), 400)
+    return true
+  }
+  const peekOff = () => (clearTimeout(peekT.current), (peekT.current = window.setTimeout(() => setPeek(null), 250)))
+  // Reply: a pill under the selection as the mouse lets go, to quote it to an agent
+  const [pill, setPill] = useState<{ x: number; y: number; text: string } | null>(null)
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   const find = findSeq !== closedAt
@@ -79,14 +111,32 @@ export function Term({
       linkHandler: {
         allowNonHttpProtocols: true,
         activate: (e, uri) => (/^https?:/i.test(uri) ? (e.metaKey || !bridge) && openExternal(uri) : filePath(uri) && (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(filePath(uri))),
-        hover: (_e, uri) => ((over = true), box.current && (box.current.title = `${filePath(uri) || uri}\n⌘-click to open`)),
-        leave: () => ((over = false), box.current && (box.current.title = '')),
+        hover: (e, uri) => ((over = true), !peekOn(e, uri) && box.current && (box.current.title = `${filePath(uri) || uri}\n⌘-click to open`)),
+        leave: () => ((over = false), peekOff(), box.current && (box.current.title = '')),
       },
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
     // a plain URL (its words are its address): a click, ⌘-click when an app has the mouse (codex opens its own: `ours`)
-    term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: (_e, uri) => ((over = true), box.current && (box.current.title = uri)), leave: () => ((over = false), box.current && (box.current.title = '')) }))
+    term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: (e, uri) => ((over = true), !peekOn(e, uri) && box.current && (box.current.title = uri)), leave: () => ((over = false), peekOff(), box.current && (box.current.title = '')) }))
+    term.registerLinkProvider({
+      provideLinks: (y, cb) => {
+        const line = term.buffer.active.getLine(y - 1)?.translateToString(true) ?? ''
+        const found = /\.(png|jpe?g|gif|webp|svg|bmp|avif)\b/i.test(line) ? [...line.matchAll(PIC)].filter(m => absOf(m[0])) : []
+        cb(
+          found.length
+            ? found.map(m => ({
+                range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                text: m[0],
+                // ⌘-click (⌃ too, unless an app has the mouse) opens it as a file:// link's
+                activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(absOf(t)),
+                hover: (e: MouseEvent, t: string) => ((over = true), peekOn(e, t)),
+                leave: () => ((over = false), peekOff()),
+              }))
+            : undefined,
+        )
+      },
+    })
     const search = new SearchAddon()
     term.loadAddon(search)
     term.open(box.current!)
@@ -113,7 +163,14 @@ export function Term({
     })
     // a quick ⌥-click moves a shell's cursor there (arrow keys); with the mouse an app's, that click is a forced
     // selection's (above), and ↑ would be claude's last prompt: off then
-    term.element?.addEventListener('mousedown', () => (term.options.altClickMovesCursor = !tracked()), true)
+    term.element?.addEventListener('mousedown', () => ((term.options.altClickMovesCursor = !tracked()), setPill(null)), true)
+    // a selection made where an app has every move (claude's fullscreen: ⌥-drag) stays while the mouse moves: xterm sends
+    // a move as input, and input clears the selection (gone before ⌘C or Reply). A click, a key or a scroll still does
+    box.current!.addEventListener('mousemove', e => !e.buttons && tracked() && term.hasSelection() && e.stopPropagation(), true)
+    term.element?.addEventListener('mouseup', e => {
+      if (e.button === 0 && props.current.onReply) setTimeout(() => term.getSelection().trim() && setPill({ x: e.clientX, y: e.clientY, text: term.getSelection() })) // after xterm's own mouseup ends the selection
+    })
+    term.element?.addEventListener('wheel', () => setPill(null), { passive: true }) // a scroll of yours: new output scrolls too, and keeps it
     try {
       const gl = new WebglAddon()
       gl.onContextLoss(() => gl.dispose())
@@ -159,6 +216,7 @@ export function Term({
     let down = false
     term.textarea?.addEventListener('focus', () => (down = false))
     term.attachCustomKeyEventHandler(e => {
+      if (e.type === 'keydown' && !MODS.includes(e.key) && !(e.metaKey && e.key === 'c')) setPill(null) // ⌥ alone, ⌘C: Reply stays
       // ⌘⏎ / ⇧⏎: ⌃J, a new line in claude's, codex's and opencode's prompt (xterm would send ⏎: submit), in any tab: claude
       // started in a terminal tab too; a shell runs the line on ⌃J as on ⏎. ponytail: a TUI that reads ⌃J as ↓ (fzf) gets ↓
       if (e.key === 'Enter' && (e.metaKey || e.shiftKey) && !e.ctrlKey && !e.altKey && !e.isComposing) {
@@ -181,6 +239,7 @@ export function Term({
     term.onSelectionChange(() => {
       const text = term.getSelection()
       if (copy.current && text) navigator.clipboard.writeText(text).catch(() => {})
+      if (!text) setPill(null)
     })
     let raf = 0
     const ro = new ResizeObserver(() => {
@@ -198,6 +257,7 @@ export function Term({
     xterms.set(tab, term)
     return () => {
       alive = false
+      clearTimeout(peekT.current)
       api.send('detach', { tab })
       off()
       ro.disconnect()
@@ -246,10 +306,23 @@ export function Term({
         }}
       />
       {find && xt && <FindBar term={xt.term} search={xt.search} seq={findSeq} onClose={() => setClosedAt(findSeq)} />}
+      {pill && onReply && (
+        <button
+          type="button"
+          className="term-reply"
+          style={{ left: Math.min(pill.x + 6, innerWidth - 90), top: Math.min(pill.y + 10, innerHeight - 34) }}
+          onMouseDown={e => e.preventDefault() /* the selection stays */}
+          onClick={() => (onReply(pill.text, { x: pill.x, y: pill.y }), setPill(null))}
+        >
+          <Icon name="reply" size={12} /> Reply
+        </button>
+      )}
+      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(peekT.current)} onLeave={() => setPeek(null)} />}
     </>
   )
 }
 
+const MODS = ['Alt', 'Meta', 'Shift', 'Control', 'CapsLock']
 // macOS editing keys as iTerm's Natural Text Editing sends them (xterm sends nothing for ⌘← ⌘→, a plain ⌫ for ⌘⌫):
 // line start and end (⌃A ⌃E), delete the line (⌃U), a word back and on (Esc b, Esc f)
 const EDIT_KEYS: Record<string, string> = { '⌘ArrowLeft': '\x01', '⌘ArrowRight': '\x05', '⌘Backspace': '\x15', '⌥ArrowLeft': '\x1bb', '⌥ArrowRight': '\x1bf' }

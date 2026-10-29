@@ -1065,8 +1065,8 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number }
-const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize'] as const
+export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number }
+const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1157,6 +1157,10 @@ export function applyTheme(p: string | Paint = '') {
   const font = o.uiFont?.trim()
   root.classList.toggle('theme-font', font === 'theme')
   if (font && font !== 'theme') st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
+  // its size: tabs, menus, dropdowns, the status bar, tooltips as one (styles.css' html[data-ui-size]); unset: their own
+  const size = Number(o.uiSize)
+  if (size >= 8 && size <= 20) root.dataset.uiSize = String(size), st.setProperty('--ui-size', `${size}px`)
+  else delete root.dataset.uiSize
   // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
   // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); pills and circles stay
   if (o.accent && /^#[\da-f]{6}$/i.test(o.accent)) st.setProperty('--accent', o.accent), st.setProperty('--accent-fg', onAccent(o.accent))

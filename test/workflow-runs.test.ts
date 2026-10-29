@@ -254,7 +254,7 @@ end: success
   assert.ok(r.log.some((l: string) => /review: a new claude tab, .* · Review\nreview x1$/.test(l)), 'the prompt in the log, under its line')
   const ws = (await rig.rpc('state')).workspaces.find((w: any) => w.id === run.ws)
   assert.equal(readFileSync(join(ws.storage, 'kept', 'r.txt'), 'utf8'), 'hi\n', 'a folder of the workspace, copied')
-  assert.equal(readFileSync(join(ws.storage, 'The repo.url'), 'utf8'), '[InternetShortcut]\r\nURL=https://example.com/x1\r\n')
+  assert.deepEqual(JSON.parse(readFileSync(join(ws.storage, '.laki-links.json'), 'utf8')).map((l: any) => [l.title, l.url]), [['The repo', 'https://example.com/x1']], 'a link, in its links')
 
   // a file from outside the workspace, an action that isn't there: it asks; deleted while it waits, it stops and goes
   await rig.rpc('flowSave', { id: 'out', text: '# Out\nruns in: main\n\n## start\ninput: task\nnext: s\n\n## s\nsave: hosts\nfrom: /etc/hosts\nok: a\n\n## a\nagent: claude · use: Nope\nnext: e\n\n## e\nend: success\n' })

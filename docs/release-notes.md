@@ -4,8 +4,40 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › Appearance › Interface: one *Text size* (9–16) for tabs, menus, dropdowns, the status bar and tooltips, and
+  the font: Laki's own, the developer fonts (the terminal's) or any on your Mac, with a live preview. *Sidebar*: its own font, the project names' font, sizes 9
+  and 10, rows set out like the terminal's, and a preview.
+- *Full-width status bar* (Appearance › Interface): one bar under the sidebar too, on every page (the sidebar's bottom
+  buttons first, with their words, AI and Settings at its end; the workspace's branch, ports and PR only on the
+  workspace), as Zed's.
+- Custom CSS has a guide: the variables worth changing (in this theme's colors), where things are, examples to add.
+- Settings › General › Storage: how much it holds, *Show in Finder*, and *Delete files after* 7–180 days, a year or
+  never (90 by default; only the workspaces' own folders).
+- Links agents publish live in one hidden file per workspace instead of `.url` files (old ones move in); a right click
+  in the Artifacts strip removes one. HTML in Files › Artifacts opens as a page (*Source* for its text).
+- `laki show "<text>" --open <folder|file|url>`: an agent puts a card under its tab with buttons you click (Finder, the
+  file's app, the browser). Claude and Codex are told about it.
+- A workspace's ⋯: *Rename with AI* (its agent names it from its PR), and its PR's actions in one *PR #n ›* submenu,
+  as on the status bar PR's right click, with *Detach PR #n* in both (any PR, kept off until you attach it again;
+  `laki pr . --detach`).
+- *Review a PR…* (a project's + and ⋯, ⌘K): any PR, yours or not, in a workspace of its own on the Review tab, no agent.
+- `laki preset ls|add|set|on|off|rm`: agent profiles from the command line (an agent's change asks you first).
+- ⇧⌘F filters the sidebar, its box focused (Settings › Keys).
+- Laki AI and agents' `laki new` put a new workspace in the group its task belongs to by what the groups' names mean (a
+  PR review in *On review*, a spike in *POC*), or in none when none plainly fits.
+- A right click on a done bubble marks it seen. Needs you's *Review* only when there are changes to look at, and the
+  bars show no per-workspace extension where there's no workspace (a terminal).
+- Select text in a terminal and *Reply*: the quote and your words go to the agent (⏎ into its prompt, ⌘⏎ sent); from a
+  shell, to the workspace's agent.
+- Hover a GitHub PR or issue link in a terminal for its card (title, state, author, size), or a picture's path or link
+  (the workspace's, a pasted screenshot, the web's) to see it.
+- *Keep the Mac awake while agents work* (Settings › Git & worktrees, off by default): no sleep while an agent works or
+  waits for you; the screen still sleeps.
+- *Screenshot to Laki AI* is on by default (⌃⌥⌘S, and the menu bar's item with its keys): a part of the screen to Laki
+  AI with the mic listening. Settings › Keys shows the global hotkeys too, and Help the keys you set, not the defaults.
 - ⌥-click and ⌥-drag select in a terminal even where the app has the mouse (Claude Code's fullscreen mode, whose own
-  double-click keeps the dot): ⌥-double-click `it.` and `it` is copied.
+  double-click keeps the dot): ⌥-double-click `it.` and `it` is copied; the selection stays as the mouse moves, for ⌘C
+  and *Reply*.
 
 ## 0.34.0 · Oct 29, 2026
 

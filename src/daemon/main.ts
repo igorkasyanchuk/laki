@@ -222,6 +222,8 @@ const api: Record<string, Handler> = {
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
   seen: p => core.seen(p.tab), // the Needs you list's Seen: its ● cleared, as a look does
+  show: p => core.show({ ...p, tab: p.from?.tab ?? p.tab }), // laki show: a card under the caller's own tab (its process's, when it's in one)
+  showDone: p => core.showDone(String(p.tab ?? '')), // its ✕
   browse: p => core.browse(p),
   timer: p => core.timer(p),
   browseDone: p => core.browseDone(p),
@@ -255,6 +257,9 @@ const api: Record<string, Handler> = {
   tabClose: p => core.closeTab(p.id),
   tabSet: p => core.tabSet(p),
   settingsSet: ({ from: _, ...p }) => core.settingsSet(p), // from: whoCalls', not a setting
+  storageInfo: () => core.storageInfo(), // Settings › General › Storage: its folder and size
+  storageTidy: p => core.storageTidy(p.now), // tests move the clock
+  presetSave: async p => (await presetAsk(p), core.presetSave(p)), // laki preset: one profile; an agent's asked in the app first
   openIn: p => core.openIn(p),
   apps: () => core.apps(),
   wsSet: p => core.wsSet(p),
@@ -301,6 +306,7 @@ const api: Record<string, Handler> = {
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
   artifactList: p => core.artifactList(p.ws),
+  linkRm: p => core.linkRm(p.ws, String(p.url ?? '')), // a kept link taken off (the gallery's right click)
   fileWrite: p => core.fileWrite(p),
   hunkUndo: p => core.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
   fileUndo: p => core.fileUndo(p),
@@ -312,6 +318,7 @@ const api: Record<string, Handler> = {
   issueList: p => core.issueList(p),
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
+  ghCard: p => core.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
   prLabel: p => core.prLabel(p),
   prThreads: p => core.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
   prTalk: p => core.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
@@ -457,7 +464,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin'])
+const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'presetSave']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets
 const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button)
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
@@ -473,7 +480,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk'])
+const FROM = new Set(['show', 'presetSave', 'wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -554,6 +561,21 @@ const wsRef = (ref: string) => {
   } catch {
     return core.state.workspaces.find(w => w.name === ref)?.id
   }
+}
+// laki preset from an agent's tab: a profile's args and env run in every tab started on it (a mode that never asks too),
+// so the user says yes in the app first, the whole profile shown; once only (no Always)
+async function presetAsk(p: any) {
+  const by = core.agentCaller(p.from)
+  if (!by) return
+  const name = String(p.name ?? '')
+  const what = p.rm ? 'remove' : p.add ? 'add' : 'change'
+  if (!core.clients.size) throw new Error(`to ${what} a profile the user says yes in Laki's window, and it isn't open: ask them to do it in Settings › Agents & profiles`)
+  const was = core.presets().find(x => x.name === name)
+  const text = p.rm ? JSON.stringify(was ?? { name }, null, 2) : JSON.stringify({ ...(was ?? { name, agent: 'claude' }), ...(p.set ?? {}) }, null, 2)
+  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text: text.slice(0, 2000), ws: by, tab: p.from.tab })
+  if (how !== 'once') throw new Error(`${what} the profile ${name}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string | null = p.target, text = p.text) {
   const by = core.agentCaller(p.from)
@@ -746,7 +768,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind

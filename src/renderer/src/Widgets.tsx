@@ -46,6 +46,7 @@ const URL_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset', 'action', 'for
 // /img (App sets how, imgKey); none set: dropped
 let viaDaemon: ((url: string) => string) | undefined
 export const imagesVia = (f?: (url: string) => string) => void (viaDaemon = f)
+export const imgVia = (url: string) => viaDaemon?.(url) // an https picture's address through the daemon (LinkPeek's)
 export function clean(html: string): DocumentFragment {
   const t = document.createElement('template')
   t.innerHTML = html
@@ -352,7 +353,7 @@ export function WidgetGrid({ widgets, api, desk }: { widgets: WidgetView[]; api:
 // the top bar's or the status bar's widgets: a line high, each as wide as its cells across (a ½-high one fits best)
 export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; api: WidgetApi; place: 'top' | 'status' }) {
   const [parked, load] = useParked()
-  const on = widgets.filter(w => w.on && placesOf(w).includes(place))
+  const on = widgets.filter(w => w.on && placesOf(w).includes(place) && w.here !== null) // a per-workspace one with no workspace here (a terminal, a browser): nothing to show in a bar
   if (!on.length) return null
   return (
     <div className={`widget-strip ${place} nodrag`}>

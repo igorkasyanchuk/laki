@@ -20,6 +20,7 @@ export const KEYS = [
   { id: 'palette', label: 'Palette', key: '⌘K' },
   { id: 'files', label: 'Find a file', key: '⌘P' },
   { id: 'find', label: 'Find in the terminal or a diff', key: '⌘F' },
+  { id: 'filter', label: 'Filter the sidebar (its box gets the keys)', key: '⇧⌘F' },
   { id: 'next', label: 'Next tab that needs you', key: '⌘J' },
   { id: 'later', label: 'Send a message later', key: '⌘L' },
   { id: 'artifacts', label: 'Show / hide artifacts', key: '⇧⌘A' },

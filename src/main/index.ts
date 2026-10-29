@@ -165,9 +165,9 @@ app.whenReady().then(() => {
     s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
   }
   // the app's own session (its windows, and the frames in them: an extension's page, an artifact, the video): the
-  // microphone (not the camera) for its own pages (Settings › Voice's cloud), full screen and a clipboard write for
-  // any, nothing else
-  const ok = (perm: string, url?: string, video?: boolean) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || (perm === 'media' && !video && appPage(url))
+  // microphone (not the camera) and the fonts' names for its own pages (Settings › Voice's cloud, Appearance's font
+  // lists), full screen and a clipboard write for any, nothing else
+  const ok = (perm: string, url?: string, video?: boolean) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || ((perm === 'media' && !video) || perm === 'local-fonts') && appPage(url) // local-fonts: Settings › Appearance's font lists
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ok(perm, d.requestingUrl || wc.getURL(), 'mediaTypes' in d && !!d.mediaTypes?.includes('video'))))
   session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL(), d.mediaType === 'video'))
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
@@ -761,6 +761,7 @@ ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
   snap(false, now)
 })
 ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab), earn('bubble')))
+ipcMain.on('floater-seen', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && void rpc('seen', { tab }).catch(() => {}))
 // the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
 // own), Ask Laki AI (the AI page, in one too), the menu bar's screenshots; Say it from the menu: the bar opens its window
 // (the stack's opens it itself)
@@ -1225,6 +1226,7 @@ const appMenu = () => Menu.setApplicationMenu(
       label: 'View',
       submenu: [
         bound('Toggle Sidebar', 'sidebar'),
+        bound('Filter the Sidebar', 'filter'),
         bound('Workspace Info', 'info'),
         key('Changes', 'CmdOrCtrl+D', 'd'),
         { type: 'separator' },

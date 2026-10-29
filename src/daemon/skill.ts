@@ -4,6 +4,7 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { groupRule } from '../shared/tools.ts'
 import { USAGE } from '../shared/usage.ts'
 import { cliArgv, cliEnv, dir, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
@@ -79,11 +80,15 @@ Unset: don't.
 
 A PR of your workspace's branch shows on the workspace on its own once pushed (its status, checks, author). One you
 opened on another branch, or in another repo, doesn't: attach it right after \`gh pr create\`, \`laki pr . <url>\`
-(MCP: \`laki_attach_pr\`).
+(MCP: \`laki_attach_pr\`). One that isn't this workspace's after all: \`laki pr . --detach\` (it stays only related).
 
 ## Keep files and links for the user
 
 ${STORAGE_NOTE}
+
+Something for the user to look at (a folder of screenshots, a report, a page you started): \`laki show "<what it is>"
+--open <folder|file|url>\` (4 at most) puts a card under your tab in Laki with a button each, instead of asking them to
+run \`open …\`. Nothing opens until they click.
 
 ## Commands
 
@@ -102,6 +107,7 @@ ${USAGE}
    prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
    \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode; \`--no-setup\` skips the setup script;
    \`--template\`, \`--action\` and \`--group\` use the user's prompt templates, agent actions and sidebar groups.
+   ${groupRule("each project's \`groups\` in \`laki ls --json\`; \`--group <name>\`")}
    Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.
 3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
    permission, idle).

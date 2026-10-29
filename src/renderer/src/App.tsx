@@ -10,9 +10,10 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, LaterStrip, QueueStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, LaterStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
+import { phVars, sideAttrs, sideVars } from './SettingsLook'
 import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
@@ -182,7 +183,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { reviewPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -221,19 +222,11 @@ const PICTURE = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i // what Copy puts on t
 const PLAIN = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|css|svg|[cm]?[jt]sx?|py|rb|go|rs|sh|sql|diff|patch)$/i // Copy text: files that are text
 const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_IDS.includes(id) ? 'code' : 'terminal')
 
-// Settings › Appearance › Project names: what's not the theme's goes on the sidebar, as data-ph-* (styles.css) and
-// the values as --ph-* (spacing, size, weight: any CSS value)
-const own = (pl: ProjectLook | undefined, k: keyof ProjectLook) => (pl?.[k] && pl[k] !== 'theme' ? pl[k] : undefined)
-const phAttrs = (pl?: ProjectLook) => Object.fromEntries((['font', 'case', 'spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`data-ph-${k}`, k === 'font' || k === 'case' ? own(pl, k) : '']] : [])))
-const phVars = (pl?: ProjectLook) => Object.fromEntries((['spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`--ph-${k}`, own(pl, k)]] : []))) as CSSProperties
 // a workspace's state in words, for the sidebar's Extended and Cards rows
 const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'working', done: 'done', idle: 'idle', exited: 'stopped', limit: 'at its usage limit' }
 // a row's +/-: 1234 as 1.2k, 12345 as 12k
 const clip = (s: string, n = 60) => (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ')) // a message on one line
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
-// …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's
-const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon', head: '--ph-h', gap: '--proj-gap', rowGap: '--ws-gap' } as const
-const sideVars = (sl?: SideLook) => Object.fromEntries((Object.keys(SIDE_VARS) as (keyof typeof SIDE_VARS)[]).flatMap(k => (sl?.[k] && sl[k] !== 'theme' ? [[SIDE_VARS[k], sl[k]]] : []))) as CSSProperties
 
 // the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
 const TIMER_THEN = [
@@ -495,6 +488,7 @@ export function App() {
   const [shown, setShown] = useState<ShownWin[]>([]) // what workflows' Show you blocks show, in turn
   const [pops, setPops] = useState<ShownPop[]>([]) // and their popovers (an end's too), the newest 3
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
+  const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
@@ -1668,6 +1662,22 @@ export function App() {
   // a terminal's ⌘-clicked file:// link: a file of the tab's workspace in the preview, anything else as Finder would
   // (main's open-path, which follows links: a workspace's file by its real path too); a host's only in the preview,
   // through the daemon; a browser has no Finder
+  // Reply's targets for a tab's selected text: the tab when an agent runs in it, else its workspace's live agents
+  const replyTo = (id: string) => {
+    const t = byId(id)
+    if (!t) return []
+    if ((t.kind === 'agent' || t.runs) && t.status !== 'exited') return [t]
+    return tabs.filter(x => x.workspace === t.workspace && x.id !== t.id && x.kind === 'agent' && x.status !== 'exited')
+  }
+  // a picture hovered in a tab's terminal (LinkPeek): a file of its workspace or its storage folder, else a pasted one
+  // (aiImage: the daemon's own <data>/images only)
+  const peekImage = (id: string) => (path: string) => {
+    const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
+    const read = (storage: boolean) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path, storage }).then(r => r.image)
+    if (w && path.startsWith(`${w.path}/`)) return read(false)
+    if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
+    return api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture')))
+  }
   const openPath = async (tab: string, path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(tab)?.workspace)
     if (!w) return
@@ -1744,7 +1754,7 @@ export function App() {
     artifacts: w.storage
       ? {
           files: () => api.call<{ path: string }[]>('artifactList', { ws: w.id }).then(l => ({ files: l.map(f => f.path), changed: {} })),
-          preview: path => openFile({ ws: w.id, path, storage: true }),
+          preview: path => (/\.html?$/i.test(path) && inViewer(path) ? openArt(w, path) : openFile({ ws: w.id, path, storage: true })), // an HTML page shown as a page (its Source: the preview)
           open: path => openArt(w, path),
           menu: (e, path) => openMenu(e, artMenu(w, path)),
         }
@@ -1910,9 +1920,10 @@ export function App() {
   const kh = (id: KeyId) => keyShow(kb[id]) || undefined // as a menu's hint
   const kt = (title: string, id: KeyId) => (kb[id] ? `${title} (${keyShow(kb[id])})` : title) // a tooltip with its keys
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
-  useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
-  const shotKey = !view ? null : settings.shotAsk === true && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
-  useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey)), [shotKey])
+  const [held, setHeld] = useState({ open: false, shot: false }) // main took the keys (Help shows only those)
+  useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey).then(open => setHeld(h => ({ ...h, open })))), [hotkey])
+  const shotKey = !view ? null : settings.shotAsk !== false && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
+  useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey).then(shot => setHeld(h => ({ ...h, shot })))), [shotKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
   useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto)), [updateAuto])
   // main's update.ts: a newer release stays in the status bar until you update (every check says so, a restart too);
@@ -2176,6 +2187,14 @@ export function App() {
       toolLine.add({ req: m.req, title, text: `${lines.length ? `${lines.join('\n')}\n\n` : ''}Its agent asks while it works in the background. Always: it uses ${m.perm} unasked from now on (Revoke on its page). Deny: it goes on without it.`, picks, answer })
       return toolShow()
     }
+    if (m.cross === 'preset') {
+      // an agent's laki preset (main.ts' presetAsk): the profile as it would be; once only
+      const title = `${m.agent} in ${m.from} wants to ${m.target}`
+      const picks: Pick[] = [{ label: 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, 'Settings › Agents & profiles', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      toolLine.add({ req: m.req, title, text: `Every tab started on it runs with its args and env.\n\n${m.text}`, picks, answer })
+      return toolShow()
+    }
     if (m.cross) {
       // an agent's send or screen into another workspace's tab (main.ts' crossAsk): what it sends, or that it reads; an
       // event for another workspace (emit): its workflows and extensions run there
@@ -2403,10 +2422,18 @@ export function App() {
   }
   const laterCancel = (w: WorkspaceView) => call('wsSet', { id: w.id, pending: null }).then(() => done(`${w.pending?.agent ?? 'Its agent'} won't start in ${wsName(w)}`), () => {})
   const laterItems = (w: WorkspaceView): MenuItem[] => (w.pending ? [{ head: pendingWords(w.pending, true) }, { label: 'Start now', icon: 'run', run: () => laterNow(w) }, { label: 'Change time…', icon: 'clock', run: () => void laterChange(w) }, { label: 'Cancel delayed start', icon: 'x', danger: true, run: () => void laterCancel(w) }, null] : [])
+  // Rename with AI: the workspace's agent (the tab you're on there, else its first live one) asked, when its turn ends,
+  // to name it from its PR's title and description, else its task, through laki rename
+  const liveAgent = (w: WorkspaceView) => (ts => ts.find(t => t.id === tabByWs[w.id]) ?? ts[0])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited'))
+  const aiRename = (w: WorkspaceView, t: TabView) =>
+    void call<{ sent?: boolean }>('send', { target: t.id, whenIdle: true, text: `Rename this workspace after its task, in 2 to 5 words a person would say: from its pull request's title and description if it has one${w.pr ? ` (#${w.pr.number})` : ' (gh pr view)'}, else from what you're working on here. Run \`laki rename . "<the name>"\`, say the new name in one line, and change nothing else.` })
+      .then(r => done(r?.sent ? `Asked ${t.name} to name it` : `${t.name} names it when its turn ends`), fail)
+  const detachPr = (w: WorkspaceView) => void call('prDetach', { ws: w.id }).then(() => done(w.prLinked ? 'Only related now: its own PR, once opened, is its PR' : `PR #${w.pr?.number ?? ''} detached: only related`), () => {}) // call toasts a failure
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
     ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
+    ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', key: 'w', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
     { label: 'Open in', icon: 'code', key: 'o', items: openInItems({ ws: w.id }) },
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
@@ -2416,10 +2443,8 @@ export function App() {
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
-    ...(w.kind === 'worktree' ? [{ label: w.pr ? 'Refresh PR status' : 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
-    ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', key: 'h', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
+    ...prSub(w),
     ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
-    ...(w.pr?.state === 'OPEN' && !w.pr.mine && allows(w, 'approve') ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
     ...runItems(w),
     ...flowMenu(w),
@@ -2434,6 +2459,16 @@ export function App() {
     ...extItems('workspace', w, { ws: w.id }),
   ]
 
+  // PR #n › (or Pull request ›): the status bar PR's menu, a submenu; no PR: look for one, attach one
+  const prSub = (w: WorkspaceView): MenuItem[] =>
+    (items => (items.length ? [{ label: w.pr ? `PR #${w.pr.number}` : 'Pull request', icon: 'pr', key: 'h', items }] : []))(
+      w.pr
+        ? prMenu(w)
+        : [
+            ...(w.kind === 'worktree' ? [{ label: 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
+            ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
+          ],
+    )
   // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
   // of its group (last before the first one); no groups: nothing (they're made from the project's ⋯)
   // Move to group: a workspace's, or several picked ones of one project (groupMoves: [] when they aren't)
@@ -2557,6 +2592,7 @@ export function App() {
           ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
+    ...(w.pr ? [null, { label: `Detach PR #${w.pr.number}`, icon: 'unlink', key: 'd', sub: 'Only related, kept off this workspace (Attach a PR brings it back)', run: () => detachPr(w) } as MenuItem] : []),
   ]
 
   // right click on a tab (or a pane header: one session)
@@ -2729,6 +2765,7 @@ export function App() {
   const plusMenu = (p: Project, place?: string): MenuItem[] => [
     { label: 'New workspace', icon: 'plus', key: 'n', hint: place ? undefined : kh('newWs'), run: () => newWs(p.id, place ? { place } : undefined) },
     { label: 'Terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p, place) },
+    ...(p.git !== false && !p.host ? [{ label: 'Review a PR…', icon: 'review', key: 'r', sub: 'Any PR, yours or not: its branch, no agent, on the Review tab', run: () => setDialog({ reviewPr: p.id }) } as MenuItem] : []),
   ]
   const termWhere = (p: Project) => `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
@@ -2753,6 +2790,8 @@ export function App() {
       palette: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       files: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       find: () => dialog || findIn() || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog; a diff's own (findIn) first
+      // the sidebar's filter: open, its box focused; pressed again in the box: closed
+      filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),
       next: nextNeed,
       later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
       artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
@@ -2858,6 +2897,7 @@ export function App() {
     return [
       { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : kh('newWs'), run: () => newIn(p) },
       ...(!p.kind && termsOk ? [{ label: 'New terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p) } as MenuItem] : []),
+      ...(!p.kind && p.git !== false && !p.host ? [{ label: 'Review a PR…', icon: 'review', key: 'r', run: () => setDialog({ reviewPr: p.id }) } as MenuItem] : []),
       ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', run: () => setDialog({ project: p.id }) } as MenuItem]),
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
@@ -2912,6 +2952,7 @@ export function App() {
       a({ label: `Compare the race: ${wsName(w).replace(/-[^-]+$/, '')}`, icon: 'race', run: () => setDialog({ compare: race }) })
     }
     a({ label: 'New workspace', icon: 'plus', hint: kh('newWs'), run: () => newWs(ws?.project) })
+    if (project && !project.kind && project.git !== false && !project.host) a({ label: `Review a PR in ${project.name}…`, icon: 'review', run: () => setDialog({ reviewPr: project.id }) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'New terminal (in your home folder)', icon: 'terminal', run: () => quickNew('shells') })
     a({ label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
@@ -3649,16 +3690,194 @@ export function App() {
       {tabList}
     </div>
   )
+  // Appearance › Interface › Full-width status bar (Zed's way): one bar under the sidebar and the main area, over every
+  // page too, the sidebar's foot buttons first (with their words) and AI and Settings at its end; off: as before
+  const wideBar = settings.statusBar === 'wide' && !narrow
+  const pageHere = dialog !== null && isPlace(dialog) && view ? placeName({ d: dialog, ws: ws?.id ?? null }) : ''
+  const pageBar = wideBar && !!pageHere // a page over the workspace: the bar says only what isn't the workspace's
+  // the sidebar's foot buttons (Schedule, Board… without the rail; Video, Meme, Timer, its extensions, Settings), there
+  // or first in the wide status bar (bar: without AI and Settings, which go at its end); words: their labels
+  const footButtons = (words: boolean, bar = false) => (
+    <>
+          {!rail && ( // the rail layout has them on its rail
+            <>
+              <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={words ? 'Schedule' : undefined} onClick={toSchedules} />
+              <IconButton icon="board" title={BOARD_TIP} label={words ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
+              {specsOn && <IconButton icon="spec" title={SPECS_TIP} label={words ? 'Specs' : undefined} on={!!specsOf(dialog)} onClick={toSpecs} />}
+              {flowsOn && <IconButton icon="flow" title={FLOWS_TIP} label={words ? 'Workflows' : undefined} on={!!flowsOf(dialog)} className={flowsAsk ? 'dot' : ''} onClick={toFlows} />}
+              {aiOn(settings) && !bar && <IconButton icon="ai" title={AI_TIP} label={words ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
+            </>
+          )}
+          <IconButton icon="youtube" title="Watch a YouTube video while you work" label={words ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
+          {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={words ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
+          <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={words ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
+          <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
+          {!rail && !bar && (
+            <>
+              <span className="spacer" />
+              <IconButton icon="gear" title={kt('Settings', 'settings')} keyId="settings" label={words ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
+            </>
+          )}
+    </>
+  )
+  const statusBar = view && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
+        <div className={`status ${wideBar ? 'wide' : ''}`}>
+          {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
+          {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own
+            <>
+              {ctxOn && tab?.context && (
+                // the focused tab's context: how full, so you compact or start a new chat in time
+                <span className="sb-ctx" data-tip={`${tab.name}'s context: ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
+                  <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
+                    <i style={{ width: `${ctxPct(tab.context)}%` }} />
+                  </span>
+                  {ctxPct(tab.context)}%
+                </span>
+              )}
+              {git && (
+                // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
+                <button
+                  className={`sb-branch ${branchFull ? 'full' : ''}`}
+                  data-tip={`${ws.kind === 'worktree' ? `${ws.branch} ← ${ws.base}` : `${ws.branch}, the repo itself`} · click: ${branchFull ? 'shorter' : 'all of it'}`}
+                  onClick={() => setBranchFull(f => !f)}
+                >
+                  <Icon name="fork" size={11} />
+                  {branchFull ? ws.branch : shortBranch(ws.branch)}
+                  {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
+                </button>
+              )}
+              {ws.codespace !== undefined && (
+                // a cloud workspace: its codespace and its state (why it failed, cut: all of it on hover)
+                <button className="sb-flow" data-status={ws.csState === 'Failed' ? 'failed' : ws.csState === 'Available' ? undefined : 'waiting'} data-tip={`Codespace ${ws.codespace || '(being made)'}: ${csWord(ws.csState)}${ws.csError ? ` · ${ws.csError}` : ''} · click: your codespaces on GitHub`} onClick={() => openExternal('https://github.com/codespaces')}>
+                  <span className="sb-flow-icon">
+                    <Icon name="cloud" size={12} />
+                  </span>
+                  <span className="sb-flow-name">
+                    codespace<span className="muted"> · {csWord(ws.csState)}{ws.csState === 'Failed' && ws.csError ? `: ${ws.csError}` : ''}</span>
+                  </span>
+                </button>
+              )}
+              {(pj =>
+                pj?.cfgWait && (
+                  // its repo's .laki.json, not trusted as it is: its setup, scripts and env wait for you
+                  <button className="sb-flow" data-status="waiting" data-tip="This repo's .laki.json isn't trusted yet: its setup, scripts and env wait · click: look at it" onClick={() => cfgSheet(pj)}>
+                    <span className="sb-flow-icon">
+                      <Icon name="shieldAlert" size={11} />
+                    </span>
+                    <span className="sb-flow-name">.laki.json waits for you</span>
+                  </button>
+                ))(view.projects.find(x => x.id === ws.project))}
+              {(f =>
+                f && (
+                  // the workflow run that made this workspace, or sent the focused tab its last block: a click opens it
+                  <button className="sb-flow" data-status={f.status} data-tip={`Workflow run: ${f.name} · ${f.status}${f.block ? ` at ${f.block}` : ''} · click: open it`} onClick={() => setDialog({ workflows: '', run: f.id })}>
+                    <span className="sb-flow-icon">
+                      <Icon name={f.status === 'running' ? 'gear' : 'flow'} size={12} />
+                    </span>
+                    <span className="sb-flow-name">
+                      {f.name}
+                      {f.block && ['running', 'waiting', 'paused'].includes(f.status) && <span className="muted"> · {f.block}</span>}
+                    </span>
+                  </button>
+                ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
+              {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
+              <span className="port-item">
+                <button
+                  className={`listen ${portUp ? '' : 'port-main'}`}
+                  data-tip={`$PORT · ${portUp ? 'listening · ' : ''}open http://localhost:${ws.port}`}
+                  onClick={() => openPort(ws.port)}
+                >
+                  $PORT {ws.port}
+                  {ws.portNames?.[ws.port] && <span className="port-name">{ws.portNames[ws.port]}</span>}
+                </button>
+                <TunnelButton key={ws.id} port={ws.port} tunnel={ws.tunnels?.find(t => t.port === ws.port)} api={tunnelApi(ws)} />
+                {portStop(ws, ws.port)}
+              </span>
+              )}
+              {ports.map(port => (
+                <span key={`${ws.id}:${port}`} className="port-item">
+                  <button className="listen" data-tip={ws.ports.includes(port) ? `listening · open http://localhost:${port}` : 'not listening now'} onClick={() => openPort(port)}>
+                    ↗{port}
+                    {ws.portNames?.[port] && <span className="port-name">{ws.portNames[port]}</span>}
+                  </button>
+                  <TunnelButton port={port} tunnel={ws.tunnels?.find(t => t.port === port) /* an older daemon has none */} api={tunnelApi(ws)} />
+                  {portStop(ws, port)}
+                </span>
+              ))}
+              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
+              {attachable(ws) && ws.kind !== 'local' && (
+                <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
+                  + PR
+                </button>
+              )}
+              {ws.setup && <span className="warn-soft">setup running…</span>}
+            </>
+          )}
+          {!!ws?.artifacts && ws.storage && !pageBar && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): shown here; Finder and Files from the strip's ⋯
+            <button
+              className={`listen port-main ${gallery === ws.id ? 'on' : ''}`}
+              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A`}
+              onClick={toggleArtifacts}
+            >
+              Artifacts: {ws.artifacts}
+            </button>
+          )}
+          <span className="spacer" />
+          {view.remote && ws?.browser === undefined && (
+            <button
+              className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''}`}
+              data-tip={view.remote.open ? 'Remote access for anyone with the link (no email): Settings › Remote access' : `Remote access for ${view.remote.mail}: Settings › Remote access`}
+              onClick={() => setDialog({ section: 'remote' })}
+            >
+              {!view.remote.url ? 'Remote starting…' : view.remote.open ? 'Remote: open to anyone with the link' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}
+            </button>
+          )}
+          {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
+          {upd?.latest && ( // a newer release: here until you update (Settings › General › Updates: its notes, Update)
+            <button className={`sb-update ${upd.status === 'ready' ? 'sb-ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
+              <Icon name="download" size={11} />
+              {upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
+            </button>
+          )}
+          <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
+          {!achKept.off && achN > 0 /* none yet: no 0/54 from the first second (⌘K and Settings › Achievements open it) */ && (
+            <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
+              <Icon name="trophy" size={11} />
+              {achN}/{achAll.length}
+            </button>
+          )}
+          {aiFab && aiDock && (
+            // the AI button minimized: here until its right click puts it back
+            <button
+              className={`sb-ai ${aiFloat ? 'on' : ''} ${fly}`}
+              data-tip={`${aiFloat ? 'Close Laki AI (Esc)' : 'Ask Laki AI about what is on screen'} · right click: float the button again`}
+              onClick={() => setAiFloat(o => !o)}
+              onContextMenu={e => openMenu(e, [{ label: 'Float the button again', icon: 'popOut', run: () => dock(false) }])}
+            >
+              <Icon name="ai" size={11} />
+              AI
+            </button>
+          )}
+          {wideBar && !rail && ( // no rail: its AI and Settings at the end
+            <span className="sb-foot">
+              {aiOn(settings) && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
+              <IconButton icon="gear" title={kt('Settings', 'settings')} keyId="settings" label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
+            </span>
+          )}
+        </div>
+  )
+
   return (
-    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''}`} data-pad={settings.termPad}>
+    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''}`} data-pad={settings.termPad}>
       {railBar}
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
-      <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
+      <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} keyId="sidebar" onClick={() => setSideOpen(false)} />
           {!railBar && histNav}
           <span className="spacer" />
-          <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
+          <IconButton icon="filter" title={kt(find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR', 'filter')} keyId="filter" on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
           {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
           {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
@@ -3791,27 +4010,11 @@ export function App() {
         ))}
         <WidgetGrid widgets={ownWidgets} api={widgetApi} desk={settings.desk !== false} />
         {!onboard.off && onboardDone.size < STEPS.length && dialog !== 'onboard' && <OnboardBar done={STEPS.filter(x => onboardDone.has(x.id)).length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />}
-        <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
-          {!rail && ( // the rail layout has them on its rail
-            <>
-              <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={labels ? 'Schedule' : undefined} onClick={toSchedules} />
-              <IconButton icon="board" title={BOARD_TIP} label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
-              {specsOn && <IconButton icon="spec" title={SPECS_TIP} label={labels ? 'Specs' : undefined} on={!!specsOf(dialog)} onClick={toSpecs} />}
-              {flowsOn && <IconButton icon="flow" title={FLOWS_TIP} label={labels ? 'Workflows' : undefined} on={!!flowsOf(dialog)} className={flowsAsk ? 'dot' : ''} onClick={toFlows} />}
-              {aiOn(settings) && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
-            </>
-          )}
-          <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
-          {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
-          <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
-          <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
-          {!rail && (
-            <>
-              <span className="spacer" />
-              <IconButton icon="gear" title={kt('Settings', 'settings')} keyId="settings" label={labels ? 'Settings' : undefined} on={settingsOf(dialog)} onClick={toSettings} />
-            </>
-          )}
-        </div>
+        {!wideBar && (
+          <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
+            {footButtons(labels)}
+          </div>
+        )}
       </aside>
       )}
       {sideOpen && !listOff && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
@@ -3903,12 +4106,16 @@ export function App() {
                     theme={theme}
                     look={termLook(settings)}
                     onFile={path => openPath(id, path)}
+                    onReply={replyTo(id).length ? (text, at) => setReply({ tab: id, text, ...at }) : undefined}
+                    image={peekImage(id)}
+                    cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                   />
                 )}
                 foot={id =>
                   (t =>
                     t && (
                       <>
+                        <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
                         <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />
@@ -4028,7 +4235,7 @@ export function App() {
                 onWs={id => (setReveal(r => [...r, id]), setWsId(id))}
                 onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
                 onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
-                onDetach={() => call('prDetach', { ws: ws.id }).then(() => done('Only related now: its own PR, once opened, is its PR'), () => {})}
+                onDetach={() => detachPr(ws)}
                 onStorage={bridge?.openPath && ws.storage ? () => void bridge!.openPath!(ws.storage!).then(r => r === 'missing' && toast('Nothing kept yet: its folder is made with its first tab')) : undefined}
                 />
               }
@@ -4077,6 +4284,7 @@ export function App() {
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
+            storage={() => api.call('storageInfo')}
             uiReset={() => api.call('uiReset')}
             simulator={p => api.call('sim', p)}
             tunnels={n => api.call('tunnelCheck', n)}
@@ -4118,6 +4326,20 @@ export function App() {
               }}
             />
           ))(sharing ? byId(sharing) : undefined)}
+        {(t =>
+          t &&
+          reply && (
+            <ReplyPop
+              key={`${reply.tab}:${reply.x}:${reply.y}`}
+              from={t}
+              text={reply.text}
+              at={reply}
+              to={replyTo(t.id)}
+              onAdd={(to, text) => call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: finish it there`)))}
+              onSend={(to, text) => call<{ queued?: number }>('send', { target: to.id, text, ...(to.kind === 'agent' && { whenIdle: true }) }).then(r => done(r.queued ? `Queued for ${to.name}: it goes after its turn` : `Sent to ${to.name}`))}
+              onClose={() => setReply(null)}
+            />
+          ))(reply ? byId(reply.tab) : undefined)}
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(dialog && typeof dialog === 'object' && 'widget' in dialog ? (dialog.back ?? null) : null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? shownWidgets.find(x => x.id === dialog.widget) : undefined)}
         {(w => w && extModal && <WidgetModal key={extModal.n} w={w} ws={extModal.ws} m={extModal.m} api={widgetApi} onClose={m => setExtModal(x => (!m || x?.m === m ? null : x))} />)(extModal ? view.widgets?.find(x => x.id === extModal.wid) : undefined)}
         {(e => e && (
@@ -4140,7 +4362,7 @@ export function App() {
           />
         ))(extOf(dialog))}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={extOf(dialog.back ?? null) ? placeName({ d: dialog.back!, ws: null }) : backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
-        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
+        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
@@ -4433,6 +4655,7 @@ export function App() {
               menu: path => artMenu(ws, path),
               copy,
               page: path => (inViewer(path) ? artPage(ws, path) : undefined),
+              unlink: url => api.call('linkRm', { ws: ws.id, url }),
               external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
             }}
           />
@@ -4445,150 +4668,12 @@ export function App() {
             read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
             onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
             onFile={asFile(w, artView.path)}
+            onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, storage: true }))}
             onReveal={bridge?.openPath && (() => revealArt(w, artView.path))}
             onClose={() => setArtView(null)}
           />
         ))(view.workspaces.find(x => x.id === artView.ws))}
-        {(ws?.browser === undefined || !connected) && ( // a browser page: none, unless something's wrong
-        <div className="status">
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
-          {ws && ws.browser === undefined && ( // a page: no port, branch or folder of its own
-            <>
-              {ctxOn && tab?.context && (
-                // the focused tab's context: how full, so you compact or start a new chat in time
-                <span className="sb-ctx" data-tip={`${tab.name}'s context: ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
-                  <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
-                    <i style={{ width: `${ctxPct(tab.context)}%` }} />
-                  </span>
-                  {ctxPct(tab.context)}%
-                </span>
-              )}
-              {git && (
-                // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
-                <button
-                  className={`sb-branch ${branchFull ? 'full' : ''}`}
-                  data-tip={`${ws.kind === 'worktree' ? `${ws.branch} ← ${ws.base}` : `${ws.branch}, the repo itself`} · click: ${branchFull ? 'shorter' : 'all of it'}`}
-                  onClick={() => setBranchFull(f => !f)}
-                >
-                  <Icon name="fork" size={11} />
-                  {branchFull ? ws.branch : shortBranch(ws.branch)}
-                  {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
-                </button>
-              )}
-              {ws.codespace !== undefined && (
-                // a cloud workspace: its codespace and its state (why it failed, cut: all of it on hover)
-                <button className="sb-flow" data-status={ws.csState === 'Failed' ? 'failed' : ws.csState === 'Available' ? undefined : 'waiting'} data-tip={`Codespace ${ws.codespace || '(being made)'}: ${csWord(ws.csState)}${ws.csError ? ` · ${ws.csError}` : ''} · click: your codespaces on GitHub`} onClick={() => openExternal('https://github.com/codespaces')}>
-                  <span className="sb-flow-icon">
-                    <Icon name="cloud" size={12} />
-                  </span>
-                  <span className="sb-flow-name">
-                    codespace<span className="muted"> · {csWord(ws.csState)}{ws.csState === 'Failed' && ws.csError ? `: ${ws.csError}` : ''}</span>
-                  </span>
-                </button>
-              )}
-              {(pj =>
-                pj?.cfgWait && (
-                  // its repo's .laki.json, not trusted as it is: its setup, scripts and env wait for you
-                  <button className="sb-flow" data-status="waiting" data-tip="This repo's .laki.json isn't trusted yet: its setup, scripts and env wait · click: look at it" onClick={() => cfgSheet(pj)}>
-                    <span className="sb-flow-icon">
-                      <Icon name="shieldAlert" size={11} />
-                    </span>
-                    <span className="sb-flow-name">.laki.json waits for you</span>
-                  </button>
-                ))(view.projects.find(x => x.id === ws.project))}
-              {(f =>
-                f && (
-                  // the workflow run that made this workspace, or sent the focused tab its last block: a click opens it
-                  <button className="sb-flow" data-status={f.status} data-tip={`Workflow run: ${f.name} · ${f.status}${f.block ? ` at ${f.block}` : ''} · click: open it`} onClick={() => setDialog({ workflows: '', run: f.id })}>
-                    <span className="sb-flow-icon">
-                      <Icon name={f.status === 'running' ? 'gear' : 'flow'} size={12} />
-                    </span>
-                    <span className="sb-flow-name">
-                      {f.name}
-                      {f.block && ['running', 'waiting', 'paused'].includes(f.status) && <span className="muted"> · {f.block}</span>}
-                    </span>
-                  </button>
-                ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
-              {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
-              <span className="port-item">
-                <button
-                  className={`listen ${portUp ? '' : 'port-main'}`}
-                  data-tip={`$PORT · ${portUp ? 'listening · ' : ''}open http://localhost:${ws.port}`}
-                  onClick={() => openPort(ws.port)}
-                >
-                  $PORT {ws.port}
-                  {ws.portNames?.[ws.port] && <span className="port-name">{ws.portNames[ws.port]}</span>}
-                </button>
-                <TunnelButton key={ws.id} port={ws.port} tunnel={ws.tunnels?.find(t => t.port === ws.port)} api={tunnelApi(ws)} />
-                {portStop(ws, ws.port)}
-              </span>
-              )}
-              {ports.map(port => (
-                <span key={`${ws.id}:${port}`} className="port-item">
-                  <button className="listen" data-tip={ws.ports.includes(port) ? `listening · open http://localhost:${port}` : 'not listening now'} onClick={() => openPort(port)}>
-                    ↗{port}
-                    {ws.portNames?.[port] && <span className="port-name">{ws.portNames[port]}</span>}
-                  </button>
-                  <TunnelButton port={port} tunnel={ws.tunnels?.find(t => t.port === port) /* an older daemon has none */} api={tunnelApi(ws)} />
-                  {portStop(ws, port)}
-                </span>
-              ))}
-              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
-              {attachable(ws) && ws.kind !== 'local' && (
-                <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
-                  + PR
-                </button>
-              )}
-              {ws.setup && <span className="warn-soft">setup running…</span>}
-            </>
-          )}
-          {!!ws?.artifacts && ws.storage && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): shown here; Finder and Files from the strip's ⋯
-            <button
-              className={`listen port-main ${gallery === ws.id ? 'on' : ''}`}
-              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A`}
-              onClick={toggleArtifacts}
-            >
-              Artifacts: {ws.artifacts}
-            </button>
-          )}
-          <span className="spacer" />
-          {view.remote && ws?.browser === undefined && (
-            <button
-              className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''}`}
-              data-tip={view.remote.open ? 'Remote access for anyone with the link (no email): Settings › Remote access' : `Remote access for ${view.remote.mail}: Settings › Remote access`}
-              onClick={() => setDialog({ section: 'remote' })}
-            >
-              {!view.remote.url ? 'Remote starting…' : view.remote.open ? 'Remote: open to anyone with the link' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}
-            </button>
-          )}
-          {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
-          {upd?.latest && ( // a newer release: here until you update (Settings › General › Updates: its notes, Update)
-            <button className={`sb-update ${upd.status === 'ready' ? 'sb-ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
-              <Icon name="download" size={11} />
-              {upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
-            </button>
-          )}
-          <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
-          {!achKept.off && achN > 0 /* none yet: no 0/54 from the first second (⌘K and Settings › Achievements open it) */ && (
-            <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
-              <Icon name="trophy" size={11} />
-              {achN}/{achAll.length}
-            </button>
-          )}
-          {aiFab && aiDock && (
-            // the AI button minimized: here until its right click puts it back
-            <button
-              className={`sb-ai ${aiFloat ? 'on' : ''} ${fly}`}
-              data-tip={`${aiFloat ? 'Close Laki AI (Esc)' : 'Ask Laki AI about what is on screen'} · right click: float the button again`}
-              onClick={() => setAiFloat(o => !o)}
-              onContextMenu={e => openMenu(e, [{ label: 'Float the button again', icon: 'popOut', run: () => dock(false) }])}
-            >
-              <Icon name="ai" size={11} />
-              AI
-            </button>
-          )}
-        </div>
-        )}
+        {!wideBar && statusBar}
         {aiFab && (
           <>
             {aiFloat && (
@@ -4611,6 +4696,7 @@ export function App() {
           </>
         )}
       </main>
+      {wideBar && statusBar}
 
       {menu}
       <Tips />
@@ -4836,6 +4922,23 @@ export function App() {
           }}
         />
       ))(live.find(w => w.id === dialog.attachPr))}
+      {dialog && typeof dialog === 'object' && 'reviewPr' in dialog && (p => p && (
+        // Review a PR: any PR of the repo, yours or not, checked out in a worktree of its own (gh pr checkout, forks too),
+        // no agent and no setup script, opened on the Review tab once its changes are scanned
+        <Prompt
+          title={`Review a pull request in ${p.name}`}
+          placeholder="https://github.com/owner/repo/pull/12, or 12"
+          hint="Its URL, or its number in this repo: a workspace on its branch (named pr-<n>-<title>), no agent, opened on the Review tab. Run ▾ › Run the setup script if it needs one."
+          onClose={() => setDialog(null)}
+          onSubmit={async pr => {
+            const w = await call<WorkspaceView>('wsNew', { project: p.id, pr, preset: 'none', noSetup: true })
+            setDialog(null)
+            showNew(w.id)
+            setReviewing(m => ({ ...m, [w.id]: true }))
+            done(`Reviewing ${w.name ?? w.id}: its Review tab shows once its changes are read`)
+          }}
+        />
+      ))(view?.projects.find(x => x.id === dialog.reviewPr))}
       {dialog && typeof dialog === 'object' && 'ciLog' in dialog && (w => w && (
         <CiLog
           key={dialog.job}

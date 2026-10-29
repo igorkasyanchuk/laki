@@ -4,7 +4,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
+import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
 import { RELEASES_URL, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
@@ -22,6 +22,7 @@ import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
 import { Group, Says, Scope } from './SettingsKit'
+import { CssGuide, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
 import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection } from './SettingsConnect'
@@ -38,21 +39,20 @@ export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
 
-const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
-  ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
+const PROJECT_LOOK: [Exclude<keyof ProjectLook, 'font'>, string, [string, string][]][] = [
   ['case', 'Case', [['theme', "Theme's"], ['upper', 'UPPERCASE'], ['none', 'As named']]],
   ['spacing', 'Letter spacing', [['theme', "Theme's"], ['0', 'None'], ['0.4px', 'Tight'], ['1px', 'Normal'], ['2px', 'Wide'], ['3px', 'Wider']]],
-  ['size', 'Size', [['theme', "Theme's"], ...[10, 11, 12, 13, 14, 15, 16, 18, 20].map((n): [string, string] => [`${n}px`, String(n)])]],
+  ['size', 'Size', [['theme', "Theme's"], ...[9, 10, 11, 12, 13, 14, 15, 16, 18, 20].map((n): [string, string] => [`${n}px`, String(n)])]],
   ['weight', 'Weight', [['theme', "Theme's"], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Heavy']]],
 ]
 // the sidebar's lines and rows (SideLook): CSS values, App.tsx puts them on the sidebar as the variables looks set
-const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]][] = [
+const SIDE_LOOK: [Exclude<keyof SideLook, 'labels' | 'font'>, string, [string, string][]][] = [
   ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['2px solid var(--line)', 'Thick'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['2px dotted var(--muted)', 'Big dots'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['2px dotted var(--accent)', 'Accent dots'], ['none', 'None']]],
   ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['3px double var(--line)', 'Double'], ['none', 'Nothing']]],
   ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
   ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Snug'], ['28px', 'Normal'], ['32px', 'Roomy'], ['36px', 'Large'], ['40px', 'Huge']]],
   ['rowGap', 'Space between rows', [['theme', "Theme's"], ['0px', 'None'], ['1px', 'Normal'], ['3px', 'More'], ['6px', 'Lots']]],
-  ['text', 'Text size', [['theme', "Theme's"], ...[11, 12, 13, 14, 15, 16, 17, 18].map((n): [string, string] => [`${n}px`, String(n)])]],
+  ['text', 'Text size', [['theme', "Theme's"], ...[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((n): [string, string] => [`${n}px`, String(n)])]],
   ['icons', 'Icon size', [['theme', 'Default (13)'], ['11px', '11'], ['12px', '12'], ['14px', '14'], ['16px', '16'], ['18px', '18']]],
   ['head', 'Project row height', [['theme', "Theme's"], ['24px', 'Compact'], ['28px', 'Normal'], ['32px', 'Roomy'], ['36px', 'Large']]],
   ['gap', 'Space between projects', [['theme', "Theme's"], ['0px', 'None'], ['3px', 'Small'], ['6px', 'Normal'], ['12px', 'Large'], ['20px', 'Huge']]],
@@ -130,6 +130,8 @@ export type AppSettings = Paint & {
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
   storageDir?: string // workspaces' storage folders, one per workspace inside (unset: <data>/storage)
   keepStorage?: boolean // a deleted workspace's storage folder stays
+  statusBar?: 'main' | 'wide' // under the main area (unset), or full width, Zed's way
+  storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
@@ -150,6 +152,7 @@ export type AppSettings = Paint & {
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
   bgRefresh?: boolean // PR checks on their own (unset: on)
+  keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
@@ -183,7 +186,7 @@ export type AppSettings = Paint & {
   keys?: Record<string, string> // Settings › Keys: App's own actions' keys over shared/keys.ts KEYS ('': none)
   hotkeyOn?: boolean // the global hotkey (unset: on)
   hotkey?: string // its keys (unset: HOTKEY; '': none)
-  shotAsk?: boolean // Screenshot to Laki AI (off unless true)
+  shotAsk?: boolean // Screenshot to Laki AI (on unless false)
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   specs?: boolean // Specs & Brainstorms (Specs.tsx), on unless false
@@ -233,6 +236,30 @@ const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
 const SOUNDS = ['Basso', 'Blow', 'Bottle', 'Frog', 'Funk', 'Glass', 'Hero', 'Morse', 'Ping', 'Pop', 'Purr', 'Sosumi', 'Submarine', 'Tink']
 
 export const FONT_SIZE = 13
+// General › Storage › Delete files after: days (0: never)
+const STORAGE_KEEP: [number, string][] = [[7, '7 days'], [30, '30 days'], [60, '60 days'], [90, '90 days'], [180, '180 days'], [365, 'A year'], [0, 'Never']]
+// the storage folder's size and folders, as it shows (read once per page; Refresh again), and Show in Finder
+function StorageUse({ api, dir }: { api: () => Promise<{ dir: string; bytes: number; folders: number }>; dir?: string }) {
+  const [u, setU] = useState<{ dir: string; bytes: number; folders: number } | null>(null)
+  const read = () => void api().then(setU, () => setU(null))
+  useEffect(() => ((t: number) => () => clearTimeout(t))(window.setTimeout(read, 800)), [dir]) // once typing stops: the folder saved, one du
+  const size = (b: number) => (b < 1 << 20 ? `${Math.round(b / 1024)} KB` : b < 1 << 30 ? `${(b / (1 << 20)).toFixed(1)} MB` : `${(b / (1 << 30)).toFixed(2)} GB`)
+  return (
+    <div className="storage-use">
+      <span className="muted small">{u ? `${size(u.bytes)} in ${u.folders} workspace folder${u.folders === 1 ? '' : 's'}` : 'Reading its size…'}</span>
+      <span className="spacer" />
+      <button type="button" onClick={read}>
+        <Icon name="refresh" /> Refresh
+      </button>
+      {bridge && u && (
+        <button type="button" onClick={() => void bridge!.openPath?.(u.dir)}>
+          <Icon name="folder" /> Show in Finder
+        </button>
+      )}
+    </div>
+  )
+}
+const UI_SIZES = [9, 10, 11, 12, 13, 14, 15, 16] // Appearance › Interface › Text size, px
 // Settings and Help's own size (Appearance), over the terminal font's: ⌘± step through these while one is open
 export const PAGE_ZOOMS = [0.9, 1, 1.1, 1.25, 1.5]
 export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
@@ -253,6 +280,8 @@ export function installedFonts() {
   const base = fallbacks.map(width)
   return FONTS.filter(f => fallbacks.some((b, i) => width(`"${f}", ${b}`) !== base[i]))
 }
+let devList: string[] | undefined
+const devFonts = () => (devList ??= installedFonts()) // the font pickers' For developers, measured once
 // a font name for xterm, with fallbacks
 export const fontStack = (f?: string) => [f?.trim() && JSON.stringify(f.trim()), '"JetBrains Mono"', '"SF Mono"', 'Menlo', 'Monaco', 'monospace'].filter(Boolean).join(', ')
 
@@ -345,11 +374,12 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Interface font', 'ui type'],
   ['appearance', 'Accent color', 'colour highlight'],
   ['appearance', 'Corners', 'radius rounded square'],
+  ['appearance', 'Full-width status bar', 'status bar wide bottom zed'],
   ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
-  ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
+  ['appearance', 'Sidebar', 'project names font case letter spacing size weight rows text'],
   ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
   ['appearance', 'Browsers', 'rail browser web button show hide list'],
@@ -416,6 +446,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['git', 'Keep the Mac awake while agents work', 'sleep caffeinate power battery idle awake'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
   ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
@@ -802,6 +833,7 @@ export function SettingsPage(p: {
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
+  storage?: () => Promise<{ dir: string; bytes: number; folders: number }> // General › Storage: its folder, size and folders (the daemon's storageInfo)
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   scriptLogs?: () => void // development mode's setup and teardown runs
@@ -848,22 +880,19 @@ export function SettingsPage(p: {
     return () => clearTimeout(off)
   }, [spot]) // set with its section: rendered by now
   // a row of selects over one of the sidebar's looks: 'theme' is the theme's own
-  const lookGrid = (key: 'projectLook' | 'sideLook', rows: [string, string, [string, string][]][]) => (
-    <div className="grid5">
-      {rows.map(([k, label, opts]) => (
-        <label key={k}>
-          {label}
-          <select value={String((s[key] as Record<string, unknown> | undefined)?.[k] ?? 'theme')} onChange={e => set({ [key]: { ...s[key], [k]: e.target.value } })}>
-            {opts.map(([v, name]) => (
-              <option key={v} value={v}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
-    </div>
-  )
+  const lookRows = (key: 'projectLook' | 'sideLook', rows: [string, string, [string, string][]][]) =>
+    rows.map(([k, label, opts]) => (
+      <label key={k} className="switch-row">
+        <select value={String((s[key] as Record<string, unknown> | undefined)?.[k] ?? 'theme')} onChange={e => set({ [key]: { ...s[key], [k]: e.target.value } })}>
+          {opts.map(([v, name]) => (
+            <option key={v} value={v}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <Says title={label} />
+      </label>
+    ))
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
   // Export / Import (General): every setting in a file, for another Mac; an import goes through the page, so it's
@@ -1023,6 +1052,34 @@ export function SettingsPage(p: {
       ].slice(0, 12)
   const go = (r: { sec: string; title: string }) => (setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() }))
   const nextKey = keyShow(keyMap(s.keys).next) // Needs you's words: ⌘J, or what Settings › Keys made it ('': none)
+  // the global hotkeys (main's globalShortcut): General's, and the Keys page's too, with the keys in use now
+  const globalKeys = bridge?.hotkey && (
+    <Group title="Global hotkey">
+      <HotkeyField
+        on={s.hotkeyOn !== false}
+        keys={s.hotkey ?? HOTKEY}
+        def={HOTKEY}
+        title="Bring Laki forward from any app"
+        hint="Whatever app you're in, these keys show Laki's window"
+        bind={k => bridge!.hotkey!(k || '')}
+        onOn={hotkeyOn => set({ hotkeyOn })}
+        onKeys={hotkey => set({ hotkey })}
+      />
+      {bridge.shotKey && (
+        <HotkeyField
+          on={s.shotAsk !== false}
+          keys={s.shotKey ?? SHOT_KEY}
+          def={SHOT_KEY}
+          title="Screenshot to Laki AI"
+          hint="From any app: pick a part of the screen, and Laki AI's window opens with it attached and the mic listening. Say what to do, then send. The menu bar has it too."
+          off={aiOn(s) ? undefined : 'Laki AI answers it: turn Laki AI on in Settings › AI'}
+          bind={k => bridge!.shotKey!(k)}
+          onOn={shotAsk => set({ shotAsk })}
+          onKeys={shotKey => set({ shotKey })}
+        />
+      )}
+    </Group>
+  )
   return (
     <div className="settings-page" style={{ zoom: scale }}>
       <div className="settings-head">
@@ -1127,6 +1184,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.bgRefresh !== false} onChange={v => set({ bgRefresh: v })}>
                   <Says title="Refresh PR status in the background" hint="Checks each workspace's PR, CI and reviews every few minutes (Settings › Pull requests) and as an agent's turn ends. Off: only a PR's right click › Refresh, if gh asks for an SSH passphrase or GitHub limits you. The PR switches need it" />
                 </Switch>
+                <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
+                  <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />
+                </Switch>
               </div>
               </Group>
               <Group title="Clean-up">
@@ -1176,38 +1236,12 @@ export function SettingsPage(p: {
                 <Group title="Menu bar">
                   <div className="setting-box">
                     <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
-                      <Says title="Menu bar icon" hint="Laki's mark in the menu bar (the tray) with the count of agents that need you, as the Dock's badge; its menu lists them, new workspaces, screenshots and Open Laki with its hotkey" />
+                      <Says title="Menu bar icon" hint="Laki's mark in the menu bar (the tray) with the count of agents that need you, as the Dock's badge; its menu lists them, new workspaces and screenshots, then Screenshot to Laki AI and Open Laki with their hotkeys" />
                     </Switch>
                   </div>
                 </Group>
               )}
-              {bridge?.hotkey && (
-                <Group title="Global hotkey">
-                  <HotkeyField
-                    on={s.hotkeyOn !== false}
-                    keys={s.hotkey ?? HOTKEY}
-                    def={HOTKEY}
-                    title="Bring Laki forward from any app"
-                    hint="Whatever app you're in, these keys show Laki's window"
-                    bind={k => bridge!.hotkey!(k || '')}
-                    onOn={hotkeyOn => set({ hotkeyOn })}
-                    onKeys={hotkey => set({ hotkey })}
-                  />
-                  {bridge.shotKey && (
-                    <HotkeyField
-                      on={s.shotAsk === true}
-                      keys={s.shotKey ?? SHOT_KEY}
-                      def={SHOT_KEY}
-                      title="Screenshot to Laki AI"
-                      hint="From any app: pick a part of the screen, and Laki AI's window opens with it attached and the mic listening. Say what to do, then send. The menu bar has it too."
-                      off={aiOn(s) ? undefined : 'Laki AI answers it: turn Laki AI on in Settings › AI'}
-                      bind={k => bridge!.shotKey!(k)}
-                      onOn={shotAsk => set({ shotAsk })}
-                      onKeys={shotKey => set({ shotKey })}
-                    />
-                  )}
-                </Group>
-              )}
+              {globalKeys}
               <Group title="Notifications" hint="Phone pushes are in their own section">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
@@ -1268,7 +1302,19 @@ export function SettingsPage(p: {
               </Group>
               <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the info panel opens it">
                 <FolderField value={s.storageDir} label="Folder for storage" placeholder="Laki's data folder: ~/.laki/storage" onChange={v => set({ storageDir: v })} />
+                {p.storage && <StorageUse api={p.storage} dir={s.storageDir} />}
                 <div className="setting-box">
+                  <label className="switch-row">
+                    <select value={s.storageDays ?? STORAGE_DAYS} onChange={e => set({ storageDays: Number(e.target.value) })}>
+                      {STORAGE_KEEP.map(([d, name]) => (
+                        <option key={d} value={d}>
+                          {name}
+                          {d === STORAGE_DAYS ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <Says title="Delete files after" hint="A file in a workspace's storage folder that hasn't changed for this long goes, checked hourly (only the folders Laki made, never others in the folder above)" />
+                  </label>
                   <Switch className="switch-row" on={!!s.keepStorage} onChange={v => set({ keepStorage: v })}>
                     <Says title="Keep a deleted workspace's storage" hint="Off: deleting a workspace deletes its storage folder too (archiving keeps it)" />
                   </Switch>
@@ -1374,24 +1420,29 @@ export function SettingsPage(p: {
           {sec === 'appearance' && (
             <>
               <h2>Appearance</h2>
-              <Group title="Interface">
-              <div className="grid2">
-                <label>
-                  Interface font
-                  <select
-                    value={s.uiFont ?? ''}
-                    onChange={e => paint({ uiFont: e.target.value })}
-                  >
-                    <option value="">Default (SF Pro on a Mac)</option>
-                    <option value="theme">The theme's own</option>
-                    {s.uiFont && s.uiFont !== 'theme' && !UI_FONTS.includes(s.uiFont) && <option value={s.uiFont}>{s.uiFont}</option>}
-                    {UI_FONTS.map(f => (
-                      <option key={f} value={f}>
-                        {f === 'system' ? 'SF Pro (the Mac’s)' : f}
+              <Group title="Interface" hint="Tabs, menus, dropdowns, the status bar and tooltips: one font and one size. The preview changes as you do">
+              <InterfacePreview />
+              <div className="setting-box">
+                <label className="switch-row">
+                  <FontPick value={s.uiFont ?? ''} label="Interface font" first={[['', 'Default (SF Pro on a Mac)'], ['theme', "The theme's own"], ['system', 'SF Pro (the Mac’s)']]} dev={devFonts()} onChange={v => paint({ uiFont: v })} />
+                  <Says title="Font" hint="Laki's own, the developer fonts (the terminal's), then every other font on this Mac" />
+                </label>
+                <label className="switch-row">
+                  <select value={s.uiSize || 0} onChange={e => paint({ uiSize: Number(e.target.value) /* 0: theirs, saved as such (unset wouldn't replace it) */ })}>
+                    <option value={0}>Theirs, 11-13px (default)</option>
+                    {UI_SIZES.map(n => (
+                      <option key={n} value={n}>
+                        {n}px
                       </option>
                     ))}
                   </select>
+                  <Says title="Text size" hint="Tabs, menus and dropdowns, the status bar, tooltips, the side panel's tabs, as one" />
                 </label>
+                <Switch className="switch-row" on={s.statusBar === 'wide'} onChange={on => set({ statusBar: on ? 'wide' : 'main' })}>
+                  <Says title="Full-width status bar" hint="One bar under the sidebar and the main area, on every page too: the sidebar's bottom buttons first, the workspace's branch, ports and PR while you're on it, as Zed's. Off: under the main area only" />
+                </Switch>
+              </div>
+              <div className="grid2">
                 <label data-tip="While Settings or Help is open, ⌘+ and ⌘− change it too (⌘0: 100%)">
                   Settings &amp; Help size
                   <select value={PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom : 1} onChange={e => set({ pageZoom: Number(e.target.value) })}>
@@ -1504,12 +1555,8 @@ export function SettingsPage(p: {
                   <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
                 </Switch>
               </Group>
-              <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
-              <div className="setting-box">
-                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
-                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
-                </Switch>
-              </div>
+              <Group title="Sidebar" hint="How the sidebar's rows and project names look; each choice is over the theme's. The preview changes as you do">
+              <SidePreview sl={s.sideLook} pl={s.projectLook} style={s.sideStyle} />
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
                   {SIDE_STYLES.map(([k, name, what]) => (
@@ -1520,7 +1567,24 @@ export function SettingsPage(p: {
                 </div>
                 <p className="muted small">{(SIDE_STYLES.find(x => x[0] === (s.sideStyle ?? 'default')) ?? SIDE_STYLES[1])[2]}</p>
               </div>
-              {lookGrid('sideLook', SIDE_LOOK)}
+              <div className="setting-box">
+                <label className="switch-row">
+                  <FontPick value={s.sideLook?.font ?? ''} label="Sidebar font" first={[['', "The interface's (default)"]]} dev={devFonts()} onChange={v => set({ sideLook: { ...s.sideLook, font: v } })} />
+                  <Says title="Font" hint="Laki's own, the developer fonts, every other font on this Mac" />
+                </label>
+                {lookRows('sideLook', SIDE_LOOK)}
+              </div>
+              <h4 className="set-sub">Project names</h4>
+              <div className="setting-box">
+                <label className="switch-row">
+                  <FontPick value={s.projectLook?.font && s.projectLook.font !== 'theme' ? s.projectLook.font : ''} label="Project names' font" first={[['', "Theme's (default)"], ['ui', 'Interface'], ['mono', 'Monospace']]} dev={devFonts()} onChange={v => set({ projectLook: { ...s.projectLook, font: v || 'theme' } })} />
+                  <Says title="Font" hint="The projects' heads: Laki's own, the developer fonts, every other font on this Mac" />
+                </label>
+                {lookRows('projectLook', PROJECT_LOOK)}
+              </div>
+              <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
+                <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
+              </Switch>
               <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
                 <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Schedule, Board, Video, Timer, Settings (Rail and list: Video, Meme, Timer); the last ones drop theirs when the row is too narrow" />
               </Switch>
@@ -1690,9 +1754,6 @@ export function SettingsPage(p: {
                   </div>
                 </Group>
               )}
-              <Group title="Project names" hint="The projects' heads in the sidebar, over the theme's">
-                {lookGrid('projectLook', PROJECT_LOOK)}
-              </Group>
               <Group title="Window">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.glass} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
@@ -1821,6 +1882,7 @@ export function SettingsPage(p: {
               </Group>
               <Group title="Custom CSS" hint="Anything the pickers above don't reach: your own rules over the app's, in every window, as you type. Pictures and fonts from the web stay blocked">
                 <textarea className="mono custom-css" rows={6} spellCheck={false} value={s.customCss ?? ''} placeholder={'.sidebar .ws { font-size: 15px; }\n.project-name { color: var(--accent); }'} onChange={e => set({ customCss: e.target.value })} />
+                <CssGuide open={!s.customCss?.trim()} onAdd={css => set({ customCss: `${(s.customCss ?? '').trimEnd()}${s.customCss?.trim() ? '\n' : ''}${css}\n` })} />
               </Group>
             </>
           )}
@@ -2039,7 +2101,7 @@ export function SettingsPage(p: {
               over={s.keys}
               others={[
                 ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),
-                ...(s.shotAsk === true && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
+                ...(s.shotAsk !== false && aiOn(s) && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
                 ...(s.pickerKey !== '' ? ([[s.pickerKey ?? PICKER_KEY, 'Pick an element (development mode)']] as [string, string][]) : []),
               ]}
               onChange={keys => set({ keys })}
@@ -2047,6 +2109,7 @@ export function SettingsPage(p: {
               onOverlay={keyOverlay => set({ keyOverlay })}
             />
           )}
+          {sec === 'keys' && globalKeys}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (

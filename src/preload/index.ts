@@ -24,7 +24,8 @@ contextBridge.exposeInMainWorld('laki', {
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
   keys: (over: Record<string, string>) => ipcRenderer.send('keys', over), // Settings › Keys' over shared/keys.ts' defaults: the menu shows them
-  shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label), // Screenshot to Laki AI's ('' none; false: it's off)
+  // Screenshot to Laki AI's ('' none; false: it's off); macOS only: main's screenshot is screencapture
+  ...(process.platform === 'darwin' && { shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label) }),
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
   update: (op: 'state' | 'check' | 'download' | 'install'): Promise<object | null> => ipcRenderer.invoke('update', op),
   updateAuto: (on: boolean) => ipcRenderer.send('update-auto', on),
@@ -73,6 +74,7 @@ contextBridge.exposeInMainWorld('laki', {
     size: (len: number, up?: boolean) => ipcRenderer.send('floater-size', len, up), // its length along the edge; up: the stack opened or closed, the + stays put
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
     open: (tab: string) => ipcRenderer.send('floater-open', tab),
+    seen: (tab: string) => ipcRenderer.send('floater-seen', tab), // a right click: its ● cleared without opening it
     act: (what: 'new' | 'mic' | 'area' | 'screen' | 'ai') => ipcRenderer.send('floater-act', what), // the +'s actions (the bar's stack or the menu)
     tip: (name: string, hint: string, top: number) => ipcRenderer.send('floater-tip', name, hint, top), // a stacked action's name beside it
     menuAt: (top: number) => ipcRenderer.send('floater-menu-at', top), // the +'s top, then the page opens #menu

@@ -7,7 +7,7 @@ import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
-import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, templated, templatesFor, withPaths } from './text'
+import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
 import { AGENT_COLORS, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
@@ -1666,7 +1666,7 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void } // page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown> } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string } | { error: string }
@@ -1675,7 +1675,7 @@ export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these 
 
 // an HTML or Markdown artifact in the app (Settings › General › Storage: Open artifacts in Laki): HTML in a sandboxed
 // frame (the daemon's /artifact/…: its CSS, scripts and pictures beside it load), Markdown rendered
-export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onClose: () => void }) {
+export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const html = HTML.test(path)
   useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path])
@@ -1696,6 +1696,7 @@ export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, o
       </div>
       <div className="buttons">
         <span className="muted small grow">{html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
+        {onSource && <button onClick={onSource} data-tip="Its text in the side panel's preview">Source</button>}
         {onReveal && <button onClick={onReveal}>Show in Finder</button>}
         {onExternal && <button onClick={onExternal}>Open in the browser</button>}
         {onFile && (
@@ -1710,8 +1711,9 @@ export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, o
     </Modal>
   )
 }
-// links: its .url files (what its agents published): first, a click opens them in the browser
-export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: string; n: number; links?: { path: string; url: string; title: string }[]; api: ArtifactsApi; onClose: () => void }) {
+// links: what its agents published (the daemon's links file): first in the folder itself, a click opens them in the
+// browser, a right click takes one off
+export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: string; n: number; links?: { path: string; url: string; title: string; at: number }[]; api: ArtifactsApi; onClose: () => void }) {
   const linkOf = (path: string) => links.find(l => l.path === path)
   const [menu, openMenu] = useMenu()
   const [files, setFiles] = useState<Artifact[] | null>(null)
@@ -1727,7 +1729,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   // dir's own files (links first, newest first, as listed) and its folders (each with its files' count, the newest first)
   const under = (f: Artifact) => !dir || f.path.startsWith(`${dir}/`)
   const rest = (f: Artifact) => (dir ? f.path.slice(dir.length + 1) : f.path)
-  const here = useMemo(() => files?.filter(f => under(f) && !rest(f).includes('/')) ?? null, [files, dir])
+  const here = useMemo(() => (files ? [...(dir ? [] : links.map(l => ({ path: l.path, size: 0, at: l.at }))), ...files.filter(f => under(f) && !rest(f).includes('/'))] : null), [files, dir, links])
   const folders = useMemo(() => {
     const m = new Map<string, { n: number; at: number }>()
     for (const f of files ?? []) {
@@ -1767,7 +1769,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   // a right click: a link's Open and Copy link, a file's the app's menu
   const rightClick = (e: MouseEvent, f: Artifact) => {
     const l = linkOf(f.path)
-    const items: MenuItem[] = l ? [{ label: 'Open in the browser', icon: 'globe', run: () => go(l.url) }, ...(a.copy ? [{ label: 'Copy link', icon: 'copy', key: 'c', run: () => a.copy!(l.url) } as MenuItem] : [])] : (a.menu?.(f.path) ?? [])
+    const items: MenuItem[] = l ? [{ label: 'Open in the browser', icon: 'globe', run: () => go(l.url) }, ...(a.copy ? [{ label: 'Copy link', icon: 'copy', key: 'c', run: () => a.copy!(l.url) } as MenuItem] : []), ...(a.unlink ? [null, { label: 'Remove the link', icon: 'trash', danger: true, run: () => void a.unlink!(l.url).catch(e => setErr(String(e?.message ?? e))) } as MenuItem] : [])] : (a.menu?.(f.path) ?? [])
     if (!items.length) return
     e.preventDefault()
     openMenu(e, items)
@@ -1816,7 +1818,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
         ) : (
           'Artifacts'
         )}{' '}
-        <span className="muted">{files ? files.filter(under).length : ''}</span>
+        <span className="muted">{files ? files.filter(under).length + (dir ? 0 : links.length) : ''}</span>
         <span className="grow" />
         {(a.reveal || a.files) && (
           <IconButton
@@ -1834,7 +1836,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
       </div>
       <div className="art-strip">
         {err && <span className="warn small">{err}</span>}
-        {files && !files.length && <span className="muted small">Nothing kept yet</span>}
+        {files && !files.length && !links.length && <span className="muted small">Nothing kept yet</span>}
         {folders.map(([name, x]) => (
           <button
             key={`dir:${name}`}
@@ -1868,15 +1870,26 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
         ))}
       </div>
       {at && here && (
-        <Modal title={`${at.path} · ${i + 1} of ${here.length}`} onClose={() => setBig(null)} wide loose>
+        <Modal title={`${linkOf(at.path)?.title ?? at.path} · ${i + 1} of ${here.length}`} onClose={() => setBig(null)} wide loose>
           <div className="art-big" onContextMenu={e => rightClick(e, at)}>
             {look(at, true)}
           </div>
           <div className="buttons">
-            <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
-            {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}
-            {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
-            {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
+            {(l =>
+              l ? (
+                // a kept link: no file to show in Finder or Files
+                <>
+                  <span className="muted small grow">{l.url} · {new Date(at.at).toLocaleString()}</span>
+                  <button onClick={() => go(l.url)}>Open in the browser</button>
+                </>
+              ) : (
+                <>
+                  <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
+                  {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}
+                  {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
+                  {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
+                </>
+              ))(linkOf(at.path))}
             <button aria-label="Previous" disabled={here.length < 2} onClick={() => step(-1)}>
               <Icon name="back" />
             </button>
@@ -1887,6 +1900,101 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
         </Modal>
       )}
       {menu}
+    </div>
+  )
+}
+
+// Reply to selected terminal text (Term's pill): the quote, a box for your words; Enter puts both in the agent's prompt
+// (unsent, for you to finish there), ⌘⏎ sends them (after its turn, if it's working). From a tab that isn't an agent's,
+// its workspace's agents: a pick when there are several. Esc or a click outside closes it
+export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from: TabView; text: string; at: { x: number; y: number }; to: TabView[]; onAdd: (to: TabView, msg: string) => Promise<unknown>; onSend: (to: TabView, msg: string) => Promise<unknown>; onClose: () => void }) {
+  const [words, setWords] = useState('')
+  const [pick, setPick] = useState(to[0]?.id)
+  const [busy, setBusy] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose) // App's is new each render: the listeners stay put
+  close.current = onClose
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), close.current())
+    const click = (e: globalThis.MouseEvent) => !box.current?.contains(e.target as Node) && close.current()
+    window.addEventListener('keydown', key, true) // before the terminal under it
+    window.addEventListener('mousedown', click, true)
+    return () => (window.removeEventListener('keydown', key, true), window.removeEventListener('mousedown', click, true))
+  }, [])
+  const target = to.find(t => t.id === pick) ?? to[0]
+  const msg = () => replyText(text, words, target?.id === from.id ? undefined : from.name)
+  const go = (send: boolean) => {
+    if (!target || busy) return
+    setBusy(true)
+    ;(send ? onSend(target, msg()) : onAdd(target, `${msg()}${words.trim() ? '' : '\n'}`)).then(onClose, () => setBusy(false))
+  }
+  const lines = text.trim().split('\n')
+  const low = at.y > innerHeight * 0.55
+  return (
+    <div ref={box} className="tunnel-pop reply-pop" role="dialog" aria-label="Reply" style={{ left: Math.max(8, Math.min(at.x - 20, innerWidth - 428)), ...(low ? { bottom: innerHeight - at.y + 12 } : { top: at.y + 16 }) }}>
+      <pre className="reply-quote">
+        {lines.slice(0, 6).join('\n')}
+        {lines.length > 6 && `\n… ${lines.length - 6} more line${lines.length === 7 ? '' : 's'}`}
+      </pre>
+      <textarea
+        autoFocus
+        rows={3}
+        value={words}
+        placeholder={`Your reply to ${target?.name ?? 'the agent'}`}
+        onChange={e => setWords(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), go(e.metaKey || e.ctrlKey))}
+      />
+      <div className="row">
+        {to.length > 1 ? (
+          <select value={target?.id} onChange={e => setPick(e.target.value)} aria-label="To">
+            {to.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="muted small">{target ? `To ${target.name}` : 'No agent runs here now'}</span>
+        )}
+        <span className="spacer" />
+        <button disabled={busy || !target} onClick={() => go(false)} data-tip="Into its prompt, unsent: you finish it there (Enter)">
+          Add to prompt
+        </button>
+        <button className="primary" disabled={busy || !target} onClick={() => go(true)} data-tip="Send it now, or after its turn if it's working (⌘⏎)">
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// laki show: what the tab's agent put there for you (the view's card), under its terminal like the queue: its words and
+// a button per thing to open, which opens only on your click (a folder in Finder, a file in its app, a page in the
+// browser); ✕ closes it. In a browser elsewhere (no bridge) a path's button copies it
+export function ShowStrip({ tab, onClose, onCopy }: { tab: TabView; onClose: () => void; onCopy: (text: string) => void }) {
+  const c = tab.card
+  if (!c) return null
+  const go = (o: (typeof c.open)[number]) => (o.kind === 'url' ? openExternal(o.target) : bridge?.openPath ? void bridge.openPath(o.target) : onCopy(o.target))
+  return (
+    <div className="queue-strip show-strip" role="region" aria-label={`${tab.name} shows you`}>
+      <div className="queue-head">
+        <Icon name="agent" size={13} />
+        <span className="queue-what">
+          <b>{tab.name}</b> · {c.title ?? 'for you'}
+        </span>
+        <span className="grow" />
+        <IconButton icon="x" title="Close it" onClick={onClose} />
+      </div>
+      {c.text && <div className="show-text">{c.text}</div>}
+      {c.open.length > 0 && (
+        <div className="show-open">
+          {c.open.map((o, i) => (
+            <button key={i} className={i ? '' : 'primary'} data-tip={o.target} onClick={() => go(o)}>
+              <Icon name={o.kind === 'url' ? 'globe' : o.kind === 'folder' ? 'folder' : 'file'} size={13} /> {o.kind !== 'url' && !bridge?.openPath ? `Copy ${o.kind === 'folder' ? 'its path' : o.target.split('/').pop()}` : o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

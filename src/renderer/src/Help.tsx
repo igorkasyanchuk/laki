@@ -15,12 +15,13 @@ type Sec = { id: string; title: string; kind?: 'list' | 'pre'; items: Item[] }
 
 const GUIDE = `${REPO}/blob/main/docs/guide.md`
 
-// m: the keys in use (Settings › Keys)
-const keysOf = (m: KeyMap): [string, string][] => {
+// m: the keys in use (Settings › Keys); g: the global hotkeys in use ('' none or off)
+export type GlobalKeys = { open: string; shot: string }
+const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
   const k = (id: KeyId) => keyShow(m[id]) || 'none'
   return [
-    ['⌃⌥⌘L', 'from any app: bring Laki forward (Settings › General › Global hotkey)'],
-    ['⌃⌥⌘S', 'from any app, when on: a part of the screen to Laki AI, the mic listening (Settings › General › Global hotkey)'],
+    [keyShow(g.open) || 'none', 'from any app: bring Laki forward (Settings › Keys › Global hotkey)'],
+    [keyShow(g.shot) || 'none', 'from any app: a part of the screen to Laki AI, the mic listening; the menu bar has it too (Settings › Keys › Global hotkey)'],
     ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
     [k('newWs'), 'new workspace'],
     [`${k('newTab')} / ${k('closeTab')}`, 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],
@@ -37,7 +38,8 @@ const keysOf = (m: KeyMap): [string, string][] => {
     [k('find'), 'find in the terminal or a diff (here: the filter)'],
     ['⌘S', "save the file you're editing in the preview"],
     ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
-    ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes"],
+    ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes: a GitHub PR or issue shows its card, a picture's path or link the picture"],
+    ['select · Reply', "in a terminal: the pill under the selected text quotes it to the agent (from a shell, the workspace's) with your words; ⏎ puts both in its prompt, ⌘⏎ sends them"],
     ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
     ['⌥-double-click · ⌥-drag', "select in a terminal where the app takes the mouse (Claude Code's fullscreen mode): Laki's selection, copied without the dot after a word"],
     ['⌘D', 'changes against the base branch'],
@@ -89,7 +91,7 @@ const Row = ({ id, k, children }: { id?: string; k: ReactNode; children: ReactNo
   </div>
 )
 
-export function HelpPage({ cli, ship, zoom = 1, keys, onClose }: { cli: string; ship?: boolean; zoom?: number; keys: KeyMap; onClose: () => void }) {
+export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: string; ship?: boolean; zoom?: number; keys: KeyMap; global: GlobalKeys; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<{ sec?: string; row?: string }>({}) // ids in view
   const main = useRef<HTMLDivElement>(null)
@@ -149,7 +151,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, onClose }: { cli: string; 
         'When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.',
       ].map((v, i) => ({ v, n: i + 1 })),
     },
-    { id: 'keys', title: 'Keys', items: [...keysOf(keys).map(([k, v]) => ({ k: kbds(k), v })), { note: true, v: 'Settings › Keys changes the keys of most of these. Hold ⌘ alone a moment to see them beside the buttons, tabs and rows they go to.' }] },
+    { id: 'keys', title: 'Keys', items: [...keysOf(keys, global).map(([k, v]) => ({ k: kbds(k), v })), { note: true, v: 'Settings › Keys changes the keys of most of these. Hold ⌘ alone a moment to see them beside the buttons, tabs and rows they go to.' }] },
     {
       id: 'status',
       title: 'Status',

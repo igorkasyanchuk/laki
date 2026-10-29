@@ -701,9 +701,12 @@ test('the primary PR and related links: an agent’s new session keeps its promp
   // the info panel's ✕: that one off (any case)
   await rig.rpc('wsSet', { id: review.id, unrelate: issue.replace('o/r', 'O/R') })
   assert.deepEqual((await wsOf(review.id)).related, ['https://github.com/o/r/pull/15000'])
-  // a branch's own PR stays its PR; attached over it, it's related
+  // a branch's own PR: detached, kept off (a scan doesn't bring it back, prOff) until attached again; attached over it, it's related
   await until(async () => (await wsOf(fix.id)).pr, "the fix's own branch PR")
-  await assert.rejects(rig.rpc('prDetach', { ws: fix.id }), /its PR is its branch's: it stays/)
+  const own = (await wsOf(fix.id)).pr.url
+  await rig.rpc('prDetach', { ws: fix.id })
+  await rig.rpc('prRefresh')
+  assert.deepEqual([(await wsOf(fix.id)).pr, (await wsOf(fix.id)).prOff, (await wsOf(fix.id)).related], [undefined, own, [old, own]])
   writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 5, title: 'Five', url: 'https://github.com/o/r/pull/5', headRefName: 'five', baseRefName: 'main', isCrossRepository: false }))
   await rig.rpc('prAttach', { ws: fix.id, pr: '5' })
   assert.deepEqual([(await wsOf(fix.id)).prUrl, (await wsOf(fix.id)).related], ['https://github.com/o/r/pull/5', [old, 'https://github.com/o/r/pull/15000']])
@@ -771,4 +774,22 @@ test("who reviewed a PR (each one's last approval or ask for changes; a comment 
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /-f id=PR_kw9 -f path=a.ts -f query=mutation[^\n]*unmarkFileAsViewed/)
   rmSync(join(gh, 'graphql.json'))
   await assert.rejects(rig.rpc('prViewed', { ws: ws.id, path: 'a.ts', viewed: true, id: 'PR_kw9' }), /gh: |not found/)
+})
+
+test("ghCard: a PR's or issue's card by its link (gh, kept a minute); other links refused, gh's failure said", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh, { recursive: true })
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 12, title: 'Add CSV export', state: 'OPEN', isDraft: true, author: { login: 'ann' }, additions: 40, deletions: 3, changedFiles: 2, updatedAt: '2026-10-29T10:00:00Z', labels: [{ name: 'feature', color: '0e8a16' }], reviewDecision: 'REVIEW_REQUIRED' }))
+  const pr = await rig.rpc('ghCard', { url: 'https://github.com/o/r/pull/12/files' })
+  assert.deepEqual(pr, { kind: 'pr', repo: 'o/r', url: 'https://github.com/o/r/pull/12', number: 12, title: 'Add CSV export', state: 'open', draft: true, author: 'ann', at: '2026-10-29T10:00:00Z', labels: [{ name: 'feature', color: '0e8a16' }], add: 40, del: 3, files: 2, review: 'REVIEW_REQUIRED' })
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 12, title: 'changed', state: 'MERGED' }))
+  assert.equal((await rig.rpc('ghCard', { url: 'https://github.com/o/r/pull/12' })).title, 'Add CSV export') // kept a minute
+  writeFileSync(join(gh, 'issue.json'), JSON.stringify({ number: 7, title: 'Login loops', state: 'CLOSED', author: { login: 'bo' }, labels: [], comments: [{}, {}, {}] }))
+  const issue = await rig.rpc('ghCard', { url: 'https://github.com/o/r/issues/7#issuecomment-1' })
+  assert.deepEqual([issue.kind, issue.state, issue.comments, issue.labels], ['issue', 'closed', 3, undefined])
+  await assert.rejects(rig.rpc('ghCard', { url: 'https://github.com/o/r/pull/12x' }), /not a link to a GitHub pull request or issue/)
+  await assert.rejects(rig.rpc('ghCard', { url: 'https://gitlab.com/o/r/pull/1' }), /not a link/)
+  rmSync(join(gh, 'issue.json'))
+  await assert.rejects(rig.rpc('ghCard', { url: 'https://github.com/o/r/issues/8' }), /Issue #8 not found/)
 })
