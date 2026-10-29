@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.35.0 · Oct 29, 2026
 
 - Settings › Appearance › Interface: one *Text size* (9–16) for tabs, menus, dropdowns, the status bar and tooltips, and
   the font: Laki's own, the developer fonts (the terminal's) or any on your Mac, with a live preview. *Sidebar*: its own font, the project names' font, sizes 9
