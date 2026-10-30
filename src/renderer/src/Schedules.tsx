@@ -6,7 +6,7 @@ import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { ask, Icon, IconButton, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { ask, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Schedule>): Promise<Schedule>
@@ -306,9 +306,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             <div className="sched-list">
               {schedules.map(s => (
                 <div key={s.id} className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
-                  <span className="sched-icon">
-                    <Icon name={s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal'} />
-                  </span>
+                  {((k: IconName) => (
+                    <span className="sched-icon" data-kind={k}>
+                      <Icon name={k} />
+                    </span>
+                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
                   <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
                     <span className="sched-name">{s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt)}</span>
                     <span className="sched-meta">

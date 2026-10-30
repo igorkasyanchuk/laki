@@ -33,7 +33,8 @@ time and AI money per run (`budget: 60 min, $5`).
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Orchestrate**: the orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
-  a workspace each, follow them up and bring their reports together.
+  a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
+  makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; their dev servers' ports in the status bar (not
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an

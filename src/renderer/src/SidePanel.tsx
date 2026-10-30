@@ -287,7 +287,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: Pan
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
       <div className="sp-body" ref={findAt} data-find>
-        <DiffFind at={findAt} />
+        <DiffFind at={findAt} unfold={w => setOpen(o => (n => (n.size === o.size ? o : n))(new Set([...o, ...[...byFile].filter(([, fd]) => fd.hunks.some(h => h.toLowerCase().includes(w))).map(([p]) => p)])))} />
         {err && <div className="warn small pad">{err}</div>}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
         {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}

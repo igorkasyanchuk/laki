@@ -13,14 +13,14 @@
 // click); the PR's own description is the comments column's PR tab. Read again as the workspace's stat moves.
 // Keys: j/k the next or last file, v Viewed, b blame, p pin, c a comment (the line under the mouse, else the file's
 // first change), ⌘⏎ sends to the agent.
-import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
 import { globTest } from '../../shared/widgetSchema'
 import { atHead, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
-import { Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
+import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
@@ -39,11 +39,12 @@ const VIEWED = 'laki.reviewed' // each workspace's files viewed here: path → i
 const FILES_W = 'laki.reviewFilesW' // the files' column's width
 const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
 const NOTES_OFF = 'laki.reviewNotesOff' // true: the comments hidden to a strip
+const FILES_OFF = 'laki.reviewFilesOff' // true: the files hidden to a strip, likewise
 const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
 const PINS = 'laki.reviewPins' // each workspace's pinned files, in the order pinned
 const FILES_INIT = 220
 const NOTES_INIT = 300
-const STRIP = 28 // the hidden comments' strip
+const STRIP = 28 // a hidden column's strip: the files', the comments'
 const readAll = <T,>(k: string) => load<Record<string, T>>(k, {})
 const keepFor = <T,>(k: string, ws: string, v: T | undefined) => store(k, { ...readAll<T>(k), [ws]: v }) // undefined: dropped by JSON
 const hash = (s: string) => {
@@ -68,22 +69,6 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
-
-// an edge between two columns: dragged (to: the pointer's x in the columns' box), double-clicked back to its width
-function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {
-  const held = (e: PointerEvent<HTMLDivElement>) => e.currentTarget.hasPointerCapture(e.pointerId)
-  return (
-    <div
-      className={`fr-edge ${'right' in x ? 'r' : ''}`}
-      style={x}
-      data-tip="Drag to resize · double-click to reset"
-      onPointerDown={e => (e.currentTarget.setPointerCapture(e.pointerId), e.preventDefault())}
-      onPointerMove={e => held(e) && to(e.clientX, e.currentTarget.parentElement!.getBoundingClientRect())}
-      onLostPointerCapture={done}
-      onDoubleClick={reset}
-    />
-  )
-}
 
 export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree) // Diff.tsx: Branch, Uncommitted, PR #n
@@ -354,7 +339,7 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
         icon: 'checks',
         items: [
           ...dirs.map(dir => (n => ({ label: `Everything in ${dir}/`, icon: 'folder', sub: `${n} file${n === 1 ? '' : 's'}`, run: () => mark(inFolder(dir), true) }) as MenuItem)(inFolder(dir).length)),
-          { label: 'Files matching a pattern…', icon: 'filter', sub: 'the filter, then Mark viewed', run: () => (setQ(dirs.length ? `${dirs.at(-1)}/**` : /\.[^.]+$/.exec(p) ? `*${/\.[^.]+$/.exec(p)![0]}` : '*'), setTimeout(() => filterBox.current?.select(), 0)) },
+          { label: 'Files matching a pattern…', icon: 'filter', sub: 'the filter, then Mark viewed', run: () => (hideFiles(false), setQ(dirs.length ? `${dirs.at(-1)}/**` : /\.[^.]+$/.exec(p) ? `*${/\.[^.]+$/.exec(p)![0]}` : '*'), setTimeout(() => filterBox.current?.select(), 0)) },
         ],
       },
       ...(api.fileItems && !gone ? [null, { label: 'Open in, copy path', icon: 'popOut', items: api.fileItems(p).filter(x => !(x && 'head' in x)) } as MenuItem] : []),
@@ -399,10 +384,13 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
   const [nw, setNw] = useState(() => load(NOTES_W, NOTES_INIT))
   const [notesOff, setNotesOff] = useState(() => load(NOTES_OFF, false))
   const hideNotes = (off: boolean) => (setNotesOff(off), store(NOTES_OFF, off))
+  const [filesOff, setFilesOff] = useState(() => load(FILES_OFF, false))
+  const hideFiles = (off: boolean) => (setFilesOff(off), store(FILES_OFF, off))
   const [side, setSide] = useState<'mine' | 'pr' | 'gh'>(() => load<'mine' | 'pr' | 'gh' | ''>(SIDE, '') || (notes.length || !pr ? 'mine' : 'gh'))
   const pickTab = (s: 'mine' | 'pr' | 'gh') => (setSide(s), store(SIDE, s))
   const tab = pr ? side : 'mine'
   const right = notesOff ? STRIP : nw
+  const left = filesOff ? STRIP : fw
 
   const add_ = files.reduce((n, f) => n + (f.add ?? 0), 0)
   const del_ = files.reduce((n, f) => n + (f.del ?? 0), 0)
@@ -445,7 +433,15 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
-      <div className="fr-cols" style={{ gridTemplateColumns: `${fw}px minmax(0, 1fr) ${right}px` }}>
+      <div className="fr-cols" style={{ gridTemplateColumns: `${left}px minmax(0, 1fr) ${right}px` }}>
+        {filesOff ? (
+          <button type="button" className="fr-strip left" onClick={() => hideFiles(false)} data-tip="Show the files">
+            <Icon name="files" />
+            <span className="fr-vert">
+              Files · {nViewed} of {files.length} viewed
+            </span>
+          </button>
+        ) : (
         <div className="fr-files">
           <div className="fr-filter">
             <Icon name="filter" />
@@ -458,6 +454,7 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
               onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), q ? setQ('') : e.currentTarget.blur())}
               data-tip="Words in a path, or a glob: spec/**, *.rb, **/*_test.go (no /: the file's name)"
             />
+            <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
           </div>
           <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
             <span className="grow">
@@ -486,9 +483,10 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
           ))}
           {query && !listed.length && <div className="muted small pad">No file matches.</div>}
         </div>
-        <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} />
+        )}
+        {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} />}
         <div className="fr-diff" ref={body} onScroll={() => requestAnimationFrame(spy)}>
-          <DiffFind at={root} within={body} />
+          <DiffFind at={root} within={body} unfold={w => setShown(files.filter(f => !shown(f.path) && byFile.get(f.path)?.hunks.some(h => h.toLowerCase().includes(w))).map(f => f.path), true)} />
           {err && <div className="warn small pad">{err}</div>}
           {gh.err && <div className="warn small pad">{gh.err}</div>}
           {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}</div>}
@@ -572,7 +570,7 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
           </button>
         ) : (
           <>
-            <Edge x={{ right: nw }} to={(x, box) => setNw(Math.round(Math.max(200, Math.min(box.right - x, 720, box.width - fw - 320))))} done={() => store(NOTES_W, nw)} reset={() => (setNw(NOTES_INIT), store(NOTES_W, NOTES_INIT))} />
+            <Edge x={{ right: nw }} to={(x, box) => setNw(Math.round(Math.max(200, Math.min(box.right - x, 720, box.width - left - 320))))} done={() => store(NOTES_W, nw)} reset={() => (setNw(NOTES_INIT), store(NOTES_W, NOTES_INIT))} />
             <div className="fr-notes">
               <div className="fr-notes-head">
                 {pr ? (

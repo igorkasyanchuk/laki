@@ -7,7 +7,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ago } from './Info'
 import { SpecEditor } from './SpecEditor'
-import { ask, colorVar, Icon, IconButton, type MenuItem, Page, TAB_COLORS, useMenu } from './ui'
+import { ask, colorVar, Edge, Icon, IconButton, keep, load as stored, type MenuItem, Page, TAB_COLORS, useMenu, usePageSide } from './ui'
+
+const SIDE_W = 'laki.notesW' // the list's width
+const SIDE_INIT = 290
 
 type Item = { id: string; title: string; color?: string; pinned?: boolean; preview: string; created: number; at: number }
 type Note = Item & { blocks: unknown[]; md: string }
@@ -30,6 +33,8 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const [q, setQ] = useState('')
   const [only, setOnly] = useState<string | null>(null) // a color: only those
   const [err, setErr] = useState('')
+  const [sideW, setSideW] = useState(() => stored(SIDE_W, SIDE_INIT))
+  const [side, sideBtn] = usePageSide('notes')
   const [menu, openMenu] = useMenu()
   const qNow = useRef(q)
   qNow.current = q
@@ -65,6 +70,12 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   return (
     <Page
       title="Notes"
+      head={
+        <>
+          {sideBtn}
+          <b>Notes</b>
+        </>
+      }
       wide
       esc={false} /* a page to stay on, as the rail's others: Esc never closes it (the editor's own Esc) */
       onClose={onClose}
@@ -76,7 +87,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
     >
       {menu}
       <div className="notes">
-        <aside className="notes-side">
+        <aside className="notes-side" hidden={!side} style={{ width: sideW }}>
           <div className="notes-find find-field">
             <Icon name="search" size={13} />
             <input value={q} placeholder="Search notes" spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && q && (e.preventDefault(), setQ(''))} />
@@ -104,6 +115,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
             ))}
           </div>
         </aside>
+        {side && <Edge x={{ left: sideW }} to={(x, box) => setSideW(Math.round(Math.max(200, Math.min(x - box.left, 560, box.width - 360))))} done={() => keep(SIDE_W, sideW)} reset={() => (setSideW(SIDE_INIT), keep(SIDE_W, SIDE_INIT))} />}
         {open ? (
           <NoteEdit key={open} id={open} meta={list?.find(x => x.id === open)} api={api} onSaved={saved} colorItems={colorItems} onRemove={remove} openMenu={openMenu} />
         ) : (

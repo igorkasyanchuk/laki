@@ -112,7 +112,7 @@ async function aboutWidget(id: string) {
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
 // and the skill's
-const toolsFor = (to: Rpc, chat: string, rpc = aiRpc(to, chat)) => [...tools(rpc, undefined, 'Laki AI').filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])] // its looks said as its own (aiRpc)
+const toolsFor = (to: Rpc, chat: string, rpc = aiRpc(to, chat)) => [...tools(rpc, undefined, 'Laki AI').filter(t => !['laki_progress', 'laki_memory', 'laki_remember', 'laki_name'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])] // its looks said as its own (aiRpc)
 
 // ---------- the key: a file only you can read, never in state.json or the view
 

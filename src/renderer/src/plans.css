@@ -471,16 +471,17 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .plans-bar input { flex: 1 1 220px; width: auto; min-width: 0; }
 .plans-bar select { flex: none; width: auto; max-width: 220px; }
 .plans-bar button { display: inline-flex; align-items: center; gap: 5px; }
-.plans-rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--rs, 8px); overflow: hidden; }
-.plans-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; text-align: left; border: none; border-radius: 0; background: none; color: var(--fg); cursor: pointer; }
+.plans-rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: calc(var(--radius) + 4px); background: var(--panel); overflow: hidden; }
+.plans-row { --ic: var(--accent); display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; text-align: left; border: none; border-radius: 0; background: none; color: var(--fg); cursor: pointer; }
 .plans-row + .plans-row { border-top: 1px solid var(--line); }
 .plans-row:hover { background: var(--hover); }
-.plans-row .icon-svg { flex: none; color: var(--muted); }
-.plans-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plans-meta { flex: none; }
+.plans-row > .icon-svg { flex: none; box-sizing: content-box; padding: 9px; border-radius: calc(var(--radius) + 2px); color: var(--ic); background: color-mix(in srgb, var(--ic) 16%, transparent); } /* in a tile of its kind's color */
+.plans-row.brainstorm { --ic: var(--waiting); }
+.plans-title { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plans-meta { flex: none; font-size: 12.5px; }
 .plans-kinds { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .plans-kinds .seg button { display: inline-flex; align-items: center; gap: 5px; }
-.plans-kind { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--muted); border: 1px solid var(--line); }
+.plans-kind { flex: none; padding: 1px 8px; border-radius: 999px; font-size: 12px; color: var(--muted); border: 1px solid var(--line); }
 .plans-kind.brainstorm { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
 .plans-kind.spec { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .plans-empty { padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--rs, 8px); line-height: 1.5; }

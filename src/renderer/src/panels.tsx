@@ -1540,9 +1540,7 @@ export function Ready({ name, branch, project, actions, later }: { name: string;
         <span className="ready-mark">
           <img src={icon} alt="" />
         </span>
-        <span className="ready-chip">
-          <i /> Ready{project && <span className="muted"> · {project}</span>}
-        </span>
+        {project && <span className="ready-proj">{project}</span>}
         <h1>{name}</h1>
         <p className="muted">
           {branch ? (

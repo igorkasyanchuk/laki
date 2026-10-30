@@ -10,7 +10,7 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    on a new daemon method or behavior (AGENTS.md, API).
 3. Check:
    ```bash
-   npm install
+   npm ci
    npm run typecheck
    npm test
    ```

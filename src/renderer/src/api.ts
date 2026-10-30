@@ -24,7 +24,7 @@ type Bridge = {
   openFile?(path: string, root: string): Promise<'opened' | 'missing'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
   dictate?(): void
   dictationSettings?(): void
-  glass?(on: boolean): void
+  glass?(on: boolean, light?: boolean): void
   fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)

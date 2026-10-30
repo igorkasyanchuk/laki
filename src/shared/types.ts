@@ -173,6 +173,7 @@ export type Workspace = {
   muted?: boolean // no notifications from its tabs
   pinned?: boolean // the sidebar shows it above the projects, under Pinned
   railPin?: number // on the rail, after a line, for a quick click (RAIL_PINS at most): when it was pinned, their order
+  icon?: string // its rail pin's (an ICONS name or an emoji, kept by wsSet), over its initials or a terminal's mark
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
   autoMerge?: boolean // merge conflicts with the PR's base go to the agent
@@ -376,7 +377,10 @@ export type Tab = {
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
   usedAt?: number // made, or its agent's last turn or ask (ms): one unused past sleepAfter stays asleep after a restart (restoreAll)
   script?: RunScript // a script tab's (kind script): which RUN_SCRIPTS one, whatever it's named
+  alias?: string // its @name (laki name, ALIAS): other agents send and ask to @name, wherever it runs; one live tab each
 }
+
+export const ALIAS = /^[a-z][a-z0-9-]{0,23}$/ // an agent's @name: a word, lowercase, dashes
 
 // a few words of what a prompt asks, for a tab's name: its first line less links (a GitHub PR's or issue's is #n), flags,
 // Markdown, a leading "please" and a trailing "the"; a path is its file's name; "" when nothing's left
@@ -547,6 +551,7 @@ export type Settings = {
   memoryCompact?: { on?: boolean; days?: number } // on (unless false; it sends them to Laki AI's model): agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; else only Compact now
   flowVars?: Record<string, string> // workflows' global variables, {{vars.NAME}} in every one (a workflow's own var lines win)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
+  design?: Design // the window's frame: cards, tiles, sections… (unset: classic)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
@@ -629,6 +634,7 @@ export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* a
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
 export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
+export type Design = 'classic' | 'sections' | 'cards' | 'inset' | 'tiles' | 'soft' // Settings.tsx DESIGNS, styles.css' Design block
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type ScriptRun = { ws: string; name: string; project: string; kind: 'setup' | 'teardown'; cmd: string; at: number; secs: number; code: number | null; text: string } // scriptLogs': a setup's or teardown's run (development mode)
@@ -683,7 +689,7 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
 export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; used?: boolean; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number } // via tailscale: tailscale serve, the tailnet's devices only; funnel: tailscale funnel, the internet (with a PIN); used: the link was opened (it works once); peers: the tailnet's other devices online as it started
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
-export const STORAGE_DAYS = 90 // Settings › General › Storage's Delete files after (core.ts storageTidy)
+export const STORAGE_DAYS = 0 // Settings › General › Storage's Delete files after (core.ts storageTidy): never unless you pick a time (0.35 had 90)
 export const IMAGE_DAYS = 30 // days a pasted image or an attached file is kept (<data>/images, <data>/files: Laki AI's chats, prompts) unless Settings › AI says otherwise
 export const FILE_MAX = 25 << 20 // an attached file's bytes at most (fileSave; PromptInput checks first: past the socket's maxPayload, its connection drops)
 // an earlier chat of the AI page's (New chat keeps the one it ends): its file's name, its first ask, its last message, its messages
@@ -873,5 +879,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 124
+export const API = 125
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

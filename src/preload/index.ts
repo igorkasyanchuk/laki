@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('laki', {
   openFile: (path: string, root: string): Promise<'opened' | 'missing'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
-  glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
+  glass: (on: boolean, light?: boolean) => ipcRenderer.send('glass', on, light), // the window's blur behind see-through backgrounds
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it

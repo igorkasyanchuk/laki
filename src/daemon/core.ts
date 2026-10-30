@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, type Agent, AGENTS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { actionSlug, againOnEnter, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
@@ -326,6 +326,7 @@ const LAKI_NOTE = () =>
 - \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
+- \`laki name <name>\`, \`laki agents\`, \`laki ask @<name> "<question>"\` (prints its reply), \`laki send @<name> "<text>"\`: talk to other agents in Laki by name, when the user asks you to work with them.
 - \`laki show "<what to look at>" --open <folder|file|url>\`: a card under your tab in Laki with a button that opens it (a folder in Finder, a file in its app, a page in the browser), instead of asking the user to run \`open …\`; \`--open\` again for more (4 at most).
 - ${STORAGE_NOTE}${widgetTools().length ? TOOLS_NOTE : ''}`
 // laki show: an agent's card under its tab (Card), one a tab (a newer one replaces it), kept in memory until you close
@@ -706,6 +707,12 @@ export function findTab(id: string): Tab {
 export function resolveTarget(ref: string): Tab {
   const direct = state.tabs.find(t => t.id === ref)
   if (direct) return direct
+  if (ref.startsWith('@')) {
+    // an agent's @name (laki name), in any workspace
+    const named = state.tabs.find(t => t.alias === ref.slice(1).toLowerCase())
+    if (!named) throw new Error(`no agent is named ${ref} (laki agents lists the names)`)
+    return named
+  }
   const [wref, tref] = ref.split('/')
   const ws = findWs(wref)
   const tabs = tabsOf(ws.id)
@@ -1431,8 +1438,15 @@ function titleFrom(tab: Tab, prompt: unknown) {
   save()
 }
 
-export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean }) {
+export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean; alias?: string }) {
   const t = findTab(o.id)
+  // its @name: one live tab each (an ended agent's goes to the new one); '' drops it
+  const alias = typeof o.alias === 'string' ? o.alias.trim().replace(/^@/, '').toLowerCase() : undefined
+  if (alias && !ALIAS.test(alias)) throw new Error(`@${alias}: a name is a word of letters, digits and dashes, 24 at most, starting with a letter`)
+  const had = alias ? state.tabs.find(x => x.alias === alias && x.id !== t.id) : undefined
+  if (had && tabStatus(had.id) !== 'exited') throw new Error(`@${alias} is taken: ${had.name} in ${had.workspace} has it`)
+  if (had) had.alias = undefined
+  if (alias !== undefined) t.alias = alias || undefined
   if (o.name?.trim()) (t.name = o.name.trim().slice(0, 40)), (t.titled = true)
   if (o.color !== undefined) t.color = o.color || undefined
   if (o.muted !== undefined) t.muted = o.muted || undefined
@@ -1444,7 +1458,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
   const w = findWs(o.id)
   // a later start: null cancels it (the workspace stays, no agent), at moves it (or to the limit's reset), prompt
   // changes what it says; start: now
@@ -1452,6 +1466,8 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.start && w.archived) throw new Error(`${w.id} is archived: restore it first`) // its folder went with the archive
   if (o.pending?.at !== undefined) startCheck(o.pending.at, w.pending!.preset, presetNamed(w.pending!.preset)?.agent ?? w.pending!.preset)
   if (o.railPin && !w.railPin && railTaken() >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
+  if (o.icon !== undefined && o.icon !== '' && !isIconName(o.icon) && !emojiOf(o.icon)) throw new Error("a workspace's icon is an icon's name or an emoji")
+  if (o.icon !== undefined) w.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon) // '': none, its initials again
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
@@ -2222,6 +2238,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   stopTunnels(ws.id) // one started during the teardown
   stopShares({ ws: ws.id })
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id || t.kind === 'agent' || t.kind === 'shell')
+  for (const t of state.tabs) if (t.workspace === ws.id) delete t.alias // an @name is a working agent's: free again
   save()
   changed()
   widgetEvent('workspace.archived', causeRun(o), ws.id, undefined, causeEv(callerAgent(o.from) ?? o.agent, o))

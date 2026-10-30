@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -460,8 +460,11 @@ ipcMain.on('full-screen', (e, on: boolean) => {
   if (!on) focusFull = null
 })
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
-ipcMain.on('glass', (e, on: boolean) => {
+ipcMain.on('glass', (e, on: boolean, light?: boolean) => {
   if (!from(e)) return
+  // the blur takes the window's appearance: a light theme's over a dark Mac's blur is grey under its dark text and icons.
+  // ponytail: app-wide, so pages that follow prefers-color-scheme (an artifact, an extension's) follow the theme meanwhile
+  nativeTheme.themeSource = on ? (light ? 'light' : 'dark') : 'system'
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })

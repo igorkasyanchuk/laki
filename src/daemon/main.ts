@@ -255,7 +255,7 @@ const api: Record<string, Handler> = {
   reminderRm: p => core.reminderRm(p),
   reminderTick: p => core.reminderTick(p.now), // tests move the clock
   tabClose: p => core.closeTab(p.id),
-  tabSet: p => core.tabSet(p),
+  tabSet: ({ from: _, ...p }) => core.tabSet(p), // from: whoCalls' (an agent names its own tab only: agentNo)
   settingsSet: ({ from: _, ...p }) => core.settingsSet(p), // from: whoCalls', not a setting
   storageInfo: () => core.storageInfo(), // Settings › General › Storage: its folder and size
   storageTidy: p => core.storageTidy(p.now), // tests move the clock
@@ -306,7 +306,7 @@ const api: Record<string, Handler> = {
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
   artifactList: p => core.artifactList(p.ws),
-  linkRm: p => core.linkRm(p.ws, String(p.url ?? '')), // a kept link taken off (the gallery's right click)
+  linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), core.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
   fileWrite: p => core.fileWrite(p),
   hunkUndo: p => core.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
   fileUndo: p => core.fileUndo(p),
@@ -465,7 +465,7 @@ const api: Record<string, Handler> = {
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
 const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'presetSave']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets
-const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button)
+const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
@@ -480,7 +480,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['show', 'presetSave', 'wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk'])
+const FROM = new Set(['show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -531,6 +531,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
+  else if (method === 'tabSet' && p.alias !== undefined && p.from?.tab !== p.id) notAgent(p, "name another agent's tab (laki name names your own)") // else it could take a name and its messages
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }
 // M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
@@ -571,10 +572,13 @@ async function presetAsk(p: any) {
   const what = p.rm ? 'remove' : p.add ? 'add' : 'change'
   if (!core.clients.size) throw new Error(`to ${what} a profile the user says yes in Laki's window, and it isn't open: ask them to do it in Settings › Agents & profiles`)
   const was = core.presets().find(x => x.name === name)
-  const text = p.rm ? JSON.stringify(was ?? { name }, null, 2) : JSON.stringify({ ...(was ?? { name, agent: 'claude' }), ...(p.set ?? {}) }, null, 2)
+  // the whole of it, never cut: a long value (a model's name) would push a mode that never asks out of sight
+  const set = p.set && typeof p.set === 'object' ? p.set : {}
+  const whole = JSON.stringify(p.rm ? (was ?? { name }) : { ...(was ?? { name, agent: 'claude' }), ...set }, null, 2)
+  const text = p.rm || !Object.keys(set).length ? whole : `What changes:\n${JSON.stringify(set, null, 2)}\n\nThe profile then:\n${whole}`
   const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
   const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text: text.slice(0, 2000), ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text, ws: by, tab: p.from.tab })
   if (how !== 'once') throw new Error(`${what} the profile ${name}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string | null = p.target, text = p.text) {
@@ -594,9 +598,14 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
   else if (how !== 'once') throw new Error(`${tab ? `${tab.name} is in ${name(to)}` : `${what} is for ${name(to)}`}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 
+// the ticks' now (storageTidy, archivedTidy, scheduleTick…): a test's daemon only (the rig's LAKI_TEST_PARENT); any
+// other caller's clock is the Mac's, else a date years ahead deletes every storage folder's files at once
+const TEST_CLOCK = !!process.env.LAKI_TEST_PARENT && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's daemon that takes none (api.test's)
+
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
+  if (!TEST_CLOCK && params && typeof params === 'object' && 'now' in params) params = { ...params, now: undefined }
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   if (sock) params = await whoCalls(sock, method, params)
   if (sock) agentNo(method, params ?? {})

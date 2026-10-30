@@ -33,7 +33,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
                                               a new tab; with a prompt, its agent starts on it
-  laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
+  laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
+  laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
+  laki agents                                 the named agents, wherever they run
+  laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki show <text> [--open <folder|file|url>…] [--title t]   in a tab: a card under it in Laki, a button per --open
                                               (a folder in Finder, a file in its app, a page in the browser)
@@ -126,7 +129,21 @@ something (status waiting: a permission prompt), the text would answer it: leave
 From an agent's tab, a tab in another workspace: the user is asked in the app first.
 
   laki send a1b2 "Now add tests for it"
-  laki send a1b2/codex --when-idle "Rebase on main when you're done"`,
+  laki send a1b2/codex --when-idle "Rebase on main when you're done"
+  laki send @backend "The API is merged: rebase on main"`,
+  name: `Gives the agent in this tab (\$LAKI_TAB) a name other agents reach it by, in any workspace: @<name> works wherever a
+target goes (laki send, laki ask, laki screen). A word of letters, digits and dashes; one live agent per name (an ended
+one's goes to the next). It stays with the tab until the tab closes or its workspace is archived; laki name "" drops it.
+
+  laki name backend
+  laki agents                                   who has a name, where, and what it's doing`,
+  agents: `Lists the agents with a name (laki name): @name, the agent, its status, its workspace and tab.`,
+  ask: `Asks another agent something and waits for its reply: the question goes in as its turn ends (--when-idle), saying
+who asks, and the answer its next turn ends with is printed. 15 minutes unless --wait. From an agent's tab, an agent
+in another workspace: the user is asked in the app first. For a message that needs no answer, laki send.
+
+  laki ask @backend "Which endpoint returns the user's teams?"
+  laki ask a1b2 --wait 30 "Review my last commit on main and say what you'd change"`,
   screen: `Prints the bottom of a tab's screen (30 lines unless --lines): what the agent shows now, its question too.
 laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and apps' windows instead (shot prints a
 PNG's path: read it). From an agent's tab, a tab in another workspace: the user is asked in the app first.

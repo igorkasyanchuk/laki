@@ -223,6 +223,31 @@ export { keyLabel } from '../../shared/keys'
 export const HOTKEY = '⌃⌥⌘L' // the global hotkey's keys (settings.hotkey unset)
 export const SHOT_KEY = '⌃⌥⌘S' // Screenshot to Laki AI's (settings.shotKey unset)
 
+// an edge between two columns (the full review's, Notes'): dragged (to: the pointer's x in the columns' box), double-clicked back to its width
+export function Edge({ x, to, done, reset }: { x: { left: number } | { right: number }; to: (x: number, box: DOMRect) => void; done: () => void; reset: () => void }) {
+  const held = (e: PE<HTMLDivElement>) => e.currentTarget.hasPointerCapture(e.pointerId)
+  return (
+    <div
+      className={`fr-edge ${'right' in x ? 'r' : ''}`}
+      style={x}
+      data-tip="Drag to resize · double-click to reset"
+      onPointerDown={e => (e.currentTarget.setPointerCapture(e.pointerId), e.preventDefault())}
+      onPointerMove={e => held(e) && to(e.clientX, e.currentTarget.parentElement!.getBoundingClientRect())}
+      onLostPointerCapture={done}
+      onDoubleClick={reset}
+    />
+  )
+}
+
+// a page's own list (Notes', Laki AI's chats): its head's sidebar button hides and shows it, kept per page
+// (laki.pageSides), apart from the app's sidebar
+export function usePageSide(page: string): [boolean, ReactNode] {
+  const all = () => (m => (m && typeof m === 'object' ? (m as Record<string, boolean>) : {}))(load<unknown>('laki.pageSides', {}))
+  const [shown, setShown] = useState(() => all()[page] !== false)
+  const flip = () => (setShown(!shown), keep('laki.pageSides', { ...all(), [page]: !shown }))
+  return [shown, <IconButton icon="sidebar" title={shown ? 'Hide the list' : 'Show the list'} className="page-side-btn" onClick={flip} />]
+}
+
 export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
   useEffect(() => {
     if (!esc) return
@@ -418,7 +443,7 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
 type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
 export type MenuItem =
-  | (ItemBase & { run: () => void; items?: never })
+  | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
   | { head: string }
   | { filter: string; typed?: (q: string) => MenuItem } // typed: an item for what's typed itself, first (a Desk tab's emoji); null: none
@@ -476,17 +501,18 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     clearTimeout(wait.current)
     if (subOf?.it !== it && (subOf || it.items)) wait.current = window.setTimeout(() => (it.items ? open(it, el) : setSubOf(null)), subOf ? 250 : 120)
   }
-  const pick = (a: Act, el?: Element | null, first = true) => {
+  const pick = (a: Act, el?: Element | null, first = true, meta = false) => {
     if (a.items) return el && open(a, el, first) // a key's: its first item picked
     onClose()
-    a.run?.()
+    const go = meta && a.cmd ? a.cmd : a.run
+    go?.()
   }
   const elOf = (a: Act) => box.current?.querySelectorAll('.menu-item')[acts.indexOf(a)] ?? null
   const colors = items.find(it => !!it && 'colors' in it) as Extract<MenuItem, { colors: string[] }> | undefined
   // keys go to the menu while it's open (not to the terminal under it); ⌘ shortcuts still work
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
-    if (e.metaKey || e.ctrlKey || e.altKey || subOf) return // an open submenu has the keys
+    if ((e.metaKey && e.key !== 'Enter') || e.ctrlKey || e.altKey || subOf) return // an open submenu has the keys; ⌘⏎ is a pick with ⌘
     if (filter && !['Escape', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return // typed into the box
     if (filter && e.key === 'Escape' && q) return e.preventDefault(), e.stopPropagation(), setQ('') // Esc clears it first
     e.preventDefault()
@@ -495,7 +521,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     if (e.key === 'Escape' || (e.key === 'ArrowLeft' && onBack)) (onBack ?? onClose)()
     else if (e.key === 'ArrowDown') setSel((sel + 1) % acts.length)
     else if (e.key === 'ArrowUp') setSel((sel <= 0 ? acts.length : sel) - 1)
-    else if ((e.key === 'Enter' || (e.key === 'ArrowRight' && acts[sel]?.items)) && acts[sel]) pick(acts[sel], elOf(acts[sel]))
+    else if ((e.key === 'Enter' || (e.key === 'ArrowRight' && acts[sel]?.items)) && acts[sel]) pick(acts[sel], elOf(acts[sel]), true, e.metaKey)
     else if (e.key === 'Enter' && grid && gridShown.length) (onClose(), grid.pick(gridShown[0][0])) // the first emoji the filter left
     else if (colors && /^[0-9]$/.test(k) && +k <= colors.colors.length) {
       onClose()
@@ -590,7 +616,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         aria-expanded={it.items ? subOf?.it === it : undefined}
         className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
         data-tip={it.tip}
-        onClick={e => pick(it, e.currentTarget, e.detail === 0)}
+        onClick={e => pick(it, e.currentTarget, e.detail === 0, e.metaKey)}
         onPointerEnter={e => hover(it, e.currentTarget)}
         onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
       >
@@ -628,12 +654,16 @@ export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem
 
 // tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably)
 export function Tips() {
-  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean } | null>(null)
+  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean; menu?: DOMRect } | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  // centered on the element, but kept inside the window (measured before it's painted)
+  // centered on the element, but kept inside the window (measured before it's painted); a menu item's beside its menu,
+  // never over the items under it: on its left when there's room, else its right
   useLayoutEffect(() => {
     const el = box.current
-    if (el && tip) el.style.left = `${Math.max(8, Math.min(tip.x - el.offsetWidth / 2, window.innerWidth - el.offsetWidth - 8))}px`
+    if (!el || !tip) return
+    const w = el.offsetWidth
+    const m = tip.menu
+    el.style.left = `${m ? (m.left - w - 8 >= 8 ? m.left - w - 8 : Math.min(m.right + 8, window.innerWidth - w - 8)) : Math.max(8, Math.min(tip.x - w / 2, window.innerWidth - w - 8))}px`
   }, [tip])
   useEffect(() => {
     let timer = 0
@@ -651,6 +681,8 @@ export function Tips() {
       cur = el
       timer = window.setTimeout(() => {
         const r = el.getBoundingClientRect()
+        const menu = el.closest('.menu')?.getBoundingClientRect()
+        if (menu) return setTip({ text: el.dataset.tip!, x: 0, y: r.top + r.height / 2, below: true, menu })
         const below = r.bottom + 30 < window.innerHeight
         setTip({ text: el.dataset.tip!, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below })
       }, 350)
@@ -670,7 +702,7 @@ export function Tips() {
   }, [])
   if (!tip) return null
   return (
-    <div className="tip" ref={box} style={{ top: tip.y, transform: tip.below ? undefined : 'translateY(-100%)' }}>
+    <div className={`tip ${tip.menu ? 'side' : ''}`} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)' }}>
       {tip.text}
     </div>
   )

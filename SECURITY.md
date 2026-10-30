@@ -56,8 +56,11 @@ Out of scope:
 - A repo's extension isn't trusted as its `node_modules/` (its installed packages) or what widget.json's `state`
   names: code it runs from there can change without turning it off.
 - An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
-  phone webhook or extension folders, nor a project's scripts, env, trust or memory list), and ask Laki AI, which acts
-  as you.
+  phone webhook, extension folders or what Open in editor runs, nor a project's scripts, env, trust or memory list),
+  and ask Laki AI, which acts as you, but not in an extension's page chat.
+- An extension that's on stays on when Laki AI rewrites it only from its own page chat (the extension's *Edit* chat,
+  which an agent can't ask in). Changed anywhere else (Laki AI's other chats, an agent, an MCP client), it turns off,
+  and loses network access, once what it runs changes.
 - Releases (since 0.25.0) are signed with a Developer ID, with the hardened runtime, and notarized. A build from
   source (`npm run pack`) is ad-hoc signed: macOS asks you to allow it once (Privacy & Security › Open Anyway; the
   guide's [Install](docs/guide.md#install)).

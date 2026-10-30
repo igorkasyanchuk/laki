@@ -8,7 +8,7 @@ import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
-import { newWsKit, state } from '../shared/tools.ts'
+import { askAgent, newWsKit, state } from '../shared/tools.ts'
 import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
@@ -21,7 +21,7 @@ const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
 const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
+const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -406,6 +406,27 @@ async function main() {
       const [target, ...words] = rest
       const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] }, 150000) // another workspace's from an agent: the user is asked first
       return out(r, r.sent ? 'sent' : `queued (${r.queued} waiting): sent when the agent finishes its turn`)
+    }
+    case 'name': {
+      // laki name <name> [--tab id]: an agent's @name (its own tab, $LAKI_TAB), for other agents' laki send and ask; '' none
+      const tab = (flags.tab as string) || process.env.LAKI_TAB
+      if (!tab || rest[0] === undefined) throw new Error('usage: laki name <name> (in an agent\'s tab), or --tab <id>; "" drops it')
+      const t = await rpc('tabSet', { id: tab, alias: rest[0], from: caller() })
+      return out(t, t.alias ? `@${t.alias}` : 'no name')
+    }
+    case 'agents': {
+      // the named agents (laki name), wherever they run
+      const v: View = await rpc('state')
+      const named = v.tabs.filter(t => t.alias)
+      const wsName = (id: string) => v.workspaces.find(w => w.id === id)?.name ?? id
+      return out(named.map(t => ({ name: `@${t.alias}`, tab: t.id, workspace: t.workspace, agent: t.preset, status: t.status })), named.map(t => `@${t.alias}  ${t.preset ?? t.kind}  ${t.status}  ${wsName(t.workspace)}/${t.name}  (${t.workspace}/${t.id})`).join('\n') || 'no agent has a name yet (laki name <name> in its tab)')
+    }
+    case 'ask': {
+      // laki ask <@name|ws[/tab]> <question> [--wait min]: typed in as its turn ends, then its reply printed
+      const [target, ...words] = rest
+      if (!target || !words.length) throw new Error('usage: laki ask <@name|ws[/tab]> <question> [--wait minutes]')
+      const said = await askAgent(rpc, target, words.join(' '), process.env.LAKI_TAB, Number(flags.wait))
+      return out({ answer: said }, said || '(it answered with no text)')
     }
     case 'progress': {
       // laki progress <0-100> [what you're on]: an agent's estimate, on its tab (LAKI_TAB) until its turn ends

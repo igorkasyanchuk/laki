@@ -35,8 +35,41 @@ export async function state(rpc: Rpc = conn) {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined, groupTemplates: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.template).map(s => [s.name || 'Unnamed group', s.template!]))), groupAgents: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.preset && v.presets.some(x => x.name === s.preset && !x.off)).map(s => [s.name || 'Unnamed group', s.preset!]))) })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group; groupTemplates and groupAgents: a group's prompt template and agent, which a new workspace in it starts with
     workspaces: live
       .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review, updated: w.pr.updated }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; tabs: its tabs with splits, as the app shows them
-    tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
+    tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, alias: t.alias && `@${t.alias}`, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
+}
+
+// laki ask (and MCP's laki_ask_agent): a question to another agent, saying who asks, typed in when its turn ends; then
+// the reply its next turn ends with. send and deliver set it running as they type, so once the message has left its
+// queue a turn that's over is ours (ran), or, quicker than a look, its last answer changed since the message waited
+export async function askAgent(rpc: Rpc, target: string, question: string, me = process.env.LAKI_TAB, minutes = 15, asker = 'the user') {
+  const waitMs = Math.min(Math.max(Number(minutes) || 15, 1), 24 * 60) * 60000 // 1 minute to a day
+  const v0: View = await rpc('state')
+  const mine = v0.tabs.find(t => t.id === me)
+  const agent = mine && (mine.kind === 'agent' || !!mine.runs) // a shell tab's: you typed it (claude run in one: an agent)
+  const ws = agent ? v0.workspaces.find(w => w.id === mine.workspace) : undefined
+  const who = agent ? (mine.alias ? `@${mine.alias}` : `${mine.name} (tab ${mine.id})`) : asker
+  // yourself (your tab, your @name, your workspace's agent that's you): its turn can't start while yours waits
+  const [wref, tref] = target.split('/')
+  const self = mine && (target === mine.id || (!!mine.alias && target.toLowerCase() === `@${mine.alias}`) || (wref === mine.workspace && (tref ? tref === mine.id || tref === mine.name : v0.tabs.find(t => t.workspace === wref && t.kind === 'agent')?.id === mine.id)))
+  if (self) throw new Error("that's you: ask another agent (its turn can't start while yours waits)")
+  const text = `A question from ${who}${ws ? `, an agent in Laki's workspace ${ws.name ?? ws.id}` : ''}, sent with laki ask. Answer it in your reply: your reply goes back to it as this turn ends.\n\n${question}`
+  const r = await rpc<{ tab: string; sent?: boolean }>('send', { target, text, whenIdle: true, agent: true }, 150000) // another workspace's: the user is asked first
+  let was = v0.tabs.find(t => t.id === r.tab)?.last
+  let ran = false
+  for (const end = Date.now() + waitMs; Date.now() < end; await new Promise(res => setTimeout(res, 1000))) { // the whole view each look: once a second
+    const t = (await rpc<View>('state')).tabs.find(x => x.id === r.tab)
+    if (!t) throw new Error(`${target} closed before it answered`)
+    if (t.queue?.includes(text)) was = t.last // still waiting for its turn
+    else if (t.status === 'running' || t.status === 'waiting') ran = true
+    else if (t.status === 'exited') throw new Error(`${target} ended before it answered`)
+    else if (ran || t.last !== was) {
+      // an agent with no end-of-turn hook (grok; gemini without hooks) keeps its last answer: never hand that back as this one's
+      const said = t.last !== was ? (t.last ?? '') : `(no reply text came back: laki screen ${target} shows it)`
+      return t.limit ? `(${target} hit its usage limit) ${said}`.trim() : said
+    }
+  }
+  throw new Error(`no answer from ${target} in ${Math.round(waitMs / 60000)} minutes (it may still be working: laki screen ${target})`)
 }
 
 // which sidebar group a new workspace goes in, by what the groups' names mean (Laki AI's SYSTEM, the tool's group, the
@@ -145,6 +178,21 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end. Agents only, and not while one asks the user something. Another workspace's tab: the user is asked first.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), when_idle: { type: 'boolean', description: 'queue it until the agent finishes its turn' } }, ['target', 'text']),
     run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle, agent: true }, 150000), // another workspace's: the user is asked first
+  },
+  {
+    name: 'laki_name',
+    description: "Give yourself a name other agents reach you by, in any workspace: @<name> (letters, digits, dashes) works wherever a target goes (laki_send, laki_ask_agent, laki screen). One agent per name; yours until your tab ends. Empty: none.",
+    inputSchema: obj({ name: str('a short word, e.g. backend or reviewer') }, ['name']),
+    run: async a => {
+      if (!process.env.LAKI_TAB) throw new Error('only an agent in a Laki tab has a name')
+      return (await rpc('tabSet', { id: process.env.LAKI_TAB, alias: String(a.name ?? '') }), a.name ? `you are @${String(a.name).replace(/^@/, '').toLowerCase()}` : 'no name now')
+    },
+  },
+  {
+    name: 'laki_ask_agent',
+    description: "Ask another agent something and wait for its answer: the question goes in when its turn ends (saying who asks), and its reply comes back as this tool's result. target: @name (laki_name), <ws>/<tab> or a workspace id. Another workspace's agent: the user is asked first. A tool call that may time out sooner (codex's MCP calls: 60 s unless tool_timeout_sec says more) can run `laki ask <target> \"<question>\"` in a shell instead.",
+    inputSchema: obj({ target: str('@name, <ws>/<tab> or a workspace id'), question: str('what you want to know or want it to do'), wait_minutes: { type: 'number', description: 'how long to wait for the answer (default 15)' } }, ['target', 'question']),
+    run: a => askAgent(rpc, String(a.target), String(a.question), process.env.LAKI_TAB, a.wait_minutes, who),
   },
   {
     name: 'laki_new_tab',

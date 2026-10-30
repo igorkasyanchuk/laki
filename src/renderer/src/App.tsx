@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, In
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, LaterStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
+import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
 import { Picker, PICKER_KEY } from './Picker'
@@ -43,12 +43,12 @@ import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
+import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
 import { AGENT_COLORS, ask, askText, AskHost, Boundary, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
-import { emojiOf } from '../../shared/icons'
+import { emojiOf, isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -69,6 +69,31 @@ type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
+const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
+const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
+
+// the AI button keeps to the terminals' corner (--fab-r: what's right of them), so the file preview's and the side
+// panel's last rows show
+function FabCorner({ className, children }: { className: string; children: ReactNode }) {
+  const at = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const fab = at.current
+    const main = fab?.parentElement
+    const wrap = main?.querySelector('.term-wrap')
+    if (!fab || !main || !wrap) return
+    const set = () => fab.style.setProperty('--fab-r', `${Math.max(0, main.getBoundingClientRect().right - wrap.getBoundingClientRect().right)}px`)
+    const ro = new ResizeObserver(set)
+    ro.observe(wrap)
+    ro.observe(main)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div className={className} ref={at}>
+      {children}
+    </div>
+  )
+}
+
 function AiFloat({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<FloatAt | null>(() => load<FloatAt | null>('laki.aiFloatAt', null))
@@ -183,7 +208,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { reviewPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -472,8 +497,12 @@ export function App() {
     const ok = Object.entries(m && typeof m === 'object' ? m : {}).filter(([, w]) => typeof w === 'number' && w >= 160 && w <= 480) // SideHandle's range
     return { projects: one, shells: one, browsers: one, ...Object.fromEntries(ok) }
   })
-  const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
   const [railKind, setRailKind] = useState<RailKind>(() => load('laki.rail', 'projects')) // the rail layout's list: which kind
+  // the sidebar shown or hidden, each kind its own (Projects, Terminals, Browsers); laki.sideOpen was one for all
+  const [sideOpens, setSideOpens] = useState<Partial<Record<RailKind, boolean>>>(() => (o => (o && typeof o === 'object' ? o : { projects: o !== false }))(load<unknown>('laki.sideOpen', true)))
+  // Terminals' and Browsers' list folded to a strip, left or right of the main area (as Changes' comments): a kind's
+  const [strips, setStrips] = useState<Partial<Record<RailKind, 'left' | 'right'>>>(() => load('laki.strips', {}))
+  const setStrip = (k: RailKind, at?: 'left' | 'right') => setStrips(m => (({ [k]: _, ...rest }) => (at ? { ...rest, [k]: at } : rest))(m))
   const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects and seps whose workspaces are hidden
   const [find, setFind] = useState<Find | null>(null) // the sidebar's filter: null, all of them
   const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
@@ -501,6 +530,11 @@ export function App() {
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
   const narrow = useSyncExternalStore(NARROW.on, NARROW.now) // a phone: one pane at a time, the sidebar and panels over it
+  const sideKey: RailKind = narrow ? 'projects' : railKind // a phone's drawer: one, whatever a row's kind
+  const sideOpen = sideOpens[sideKey] ?? sideOpens.projects ?? true
+  const keyNow = useRef(sideKey)
+  keyNow.current = sideKey // the kind in sight when it's called: a timer's ring is an older render's
+  const setSideOpen = (v: boolean | ((o: boolean) => boolean)) => setSideOpens(m => (k => ({ ...m, [k]: typeof v === 'function' ? v(m[k] ?? m.projects ?? true) : v }))(keyNow.current))
   const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
   // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
   // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
@@ -690,8 +724,9 @@ export function App() {
     })
   }, [view?.layouts, layoutsOn])
   useEffect(() => void localStorage.setItem('laki.sideW', JSON.stringify(sideWs)), [sideWs])
-  useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
+  useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpens)), [sideOpens])
   useEffect(() => void localStorage.setItem('laki.rail', JSON.stringify(railKind)), [railKind])
+  useEffect(() => void localStorage.setItem('laki.strips', JSON.stringify(strips)), [strips])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.branchFull', JSON.stringify(branchFull)), [branchFull])
   // a new workspace, and the one selected before it, stay in sight: their projects and seps unfold once the view has them
@@ -858,9 +893,11 @@ export function App() {
   const moreContrast = useSyncExternalStore(MORE.on, MORE.now)
   const theme = paintKey(paint) + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') // terminals repaint when it changes
   const painted = useRef<string | null>(null)
-  const glassed = useRef<boolean | null>(null)
+  const glassed = useRef('')
   if (view && painted.current !== theme) {
-    if (glassed.current !== blurred(paint)) bridge?.glass?.((glassed.current = blurred(paint))) // the window's own blur
+    // the window's own blur, light or dark as the theme is
+    const blur = blurred(paint), light = !!THEMES.find(t => t.id === paint.theme)?.light
+    if (glassed.current !== `${blur} ${light}`) (glassed.current = `${blur} ${light}`), bridge?.glass?.(blur, light)
     painted.current = theme
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
@@ -1397,7 +1434,8 @@ export function App() {
 
   // a new shell from a shell: in the folder that one is in now (cwdOf), as a terminal's new tab does
   const cwdOf = (w: WorkspaceView | null, from = tab) => (from?.kind === 'shell' && from.workspace === w?.id ? { cwdOf: from.id } : undefined)
-  const newTab = async (preset: string, cmd?: string, w: WorkspaceView | null = ws) => w && selectTab(await call<TabView>('tabNew', { ws: w.id, preset, cmd, ...(preset === 'shell' && !cmd && cwdOf(w)) }))
+  // own: a tab of its own whatever Settings' splitNew says (⌘ held as the + menu's item was picked)
+  const newTab = async (preset: string, cmd?: string, w: WorkspaceView | null = ws, own = false) => w && selectTab(await call<TabView>('tabNew', { ws: w.id, preset, cmd, ...(preset === 'shell' && !cmd && cwdOf(w)), ...(own && { beside: null }) }))
   // a new shell next to the focused pane
   const split = async (edge: 'right' | 'bottom', next = tab?.id) => {
     if (!ws || !next) return
@@ -1473,7 +1511,7 @@ export function App() {
     if (!(await busyWith([w.id], 'closing', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return
     done(`Closed ${wsName(w)}`)
   }
-  const rmItem = (w: WorkspaceView): MenuItem => (isTerm(w) ? { label: 'Close terminal', icon: 'x', key: 'x', danger: true, run: () => closeTerm(w) } : { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) })
+  const rmItem = (w: WorkspaceView): MenuItem => (isTerm(w) ? { label: 'Close terminal', icon: 'x', key: 'x', danger: true, tip: 'Ends its shells and removes it', run: () => closeTerm(w) } : { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, tip: w.kind === 'worktree' ? 'Removes it and its worktree; its branch stays' : 'Removes it from Laki; its folder stays', run: () => rmWs(w) })
   // an extension's gates on a ship, a merge or an archive: Checking… on its button while they run (checking: the step and
   // workspace; an archive's row says it, busyWith); a hold says what held it, each by its icon, then Do it anyway (asked
   // first) or the agent's fix, shown to change first. f(force) makes the call; undefined: failed (the toast says), or not done
@@ -1631,16 +1669,16 @@ export function App() {
     const p = view?.projects.find(x => x.id === w.project)
     const edit = () => p && setDialog({ settings: p.id, script: 'run', spot: 'Scripts' }) // opened at its Scripts, lit
     return [
-      { label: dev ? 'Restart' : 'Run', icon: 'run', key: 'r', run: () => (w.run ? call<TabView>('run', { ws: w.id }).then(selectTab, () => {}) : edit()) },
-      ...(dev && dev.status !== 'exited' ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: dev.id, data: '\x03' }) } as MenuItem] : []),
-      ...(dev ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(dev.id) } as MenuItem] : []),
-      ...(w.scripts ?? []).map((k): MenuItem => ({ label: SCRIPT_LABELS[k], icon: SCRIPT_ICONS[k], run: () => runScript(w, k) })),
-      ...(w.noSetup && p?.hasSetup ? [{ label: 'Run the setup script', icon: 'terminal', sub: 'Made without it', run: () => call<TabView>('run', { ws: w.id, script: 'setup' }).then(selectTab, () => {}) } as MenuItem] : []), // its tab; the item goes
-      { label: `Open localhost:${w.port}`, icon: 'link', key: 'o', run: () => openPort(w.port) },
+      { label: dev ? 'Restart' : 'Run', icon: 'run', key: 'r', tip: w.run ? `Runs the project's run script in its own tab, $PORT set to ${w.port}${dev ? ': stopped first' : ''}` : 'No run script yet: set one in the project\'s settings', run: () => (w.run ? call<TabView>('run', { ws: w.id }).then(selectTab, () => {}) : edit()) },
+      ...(dev && dev.status !== 'exited' ? [{ label: 'Stop', icon: 'stop', key: 's', tip: 'Sends ⌃C to the run tab', run: () => api.send('input', { tab: dev.id, data: '\x03' }) } as MenuItem] : []),
+      ...(dev ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', tip: 'Brings the run script\'s tab to the front', run: () => selectTab(dev.id) } as MenuItem] : []),
+      ...(w.scripts ?? []).map((k): MenuItem => ({ label: SCRIPT_LABELS[k], icon: SCRIPT_ICONS[k], tip: `Runs the project's ${k} script in a tab of its own`, run: () => runScript(w, k) })),
+      ...(w.noSetup && p?.hasSetup ? [{ label: 'Run the setup script', icon: 'terminal', sub: 'Made without it', tip: 'Runs the project\'s setup script here, as a new workspace would have',  run: () => call<TabView>('run', { ws: w.id, script: 'setup' }).then(selectTab, () => {}) } as MenuItem] : []), // its tab; the item goes
+      { label: `Open localhost:${w.port}`, icon: 'link', key: 'o', tip: `Opens this workspace's port (its $PORT) in your browser`, run: () => openPort(w.port) },
       ...actionItems(w),
       null,
-      { label: w.run || w.scripts?.length ? 'Edit scripts…' : 'Set a run script…', icon: 'pencil', key: 'e', run: edit },
-      ...(p && !p.kind ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: p.id, spot: 'Actions' }) } as MenuItem] : []),
+      { label: w.run || w.scripts?.length ? 'Edit scripts…' : 'Set a run script…', icon: 'pencil', key: 'e', tip: 'Opens the project\'s settings at Scripts: setup, run, teardown, test, lint, format, deploy', run: edit },
+      ...(p && !p.kind ? [{ label: 'Edit actions…', icon: 'pencil', tip: 'Opens the project\'s settings at Actions: saved prompts for an agent and commands for a shell, listed in this menu', run: () => setDialog({ settings: p.id, spot: 'Actions' }) } as MenuItem] : []),
     ]
   }
   // the file preview goes (closed, or another file shown): an unsaved edit only once you say so
@@ -2298,13 +2336,13 @@ export function App() {
     wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
   }
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
-  // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and
-  // Help their own size
+  // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), a page its own
+  // size (below)
   const [zooms, setZooms] = useState<Record<string, number>>(() => (z => (z && typeof z === 'object' && !Array.isArray(z) ? z : {}))(load<unknown>('laki.zoom', {})) as Record<string, number>)
   useEffect(() => void localStorage.setItem('laki.zoom', JSON.stringify(zooms)), [zooms])
   const sizeOf = (id: string) => Math.min(32, Math.max(8, fontSize + (Number(zooms[id]) || 0)))
   const zoom = (d: number) => {
-    if (pageOpen) return zoomPage(d)
+    if (pageKey && document.querySelector('.main > .settings-page')) return zoomPage(d) // a page over the terminals
     if (!tab || dialog) return // a page or dialog over the terminals: not the tab you'd see grow
     const size = d ? Math.min(32, Math.max(8, sizeOf(tab.id) + d)) : fontSize
     if (size === sizeOf(tab.id)) return // as big or as small as it goes, or at Settings' size already
@@ -2314,12 +2352,21 @@ export function App() {
   }
   const tabIds = view?.tabs.map(t => t.id).join() // closed tabs' zooms go
   useEffect(() => void (view && setZooms(z => (Object.keys(z).every(id => view.tabs.some(t => t.id === id)) ? z : Object.fromEntries(Object.entries(z).filter(([id]) => view.tabs.some(t => t.id === id)))))), [tabIds])
-  // Settings and Help: ⌘± zoom them (Appearance's Settings & Help size), over the terminal font's size they follow
-  const pageOpen = settingsOf(dialog) || dialog === 'help'
+  // Appearance's Pages size: Settings, Help and the list pages, over the terminal font's size they follow
   const pageZoom = PAGE_ZOOMS.includes(settings.pageZoom as number) ? settings.pageZoom! : 1
+  // ⌘± on a page: its own size over that, kept per page (laki.pageZooms, by its dialog's kind), as a browser keeps a
+  // site's; ⌘0 back to 100%
+  const [ownZooms, setOwnZooms] = useState<Record<string, number>>(() => (z => (z && typeof z === 'object' && !Array.isArray(z) ? z : {}))(load<unknown>('laki.pageZooms', {})) as Record<string, number>)
+  useEffect(() => void localStorage.setItem('laki.pageZooms', JSON.stringify(ownZooms)), [ownZooms])
+  const pageKey = !dialog ? undefined : settingsOf(dialog) ? 'settings' : typeof dialog === 'string' ? dialog : Object.keys(dialog)[0]
+  const own = (pageKey && OWN_ZOOMS.includes(ownZooms[pageKey]) && ownZooms[pageKey]) || 1
   const zoomPage = (d: number) => {
-    const i = PAGE_ZOOMS.indexOf(pageZoom)
-    call('settingsSet', { pageZoom: d ? PAGE_ZOOMS[Math.min(PAGE_ZOOMS.length - 1, Math.max(0, i + d))] : 1 }).catch(() => {})
+    const i = OWN_ZOOMS.indexOf(own)
+    const z = d ? OWN_ZOOMS[Math.min(OWN_ZOOMS.length - 1, Math.max(0, i + d))] : 1
+    if (!pageKey || z === own) return
+    if (document.querySelector(FIXED_PAGE)) return toast('This page keeps its size: its tiles and blocks drag in fixed steps') // styles.css: no zoom there
+    setOwnZooms(({ [pageKey]: _, ...rest }) => (z === 1 ? rest : { ...rest, [pageKey]: z }))
+    toast(`This page: ${Math.round(z * 100)}%${z === 1 ? '' : ' (⌘0: 100%)'}`, undefined, undefined, true)
   }
 
   // the sidebar's order: projects, and workspaces and seps within their project, dragged
@@ -2421,7 +2468,7 @@ export function App() {
     call('wsSet', { id: w.id, pending: { at } }).then(() => done(pendingWords({ at: at === 'limit' ? undefined : at, limit: at === 'limit', agent: '' }, true)), () => {})
   }
   const laterCancel = (w: WorkspaceView) => call('wsSet', { id: w.id, pending: null }).then(() => done(`${w.pending?.agent ?? 'Its agent'} won't start in ${wsName(w)}`), () => {})
-  const laterItems = (w: WorkspaceView): MenuItem[] => (w.pending ? [{ head: pendingWords(w.pending, true) }, { label: 'Start now', icon: 'run', run: () => laterNow(w) }, { label: 'Change time…', icon: 'clock', run: () => void laterChange(w) }, { label: 'Cancel delayed start', icon: 'x', danger: true, run: () => void laterCancel(w) }, null] : [])
+  const laterItems = (w: WorkspaceView): MenuItem[] => (w.pending ? [{ head: pendingWords(w.pending, true) }, { label: 'Start now', icon: 'run', tip: 'Starts its agent now instead of at the time set', run: () => laterNow(w) }, { label: 'Change time…', icon: 'clock', run: () => void laterChange(w) }, { label: 'Cancel delayed start', icon: 'x', danger: true, tip: 'Its agent never starts; the workspace stays', run: () => void laterCancel(w) }, null] : [])
   // Rename with AI: the workspace's agent (the tab you're on there, else its first live one) asked, when its turn ends,
   // to name it from its PR's title and description, else its task, through laki rename
   const liveAgent = (w: WorkspaceView) => (ts => ts.find(t => t.id === tabByWs[w.id]) ?? ts[0])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited'))
@@ -2432,27 +2479,28 @@ export function App() {
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
     ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
-    { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
+    { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
     ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', key: 'w', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
-    { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
-    { label: 'Open in', icon: 'code', key: 'o', items: openInItems({ ws: w.id }) },
-    { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
-    { label: 'Remind me…', icon: 'timer', key: 'e', run: () => setDialog({ remind: w.id }) },
-    { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
-    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
-    ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
-    ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
-    ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
+    { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
+    { label: 'Open in', icon: 'code', key: 'o', tip: 'Its folder in an editor, a terminal or Finder', items: openInItems({ ws: w.id }) },
+    { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
+    { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
+    { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', tip: w.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
+    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', tip: 'A button on the left rail that opens it from anywhere', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
+    ...(rail && w.railPin ? [{ label: 'Rail icon', icon: isIconName(w.icon) ? w.icon : 'star', items: iconItems(w.icon, i => void call('wsSet', { id: w.id, icon: i ?? '' }).catch(fail)) } as MenuItem] : []), // its pin's, a terminal's too
+    ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
+    ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', tip: 'The agents that raced on this task side by side, to keep one', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
+    ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
     ...prSub(w),
-    ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
+    ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', tip: 'What Laki did for it: PR scans, deliveries, setup runs', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
     ...runItems(w),
     ...flowMenu(w),
     null,
     ...(w.kind === 'worktree'
       ? [
-          { label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(w) } as MenuItem,
-          { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(w) } as MenuItem,
+          { label: 'Fork workspace', icon: 'fork', key: 'f', tip: 'A new worktree off its branch\'s last commit, its agent\'s chat forked too', run: () => forkWs(w) } as MenuItem,
+          { label: 'Archive workspace', icon: 'archive', key: 'a', tip: 'Removes its worktree, keeps the branch; restore it from the project\'s menu', run: () => archive(w) } as MenuItem,
         ]
       : []),
     rmItem(w),
@@ -2465,8 +2513,8 @@ export function App() {
       w.pr
         ? prMenu(w)
         : [
-            ...(w.kind === 'worktree' ? [{ label: 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
-            ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
+            ...(w.kind === 'worktree' ? [{ label: 'Look for a PR', icon: 'refresh', tip: 'Asks GitHub now for a PR on its branch', run: refreshPR } as MenuItem] : []),
+            ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', tip: 'Makes a PR by its link or number this workspace\'s', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
           ],
     )
   // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
@@ -2575,11 +2623,11 @@ export function App() {
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
-    { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', run: refreshPR },
+    { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', tip: 'Reads its checks, reviews and state again now', run: refreshPR },
     ...(w.pr
       ? [
           { label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem,
-          { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem,
+          { label: 'Open its checks', icon: 'link', key: 'c', tip: 'Its CI checks on GitHub', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem,
           { label: 'Copy PR link', icon: 'copy', key: 'l', run: () => copy(w.pr!.url) } as MenuItem,
           { label: `Copy #${w.pr.number}`, icon: 'copy', key: 'n', run: () => copy(`#${w.pr!.number}`) } as MenuItem,
         ]
@@ -2587,9 +2635,9 @@ export function App() {
     ...(w.pr?.state === 'OPEN'
       ? [
           null,
-          ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', run: () => prAct(w, 'merge') } as MenuItem] : []),
-          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', run: () => prAct(w, 'approve') } as MenuItem]),
-          ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, run: () => prAct(w, 'close') } as MenuItem] : []),
+          ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: 'Merges it on GitHub, after you confirm', run: () => prAct(w, 'merge') } as MenuItem] : []),
+          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
+          ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, tip: 'Closes it on GitHub without merging, after you confirm', run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
     ...(w.pr ? [null, { label: `Detach PR #${w.pr.number}`, icon: 'unlink', key: 'd', sub: 'Only related, kept off this workspace (Attach a PR brings it back)', run: () => detachPr(w) } as MenuItem] : []),
@@ -2602,14 +2650,14 @@ export function App() {
     const ended = ts.filter(t => t.status === 'exited' && againOnEnter(t))
     const others = groups.filter(x => x !== g).flatMap(x => tabsOf(x).map(byId)).filter((t): t is TabView => !!t)
     return [
-      { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ rename: ts[0].id }) },
+      { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'The tab\'s name', run: () => setDialog({ rename: ts[0].id }) },
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
-      { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
-      { label: 'Mark as unread', icon: 'unread', key: 'u', run: () => ts.forEach(t => markUnread(t.id)) },
+      { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: ts[0].muted ? 'It notifies you again' : 'No notifications or Dock count from this tab', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
+      { label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => ts.forEach(t => markUnread(t.id)) },
       ...(bridge?.floatTab && ts.length === 1 ? [floated.includes(ts[0].id) ? ({ label: 'Back from its own window', icon: 'popIn', run: () => floatTab(ts[0].id, false) } as MenuItem) : ({ label: 'Float in its own window', icon: 'popOut', sub: 'Over every app, so you can watch it from anywhere', run: () => floatTab(ts[0].id) } as MenuItem)] : []),
-      ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
+      ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', tip: 'Types a message into it at a time you pick, or once its turn ends', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(ts.length === 1 ? [{ label: 'Copy contents', icon: 'copy', sub: 'Its whole terminal as text, the scrollback too', run: () => copyTab(ts[0]) } as MenuItem] : []),
-      ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
+      ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', tip: 'A laki:// link that opens this tab', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
       ts[0].share
         ? {
             label: 'Shared live view',
@@ -2622,20 +2670,20 @@ export function App() {
           }
         : { label: 'Share live view…', icon: 'globe', sub: 'A view-only page of it, live, at a link', run: () => setSharing(ts[0].id) },
       null,
-      { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
-      { label: 'Split down', icon: 'splitDown', run: () => (selectTab(ts[0].id), split('bottom', ts[0].id)) },
+      { label: 'Split right', icon: 'splitRight', tip: 'A new pane beside it, in the same tab', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
+      { label: 'Split down', icon: 'splitDown', tip: 'A new pane under it, in the same tab', run: () => (selectTab(ts[0].id), split('bottom', ts[0].id)) },
       ...(g && tabsOf(g).length > 1
         ? ids.length > 1
-          ? [{ label: 'Separate panes', icon: 'unsplit', run: () => setGroups(groups.flatMap(x => (x === g ? tabsOf(x).map(tab => ({ tab })) : [x]))) } as MenuItem]
-          : [{ label: 'Move to its own tab', icon: 'unsplit', run: () => setGroups(move(groups, ids[0], false, 'bar')) } as MenuItem]
+          ? [{ label: 'Separate panes', icon: 'unsplit', tip: 'Each pane back in a tab of its own', run: () => setGroups(groups.flatMap(x => (x === g ? tabsOf(x).map(tab => ({ tab })) : [x]))) } as MenuItem]
+          : [{ label: 'Move to its own tab', icon: 'unsplit', tip: 'Out of this split, into a tab of its own', run: () => setGroups(move(groups, ids[0], false, 'bar')) } as MenuItem]
         : []),
-      ...(ended.length ? [{ label: 'Restart', icon: 'restore', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
+      ...(ended.length ? [{ label: 'Restart', icon: 'restore', tip: 'Starts it again (an agent resumes its chat)', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
       ...(ts.length === 1 && accountsOf(ts[0].preset).length > 1 && !view?.workspaces.find(w => w.id === ts[0].workspace)?.host
-        ? [{ label: 'Restart on another account', icon: 'restore', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
+        ? [{ label: 'Restart on another account', icon: 'restore', tip: 'The same chat, resumed on another sign-in (Settings › Agents & profiles)', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
         : []),
       null,
-      { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: kh('closeTab'), run: () => closeTabs(ts) },
-      ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
+      { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: kh('closeTab'), tip: 'Ends what runs in it', run: () => closeTabs(ts) },
+      ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, tip: 'Every tab of this workspace but this one', run: () => closeTabs(others) } as MenuItem] : []) : []),
       ...(ts.length === 1 ? extItems('tab', view?.workspaces.find(x => x.id === ts[0].workspace), { ws: ts[0].workspace, tab: ts[0].id }) : []),
     ]
   }
@@ -2765,7 +2813,6 @@ export function App() {
   const plusMenu = (p: Project, place?: string): MenuItem[] => [
     { label: 'New workspace', icon: 'plus', key: 'n', hint: place ? undefined : kh('newWs'), run: () => newWs(p.id, place ? { place } : undefined) },
     { label: 'Terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p, place) },
-    ...(p.git !== false && !p.host ? [{ label: 'Review a PR…', icon: 'review', key: 'r', sub: 'Any PR, yours or not: its branch, no agent, on the Review tab', run: () => setDialog({ reviewPr: p.id }) } as MenuItem] : []),
   ]
   const termWhere = (p: Project) => `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
@@ -2843,11 +2890,11 @@ export function App() {
   useEffect(() => void bridge?.keys?.(settings.keys ?? {}), [JSON.stringify(settings.keys ?? {})]) // the menu bar's items show them
 
   // the actions, once: the ⋯ menus and the palette show the same ones
-  type Action = { label: string; icon: IconName; hint?: string; key?: string; danger?: boolean; sub?: string; run: () => void }
+  type Action = { label: string; icon: IconName; hint?: string; key?: string; danger?: boolean; sub?: string; tip?: string; run: () => void; cmd?: () => void }
   const newTabIn = (w: WorkspaceView | null): Action[] => [
-    { label: 'Shell', icon: 'terminal', hint: w?.id === ws?.id ? kh('newTab') : undefined, run: () => newTab('shell', undefined, w) },
-    ...(view?.presets ?? []).filter(p => !p.off).map(p => ({ label: p.name, icon: 'agent', sub: p.agent === 'command' ? 'Command' : [AGENT_NAMES[p.agent], p.model].filter(Boolean).join(' · '), run: () => newTab(p.name, undefined, w) }) as Action),
-    { label: 'Command…', icon: 'terminal', run: () => (w && setWsId(w.id), setDialog('custom')) }, // the dialog is for the selected one
+    { label: 'Shell', icon: 'terminal', hint: w?.id === ws?.id ? kh('newTab') : undefined, tip: 'A terminal in the workspace\'s folder', run: () => newTab('shell', undefined, w), cmd: () => newTab('shell', undefined, w, true) }, // cmd: ⌘-click or ⌘⏎, a tab of its own, never a split
+    ...(view?.presets ?? []).filter(p => !p.off).map(p => ({ label: p.name, icon: 'agent', sub: p.agent === 'command' ? 'Command' : [AGENT_NAMES[p.agent], p.model].filter(Boolean).join(' · '), tip: `Starts ${p.name} in a new tab here (⌘-click: never in a split)`, run: () => newTab(p.name, undefined, w), cmd: () => newTab(p.name, undefined, w, true) }) as Action),
+    { label: 'Command…', icon: 'terminal', tip: 'A tab that runs a command you type', run: () => (w && setWsId(w.id), setDialog('custom')) }, // the dialog is for the selected one
   ]
   const newTabActions = newTabIn(ws)
   // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), around
@@ -2879,14 +2926,14 @@ export function App() {
   const wsActions: Action[] = !ws
     ? []
     : [
-        ...(tab ? [{ label: 'Split right', icon: 'splitRight', run: () => split('right') } as Action, { label: 'Split down', icon: 'splitDown', run: () => split('bottom') } as Action] : []),
+        ...(tab ? [{ label: 'Split right', icon: 'splitRight', tip: 'A new pane beside this one, in the same tab', run: () => split('right') } as Action, { label: 'Split down', icon: 'splitDown', tip: 'A new pane under this one, in the same tab', run: () => split('bottom') } as Action] : []),
         ...(ws.kind === 'worktree'
-          ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(ws) } as Action]
+          ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', tip: 'A new worktree off its branch\'s last commit, its agent\'s chat forked too', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', tip: 'Removes its worktree, keeps the branch; restore it from the project\'s menu', run: () => archive(ws) } as Action]
           : []),
-        ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: kh('later'), run: () => sendLater() } as Action] : []),
-        { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
+        ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: kh('later'), tip: 'Types a message into an agent at a time you pick, or once its turn ends', run: () => sendLater() } as Action] : []),
+        { label: 'Rename workspace…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: ws.id }) },
         ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
-        { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
+        { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', tip: ws.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
         rmItem(ws) as Action,
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
@@ -2896,20 +2943,19 @@ export function App() {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : kh('newWs'), run: () => newIn(p) },
-      ...(!p.kind && termsOk ? [{ label: 'New terminal', icon: 'terminal', key: 't', hint: termWhere(p), run: () => termIn(p) } as MenuItem] : []),
-      ...(!p.kind && p.git !== false && !p.host ? [{ label: 'Review a PR…', icon: 'review', key: 'r', run: () => setDialog({ reviewPr: p.id }) } as MenuItem] : []),
-      ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', run: () => setDialog({ project: p.id }) } as MenuItem]),
+      ...(!p.kind && termsOk ? [{ label: 'New terminal', icon: 'terminal', key: 't', hint: termWhere(p), tip: 'A shell in the project\'s own folder, listed with its workspaces', run: () => termIn(p) } as MenuItem] : []),
+      ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', tip: 'Its notes, scheduled tasks, memory and settings', run: () => setDialog({ project: p.id }) } as MenuItem]),
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
-      { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
+      { label: 'Add a group', icon: 'sep', tip: 'A named head in its list: drop workspaces under it', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
-      { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
+      { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', tip: 'Your Markdown notes for this project; agents don\'t see them', run: () => setDialog({ notes: p.id }) },
       { label: 'Color', icon: 'palette', items: [{ colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) }] },
       ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
       ...(p.kind ? [] : sortItems(p.sort ?? 'manual', sort => call('projectSet', { id: p.id, sort: sort ?? 'manual' }))),
       null,
       ...(p.kind ? [] : [{ label: 'Settings', icon: 'settings', key: 's', run: () => setDialog({ project: p.id, tab: 'settings' }) } as MenuItem]), // its page's Settings tab; Terminals and Browsers have none
-      { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
-      { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
+      { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), tip: 'Prompts that run in it on a schedule', run: () => setDialog({ schedules: p.id }) },
+      { label: 'Remove project', icon: 'trash', key: 'd', danger: true, tip: 'Takes it out of Laki; its files stay', run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: wsName(w), icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
   }
@@ -2952,7 +2998,6 @@ export function App() {
       a({ label: `Compare the race: ${wsName(w).replace(/-[^-]+$/, '')}`, icon: 'race', run: () => setDialog({ compare: race }) })
     }
     a({ label: 'New workspace', icon: 'plus', hint: kh('newWs'), run: () => newWs(ws?.project) })
-    if (project && !project.kind && project.git !== false && !project.host) a({ label: `Review a PR in ${project.name}…`, icon: 'review', run: () => setDialog({ reviewPr: project.id }) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'New terminal (in your home folder)', icon: 'terminal', run: () => quickNew('shells') })
     a({ label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
@@ -3429,10 +3474,11 @@ export function App() {
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
             data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
-            data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
+            {ts.filter(t => t.alias).map(t => <span key={t.id} className="tab-alias">@{t.alias}</span> /* laki name: what other agents call it */)}
             {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}
             {ts.some(t => t.muted) && (
@@ -3454,7 +3500,7 @@ export function App() {
           </div>
         )
       })}
-      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N)" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
+      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N) · ⌘-click an item: a tab of its own, never a split" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
     </>
   )
   const schedTip = nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'
@@ -3545,7 +3591,7 @@ export function App() {
     return (
       <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${dropOn === w.id ? 'drop-on' : ''}`} {...dropProps(w)} aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
         <span className="rail-icon" style={colorVar(tint(w))}>
-          {k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
+          {w.icon ? isIconName(w.icon) ? <Icon name={w.icon} size={18} /> : <span className="rail-emoji">{w.icon}</span> : k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
           {k === 'projects' && <ProjectMark p={projOf(w)} size={11} /> /* its project's, at the corner */}
           {n > 0 ? <span className="rail-count">{n}</span> : mine.some(t => spins(t)) && <span className="rail-dot" />}
         </span>
@@ -3610,6 +3656,28 @@ export function App() {
   const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
+  // the list as a strip: a name each, written down it (no filter, a page over it or a phone: the list)
+  const strip = rail && sideOpen && !listOff && !find && railKind !== 'projects' ? strips[railKind] : undefined
+  const stripMenu = (at: 'left' | 'right'): MenuItem[] => [
+    { label: 'Show the list', icon: 'sidebar', run: () => setStrip(railKind) },
+    { label: at === 'left' ? 'Move it to the right' : 'Move it to the left', icon: at === 'left' ? 'chevronsRight' : 'chevronsLeft', run: () => setStrip(railKind, at === 'left' ? 'right' : 'left') },
+  ]
+  const stripNeeds = strip && new Set(needing.map(t => t.workspace)) // the Dock's list: its rows' dots
+  const stripBar = strip && (
+    <nav className={`side-strip ${strip}`} aria-label={railKind === 'shells' ? 'Terminals' : 'Browsers'} onContextMenu={e => (e.preventDefault(), openMenu(e, stripMenu(strip)))}>
+      <span className="strip-drag drag" />
+      <IconButton icon={strip === 'left' ? 'chevronsRight' : 'chevronsLeft'} title="Show the list · right click: move the strip to the other side" onClick={() => setStrip(railKind)} />
+      {order
+        .filter(w => kindOf(w) === railKind)
+        .map(w => (
+          <button key={w.id} type="button" className={`strip-ws ${w.id === ws?.id && !onPage ? 'sel' : ''}`} style={colorVar(tint(w))} data-tip={wsName(w)} onClick={() => (setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), e.stopPropagation(), openMenu(e, wsMenu(w)))}>
+            <span className="fr-vert">{wsName(w)}</span>
+            {stripNeeds && stripNeeds.has(w.id) && <i role="img" aria-label="needs you" />}
+          </button>
+        ))}
+      <IconButton icon="plus" title={railKind === 'shells' ? 'New terminal' : 'New browser'} onClick={() => railKind !== 'projects' && quickNew(railKind)} />
+    </nav>
+  )
   // back and forward's buttons: the rail's top, else the sidebar's head; a right click lists where each goes
   const histMenu = (e: React.MouseEvent, by: -1 | 1) => {
     e.preventDefault()
@@ -3658,7 +3726,9 @@ export function App() {
       { label: 'Customize the rail…', icon: 'gear', sub: 'which buttons show, their order', run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
     ])
   }
-  const railBar = rail && sideOpen && (
+  // the rail stays while Projects' sidebar is open: a kind whose list is hidden (Terminals, Browsers) keeps it
+  const railUp = rail && (sideOpen || (sideOpens.projects ?? true))
+  const railBar = railUp && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }} onContextMenu={e => !e.defaultPrevented && railMenu(e)}>
       {histNav}
       {kindButton(RAIL[0])}
@@ -3869,14 +3939,15 @@ export function App() {
   )
 
   return (
-    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''}`} data-pad={settings.termPad}>
+    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
       {railBar}
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
-      <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
+      <aside className="sidebar" hidden={!sideOpen || listOff || !!strip} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title={kt('Hide sidebar', 'sidebar')} keyId="sidebar" onClick={() => setSideOpen(false)} />
           {!railBar && histNav}
           <span className="spacer" />
+          {rail && railKind !== 'projects' && !find && <IconButton icon="chevronsLeft" title="Fold the list to a strip · right click: a strip on the right" onClick={() => setStrip(railKind, 'left')} onContextMenu={e => (e.preventDefault(), setStrip(railKind, 'right'))} />}
           <IconButton icon="filter" title={kt(find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR', 'filter')} keyId="filter" on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
           {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
@@ -4017,7 +4088,8 @@ export function App() {
         )}
       </aside>
       )}
-      {sideOpen && !listOff && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
+      {strip === 'left' && stripBar}
+      {sideOpen && !listOff && !strip && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
 
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
@@ -4260,6 +4332,7 @@ export function App() {
         {(dialog === 'settings' || settingsFor || section) && (
           <SettingsPage
             key={settingsKey}
+            own={own}
             settings={view.settings}
             presets={view.presets}
             apps={apps}
@@ -4362,7 +4435,7 @@ export function App() {
           />
         ))(extOf(dialog))}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={extOf(dialog.back ?? null) ? placeName({ d: dialog.back!, ws: null }) : backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
-        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
+        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom * own} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
@@ -4682,7 +4755,7 @@ export function App() {
               </AiFloat>
             )}
             {!aiDock && (
-              <div className={`ai-fab-wrap ${fly}`}>
+              <FabCorner key={ws?.id ?? ''} className={`ai-fab-wrap ${fly}`}>
                 <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => openMenu(e, [{ label: 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
                   <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
                 </button>
@@ -4691,11 +4764,12 @@ export function App() {
                     <Icon name="minus" size={10} />
                   </button>
                 )}
-              </div>
+              </FabCorner>
             )}
           </>
         )}
       </main>
+      {strip === 'right' && stripBar}
       {wideBar && statusBar}
 
       {menu}
@@ -4922,23 +4996,6 @@ export function App() {
           }}
         />
       ))(live.find(w => w.id === dialog.attachPr))}
-      {dialog && typeof dialog === 'object' && 'reviewPr' in dialog && (p => p && (
-        // Review a PR: any PR of the repo, yours or not, checked out in a worktree of its own (gh pr checkout, forks too),
-        // no agent and no setup script, opened on the Review tab once its changes are scanned
-        <Prompt
-          title={`Review a pull request in ${p.name}`}
-          placeholder="https://github.com/owner/repo/pull/12, or 12"
-          hint="Its URL, or its number in this repo: a workspace on its branch (named pr-<n>-<title>), no agent, opened on the Review tab. Run ▾ › Run the setup script if it needs one."
-          onClose={() => setDialog(null)}
-          onSubmit={async pr => {
-            const w = await call<WorkspaceView>('wsNew', { project: p.id, pr, preset: 'none', noSetup: true })
-            setDialog(null)
-            showNew(w.id)
-            setReviewing(m => ({ ...m, [w.id]: true }))
-            done(`Reviewing ${w.name ?? w.id}: its Review tab shows once its changes are read`)
-          }}
-        />
-      ))(view?.projects.find(x => x.id === dialog.reviewPr))}
       {dialog && typeof dialog === 'object' && 'ciLog' in dialog && (w => w && (
         <CiLog
           key={dialog.job}

@@ -103,7 +103,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
     </nav>
   )
   const row = (p: Plan) => (
-    <button key={`${p.project}/${p.kind}/${p.slug}`} className="plans-row" onClick={() => open(p)} onContextMenu={e => api.pin && (e.preventDefault(), openMenu(e, pinItem(p)))}>
+    <button key={`${p.project}/${p.kind}/${p.slug}`} className={`plans-row ${p.kind}`} onClick={() => open(p)} onContextMenu={e => api.pin && (e.preventDefault(), openMenu(e, pinItem(p)))}>
       <Icon name={kindIcon(p.kind)} />
       <span className="plans-title">{p.title}</span>
       <span className={`plans-kind ${p.kind}`}>{KIND_WORDS[p.kind][1]}</span>
@@ -135,6 +135,12 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
         <PlanView key={`${sel.project}/${sel.kind}/${sel.slug}`} at={sel} api={api} projectName={name(sel.project)} onTitle={setSelTitle} onSaved={refresh} onGone={() => up(null)} />
       ) : (
         <div className="plans-index">
+          <header className="sched-hero">
+            <span className="sched-hero-icon">
+              <Icon name={only ? kindIcon(only) : 'spec'} size={20} />
+            </span>
+            <p className="muted">{only ? KIND_SAYS[only] : ALL_SAYS}</p>
+          </header>
           <div className="plans-bar">
             <input className="grow" type="search" value={q} placeholder="Filter by title or project" aria-label="Filter" onChange={e => setQ(e.target.value)} />
             <select value={project} aria-label="Project" onChange={e => setProject(e.target.value)}>
@@ -158,7 +164,6 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
                 </button>
               ))}
             </div>
-            <p className="muted small plans-says">{only ? KIND_SAYS[only] : ALL_SAYS}</p>
           </div>
           {list === null ? (
             <p className="muted small">Loading…</p>

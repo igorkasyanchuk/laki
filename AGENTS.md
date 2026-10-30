@@ -187,13 +187,16 @@ merge base: Changes' and the Review tab's *Uncommitted*, Diff.tsx `useScope`/`at
 --uncommitted`, MCP's `laki_diff`), settings' `editors` (a project's own editor by its id: `openIn` `editor` takes it
 first; App's `editorOf`, a folder's Open in pick sets it), `customCss` in `REMOTE_KEYS`. 123: `presetSave` (`laki
 preset`: one profile by name, `add`, `rm`, `set`; an agent's asked in the app first, main.ts' `presetAsk`, a `toolAsk`
-`cross: 'preset'`), `storageInfo` and `storageTidy` (settings' `storageDays`, `STORAGE_DAYS` 90: a storage folder's
+`cross: 'preset'`), `storageInfo` and `storageTidy` (settings' `storageDays`, `STORAGE_DAYS` 0, never (0.35: 90): a storage folder's
 file not changed for so long goes, hourly, only `ws.storage` folders), links in one hidden `.laki-links.json` per storage
 folder (artifacts.ts `LINKS`: a `.url` file moved into it, `fileUrls`; a `Link`'s `path` is `link:<url>`, not a file;
 `artifactList` files only; `linkRm`), `show`/`showDone` (`laki show`: a tab's `card`, `Card`), `prDetach` of a branch's
 own PR (a workspace's `prOff`: the scan leaves it out until `prAttach`). 124: `ghCard` (`url`: a GitHub PR's or
 issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link, a failure not kept; shared/types.ts
-`GhCard`): a terminal link's hover card (LinkPeek.tsx). A setting the renderer adds
+`GhCard`): a terminal link's hover card (LinkPeek.tsx). 125: a tab's `alias` (`tabSet` `alias`, `ALIAS`: one live tab each; `resolveTarget` `@name`; the CLI's `laki name`,
+`agents`, `ask`, shared/tools.ts `askAgent`, MCP's `laki_name`, `laki_ask_agent`; dropped as its workspace archives), a
+workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` (main.ts `TEST_CLOCK`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
+`linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts

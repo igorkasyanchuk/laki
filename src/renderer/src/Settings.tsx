@@ -4,7 +4,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
+import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
 import { RELEASES_URL, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
@@ -22,7 +22,7 @@ import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
 import { Group, Says, Scope } from './SettingsKit'
-import { CssGuide, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
+import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
 import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection } from './SettingsConnect'
@@ -77,6 +77,17 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['cards', 'Cards', 'A card each, with the agent’s last answer'],
   ['status', 'Status', 'An edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
+// the window's frame (App's data-design and data-dz, styles.css' Design block): how its parts sit together, over the
+// theme; each a set of traits (data-dz's words), the CSS keyed on them
+export const DESIGNS: [Design, string, string, string][] = [
+  ['classic', 'Classic', 'Edge to edge, a line between the parts', ''],
+  ['sections', 'Sections', 'The sidebar a card with each project boxed; the terminals and the side panel cards inside one card', 'chrome side-card boxed body inner pills'],
+  ['cards', 'Cards', 'The sidebar, the terminals and the side panel each a card', 'chrome side-card parts pills shadow'],
+  ['inset', 'Inset', 'One raised card for the terminals and the side panel, the sidebar flat beside the rail', 'chrome body joined'],
+  ['tiles', 'Tiles', 'Every split pane a tile of its own, projects boxed', 'chrome side-card boxed parts tiles pills shadow'],
+  ['soft', 'Soft', 'No lines: tints, round shapes, more room, the side panel floating over the terminals', 'boxed float pills lineless'],
+]
+export const designTraits = (d?: Design) => DESIGNS.find(x => x[0] === d)?.[3] || undefined
 // Appearance's Icons: each pack drawn by these
 const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
 // Appearance's corners (--radius) and where the tabs go
@@ -126,7 +137,7 @@ export type AppSettings = Paint & {
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
   splitNew?: boolean // a new tab opens beside the pane you're on (the daemon's layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
-  pageZoom?: number // Settings and Help's size, one of PAGE_ZOOMS (unset: 1)
+  pageZoom?: number // Settings', Help's and the list pages' size (App's --page-zoom), one of PAGE_ZOOMS (unset: 1)
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
   storageDir?: string // workspaces' storage folders, one per workspace inside (unset: <data>/storage)
   keepStorage?: boolean // a deleted workspace's storage folder stays
@@ -211,6 +222,7 @@ export type AppSettings = Paint & {
   railOrder?: string[] // its buttons' order (RAIL_ITEMS' keys)
   railHide?: string[] // its buttons in ⋯ More
   sideStyle?: SideStyle // the sidebar's rows
+  design?: Design // the window's frame (unset: classic)
   memory?: Memory[] // Global memory: the user's rules for every project's agents
   memoryCompact?: { on?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own, on unless false (daemon/memory.ts)
   imageDays?: number // pasted images and attached files kept this many days (unset: IMAGE_DAYS)
@@ -358,6 +370,7 @@ const FIND: [string, string, string?][] = [
   ['ai', 'Keep pasted images (days)', 'images screenshots files attached storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
+  ['appearance', 'Design', 'layout frame window cards sections tiles inset soft rounded corners padding gaps style variation'],
   ['appearance', 'Fun button', 'meme reddit smiley break joke'],
   ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
@@ -375,7 +388,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Accent color', 'colour highlight'],
   ['appearance', 'Corners', 'radius rounded square'],
   ['appearance', 'Full-width status bar', 'status bar wide bottom zed'],
-  ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
+  ['appearance', 'Pages size', 'zoom text font size small bigger larger readable page settings help scheduled tasks workflows specs brainstorms'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
@@ -813,6 +826,7 @@ function CliField({ api, onSkill }: { api: CliApi; onSkill?: () => void }) {
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
 export function SettingsPage(p: {
+  own?: number // its own ⌘± size (App's), over Pages size
   settings: AppSettings
   apps: AppInfo[]
   onSave: (s: AppSettings) => void
@@ -925,7 +939,7 @@ export function SettingsPage(p: {
   useEffect(() => setS(x => (x.pageZoom === settings.pageZoom ? x : { ...x, pageZoom: settings.pageZoom })), [settings.pageZoom])
   useEffect(() => setS(x => (x.notify === settings.notify ? x : { ...x, notify: settings.notify })), [settings.notify]) // ⌘K's switch
   // the page grows with the terminal's font size, from 13px as 100%, times its own size (Appearance)
-  const scale = ((s.fontSize ?? FONT_SIZE) / FONT_SIZE) * (PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom! : 1)
+  const scale = ((s.fontSize ?? FONT_SIZE) / FONT_SIZE) * (PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom! : 1) * (p.own ?? 1)
   const project = p.projects?.find(x => `project:${x.id}` === sec)
   // saved a moment after the last change, or on closing before that
   const first = useRef(true)
@@ -1081,7 +1095,7 @@ export function SettingsPage(p: {
     </Group>
   )
   return (
-    <div className="settings-page" style={{ zoom: scale }}>
+    <div className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties}>
       <div className="settings-head">
         <b>Settings</b>
         <span className="grow" />
@@ -1420,6 +1434,17 @@ export function SettingsPage(p: {
           {sec === 'appearance' && (
             <>
               <h2>Appearance</h2>
+              <Group title="Design" hint="How the window's parts sit together: the sidebar, the tabs, the terminals and the side panel. Over the theme; not on a phone or in full screen, where it's Classic">
+                <div className="designs" role="radiogroup" aria-label="Design">
+                  {(on => DESIGNS.map(([k, name, what, traits]) => (
+                    <button key={k} type="button" role="radio" aria-checked={on === k} className={`design-card ${on === k ? 'on' : ''}`} onClick={() => set({ design: k })}>
+                      <DesignMini traits={traits} />
+                      <b>{name}</b>
+                      <span className="muted small">{what}</span>
+                    </button>
+                  )))(designTraits(s.design) ? s.design : 'classic') /* one it no longer has: Classic, as the window */}
+                </div>
+              </Group>
               <Group title="Interface" hint="Tabs, menus, dropdowns, the status bar and tooltips: one font and one size. The preview changes as you do">
               <InterfacePreview />
               <div className="setting-box">
@@ -1443,8 +1468,8 @@ export function SettingsPage(p: {
                 </Switch>
               </div>
               <div className="grid2">
-                <label data-tip="While Settings or Help is open, ⌘+ and ⌘− change it too (⌘0: 100%)">
-                  Settings &amp; Help size
+                <label data-tip="Settings, Help, Scheduled tasks, Workflows' list, Specs & Brainstorms' list, Achievements and project pages. ⌘+ and ⌘− on any page size that page alone, kept for it (⌘0: back to 100%)">
+                  Pages size
                   <select value={PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom : 1} onChange={e => set({ pageZoom: Number(e.target.value) })}>
                     {PAGE_ZOOMS.map(z => (
                       <option key={z} value={z}>
@@ -1574,13 +1599,15 @@ export function SettingsPage(p: {
                 </label>
                 {lookRows('sideLook', SIDE_LOOK)}
               </div>
-              <h4 className="set-sub">Project names</h4>
-              <div className="setting-box">
-                <label className="switch-row">
-                  <FontPick value={s.projectLook?.font && s.projectLook.font !== 'theme' ? s.projectLook.font : ''} label="Project names' font" first={[['', "Theme's (default)"], ['ui', 'Interface'], ['mono', 'Monospace']]} dev={devFonts()} onChange={v => set({ projectLook: { ...s.projectLook, font: v || 'theme' } })} />
-                  <Says title="Font" hint="The projects' heads: Laki's own, the developer fonts, every other font on this Mac" />
-                </label>
-                {lookRows('projectLook', PROJECT_LOOK)}
+              <div className="set-subgroup">
+                <h4 className="set-sub">Project names</h4>
+                <div className="setting-box">
+                  <label className="switch-row">
+                    <FontPick value={s.projectLook?.font && s.projectLook.font !== 'theme' ? s.projectLook.font : ''} label="Project names' font" first={[['', "Theme's (default)"], ['ui', 'Interface'], ['mono', 'Monospace']]} dev={devFonts()} onChange={v => set({ projectLook: { ...s.projectLook, font: v || 'theme' } })} />
+                    <Says title="Font" hint="The projects' heads: Laki's own, the developer fonts, every other font on this Mac" />
+                  </label>
+                  {lookRows('projectLook', PROJECT_LOOK)}
+                </div>
               </div>
               <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
                 <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />

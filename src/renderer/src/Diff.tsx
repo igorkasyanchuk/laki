@@ -620,10 +620,12 @@ function Suggested({ t, lines, text, pending = [], busy, onApply }: { t: Thread;
 // ⌘F in a diff (Changes, the full review): App sends 'laki-find' to the [data-find] the pointer was in last (the full
 // review's when it's shown). Its words found in the lines' text (not their numbers or buttons), marked with the CSS
 // Custom Highlight API: nothing in the diff is redrawn. ⏎ next, ⇧⏎ previous, Esc closes; found again as files open and
-// close. ponytail: a folded file's lines aren't drawn, so they aren't found; a match within one line's text only
+// close. A folded file's lines aren't drawn: unfold opens the ones that match first. ponytail: a match within one line's text only
 const FIND_MAX = 2000
 let finding: object | null = null // the bar whose marks the highlights are: the last to search (Changes' and the review's share them)
-export function DiffFind({ at, within = at }: { at: RefObject<HTMLElement | null>; within?: RefObject<HTMLElement | null> }) {
+// unfold: the folded files whose lines have the words opened, so they're drawn and found (two characters at least: one
+// would open nearly every file)
+export function DiffFind({ at, within = at, unfold }: { at: RefObject<HTMLElement | null>; within?: RefObject<HTMLElement | null>; unfold?: (word: string) => void }) {
   const [seq, setSeq] = useState(0) // 0: closed; each ⌘F: focused again
   const [q, setQ] = useState('')
   const [hit, setHit] = useState({ i: 0, n: 0 })
@@ -675,6 +677,7 @@ export function DiffFind({ at, within = at }: { at: RefObject<HTMLElement | null
   useEffect(() => {
     cur.current = 0
     search(true)
+    if (seq && q.length > 1) unfold?.(q.toLowerCase())
   }, [q, seq > 0])
   // files opened, folded or read again: the same words found again, where it was
   useEffect(() => {
@@ -682,7 +685,7 @@ export function DiffFind({ at, within = at }: { at: RefObject<HTMLElement | null
     if (!seq || !q || !el) return
     let t: ReturnType<typeof setTimeout>
     const mine = (n: Node) => !!(n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement)?.closest('.diff-find-at') // the bar's own count: not the diff
-    const mo = new MutationObserver(m => m.some(x => !mine(x.target)) && (clearTimeout(t), (t = setTimeout(() => search(false), 250))))
+    const mo = new MutationObserver(m => m.some(x => !mine(x.target)) && (clearTimeout(t), (t = setTimeout(() => search(!ranges.current.length), 250)))) // none before (all folded): to the first
     mo.observe(el, { childList: true, subtree: true, characterData: true })
     return () => (mo.disconnect(), clearTimeout(t))
   }, [seq > 0, q])

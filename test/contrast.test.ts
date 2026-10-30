@@ -5,17 +5,17 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { THEMES, contrast as ratio, readable } from '../src/renderer/src/themes.ts'
 
-// what sits on what, and how much it needs: 4.5 for text, 3 for hints, bold labels and marks (2.5 for a status mark on
-// the selection: its shape tells it too); a selection, a hovered row and a line need only to show
+// what sits on what, and how much it needs: 4.5 for text, hints and status words alike (3.5 for a hint on the selection;
+// 2.5 for a status mark there: its shape tells it too); a selection, a hovered row and a line need only to show
 const PAIRS: [string, string, number][] = [
   ['fg', 'panel', 4.5],
   ['fg', 'raised', 4.5],
   ['fg', 'sel', 4.5],
-  ['muted', 'panel', 3],
-  ['muted', 'raised', 3],
-  ['muted', 'sel', 3],
+  ['muted', 'panel', 4.5],
+  ['muted', 'raised', 4.5],
+  ['muted', 'sel', 3.5],
   ['accentFg', 'accent', 4.5],
-  ...['running', 'waiting', 'done', 'error'].flatMap(k => [[k, 'panel', 3], [k, 'sel', 2.5]] as [string, string, number][]),
+  ...['running', 'waiting', 'done', 'error'].flatMap(k => [[k, 'panel', 4.5], [k, 'raised', 4.5], [k, 'sel', 2.5]] as [string, string, number][]),
   ['sel', 'bg', 1.2],
   ['line', 'bg', 1.15],
 ]
@@ -49,8 +49,10 @@ test('contrast: every theme is readable', () => {
     const rail = side.map(x => hex(rgb(x).map(v => v * (t.light ? 0.94 : 0.82))))
     const on = (what: string, color: string, bgs: string[], min: number) => bgs.forEach(b => need(what, color, b, min))
     on('fg', c.fg, [...bg, ...side], 4.5)
-    on('muted', c.muted, [...bg, ...side, ...rail], 3)
-    for (const k of ['running', 'waiting', 'done', 'error']) on(k, c[k], [...bg, ...side], 3)
+    on('muted', c.muted, [...bg, ...side, ...rail], 4.5)
+    for (const k of ['running', 'waiting', 'done', 'error']) on(k, c[k], [...bg, ...side], 4.5)
+    // the text a step above its hints
+    need('fg over muted', c.fg, c.muted, 1.3)
     if (!t.grad) need('raised on side', c.raised, c.side, 1.07)
     // the terminal: its colors as text (black and white aside: a light theme's are the background's), its dim grey;
     // 1-6 are the diff's, the tab colors' and the PR marks' too: in the sidebar and on panels
@@ -58,7 +60,7 @@ test('contrast: every theme is readable', () => {
     for (const i of [1, 2, 3, 4, 5, 6]) on(`ansi ${i}`, ansi[i], [...bg, ...side, c.panel], 3)
     on('ansi 8', ansi[8], bg, 2.5)
     // the accent as text: applyTheme's --accent-ink
-    for (const b of [...bg, c.panel]) need('accent text', readable(c.accent, [...bg, c.panel]), b, 4.5)
+    for (const b of [...bg, c.panel, ...side]) need('accent text', readable(c.accent, [...bg, c.panel, ...side]), b, 4.5)
   }
   assert.deepEqual(bad, [])
 })

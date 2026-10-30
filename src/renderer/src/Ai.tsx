@@ -10,7 +10,7 @@ import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
 import { type Complete, type Img, type Inserts, PromptInput, useDraft } from './PromptInput'
-import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
+import { ask as confirm, escapes, Icon, IconButton, Page, usePageSide } from './ui'
 import type { UiSpec } from '../../shared/widgetUi'
 import { CELL_W, KitBody } from './Widgets'
 
@@ -74,6 +74,7 @@ export function AiPage({
 }) {
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
+  const [side, sideBtn] = usePageSide('ai') // the earlier chats' list
   const [text, setText, images, setImages] = useDraft('ai:') // the AI page's, the floating chat's and the AI window's are one
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -288,9 +289,20 @@ export function AiPage({
       </div>
     )
   return (
-    <Page title="Laki AI" onClose={onClose} wide esc={false} /* a page to stay on: Esc is the prompt's, never a close */>
+    <Page
+      title="Laki AI"
+      head={
+        <>
+          {sideBtn}
+          <b>Laki AI</b>
+        </>
+      }
+      onClose={onClose}
+      wide
+      esc={false} /* a page to stay on: Esc is the prompt's, never a close */
+    >
       <div className="ai-page ai-split">
-        <aside className="ai-chats" aria-label="Chats">
+        <aside className="ai-chats" aria-label="Chats" hidden={!side}>
           <button className="ai-new primary" disabled={!d?.chat.length || d.busy} data-tip={d?.busy ? 'It works on this one: stop it first' : 'Start a new conversation: this one stays below'} onClick={newChat}>
             <Icon name="plus" size={12} /> New chat
           </button>

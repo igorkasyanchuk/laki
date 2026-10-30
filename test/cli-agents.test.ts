@@ -284,4 +284,15 @@ test("cli: laki show puts a card under the agent's tab (a folder, a file, a link
   r = await as('preset', 'add', 'claude-ask', '--perm', 'auto')
   assert.match(r.err, /says yes in Laki's window, and it isn't open/)
   assert.ok(!(await rig.rpc('state')).presets.some((x: any) => x.name === 'claude-ask'))
+  // the window open: the whole change in the question, never cut (a long model name can't push the mode out of sight)
+  const app = await connect(rig)
+  const model = `m${'x'.repeat(3000)}`
+  const going = as('preset', 'add', 'claude-ask', '--model', model, '--perm', 'bypassPermissions')
+  const ask = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'preset'), 'asked in the app', 30000)
+  assert.ok(ask.text.startsWith('What changes:') && ask.text.includes(model) && ask.text.indexOf('bypassPermissions') > ask.text.indexOf(model), ask.text.slice(0, 200))
+  await rig.rpc('widgetToolAnswer', { req: ask.req, allow: 'deny' })
+  assert.match((await going).err, /the user said no/)
+  app.close()
+  // a kept link is the user's: an agent can't take it off
+  await assert.rejects(rig.rpc('linkRm', { ws: ws.id, url: 'https://x.dev/', from: { ws: ws.id, tab: tab.id } }), /an agent can't take a kept link off/)
 })

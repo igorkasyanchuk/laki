@@ -802,8 +802,7 @@ review decision, size, checks (each links to its run) and description, as in *Re
 when *failing CI* or *conflicts* gave up (turn it off and on to try again), and *Send now* beside one when there's
 something to send to the agent now. Its ⋯ has *Not this workspace's PR*: it moves to *related*; a linked one
 (another branch's) gives way to the branch's own PR, once there is one; the branch's own is kept off until you attach
-it again. **Review a PR…** (a project's + and ⋯, ⌘K): any PR of the repo, yours or not, by its link or number, in a
-workspace of its own (`gh pr checkout`, forks too; no agent, no setup script) opened on the Review tab.
+it again.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
 1 to 30 minutes), and a couple of seconds after an agent's turn ends (at most every 20 seconds), so a PR the agent just
@@ -1824,7 +1823,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   the strip and open in the browser on a click (a right click: *Copy link*, *Remove the link*),
   and *Info* lists them under *links*. In Files' *Artifacts*, an HTML file opens as a page (*Source*: its text).
   Settings › General › Storage shows how much the folder holds (*Show in Finder*) and *Delete files after*: a file
-  that hasn't changed for 7, 30, 60, 90 (the default) or 180 days or a year goes, checked hourly, or never; only the
+  that hasn't changed for 7, 30, 60, 90 or 180 days or a year goes, checked hourly, or never (the default); only the
   workspaces' own folders, never anything else in the storage folder. Archiving keeps it; deleting the workspace (or removing its
   project) deletes it too, unless *Keep a deleted workspace's storage* is on. None for Terminals, Browsers and SSH hosts.
   An HTML or Markdown file opens in a viewer over the app (*Open HTML and Markdown artifacts*: *In Laki*, the default, or
@@ -1891,7 +1890,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   workspace each: plan the tasks and what waits on what, start them (`laki new`), read and follow them up (`laki
   screen`, `laki send`), take each one's `LAKI_WORKER_DONE` / `LAKI_WORKER_BLOCKED` report and bring the results
   together; in Laki's Claude Code tabs it's also `/laki:orchestrate <the work>`, in its OpenCode tabs `/laki-orchestrate <the work>`. An agent reads and messages the
-  workspaces it started without Laki asking you; any other workspace, Laki asks first.
+  workspaces it started without Laki asking you; any other workspace, Laki asks first. Agents can also talk by name:
+  `laki name <name>` in one's tab makes it `@<name>` for the others (`laki agents` lists them), `laki ask @<name>
+  "<question>"` asks it and prints its reply, `laki send @<name>` tells it something; MCP's `laki_name` and
+  `laki_ask_agent` do the same. A tab keeps its name until it closes or its workspace is archived; the tab bar shows it.
   It holds the app's path: update it after moving the app. A skill installed with other text than this Laki's (an
   older Laki's, or edited) says *out of date*, with *Update* (*Update all* for several); the app shows a bar with
   *Update* too, until *Not now*. One set up by another Laki (another data folder) says so, with *Use this one*. *Remove* takes only its own files. Below it, *MCP
@@ -2005,6 +2007,9 @@ laki new app --after-limit --prompt "…"                 # its agent once the p
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
 laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
+laki name backend                                       # in an agent's tab: other agents reach it as @backend, in any workspace
+laki agents                                             # the named agents: where, which agent, what they're doing
+laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 laki screen fix-the-login/claude
 laki diff fix-the-login [--uncommitted] | run fix-the-login | ship fix-the-login -m "Fix redirect"

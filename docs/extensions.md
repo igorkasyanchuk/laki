@@ -934,9 +934,10 @@ and commit it. Folders and one-file extensions both work.
 - Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`,
   `laki_extension_check`; `fixtures/<name>.json` is the one folder they may write):
   they make or change extensions in Laki's own folder. A new one is saved off: its fetch runs commands, so you look, then
-  turn it on. One that's on stays on as Laki AI changes it; any other writer's change (an agent in a tab, an MCP client
-  outside Laki) turns it off when what it runs changes (its commands would run outside that agent's sandbox). They
-  never delete one.
+  turn it on. One that's on stays on only when Laki AI changes it from that extension's own page chat (its *Edit*
+  chat, where you watch each change; an agent can't ask there). Any other writer (Laki AI in another chat, an agent
+  in a tab, an MCP client outside Laki) turns it off, and its network access with it, when what it runs changes (its
+  commands would run outside that agent's sandbox). They never delete one.
 
 ## Safety
 

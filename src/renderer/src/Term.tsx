@@ -69,27 +69,39 @@ export function Term({
   file.current = onFile
   const props = useRef({ onReply, image, cwd })
   props.current = { onReply, image, cwd }
-  // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both
+  // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both. xterm
+  // drops the hovered link as its rows redraw and finds it again at once (a leave, then a hover): a TUI that redraws
+  // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
+  // link stays (peekAt) and only a leave that lasts 250 ms ends it
   const [peek, setPeek] = useState<Peek | null>(null)
-  const peekT = useRef(0)
+  const showT = useRef(0)
+  const hideT = useRef(0)
+  const peekAt = useRef('')
   // a path as an absolute one: a relative one under the workspace's folder ('' with none: a floated tab's)
   const absOf = (p: string) => (p.startsWith('/') ? p : props.current.cwd ? `${props.current.cwd}/${p.replace(/^\.\//, '')}` : '')
   const peekOn = (e: MouseEvent, uri: string) => {
-    clearTimeout(peekT.current)
     const path = filePath(uri) || (/^[a-z]+:/i.test(uri) ? '' : uri)
     const abs = path && absOf(path)
     const at = abs || uri
     // a file's picture needs a reader; a web one, https (the daemon's /img)
     if ((path && !abs) || !peekOf(at) || (abs ? !props.current.image : !/^https:/i.test(at))) return false
+    clearTimeout(hideT.current)
+    if (peekAt.current === at) return true
+    clearTimeout(showT.current)
+    peekAt.current = at
     const { clientX: x, clientY: y } = e
-    peekT.current = window.setTimeout(() => setPeek({ uri: at, x, y, image: abs ? () => props.current.image!(abs) : undefined }), 400)
+    showT.current = window.setTimeout(() => setPeek({ uri: at, x, y, image: abs ? () => props.current.image!(abs) : undefined }), 400)
     return true
   }
-  const peekOff = () => (clearTimeout(peekT.current), (peekT.current = window.setTimeout(() => setPeek(null), 250)))
+  const peekGone = () => (clearTimeout(showT.current), clearTimeout(hideT.current), (peekAt.current = ''), setPeek(null))
+  const peekOff = () => (clearTimeout(hideT.current), (hideT.current = window.setTimeout(peekGone, 250)))
   // Reply: a pill under the selection as the mouse lets go, to quote it to an agent
   const [pill, setPill] = useState<{ x: number; y: number; text: string } | null>(null)
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
+  // the scroll button (on hover): to the top of the scrollback, and back down from there. ponytail: xterm's own scrollback
+  // only; a TUI on the alternate screen (claude's fullscreen) keeps its own, so none there
+  const [jump, setJump] = useState<'top' | 'end' | null>(null)
   const find = findSeq !== closedAt
   useEffect(() => {
     let over = false // the pointer is on a link
@@ -171,6 +183,12 @@ export function Term({
       if (e.button === 0 && props.current.onReply) setTimeout(() => term.getSelection().trim() && setPill({ x: e.clientX, y: e.clientY, text: term.getSelection() })) // after xterm's own mouseup ends the selection
     })
     term.element?.addEventListener('wheel', () => setPill(null), { passive: true }) // a scroll of yours: new output scrolls too, and keeps it
+    const where = () => {
+      const b = term.buffer.active
+      setJump(b.type !== 'normal' || !b.baseY ? null : b.viewportY > 0 ? 'top' : 'end')
+    }
+    term.onScroll(where)
+    term.buffer.onBufferChange(where)
     try {
       const gl = new WebglAddon()
       gl.onContextLoss(() => gl.dispose())
@@ -201,7 +219,7 @@ export function Term({
         const r = await api.call('attach', { tab, cols: term.cols, rows: term.rows })
         if (!alive) return
         term.reset()
-        term.write(r.snapshot)
+        term.write(r.snapshot, where) // the scroll button as the snapshot leaves it
       } catch (e) {
         if (alive && !quiet) term.write(`\r\n\x1b[2m[${(e as Error).message}]\x1b[0m\r\n`) // quiet: a closed tab's, going
       }
@@ -257,7 +275,8 @@ export function Term({
     xterms.set(tab, term)
     return () => {
       alive = false
-      clearTimeout(peekT.current)
+      clearTimeout(showT.current)
+      clearTimeout(hideT.current)
       api.send('detach', { tab })
       off()
       ro.disconnect()
@@ -305,6 +324,11 @@ export function Term({
           xt.term.focus()
         }}
       />
+      {jump && xt && !find && (
+        <button type="button" className="term-jump" aria-label={jump === 'top' ? 'Scroll to the top' : 'Scroll to the end'} data-tip={jump === 'top' ? 'Scroll to the top' : 'Back to the end'} onMouseDown={e => e.preventDefault() /* the keyboard stays in the terminal */} onClick={() => (jump === 'top' ? xt.term.scrollToTop() : xt.term.scrollToBottom())}>
+          <Icon name={jump === 'top' ? 'arrowUp' : 'arrowDown'} size={13} />
+        </button>
+      )}
       {find && xt && <FindBar term={xt.term} search={xt.search} seq={findSeq} onClose={() => setClosedAt(findSeq)} />}
       {pill && onReply && (
         <button
@@ -317,7 +341,7 @@ export function Term({
           <Icon name="reply" size={12} /> Reply
         </button>
       )}
-      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(peekT.current)} onLeave={() => setPeek(null)} />}
+      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} />}
     </>
   )
 }

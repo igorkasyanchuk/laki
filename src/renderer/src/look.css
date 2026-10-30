@@ -426,8 +426,9 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='starship'] .ws.sel { background: var(--accent); color: #000; font-weight: 700; }
 [data-look='starship'] .settings-nav button { border-radius: 0 999px 999px 0; }
 [data-look='starship'] .settings-nav button.on { background: var(--peri); color: #000; }
-[data-look='starship'] .project-head { margin: 6px 40px 2px 0; border-radius: 0 999px 999px 0; background: var(--peri); color: #000; height: 22px; }
+[data-look='starship'] .project-head { margin: 6px 40px 2px 0; border-radius: 0 999px 999px 0; background: var(--peri); color: #000; height: 22px; min-height: 0; }
 [data-look='starship'] .project-head .ib { width: 20px; height: 20px; color: #000; }
+[data-look='starship'] .project-head :is(.project-chev, .project-icon, .project-count) { color: inherit; } /* black on the band, as its name */
 [data-look='starship'] .settings-main h2 { color: var(--accent-ink); }
 [data-look='starship'] .settings-main h2::after { content: ''; display: inline-block; width: 60px; height: 0.55em; margin-left: 10px; border-radius: 999px; background: var(--lav); }
 [data-look='starship'] .sidebar { border-right: 8px solid transparent;
@@ -550,7 +551,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='chalk'] .ws.sel { background: transparent; border-left-color: transparent; margin: 0 6px; padding-left: 6px;
   border-radius: 50px 38px 60px 44px / 16px 22px 14px 20px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent); }
 [data-look='chalk'] .settings-nav button.on { background: transparent; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 40px 30px 46px 34px / 14px 18px 12px 16px; }
-[data-look='chalk'] .status { --muted: #f2e3cb; --running: #9fd3ff; --waiting: #ffe27a; --done: #b9f0a8; --error: #ffaea1; border-top: 2px solid #c08a52; background: linear-gradient(180deg, #8a5c30, #6e4522 55%, #5a3818); color: #f6ead6; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+[data-look='chalk'] .status { --muted: #f2e3cb; --running: #9fd3ff; --waiting: #ffe27a; --done: #b9f0a8; --error: #ffd6cf; border-top: 2px solid #c08a52; background: linear-gradient(180deg, #8a5c30, #6e4522 55%, #5a3818); color: #f6ead6; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
 [data-look='chalk'] .status .menu-backdrop { --muted: var(--board-muted); text-shadow: none; } /* its popups are on the board */
 [data-look='chalk'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 2px var(--chalk); }
 [data-look='chalk'] .toggle.on .toggle-track { background: color-mix(in srgb, var(--accent) 70%, transparent); }
@@ -626,7 +627,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='riso'] { --radius: 4px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --pink: #ff48b0; --blue: #0078bf; --yellow: #ffe800; }
 [data-look='riso'] :is(.settings-main h2, .tunnel-head b, .modal h3) { color: var(--blue); font-weight: 800; text-shadow: 2px 1px 0 color-mix(in srgb, var(--pink) 70%, transparent); }
 [data-look='riso'] .settings-main h2 { font-size: 20px; letter-spacing: -0.3px; }
-[data-look='riso'] .project-head { color: var(--blue); text-shadow: 1px 1px 0 color-mix(in srgb, var(--pink) 60%, transparent); }
+[data-look='riso'] .project-head { color: #006aa8; text-shadow: 1px 1px 0 color-mix(in srgb, var(--pink) 60%, transparent); }
 [data-look='riso'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1.5px solid var(--blue); border-radius: var(--rs, 4px); background: transparent;
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--pink) 55%, transparent); }
 [data-look='riso'] :is(.buttons button, .seg button, .scripts-tabs button):active { transform: translate(2px, 2px); box-shadow: none; }
@@ -893,6 +894,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='luna'] .tabbar .tab:not(.sel) .glyph { color: inherit; --running: currentColor; } /* white on the blue bar */
 [data-look='luna'] :is(.side-foot, .timer-bar) { --muted: #0e2a6b; color: #05102c; } /* on the task pane's blue */
 [data-look='luna'] .sidebar { background: linear-gradient(180deg, #7ba2e7, #6375d6); border-right: 1px solid #002c9b; }
+[data-look='luna'] .need:not(:hover) { background: #f4f7fc; } /* a card on the task pane's blue, as its groups */
 [data-look='luna'] .side-head .ib { color: #fff; }
 [data-look='luna'] .project-head { margin: 8px 8px 0; border-radius: var(--rs, 6px) var(--rs, 6px) 0 0; background: linear-gradient(90deg, #ffffff, #c6d3f7); color: #215dc6; text-transform: none; font-size: 12px; letter-spacing: 0; }
 [data-look='luna'] .project-head .ib { color: #215dc6; }
@@ -916,7 +918,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 
 /* Quest: a role-playing game's menus. Blue gradient windows in a white frame, a ▶ pointer on the choice, a gold
    main button, a pixel type for the headings */
-[data-look='quest'] { --radius: 8px; --win: linear-gradient(180deg, #2a4ec4, #0c1f78 70%, #08155a); --pixel: Silom, Chicago, Monaco, var(--mono); }
+[data-look='quest'] { --radius: 8px; --win: linear-gradient(180deg, #1c3a9e, #0c1f78 70%, #08155a); --pixel: Silom, Chicago, Monaco, var(--mono); }
 [data-look='quest'] :is(.settings-main h2, .tunnel-head b, .project-head, .tab, button.primary) { font-family: var(--pixel); }
 [data-look='quest'] .settings-main h2 { color: #fff; text-shadow: 2px 2px 0 #000a2e; letter-spacing: 1px; }
 [data-look='quest'] .project-head { color: #ffd84a; text-shadow: 1px 1px 0 #000a2e; }
@@ -931,7 +933,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='quest'] .menu-item:hover { background: rgba(255, 255, 255, 0.1); }
 [data-look='quest'] .menu-item:hover::before { content: '\25B6'; position: absolute; left: 5px; font-size: 10px; color: #fff; text-shadow: 1px 1px 0 #000a2e; }
 [data-look='quest'] :is(.tabbar, .settings-head) { --tab-line: 3px solid #fff; border-bottom: 3px solid #fff; }
-[data-look='quest'] .status { border-top: 3px solid #fff; background: var(--win); --running: #7fd0ff; --waiting: #ffd84a; --done: #7fff8a; --error: #ff8f8f; }
+[data-look='quest'] .status { border-top: 3px solid #fff; background: var(--win); --running: #7fd0ff; --waiting: #ffd84a; --done: #7fff8a; --error: #ff9a9a; }
 [data-look='quest'] .tab.sel { background: var(--win); border: 2px solid #fff; border-bottom: none; color: #ffd84a; box-shadow: none; }
 [data-look='quest'] .ws.sel { background: transparent; border-left-color: transparent; color: #ffd84a; }
 [data-look='quest'] .ws.sel::before { content: '\25B6'; font-size: 9px; margin-left: -10px; color: #fff; }
@@ -1205,7 +1207,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='transit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--line); border-radius: var(--rs, 3px); }
 [data-look='transit'] .menu { --fg: #fff; --muted: #a8a8a0; --sel: #2c2c2c; --line: #3a3a3a; border: none; border-radius: var(--rs, 4px); background: var(--sign); color: #fff; box-shadow: inset 0 3px 0 #fff, 0 14px 34px rgba(0, 0, 0, 0.35); }
 [data-look='transit'] :is(.modal, .tunnel-pop) { border: none; border-top: 6px solid var(--sign); border-radius: var(--rs, 4px); }
-[data-look='transit'] .status { --fg: #fff; --muted: #a8a8a0; border-top: none; background: var(--sign); color: #d8d8d0; }
+[data-look='transit'] .status { --fg: #fff; --muted: #a8a8a0; --running: #6aa8ff; --waiting: #f0a050; --done: #3ecf7a; --error: #ff6b62; border-top: none; background: var(--sign); color: #d8d8d0; }
 [data-look='transit'] .tab { font-weight: 600; }
 [data-look='transit'] .settings-nav button.on { background: var(--sel); color: var(--sign); font-weight: 700; }
 [data-look='transit'] .toggle.on .toggle-track { background: var(--done); }
@@ -1353,6 +1355,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   --rivet: radial-gradient(circle, #6a6e74 0 1.5px, transparent 2px); --steel: linear-gradient(180deg, #c8ccd2, #8e939a); }
 [data-look='workshop'] :is(.sidebar, .settings-nav) { background: var(--grain); }
 [data-look='workshop'] .tabbar { background: radial-gradient(circle, #1a1008 0 2.5px, transparent 3px) 0 0 / 16px 16px, #6a4f32; }
+[data-look='workshop'] .tabbar .ib { color: #d2c6ba; } /* on the wood */
 [data-look='workshop'] .tab { background: #2a1d14; }
 [data-look='workshop'] .tab.sel { background: var(--bg); }
 [data-look='workshop'] .status { --fg: #1a1008; --muted: #4a3520; --waiting: #7a4f00; --done: #2f6a1a; --error: #a8200a; --running: #1a4f8a; --accent: #a8200a; --accent-ink: #a8200a; border-top: none; color: var(--fg);
@@ -1585,7 +1588,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='diner'] .settings-nav button.on { background: var(--sel); border-radius: var(--rs, 8px); box-shadow: inset 3px 0 0 var(--accent); }
 [data-look='diner'] .tabbar { border-bottom: none; padding-bottom: 6px; background: linear-gradient(var(--side), var(--side)) top / 100% calc(100% - 6px) no-repeat, repeating-conic-gradient(#2a1e1e 0 25%, #fff 0 50%) 0 100% / 12px 12px; } /* a checkerboard floor */
 [data-look='diner'] .tab.sel { box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
-[data-look='diner'] .status { background: var(--chrome); color: #2a1e1e; --muted: #5a4e4a; --running: #266ea6; --waiting: #8d610b; --done: #257853; --error: #c0182d; border-top: 1px solid #a8aeb3; }
+[data-look='diner'] .status { background: var(--chrome); color: #2a1e1e; --muted: #5a4e4a; --running: #1e5885; --waiting: #714e09; --done: #1d5e41; --error: #a51527; border-top: 1px solid #a8aeb3; }
 [data-look='diner'] .term-wrap::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; z-index: 2; pointer-events: none; background: linear-gradient(90deg, var(--accent), #ef7a8a, var(--accent)); opacity: 0.7; }
 [data-look='diner'] .toggle.on .toggle-track { background: var(--accent); }
 [data-look='diner'] .toggle-knob { background: var(--chrome); }
@@ -2107,7 +2110,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='riptear'] .ws.sel { background: linear-gradient(90deg, rgba(242, 58, 30, 0.24), transparent); border-left-color: var(--hell); }
 [data-look='riptear'] .settings-nav button.on { background: rgba(242, 58, 30, 0.16); box-shadow: inset 2px 0 0 var(--hell); }
 [data-look='riptear'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hell)), 0 8px 12px -10px var(--hell); }
-[data-look='riptear'] .status { border-top: 2px solid #6a625c; background: linear-gradient(#3a3532, #24201e); }
+[data-look='riptear'] .status { border-top: 2px solid #6a625c; background: linear-gradient(#3a3532, #24201e); --error: #ff756a; }
 [data-look='riptear'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 130%, rgba(242, 58, 30, 0.12), transparent 60%); }
 [data-look='riptear'] :is(.board-col, .board-card) { border-color: #4a2a1e; }
 [data-look='riptear'] .toggle.on .toggle-track { background: var(--hell); }
@@ -2422,7 +2425,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 /* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
 :is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }
 /* the same for a selected row filled with one */
-:is([data-look='brutal'], [data-look='classic'], [data-look='aqua'], [data-look='starship'], [data-look='luna']) .ws.sel .glyph { color: inherit; --running: currentColor; }
+:is([data-look='brutal'], [data-look='classic'], [data-look='aqua'], [data-look='starship'], [data-look='luna'], [data-look='cassette'], [data-look='receipt'], [data-look='phantom']) .ws.sel :is(.glyph, .ws-pr) { color: inherit; --running: currentColor; } /* a PR's mark too: its shape tells its state */
 
 /* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
    theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */

@@ -112,6 +112,34 @@ export function InterfacePreview() {
   )
 }
 
+// a design in small (Appearance › Design): the rail, the sidebar with a project, the tabs, two panes and the side panel,
+// drawn by styles.css' .dz in this theme's colors
+export function DesignMini({ traits }: { traits: string }) {
+  return (
+    <div className="dz" data-dz={traits || undefined} aria-hidden>
+      <i className="dz-rail" />
+      <div className="dz-side">
+        <i className="dz-proj" />
+        <i className="dz-proj" />
+      </div>
+      <div className="dz-main">
+        <div className="dz-tabs">
+          <i className="on" />
+          <i />
+        </div>
+        <div className="dz-body">
+          <div className="dz-wrap">
+            <i className="dz-term" />
+            <i className="dz-term" />
+          </div>
+          <i className="dz-panel" />
+        </div>
+        <i className="dz-status" />
+      </div>
+    </div>
+  )
+}
+
 // the sidebar with these settings: a project's head and three rows (the app's own classes and attributes)
 export function SidePreview({ sl, pl, style }: { sl?: SideLook; pl?: ProjectLook; style?: string }) {
   const rows: [string, string, boolean][] = [

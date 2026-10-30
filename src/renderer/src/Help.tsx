@@ -2,7 +2,7 @@
 // CLI's main commands, laid out like Settings: a nav (a filter, the sections, the one in view lit) beside the
 // page. Each section and named row has a stable id, `help-<id>` (`window`, `widgets`…), for a laki://help#<id>
 // later. cli: the app's command.
-import { Fragment, isValidElement, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, Fragment, isValidElement, type ReactNode, useEffect, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { Glyph } from './Glyph'
 import { REPO } from './panels'
@@ -235,7 +235,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
           k: 'Scheduled',
           v: "The clock at the bottom of the sidebar (Rail and list: the rail's Schedule; or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {{DD-MM-YY}} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.",
         },
-        { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports your settings to a file (not env, the phone webhook, emails or workflows' variables), to import on another Mac. Accent and corners go over the theme's (every corner it draws); Settings & Help size: ⌘+ / ⌘− while either is open." },
+        { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports your settings to a file (not env, the phone webhook, emails or workflows' variables), to import on another Mac. Accent and corners go over the theme's (every corner it draws); Pages size (Settings, Help, Scheduled tasks and the other list pages); ⌘+ / ⌘− on any page (Notes, Specs, Settings…) size that page alone, kept for it, ⌘0 back to 100%." },
         { id: 'resources', k: 'Resources', v: "Settings › Resources: memory and CPU, Laki's own and each tab's. Sleep an idle agent (it wakes as you look at it; Settings can sleep them after a while); Stop the video, an extension, the preview, an agent browser or the floating bubbles until they're opened again. A graph shows memory and CPU over the last minutes; sort the rows by memory or CPU." },
         { id: 'worktrees', k: 'Worktrees', v: "Settings › Git & worktrees: where new worktrees go, a folder per project (~ is home; a project's settings can pick its own; ones made already stay), their branch prefix, and Sync the base branch (off: git fetch first, then off origin's). A new one starts off the repo's main branch unless you pick another." },
         { id: 'files', k: 'Files', v: "The side panel's preview colors code up to 50 KB and shows Markdown rendered or raw; each file opened is a tab over it, with its own unsaved edit (a middle click or ⌘W closes one; drag its left edge to widen it). Right-click a file to open it in a browser or another app. An HTML or Markdown artifact opens in a viewer over the app (Settings › General › Storage: or in the browser). The toolbar's ⋯ › Copy path copies the workspace's path." },
@@ -318,7 +318,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
 
   const go = (id: string) => document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
-    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom }}>
+    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties}>
       <div className="settings-head">
         <b>Help</b>
         <span className="grow" />

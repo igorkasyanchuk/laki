@@ -2,6 +2,25 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Settings › General › Storage's *Delete files after* is *Never* unless you pick a time (0.35 deleted after 90 days).
+- Safer with agents: a caller can't move the daemon's clock any more (a date years ahead would have tidied every
+  storage folder at once); an agent can't remove a workspace's kept links or change what Open in editor runs; a profile
+  change an agent asks for shows in full.
+- *Review a PR…* is gone from a project's + and ⋯ and ⌘K: Changes' *PR #n* shows any attached PR's changes, yours
+  or not (`laki new --pr` still checks one out).
+- Agents talk by name: `laki name backend` in an agent's tab makes it `@backend` for every other agent (`laki agents`
+  lists them), `laki ask @backend "…"` asks it and prints its reply, `laki send @backend` tells it something (MCP's
+  `laki_name`, `laki_ask_agent`). Another workspace's agent: Laki asks you first, as before.
+- A terminal tab's scroll button (on hover, top right): to the top of what scrolled away, then back to the end.
+- The floating Laki AI button keeps to the terminals' corner: the side panel's and the file preview's last rows show.
+- ⌘F in Changes and the Review tab opens the folded files that match.
+- A rail pin takes an icon or emoji of its own (its right click › *Rail icon*), a terminal's too.
+- Custom CSS wins over Appearance › Project names (`.project-name { font-size: 30px }` works; the head grows with it).
+- Settings: a group inside a group (Appearance › Sidebar › Project names) is a card of its own.
+- A GitHub link's card shows while an agent's screen keeps redrawing (Claude's and Codex's spinners started its wait over).
+
 ## 0.35.0 · Oct 29, 2026
 
 - Settings › Appearance › Interface: one *Text size* (9–16) for tabs, menus, dropdowns, the status bar and tooltips, and

@@ -628,7 +628,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   // a phone has what it needs, not what outlives its session or opens Laki wider (M4)
   const far = (method: string, params = {}) =>
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${tok}`, origin: url }, body: JSON.stringify({ method, params }) }).then(r => r.json())
-  for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }]] as const)
+  for (const [m, p] of [['shutdown', {}], ['remoteStart', { hours: 1 }], ['cliInstall', {}], ['aiKey', { key: 'k' }], ['skillSet', { agent: 'claude', on: true }], ['accountAdd', { agent: 'claude' }], ['widgetSet', { id: 'links', on: true }], ['widgetSet', { id: 'links', net: true }], ['settingsSet', { remoteMail: 'them@x.dev' }], ['settingsSet', { webhook: { url: 'https://evil.example' } }], ['settingsSet', { env: { A: '1' } }], ['settingsSet', { customCss: '.ws { display: none }' }], ['settingsSet', { editorCmd: 'sh -c evil' }]] as const)
     assert.match((await far(m, p)).error ?? '', /not over remote access: do that on the Mac itself/, m)
   await assert.rejects(c.call('shutdown'), /not over remote access/)
   assert.equal((await far('settingsSet', { remoteMail: 'me@x.dev', notify: false })).result.notify, false) // Settings sends them all back: unchanged is fine
@@ -1035,6 +1035,18 @@ test('storage: its size, and files not changed for storageDays go (only the fold
   assert.ok(existsSync(join(other, 'old.txt')), 'another folder of storageDir: never')
 })
 
+test("a caller's clock (now) moves the ticks only in a test's daemon: elsewhere a date years ahead tidies nothing", async t => {
+  const rig = await fresh(t, { env: { LAKI_TEST_CLOCK: '0' } }) // a daemon that takes no caller's clock, as every other does
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const dir: string = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).storage, 'its storage folder')
+  writeFileSync(join(dir, 'keep.md'), 'mine')
+  await rig.rpc('settingsSet', { storageDays: 30 })
+  const far = Date.now() + 10 * 365 * 86400000
+  assert.equal(await rig.rpc('storageTidy', { now: far }), 0)
+  assert.ok(existsSync(join(dir, 'keep.md')))
+})
+
 test('Artifacts: the files in a workspace storage folder, hidden ones not counted', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -1188,4 +1200,18 @@ test("an extension's https picture comes through the daemon's /img, behind its o
   assert.equal((await img(v.imgKey, 'http://example.com/a.png')).status, 400) // https only
   assert.equal((await img(v.imgKey, 'file:///etc/passwd')).status, 400)
   for (const u of ['https://127.0.0.1:1/a.png', 'https://localhost/a.png', 'https://192.168.1.1/a.png', 'https://[::1]/a.png']) assert.equal((await img(v.imgKey, u)).status, 400, u) // never this Mac's or the LAN's
+})
+
+test("a workspace's rail icon (wsSet icon): an icon's name or an emoji, '' none, anything else refused", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const icon = async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).icon
+  await rig.rpc('wsSet', { id: w.id, icon: 'terminal' })
+  assert.equal(await icon(), 'terminal')
+  await rig.rpc('wsSet', { id: w.id, icon: '🚀' })
+  assert.equal(await icon(), '🚀')
+  await assert.rejects(rig.rpc('wsSet', { id: w.id, icon: '<img src=x>' }), /an icon's name or an emoji/)
+  await rig.rpc('wsSet', { id: w.id, icon: '' })
+  assert.equal(await icon(), undefined)
 })
