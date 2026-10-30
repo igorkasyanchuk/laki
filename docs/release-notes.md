@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.36.0 · Oct 31, 2026
 
 - Settings › General › Storage's *Delete files after* is *Never* unless you pick a time (0.35 deleted after 90 days).
 - Safer with agents: a caller can't move the daemon's clock any more (a date years ahead would have tidied every
