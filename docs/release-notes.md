@@ -20,6 +20,17 @@ version it builds, with the date. -->
 - Custom CSS wins over Appearance › Project names (`.project-name { font-size: 30px }` works; the head grows with it).
 - Settings: a group inside a group (Appearance › Sidebar › Project names) is a card of its own.
 - A GitHub link's card shows while an agent's screen keeps redrawing (Claude's and Codex's spinners started its wait over).
+- Settings › Appearance › Design: how the window's parts sit together (Classic, Sections, Cards, Inset, Tiles, Soft),
+  over any theme; a theme's own painted bars and selected tab still win.
+- Pages (Settings, Help, Scheduled tasks, Workflows, Specs…): even titles, bigger and more colorful lists, *Pages size*
+  in Appearance, and ⌘± / ⌘0 per page.
+- Notes and Laki AI hide their lists from a header button; Terminals and Browsers keep their own sidebar width and
+  fold to a strip on either side; the Review tab's files list folds to the left.
+- ⌘-click or ⌘⏎ on an item of the tab bar's + menu: always a tab of its own.
+- Themes read better: hints and status colors at 4.5:1 everywhere, no faded marks, a diff's +/− clear, fixes for
+  Pocket, Quest, Transit, Diner, Luna, Starship, Aqua, Cassette, Workshop and Riso; the window's blur follows a light or
+  dark theme.
+- Menus say what each item does in a tooltip beside the menu.
 
 ## 0.35.0 · Oct 29, 2026
 
