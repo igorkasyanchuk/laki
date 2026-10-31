@@ -150,7 +150,7 @@ export const widgetRoots = () => [...devRoots(), widgetHome(), ...(state.setting
 // branch's change to them in a worktree isn't read until it reaches the project's folder
 export const repoRoots = () => state.projects.filter(p => !p.kind && !p.host).map(p => ({ root: join(p.path, '.laki', 'extensions'), project: p.id }))
 // a folder of yours (dev's, Settings') inside a project's .laki/extensions: still that repo's (its id, its trust)
-const realOf = (d: string) => {
+export const realOf = (d: string) => {
   try {
     return realpathSync(d)
   } catch {

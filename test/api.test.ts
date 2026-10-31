@@ -300,7 +300,7 @@ test('files: a plain folder\'s (no dependencies), git\'s renamed, deleted and ad
 test('workspaces: a bad base, what only worktrees do, a failed restore, a gone base branch, a fork without claude', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', base: 'no-such-branch' }), /git worktree add failed: fatal: invalid reference: no-such-branch/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', base: 'no-such-branch' }), /base no-such-branch not found in /)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'opt', base: '--orphan' }), /base --orphan\? a branch, not an option/)
   assert.ok(!(await rig.rpc('state')).workspaces.some((w: any) => w.name === 'opt'), 'nothing made')
   const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'none' })

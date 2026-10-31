@@ -397,7 +397,7 @@ export function ProjectSection(p: {
         <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
       </Group>
       {p.project.git && !p.project.host && (checkNow => (
-        <Group title="Done check" hint="As an agent's turn ends having changed files, these run in its worktree before you're told it's done. A failing script goes back to the agent with its output, 3 times in a row, then it's over to you. None ticked: off (a repo's .laki.json can bring its own check)">
+        <Group title="Done check" hint="As an agent's turn ends having changed files, these run in its worktree before you're told it's done. They run as you, on whatever the agent changed: an agent that may only edit files can make them run anything. A failing script goes back to the agent with its output, 3 times in a row, then it's over to you. None ticked: off (a repo's .laki.json can bring its own check)">
           <div className="setting-box">
             {CHECK_STEPS.map(k => (
               (has => (

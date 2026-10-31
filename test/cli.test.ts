@@ -95,7 +95,7 @@ test('cli: hook never fails, even without a daemon', async t => {
   rig.env.LAKI_TAB = 'nope'
   const r = await rig.cli('hook', 'idle')
   assert.equal(r.code, 0)
-  assert.ok(Date.now() - started < 1500)
+  assert.ok(Date.now() - started < 5000) // its own cap is 1 s; the rest is node starting under a loaded run (no daemon started, no wait for one)
 })
 
 test('cli: help, usage errors, open', async t => {

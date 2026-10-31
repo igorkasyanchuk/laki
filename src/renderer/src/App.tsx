@@ -3179,7 +3179,7 @@ export function App() {
     const steps = (['lint', 'test'] as const).filter(k => w?.scripts?.includes(k))
     if (!w || !p || !steps.length || p.config?.check || v?.settings.doneCheck === false || load<string[]>('laki.checkOffered', []).includes(p.id)) return
     store('laki.checkOffered', [...load<string[]>('laki.checkOffered', []), p.id])
-    toast(`Check ${p.name}'s work before you're told it's done? Its ${steps.join(' and ')} run as each turn ends; failures go back to the agent`, () => void call('projectSet', { id: p.id, config: { ...p.config, check: { steps } } }).then(() => done(`${p.name}: checked before you're told (Settings › ${p.name})`), () => {}), 'Turn on')
+    toast(`Check ${p.name}'s work before you're told it's done? Its ${steps.join(' and ')} run as you, on what the agent changed, as each turn ends; failures go back to the agent`, () => void call('projectSet', { id: p.id, config: { ...p.config, check: { steps } } }).then(() => done(`${p.name}: checked before you're told (Settings › ${p.name})`), () => {}), 'Turn on')
   }
   // Collision radar: where a workspace's changes meet another live worktree's, or what landed on its base since it
   // branched (the daemon's scanOverlaps); one you hid stays hidden while it reads the same

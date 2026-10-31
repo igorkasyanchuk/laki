@@ -263,7 +263,7 @@ test('new workspaces: race checks, a race with no name, a PR on Local, a bad bas
 
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', local: true, pr: '12' }), /a PR needs a worktree: a git project, not Local/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', pr: '99' }), /^Error: PR 99 not found$/)
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', base: 'nope', name: 'bad base' }), /git worktree add failed: .*nope/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', base: 'nope', name: 'bad base' }), /base nope not found in /)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', issue: '9' }), /gh issue view 9: GraphQL: Could not resolve to an issue/)
   // an issue's long body is cut; the prompt given follows it
   writeFileSync(join(rig.env.FAKE_GH, 'issue.json'), JSON.stringify({ number: 12, title: 'Big one!', url: 'https://github.com/o/r/issues/12', body: 'x'.repeat(9000) }))
@@ -283,7 +283,7 @@ test('new workspaces: race checks, a race with no name, a PR on Local, a bad bas
   await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'long '.repeat(60) })
   const made = (await rig.rpc('logs', { key: 'new' })).map((l: any) => l.text)
   assert.ok(made.some((l: string) => l.includes(`"prompt":"${'long '.repeat(40)}…"`)), made.join('\n'))
-  assert.ok(made.some((l: string) => /^repo: failed: git worktree add failed: .*nope/.test(l)), made.join('\n'))
+  assert.ok(made.some((l: string) => /^repo: failed: base nope not found in repo/.test(l)), made.join('\n'))
 
   // placed first in a project with no workspaces yet: last in the list, as it's its only one
   mkdirSync(join(rig.home, 'other'))

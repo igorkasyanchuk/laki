@@ -1189,7 +1189,7 @@ async function quitCompletely() {
     if (r.response !== 0) return
   }
   quitting = true
-  await rpc('shutdown', {}, 3000).catch(() => {})
+  await rpc('shutdown', {}, 10000).catch(() => {}) // the daemon first asks who calls (lsof, ps): a busy Mac takes a while, and a call given up is refused
   app.quit()
 }
 

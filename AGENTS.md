@@ -195,7 +195,7 @@ own PR (a workspace's `prOff`: the scan leaves it out until `prAttach`). 124: `g
 issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link, a failure not kept; shared/types.ts
 `GhCard`): a terminal link's hover card (LinkPeek.tsx). 125: a tab's `alias` (`tabSet` `alias`, `ALIAS`: one live tab each; `resolveTarget` `@name`; the CLI's `laki name`,
 `agents`, `ask`, shared/tools.ts `askAgent`, MCP's `laki_name`, `laki_ask_agent`; dropped as its workspace archives), a
-workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` (main.ts `TEST_CLOCK`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
+workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` and a data folder under /tmp (main.ts `TEST_CLOCK`, `inTemp`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
 `linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). 130: a schedule's `base` (`scheduleSet`
 keeps it for `ws` new only, refused for another, '' or null clears it; `runSchedule`: `wsNew` `base`, whose check (below) makes
 one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
@@ -1372,7 +1372,7 @@ else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: 
 and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too), `projectTrust` with a `hash`, `projectSet` with `config` or
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too; `shutdown`, `laki stop`; `checkAgain`, `checkStop`), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`), and `send`/`screen`, `input` (as a send), `tabNew` with a `prompt` (as a send, `target` *a new agent tab*) and a WebSocket's `attach` (as a screen) into

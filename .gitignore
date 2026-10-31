@@ -9,3 +9,4 @@ dist/
 
 # your own tools' folders: never committed
 .artifacto/
+.claude/

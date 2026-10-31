@@ -133,3 +133,17 @@ test("memory compaction: an OpenRouter that never answers ends at the wait (LAKI
   assert.ok(Date.now() - t0 < 10_000)
   assert.equal((await rig.rpc('state')).projects[0].memory.length, 2)
 })
+
+test('memory compaction through claude -p: no tools, no MCP server of yours (what it reads is what agents wrote)', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('projectAdd', { path: rig.repo })
+  const [p] = (await rig.rpc('state')).projects
+  await rig.rpc('memoryAdd', { project: p.id, text: 'npm test runs the tests' })
+  await rig.rpc('memoryAdd', { project: p.id, text: 'the API lives in src/daemon/main.ts' }) // two at least
+  await rig.rpc('settingsSet', { ai: { backend: 'claude' } })
+  await rig.rpc('memoryCompact', { project: p.id }).catch(() => {}) // what the fake answers doesn't matter here
+  const run = rig.fakeLog().find(l => l.bin === 'claude' && l.args[0] === '-p')
+  assert.ok(run, 'claude -p ran')
+  assert.equal(run.args[run.args.indexOf('--tools') + 1], '')
+  assert.ok(run.args.includes('--strict-mcp-config') && !run.args.includes('--mcp-config'), run.args.join(' '))
+})

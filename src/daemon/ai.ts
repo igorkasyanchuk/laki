@@ -545,15 +545,19 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
   }
 }
 
-// one question, one answer, outside any chat and with no tools (memory's compaction): Settings › AI's backend, OpenRouter
-// through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
-// chat's); logged among Laki AI's calls. agent: an extension's AI source, that agent with the user's own config (its
-// MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox read-only), 10 minutes
+// one question, one answer, outside any chat and with no tools (memory's compaction, Done check's review): Settings ›
+// AI's backend, OpenRouter through aiComplete, or claude -p / codex exec with nothing but the prompt: no tools, no MCP
+// server, not the user's config (their preset's account and env, as the chat's); logged among Laki AI's calls. preset:
+// that agent's model, effort, env and account, 10 minutes. perm (an extension's AI source or action, its id): the user's
+// own config too (its MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox
+// read-only)
 export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; perm?: string; name?: string; stop?: string; signal?: AbortSignal; onCall?: (c: AiCall, answer: string) => void }): Promise<string> {
   const s = state.settings?.ai ?? {}
-  const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
-  // perm: that extension's id: claude asks you for a tool it may not use unasked in the app, not in a hook's (laki mcp's
-  // laki_permission beside the user's own servers: widgetTools.ts widgetPermission)
+  const agent = !!o.preset // the preset's model, effort, env and account
+  // perm: an extension's id, the user's own config: claude asks you for a tool it may not use unasked in the app, not in
+  // a hook's (laki mcp's laki_permission beside the user's own servers: widgetTools.ts widgetPermission). Without it
+  // nothing of the user's: what it reads (a diff an agent wrote) can't steer a tool
+  const userCfg = !!o.perm
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
   if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text // ponytail: no onCall (an extension's agent is claude or codex)
   const pre = o.preset ?? presetOf(backend)
@@ -562,8 +566,8 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const call: AiCall = { at: Date.now(), backend, model: model || backend, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
   const args =
     backend === 'claude'
-      ? ['-p', '--output-format', 'json', ...(agent ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '']), ...(agent && o.perm ? ['--mcp-config', JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm }) } }), '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
-      : ['exec', '--json', '--skip-git-repo-check', ...(agent ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
+      ? ['-p', '--output-format', 'json', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(userCfg ? ['--mcp-config', JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm! }) } }), '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
+      : ['exec', '--json', '--skip-git-repo-check', ...(userCfg ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
   let answer = ''

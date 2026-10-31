@@ -207,7 +207,7 @@ async function main() {
       return
     }
     case 'stop':
-      return rpc('shutdown').catch(() => {})
+      return rpc('shutdown', { from: caller() }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
     case 'serve':
       return serve(rest)
     case 'remote': {

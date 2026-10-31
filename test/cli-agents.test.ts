@@ -295,4 +295,9 @@ test("cli: laki show puts a card under the agent's tab (a folder, a file, a link
   app.close()
   // a kept link is the user's: an agent can't take it off
   await assert.rejects(rig.rpc('linkRm', { ws: ws.id, url: 'https://x.dev/', from: { ws: ws.id, tab: tab.id } }), /an agent can't take a kept link off/)
+  // nor stop the daemon, nor run or stop the Done check (its scripts run as you)
+  assert.match((await as('stop')).err, /an agent can't stop Laki's daemon/)
+  await assert.rejects(rig.rpc('checkAgain', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't run the Done check/)
+  await assert.rejects(rig.rpc('checkStop', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't stop the Done check/)
+  assert.equal(await rig.rpc('ping'), 'pong') // still up
 })

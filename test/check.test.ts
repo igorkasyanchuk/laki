@@ -25,6 +25,10 @@ test('a turn that changed files is checked: a failing test goes back to the agen
   assert.equal(passed.tries, 0)
   assert.equal(passed.review.state, 'note') // the fake reviewer never says LGTM
   assert.match(passed.review.note, /Found it/)
+  // the reviewer reads a diff an agent wrote: no tools, no MCP server of the user's
+  const reviewer = rig.fakeLog().find(l => l.bin === 'claude' && l.args[0] === '-p' && l.args.includes('--append-system-prompt'))
+  assert.equal(reviewer.args[reviewer.args.indexOf('--tools') + 1], '')
+  assert.ok(reviewer.args.includes('--strict-mcp-config') && !reviewer.args.includes('--allowedTools'))
   // a turn that changes nothing isn't checked again
   await rig.rpc('send', { target: tab, text: 'just a question' })
   await until(async () => (await rig.rpc('screen', { target: tab, lines: 40 }).then((x: unknown) => JSON.stringify(x))).includes('answer: just a question'), 'its answer')
