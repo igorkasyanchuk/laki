@@ -1,5 +1,6 @@
 // Shapes shared by the daemon, the CLI and the renderer.
 import type { Collision } from './overlap.ts'
+import type { TabPlan } from './todos.ts'
 import type { Layout, SavedLayout } from './layout.ts'
 import { type Rule, stamp } from './when.ts'
 import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
@@ -511,6 +512,7 @@ export type Settings = {
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   doneCheck?: boolean // Done means checked: projects' checks as agents' turns end (on unless false; each project's steps off until ticked)
+  livePlan?: boolean // the agent's plan, live: its to-do list on its tab and row, a plan it asks you to approve as a card (on unless false)
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
@@ -775,7 +777,7 @@ export type Ask = { options: { n: number; label: string }[]; at: number; questio
 // laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a
 // page in the browser); kind: what a target is (url: http(s); folder, file: an absolute path on this Mac)
 export type Card = { id: string; title?: string; text: string; open: { label: string; target: string; kind: 'url' | 'folder' | 'file' }[]; at: number }
-export type TabView = Tab & { card?: Card; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -897,5 +899,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 127
+export const API = 128
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

@@ -7,6 +7,8 @@ version it builds, with the date. -->
 - Done check: tick a project's lint, test and format scripts (its settings › *Done check*), and a second agent's review,
   and they run as each agent's turn ends having changed files. A failure goes back to the agent with its output, a
   strip under the terminal shows each step, and the notification says *done and checked*.
+- The agent's plan, live: Claude Code's and Codex's own to-do lists show under the tab as they work, the step under way
+  in bold and *2/5* on the sidebar row; a plan Claude asks you to approve is a card you can edit and send back.
 - Collision radar: two worktrees that change the same lines (or a base that changed them since one branched) get an
   orange ⇄ on their rows, with the files and lines; open the other, tell either agent, or ask it to merge the base in.
   Settings › Git & worktrees turns it off.

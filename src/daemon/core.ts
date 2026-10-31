@@ -16,6 +16,7 @@ import { readJson } from '../shared/conn.ts'
 import { actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
+import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accounts, loginCmd } from './accounts.ts'
@@ -92,7 +93,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout } // later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout } // later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -566,7 +567,7 @@ export function view(): View {
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
     projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
@@ -2456,7 +2457,19 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     case 'running':
       r.status = 'running'
       r.limit = r.escAt = undefined
-      if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') titleFrom(tab, pl.prompt) // claude's, gemini's
+      if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
+        titleFrom(tab, pl.prompt) // claude's, gemini's
+        if (r.plan) r.plan.stale = true // the list it had is an earlier turn's until it writes one
+        r.planAsk = undefined
+      }
+      // its own to-do list (shared/todos.ts) and a plan it asks you to approve (ExitPlanMode's); a subagent's are its
+      // own (ponytail: by agent_id, which newer claudes give)
+      if (pl.tool_name && !pl.agent_id) {
+        const post = pl.hook_event_name === 'PostToolUse'
+        const next = planFrom(r.plan, { tool: pl.tool_name, input: pl.tool_input, result: pl.tool_response, post })
+        if (next) r.plan = next.items.length ? next : undefined
+        if (pl.tool_name === 'ExitPlanMode') r.planAsk = post ? undefined : String(pl.tool_input?.plan ?? '').slice(0, 20000) || undefined
+      }
       if (pl.hook_event_name === 'PostToolUse') {
         const got = publishedBy(pl)
         if (got) (r.published ??= []).push(got)
@@ -2486,6 +2499,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     case 'failed': {
       r.status = 'idle'
       r.limit = undefined
+      r.planAsk = undefined
+      if (r.plan && planDone(r.plan)) r.plan = undefined // every step done: the list goes as the turn ends
       if (Array.isArray(pl['input-messages'])) titleFrom(tab, pl['input-messages'][0]) // codex's, at its first turn's end
       const id = pl['thread-id']
       if (id && id !== tab.resumeId) {

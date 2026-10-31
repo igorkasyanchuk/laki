@@ -1461,6 +1461,15 @@ it), or, for a base that moved, *Ask the agent to merge main in*. *Hide until it
 changes those lines. Lockfiles don't count. Settings › Git & worktrees › *Collision radar* turns it off. Not on SSH
 hosts or codespaces; the base is what this clone has (nothing is fetched for it).
 
+### The agent's plan, live
+
+When an agent keeps a to-do list as it works (Claude Code's todos and tasks, Codex's plan), the list shows under its
+tab: the step under way in bold, the done ones ticked, *Plan 2/5* and the current step in its head (a click folds it).
+Its sidebar row says *2/5*; hover it for the list. A list from before your last message is dimmed until the agent writes
+a new one, and one with every step done goes as the turn ends. When Claude Code asks you to approve a plan (plan mode),
+the plan shows as a card with its menu's choices as buttons; edit the plan there and *Send changes* answers *keep
+planning* and sends your version back. Settings › Appearance › *The agent's plan, live* turns it off.
+
 ### Bird view
 
 On unless Settings › General › *Pages* turns it off; the eye beside Help (⌘K too) opens it. Every live session, agents

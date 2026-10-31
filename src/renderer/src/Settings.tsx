@@ -165,6 +165,7 @@ export type AppSettings = Paint & {
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees (unset: on)
+  livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
   copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
@@ -382,6 +383,7 @@ const FIND: [string, string, string?][] = [
   ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
   ['appearance', 'Tokens and cost', 'tokens cost price dollars spend usage today api estimate money'],
   ['general', 'Environment', 'env variables'],
@@ -1641,6 +1643,9 @@ export function SettingsPage(p: {
                 )}
                 <Switch className="switch-row" on={s.avatars !== false} onChange={v => set({ avatars: v })}>
                   <Says title="GitHub pictures" hint="PR authors' and reviewers' pictures, loaded from avatars.githubusercontent.com; off: GitHub never sees the app ask for them" />
+                </Switch>
+                <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>
+                  <Says title="The agent's plan, live" hint="An agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row. A plan it asks you to approve shows as a card you can edit: your changes go back to it. Claude Code and Codex" />
                 </Switch>
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />

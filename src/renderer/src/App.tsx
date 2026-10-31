@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -34,6 +34,7 @@ import { ComparePage } from './Compare'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
+import { planCount } from '../../shared/todos'
 import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -3238,6 +3239,7 @@ export function App() {
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
+        {(t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
         {(n => n > 0 && (
           <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), openMenu(e, radarMenu(w)))}>
             <Icon name="gitCompare" size={11} />
@@ -4249,6 +4251,7 @@ export function App() {
                     t && (
                       <>
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
+                        <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
@@ -4376,7 +4379,7 @@ export function App() {
             />
           )}
         </div>
-        {tab?.ask && (
+        {tab?.ask && !tab.planAsk /* its plan card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
           <div className="ask-bar">
             <span className="muted">{tab.name} asks:</span>

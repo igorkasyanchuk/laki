@@ -79,7 +79,11 @@ const MENU = ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell C
 let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
-  hook('UserPromptSubmit', { prompt: text })
+  hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
+  // "todo a;b;c": its to-do list (TodoWrite) as its turn starts, the first under way; "todo! …": every one done
+  if (text.startsWith('todo')) hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_input: { todos: text.replace(/^todo!? /, '').split(';').map((content, i) => ({ content, status: text.startsWith('todo!') ? 'completed' : i ? 'pending' : 'in_progress' })) } })
+  // "planmode": plan mode's end, ExitPlanMode asking you to approve its plan, a menu as the real one's
+  if (text.startsWith('planmode')) { hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'ExitPlanMode', tool_input: { plan: '1. Read cart.ts\n2. Fix the total' } }); process.stdout.write('Would you like to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your approval for the plan' }); return }
   if (text.startsWith('menu')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true

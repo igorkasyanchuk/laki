@@ -962,6 +962,16 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .check-out { flex-basis: 100%; margin-left: 20px; } .check-out summary { cursor: pointer; color: var(--muted); }
 .check-out pre, .check-note { margin: 4px 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; }
 .check-note { margin: 0 12px 8px; font-family: inherit; font-size: 12.5px; }
+.plan-head { width: 100%; border: none; background: none; text-align: left; font: inherit; cursor: pointer; } /* the agent's plan, live (panels.tsx PlanStrip) */
+.plan-head .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-head:hover { color: var(--fg); }
+.plan-list .p-done .queue-text { color: var(--muted); text-decoration: line-through; } .plan-list .p-done .check-mark { color: var(--done); }
+.plan-list .p-now .queue-text { color: var(--fg); font-weight: 600; } .plan-list .p-now .check-mark { color: var(--accent-ink); }
+.plan-strip.stale .plan-list, .plan-strip.stale .plan-head { opacity: 0.6; }
+.plan-ask { display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line); }
+.plan-ask textarea { margin: 0 12px; min-height: 60px; max-height: 220px; resize: vertical; padding: 6px 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 12.5px/1.45 var(--mono); }
+.plan-acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 8px; }
+.ws-plan { flex: none; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted); padding: 0 5px; border: 1px solid var(--line); border-radius: 999px; line-height: 15px; } /* its plan's n/m on the sidebar row */
 .queue-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; color: var(--muted); }
 .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-what b { color: var(--fg); font-weight: 600; }

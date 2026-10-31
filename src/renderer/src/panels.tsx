@@ -4,6 +4,7 @@ import { REPO, AGENT_NAMES, type AgentUsage, type CheckRun, type Doctor, type Ag
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
+import { planCount, planNow } from '../../shared/todos'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
@@ -2046,6 +2047,73 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
         )}
       </ol>
       {note && <div className="check-note">{note}</div>}
+    </div>
+  )
+}
+
+// The agent's plan, live (shared/todos.ts): its to-do list under its tab, the step under way in its head, folded by a
+// click; stale: an earlier turn's. And plan mode's plan while it waits for your yes, editable: a change answers its
+// last option (keep planning) and sends the plan as you wrote it
+export function PlanStrip({ tab, onAnswer, onSend }: { tab: TabView; onAnswer: (n: number) => Promise<unknown>; onSend: (text: string) => void }) {
+  const [open, setOpen] = useState(true)
+  const [draft, setDraft] = useState<string>()
+  const ask = tab.status === 'waiting' ? tab.planAsk : undefined
+  useEffect(() => setDraft(undefined), [ask])
+  const { plan } = tab
+  if (!plan && !ask) return null
+  const text = draft ?? ask ?? ''
+  const last = tab.ask?.options.at(-1)
+  const changed = !!ask && !!last && draft !== undefined && draft.trim() !== ask.trim()
+  const now = plan && planNow(plan)
+  return (
+    <div className={`queue-strip plan-strip${plan?.stale ? ' stale' : ''}`} role="region" aria-label={`${tab.name}'s plan`}>
+      {ask && (
+        <div className="plan-ask">
+          <div className="queue-head">
+            <Icon name="clipboardCheck" size={13} />
+            <span className="queue-what">{tab.name} asks you to approve its plan{last ? ', or change it here' : ''}</span>
+          </div>
+          <textarea value={text} readOnly={!last} onChange={e => setDraft(e.target.value)} rows={Math.min(12, text.split('\n').length + 1)} spellCheck={false} aria-label="The plan" />
+          {tab.ask && (
+            <div className="plan-acts">
+              {changed ? (
+                <>
+                  <button className="primary" onClick={() => void onAnswer(last!.n).then(() => onSend(`I changed your plan. Follow this one instead:\n\n${draft!.trim()}`))}>Send changes</button>
+                  <button onClick={() => setDraft(undefined)}>Undo changes</button>
+                </>
+              ) : (
+                tab.ask.options.map(o => (
+                  <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => void onAnswer(o.n)}>
+                    {o.label.length > 36 ? `${o.label.slice(0, 34)}…` : o.label}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {plan && (
+        <>
+          <button className="queue-head plan-head" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+            <Icon name="list" size={13} />
+            <span className="queue-what">
+              Plan {planCount(plan)}
+              {plan.stale ? ' · from before your last message' : now ? ` · ${now}` : ''}
+            </span>
+            <Icon name={open ? 'chevron' : 'chevronUp'} size={12} />
+          </button>
+          {open && (
+            <ol className="queue-list check-list plan-list">
+              {plan.items.map((i, k) => (
+                <li key={i.id ?? k} className={`p-${i.state}`}>
+                  <span className="check-mark">{i.state === 'done' ? '✓' : i.state === 'now' ? tab.status === 'running' ? <Glyph s="running" /> : '›' : '○'}</span>
+                  <span className="queue-text">{i.text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
+      )}
     </div>
   )
 }

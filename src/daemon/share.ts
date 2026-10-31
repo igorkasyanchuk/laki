@@ -4,6 +4,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { esc, markdownHtml } from '../shared/markdown.ts'
+import { planFrom, type TabPlan } from '../shared/todos.ts'
 import { costOf } from '../shared/types.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
@@ -82,7 +83,7 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
 // window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) and their
 // cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day)
 type Spent = { tokens: number; cost: number; day: string }
-export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; msg?: string; was?: Spent; total?: Record<string, number> } // msg, was: claude's last message and what it counted; total: codex's last running totals
+export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan } // msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
 export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {
@@ -94,7 +95,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     if (s.day === day) (m.today.tokens += by * s.tokens), (m.today.cost += by * s.cost)
   }
   for (const line of jsonl.split('\n')) {
-    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"')) continue // most lines: not parsed
+    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' || !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
     let j: any
     try {
       j = JSON.parse(line)
@@ -117,6 +118,16 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     } else {
       const p = j.payload
       if (j.type === 'turn_context' && p?.model) m.model = p.model
+      if (p?.type === 'user_message' && m.plan) m.plan.stale = true // a new ask: the list is the last one's until it writes one
+      if (p?.type === 'function_call' && p.name === 'update_plan') {
+        let input: unknown
+        try {
+          input = JSON.parse(p.arguments)
+        } catch {}
+        const next = planFrom(m.plan, { tool: 'update_plan', input, post: false })
+        if (next) m.plan = next.items.length ? next : undefined
+        continue
+      }
       const i = j.type === 'event_msg' && p?.type === 'token_count' && p.info
       if (!i) continue
       if (i.model_context_window) m.max = i.model_context_window

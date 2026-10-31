@@ -4,6 +4,7 @@
 import { closeSync, openSync, readSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeAtomic } from '../shared/conn.ts'
+import { planDone } from '../shared/todos.ts'
 import { type Tab, type TabView, type Today } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, dir, presetOf, state } from './core.ts'
@@ -94,14 +95,14 @@ function claudeBig(tab: Tab) {
   }
   return false
 }
-export function meterView(t: Tab): Pick<TabView, 'context' | 'usage'> {
+export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan'> {
   const r = meters.get(t.id)
   if (!r?.file?.endsWith(`${t.resumeId}.jsonl`)) return {} // another chat's (a /clear): until this one's is read
   const { m } = r
   const pr = t.preset === 'claude' ? presetOf(t) : undefined
   const said = t.model || pr?.model || (/--model\b/.test(pr?.args ?? '') ? pr!.args : '') // a model the tab or its profile names wins over claude's settings
   const max = m.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r.big) || (m.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
-  return { ...(m.used !== undefined && max && { context: { used: m.used, max } }), ...(m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  return { ...(m.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(m.used !== undefined && max && { context: { used: m.used, max } }), ...(m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 // today's, the workspaces that used most first (5)
 export function todayView(): Today | undefined {
