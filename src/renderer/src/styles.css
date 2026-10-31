@@ -956,7 +956,7 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .show-strip .show-open { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
 .show-strip .show-open button { display: inline-flex; align-items: center; gap: 6px; }
 .check-strip.s-failed, .check-strip.s-over { border-top-color: color-mix(in srgb, var(--error) 45%, var(--line)); } /* Done means checked (panels.tsx CheckStrip) */
-.check-strip .queue-head .icon-svg { color: var(--waiting); } .check-strip.s-passed .queue-head .icon-svg { color: var(--done); }
+.check-strip .queue-head > .icon-svg { color: var(--waiting); } .check-strip.s-passed .queue-head > .icon-svg { color: var(--done); } /* its status mark, not its ✕ */
 .check-list li { flex-wrap: wrap; } .check-list li .queue-text { flex: 1; }
 .check-mark { flex: none; width: 14px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 .check-list .c-pass .check-mark { color: var(--done); } .check-list .c-fail .check-mark { color: var(--error); }
@@ -976,7 +976,7 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .queue-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; color: var(--muted); }
 .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-what b { color: var(--fg); font-weight: 600; }
-.queue-head button { font-size: 12px; padding: 2px 9px; }
+.queue-head button:not(.ib) { font-size: 12px; padding: 2px 9px; } /* text buttons: an icon one (its ✕) keeps its square */
 .queue-list { list-style: none; margin: 0; padding: 0 6px 5px; overflow: auto; min-height: 0; }
 .queue-list li { display: flex; align-items: center; gap: 6px; padding: 2px 2px 2px 4px; border-radius: var(--rs, 6px); }
 .queue-list li:hover { background: var(--hover); }
