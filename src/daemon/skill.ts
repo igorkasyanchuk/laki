@@ -205,6 +205,8 @@ more than 30 minutes late is skipped and logged as missed).
 - \`--where\`: \`new\` (the default in a repo: a new worktree and workspace each run), \`folder\` (the project's
   own folder, no worktree, one session; the default for a folder without git), \`folder-new\` (the folder, a new
   session and sidebar row each run) or a workspace id (its running agent gets the prompt, queued while it works).
+- \`--base <branch>\` (with \`new\`): the branch each run's worktree starts off (none: the one the project has checked
+  out); a run whose branch is gone fails and says so.
 - \`--preset claude|codex|gemini|grok|opencode|<preset>\`; \`--name "Nightly deps {{DD-MM}}"\`: \`{{DD-MM-YY}}\`, \`{{YYYY-MM-DD}}\`,
   \`{{HH:mm}}\` or \`{{ddd D MMM}}\` in the name or the prompt become the run's date, so each run's workspace
   has its own name; \`{{branch}}\`, \`{{path}}\`, \`{{port}}\`, \`{{pr}}\`, \`{{workspace}}\`, \`{{tab}}\` in the prompt

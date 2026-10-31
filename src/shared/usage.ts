@@ -51,7 +51,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a hidden browser on the workspace's localhost (the app must be open);
                                               screenshot prints a PNG's path; in a tab, <ws> is its own
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--name n] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--base <branch>] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
@@ -215,9 +215,11 @@ prints the page's text. In a tab, <ws> is its own.
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
 late is skipped). --where: new (a worktree each run), folder, folder-new, or a workspace id (its agent gets it).
+--base: the branch a new worktree starts off (new only; gone when it runs: that run fails and says so).
 {{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
 
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
+  laki schedule add shop --when "fridays at 5pm" --base release/2.0 "Backport this week's fixes"
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
   laki schedule log`,
   remind: `A reminder for the user on Laki's calendar (Calendar), only when they ask for one. --ws . ties it to

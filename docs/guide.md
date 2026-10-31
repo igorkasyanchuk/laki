@@ -662,7 +662,9 @@ run fails, saying so.
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
   agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
-  while it works, or a new tab starts), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
+  while it works, or a new tab starts), the base branch a new workspace starts off (its chip: the repo's main on a new
+  task, any branch typed or picked; empty, the one the project has checked out; a branch gone by the time it runs fails
+  that run, saying so, `laki schedule add … --base release/2.0`), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
   `mon, wed and fri at 18:30`, `every 2 hours from 9am to 6pm`, `every 30 minutes`, `hourly on weekends`,
   `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). Until it reads, a few
   examples sit under *When* (a click fills it in); then the form says how it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).

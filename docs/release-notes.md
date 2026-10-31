@@ -24,6 +24,8 @@ version it builds, with the date. -->
 - The ✕ on an agent's card under its terminal, and on the Done check's strip, is a full-size button again: it was squeezed to a sliver.
 - New worktrees are ready sooner in a big repo: git writes their files with every CPU core (unless your git config sets
   `checkout.workers`), on SSH hosts too.
+- A scheduled task that makes a new workspace each run can start it off another branch (a release branch, develop):
+  the form's base chip, `laki schedule add --base`. A branch gone by then fails that run, saying so.
 
 ## 0.36.0 · Oct 31, 2026
 

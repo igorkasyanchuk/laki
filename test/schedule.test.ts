@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -222,6 +223,43 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   assert.ok(existsSync(plain) && !existsSync(join(plain, 'torn-down')))
   // the sessions left keep the project: delete them first
   await assert.rejects(rig.rpc('projectRm', { id: np.id }), new RegExp(`has workspaces: delete them first \\(${r2.ws}\\)`))
+})
+
+test("scheduled tasks: a new workspace each run off the branch picked; that branch gone, the run fails and says so", async t => {
+  const rig = await fresh(t)
+  const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
+  git('checkout', '-qb', 'release/2.0')
+  writeFileSync(join(rig.repo, 'rel.txt'), 'rel\n')
+  git('add', '-A')
+  git('commit', '-qm', 'rel')
+  git('checkout', '-q', 'main')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const task = (o: object) => rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'backport', when: 'fridays at 5pm', ...o })
+  await assert.rejects(task({ base: '-x' }), /a branch, not an option/)
+  await assert.rejects(task({ ws: 'local', base: 'release/2.0' }), /for a new workspace each run/)
+  const s = await task({ base: ' release/2.0 ' })
+  assert.equal(s.base, 'release/2.0')
+  const r = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(r.ok, true, r.what)
+  assert.match(r.what, /, off release\/2\.0$/)
+  const ws = (await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws)
+  assert.equal(ws.base, 'release/2.0')
+  assert.ok(existsSync(join(ws.path, 'rel.txt')), 'off the release branch')
+  // gone: a failed run that names it, no workspace off main instead
+  await rig.rpc('wsRm', { id: r.ws })
+  git('branch', '-D', 'release/2.0')
+  const gone = await rig.rpc('scheduleRun', { id: s.id })
+  assert.deepEqual([gone.ok, gone.what, gone.ws], [false, `base release/2.0 not found in ${p.name}`, undefined])
+  assert.equal((await rig.rpc('state')).workspaces.length, 0)
+  // '' clears it; moved into a workspace, it's dropped
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, base: '' })).base, undefined)
+  await rig.rpc('scheduleSet', { id: s.id, base: 'main' })
+  const into = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, ws: into.id })).base, undefined)
+  // the CLI's --base
+  const cli = await rig.cli('schedule', 'add', p.id, '--when', 'weekdays at 9am', '--base', 'main', 'triage')
+  assert.equal(cli.code, 0, cli.err)
+  assert.match(cli.out, /claude · new off main/)
 })
 
 test('scheduled tasks: an extension fetched, or one of its actions run; only one that is on', async t => {

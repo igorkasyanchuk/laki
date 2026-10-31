@@ -7,7 +7,7 @@ import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Re
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, git, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
@@ -131,8 +131,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -190,6 +190,13 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     if (ws.project !== proj.id) throw new Error(`${ws.id} isn't in ${proj.name}`)
     s.ws = ws.id
   }
+  // a base branch: a new workspace's only ('' clears it; a task moved elsewhere drops it)
+  s.base = s.base?.trim() || undefined
+  if (s.base?.startsWith('-')) throw new Error(`base ${s.base}? a branch, not an option`)
+  if (s.ws !== 'new' || s.workflow || s.widget) {
+    if (o.base?.trim()) throw new Error('a base branch is for a new workspace each run')
+    delete s.base
+  }
   s.prompt = s.prompt?.trim() ?? ''
   if (!s.prompt && !ext) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
   s.name = s.name?.trim() || undefined
@@ -244,7 +251,15 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     } else if (s.ws === 'new' || s.ws === 'local-new') {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'local-new' && { local: true, another: true }) })
+      // its base branch gone: the run fails and says so, never off another branch; one only on origin: origin's
+      // ponytail: origin/<base> as last fetched (settings.syncBase fetches it again in wsNew)
+      let base = s.ws === 'new' ? s.base : undefined
+      if (base) {
+        const has = (ref: string) => git(findProject(s.project), 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`).then(Boolean, () => false)
+        if (!(await has(base))) base = (await has(`origin/${base}`)) ? `origin/${base}` : undefined
+        if (!base) throw new Error(`base ${s.base} not found in ${findProject(s.project).name}`)
+      }
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(base && { base }), ...(s.ws === 'local-new' && { local: true, another: true }) })
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''
@@ -255,7 +270,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       changed()
       r.ws = ws.id
       r.tab = tabsOf(ws.id).find(t => t.kind === 'agent')?.id
-      r.what = `started in a new ${s.ws === 'new' ? 'workspace' : 'session in its folder'}, ${ws.id}`
+      r.what = `started in a new ${s.ws === 'new' ? 'workspace' : 'session in its folder'}, ${ws.id}${s.base ? `, off ${ws.base}` : ''}`
     } else {
       // its folder: the project's local workspace, made the first time (no worktree, no agent of its own)
       const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : findWs(s.ws)

@@ -269,10 +269,11 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         preset: str('claude (the default), codex, gemini, grok, opencode or a preset of theirs'),
         name: str('the task’s name, also each run’s workspace name; may hold {{DD-MM}}'),
         where: str('new (a new worktree each run), local (the project folder, one session), local-new (the folder, a new session each run) or a workspace id'),
+        base: str('where new: the branch each worktree starts off (none: the project’s checkout); a run whose branch is gone fails'),
       },
       ['project', 'when', 'prompt'],
     ),
-    run: a => rpc('scheduleSet', { project: a.project, when: a.when, prompt: a.prompt, preset: a.preset, name: a.name, ws: a.where }),
+    run: a => rpc('scheduleSet', { project: a.project, when: a.when, prompt: a.prompt, preset: a.preset, name: a.name, ws: a.where, base: a.base }),
   },
   // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
   {
@@ -670,9 +671,9 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_schedule_set',
-    description: 'Change a scheduled task by its id (laki_schedules): turn it on or off, its times in English, prompt or name.',
-    inputSchema: obj({ id: str("the task's id"), on: { type: 'boolean' }, when: str('e.g. "weekdays at 9am"'), prompt: str('its prompt'), name: str('its name') }, ['id']),
-    run: a => rpc('scheduleSet', { id: a.id, on: a.on, when: a.when, prompt: a.prompt, name: a.name }),
+    description: 'Change a scheduled task by its id (laki_schedules): turn it on or off, its times in English, prompt, name or base branch.',
+    inputSchema: obj({ id: str("the task's id"), on: { type: 'boolean' }, when: str('e.g. "weekdays at 9am"'), prompt: str('its prompt'), name: str('its name'), base: str("a new workspace's base branch ('': the project's checkout)") }, ['id']),
+    run: a => rpc('scheduleSet', { id: a.id, on: a.on, when: a.when, prompt: a.prompt, name: a.name, base: a.base }),
   },
   {
     name: 'laki_timer',

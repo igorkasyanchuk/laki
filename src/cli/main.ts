@@ -465,7 +465,7 @@ async function main() {
     case 'schedule': {
       const [sub = 'ls', id, ...words] = rest
       const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}`}  ${s.name || s.prompt}`
+      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.base ? ` off ${s.base}` : ''}`}  ${s.name || s.prompt}`
       if (sub === 'ls' || sub === 'log') {
         const v: View = await rpc('state')
         if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
@@ -474,7 +474,7 @@ async function main() {
       if (sub === 'add') {
         if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
         const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
-        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, name: flags.name, prompt: flags.prompt || words.join(' ') })
+        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, name: flags.name, prompt: flags.prompt || words.join(' ') })
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)

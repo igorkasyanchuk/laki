@@ -196,7 +196,10 @@ issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link,
 `GhCard`): a terminal link's hover card (LinkPeek.tsx). 125: a tab's `alias` (`tabSet` `alias`, `ALIAS`: one live tab each; `resolveTarget` `@name`; the CLI's `laki name`,
 `agents`, `ask`, shared/tools.ts `askAgent`, MCP's `laki_name`, `laki_ask_agent`; dropped as its workspace archives), a
 workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` (main.ts `TEST_CLOCK`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
-`linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). A setting the renderer adds
+`linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). 130: a schedule's `base` (`scheduleSet`
+keeps it for `ws` new only, refused for another, '' clears it; `runSchedule`: `wsNew` `base`, origin's when only there,
+gone: a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
+base chip, `SchedulesApi.branches`, a new task's the repo's `main`). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -995,7 +998,8 @@ on one only (off: a failed run), a fetch awaited (one already fetching: that one
 `widget-say`. A task with `workflow` (and `source`) starts that workflow instead
 (`flowHooks.start`/`find`, which workflow.ts sets: no import cycle) with the prompt as its task, trigger
 `schedule <id>`, skipped while its last run is live. A run (ws) makes a new workspace
-(`new`: `wsNew` with the preset and prompt; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
+(`new`: `wsNew` with the preset, the prompt and the task's `base`, checked first: gone, a failed run that says so;
+only on origin, `origin/<b>`; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
 it: the sidebar's clock),
 or a new session in the project's own folder (`local-new`: `wsNew` `local` + `another`, a local workspace beside the one
 it has, so each run is a sidebar row), or uses that folder (`local`: its local workspace, made by the first run) or a workspace

@@ -4790,6 +4790,7 @@ export function App() {
               rm: id => api.call('scheduleRm', { id }),
               run: id => api.call('scheduleRun', { id }),
               flows: flowsOn ? () => api.call('flowList', {}) : undefined,
+              branches: project => api.call('branches', { project }),
               open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),
               pick: async () => {
                 const path = bridge ? await bridge.pickFolder() : prompt('The folder’s full path') // a browser has no folder picker
