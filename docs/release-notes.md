@@ -20,6 +20,7 @@ version it builds, with the date. -->
 - Collision radar: two worktrees that change the same lines (or a base that changed them since one branched) get an
   orange ⇄ on their rows, with the files and lines; open the other, tell either agent, or ask it to merge the base in.
   Settings › Git & worktrees turns it off.
+- A Claude tab no longer flashes *Needs you* while subagents it started in the background still work (a code review's reviewers): it stays working until they're done.
 
 ## 0.36.0 · Oct 31, 2026
 

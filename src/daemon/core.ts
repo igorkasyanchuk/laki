@@ -93,7 +93,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout } // later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number } // bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -2447,6 +2447,15 @@ function turn(p: { tab: string; state: string; payload?: any }) {
   const was = r.status
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
+  // claude's Stop while subagents it started in the background still work: paused, not done (they report back as a new
+  // turn, then its real Stop). Its ● and the done notice wait for that; sweepRunning leaves it running meanwhile
+  // ponytail: agents only (subagent, workflow, teammate); a background shell or monitor may run for good
+  if (p.state === 'idle' && pl.hook_event_name === 'Stop' && bgAgents(pl.background_tasks)) {
+    r.status = 'running'
+    r.bg ??= Date.now()
+    return changed()
+  }
+  if (p.state !== 'start') r.bg = undefined
   switch (p.state) {
     case 'start':
       if (pl.session_id && pl.session_id !== tab.resumeId) {
@@ -2539,6 +2548,10 @@ function turn(p: { tab: string; state: string; payload?: any }) {
   }
   changed()
 }
+
+// a Stop's background_tasks (claude's): any agent's still going
+const bgAgents = (tasks: unknown) =>
+  Array.isArray(tasks) && tasks.some(t => /^(subagent|workflow|teammate)$/.test(t?.type) && !/^(completed?|done|failed|killed|stopped|cancell?ed|error)$/i.test(String(t?.status ?? '')))
 
 // an agent's estimate of how far along its task is (laki progress, MCP's laki_progress; the skill asks for one every
 // 20-30 s while LAKI_PROGRESS is set): on its tab until the turn ends
@@ -2786,6 +2799,7 @@ export const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && 
 // while and no "esc to interrupt" on screen (claude and codex show it while they work) means idle. For an agent
 // without hooks it's how every turn ends: done, as a hook would say (ponytail: a turn under 8s, likely Enter on a
 // menu, ends without a notification)
+const BG_MAX = 60 * 60_000 // a pause on subagents past this: the screen's word again (one that never reported back)
 export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
@@ -2797,6 +2811,7 @@ export function sweepRunning(now = Date.now()) {
       else if (!asks && r.status === 'waiting') turn({ tab: t.id, state: 'running' }) // answered
     }
     if (!s || s.exited || r?.status !== 'running' || !tracked(t) || now - s.lastOutput < QUIET) continue
+    if (r.bg && now - r.bg < BG_MAX) continue // its subagents work (turn): its next turn says when it's done
     if (BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue
     if (screen && now - (r.since ?? 0) > 2 * QUIET) {
       turn({ tab: t.id, state: 'idle' })

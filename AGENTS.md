@@ -614,7 +614,7 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 | SessionStart | records the resume id |
 | UserPromptSubmit, Pre/PostToolUse | running |
 | Notification (permission prompts) | waiting |
-| Stop | idle, plus the last answer, then delivers the next queued message |
+| Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
 | StopFailure | usage limit (`limits.ts`) |
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.

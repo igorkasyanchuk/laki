@@ -56,6 +56,32 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   watcher.close()
 })
 
+test("claude's Stop while its background subagents work: still running, no ●, no done notice, until its real Stop", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'first task' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: first task', 'its first turn')
+  const watcher = await connect(rig)
+  await watcher.call('view', { tab: tab.id, focused: true }) // its first turn's ● seen
+  await until(async () => !(await rig.tab(ws.id)).done, 'seen')
+  await watcher.call('view', { tab: null, focused: true })
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'review it' } })
+  const bg = [{ type: 'subagent', status: 'running' }, { type: 'shell', status: 'running' }]
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Started 2 reviewers.', background_tasks: bg } })
+  await new Promise(r => setTimeout(r, 300))
+  let tv = await rig.tab(ws.id)
+  assert.deepEqual([tv.status, tv.done, tv.last], ['running', false, 'answer: first task'])
+  assert.ok(!watcher.events.some(e => e.ev === 'turn' && e.kind === 'done'))
+  // a background shell alone (a dev server) doesn't hold it: done
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'reviewer reports' } })
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'All reviewed.', background_tasks: [{ type: 'shell', status: 'running' }, { type: 'subagent', status: 'completed' }] } })
+  tv = await until(async () => (x => x.status === 'idle' && x)(await rig.tab(ws.id)), 'its real Stop')
+  assert.deepEqual([tv.done, tv.last], [true, 'All reviewed.'])
+  assert.ok(watcher.events.some(e => e.ev === 'turn' && e.kind === 'done' && e.text === 'All reviewed.'))
+  watcher.close()
+})
+
 test('codex: notify ends a turn and records the thread id', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
