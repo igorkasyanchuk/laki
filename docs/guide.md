@@ -1432,6 +1432,17 @@ laki flow check .laki/workflows               # check workflow files (a folder: 
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
+### One next step
+
+The toolbar's first button is the one thing the workspace needs from you now: *Answer claude* or *Approve the plan*
+while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *Address the review*, *Overlaps another*,
+*Merge #42* once checks pass, *Review changes* when the agent is done, *Ship* when there's something to ship, *Archive*
+once its PR is merged or closed. While an agent works it shows the step under way (from its plan) and there's nothing
+to click; *CI runs* and *In review* open the PR. ⌘G does what it says. Each sidebar row gets the same as a small chip
+(none while it works). With it on, the toolbar is that button, ⋯ and Run: Layout, Full screen, Open in, Info, Preview,
+the side panel, Ship and Commands are at the top of ⋯, and their keys work as before. Settings › Appearance › *One next
+step* turns it off.
+
 ### Done check
 
 "Done" usually means the agent stopped talking. With a project's Done check, it means its work passed. Tick what runs
@@ -1623,6 +1634,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘J | the next tab that needs you (waiting first, then done unseen), across workspaces |
+| ⌘G | the workspace's next step (the toolbar's first button) |
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |

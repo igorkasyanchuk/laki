@@ -7,6 +7,9 @@ version it builds, with the date. -->
 - Done check: tick a project's lint, test and format scripts (its settings › *Done check*), and a second agent's review,
   and they run as each agent's turn ends having changed files. A failure goes back to the agent with its output, a
   strip under the terminal shows each step, and the notification says *done and checked*.
+- One next step: the toolbar's first button is what the workspace needs from you now (answer, fix CI, resolve
+  conflicts, merge, review changes, ship, archive), ⌘G, and each sidebar row says it too. The other toolbar buttons
+  moved into its ⋯; their keys still work.
 - The agent's plan, live: Claude Code's and Codex's own to-do lists show under the tab as they work, the step under way
   in bold and *2/5* on the sidebar row; a plan Claude asks you to approve is a card you can edit and send back.
 - Collision radar: two worktrees that change the same lines (or a base that changed them since one branched) get an

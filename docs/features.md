@@ -31,6 +31,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+- **One next step**: one toolbar button (⌘G) and a chip on each row for what a workspace needs from you now: answer,
+  fix CI, resolve conflicts, merge, review its changes, ship, archive.
 - **The agent's plan, live**: an agent's own to-do list under its tab, ticking off as it goes, and *2/5* on its row; a
   plan it asks you to approve is a card you can edit, your version sent back.
 - **Done check**: as an agent's turn ends having changed files, the project's lint, test and format scripts you tick run

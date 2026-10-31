@@ -22,6 +22,7 @@ export const KEYS = [
   { id: 'find', label: 'Find in the terminal or a diff', key: '⌘F' },
   { id: 'filter', label: 'Filter the sidebar (its box gets the keys)', key: '⇧⌘F' },
   { id: 'next', label: 'Next tab that needs you', key: '⌘J' },
+  { id: 'step', label: "Do the workspace's next step", key: '⌘G' },
   { id: 'later', label: 'Send a message later', key: '⌘L' },
   { id: 'artifacts', label: 'Show / hide artifacts', key: '⇧⌘A' },
   { id: 'full', label: 'Full screen: just the tab', key: '⇧⌘Enter' },

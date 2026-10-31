@@ -512,6 +512,7 @@ export type Settings = {
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   doneCheck?: boolean // Done means checked: projects' checks as agents' turns end (on unless false; each project's steps off until ticked)
+  nextStep?: boolean // One next step: the toolbar's button (⌘G) and each row's chip, the rest of the toolbar in its ⋯ (on unless false)
   livePlan?: boolean // the agent's plan, live: its to-do list on its tab and row, a plan it asks you to approve as a card (on unless false)
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)

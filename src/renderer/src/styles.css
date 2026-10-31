@@ -1430,6 +1430,19 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-resolved[open] > summary { margin-bottom: 6px; }
 .sp-resolved .sp-thread { opacity: 0.75; }
 .side-panel h3 .ib { width: 20px; height: 20px; }
+.step-btn { display: inline-flex; align-items: center; gap: 6px; height: 24px; max-width: 280px; margin-right: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--side)); color: var(--fg); font: inherit; font-size: 12px; cursor: pointer; } /* One next step (App's stepOf) */
+.step-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-btn:hover { background: var(--hover); }
+.step-btn.t-ask { border-color: color-mix(in srgb, var(--waiting) 55%, var(--line)); } .step-btn.t-ask .icon-svg { color: var(--waiting); }
+.step-btn.t-bad { border-color: color-mix(in srgb, var(--error) 55%, var(--line)); } .step-btn.t-bad .icon-svg { color: var(--error); }
+.step-btn.t-go { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); } .step-btn.t-go:hover { filter: brightness(1.08); }
+.step-btn.busy { color: var(--muted); }
+.narrow .step-btn { max-width: 140px; padding: 0 8px; }
+.ws-step { flex: none; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; line-height: 15px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); cursor: pointer; } /* a row's next step */
+.ws-step:hover { color: var(--fg); background: var(--hover); }
+.ws-step.t-ask { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 45%, transparent); }
+.ws-step.t-bad { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
+.ws-step.t-go { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .run-btn { display: inline-flex; align-items: stretch; margin-left: 6px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; height: 24px; }
 .run-btn button { display: inline-flex; align-items: center; gap: 5px; border: none; border-radius: 0; background: var(--panel); padding: 0 9px; font-size: 12px; }
 .run-btn button:hover { background: var(--hover); }

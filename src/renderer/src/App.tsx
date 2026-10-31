@@ -35,6 +35,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { planCount } from '../../shared/todos'
+import { nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -70,6 +71,7 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
 type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
+const STEP_ICON: Record<StepId, IconName> = { answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', collide: 'gitCompare', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
@@ -2856,6 +2858,7 @@ export function App() {
       // the sidebar's filter: open, its box focused; pressed again in the box: closed
       filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),
       next: nextNeed,
+      step: stepsOn && !!ws && !dialog && (() => document.querySelector<HTMLElement>('.step-btn')?.click()),
       later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
       artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
       full: () => toggleFull(), // full screen, or back
@@ -2863,7 +2866,7 @@ export function App() {
       forward: historyOn && !field && (() => travel(hist.current.i + 1)),
       settings: () => toSettings(),
       help: () => setDialog(d => (d === 'help' ? null : 'help')),
-      layout: !dialog && (() => document.querySelector<HTMLElement>('.layout-btn')?.click()),
+      layout: !dialog && (() => (b => (b ? b.click() : (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())))(document.querySelector<HTMLElement>('.layout-btn'))), // in the ⋯ with One next step: its menu there
     }
     const id = force ?? (fixed ? undefined : keyFor(e, kb))
     const run = id && bound[id]
@@ -3193,6 +3196,21 @@ export function App() {
         hide,
       ]
     })
+  // One next step (shared/nextStep.ts): the toolbar's button (⌘G) and a row's chip; a click does it
+  const stepsOn = settings.nextStep !== false
+  const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), overlaps: new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size, git: projOf(w)?.git !== false })
+  const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
+    const at = () => (setWsId(w.id), setDialog(null))
+    if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
+    if (s.id === 'conflict' || s.id === 'ci' || s.id === 'review') return void prFix(w, s.id)
+    if (s.id === 'collide') return e ? openMenu(e, radarMenu(w)) : at()
+    if (s.id === 'merge') return void prAct(w, 'merge')
+    if (s.id === 'archive') return void archive(w)
+    if (s.id === 'look') return at(), showPanel('changes')
+    if (s.id === 'ship') return at(), setDialog('ship')
+    if (s.id === 'wait' && w.pr) return openExternal(w.pr.url)
+    at()
+  }
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3230,6 +3248,7 @@ export function App() {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
+        {stepsOn && !projOf(w)?.kind && !w.term && (st => st && !st.busy && st.id !== 'collide' /* its ⇄ says it */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={st.tip} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -3715,7 +3734,22 @@ export function App() {
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const ownWidgets = shownWidgets.filter(w => (!w.project || w.project === ws?.project) && !(w.on && w.hidden)) // a repo's (.laki/extensions): only while a workspace of its project is selected; hidden: its data says so
   // the tab bar's ⋯: on a phone, the top bar's extensions too (no room for their strip), each as its button's click
-  const wsMore = (): MenuItem[] => (tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))
+  // with One next step, what the toolbar had besides it, ⋯ and Run: its keys still work
+  const tucked = (): MenuItem[] =>
+    stepsOn && ws && ws.browser === undefined && project?.kind !== 'shells'
+      ? [
+          ...(narrow ? [] : [{ label: 'Layout', icon: 'layers', hint: kh('layout'), tip: 'The agent with Preview, Changes, the dev server or a shell; yours', items: layoutMenu() } as MenuItem]),
+          { label: 'Full screen', icon: 'maximize', hint: kh('full'), tip: 'Just this tab', run: () => toggleFull(true) },
+          { label: 'Open in', icon: 'code', hint: '⌘E', tip: `Its folder in ${editorName} or another app`, items: openInItems() },
+          { label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) },
+          { label: `Preview localhost:${ws.port}`, icon: 'globe', run: () => showPanel('preview') },
+          { label: 'Side panel', icon: 'panel', hint: kh('panel'), tip: 'Info, files, changes, review, preview', run: () => togglePanel() },
+          ...(ws.kind === 'worktree' ? [{ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') } as MenuItem] : []),
+          { label: 'Commands', icon: 'search', hint: kh('palette'), run: () => setDialog('palette') },
+          null,
+        ]
+      : []
+  const wsMore = (): MenuItem[] => [...tucked(), ...(tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))]
   const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
@@ -4161,27 +4195,39 @@ export function App() {
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
           {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
-          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
-          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
+          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && !stepsOn && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
+          {ws && !(stepsOn && ws.browser === undefined && project?.kind !== 'shells') && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
-              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMore(), 'right')} />
+              <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
             </div>
           )}
           {ws && ws.browser === undefined && project?.kind !== 'shells' && (
             <div className="actions nodrag">
-              {!narrow && ( // a phone: in ⌘K's palette (the search button)
+              {stepsOn ? (
+                (st =>
+                  st && (
+                    <button className={`step-btn t-${st.tone ?? 'none'}${st.busy ? ' busy' : ''}`} data-tip={kt(st.tip ?? st.label, 'step')} onClick={e => doStep(ws, st, e)}>
+                      {st.id === 'working' ? <Glyph s="running" /> : <Icon name={STEP_ICON[st.id]} size={13} />}
+                      <span>{st.label}</span>
+                    </button>
+                  ))(stepOf(ws))
+              ) : (
                 <>
-                  <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-                  <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
-                  <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
+                {!narrow && ( // a phone: in ⌘K's palette (the search button)
+                  <>
+                    <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
+                    <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
+                    <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
+                  </>
+                )}
+                <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
+                {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
+                <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
+                {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
                 </>
               )}
-              <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
-              {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
-              <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
-              {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
-              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMore(), 'right')} />
+              <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
               <RunButton
                 running={devRunning}
                 onRun={() => (ws.run ? run() : editScripts())}
