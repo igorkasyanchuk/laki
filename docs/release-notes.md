@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A long menu (a workspace's right click) uses the window's whole height and packs its rows before it scrolls, so
+  *Delete workspace* at its end is in sight; *Run workflow* answers W again.
 - A picture's hover card in a terminal opens it larger: click the picture or its ⤢.
 - The status bar is always full width, under the sidebar too, on every page (the Appearance switch is gone); phones
   keep it under the main area.

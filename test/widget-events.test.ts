@@ -42,12 +42,13 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
 
   // turn.done: the handler gets it on stdin and in its file, says data and a toast
   await rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'all done' } })
-  await until(() => existsSync(join(home, 'got.json')) && existsSync(join(home, 'file.json')), 'the handler ran') // file.json: its second step
-  const got = JSON.parse(readFileSync(join(home, 'got.json'), 'utf8'))
+  // written, not only made: cat's and cp's files are there empty a moment (file.json: its second step)
+  const json = (f: string) => { try { return JSON.parse(readFileSync(join(home, f), 'utf8')) } catch {} }
+  const [got, file] = await until(() => (g => g && (f => f && [g, f])(json('file.json')))(json('got.json')), 'the handler ran')
   assert.equal(got.event, 'turn.done')
   assert.equal(got.last, 'all done')
   assert.deepEqual([got.ws.id, got.ws.branch, got.tab.id, got.tab.agent], [a.id, a.branch, ta.id, 'claude'])
-  assert.deepEqual(JSON.parse(readFileSync(join(home, 'file.json'), 'utf8')), got)
+  assert.deepEqual(file, got)
   assert.deepEqual(await until(() => dataOf(rig, 'ev').then(d => d?.said && d)), { said: 'turn.done' })
   await until(() => app.events.find(e => e.ev === 'widget-say' && e.widget === 'ev' && e.toast === 'seen' && e.close === 'prog'), "the toast and the close, to the app's window")
   const runs = (await rig.rpc('widgetRuns', { id: 'ev' })).runs

@@ -680,6 +680,8 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu.rich .menu-item { gap: 10px; padding: 7px 10px; border-radius: var(--rs, 8px); }
 .menu.rich .menu-item.two { align-items: flex-start; padding: 8px 10px; }
 .menu.rich .menu-item.two > .menu-pill { margin-top: 1px; }
+.menu[data-tight] .menu-item, .menu.rich[data-tight] .menu-item { padding-top: 3px; padding-bottom: 3px; } /* a menu taller than the window (ui.tsx Menu) */
+.menu[data-tight] .menu-sub { display: none; }
 .menu.rich .menu-icon:empty { display: none; }
 .menu.rich .menu-label { font-size: 13px; }
 .menu.rich .menu-label.mono { font-size: 12.5px; }

@@ -3,6 +3,7 @@
 import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
+import { menuKeys } from './text'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -453,17 +454,6 @@ export type MenuItem =
 type Act = Extract<MenuItem, { label: string }>
 const isAct = (it: MenuItem): it is Act => !!it && 'label' in it
 
-// a key per item: its own, else a free initial of its words, else any free letter of its label
-function menuKeys(acts: Act[]) {
-  const used = new Set(acts.map(a => a.key?.toLowerCase()))
-  return acts.map(a => {
-    if (a.key) return a.key.toLowerCase()
-    const l = a.label.toLowerCase()
-    const k = [...l.split(/[^a-z0-9]+/).map(w => w[0]), ...l].find(c => c && /[a-z0-9]/.test(c) && !used.has(c))
-    if (k) used.add(k)
-    return k
-  })
-}
 
 // beside: a submenu's, the item it opens from (no backdrop of its own; onBack: ← or Esc closes only it)
 function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; beside?: DOMRect; onBack?: () => void; onEnter?: () => void; onClose: () => void }) {
@@ -541,6 +531,12 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
     const px = (n: number) => `${n / z}px`
     el.style.bottom = '' // another anchor: placed again
     el.style.top = px(anchor.bottom + 4)
+    // the window's height, not CSS's 70vh: a workspace's menu scrolled its last items (Delete) out of sight; still too
+    // tall, its rows packed and their lines under dropped (data-tight), then it scrolls
+    el.style.maxHeight = px(window.innerHeight - 12)
+    el.removeAttribute('data-tight')
+    const list = el.querySelector<HTMLElement>('.menu-list')
+    if (list && list.scrollHeight > list.clientHeight + 1) el.setAttribute('data-tight', '')
     if (align === 'left') (el.style.right = ''), (el.style.left = px(anchor.left)) // a flip before held it by the other edge
     else (el.style.left = ''), (el.style.right = px(window.innerWidth - anchor.right))
     const r = el.getBoundingClientRect()

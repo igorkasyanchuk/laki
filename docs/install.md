@@ -2,9 +2,10 @@
 
 ## The app
 
-macOS 13 or later on Apple silicon or Intel. Download the dmg for your Mac (`arm64` or `x64`) from
+macOS 13 or later on Apple silicon. Download the `arm64` dmg from
 [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and drag Laki to Applications.
-It's signed and notarized: a double-click opens it. Or with Homebrew:
+It's signed and notarized: a double-click opens it, and it updates itself (Settings › General › Updates). An Intel Mac
+builds it (below). Or with Homebrew:
 
 ```bash
 brew install --cask igorkasyanchuk/laki/laki    # Laki.app in /Applications

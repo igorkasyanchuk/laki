@@ -624,3 +624,18 @@ export function completeInto(v: string, t: Trigger, caret: number, value: string
   const [a, b] = at < 0 ? [fillTemplate(value, {}), ''] : [fillTemplate(value.slice(0, at), {}), fillTemplate(value.slice(at).replace(/^\{\{\s*prompt\s*\}\}/, ''), {})]
   return { value: `${v.slice(0, t.from)}${a}${b}${v.slice(caret)}`, caret: t.from + a.length }
 }
+
+// menus' keys (ui.tsx Menu)
+// a key per item: its own, else a free initial of its words, else any free letter of its label; an own key an earlier
+// item has (Rename with AI's and Run workflow's W) is taken as none, so both answer a key
+export function menuKeys(acts: { key?: string; label: string }[]) {
+  const used = new Set<string | undefined>()
+  const own = acts.map(a => (k => (k && !used.has(k) ? (used.add(k), k) : undefined))(a.key?.toLowerCase()))
+  return acts.map((a, i) => {
+    if (own[i]) return own[i]
+    const l = a.label.toLowerCase()
+    const k = [...l.split(/[^a-z0-9]+/).map(w => w[0]), ...l].find(c => c && /[a-z0-9]/.test(c) && !used.has(c))
+    if (k) used.add(k)
+    return k
+  })
+}

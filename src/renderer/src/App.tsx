@@ -2502,7 +2502,7 @@ export function App() {
     ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
-    ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', key: 'w', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
+    ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
     { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
     { label: 'Open in', icon: 'code', key: 'o', tip: 'Its folder in an editor, a terminal or Finder', items: openInItems({ ws: w.id }) },
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },

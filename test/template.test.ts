@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, menuKeys, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -428,4 +428,10 @@ test('a double-clicked word drops the punctuation after it, not inside it', () =
 test("replyText: where the quote is from, the text fenced past its own backticks, then the words", () => {
   assert.equal(replyText('\n  error: x   \nat y\n\n', ' fix this ', 'shell'), 'From shell:\n```\n  error: x\nat y\n```\n\nfix this')
   assert.equal(replyText('run ```npm i```', ''), 'From your output:\n````\nrun ```npm i```\n````')
+})
+
+test('menuKeys: its own key, else a free initial; a key two items claim goes to the first, the second gets a free one', () => {
+  // a workspace's menu: Rename with AI and Run workflow both said W
+  assert.deepEqual(menuKeys([{ label: 'Rename…', key: 'r' }, { label: 'Rename with AI', key: 'w' }, { label: 'Run', key: 'n' }, { label: 'Run workflow', key: 'w' }, { label: 'Delete workspace', key: 'd' }]), ['r', 'w', 'n', 'u', 'd'])
+  assert.deepEqual(menuKeys([{ label: 'Open' }, { label: 'Other', key: 'o' }]), ['p', 'o']) // an own key wins over an earlier initial
 })
