@@ -342,14 +342,14 @@ async function main() {
         }
         const v: View = await rpc('state')
         if (!v.reminders) throw new Error('Calendar is off: Settings › General › Pages')
-        return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}`).join('\n') || 'no reminders')
+        return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}${r.every ? `  (${r.every})` : ''}`).join('\n') || 'no reminders')
       }
       const [when, ...words] = rest
-      if (!when || !words.length) throw new Error('usage: laki remind "<when: in 2h, tomorrow at 9am, 2026-10-20 14:30>" <text…> [--ws <id>|.]')
+      if (!when || !words.length) throw new Error('usage: laki remind "<when: in 2h, tomorrow at 9am, 2026-10-20 14:30, every weekday at 9am>" <text…> [--ws <id>|.]')
       if (flags.ws === '.' && !process.env.LAKI_WORKSPACE) throw new Error('--ws .: only in a workspace\'s tab (or give its id)')
       const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : (flags.ws as string | undefined)
       const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }) })
-      return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}`)
+      return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}${r.every ? `, then ${r.every}` : ''}`)
     }
     case 'show': {
       // laki show "<text>" [--open <folder|file|url>…] [--title t]: a card under this tab in Laki, its buttons opening

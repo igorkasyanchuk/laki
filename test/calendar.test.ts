@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseAt } from '../src/shared/when.ts'
+import { parseAt, whenOf } from '../src/shared/when.ts'
 import { fresh, until } from './helpers.ts'
 
 test('parseAt: lengths from now, dates, a day and time; nonsense says how', () => {
@@ -15,6 +15,38 @@ test('parseAt: lengths from now, dates, a day and time; nonsense says how', () =
   assert.equal(parseAt('at 5pm', now), new Date(2026, 9, 17, 17, 0).getTime()) // past today: tomorrow's
   assert.equal(parseAt(12345, now), 12345)
   for (const bad of ['2026-02-31', '2026-10-20 25:00', 'whenever', '']) assert.ok('error' in (parseAt(bad, now) as object), bad)
+})
+
+test('whenOf: words that repeat make a rule and its next time, any other one moment', () => {
+  const now = new Date(2026, 9, 16, 18, 0).getTime() // a Friday, 6pm
+  assert.deepEqual(whenOf('every weekday at 9am', now), { at: new Date(2026, 9, 19, 9, 0).getTime(), every: 'every weekday at 9am' }) // Monday's
+  assert.deepEqual(whenOf('mondays at 5pm', now), { at: new Date(2026, 9, 19, 17, 0).getTime(), every: 'mondays at 5pm' })
+  assert.deepEqual(whenOf('daily at 7:30', now), { at: new Date(2026, 9, 17, 7, 30).getTime(), every: 'daily at 7:30' })
+  assert.deepEqual(whenOf('mon at 9am', now), { at: new Date(2026, 9, 19, 9, 0).getTime() }) // one Monday
+  assert.deepEqual(whenOf('in 2h', now), { at: now + 2 * 3600000 })
+  assert.ok('error' in (whenOf('every weekday', now) as object), 'no time')
+  assert.ok('error' in (whenOf('whenever', now) as object))
+})
+
+test('reminders that repeat: rung, then moved to their next time; set once again by other words', async t => {
+  const rig = await fresh(t)
+  const ws = await rig.connect()
+  t.after(() => ws.close())
+  const r = await rig.rpc('reminderAdd', { at: 'every day at 9am', text: 'Standup' })
+  assert.equal(r.every, 'every day at 9am')
+  const first = r.at
+  const rung = await rig.rpc('reminderTick', { now: first + 1000 })
+  assert.deepEqual(rung.map((x: any) => x.id), [r.id])
+  const after = (await rig.rpc('state')).reminders.find((x: any) => x.id === r.id)
+  assert.equal(after.fired, undefined, 'not done: it comes again')
+  assert.ok(after.at > first + 1000 && after.at - first <= 2 * 86400000, 'its next time')
+  assert.deepEqual(await rig.rpc('reminderTick', { now: first + 2000 }), [], 'once each time')
+  await assert.rejects(rig.rpc('reminderAdd', { at: 'every weekday', text: 'x' }), /time/)
+  await assert.rejects(rig.rpc('reminderAdd', { every: 'tomorrow at 9am', text: 'x' }), /doesn't repeat/)
+  const once = await rig.rpc('reminderSet', { id: r.id, at: 'in 2h' })
+  assert.equal(once.every, undefined, 'other words: once')
+  assert.equal((await rig.rpc('reminderSet', { id: r.id, every: 'mondays at 10am' })).every, 'mondays at 10am')
+  assert.equal((await rig.rpc('reminderSet', { id: r.id, every: null })).every, undefined)
 })
 
 test('reminders: on unless Calendar is off; added, moved, ticked off, rung once while the app is open, removed', async t => {

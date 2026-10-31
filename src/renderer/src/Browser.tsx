@@ -4,16 +4,23 @@
 // workspace (onPage: wsSet's browser and name), so the sidebar names it and a restart opens it again. A right click
 // is main's pageMenu (link, image, text, back, forward, reload, Inspect Element); the code button opens DevTools.
 // ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them), as in the preview; only
-// ⌘W and ⌘T do (main's before-input-event sends them as browser-key: App's keys, as if typed there)
+// ⌘W and ⌘T do (main's before-input-event sends them as browser-key: App's keys, as if typed there). The camera: what's
+// in sight or the whole page (main's page-shot), copied or saved in Downloads.
 import { useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
 import { browserUrl } from './text'
-import { IconButton } from './ui'
+import { IconButton, useMenu } from './ui'
 
 const shown = (u: string) => (u === 'about:blank' ? '' : u)
 
-export function BrowserPane({ url, hidden, onPage, onOpen }: { url: string; hidden: boolean; onPage: (url: string, title: string) => void; onOpen: (url: string) => void }) {
+export function BrowserPane({ url, hidden, onPage, onOpen, onShot }: { url: string; hidden: boolean; onPage: (url: string, title: string) => void; onOpen: (url: string) => void; onShot?: (r: { path?: string; error?: string }) => void }) {
   const [addr, setAddr] = useState(shown(url))
+  const [menu, openMenu] = useMenu()
+  const shot = (whole: boolean, save: boolean) => {
+    const id = on(v => v.getWebContentsId()) as number | undefined
+    if (!id || !bridge?.pageShot) return onShot?.({ error: 'Nothing loaded yet' })
+    bridge.pageShot(id, whole, save).then(path => onShot?.({ path: path || undefined }), e => onShot?.({ error: String((e as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') }))
+  }
   const [err, setErr] = useState('')
   const [google, setGoogle] = useState(false) // Google turned down its sign-in here: main opened it in your browser
   const host = useRef<HTMLDivElement>(null)
@@ -71,8 +78,26 @@ export function BrowserPane({ url, hidden, onPage, onOpen }: { url: string; hidd
         <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), on(v => v.reload()))} />
         <input ref={input} value={addr} spellCheck={false} placeholder="Search, or type an address" onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} onFocus={e => e.target.select()} />
         <IconButton icon="link" title="Open in your browser" onClick={() => addr && onOpen(browserUrl(addr))} />
+        {bridge?.pageShot && (
+          <IconButton
+            icon="camera"
+            title="Screenshot: what's in sight, or the whole page"
+            onClick={e =>
+              openMenu(e, [
+                { head: 'What’s in sight' },
+                { label: 'Copy', icon: 'copy', key: 'c', run: () => shot(false, false) },
+                { label: 'Save to Downloads', icon: 'download', key: 's', run: () => shot(false, true) },
+                null,
+                { head: 'The whole page' },
+                { label: 'Copy', icon: 'copy', key: 'w', run: () => shot(true, false) },
+                { label: 'Save to Downloads', icon: 'download', key: 'd', run: () => shot(true, true) },
+              ])
+            }
+          />
+        )}
         {bridge && <IconButton icon="code" title="Developer tools (or right click › Inspect Element)" onClick={() => on(v => (v.isDevToolsOpened() ? v.closeDevTools() : v.openDevTools()))} />}
       </div>
+      {menu}
       {err && <div className="warn small pad">{err}</div>}
       {google && <div className="warn small pad">Google won’t sign in inside Laki’s browser: it opened in your own browser instead.</div>}
       {!bridge && <div className="muted small pad">The browser runs in the app. <button className="small" onClick={() => addr && onOpen(browserUrl(addr))}>Open it in this browser</button></div>}

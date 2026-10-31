@@ -6,7 +6,7 @@ import { type CSSProperties, Fragment, isValidElement, type ReactNode, useEffect
 import { openExternal } from './api'
 import { Glyph } from './Glyph'
 import { REPO } from './panels'
-import { Icon, IconButton } from './ui'
+import { Icon, IconButton, useToTop } from './ui'
 import { type KeyId, type KeyMap, keyShow } from '../../shared/keys'
 
 // a row: its key or label, what it says, more words the filter knows it by; n: a numbered step
@@ -40,6 +40,8 @@ const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
     ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt, also one started in a terminal tab"],
     ['⌘-click', "a file or folder link in a terminal: a file of the workspace in the preview, a folder in Finder. A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex); a link behind words (Claude Code's) on ⌘-click only. Hover a link to see where it goes: a GitHub PR or issue shows its card, a picture's path or link the picture"],
     ['select · Reply', "in a terminal: the pill under the selected text quotes it to the agent (from a shell, the workspace's) with your words; ⏎ puts both in its prompt, ⌘⏎ sends them"],
+    ['select · ⌥', 'the pill offers more: a new workspace, a new agent tab here or Laki AI, with the selected text as the prompt'],
+    ['⌘-click a file path', "in a terminal's text (src/app.ts:42): Laki's preview at that line; ⌘⌥-click your editor (Settings › Terminal swaps them)"],
     ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
     ['⌥-double-click · ⌥-drag', "select in a terminal where the app takes the mouse (Claude Code's fullscreen mode): Laki's selection, copied without the dot after a word"],
     ['⌘D', 'changes against the base branch'],
@@ -92,6 +94,7 @@ const Row = ({ id, k, children }: { id?: string; k: ReactNode; children: ReactNo
 )
 
 export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: string; ship?: boolean; zoom?: number; keys: KeyMap; global: GlobalKeys; onClose: () => void }) {
+  const [onScroll, toTop] = useToTop() // ↑ back to the top once well down
   const [q, setQ] = useState('')
   const [at, setAt] = useState<{ sec?: string; row?: string }>({}) // ids in view
   const main = useRef<HTMLDivElement>(null)
@@ -324,7 +327,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
 
   const go = (id: string) => document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
-    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties}>
+    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties} onScrollCapture={onScroll}>
       <div className="settings-head">
         <b>Help</b>
         <span className="grow" />
@@ -394,6 +397,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
           {!shown.length && <p className="muted">Nothing matches “{q.trim()}”.</p>}
         </div>
       </div>
+      {toTop}
     </div>
   )
 }

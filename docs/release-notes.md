@@ -2,6 +2,25 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- A workspace's right click is shorter: *Workspace ›* holds Rename, Info, the copies (branch, path), Mute, Remind me,
+  the pins, Logs and *Show ›*; Archive shows once, at the bottom. A double-click on a row renames it.
+- Sidebar rows in every style use their whole width: the ⋯ grows in as you rest on a row, and the marks slide left.
+- Closing a tab, or archiving or deleting the workspace you're on, leaves you on the next one, not the first.
+- Calendar's *+ Reminder* is a dialog that takes words (*tomorrow at 9am*, *in 30m*) and repeats (*every weekday at
+  9:30*, *mondays at 10am*): a reminder that rings each time, shown at every time; `laki remind` and Laki AI take them too.
+- A file path in a terminal (`src/app.ts:42`) is a link: ⌘-click opens Laki's preview at that line, ⌘⌥-click your
+  editor (Settings › Terminal swaps them).
+- Text selected in a terminal, ⌥ held: the pill offers a new workspace, a new agent tab or Laki AI with it.
+- Browsers: a camera button takes what's in sight or the whole page, copied or saved in Downloads.
+- A row's hover card says how many files changed, new and deleted ones too; resting on the status bar's PR shows its card.
+- A diff's +added −deleted is green and red in tooltips (the Review tab's, the status bar's).
+- Long pages (Settings, Help, Calendar…) get a ↑ back to the top; a terminal scrolled up keeps ↓ to the newest in sight.
+- Laki AI says where a setting is, with a link that opens it lit; the line under its box opens Settings › AI; Ask later
+  works with an empty box; its earlier chats keep their order as you open one.
+- The mic's ⌄ has *Voice settings…*; a project page's *Specs & Brainstorms* tab; the project color picker lines up.
+
 ## 0.38.0 · Oct 31, 2026
 
 - One next step moved into the ⋯ menus (the toolbar's, a row's, its right click: first there; ⌘G still does it), and

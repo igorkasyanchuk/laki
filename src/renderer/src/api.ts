@@ -46,6 +46,7 @@ type Bridge = {
   procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
+  pageShot?(webContentsId: number, whole: boolean, save: boolean): Promise<string> // a Browsers page's screenshot: copied (''), or saved (its path)
   captureRect?(r: { x: number; y: number; width: number; height: number }): Promise<string> // the app window's pixels there, a PNG in base64 (the element picker's)
   shoot?(): Promise<string | null> // a part of the screen picked with macOS's screencapture, a PNG in base64; null: cancelled
   onShot?(cb: (png: string, note?: string) => void): void

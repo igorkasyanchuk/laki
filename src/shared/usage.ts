@@ -29,7 +29,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast]
             [--cmd c] [--env KEY=value…] [--account id] [--name new]   a new profile, or change one ('' drops a field)
   laki preset on|off|rm <name>                show it in the pickers or not | delete it
-  laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am
+  laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am, every weekday at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
                                               a new tab; with a prompt, its agent starts on it
@@ -225,9 +225,10 @@ late is skipped). --where: new (a worktree each run), folder, folder-new, or a w
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
   laki schedule log`,
   remind: `A reminder for the user on Laki's calendar (Calendar), only when they ask for one. --ws . ties it to
-this workspace.
+this workspace. Words that repeat (every, daily, weekdays, mondays) make it ring each time.
 
-  laki remind "tomorrow at 9am" Check the deploy --ws .`,
+  laki remind "tomorrow at 9am" Check the deploy --ws .
+  laki remind "every weekday at 9:30" Standup`,
   flow: `Workflows: graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
 have (--ws; . is this tab's, the project then its). --dry says what a PR, approve or merge would do instead of doing it.
 --set gives one of its Start's inputs (inputs: in the file), again for each; the ones without a default are needed.

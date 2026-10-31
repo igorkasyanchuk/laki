@@ -16,7 +16,7 @@ export const PROJECT_TABS = [
   ['notes', 'Notes'],
   ['tasks', 'Scheduled tasks'],
   ['memory', 'Memory'],
-  ['specs', 'Specs'],
+  ['specs', 'Specs & Brainstorms'],
   ['settings', 'Settings'],
 ] as const
 export type ProjectTab = (typeof PROJECT_TABS)[number][0]

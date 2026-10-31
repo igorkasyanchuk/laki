@@ -256,8 +256,9 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose, esc])
+  const [onScroll, toTop] = useToTop()
   return (
-    <div className="settings-page" role="dialog" aria-label={title}>
+    <div className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
       <div className="settings-head">
         {head ?? <b>{title}</b>}
         <span className="grow" />
@@ -265,8 +266,21 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
         <IconButton icon="x" title={esc ? 'Close (Esc)' : 'Close'} onClick={onClose} />
       </div>
       <div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>
+      {toTop}
     </div>
   )
+}
+// a page scrolled well down (its body, or a list of its own): ↑ back to the top. Its frame takes onScroll (capture: a
+// scroll doesn't bubble) and draws the button (Page, Settings, Help)
+export function useToTop(): [(e: { target: EventTarget }) => void, ReactNode] {
+  const [up, setUp] = useState<HTMLElement | null>(null)
+  const onScroll = (e: { target: EventTarget }) => (el => el instanceof HTMLElement && el.scrollHeight - el.clientHeight > 400 && setUp(el.scrollTop > 400 ? el : null))(e.target)
+  const button = up?.isConnected && (
+    <button type="button" className="to-top" aria-label="Back to the top" data-tip="Back to the top" onClick={() => (up.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), setUp(null))}>
+      <Icon name="arrowUp" size={15} />
+    </button>
+  )
+  return [onScroll, button]
 }
 
 // What a throw while drawing leaves (React unmounts everything under the nearest boundary): a page's (title, onClose)
@@ -707,7 +721,9 @@ export function Tips() {
   if (!tip) return null
   return (
     <div className={`tip ${tip.menu ? 'side' : ''}`} ref={box} style={{ top: tip.y, transform: tip.menu ? 'translateY(-50%)' : tip.below ? undefined : 'translateY(-100%)' }}>
-      {tip.text}
+      {tipText(tip.text)}
     </div>
   )
 }
+// a diff's +added −deleted in a tooltip, in their colors (Review's tab, the status bar's changes, a row's stat…)
+const tipText = (text: string) => text.split(/(\+\d[\d.,k]* −\d[\d.,k]*)/).map((part, i) => (i % 2 ? (([add, del]) => <span key={i} className="ws-stat"><span className="add">{add}</span> <span className="del">{del}</span></span>)(part.split(' ')) : part))

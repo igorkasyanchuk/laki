@@ -199,7 +199,10 @@ workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored onl
 `linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). 130: a schedule's `base` (`scheduleSet`
 keeps it for `ws` new only, refused for another, '' or null clears it; `runSchedule`: `wsNew` `base`, whose check (below) makes
 one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
-base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `projectSet` `name` '' (its folder's name again; Terminals' and Browsers' keep theirs), 80 characters at most. A setting the renderer adds
+base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `projectSet` `name` '' (its folder's name again; Terminals' and Browsers' keep theirs), 80 characters at most. 132: `wsStat` (`ws`: files.ts' `statOf` now, a row's
+hover card; none off git, archived, a codespace away), a `Stat`'s `made` and `gone` (`--summary`'s create and delete
+lines, untracked files made too), a reminder's `every` (`reminderAdd`/`reminderSet` `every`, or `at` in words that
+repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -244,7 +247,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `imageSave`'s and `fileSave`'s paths only, 10 at most, after the text in the prompt as it starts; the board's `Thumbs`,
   a file's `FileChip`), `todoRm`;
 - the calendar's reminders (`settings.calendar`, on unless false; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
-  `when.ts` `parseAt`'s words, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
+  `when.ts` `parseAt`'s words, or words that repeat (`whenOf`: its next time and `every`), `every`, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
   rings again; `done`; `ws`), `reminderRm`, `reminderTick` (every 30 s and as the first client connects; with no client
   it waits): each due one not `fired` or `done` broadcast once as a `reminder` event (`reminder`: its id, never `id`),
   App's notification and toast; the CLI's `laki remind <when> <text> [--ws]` and `laki reminders [rm|done <id>]`, MCP's
@@ -1419,6 +1422,10 @@ webview and `crop`s it to the element (a canvas, scaled by the image's width ove
 `PanelApi.toPrompt` types all of it, with the screenshot's path, into the focused agent tab, else the first live one
 (`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
 
+A Browsers page's camera (`BrowserPane` `shot`, preload's `pageShot`, main's `page-shot`: the app window's own webview
+only; what's in sight by `capturePage`, the whole page by `wholePage`, DevTools' protocol `Page.captureScreenshot`
+`captureBeyondViewport`, 16384 CSS pixels tall at most, refused with its DevTools open), copied (`ClipboardItem`) or
+saved as `~/Downloads/<host>-<date>-<time>.png` (`-2`… when taken), its path back for App's toast (*Open*).
 A Browsers workspace's page (`Browser.tsx` `BrowserPane`, over `.term-wrap` in place of the terminals; App's `browsed`:
 ones opened since start stay mounted, `visibility: hidden`) is a `<webview>` in `persist:browser`: main's
 `will-attach-webview` lets it start on any http(s) page, `did-attach-webview` turns a link to a new tab into a load in
@@ -2240,12 +2247,18 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
 - **`Term.tsx`**: one xterm per pane. Reply (`onReply`, given while `replyTo` finds an agent: the tab's own when one
   runs in it, else its workspace's live agent tabs): a pill (`.term-reply`) where the mouse let go of a selection, gone
   at a key, a press, a scroll or an empty selection; it opens panels.tsx' `ReplyPop` (the quote, your words, a pick of
-  agents; ⏎ `send` `enter: false` into the prompt, ⌘⏎ `send` (`whenIdle` for an agent tab), text.ts `replyText`: *From
+  agents; ⏎ `send` `enter: false` into the prompt, ⌘⏎ `send` (`whenIdle` for an agent tab); ⌥ held (`alt`, `USES`,
+  `onSelection`: App's `selectionTo`): *New workspace* (`newWs` with the text as its prompt), *New tab here* (`tabNew`
+  with Settings' agent), *Ask Laki AI* (`aiAsk` with `whereNow`), the pill shown with ⌥ alone when no agent can be
+  replied to), text.ts `replyText`: *From
   <tab>:* (*your output* from its own), the quote fenced, the words). A link's hover card (`LinkPeek.tsx`, 400 ms on,
   250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
-  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click on the picture or its ⤢ (`.lp-open`) opens it larger: Term's `big`, panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
+  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click on the picture or its ⤢ (`.lp-open`) opens it larger: Term's `big`, panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks.
+  Any other file's path (`CODE`: one with a folder, or a bare name with `:line`; not a picture's) is a link too: ⌘-click
+  (⌃ unless an app has the mouse; a plain click would open it as you select it) is `onCode`, App's `openCode`: a file of the workspace in the preview at its line,
+  or `openIn` `editor` (`settings.fileClick`, ⌥ the other; `codeTo` for the hover's words); any other path `openPath`'s. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
   codex's and opencode's prompt, where xterm would send ⏎. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
@@ -2714,6 +2727,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/todos.ts` | the agent's plan, live: a tab's to-do list from its tools' calls, `planCount`, `planNow` |
 | `src/shared/overlap.ts` | Collision radar: a -U0 diff's base lines per file, where two diffs meet |
 | `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |
+| `src/shared/settingsMap.ts` | Settings' sections and each setting's title and words (`FIND`): the page's *Find a setting* and Laki AI's `laki_settings_find` (`skillTools`: where it is, a `laki://settings/<section>?spot=` link, matching plain values, never `SAID_NOT`'s) |
 | `src/shared/keys.ts` | Settings › Keys: `KEYS` (the rebindable actions, their defaults), `keyLabel`, `keyMap`, `keyFor`, `keyClash` (another action, `others`, `FIXED`, ⌃ alone), `keyShow`; App's, main's menu's, Help's |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI (`laki hook` is `src/cli/hook.ts`, its own build entry); `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |

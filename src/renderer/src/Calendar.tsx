@@ -4,11 +4,12 @@
 // opens its workspace or goes. App.tsx passes a CalendarApi.
 import { type FormEvent, useMemo, useState } from 'react'
 import type { Reminder, Schedule, ScheduleRun } from '../../shared/types'
-import { describe, stamp } from '../../shared/when'
+import { describe, parseWhen, type Rule, stamp, whenOf } from '../../shared/when'
+import { Modal } from './panels'
 import { Icon, IconButton, load, keep, Page } from './ui'
 
 export type CalendarApi = {
-  add(r: { at: number; text: string; ws?: string }): Promise<unknown>
+  add(r: { at: number; every?: string; text: string; ws?: string }): Promise<unknown>
   set(r: { id: string; done?: boolean; at?: number; text?: string }): Promise<unknown>
   rm(id: string): Promise<unknown>
   openWs(ws: string): void
@@ -23,12 +24,14 @@ const addDays = (t: number, n: number) => new Date(new Date(t).getFullYear(), ne
 const monday = (t: number) => addDays(dayOf(t), -((new Date(t).getDay() + 6) % 7)) // weeks start on Monday
 const count = (l: Item[], k: Item['kind'], word: string) => (n => (n ? `${n} ${word}${n > 1 ? 's' : ''}` : ''))(l.filter(i => i.kind === k).length)
 const hm = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-// <input type="datetime-local">'s value, in the Mac's time zone
-const local = (t: number) => {
+const full = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+// <input type="datetime-local">'s value, in the Mac's time zone; with a space, the words parseAt reads (2026-10-20 14:30)
+const local = (t: number, sep = 'T') => {
   const d = new Date(t)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}${sep}${p(d.getHours())}:${p(d.getMinutes())}`
 }
+const WHEN_EXAMPLES = ['in 30m', 'tomorrow at 9am', 'fri at 5pm', 'every weekday at 9:30', 'mondays at 10am']
 
 // a task's times between from and to (ms): each of its rule's, or one line a day for a busy one; once: its next run only
 export function occurrences(s: Schedule, from: number, to: number): Item[] {
@@ -37,13 +40,28 @@ export function occurrences(s: Schedule, from: number, to: number): Item[] {
   const tip = `${name} · ${describe(s.rule)}`
   if (s.rule.once) return s.next && s.next >= from && s.next < to ? [{ key: `t:${s.id}`, at: s.next, kind: 'task', text: name, tip }] : []
   const out: Item[] = []
-  for (let d = dayOf(from); d < to; d = addDays(d, 1)) {
-    if (!s.rule.days.includes(new Date(d).getDay())) continue
-    const ats = s.rule.times.map(m => new Date(new Date(d).getFullYear(), new Date(d).getMonth(), new Date(d).getDate(), Math.floor(m / 60), m % 60).getTime()).filter(t => t >= from && t < to) // as nextRun: a DST day's clock
-    if (ats.length > MANY) out.push({ key: `t:${s.id}:${d}`, at: ats[0], kind: 'task', text: `${name} ×${ats.length}`, tip })
+  for (const ats of timesOf(s.rule, from, to)) {
+    if (ats.length > MANY) out.push({ key: `t:${s.id}:${dayOf(ats[0])}`, at: ats[0], kind: 'task', text: `${name} ×${ats.length}`, tip })
     else for (const at of ats) out.push({ key: `t:${s.id}:${at}`, at, kind: 'task', text: name, tip })
   }
   return out
+}
+// a rule's times between from and to, a list per day that has any
+const timesOf = (rule: Rule, from: number, to: number) => {
+  const out: number[][] = []
+  for (let d = dayOf(from); d < to; d = addDays(d, 1)) {
+    if (!rule.days.includes(new Date(d).getDay())) continue
+    const ats = rule.times.map(m => new Date(new Date(d).getFullYear(), new Date(d).getMonth(), new Date(d).getDate(), Math.floor(m / 60), m % 60).getTime()).filter(t => t >= from && t < to) // as nextRun: a DST day's clock
+    if (ats.length) out.push(ats)
+  }
+  return out
+}
+// a reminder's times in sight: its next one, and a repeating one's after it (a line each, or one a day for a busy one:
+// times, how many; a tick stops them all)
+const remindersAt = (r: Reminder, from: number, to: number): { at: number; n: number }[] => {
+  const rule = r.every && !r.done ? parseWhen(r.every) : undefined
+  if (!rule || 'error' in rule) return r.at >= from && r.at < to ? [{ at: r.at, n: 1 }] : []
+  return timesOf(rule, Math.max(from, r.at), to).flatMap(ats => (ats.length > MANY ? [{ at: ats[0], n: ats.length }] : ats.map(at => ({ at, n: 1 }))))
 }
 
 export function CalendarPage({ schedules, runs, reminders, workspaces, api, onClose }: { schedules: Schedule[]; runs: ScheduleRun[]; reminders: Reminder[]; workspaces: { id: string; name: string }[]; api: CalendarApi; onClose: () => void }) {
@@ -64,7 +82,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
     const all: Item[] = [
       ...schedules.flatMap(s => occurrences(s, Math.max(first, Date.now()), end)), // what's coming; what was is the runs
       ...runs.filter(r => r.at >= first && r.at < end).map(r => ({ key: `r:${r.id}`, at: r.at, kind: 'run' as const, text: r.name, tip: r.what, ok: r.ok, ws: r.ws })),
-      ...reminders.filter(r => r.at >= first && r.at < end).map(r => ({ key: `m:${r.id}`, at: r.at, kind: 'reminder' as const, text: r.text, tip: [r.by && `from ${r.by}`, r.ws && workspaces.find(w => w.id === r.ws)?.name].filter(Boolean).join(' · ') || undefined, r, ws: r.ws })),
+      ...reminders.flatMap(r => remindersAt(r, first, end).map(x => ({ r, ...x }))).map(({ r, at, n }) => ({ key: `m:${r.id}:${at}`, at, kind: 'reminder' as const, text: n > 1 ? `${r.text} ×${n}` : r.text, tip: [r.every && `repeats: ${r.every} (a tick stops it)`, r.by && `from ${r.by}`, r.ws && workspaces.find(w => w.id === r.ws)?.name].filter(Boolean).join(' · ') || undefined, r, ws: r.ws })),
     ]
     const by = new Map<number, Item[]>()
     for (const i of all.sort((a, b) => a.at - b.at)) by.set(dayOf(i.at), [...(by.get(dayOf(i.at)) ?? []), i])
@@ -76,12 +94,13 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
     ? `${new Date(first).toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${new Date(addDays(end, -1)).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`
     : new Date(anchor).toLocaleDateString([], { month: 'long', year: 'numeric' })
   const newAt = (d: number) => (d === today ? Math.ceil((Date.now() + 1) / 3600000) * 3600000 : new Date(d).setHours(9)) // today: the next hour; another day: 9am (setHours: a DST day's too)
+  const when = form ? whenOf(form.at) : undefined // the words read back as they're typed
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!form) return
-    const at = new Date(form.at).getTime()
-    if (!form.text.trim() || Number.isNaN(at)) return setErr('What, and when?')
-    api.add({ at, text: form.text, ...(form.ws && { ws: form.ws }) }).then(() => (setForm(null), setErr('')), e => setErr((e as Error).message))
+    if (!form || !when) return
+    if (!form.text.trim()) return setErr('Remind you of what?')
+    if ('error' in when) return setErr(when.error)
+    api.add({ at: when.at, ...(when.every && { every: when.every }), text: form.text, ...(form.ws && { ws: form.ws }) }).then(() => (setForm(null), setErr('')), e => setErr((e as Error).message))
   }
   const line = (i: Item) => (
     <div key={i.key} className={`cal-item ${i.kind} ${i.r?.done ? 'done' : ''} ${i.kind === 'run' && !i.ok ? 'bad' : ''}`} data-tip={i.tip}>
@@ -93,12 +112,13 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
         <Icon name={i.kind === 'task' ? 'clock' : i.ok ? 'check' : 'x'} size={11} />
       )}
       <span className="cal-time">{hm(i.at)}</span>
+      {i.r?.every && <Icon name="repeat" size={10} />}
       <span className="cal-text" onClick={() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules())}>{i.text}</span>
       {i.kind === 'reminder' && <IconButton icon="x" title="Remove the reminder" className="cal-rm" onClick={() => api.rm(i.r!.id).catch(() => {})} />}
     </div>
   )
   const coming = reminders.filter(r => !r.done && r.at >= Date.now()).length
-  const openForm = (d: number) => (setErr(''), setForm({ at: local(newAt(d)), text: '', ws: '' }))
+  const openForm = (d: number) => (setErr(''), setForm({ at: d === today ? 'in 1h' : local(newAt(d), ' '), text: '', ws: '' }))
   const dayList = sel !== null ? (items.get(sel) ?? []) : []
   return (
     <Page title="Calendar" wide esc={false} /* a page to stay on, as the rail's others: Esc never closes it */ onClose={onClose}>
@@ -124,17 +144,43 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
           (<code>laki remind "tomorrow at 9am" …</code>). Click a day to see it whole.
         </p>
         {form && (
-          <form className="cal-form" onSubmit={submit}>
-            <input autoFocus placeholder="Remind me to…" value={form.text} onChange={e => setForm({ ...form, text: e.target.value })} />
-            <input type="datetime-local" value={form.at} onChange={e => setForm({ ...form, at: e.target.value })} />
-            <select value={form.ws} onChange={e => setForm({ ...form, ws: e.target.value })} aria-label="About a workspace">
-              <option value="">No workspace</option>
-              {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-            <button type="submit" className="primary">Add</button>
-            <button type="button" onClick={() => (setForm(null), setErr(''))}>Cancel</button>
-            {err && <span className="cal-err">{err}</span>}
-          </form>
+          <Modal title="New reminder" onClose={() => (setForm(null), setErr(''))}>
+            <form className="cal-form" onSubmit={submit}>
+              <label>
+                <span>Remind me to</span>
+                <input autoFocus placeholder="Check the deploy" value={form.text} onChange={e => setForm({ ...form, text: e.target.value })} />
+              </label>
+              <label>
+                <span>When</span>
+                <span className="cal-when">
+                  <input placeholder="tomorrow at 9am, every weekday at 9:30" value={form.at} onChange={e => (setErr(''), setForm({ ...form, at: e.target.value }))} />
+                  <input type="datetime-local" aria-label="Pick a date" data-tip="Pick a date" value={(t => (t && !('error' in t) && !t.every ? local(t.at) : ''))(when)} onChange={e => e.target.value && setForm({ ...form, at: e.target.value.replace('T', ' ') })} />
+                </span>
+              </label>
+              <span className={`small cal-read ${when && 'error' in when ? 'bad' : ''}`}>
+                {!when || !form.at.trim() ? '' : 'error' in when ? when.error : when.every ? `Repeats: ${when.every} · next ${full(when.at)}` : full(when.at)}
+              </span>
+              <span className="cal-examples">
+                {WHEN_EXAMPLES.map(x => (
+                  <button key={x} type="button" className="chip" onClick={() => (setErr(''), setForm({ ...form, at: x }))}>
+                    {x}
+                  </button>
+                ))}
+              </span>
+              <label>
+                <span>About</span>
+                <select value={form.ws} onChange={e => setForm({ ...form, ws: e.target.value })} aria-label="About a workspace">
+                  <option value="">No workspace</option>
+                  {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </label>
+              {err && <span className="cal-err">{err}</span>}
+              <div className="row">
+                <button type="button" onClick={() => (setForm(null), setErr(''))}>Cancel</button>
+                <button type="submit" className="primary" disabled={!form.text.trim() || !when || 'error' in when}>Add reminder</button>
+              </div>
+            </form>
+          </Modal>
         )}
         <div className="cal-main">
           <div className={`cal-grid ${mode}`}>

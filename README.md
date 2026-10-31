@@ -19,8 +19,8 @@ Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linu
   two worktrees changing the same lines are flagged before merge day.
 - **Agents keep running** when the window is closed: a daemon holds the terminals, and they resume after a restart or a
   usage limit.
-- **Drive it from anywhere**: `laki` on the command line (an MCP server too), Laki AI in plain words, your phone over
-  Cloudflare or Tailscale.
+- **Drive it from anywhere**: `laki` on the command line (an MCP server too), Laki AI in plain words (it finds a setting
+  for you too), your phone over Cloudflare or Tailscale.
 
 ## Why
 

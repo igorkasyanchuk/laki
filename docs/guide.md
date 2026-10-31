@@ -260,7 +260,8 @@ selected workspace's PR is in the status bar.
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
   agent's last answer (or what it asks), its PR (author, state, checks, review, conflicts, lines added and removed),
-  its diff size, ports and marks (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
+  its changes (how many files, new and deleted ones, lines added and removed, what's not committed), ports and marks
+  (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
   *Open*, *PR #n on GitHub* (or the PR's title), ⋯ its menu.
 - Archiving asks first, saying what goes (the worktree, uncommitted changes with it) and what stays (the branch, its
   artifacts); *Undo* is in the message that follows. Several at once (picked rows, the Board's *Archive all*) ask once.
@@ -303,6 +304,9 @@ selected workspace's PR is in the status bar.
     covers it).
   - A right click on a page: open or copy a link, copy an image or text, back, forward, reload, *Inspect Element*; the
     `</>` button opens its developer tools.
+  - The camera button takes a screenshot of what's in sight or of the whole page (up to 16,384 pixels tall), copied or
+    saved in Downloads (`<site>-<date>-<time>.png`; *Open* in the toast). The whole page needs its developer tools
+    closed.
   - Terminals and Browsers are projects like the others: drag them, fold them, remove them (your home folder stays),
     though the new-workspace page leaves them out and Files lists nothing for them (your home folder). ⌘K has *New
     terminal* and *New browser*. (A *Shells* project from before is renamed *Terminals*.) Their status bar: a terminal's
@@ -358,12 +362,16 @@ selected workspace's PR is in the status bar.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. With the rail, each kind (Projects,
   Terminals, Browsers) keeps its own width. ⌘B (or the sidebar icon) hides and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
-- Right click a workspace (or its ⋯) for its next step first, then a color, *Show ›* (what the rows show after their names: the next step, the PR, its author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan, the diff size; also Settings › Appearance › *Sidebar rows*), *Rename…* (the name it shows; its folder and branch keep the id), *Rename with
-  AI* (with an agent tab: it names the workspace from its PR's title and description, else its task, once its turn ends),
-  *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
-  *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and browsers
-  too), *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your agent and shell actions),
-  *Mark as unread*, *Copy branch name*, *PR #n ›* (the status bar PR's right-click menu: *Refresh from GitHub*, asks GitHub now, not at the next check; open it, its checks, copy its link or number, merge, approve, close, detach; no PR: *Look for a PR* and *Attach a PR…*), *Attach a PR…* (a
+- Right click a workspace (or its ⋯) for its next step first (not Archive: that's at the bottom), then a color, then
+  *Workspace ›*, a submenu of its own settings and copies: *Rename…* (the name it shows; its folder and branch keep the
+  id; a double-click on its row does it too), *Rename with AI* (with an agent tab: it names the workspace from its PR's
+  title and description, else its task, once its turn ends), *Info*, *Copy branch name*, *Copy path*, *Mute
+  notifications*, *Remind me…*, *Mark as unread*, *Pin to top* (it moves under *Pinned*, above the projects, until
+  *Unpin*), *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and
+  browsers too), *Logs* (development mode) and *Show ›* (what the rows show after their names: the next step, the PR, its
+  author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan, the diff size; also Settings › Appearance ›
+  *Sidebar rows*). Then *Open in ›*, *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your
+  agent and shell actions), *PR #n ›* (the status bar PR's right-click menu: *Refresh from GitHub*, asks GitHub now, not at the next check; open it, its checks, copy its link or number, merge, approve, close, detach; no PR: *Look for a PR* and *Attach a PR…*), *Attach a PR…* (a
   git workspace on a branch with no PR found: one opened another way, by its URL or number; also the status bar's
   *+ PR* and *Info*'s PR section; a PR whose branch is another one is only linked: its status, no PR switches;
   *Detach PR #n*: the PR only related, kept off the workspace, its branch's own too, until you attach it again;
@@ -371,7 +379,8 @@ selected workspace's PR is in the status bar.
   pushed under another branch name: one link of the repo's own remotes),
   *Approve PR #n…* (someone else's open PR), *Compare the race* (a race's
   workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
-  shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
+  shows a spinner, then a message says it's done (archive: with *Undo*), and the row after it (else the one before, in
+  its project first) is the one you're on; a tab closed likewise gives its place to the next tab. A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it), *Copy contents* (its whole terminal as text, the scrollback
   too; ⌘K's *Copy the tab's contents*) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - A project's ⋯ (or a right click on it) › its color (the swatches at the top: a bar and a tint on its head, as a workspace's), *Rename…* (the name it shows;
@@ -462,6 +471,10 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 
 **Selecting:** a double-click in a terminal selects a word without the punctuation after it (`it.` is `it`; `file.ts`
 and a link stay whole). Where an app has the mouse (Claude Code's fullscreen mode, vim, htop), a click is the app's,
 and so is what it selects: hold ⌥ to select in Laki instead (⌥-double-click a word, ⌥-drag a range).
+
+**Scrolling:** resting on a terminal shows a round button at its top right: ↑ to the top of its scrollback; scrolled up,
+↓ back to the newest stays there until you're back. A long page (Settings, Help, Calendar, Workflows…) scrolled well
+down gets ↑ at its bottom right, back to the top.
 
 **Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow. In Changes or the Review
 tab (the last place you clicked), ⌘F finds words in the diff's lines instead: ⏎ next, ⇧⏎ previous, Esc closes.
@@ -611,7 +624,11 @@ you're doing (drag its head to move it; a double-click puts it back). The – on
 it (or its right click) minimizes it into the status bar's end, where it stays until its right click (or ⌘K's *Float the Laki AI button again*) floats it again; and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
 answer, and the tab's last 40 lines. It knows Laki's built-in tools too (timers, the stopwatch, reminders, Send later,
 Bird view…) and starts a timer, a stopwatch, a reminder or a Send later when you ask (*remind me about the login PR
-in an hour*). *Laki's skill*
+in an hour*). Ask it where a setting is (*where do I turn off the sounds?*, *is copy on select on?*) and it answers
+with the place in Settings as a link that opens it lit, and the setting's value. The line under the AI page's box
+says what runs it (the agent, the model): a click opens Settings › AI › *Runs with*. The clock in its box asks later
+(in 10 minutes, at 3pm…), what's typed going with it. Its earlier chats keep their order as you take one up again.
+*Laki's skill*
 (Settings › AI, on by default) gives it more of Laki: your open PRs and everyone else's in your projects' repos, a
 project's notes, memory, templates, actions and to-dos (it writes notes and memory, adds to-dos), renaming and pinning
 workspaces and tabs, commands run in a tab that's open (*fix this and run it here*: the tab you're on, or one you
@@ -837,7 +854,7 @@ with no agent running nothing is sent, and the next check tries again.
   switch turned off and on, starts it over.
 
 Under the PR's title, who approved it and who asked for changes (each one's latest review, with their pictures);
-the status bar PR's tooltip and the row's hover card say the same.
+the row's hover card says the same, and so does the card that comes up as you rest on the status bar's PR (#n).
 
 *Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
 tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Close pull request…*), under the PR's title (the
@@ -903,7 +920,8 @@ workspace is never hidden: a folded project or group holding it, or the one you 
   closes it and keeps what you typed (so claude's own `/commands` still go as typed). Send later's box, the Board's to-dos
   and Laki AI's box (`#` and `/` only) have it too;
 - the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
-  (System Settings › Keyboard › Dictation) and opens it. With Settings › Voice on *Cloud*, the mic records instead: a
+  (System Settings › Keyboard › Dictation) and opens it, and *Voice settings…* opens Settings › Voice (macOS dictation
+  or Laki's cloud speech to text). With Settings › Voice on *Cloud*, the mic records instead: a
   click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
 - *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
@@ -1209,7 +1227,7 @@ title (the headings, a checklist of the steps you want, questions to answer). *E
 questions); *The ones Laki comes with* puts them back.
 
 They're on the rail's *Specs* (the status bar's start without the rail, ⌘K) for every project, and on a project's page,
-its *Specs* tab. The page is one list, newest first, each row with its kind (*spec* or *brainstorm*), its project and
+its *Specs & Brainstorms* tab. The page is one list, newest first, each row with its kind (*spec* or *brainstorm*), its project and
 when it changed: a filter, a project, *All* / *Specs* / *Brainstorms* (with their counts) and *New* ▾ over it. A click
 opens one alone, the page's whole width, with the way back as breadcrumbs at the top (*Specs & Brainstorms › the
 spec*). The ⤢ at the top (⌘⇧⏎) puts the
@@ -1519,9 +1537,12 @@ Reset the interface keeps them.
 The rail's Calendar (⌘K too; Settings › General › *Pages* turns it off) opens it, a page to stay on (Esc
 doesn't close it). A week (Monday first) or a month, switched at the top of the page, with ‹ *Today* › to move: your
 scheduled tasks at the times they'll run, the runs that happened, and your reminders. Click a day for its overview on
-the right (every task, run and reminder that day), *Remind me this day* or *+ Reminder* to add one: what, when, and a
-workspace it's about if any. Laki AI and agents add them too, when you ask
-(*remind me to check the release tomorrow at 10*; `laki remind "tomorrow at 10am" Check the release`, MCP's
+the right (every task, run and reminder that day), *Remind me this day* or *+ Reminder* to add one, in a dialog: what,
+when in your words (*in 30m*, *tomorrow at 9am*, *fri at 5pm*, read back as a date as you type; the calendar button
+picks one), and a workspace it's about if any. Words that repeat (*every weekday at 9:30*, *mondays at 10am*, *daily at
+8*) make a reminder that rings each time, shown at every time in the calendar; ticking it off stops it. Laki AI and agents add them too, when you ask
+(*remind me to check the release tomorrow at 10*; `laki remind "tomorrow at 10am" Check the release`, `laki remind
+"every weekday at 9:30" Standup`, MCP's
 `laki_reminder`). As one is due Laki notifies you (a toast too, *Open* goes to its workspace); one due while Laki was
 closed rings as it opens. Tick it off when it's done; the rail's count is the ones that rang and aren't.
 
@@ -1664,8 +1685,10 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘F | find in the terminal, or in the diff (Changes, the Review tab) |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
+| ⌘-click a file path | in a terminal's text (`src/app.ts:42`, `./lib/x.go`, `App.tsx:42`): a file of the workspace opens in Laki's preview at that line, ⌘⌥-click in your editor (Settings › Terminal › *A file path clicked* swaps them) |
 | ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's. A link behind words (Claude Code's) opens on ⌘-click only; hovering shows where any link goes. Resting on a GitHub PR or issue link shows its card (title, state, author, size; a click opens it on GitHub), and on a picture (a file of the workspace, a pasted screenshot, an https one) shows the picture |
 | select, then *Reply* | in a terminal: the pill under the selected text quotes it to the agent (that tab's, or from a shell its workspace's: a pick when there are several) with your words; ⏎ puts both in its prompt for you to finish, ⌘⏎ sends them (after its turn if it's working) |
+| select, hold ⌥ | the pill offers more: *New workspace* (the new-workspace page with the text as its prompt), *New tab here* (your default agent, started with it), *Ask Laki AI* |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
@@ -1828,7 +1851,8 @@ lit for a moment.
   cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
   ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
-  Editing has them; on by default) and
+  Editing has them; on by default), *A file path clicked* (in a terminal's text: Laki's preview at its line, the
+  default, or your editor; ⌘⌥-click the other) and
   *Dim other panes* (in a split, the panes without the keyboard fade back; on by default) and *Focus the pane under
   the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; on by default), *New
   tabs open as a split*, *Close tabs without asking* (off by default: closing a tab whose agent or server still runs

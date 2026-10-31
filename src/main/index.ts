@@ -3,7 +3,7 @@
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
-import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -1114,6 +1114,50 @@ ipcMain.handle('capture', async (e, id: number) => {
   if (img.isEmpty()) throw new Error('nothing on screen to capture yet')
   return img.toPNG().toString('base64')
 })
+// a Browsers page's screenshot (its toolbar's camera): what's in sight, or the whole page; copied, or saved in Downloads
+// as <host>-<date>-<time>.png (its path back)
+ipcMain.handle('page-shot', async (e, id: number, whole: unknown, save: unknown) => {
+  if (!win || e.sender !== win.webContents) throw new Error('not the app window')
+  const wc = webContents.fromId(id)
+  if (!wc || wc.getType() !== 'webview' || wc.hostWebContents !== e.sender) throw new Error('no such page')
+  const img = whole ? await wholePage(wc) : await wc.capturePage()
+  if (img.isEmpty()) throw new Error('nothing on screen to capture yet')
+  if (!save) return await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(img.toPNG())], { type: 'image/png' }) })]), ''
+  const host = (() => {
+    try {
+      return new URL(wc.getURL()).hostname.replace(/^www\./, '').replace(/[^\w.-]/g, '')
+    } catch {
+      return ''
+    }
+  })() || 'page'
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  const name = `${host}-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  let path = join(app.getPath('downloads'), `${name}.png`)
+  for (let n = 2; existsSync(path); n++) path = join(app.getPath('downloads'), `${name}-${n}.png`)
+  writeFileSync(path, img.toPNG())
+  return path
+})
+// the whole page, past what's in sight, through DevTools' protocol. ponytail: 16384 device pixels tall at most (a longer
+// page is cut there); with its DevTools open, attach throws: said
+async function wholePage(wc: Electron.WebContents) {
+  const d = wc.debugger
+  try {
+    d.attach('1.3')
+  } catch {
+    throw new Error('close its developer tools first: they hold the page')
+  }
+  try {
+    const m = await d.sendCommand('Page.getLayoutMetrics')
+    const size = m.cssContentSize ?? m.contentSize
+    const dpr = m.visualViewport?.clientWidth && m.cssVisualViewport?.clientWidth ? m.visualViewport.clientWidth / m.cssVisualViewport.clientWidth : 1 // Retina: 2
+    const clip = { x: 0, y: 0, width: Math.ceil(size.width), height: Math.min(Math.ceil(size.height), Math.floor(16384 / dpr)), scale: 1 } // past the GPU's 16384: tiles repeat
+    const r = await d.sendCommand('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip })
+    return nativeImage.createFromBuffer(Buffer.from(r.data, 'base64'))
+  } finally {
+    d.detach()
+  }
+}
 // development mode's element picker: the app window's own pixels in a box (CSS pixels), a PNG in base64
 ipcMain.handle('capture-rect', async (e, r: { x: unknown; y: unknown; width: unknown; height: unknown }) => {
   if (!win || e.sender !== win.webContents) throw new Error('not the app window')

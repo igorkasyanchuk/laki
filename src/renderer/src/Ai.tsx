@@ -64,7 +64,7 @@ export function AiPage({
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
   onClose: () => void
-  onSettings?: () => void
+  onSettings?: (spot?: string) => void // Settings › AI, lit at that card
   onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
   compact?: boolean // the bubbles' AI window: the chat alone under a head of its own (no Calls, Info or cost)
   context?: () => Promise<string> // where the user is as they ask (the floating chat's): for the model, not the conversation
@@ -143,7 +143,7 @@ export function AiPage({
   const t = d?.totals
   const settingsLink = (label: string) =>
     onSettings ? (
-      <button className="link" onClick={onSettings}>
+      <button className="link" onClick={() => onSettings()}>
         {label}
       </button>
     ) : (
@@ -239,7 +239,7 @@ export function AiPage({
                   tools={
                     <>
                       {onLater && (
-                        <button type="button" className="ib" aria-label="Ask later" data-tip={images.length ? 'Ask later takes words only: remove the images' : 'Ask later: in 10 min, at 3pm…'} disabled={!ready || !text.trim() || !!images.length} onClick={() => onLater(text)}>
+                        <button type="button" className="ib" aria-label="Ask later" data-tip={images.length ? 'Ask later takes words only: remove the images' : !ready ? 'Laki AI isn’t set up: Settings › AI' : 'Ask later: in 10 min, at 3pm… (what’s typed goes with it)'} disabled={!ready || !!images.length} onClick={() => onLater(text)}>
                           <Icon name="timer" />
                         </button>
                       )}
@@ -254,7 +254,14 @@ export function AiPage({
                 <div className="ai-err">{err}</div>
               ) : (
                 !compact && <div className="ai-foot">
-                  {runs} · {model} · {skill ? 'it removes only what you confirm; never archives, ships or merges' : 'it never archives, deletes, ships or merges'}
+                  {onSettings ? (
+                    <button type="button" className="link ai-runs" data-tip="Change it: Settings › AI › Runs with" onClick={() => onSettings('Runs with')}>
+                      {runs} · {model}
+                    </button>
+                  ) : (
+                    `${runs} · ${model}`
+                  )}{' '}
+                  · {skill ? 'it removes only what you confirm; never archives, ships or merges' : 'it never archives, deletes, ships or merges'}
                 </div>
               )}
             </div>
@@ -307,19 +314,23 @@ export function AiPage({
             <Icon name="plus" size={12} /> New chat
           </button>
           <div className="ai-chats-head">Chats</div>
-          <button className="ai-chat on" aria-current="true" onClick={() => setTab('chat')}>
-            <span className="ai-chat-title">{firstAsk ? firstAsk.text.trim().split('\n')[0] || 'An image' : 'New chat'}</span>
-            <span className="ai-chat-at">{d?.busy ? 'working…' : 'now'}</span>
-          </button>
-          {past.map(c => (
-            <div key={c.id} className="ai-chat-row">
-              <button className="ai-chat" disabled={d?.busy} data-tip={d?.busy ? 'It works on this chat: stop it first' : c.title} onClick={() => openPast(c.id)}>
-                <span className="ai-chat-title">{c.title}</span>
-                <span className="ai-chat-at">{ago(c.at)}</span>
+          {/* by last word said, this one among them: taking another up leaves the order as it was */}
+          {[{ at: d?.chat.length ? Math.max(0, ...d.chat.map(m => m.at ?? 0)) : Infinity }, ...past].sort((a, b) => b.at - a.at).map(c =>
+            'id' in c ? (
+              <div key={c.id} className="ai-chat-row">
+                <button className="ai-chat" disabled={d?.busy} data-tip={d?.busy ? 'It works on this chat: stop it first' : c.title} onClick={() => openPast(c.id)}>
+                  <span className="ai-chat-title">{c.title}</span>
+                  <span className="ai-chat-at">{ago(c.at)}</span>
+                </button>
+                <IconButton icon="trash" title="Delete this chat" className="ai-chat-rm" onClick={() => rmPast(c)} />
+              </div>
+            ) : (
+              <button key="now" className="ai-chat on" aria-current="true" onClick={() => setTab('chat')}>
+                <span className="ai-chat-title">{firstAsk ? firstAsk.text.trim().split('\n')[0] || 'An image' : 'New chat'}</span>
+                <span className="ai-chat-at">{d?.busy ? 'working…' : c.at === Infinity ? 'now' : ago(c.at)}</span>
               </button>
-              <IconButton icon="trash" title="Delete this chat" className="ai-chat-rm" onClick={() => rmPast(c)} />
-            </div>
-          ))}
+            ),
+          )}
           {!past.length && <p className="muted small ai-chats-none">Chats you end with New chat stay here: a click takes one up again.</p>}
         </aside>
         <div className="ai-main">
@@ -382,7 +393,7 @@ export function AiPage({
                 <p>{PAYS[backend]}</p>
                 <p className="muted">{SESSION[backend]}</p>
                 {onSettings && (
-                  <button className="link" onClick={onSettings}>
+                  <button className="link" onClick={() => onSettings()}>
                     <Icon name="settings" size={12} /> Change in Settings
                   </button>
                 )}

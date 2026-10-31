@@ -217,6 +217,7 @@ const api: Record<string, Handler> = {
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
+  wsStat: p => core.wsStat(p), // a row's hover card: its diff's size now
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
   wsFan: p => core.wsFan(core.byCaller(p)),

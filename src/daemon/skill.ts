@@ -218,7 +218,7 @@ more than 30 minutes late is skipped and logged as missed).
   and \`rm\` take an id.
 - A reminder for the user (Calendar, unless it's off: Settings › General › Pages), only when they ask for one:
   \`laki remind "<when: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30>" <text> --ws .\` (\`--ws .\`: about your
-  workspace); it notifies them then. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
+  workspace); it notifies them then. Words that repeat (every weekday at 9:30, mondays at 10am) ring each time. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
 
 ## Recipes
 

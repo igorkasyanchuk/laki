@@ -416,6 +416,8 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .row-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .button-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; } /* a setting's words, its button at the end, like a switch-row's */
 .button-row > button { flex: none; }
+.pick-btn { display: inline-flex; align-items: center; gap: 6px; } /* a value and its ⌄ picker: mark, words, chevron on one line */
+.pick-btn > :last-child { margin-left: 2px; opacity: 0.7; }
 .grid5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-head .ib { opacity: 0; }
@@ -490,6 +492,9 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .electron.list-off .settings-head { padding-left: max(16px, calc(76px - var(--rail-w, 68px))); } /* the rail's page: past the traffic lights */
 .settings-body { flex: 1; display: flex; min-height: 0; }
 .page-body { flex: 1; overflow-y: auto; padding: 28px 32px 48px; } /* a page like Settings: the new-workspace form */
+.to-top { position: absolute; right: 24px; bottom: 22px; z-index: 6; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); cursor: pointer; animation: to-top-in 0.16s ease-out; } /* ui.tsx Page: scrolled well down */
+.to-top:hover { color: var(--accent-ink); border-color: var(--accent); }
+@keyframes to-top-in { from { opacity: 0; transform: translateY(6px); } }
 .page-body > * { max-width: 760px; margin: 0 auto; }
 .settings-nav { width: 180px; flex: none; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); background: var(--side); }
 .settings-nav button { display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 10px; color: var(--muted); }
@@ -701,6 +706,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .swatch.on { outline: 2px solid var(--fg); outline-offset: 1px; }
 .swatch:first-child { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%); }
 .tip { position: fixed; z-index: 200; pointer-events: none; margin: 6px 0; padding: 3px 8px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 5px); font-size: 11.5px; width: max-content; white-space: pre-line; max-width: min(420px, calc(100vw - 16px)); overflow-wrap: anywhere; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+.tip .ws-stat { display: inline; font: inherit; } /* a diff's +added −deleted, colored (ui.tsx tipText) */
 .status button.listen.port-main { color: var(--muted); }
 .menu-head { padding: 4px 8px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
 .drop-overlay { position: fixed; inset: 8px; z-index: 60; pointer-events: none; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--accent); border-radius: var(--rs, 12px); background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--fg); font-size: 15px; }
@@ -1925,6 +1931,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-body a[href^="laki:"]:hover { text-decoration: none; background: color-mix(in srgb, var(--accent) 24%, transparent); }
 .ai-foot, .ai-dock > .ai-err { margin-top: 6px; text-align: center; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-foot { color: var(--muted); }
+.ai-foot .ai-runs { font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; } /* Settings › AI › Runs with */
+.ai-foot .ai-runs:hover { color: var(--accent-ink); }
 /* a tab floated out of the app (?window=tab, frameless, over every app): its head is the title bar, then the terminal */
 .tab-window { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--app-bg, var(--bg)); }
 .tab-win-head { flex: none; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px 0 10px; border-bottom: 1px solid var(--line); background: var(--side); font-size: 12px; -webkit-app-region: drag; user-select: none; }
@@ -2117,13 +2125,11 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ws-acts { display: none; flex: none; margin-right: -6px; }
 .ws-acts .ib { width: 20px; height: 20px; }
 @media (hover: hover) {
-  /* compact, default, status: the ⋯ grows in at the row's end and the marks slide left to make room (none hide) */
+  /* every style: the ⋯ grows in at the row's end and the marks slide left to make room (none hide); its height counts
+     while it's 0 wide, so a two-line row never jumps */
   .ws > .ws-acts { display: inline-flex; width: 0; margin: 0 0 0 -6px; opacity: 0; overflow: hidden; transform: translateX(6px); transition: width 0.16s ease, margin 0.16s ease, opacity 0.16s ease, transform 0.16s ease; }
   .ws:hover > .ws-acts { width: 20px; margin: 0 -6px 0 0; opacity: 1; transform: none; }
   .ws:hover > .ws-acts .icon-svg { animation: ws-dots 0.3s ease-out; }
-  /* extended and cards (rows as tall as their first line's marks): the ⋯ keeps its place, hidden until a hover, and
-     the marks stay, so a hover moves nothing */
-  .sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .ws-acts { width: 20px; margin: 0 -6px 0 0; }
 }
 @keyframes ws-dots { from { clip-path: inset(0 100% 0 0); } } /* the dots appear left to right */
 @media (prefers-reduced-motion: reduce) { .ws > .ws-acts { transition: none; } .ws:hover > .ws-acts .icon-svg { animation: none; } }
@@ -2476,6 +2482,7 @@ button.board-name:hover { background: none; }
 .wp-pr-meta { display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--muted); font-size: 11px; }
 .wp-pr-meta .ci-fail { color: var(--error); } .wp-pr-meta .ci-pass { color: var(--done); } .wp-pr-meta .ci-pending { color: var(--waiting); }
 .wp-line { color: var(--muted); font-size: 11px; }
+.pr-peek { font: 12px/1.35 var(--ui-font); white-space: normal; text-align: left; } /* the status bar PR's card: not the bar's mono */
 .wp-acts { display: flex; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .wp-acts > button { padding: 3px 9px; font-size: 11.5px; }
 /* a project's page (Project.tsx): from the top, its path and tabs, then the tab; Settings' project section as it is */
@@ -2518,7 +2525,7 @@ button.board-name:hover { background: none; }
 /* Reply on a terminal's selected text: Term's pill, then panels.tsx' ReplyPop */
 .tab-alias { flex: none; margin-left: 4px; color: var(--accent-ink); font: 600 0.9em var(--mono); } /* a tab's @name (laki name) */
 .term-jump { position: absolute; top: 10px; right: 18px; z-index: 9; /* over xterm's layers (they go to 8) */ display: none; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); cursor: pointer; }
-.pane-body:hover > .term-jump, .term-jump:focus-visible { display: grid; } /* the scroll button: on hover only */
+.pane-body:hover > .term-jump, .term-jump.end, .term-jump:focus-visible { display: grid; } /* the scroll button: on hover; scrolled up (↓ back to the newest), always */
 .term-jump:hover { color: var(--fg); }
 /* Reader view (Reader.tsx): over the terminal, which stays attached under it */
 .reader { position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 13.5px/1.55 var(--ui-font); }
@@ -2539,8 +2546,10 @@ button.board-name:hover { background: none; }
 .reader-switch:hover, .pane-body:hover .reader-switch { opacity: 1; }
 .reader-switch button { border: none; background: none; padding: 1px 9px; font: 11px var(--ui-font); color: var(--muted); cursor: pointer; }
 .reader-switch button.on { background: var(--hover); color: var(--fg); }
-.term-reply { position: fixed; z-index: 9; /* over the terminal (xterm's layers go to 8), under dialogs and pages */ display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: 500 12px var(--ui-font); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); cursor: pointer; }
-.term-reply:hover { border-color: var(--accent); color: var(--accent-ink); }
+.term-reply { position: fixed; z-index: 9; /* over the terminal (xterm's layers go to 8), under dialogs and pages */ display: inline-flex; align-items: center; height: 24px; padding: 0 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.term-reply > button { display: inline-flex; align-items: center; gap: 5px; height: 18px; padding: 0 7px; border: none; border-radius: 999px; background: none; color: var(--fg); font: 500 12px var(--ui-font); white-space: nowrap; cursor: pointer; }
+.term-reply > button:hover { background: var(--sel); color: var(--accent-ink); }
+.term-reply > button + button { margin-left: 2px; }
 .reply-pop { width: 420px; z-index: 9; }
 .reply-quote { margin: 0; max-height: 120px; overflow: auto; padding: 6px 8px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--fg) 5%, transparent); font: 11.5px/1.4 var(--mono); white-space: pre-wrap; color: var(--muted); }
 .reply-pop textarea { width: 100%; box-sizing: border-box; resize: vertical; font: 13px/1.4 var(--ui-font); }
@@ -2612,10 +2621,19 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .narrow .cal.with-day .cal-main { grid-template-columns: 1fr; }
 .cal { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .cal code { font-family: var(--mono); font-size: 11.5px; }
-.cal-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border: 1px solid var(--accent); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 6%, transparent); }
-.cal-form > input:first-child { flex: 1 1 220px; }
-.cal-form > input[type='datetime-local'], .cal-form > select { flex: 0 1 auto; width: auto; }
-.cal-err { flex-basis: 100%; color: var(--error); font-size: 12px; }
+.cal-form { display: flex; flex-direction: column; gap: 10px; min-width: min(460px, calc(100vw - 64px)); } /* Calendar's New reminder dialog */
+.cal-form > label { display: flex; flex-direction: column; gap: 4px; }
+.cal-form > label > span:first-child { font-size: 12px; color: var(--muted); }
+.cal-when { display: flex; gap: 6px; }
+.cal-when > input:first-child { flex: 1; min-width: 0; }
+.cal-when > input[type='datetime-local'] { flex: none; width: 36px; padding-inline: 6px; color: transparent; cursor: pointer; } /* the picker's icon only: the words are the field */
+.cal-when > input[type='datetime-local']::-webkit-datetime-edit { display: none; }
+.cal-read { min-height: 1.3em; margin-top: -4px; color: var(--done); }
+.cal-read.bad { color: var(--muted); }
+.cal-examples { display: flex; flex-wrap: wrap; gap: 4px; }
+.cal-examples .chip { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
+.cal-err { color: var(--error); font-size: 12px; }
+.cal-form > .row { justify-content: flex-end; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .cal-dow { padding: 4px 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--side); }
 .cal-day { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 4px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; }

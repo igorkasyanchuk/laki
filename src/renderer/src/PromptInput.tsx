@@ -314,6 +314,8 @@ export function PromptInput(p: {
                     { head: 'Dictation · macOS' },
                     { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
                     { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
+                    null,
+                    { label: 'Voice settings…', icon: 'mic', hint: 'Settings › Voice', tip: 'macOS dictation or Laki’s cloud speech to text, Hold Fn, sending as you stop', run: () => openExternal('laki://settings/voice') },
                   ],
             )
           }

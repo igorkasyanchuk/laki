@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Reminder, REMINDERS_MAX, type Schedule, type ScheduleRun, type Tab, type Todo, USAGE_AT, resetOf, type Workspace } from '../shared/types.ts'
-import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
+import { nextRun, parseAt, parseWhen, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
 import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
@@ -57,15 +57,30 @@ const reminderAt = (at: unknown) => {
   if (typeof r !== 'number') throw new Error(r.error)
   return r
 }
+// at's words, or every's: one moment, or a rule that repeats (every weekday at 9am: its next time and the words)
+const reminderWhen = (at: unknown, every?: unknown): { at: number; every?: string } => {
+  if (typeof every === 'string' && every.trim()) {
+    const w = whenOf(every)
+    if ('error' in w) throw new Error(w.error)
+    if (!w.every) throw new Error(`${every.trim()} doesn't repeat: say every… (every weekday at 9am)`)
+    return { at: at === undefined || at === '' ? w.at : reminderAt(at), every: w.every.slice(0, 200) }
+  }
+  if (typeof at === 'string' && !/^\d+$/.test(at)) {
+    const w = whenOf(at)
+    if ('error' in w) throw new Error(w.error)
+    return { at: w.at, ...(w.every && { every: w.every.slice(0, 200) }) }
+  }
+  return { at: reminderAt(typeof at === 'string' ? Number(at) : at) }
+}
 
-export function reminderAdd(o: { at: number | string; text: string; ws?: string; project?: string; by?: string; tab?: string }) {
+export function reminderAdd(o: { at?: number | string; every?: string; text: string; ws?: string; project?: string; by?: string; tab?: string }) {
   calendarOn()
   const text = reminderText(o.text)
-  const at = reminderAt(o.at)
+  const { at, every } = reminderWhen(o.at, o.every)
   const ws = o.ws ? findWs(o.ws) : undefined
   const project = ws?.project ?? (o.project ? findProject(o.project).id : undefined)
   const by = (typeof o.by === 'string' && o.by.trim().slice(0, 80)) || byTab(o.tab) // said, else the tab it came from
-  const r: Reminder = { id: randomUUID().slice(0, 8), at, text, made: Date.now(), ...(ws && { ws: ws.id }), ...(project && { project }), ...(by && { by }) }
+  const r: Reminder = { id: randomUUID().slice(0, 8), at, text, made: Date.now(), ...(every && { every }), ...(ws && { ws: ws.id }), ...(project && { project }), ...(by && { by }) }
   const all = [...state.reminders!, r]
   // ponytail: past REMINDERS_MAX the oldest rung ones go, then the oldest; a list, not a database
   while (all.length > REMINDERS_MAX) all.splice(all.findIndex(x => x.fired) >= 0 ? all.findIndex(x => x.fired) : 0, 1)
@@ -75,13 +90,17 @@ export function reminderAdd(o: { at: number | string; text: string; ws?: string;
   return r
 }
 
-// text, at (moved: it rings again), done, ws ('' none)
-export function reminderSet(o: { id: string; text?: string; at?: number | string; done?: boolean; ws?: string }) {
+// text, at (moved: it rings again; words that repeat make it repeat, others make it once), every ('' or null: once,
+// at its next time), done, ws ('' none)
+export function reminderSet(o: { id: string; text?: string; at?: number | string; every?: string | null; done?: boolean; ws?: string }) {
   calendarOn()
   const r = reminderOf(o.id)
   if (o.text !== undefined) r.text = reminderText(o.text)
-  if (o.at !== undefined) {
-    r.at = reminderAt(o.at)
+  if (o.at !== undefined || o.every !== undefined) {
+    const w = o.every ? reminderWhen(o.at, o.every) : o.at !== undefined ? reminderWhen(o.at) : { at: r.at }
+    r.at = w.at
+    if (w.every) r.every = w.every
+    else delete r.every
     if (r.at > Date.now()) delete r.fired
   }
   if (o.done !== undefined) r.done = !!o.done || undefined
@@ -110,9 +129,14 @@ export function reminderTick(now = Date.now()) {
   if (state.settings?.calendar === false || !clients.size) return []
   const due = state.reminders!.filter(r => !r.fired && !r.done && r.at <= now)
   for (const r of due) {
-    r.fired = true
     broadcast({ ev: 'reminder', reminder: r.id, text: r.text, at: r.at, ws: r.ws }) // not id: that would make it a reply
+    // a repeating one: its next time after now (the ones missed while nobody heard ring as this one)
+    const rule = r.every ? parseWhen(r.every, now) : undefined
+    const next = rule && !('error' in rule) ? nextRun(rule, Math.max(now, r.at)) : undefined
+    if (next) r.at = next
+    else r.fired = true
   }
+  if (due.length) state.reminders!.sort((a, b) => a.at - b.at)
   if (due.length) save(), changed()
   return due
 }

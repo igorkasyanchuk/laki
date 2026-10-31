@@ -14,7 +14,7 @@ import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
-import { Icon } from './ui'
+import { Icon, type IconName } from './ui'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 
@@ -31,6 +31,10 @@ const filePath = (uri: string) => {
 // a picture's path in plain text (claude's Read(src/a.png), a pasted screenshot's): a link that shows it on hover
 // ponytail: a wide character (CJK) before it shifts the cells; a path broken over two lines isn't one
 const PIC = /(?<=^|[\s'"`(\[<])\.{0,2}\/?(?:[\w@%+.-]+\/)*[\w@%+-][\w@%+.-]*\.(?:png|jpe?g|gif|webp|svg|bmp|avif)(?![\w/])/gi
+// any other file's: a path with a folder in it (src/app.ts, ./lib/x.go, an absolute one), or a bare name with a line
+// (App.tsx:42); its line (and column) after it. ponytail: a site's path in plain text (example.com/a.md) reads as one too
+const CODE = /(?<=^|[\s'"`(\[<])(?:\.{0,2}\/?(?:[\w@%+.-]+\/)+[\w@%+-][\w@%+.-]*\.[A-Za-z]\w{0,9}|[\w@%+-][\w@%+.-]*\.[A-Za-z]\w{0,9}(?=:\d))(?::(\d+)(?::\d+)?)?(?![\w/])/g
+const PICTURE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(:|$)/i
 
 export function Term({
   tab,
@@ -44,6 +48,9 @@ export function Term({
   look = termLook({}),
   onFile,
   onReply,
+  onSelection,
+  onCode,
+  codeTo = 'preview',
   image,
   cwd,
 }: {
@@ -58,6 +65,9 @@ export function Term({
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
   onFile?: (path: string) => void // a ⌘-clicked file:// link's path
   onReply?: (text: string, at: { x: number; y: number }) => void // Reply on selected text (none: no Reply)
+  onSelection?: (text: string, how: SelectionUse) => void // ⌥ held by Reply: the selection as a new workspace's, tab's or Laki AI's prompt
+  onCode?: (path: string, line: number | undefined, other: boolean) => void // a file path in its text clicked (other: ⌥ held)
+  codeTo?: 'preview' | 'editor' // where a click opens one (Settings' fileClick), for its hover's words
   image?: (path: string) => Promise<string | undefined> // a hovered picture's data URL (an absolute path)
   cwd?: string // the workspace's folder: a relative picture path's
 }) {
@@ -68,8 +78,8 @@ export function Term({
   const box = useRef<HTMLDivElement>(null)
   const file = useRef(onFile)
   file.current = onFile
-  const props = useRef({ onReply, image, cwd })
-  props.current = { onReply, image, cwd }
+  const props = useRef({ onReply, onSelection, onCode, codeTo, image, cwd })
+  props.current = { onReply, onSelection, onCode, codeTo, image, cwd }
   // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both. xterm
   // drops the hovered link as its rows redraw and finds it again at once (a leave, then a hover): a TUI that redraws
   // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
@@ -99,6 +109,16 @@ export function Term({
   const peekOff = () => (clearTimeout(hideT.current), (hideT.current = window.setTimeout(peekGone, 250)))
   // Reply: a pill under the selection as the mouse lets go, to quote it to an agent
   const [pill, setPill] = useState<{ x: number; y: number; text: string } | null>(null)
+  const [alt, setAlt] = useState(false) // ⌥ held: the pill's other uses of the selection
+  useEffect(() => {
+    if (!pill) return
+    const on = (e: KeyboardEvent) => setAlt(e.altKey)
+    const off = () => setAlt(false) // ⌥ let go in another app: no keyup here
+    addEventListener('keydown', on, true)
+    addEventListener('keyup', on, true)
+    addEventListener('blur', off)
+    return () => (removeEventListener('keydown', on, true), removeEventListener('keyup', on, true), removeEventListener('blur', off))
+  }, [pill])
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   // the scroll button (on hover): to the top of the scrollback, and back down from there. ponytail: xterm's own scrollback
@@ -137,16 +157,29 @@ export function Term({
       provideLinks: (y, cb) => {
         const line = term.buffer.active.getLine(y - 1)?.translateToString(true) ?? ''
         const found = /\.(png|jpe?g|gif|webp|svg|bmp|avif)\b/i.test(line) ? [...line.matchAll(PIC)].filter(m => absOf(m[0])) : []
+        // a file's: ⌘-click (⌃ too, unless an app has the mouse), as a picture's and a file:// link's: a plain click, or a
+        // double-click's first, would open it as you select a path. It opens where Settings says, ⌥ the other way
+        const code = props.current.onCode && props.current.cwd && /\.[A-Za-z]/.test(line) ? [...line.matchAll(CODE)].filter(m => !PICTURE.test(m[0]) && !found.some(p => p.index < m.index + m[0].length && m.index < p.index + p[0].length)) : []
+        const to = (alt: boolean) => ((props.current.codeTo === 'editor') !== alt ? 'your editor' : "Laki's preview")
         cb(
-          found.length
-            ? found.map(m => ({
-                range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
-                text: m[0],
-                // ⌘-click (⌃ too, unless an app has the mouse) opens it as a file:// link's
-                activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(absOf(t)),
-                hover: (e: MouseEvent, t: string) => ((over = true), peekOn(e, t)),
-                leave: () => ((over = false), peekOff()),
-              }))
+          found.length || code.length
+            ? [
+                ...found.map(m => ({
+                  range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                  text: m[0],
+                  // ⌘-click (⌃ too, unless an app has the mouse) opens it as a file:// link's
+                  activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(absOf(t)),
+                  hover: (e: MouseEvent, t: string) => ((over = true), peekOn(e, t)),
+                  leave: () => ((over = false), peekOff()),
+                })),
+                ...code.map(m => ({
+                  range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                  text: m[0],
+                  activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && props.current.onCode?.(absOf(t.replace(/(:\d+)+$/, '')), m[1] ? Number(m[1]) : undefined, e.altKey),
+                  hover: () => ((over = true), box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`)),
+                  leave: () => ((over = false), box.current && (box.current.title = '')),
+                })),
+              ]
             : undefined,
         )
       },
@@ -182,7 +215,7 @@ export function Term({
     // a move as input, and input clears the selection (gone before ⌘C or Reply). A click, a key or a scroll still does
     box.current!.addEventListener('mousemove', e => !e.buttons && tracked() && term.hasSelection() && e.stopPropagation(), true)
     term.element?.addEventListener('mouseup', e => {
-      if (e.button === 0 && props.current.onReply) setTimeout(() => term.getSelection().trim() && setPill({ x: e.clientX, y: e.clientY, text: term.getSelection() })) // after xterm's own mouseup ends the selection
+      if (e.button === 0 && (props.current.onReply || props.current.onSelection)) setTimeout(() => term.getSelection().trim() && (setAlt(e.altKey), setPill({ x: e.clientX, y: e.clientY, text: term.getSelection() }))) // after xterm's own mouseup ends the selection
     })
     term.element?.addEventListener('wheel', () => setPill(null), { passive: true }) // a scroll of yours: new output scrolls too, and keeps it
     const where = () => {
@@ -327,21 +360,26 @@ export function Term({
         }}
       />
       {jump && xt && !find && (
-        <button type="button" className="term-jump" aria-label={jump === 'top' ? 'Scroll to the top' : 'Scroll to the end'} data-tip={jump === 'top' ? 'Scroll to the top' : 'Back to the end'} onMouseDown={e => e.preventDefault() /* the keyboard stays in the terminal */} onClick={() => (jump === 'top' ? xt.term.scrollToTop() : xt.term.scrollToBottom())}>
+        <button type="button" className={`term-jump ${jump}`} aria-label={jump === 'top' ? 'Scroll to the top' : 'Scroll to the end'} data-tip={jump === 'top' ? 'Scroll to the top' : 'Back to the end'} onMouseDown={e => e.preventDefault() /* the keyboard stays in the terminal */} onClick={() => (jump === 'top' ? xt.term.scrollToTop() : xt.term.scrollToBottom())}>
           <Icon name={jump === 'top' ? 'arrowUp' : 'arrowDown'} size={13} />
         </button>
       )}
       {find && xt && <FindBar term={xt.term} search={xt.search} seq={findSeq} onClose={() => setClosedAt(findSeq)} />}
-      {pill && onReply && (
-        <button
-          type="button"
-          className="term-reply"
-          style={{ left: Math.min(pill.x + 6, innerWidth - 90), top: Math.min(pill.y + 10, innerHeight - 34) }}
-          onMouseDown={e => e.preventDefault() /* the selection stays */}
-          onClick={() => (onReply(pill.text, { x: pill.x, y: pill.y }), setPill(null))}
-        >
-          <Icon name="reply" size={12} /> Reply
-        </button>
+      {pill && (onReply || (alt && onSelection)) && (
+        <span className="term-reply" style={{ left: Math.min(pill.x + 6, innerWidth - (alt && onSelection ? 420 : 90)), top: Math.min(pill.y + 10, innerHeight - 34) }} onMouseDown={e => e.preventDefault() /* the selection stays */}>
+          {onReply && (
+            <button type="button" data-tip={onSelection && !alt ? 'Hold ⌥ for a new workspace, tab or Laki AI with it' : undefined} onClick={() => (onReply(pill.text, { x: pill.x, y: pill.y }), setPill(null))}>
+              <Icon name="reply" size={12} /> Reply
+            </button>
+          )}
+          {alt &&
+            onSelection &&
+            USES.map(([how, icon, label]) => (
+              <button key={how} type="button" onClick={() => (onSelection(pill.text, how), setPill(null))}>
+                <Icon name={icon} size={12} /> {label}
+              </button>
+            ))}
+        </span>
       )}
       {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} onOpen={b => (peekGone(), setBig(b))} />}
       {big && (
@@ -356,6 +394,12 @@ export function Term({
 }
 
 const MODS = ['Alt', 'Meta', 'Shift', 'Control', 'CapsLock']
+export type SelectionUse = 'workspace' | 'tab' | 'ai'
+const USES: [SelectionUse, IconName, string][] = [
+  ['workspace', 'plus', 'New workspace'],
+  ['tab', 'agent', 'New tab here'],
+  ['ai', 'ai', 'Ask Laki AI'],
+]
 // macOS editing keys as iTerm's Natural Text Editing sends them (xterm sends nothing for ⌘← ⌘→, a plain ⌫ for ⌘⌫):
 // line start and end (⌃A ⌃E), delete the line (⌃U), a word back and on (Esc b, Esc f)
 const EDIT_KEYS: Record<string, string> = { '⌘ArrowLeft': '\x01', '⌘ArrowRight': '\x05', '⌘Backspace': '\x15', '⌥ArrowLeft': '\x1bb', '⌥ArrowRight': '\x1bf' }

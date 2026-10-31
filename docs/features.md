@@ -48,10 +48,11 @@ time and AI money per run (`budget: 60 min, $5`).
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
-  your home folder and a browser (any website, sign-ins kept, Google's too) live in the sidebar too, from + at its top. A tab floats
+  your home folder and a browser (any website, sign-ins kept, Google's too; a screenshot of what's in sight or the whole page, copied or saved) live in the sidebar too, from + at its top. A tab floats
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text and *Reply*: it
-  goes to the agent, quoted, with your words. A GitHub PR or issue link shows its card on hover, a picture's path or link
-  the picture (a click opens it larger). *Keep the Mac awake while agents work* (Settings › Git & worktrees). Collision radar marks two worktrees that change the same lines (or a base that changed them since), while both agents can still adjust. Run ▾ runs the project's
+  goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
+  or issue link shows its card on hover, a picture's path or link the picture (a click opens it larger); a file's path
+  (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees). Collision radar marks two worktrees that change the same lines (or a base that changed them since), while both agents can still adjust. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
@@ -76,7 +77,8 @@ time and AI money per run (`budget: 60 min, $5`).
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
-- **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
+- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English,
+  and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
@@ -107,5 +109,6 @@ time and AI money per run (`budget: 60 min, $5`).
   PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also
   lists your PRs and others', runs your actions and templates, keeps a project's notes and memory, and asks you with options when unsure (it
   removes something only when you press Yes); a chat button on every page that knows what you're looking at; timers, reminders and messages for later on request;
+  it tells you where a setting is, with a link that opens it;
   on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
 - **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.

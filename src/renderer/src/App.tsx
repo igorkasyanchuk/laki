@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame } from '../../shared/types'
+import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -7,7 +7,7 @@ import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyActio
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { FullReview, type ReviewApi, type Talk } from './FullReview'
-import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
+import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, PrCard, prState, PRStatus, REVIEW, reviewersText, short, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
@@ -40,7 +40,7 @@ import { Reader, type ReaderApi, readable } from './Reader'
 import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
-import { Term, xterms } from './Term'
+import { Term, xterms, type SelectionUse } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf, allAgents, fillRoles, LAYOUT_PRESETS, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout, toRoles } from '../../shared/layout'
 import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
@@ -257,7 +257,6 @@ const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_I
 const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'working', done: 'done', idle: 'idle', exited: 'stopped', limit: 'at its usage limit' }
 // a row's +/-: 1234 as 1.2k, 12345 as 12k
 const clip = (s: string, n = 60) => (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ')) // a message on one line
-const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 
 // the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
 const TIMER_THEN = [
@@ -549,6 +548,14 @@ export function App() {
   // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
   // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
   const [peek, setPeek] = useState<{ id: string; top: number; left: number } | null>(null)
+  // its diff's size, asked for as the card opens (the scan keeps only the shown workspaces')
+  const [peekStat, setPeekStat] = useState<{ id: string; stat: Stat } | null>(null)
+  useEffect(() => {
+    if (!peek || viewRef.current?.workspaces.find(w => w.id === peek.id)?.stat) return // the scan's already
+    let on = true
+    api.call<Stat | null>('wsStat', { ws: peek.id }).then(stat => on && stat && setPeekStat({ id: peek.id, stat }), () => {})
+    return () => void (on = false)
+  }, [peek?.id])
   const peekTimer = useRef(0)
   const peekBox = useRef<HTMLDivElement>(null)
   const peekAt = (id?: string, el?: HTMLElement) => {
@@ -613,8 +620,13 @@ export function App() {
   // what's on screen stays there: a pick that's gone (archived, removed) or not in the view yet falls back to the one
   // shown, not to the first row, which a new workspace (placed on top, or sorted by last active) would take
   const shownWs = useRef<string | null>(null)
-  const ws = live.find(w => w.id === wsId) ?? live.find(w => w.id === shownWs.current) ?? order[0] ?? null
+  // one closed, archived or removed: the next row (else the one before), of its project first
+  const lastRows = useRef<WorkspaceView[]>([])
+  const nextWs = (id: string | null) =>
+    (o => (i => (i < 0 ? undefined : (near => near.find(w => w.project === o[i].project) ?? near[0])([...o.slice(i + 1), ...o.slice(0, i).reverse()].map(w => live.find(x => x.id === w.id)).filter((w): w is WorkspaceView => !!w))))(o.findIndex(w => w.id === id)))(lastRows.current)
+  const ws = live.find(w => w.id === wsId) ?? live.find(w => w.id === shownWs.current) ?? nextWs(shownWs.current) ?? order[0] ?? null
   shownWs.current = ws?.id ?? null
+  lastRows.current = order
   const wsFiles = ws ? openFiles.filter(f => f.ws === ws.id) : [] // this workspace's open files, its tabs
   const previewed = wsFiles.find(f => fileKey(f) === shownFile[ws?.id ?? '']) ?? wsFiles.at(-1) ?? null // the one in front
   const project = view?.projects.find(p => p.id === ws?.project)
@@ -624,8 +636,11 @@ export function App() {
   const placed = groupsOf(stored[ws?.id ?? ''], tabs.map(t => t.id))
   const groups = narrow ? placed.flatMap(g => tabsOf(g).map(tab => ({ tab }))) : placed // too narrow for splits: a tab per pane
   const shownTab = useRef<string | null>(null) // likewise the tab: a new one doesn't take the pane's place
-  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.id === shownTab.current) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  const shownOrder = useRef<string[]>([]) // the tab bar as last drawn: a closed tab's next one (else the one before) takes its place
+  const nextOf = (id: string | null) => (o => (i => (i < 0 ? undefined : [...o.slice(i + 1), ...o.slice(0, i).reverse()].map(byId).find(Boolean)))(o.indexOf(id ?? '')))(shownOrder.current)
+  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.id === shownTab.current) ?? nextOf(shownTab.current) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
   shownTab.current = tab?.id ?? null
+  shownOrder.current = groups.flatMap(tabsOf)
   const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
   const visible = tabsOf(group)
 
@@ -1648,6 +1663,8 @@ export function App() {
     // ponytail: Undo opens its address again, not its pin, color, group or name (wsRm forgets them)
     done(`Closed ${wsName(w)}`, () => quickNew('browsers', w.browser || undefined))
   }
+  // 5 files: 1 new, 1 deleted, 3 changed
+  const filesText = (st: Stat) => (changed => `${st.files} ${st.files === 1 ? 'file' : 'files'}${st.made || st.gone ? `: ${[st.made && `${st.made} new`, st.gone && `${st.gone} deleted`, changed > 0 && `${changed} changed`].filter(Boolean).join(', ')}` : ''}`)(st.files - (st.made ?? 0) - (st.gone ?? 0))
   const statText = (w: WorkspaceView) => w.stat && `+${w.stat.add} −${w.stat.del} in ${w.stat.files} ${w.stat.files === 1 ? 'file' : 'files'} against ${w.kind === 'worktree' ? w.base : 'the last commit'}${w.stat.dirty ? `, ${w.stat.dirty} not committed` : ''}`
   // a workspace's first agent tab; ● again on a tab, as if its turn ended unseen (until it's looked at again)
   const agentTab = (id: string) => view?.tabs.find(t => t.workspace === id && t.kind === 'agent')
@@ -1744,6 +1761,17 @@ export function App() {
   // (main's open-path, which follows links: a workspace's file by its real path too); a host's only in the preview,
   // through the daemon; a browser has no Finder
   // Reply's targets for a tab's selected text: the tab when an agent runs in it, else its workspace's live agents
+  // ⌥ by Reply: the selection as a new workspace's prompt (the page filled in), a new agent tab's here, or Laki AI's question
+  const selectionTo = (id: string) => (text: string, how: SelectionUse) => {
+    const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
+    const said = text.trim()
+    if (how === 'workspace') return newWs(projOf(w)?.kind ? undefined : w?.project, { prompt: said }) // a terminal's: you pick the project
+    if (how === 'tab') return void (w && call<TabView>('tabNew', { ws: w.id, preset: settings.agent ?? 'claude', prompt: said }).then(selectTab, () => {}))
+    if (!aiOn(settings)) return toast('Laki AI is off: Settings › AI')
+    if (settings.ai?.float === false) setDialog('ai')
+    else setAiFloat(true)
+    void whereNow().then(context => api.call('aiAsk', { text: said, context })).catch(fail)
+  }
   const replyTo = (id: string) => {
     const t = byId(id)
     if (!t) return []
@@ -1766,6 +1794,15 @@ export function App() {
     const how = w.host || !bridge?.openPath ? (rel ? { rel } : 'none') : await bridge.openPath(path, w.path)
     if (typeof how === 'object') panelApi(w).preview(how.rel)
     else if (how === 'missing') toast(`Not there: ${path}`)
+  }
+  // a file path in a terminal's text, clicked: a file of the workspace in Laki's preview at its line, or your editor
+  // (Settings › Terminal's fileClick; other: ⌥ held with ⌘, the other one); any other path as a file:// link's
+  const openCode = (tab: string) => (path: string, line: number | undefined, other: boolean) => {
+    const w = view?.workspaces.find(x => x.id === byId(tab)?.workspace)
+    const rel = w && path.startsWith(`${w.path}/`) ? path.slice(w.path.length + 1) : ''
+    if (!w || !rel) return void openPath(tab, path)
+    if ((settings.fileClick === 'editor') !== other) return void call('openIn', { ws: w.id, app: 'editor', file: rel }).catch(() => {})
+    panelApi(w).preview(rel, line)
   }
   // Changes' Revert, a git action: always asked (a whole file, or what of it: a hunk, some lines), an agent at work there
   // in the same question
@@ -2524,28 +2561,35 @@ export function App() {
     void call<{ sent?: boolean }>('send', { target: t.id, whenIdle: true, text: `Rename this workspace after its task, in 2 to 5 words a person would say: from its pull request's title and description if it has one${w.pr ? ` (#${w.pr.number})` : ' (gh pr view)'}, else from what you're working on here. Run \`laki rename . "<the name>"\`, say the new name in one line, and change nothing else.` })
       .then(r => done(r?.sent ? `Asked ${t.name} to name it` : `${t.name} names it when its turn ends`), fail)
   const detachPr = (w: WorkspaceView) => void call('prDetach', { ws: w.id }).then(() => done(w.prLinked ? 'Only related now: its own PR, once opened, is its PR' : `PR #${w.pr?.number ?? ''} detached: only related`), () => {}) // call toasts a failure
+  // Workspace ›: its own settings and copies, a submenu, so the menu's top level is what you do with it
+  const wsOwn = (w: WorkspaceView): MenuItem[] => [
+    { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
+    ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
+    { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
+    ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
+    ...(w.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (w.host ? `${w.host}:` : '') + shortPath(w.path), run: () => copy((w.host ? `${w.host}:` : '') + w.path) } as MenuItem] : []),
+    null,
+    { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
+    { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
+    ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
+    { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', tip: w.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
+    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', tip: 'A button on the left rail that opens it from anywhere', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
+    ...(rail && w.railPin ? [{ label: 'Rail icon', icon: isIconName(w.icon) ? w.icon : 'star', items: iconItems(w.icon, i => void call('wsSet', { id: w.id, icon: i ?? '' }).catch(fail)) } as MenuItem] : []), // its pin's, a terminal's too
+    ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', tip: 'What Laki did for it: PR scans, deliveries, setup runs', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
+    null,
+    ...showItems(),
+  ]
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
     ...stepItem(w),
     ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
-    { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
-    ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
-    { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
+    { label: 'Workspace', icon: 'settings', key: 's', items: wsOwn(w) }, // no tip: it would cover the submenu; W is Run workflow's
     { label: 'Open in', icon: 'code', key: 'o', tip: 'Its folder in an editor, a terminal or Finder', items: openInItems({ ws: w.id }) },
-    { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
-    { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
-    { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', tip: w.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
-    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', tip: 'A button on the left rail that opens it from anywhere', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
-    ...(rail && w.railPin ? [{ label: 'Rail icon', icon: isIconName(w.icon) ? w.icon : 'star', items: iconItems(w.icon, i => void call('wsSet', { id: w.id, icon: i ?? '' }).catch(fail)) } as MenuItem] : []), // its pin's, a terminal's too
-    ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', tip: 'The agents that raced on this task side by side, to keep one', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
-    ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
     ...prSub(w),
-    ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', tip: 'What Laki did for it: PR scans, deliveries, setup runs', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
     ...runItems(w),
     ...flowMenu(w),
-    ...showItems(),
     null,
     ...(w.kind === 'worktree'
       ? [
@@ -3267,7 +3311,7 @@ export function App() {
   // the step as the first item of a workspace's ⋯ (the toolbar's, a row's and its right click), a line under it;
   // overlaps: the radar's menu beside it
   const stepItem = (w: WorkspaceView): MenuItem[] =>
-    (st => (st ? [{ label: st.label, icon: STEP_ICON[st.id], hint: w.id === ws?.id ? kh('step') : undefined, tip: st.tip, ...(st.id === 'collide' ? { items: radarMenu(w) } : { run: () => doStep(w, st) }) } as MenuItem, null] : []))(stepsOn && !projOf(w)?.kind && !w.term ? stepOf(w) : undefined)
+    (st => (st ? [{ label: st.label, icon: STEP_ICON[st.id], hint: w.id === ws?.id ? kh('step') : undefined, tip: st.tip, ...(st.id === 'collide' ? { items: radarMenu(w) } : { run: () => doStep(w, st) }) } as MenuItem, null] : []))(stepsOn && !projOf(w)?.kind && !w.term ? (st => (st?.id === 'archive' && w.kind === 'worktree' ? undefined : st))(stepOf(w)) : undefined)
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3293,6 +3337,7 @@ export function App() {
         onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
         onPointerLeave={() => peekAt()}
         onClick={e => ((e.metaKey || e.shiftKey) && !narrow && pickable(w) ? pickRow(w, e) : (setWsId(w.id), (!pin && !find && rows.dragged()) || (setPicked([]), setDialog(null)), narrow && setSideOpen(false))) /* ⌘ and ⇧: picked; a page over the main area (Settings, the new-workspace page…) gives way to it, and the picks go, not at a drag's end */}
+        onDoubleClick={e => !(e.metaKey || e.shiftKey) && setDialog({ renameWs: w.id })}
         onContextMenu={e => openMenu(e, wsMenu(w))}
         {...dropProps(w)}
       >
@@ -3386,7 +3431,7 @@ export function App() {
           </span>
         )}
         {/* on hover, after the marks (they slide left): its menu */}
-        <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+        <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
           <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
         </span>
         {more && (
@@ -3479,27 +3524,8 @@ export function App() {
           ))}
         </div>
         {last && <div className="wp-last">{last}</div>}
-        {pr && (
-          <div className="wp-pr">
-            <a href={pr.url} onClick={e => (e.preventDefault(), openExternal(pr.url))}>
-              {(!pr.mine || settings.ownAvatar !== false) && <Avatar login={pr.author} size={16} />}
-              <span className={`wp-pr-state ${prState(pr)}`}>{prState(pr)}</span>
-              <span className="wp-pr-title">
-                #{pr.number} {pr.title}
-              </span>
-            </a>
-            <div className="wp-pr-meta">
-              {pr.author && !pr.mine && <span>by {pr.author}</span>}
-              {pr.list?.length || pr.checks ? <span className={`ci-${pr.checks}`}><CiMark pr={pr} /></span> : null}
-              {pr.review && REVIEW[pr.review] && <span>{REVIEW[pr.review]}</span>}
-              {pr.conflict && pr.state === 'OPEN' && <span className="ci-fail">conflicts</span>}
-              {(pr.additions || pr.deletions) ? <span className="ws-stat"><span className="add">+{short(pr.additions ?? 0)}</span> <span className="del">−{short(pr.deletions ?? 0)}</span></span> : null}
-              {w.prLinked && <span>linked</span>}
-            </div>
-            {reviewersText(pr) && <div className="wp-pr-meta">{reviewersText(pr)}</div>}
-          </div>
-        )}
-        {w.stat && (w.stat.add > 0 || w.stat.del > 0 || w.stat.dirty > 0) && <div className="wp-line">{statText(w)}</div>}
+        {pr && <PrCard pr={pr} linked={w.prLinked} face={!pr.mine || settings.ownAvatar !== false} onOpen={openExternal} />}
+        {(st => st && (st.add > 0 || st.del > 0 || st.dirty > 0) && <div className="wp-line wp-files">{filesText(st)} <span className="ws-stat"><span className="add">+{short(st.add)}</span> <span className="del">−{short(st.del)}</span></span>{st.dirty ? ` · ${st.dirty} not committed` : ''}</div>)(w.stat ?? (peekStat?.id === w.id ? peekStat.stat : undefined))}
         {marks.map(m => (
           <div key={String(m)} className="wp-line">
             {m}
@@ -4018,7 +4044,7 @@ export function App() {
                   {portStop(ws, port)}
                 </span>
               ))}
-              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
+              <PRStatus w={infoOf(ws)} face={!ws.pr?.mine || settings.ownAvatar !== false} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
               {attachable(ws) && ws.kind !== 'local' && (
                 <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
                   + PR
@@ -4324,6 +4350,9 @@ export function App() {
                     look={termLook(settings)}
                     onFile={path => openPath(id, path)}
                     onReply={replyTo(id).length ? (text, at) => setReply({ tab: id, text, ...at }) : undefined}
+                    onSelection={selectionTo(id)}
+                    onCode={openCode(id)}
+                    codeTo={settings.fileClick === 'editor' ? 'editor' : 'preview'}
                     image={peekImage(id)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                   />
@@ -4376,7 +4405,7 @@ export function App() {
             )}
             {browsed.flatMap(id => {
               const w = live.find(x => x.id === id)
-              return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} />] : []
+              return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
             {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
@@ -4674,7 +4703,7 @@ export function App() {
             }}
           />
         ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={spot => setDialog({ section: 'ai', ...(spot && { spot }) })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />}
         {(o =>
           o &&
           specsOn && (

@@ -357,7 +357,7 @@ export function ProjectSection(p: {
       )}
       <Group title="Color and icon" hint="Its mark before its name in the sidebar, menus, the palette and the window's title (an emoji there); the color also on its workspaces' bar where they have none of their own, rail pins and the bubbles">
         <div className="button-row">
-          <button type="button" aria-haspopup="menu" onClick={lookMenu}>
+          <button type="button" className="pick-btn" aria-haspopup="menu" onClick={lookMenu}>
             <ProjectMark p={p.project} or={p.project.git ? 'fork' : 'folder'} size={14} /> {[p.project.color, p.project.icon && (emojiOf(p.project.icon) ?? iconWords(p.project.icon))].filter(Boolean).join(' · ') || 'None yet'}
             <Icon name="chevron" size={11} />
           </button>

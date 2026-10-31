@@ -227,7 +227,7 @@ test('without gh or cloudflared: doctor says missing; diff against a base that i
   // the sidebar's stat, asked for every 20 ms here: one scan at a time, one asked for meanwhile runs after it
   writeFileSync(join(ws.path, 'u.txt'), 'a\nb\n')
   await rig.rpc('settingsSet', { diffStat: true })
-  assert.deepEqual(await until(async () => (await wsOf(rig, ws.id)).stat, 'stat'), { add: 3, del: 0, files: 3, dirty: 3 })
+  assert.deepEqual(await until(async () => (await wsOf(rig, ws.id)).stat, 'stat'), { add: 3, del: 0, files: 3, dirty: 3, made: 2, gone: 0 }) // u.txt and bin.dat new
   await rig.rpc('settingsSet', { diffStat: false })
   rmSync(join(ws.path, 'u.txt'))
 
@@ -530,7 +530,7 @@ test('an SSH host: hostSync follows the branch, sleep refused, diff and stats, a
   writeFileSync(join(ws.path, 'new.txt'), 'one\ntwo\n')
   assert.deepEqual((await rig.rpc('diff', { ws: ws.id })).files, [{ path: 'new.txt', add: 2, del: 0, status: 'A' }])
   // a scan under way as the file came may see it in ls-files, not yet in status: the next one has both
-  const want = JSON.stringify({ add: 0, del: 0, files: 1, dirty: 1 })
+  const want = JSON.stringify({ add: 0, del: 0, files: 1, dirty: 1, made: 1, gone: 0 })
   await until(async () => JSON.stringify((await wsOf(rig, ws.id)).stat) === want, `stat scanned as ${want}`)
 
   // the PR scan reads its branch there: the same, then another one

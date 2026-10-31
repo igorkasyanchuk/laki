@@ -283,12 +283,17 @@ async function statOf(w: Workspace): Promise<Stat> {
   // --no-optional-locks: a scan never holds index.lock while an agent or you commit
   const from = await diffBase(w)
   const [numstat, untracked, status] = await Promise.all([
-    git(w, '--no-optional-locks', 'diff', '--numstat', '-M', from),
+    git(w, '--no-optional-locks', 'diff', '--numstat', '--summary', '-M', from), // --summary: create and delete mode lines
     git(w, '--no-optional-locks', 'ls-files', '--others', '--exclude-standard'),
     git(w, '--no-optional-locks', 'status', '--porcelain'),
   ])
-  const st: Stat = { add: 0, del: 0, files: 0, dirty: status.split('\n').filter(Boolean).length }
+  const st: Stat = { add: 0, del: 0, files: 0, dirty: status.split('\n').filter(Boolean).length, made: 0, gone: 0 }
   for (const l of numstat.split('\n').filter(Boolean)) {
+    if (l.startsWith(' ')) {
+      if (l.startsWith(' create mode')) st.made!++
+      else if (l.startsWith(' delete mode')) st.gone!++
+      continue
+    }
     const [a, d] = l.split('\t')
     st.add += Number(a) || 0 // a binary file: -
     st.del += Number(d) || 0
@@ -298,6 +303,7 @@ async function statOf(w: Workspace): Promise<Stat> {
   // file's newlines, a binary's none
   const fresh = untracked.split('\n').filter(Boolean)
   st.files += fresh.length
+  st.made! += fresh.length
   for (const f of w.host ? [] : fresh.slice(0, 100)) { // ponytail: a host's new files count, not their lines
     try {
       const p = join(w.path, f)
@@ -307,6 +313,12 @@ async function statOf(w: Workspace): Promise<Stat> {
     } catch {}
   }
   return st
+}
+// the hover card's: one workspace's now (the scan keeps only the shown ones'); none off a git repo or for a codespace asleep
+export async function wsStat(o: { ws: string }): Promise<Stat | null> {
+  const w = findWs(o.ws)
+  if (w.archived || away(w) || state.projects.find(p => p.id === w.project)?.git === false || (!w.host && !existsSync(w.path))) return null
+  return stats.get(w.id) ?? statOf(w)
 }
 // a window's workspace for the Review tab: its view's ws, else (none, or null: a page over it, an SSH host's) its tab's
 export const viewWs = (v: Conn['view']) => v && (v.ws ?? state.tabs.find(t => t.id === v.tab)?.workspace)

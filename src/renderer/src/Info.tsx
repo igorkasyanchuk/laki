@@ -1,7 +1,7 @@
 // A workspace's info panel (the ⓘ in the tab bar) and its PR in the status bar: CI, review, and the
 // switches that send failing CI or new review comments to the agent. App.tsx maps a
 // workspace to WsInfo.
-import { type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { jobOf, MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
 import { Folded } from './MarkdownView'
 import { shortPath } from './text'
@@ -177,16 +177,55 @@ export function AutoToggles({ w, onToggle, names = ['fix CI', 'review', 'fix con
   )
 }
 
-// the status bar's PR: number, CI, then the switches
+export const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+// a PR at a glance: a row's hover card and the status bar's (face: the author's picture, unless it's yours and Settings
+// leaves yours out)
+export function PrCard({ pr, linked, face = true, onOpen }: { pr: PRInfo; linked?: boolean; face?: boolean; onOpen: (url: string) => void }) {
+  return (
+    <div className="wp-pr">
+      <a href={pr.url} onClick={e => (e.preventDefault(), onOpen(pr.url))}>
+        {face && <Avatar login={pr.author} size={16} />}
+        <span className={`wp-pr-state ${prState(pr)}`}>{prState(pr)}</span>
+        <span className="wp-pr-title">
+          #{pr.number} {pr.title}
+        </span>
+      </a>
+      <div className="wp-pr-meta">
+        {pr.author && !pr.mine && <span>by {pr.author}</span>}
+        {pr.list?.length || pr.checks ? <span className={`ci-${pr.checks}`}><CiMark pr={pr} /></span> : null}
+        {pr.review && REVIEW[pr.review] && <span>{REVIEW[pr.review]}</span>}
+        {pr.conflict && pr.state === 'OPEN' && <span className="ci-fail">conflicts</span>}
+        {pr.additions || pr.deletions ? <span className="ws-stat"><span className="add">+{short(pr.additions ?? 0)}</span> <span className="del">−{short(pr.deletions ?? 0)}</span></span> : null}
+        {linked && <span>linked</span>}
+      </div>
+      {reviewersText(pr) && <div className="wp-pr-meta">{reviewersText(pr)}</div>}
+    </div>
+  )
+}
+
+// the status bar's PR: number, CI, then the switches; resting on its number: PrCard above it
 // onMenu: a right click (Refresh from GitHub)
-export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void }) {
+export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; face?: boolean; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void }) {
   const pr = w.pr
+  const [card, setCard] = useState<{ left: number; bottom: number } | null>(null)
+  const timer = useRef(0)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const rest = (el?: HTMLElement) => {
+    clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => (r => setCard(r ? { left: Math.max(8, Math.min(r.left, innerWidth - 328)), bottom: innerHeight - r.top + 6 } : null))(el?.getBoundingClientRect()), el ? (card ? 0 : 450) : 200)
+  }
   if (!pr) return null
   return (
     <span className="pr-status" onContextMenu={onMenu}>
-      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={[pr.title, prState(pr), reviewersText(pr), onMenu && 'right click: refresh, merge, detach…'].filter(Boolean).join(' · ')} onClick={() => onOpen(pr.url)}>
+      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} aria-label={`PR #${pr.number}: ${pr.title ?? ''}`} onPointerEnter={e => e.pointerType === 'mouse' && rest(e.currentTarget)} onPointerLeave={() => rest()} onPointerDown={() => (clearTimeout(timer.current), setCard(null))} onClick={() => onOpen(pr.url)}>
         #{pr.number}
       </button>
+      {card && (
+        <div className="ws-peek pr-peek" style={{ left: card.left, bottom: card.bottom }} onPointerEnter={() => clearTimeout(timer.current)} onPointerLeave={() => rest()}>
+          <PrCard pr={pr} linked={w.prLinked} face={face} onOpen={onOpen} />
+          {onMenu && <div className="wp-line">Right click: refresh, merge, detach…</div>}
+        </div>
+      )}
       {pr.state === 'OPEN' && (
         <>
           <button className={`pr pr-${pr.checks || 'none'}`} data-tip="Checks on GitHub · right click to refresh" onClick={() => onOpen(`${pr.url}/checks`)}>

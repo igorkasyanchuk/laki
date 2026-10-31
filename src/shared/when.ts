@@ -129,6 +129,19 @@ export function parseAt(text: string | number, now = Date.now()): number | { err
   return nextRun(r, now) ?? say
 }
 
+// a reminder's when that repeats: words that say again and again (every weekday at 9am, mondays at 5pm, daily at 8:30)
+export const REPEATS = /\b(every|each|daily|hourly|nightly|week ?days|work ?days|weekends|(?:sun|mon|tues|wednes|thurs|fri|satur)days)\b/i
+// a reminder's when, in words: a repeating rule (REPEATS: parseWhen's, its next time; every: the words) or one moment
+// (parseAt)
+export function whenOf(text: string, now = Date.now()): { at: number; every?: string } | { error: string } {
+  const s = String(text ?? '').trim()
+  if (!REPEATS.test(s)) return (at => (typeof at === 'number' ? { at } : at))(parseAt(s, now))
+  const r = parseWhen(s, now)
+  if ('error' in r) return r
+  const at = nextRun(r, now)
+  return at === undefined ? { error: 'When? (every weekday at 9am)' } : r.once ? { at } : { at, every: s }
+}
+
 // parseAt's time, or its words as an error: ms as digits too (laki new --at, MCP's start_at)
 export function atOrThrow(v: unknown) {
   const t = parseAt(typeof v === 'number' || /^\d+$/.test(String(v)) ? Number(v) : String(v))

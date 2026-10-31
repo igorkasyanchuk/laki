@@ -2,6 +2,7 @@
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
 import { FitAddon } from '@xterm/addon-fit'
+import { FIND, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
@@ -13,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch } from './ui'
+import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS } from './Usage'
@@ -142,6 +143,7 @@ export type AppSettings = Paint & {
   fontFamily?: string
   copyOnSelect?: boolean
   editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
+  fileClick?: 'preview' | 'editor' // a file path clicked in a terminal: Laki's preview (unset) or your editor
   lineHeight?: number
   letterSpacing?: number // px
   fontWeight?: string // 300…700
@@ -388,183 +390,7 @@ const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'me
 const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
-// Find a setting (the nav's search box): each setting's title as the page writes it, its section, words it goes by.
-// A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
-const FIND: [string, string, string?][] = [
-  ['general', 'New workspaces start', 'default agent preset'],
-  ['git', 'Branch prefix', 'git worktree'],
-  ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
-  ['general', 'macOS notifications', 'notify waiting done limit mute'],
-  ['general', 'Sound', 'notification'],
-  ['general', 'Plan limit nearly used', 'usage 5-hour weekly session quota notify 90% threshold claude codex'],
-  ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],
-  ['notes', 'Release notes', "what's new changelog version changes added recently"],
-  ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],
-  ['ai', 'Runs with', 'backend openrouter claude -p codex exec model'],
-  ['ai', 'OpenRouter API key', 'token secret ai'],
-  ['ai', 'Spending', 'cost usage tokens ai today month'],
-  ['ai', "Laki's skill", 'tools prs notes memory shells actions templates ask options remove'],
-  ['ai', 'Show costs ($)', 'hide cost money dollars price spend'],
-  ['ai', 'Your instructions', 'custom context system prompt my own rules'],
-  ['ai', 'Keep pasted images (days)', 'images screenshots files attached storage retention delete older clean thumbnails 30'],
-  ['webhook', 'Send test', 'webhook phone push'],
-  ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
-  ['appearance', 'Design', 'layout frame window cards sections tiles inset soft rounded corners padding gaps style variation'],
-  ['appearance', 'Sidebar rows', 'marks row sidebar show hide next step chip merge archive pr github icon author avatar approved approval check double eyes commented review conflicts failing checks ci overlaps radar plan diff size lines'],
-  ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
-  ['appearance', 'Status bar', 'bottom bar footer hide show status'],
-  ['appearance', 'Video button', 'youtube watch video hide'],
-  ['appearance', 'Meme button', 'fun meme reddit smiley break joke'],
-  ['appearance', 'Timer button', 'timer countdown stopwatch hide'],
-  ['appearance', 'Turn timers', 'elapsed time'],
-  ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
-  ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
-  ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
-  ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
-  ['appearance', 'One next step', 'next step menu what now answer merge ship archive fix ci ⌘g'],
-  ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
-  ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
-  ['appearance', 'Tokens and cost', 'tokens cost price dollars spend usage today api estimate money'],
-  ['general', 'Environment', 'env variables'],
-  ['general', 'Move to another Mac', 'export import backup file'],
-  ['appearance', 'Interface font', 'ui type'],
-  ['appearance', 'Accent color', 'colour highlight'],
-  ['appearance', 'Corners', 'radius rounded square'],
-  ['appearance', 'Pages size', 'zoom text font size small bigger larger readable page settings help scheduled tasks workflows specs brainstorms'],
-  ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
-  ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
-  ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
-  ['appearance', 'Sidebar', 'project names font case letter spacing size weight rows text'],
-  ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
-  ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
-  ['appearance', 'Browsers', 'rail browser web button show hide list'],
-  ['appearance', 'Sidebar', 'status guide line divider indent row height space spacing gap between rows projects project row height font size bigger dotted dashed text size icon size avatar github style compact extended cards'],
-  ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words buttons and bars'],
-  ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
-  ['appearance', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
-  ['appearance', 'Glow', 'glass colors'],
-  ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
-  ['appearance', 'Favorites', 'theme star starred favorite'],
-  ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],
-  ['general', 'Open HTML and Markdown artifacts', 'artifacts viewer html markdown md browser embed inline modal open in laki default browser'],
-  ['appearance', 'Finished ones stand out', 'floating bubbles done finished green pulse attention'],
-  ['presets', 'Tell it about Laki', 'note system prompt skill rename pr storage'],
-  ['terminal', 'Font', 'monospace family'],
-  ['terminal', 'Font size', 'zoom bigger smaller'],
-  ['terminal', 'Line height', ''],
-  ['terminal', 'Letter spacing', ''],
-  ['terminal', 'Font weight', 'bold light'],
-  ['terminal', 'Minimum contrast', 'readable'],
-  ['terminal', 'Cursor style', 'block bar underline'],
-  ['terminal', 'Padding', 'tiny minimal roomy space around margin inner edge'],
-  ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
-  ['terminal', 'Blinking cursor', 'blink'],
-  ['terminal', 'Copy selected text', 'clipboard selection'],
-  ['terminal', 'Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫', 'cmd option arrow keys line start end word caret cursor home natural text editing iterm'],
-  ['terminal', 'Dim other panes', 'split focus fade'],
-  ['terminal', 'Focus the pane under the mouse', 'split hover caret cursor follows'],
-  ['terminal', 'New tabs open as a split', 'pane panel nested inside tab beside'],
-  ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
-  ['open', 'Custom command', 'editor'],
-  ['appearance', 'Custom CSS', 'css style styles stylesheet own rules customize anything font size spacing colors'],
-  ['open', 'Per project', 'editor xcode project own each per project ⌘e'],
-  ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
-  ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
-  ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
-  ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
-  ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
-  ['pr', 'Fix CI', 'pr prompt failing checks auto'],
-  ['pr', 'Review', 'pr prompt comments auto'],
-  ['pr', 'Fix conflicts', 'pr prompt merge auto'],
-  ['templates', 'Prompt templates', 'prompt'],
-  ['memory', 'Global memory', 'rules instructions every project all projects claude md agents memory custom remember always'],
-  ['actions', 'Actions', 'run menu prompt command'],
-  ['skill', 'Agent skill', 'mcp server laki cli'],
-  ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
-  ['skill', 'Orchestrator', 'agent skill laki-orchestrate parallel agents workers fan out coordinate superset'],
-  ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
-  ['widgets', 'More folders', 'extensions widgets'],
-  ['widgets', 'Keep logs for every extension', 'extensions widgets log logs debug stderr errors'],
-  ['terminal', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
-  ['terminal', 'Show progress', 'percent sidebar tab both'],
-  ['terminal', 'Progress in the sidebar', 'percent line bar row'],
-  ['ai', 'Chat button in the corner', 'floating chat ask laki ai anywhere'],
-  ['voice', 'Speech to text', 'voice dictation dictate microphone mic speak talk speech transcribe whisper cloud openrouter engine'],
-  ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
-  ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
-  ['voice', 'Send as you stop talking', 'auto send submit enter release let go stop talking voice dictation agent prompt'],
-  ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
-  ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
-  ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
-  ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],
-  ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
-  ['terminal', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
-  ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
-  ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
-  ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
-  ['git', 'Keep the Mac awake while agents work', 'sleep caffeinate power battery idle awake'],
-  ['git', 'Done check', 'verify test lint format review checked before done second opinion'],
-  ['git', 'Collision radar', 'overlap conflict collide same lines files worktrees merge base moved'],
-  ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
-  ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
-  ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
-  ['keys', 'Show the keys while ⌘ is held', 'hold command overlay badges cheat sheet hints which key'],
-  ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
-  ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
-  ['general', 'Screenshot to Laki AI', 'global hotkey screenshot region area capture dictation voice mic ask ai menu bar tray'],
-  ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
-  ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
-  ['general', 'Bird view', 'pages overview all sessions screens preview eye running'],
-  ['general', 'Calendar', 'pages reminders follow-ups week month scheduled tasks dates'],
-  ['general', 'My Desk', 'pages desk dashboard overview widgets extensions tiles resize build'],
-  ['general', 'Notes', 'pages notes notebook notion editor write pages memo colors search'],
-  ['general', 'To-dos', 'pages todo todos to do checklist tasks list slack notion check off rail'],
-  ['pr', 'Review tab', 'full review diff changes files viewed comments pending post github pr tab code review pin expand context description'],
-  ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
-  ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
-  ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
-  ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
-  ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
-  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
-  ['general', 'Creation log', 'new workspace create logs what ran command development'],
-  ['general', 'Setup & teardown', 'setup teardown script logs output deleted workspaces development'],
-  ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
-  ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
-  ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
-  ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
-  ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],
-  ['simulator', 'Emulator window', 'android emulator window headless no-window one instance avd'],
-  ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
-  ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
-  ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
-]
 
-// the nav's sections, under a head each (group): the app, its agents, what it connects to
-const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] = [
-  { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
-  { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
-  { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Laki' },
-  { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
-  { id: 'needs', label: 'Needs you', icon: 'inbox', group: 'Laki' },
-  { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
-  { id: 'keys', label: 'Keys', icon: 'keyboard', group: 'Laki' },
-  { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
-  { id: 'achievements', label: 'Achievements', icon: 'trophy', group: 'Laki' },
-  { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
-  { id: 'presets', label: 'Agents & profiles', icon: 'agent', group: 'Agents' },
-  { id: 'memory', label: 'Global memory', icon: 'bulb', group: 'Agents' },
-  { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
-  { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
-  { id: 'skill', label: 'Agent skill', icon: 'import', group: 'Agents' },
-  { id: 'ai', label: 'AI', icon: 'ai', group: 'Agents' },
-  { id: 'voice', label: 'Voice', icon: 'mic', group: 'Agents' },
-  { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
-  { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
-  { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
-  { id: 'tunnels', label: 'Tunnels', icon: 'share', group: 'Connect' },
-  { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
-  { id: 'simulator', label: 'Simulators', icon: 'phone', group: 'Connect' },
-]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
 
 // Achievements (App's, achievements.ts): on or off, how many, the page, the hidden ones back. Not a setting of this
@@ -902,6 +728,7 @@ export function SettingsPage(p: {
   onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
   achievements?: AchievementsApi // App's: the count, on or off, the page
 }) {
+  const [onScroll, toTop] = useToTop() // ↑ back to the top once well down
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
@@ -930,10 +757,10 @@ export function SettingsPage(p: {
   useEffect(() => {
     if (!spot) return
     const t = spot.title.toLowerCase()
-    const el = spot.group
-      ? [...document.querySelectorAll<HTMLElement>('.settings-main .set-head > h3')].find(e => e.textContent?.trim().toLowerCase() === t)?.closest<HTMLElement>('.set-group')
-      : [...document.querySelectorAll<HTMLElement>('.settings-main :is(h2, h3, label, .field, .switch-row, .switch-text, .muted.small)')].find(e => e.textContent?.trim().toLowerCase().startsWith(t))
-    el?.scrollIntoView({ block: spot.group ? 'start' : 'center' })
+    // a link's spot: a card by its title, else a setting's (Laki AI's laki_settings_find links to either)
+    const card = spot.group ? [...document.querySelectorAll<HTMLElement>('.settings-main .set-head > h3')].find(e => e.textContent?.trim().toLowerCase() === t)?.closest<HTMLElement>('.set-group') : undefined
+    const el = card ?? [...document.querySelectorAll<HTMLElement>('.settings-main :is(h2, h3, label, .field, .switch-row, .switch-text, .muted.small)')].find(e => e.textContent?.trim().toLowerCase().startsWith(t))
+    el?.scrollIntoView({ block: card ? 'start' : 'center' })
     el?.classList.add('spot')
     const off = setTimeout(() => el?.classList.remove('spot'), 2600)
     return () => clearTimeout(off)
@@ -1143,7 +970,7 @@ export function SettingsPage(p: {
     </Group>
   )
   return (
-    <div className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties}>
+    <div className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties} onScrollCapture={onScroll}>
       <div className="settings-head">
         <b>Settings</b>
         <span className="grow" />
@@ -2089,6 +1916,7 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={s.editKeys !== false} onChange={v => set({ editKeys: v })}>
                     <Says title="Mac editing keys" hint="⌘← ⌘→ to the line's start and end, ⌥← ⌥→ a word at a time, ⌘⌫ the line before the cursor" />
                   </Switch>
+                  {row('A file path clicked', "⌘-click on src/app.ts:42 in a terminal; ⌘⌥-click opens it the other way", 'fileClick', 'preview', ['preview', 'editor'], v => (v === 'editor' ? 'Your editor (Open in)' : "Laki's preview, at its line"))}
                 </div>
               </Group>
             </>
@@ -2434,6 +2262,7 @@ export function SettingsPage(p: {
           )}
         </div>
       </div>
+      {toTop}
     </div>
   )
 }

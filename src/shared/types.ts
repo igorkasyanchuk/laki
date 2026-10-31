@@ -453,6 +453,7 @@ export type Settings = {
   fontFamily?: string
   copyOnSelect?: boolean
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
+  fileClick?: 'preview' | 'editor' // a file path ⌘-clicked in a terminal (src/app.ts:42): Laki's preview (unset) or your editor; ⌘⌥: the other
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   needsList?: boolean // Settings › Appearance › Sidebar: the Needs you list above Pinned and the projects (on unless false)
@@ -669,7 +670,8 @@ export type SideLook = { font?: string; /* the sidebar's font: a name (unset: th
 export type Todo = { id: string; project: string; text: string; at: number; images?: string[] } // images: pasted ones (<data>/images), their paths after the text as it starts
 // a follow-up on the calendar (Calendar): a note for a moment, from you, Laki AI or an agent (by), maybe about a
 // workspace or a project; it rings once as it's due (fired) while the app is open, done: ticked off
-export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean }
+// every: the words of a repeating one (when.ts whenOf: every weekday at 9am); at is then its next time, moved on as it rings
+export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean; every?: string }
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // a tile on the Desk: an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
 // x, y: its cell, columns from the left and rows from the top, 0 first (none: the first spot it fits, deskLayout)
@@ -800,8 +802,9 @@ export type NamedTunnel = { name?: string; domain?: string }
 
 // run: the project has a dev command; scripts: the RUN_SCRIPTS it has
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
-// (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's)
-export type Stat = { add: number; del: number; files: number; dirty: number }
+// (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's); made and gone:
+// files created (untracked ones too) and deleted, of those files
+export type Stat = { add: number; del: number; files: number; dirty: number; made?: number; gone?: number }
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
@@ -904,7 +907,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 131
+export const API = 132
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
