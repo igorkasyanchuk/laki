@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.38.0 · Oct 31, 2026
 
 - One next step moved into the ⋯ menus (the toolbar's, a row's, its right click: first there; ⌘G still does it), and
   the toolbar has its buttons back: Layout, Full screen, Open in, Info, Preview, the panel, Ship, Commands.
