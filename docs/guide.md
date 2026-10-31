@@ -99,7 +99,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
 - **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 4 cells
-  across), in the top bar, the status bar or on My Desk, or buttons on the rail and the sidebar's foot: a count, a
+  across), in the top bar, the status bar or on My Desk, or buttons on the rail and the status bar's start: a count, a
   chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
   Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
   Extensions › *New ▾*, or My Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
@@ -1011,8 +1011,8 @@ Where each one shows is its own (Settings › Extensions › the extension: *Sid
 *Sidebar foot*, *My Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
 bar left of its buttons, the status bar's right end, a tab of the right panel (⌥⌘B), or a mark on each workspace's row
 (a per-workspace one: its count for that workspace, its tip on hover); the
-bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, in the sidebar's foot)
-or in the sidebar's foot (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
+bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, at the status bar's start)
+or at the status bar's start (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
 its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
 half that: ½, a thin line, like *Links*, its sites as plain words with a rule between them, wrapping when they don't fit),
@@ -1201,7 +1201,7 @@ title (the headings, a checklist of the steps you want, questions to answer). *E
 *Feature* (a spec: goal, context, steps, how to verify) and *Idea* (a brainstorm: the idea, who it's for, constraints,
 questions); *The ones Laki comes with* puts them back.
 
-They're on the rail's *Specs* (the sidebar's foot without the rail, ⌘K) for every project, and on a project's page,
+They're on the rail's *Specs* (the status bar's start without the rail, ⌘K) for every project, and on a project's page,
 its *Specs* tab. The page is one list, newest first, each row with its kind (*spec* or *brainstorm*), its project and
 when it changed: a filter, a project, *All* / *Specs* / *Brainstorms* (with their counts) and *New* ▾ over it. A click
 opens one alone, the page's whole width, with the way back as breadcrumbs at the top (*Specs & Brainstorms › the
@@ -1708,7 +1708,7 @@ lit for a moment.
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
   button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
-  from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), *Interface* (a preview of a tab, a menu, a tooltip and the status bar, then the font: SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Laki's own, Inter, Geist, IBM Plex Sans, Roboto and more, then the developer fonts (the terminal's monospace ones), then every other font on this Mac, the sidebar's and the project names' pickers too; and *Text size*: 9 to 16 px for tabs, menus and dropdowns, the status bar, tooltips and the side panel's tabs as one, theirs by default), *Full-width status bar* (off by default: under the main area; on: one bar under the rail and the sidebar too, as Zed's, on every page: the sidebar's bottom buttons first, with their words (AI and Settings at its end without the rail), and on a page none of the workspace's branch, ports, PR or artifacts), *Settings & Help size* (90% to 150%,
+  from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), *Interface* (a preview of a tab, a menu, a tooltip and the status bar, then the font: SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Laki's own, Inter, Geist, IBM Plex Sans, Roboto and more, then the developer fonts (the terminal's monospace ones), then every other font on this Mac, the sidebar's and the project names' pickers too; and *Text size*: 9 to 16 px for tabs, menus and dropdowns, the status bar, tooltips and the side panel's tabs as one, theirs by default), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Icons* (Tabler by default, Lucide, or Laki's own; *Line width* 0.5 to 2.5, each pack's own 2; *Size* 12 to 18, 14 as

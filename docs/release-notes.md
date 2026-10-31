@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- A picture's hover card in a terminal opens it larger: click the picture or its ⤢.
+- The status bar is always full width, under the sidebar too, on every page (the Appearance switch is gone); phones
+  keep it under the main area.
 - Done check: tick a project's lint, test and format scripts (its settings › *Done check*), and a second agent's review,
   and they run as each agent's turn ends having changed files. A failure goes back to the agent with its output, a
   strip under the terminal shows each step, and the notification says *done and checked*.

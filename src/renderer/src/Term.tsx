@@ -9,7 +9,8 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
-import { LinkPeek, type Peek, peekOf } from './LinkPeek'
+import { type Big, LinkPeek, type Peek, peekOf } from './LinkPeek'
+import { Modal } from './panels'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
@@ -74,6 +75,7 @@ export function Term({
   // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
   // link stays (peekAt) and only a leave that lasts 250 ms ends it
   const [peek, setPeek] = useState<Peek | null>(null)
+  const [big, setBig] = useState<Big | null>(null) // a hovered picture opened larger
   const showT = useRef(0)
   const hideT = useRef(0)
   const peekAt = useRef('')
@@ -341,7 +343,14 @@ export function Term({
           <Icon name="reply" size={12} /> Reply
         </button>
       )}
-      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} />}
+      {peek && <LinkPeek key={peek.uri /* another link: a card of its own */} peek={peek} onEnter={() => clearTimeout(hideT.current)} onLeave={peekGone} onOpen={b => (peekGone(), setBig(b))} />}
+      {big && (
+        <Modal title={big.size ? `${big.name} · ${big.size}` : big.name} onClose={() => setBig(null)} loose>
+          <div className="art-big lp-big">
+            <img src={big.src} alt={big.name} />
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

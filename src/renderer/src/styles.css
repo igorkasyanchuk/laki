@@ -460,12 +460,13 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 html.away *, html.away *::before, html.away *::after { animation-play-state: paused !important; } /* Laki in the background (App's away): nothing animates */
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
-/* Appearance › Interface › Full-width status bar (App's wideBar): the bar under the rail, the sidebar and the main
-   area, over pages too (they cover the main area only); the sidebar's foot buttons first (.sb-foot), with their words,
+/* the status bar, full width (App's wideBar; not on a phone): under the rail, the sidebar and the main area, over pages
+   too (they cover the main area only), under dialogs; the sidebar's foot buttons first (.sb-foot), with their words,
    and without the rail its AI and Settings at the end */
 .app.wide-status { padding-bottom: 24px; }
 .status.wide { position: absolute; left: 0; right: 0; bottom: 0; z-index: 31; height: 24px; padding-left: 8px; }
 .app.full .status.wide { display: none; }
+.app.wide-status:has(.overlay) .status.wide { z-index: 9; } /* a dialog open: under its backdrop, as under the main area's */
 .app.wide-status.full { padding-bottom: 0; }
 .status .sb-foot { display: inline-flex; align-items: center; gap: 2px; flex: none; }
 .status .sb-foot .ib { width: 22px; height: 20px; min-height: 0; }
@@ -2551,6 +2552,10 @@ button.board-name:hover { background: none; }
 .reply-pop select { max-width: 170px; }
 /* a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, or a picture */
 .link-peek { position: fixed; z-index: 9; max-width: 360px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 12px/1.4 var(--ui-font); color: var(--fg); }
+.link-peek .lp-img { display: block; padding: 0; border: none; background: none; cursor: zoom-in; } /* a click on the picture, or its ⤢: Term's modal */
+.link-peek .lp-open { position: absolute; top: 4px; right: 4px; background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: 6px; }
+.modal:has(> .lp-big) { width: min(1100px, calc(100vw - 32px)); height: auto; max-height: 92vh; } /* a hovered picture, larger */
+.lp-big img { max-height: calc(92vh - 70px); }
 .link-peek.img img { display: block; max-width: 336px; max-height: 240px; object-fit: contain; border-radius: 4px; background: repeating-conic-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
 .lp-gh { all: unset; display: flex; flex-direction: column; gap: 5px; min-width: 260px; cursor: pointer; }
 .lp-head { display: flex; align-items: center; gap: 6px; color: var(--muted); }

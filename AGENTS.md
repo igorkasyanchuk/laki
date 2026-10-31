@@ -2122,8 +2122,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
   - The toolbar's ⋯ (`wsActions`) has *Copy path* (the full one, `host:` first; `shortPath`'d as its hint); the status
-    bar has no path. A Terminals workspace's leaves out `$PORT` (its listening ports as any), a Browsers one has no status bar (unless
-    the daemon is stale or the connection is down).
+    bar has no path. A Terminals workspace's leaves out `$PORT` (its listening ports as any), a Browsers one's bar has only the foot
+    buttons (on a phone none, unless the daemon is stale or the connection is down).
   - Resting on a row (`peek`, 550 ms; 120 ms once one shows) shows `peekCard` beside the sidebar instead of a
     tooltip: state and agents, the last answer or the ask, the PR (avatar, state, title, author, checks, review,
     conflicts, size), `statText`, ports and marks, *Open*, the PR, ⋯; it stays while the mouse is on it (250 ms to get
@@ -2221,7 +2221,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   250 ms to reach it; `peekOf`: a GitHub PR or issue link, `ghCard`; an image, by extension): from the OSC 8 handler, the
   WebLinksAddon and a link provider of its own for a picture's path in plain text (`PIC`, relative to `cwd`, the
   workspace's folder); App's `peekImage`: `fileRead` (the workspace, else its storage folder), else `aiImage` (pasted
-  ones only); an https one through `/img` (Widgets.tsx `imgVia`). No native title over a link that peeks. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
+  ones only); an https one through `/img` (Widgets.tsx `imgVia`); a click on the picture or its ⤢ (`.lp-open`) opens it larger: Term's `big`, panels.tsx' `Modal`, which outlives the card. No native title over a link that peeks. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
   codex's and opencode's prompt, where xterm would send ⏎. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a

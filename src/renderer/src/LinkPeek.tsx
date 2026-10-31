@@ -1,12 +1,13 @@
 // A link's hover card in a terminal (Term: 400 ms on a link, gone as the pointer leaves the link and the card): a
 // GitHub PR's or issue's (the daemon's ghCard: gh, kept a minute; a click opens it on GitHub), or an image's (Term's
-// `image`: a file of the workspace or its storage folder, a pasted one; an https one through the daemon's /img)
+// `image`: a file of the workspace or its storage folder, a pasted one; an https one through the daemon's /img; a click on
+// it, or its ⤢, opens it larger: Term's modal, which outlives the card)
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type GhCard, GH_LINK } from '../../shared/types'
 import { api, openExternal } from './api'
 import { ago } from './Info'
-import { Icon } from './ui'
+import { Icon, IconButton } from './ui'
 import { imgVia } from './Widgets'
 
 export const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
@@ -14,7 +15,8 @@ export const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 export const peekOf = (uri: string) => (GH_LINK.test(uri) ? 'gh' : IMAGE.test(uri.split(/[?#]/)[0]) ? 'img' : undefined)
 export type Peek = { uri: string; x: number; y: number; image?: () => Promise<string | undefined> } // image: a local file's data URL
 
-export function LinkPeek({ peek, onEnter, onLeave }: { peek: Peek; onEnter: () => void; onLeave: () => void }) {
+export type Big = { src: string; name: string; size: string } // an image opened larger (Term's modal)
+export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnter: () => void; onLeave: () => void; onOpen: (b: Big) => void }) {
   const [card, setCard] = useState<GhCard>()
   const [src, setSrc] = useState<string>()
   const [size, setSize] = useState('')
@@ -36,6 +38,8 @@ export function LinkPeek({ peek, onEnter, onLeave }: { peek: Peek; onEnter: () =
   const style = { left: Math.max(8, Math.min(peek.x - 12, innerWidth - 376)), ...(low ? { bottom: innerHeight - peek.y + 14 } : { top: peek.y + 18 }) }
   const [, owner, name, what, num] = GH_LINK.exec(peek.uri) ?? []
   const state = card && (card.draft && card.state === 'open' ? 'draft' : card.state)
+  const file = decodeURIComponent(peek.uri.split(/[?#]/)[0].split('/').pop() ?? '')
+  const open = () => src && onOpen({ src, name: file, size })
   return createPortal(
     <div className={`link-peek ${kind}`} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       {kind === 'gh' ? (
@@ -80,9 +84,16 @@ export function LinkPeek({ peek, onEnter, onLeave }: { peek: Peek; onEnter: () =
         </button>
       ) : (
         <>
-          {src && !err ? <img src={src} alt="" onLoad={e => setSize(`${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight}`)} onError={() => setErr("Couldn't load it")} /> : <span className={err ? 'lp-err' : 'lp-wait muted'}>{err || 'Loading…'}</span>}
+          {src && !err ? (
+            <button type="button" className="lp-img" data-tip="Open larger" onClick={open}>
+              <img src={src} alt="" onLoad={e => setSize(`${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight}`)} onError={() => setErr("Couldn't load it")} />
+            </button>
+          ) : (
+            <span className={err ? 'lp-err' : 'lp-wait muted'}>{err || 'Loading…'}</span>
+          )}
+          {src && !err && <IconButton icon="maximize" title="Open larger" className="lp-open" onClick={open} />}
           <span className="lp-meta muted">
-            {decodeURIComponent(peek.uri.split(/[?#]/)[0].split('/').pop() ?? '')}
+            {file}
             {size && ` · ${size}`}
           </span>
         </>

@@ -477,7 +477,6 @@ export type Settings = {
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
   sideClear?: number // without glass: how see-through the sidebar and the rail are, the rest solid: % (unset: 0)
   uiFont?: string // the interface's font
-  statusBar?: 'main' | 'wide' // the status bar under the main area (unset), or full width under the sidebar too, over every page (Appearance › Interface)
   uiSize?: number // tabs, menus, dropdowns, the status bar, tooltips and the side panel's tabs as one: px (unset: theirs; Appearance › Interface)
   accent?: string // #rrggbb over the theme's accent (unset: the theme's)
   radius?: string // corners, a CSS length over the theme's (unset: the theme's)

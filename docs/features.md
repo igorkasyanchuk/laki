@@ -51,7 +51,7 @@ time and AI money per run (`budget: 60 min, $5`).
   your home folder and a browser (any website, sign-ins kept, Google's too) live in the sidebar too, from + at its top. A tab floats
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text and *Reply*: it
   goes to the agent, quoted, with your words. A GitHub PR or issue link shows its card on hover, a picture's path or link
-  the picture. *Keep the Mac awake while agents work* (Settings › Git & worktrees). Collision radar marks two worktrees that change the same lines (or a base that changed them since), while both agents can still adjust. Run ▾ runs the project's
+  the picture (a click opens it larger). *Keep the Mac awake while agents work* (Settings › Git & worktrees). Collision radar marks two worktrees that change the same lines (or a base that changed them since), while both agents can still adjust. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.

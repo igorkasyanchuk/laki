@@ -3871,9 +3871,9 @@ export function App() {
       {tabList}
     </div>
   )
-  // Appearance › Interface › Full-width status bar (Zed's way): one bar under the sidebar and the main area, over every
-  // page too, the sidebar's foot buttons first (with their words) and AI and Settings at its end; off: as before
-  const wideBar = settings.statusBar === 'wide' && !narrow
+  // the status bar, full width (Zed's way): one bar under the sidebar and the main area, over every page too, the
+  // sidebar's foot buttons first (with their words) and AI and Settings at its end; a phone's under the main area
+  const wideBar = !narrow
   const pageHere = dialog !== null && isPlace(dialog) && view ? placeName({ d: dialog, ws: ws?.id ?? null }) : ''
   const pageBar = wideBar && !!pageHere // a page over the workspace: the bar says only what isn't the workspace's
   // the sidebar's foot buttons (Schedule, Board… without the rail; Video, Meme, Timer, its extensions, Settings), there

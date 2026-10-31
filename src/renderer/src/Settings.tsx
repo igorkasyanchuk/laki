@@ -141,7 +141,6 @@ export type AppSettings = Paint & {
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
   storageDir?: string // workspaces' storage folders, one per workspace inside (unset: <data>/storage)
   keepStorage?: boolean // a deleted workspace's storage folder stays
-  statusBar?: 'main' | 'wide' // under the main area (unset), or full width, Zed's way
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   projectLook?: ProjectLook // the sidebar's project names
@@ -395,7 +394,6 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Interface font', 'ui type'],
   ['appearance', 'Accent color', 'colour highlight'],
   ['appearance', 'Corners', 'radius rounded square'],
-  ['appearance', 'Full-width status bar', 'status bar wide bottom zed'],
   ['appearance', 'Pages size', 'zoom text font size small bigger larger readable page settings help scheduled tasks workflows specs brainstorms'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
@@ -1479,9 +1477,6 @@ export function SettingsPage(p: {
                   </select>
                   <Says title="Text size" hint="Tabs, menus and dropdowns, the status bar, tooltips, the side panel's tabs, as one" />
                 </label>
-                <Switch className="switch-row" on={s.statusBar === 'wide'} onChange={on => set({ statusBar: on ? 'wide' : 'main' })}>
-                  <Says title="Full-width status bar" hint="One bar under the sidebar and the main area, on every page too: the sidebar's bottom buttons first, the workspace's branch, ports and PR while you're on it, as Zed's. Off: under the main area only" />
-                </Switch>
               </div>
               <div className="grid2">
                 <label data-tip="Settings, Help, Scheduled tasks, Workflows' list, Specs & Brainstorms' list, Achievements and project pages. ⌘+ and ⌘− on any page size that page alone, kept for it (⌘0: back to 100%)">
