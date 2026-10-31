@@ -164,6 +164,7 @@ export type AppSettings = Paint & {
   prScan?: number // minutes between PR checks
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
+  radar?: boolean // Collision radar: overlapping changes between worktrees (unset: on)
   copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
@@ -460,6 +461,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Specs & Brainstorms', 'pages spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'pages workflow flow flows blocks graph automation pipeline runs decisions'],
   ['git', 'Keep the Mac awake while agents work', 'sleep caffeinate power battery idle awake'],
+  ['git', 'Collision radar', 'overlap conflict collide same lines files worktrees merge base moved'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
   ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
@@ -1197,6 +1199,9 @@ export function SettingsPage(p: {
               <div className="setting-box">
                 <Switch className="switch-row" on={s.bgRefresh !== false} onChange={v => set({ bgRefresh: v })}>
                   <Says title="Refresh PR status in the background" hint="Checks each workspace's PR, CI and reviews every few minutes (Settings › Pull requests) and as an agent's turn ends. Off: only a PR's right click › Refresh, if gh asks for an SSH passphrase or GitHub limits you. The PR switches need it" />
+                </Switch>
+                <Switch className="switch-row" on={s.radar !== false} onChange={v => set({ radar: v })}>
+                  <Says title="Collision radar" hint="Every 15 seconds, compares what each worktree changes with the project's other worktrees and with what landed on its base since it branched. Where two change the same lines, both rows get a mark: open the other, or tell either agent, before merge day. Lockfiles don't count" />
                 </Switch>
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />

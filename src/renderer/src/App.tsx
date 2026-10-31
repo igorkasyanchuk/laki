@@ -34,6 +34,7 @@ import { ComparePage } from './Compare'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
+import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms } from './Term'
@@ -522,6 +523,8 @@ export function App() {
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
+  // Collision radar's overlaps you hid, until they change (each one's radarKey)
+  const [radarHid, setRadarHid] = useState<string[]>(() => load('laki.radarHide', []))
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
   const [full, setFull] = useState(false)
@@ -729,6 +732,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.strips', JSON.stringify(strips)), [strips])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.branchFull', JSON.stringify(branchFull)), [branchFull])
+  useEffect(() => store('laki.radarHide', radarHid.length ? radarHid.slice(-200) : undefined), [radarHid]) // ponytail: the newest 200, none pruned as they go
   // a new workspace, and the one selected before it, stay in sight: their projects and seps unfold once the view has them
   const [reveal, setReveal] = useState<string[]>([])
   useEffect(() => {
@@ -3137,6 +3141,35 @@ export function App() {
   const needNext = needAfter()
   const needsShown = !find && (!rail || railKind === 'projects') && settings.needsList !== false && !folded.includes('needs')
   const needWs = needsShown ? undefined : needNext?.workspace
+  // Collision radar: where a workspace's changes meet another live worktree's, or what landed on its base since it
+  // branched (the daemon's scanOverlaps); one you hid stays hidden while it reads the same
+  const radarKey = (w: WorkspaceView, c: Collision) => [w.id, c.ws ?? c.base, c.file, c.mine, c.theirs].join('|')
+  const radarOf = (w: WorkspaceView) => (w.overlaps ?? []).filter(c => !radarHid.includes(radarKey(w, c)))
+  const radarWhose = (c: Collision) => (c.ws ? wsName(view.workspaces.find(x => x.id === c.ws) ?? { id: c.ws }) : c.base!)
+  const radarTip = (w: WorkspaceView) => radarOf(w).map(c => `${c.file}: ${c.ws ? `${radarWhose(c)} changes it too` : `${c.base} changed it since this branched`} (${spanText(c.theirs)}; here ${spanText(c.mine)})`).join('\n')
+  const radarMenu = (w: WorkspaceView): MenuItem[] =>
+    radarOf(w).flatMap((c, i): MenuItem[] => {
+      const o = c.ws ? view.workspaces.find(x => x.id === c.ws) : undefined
+      const where = `${c.file} (${spanText(c.theirs)} there, ${spanText(c.mine)} here)`
+      const hide = { label: 'Hide until it changes', icon: 'eye', tip: 'Shows again when either side changes those lines', run: () => setRadarHid(h => [...h, radarKey(w, c)]) } as MenuItem
+      if (!o)
+        return [
+          ...(i ? [null] : []),
+          { head: `${c.base} changed ${c.file} since this branched` },
+          { label: `Ask the agent to merge ${c.base} in`, icon: 'gitMerge', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, tip: 'Sent when its turn ends', run: () => void call('send', { target: w.id, whenIdle: true, text: `${c.base} has changed ${where} since this branch started, where you change it too. Merge ${c.base} in now (git merge ${c.base}; no rebase, no force push), resolve any conflicts keeping what both sides meant, run what you can locally, then say what changed.` }).then(() => toast('Sent to the agent'), () => {}) },
+          hide,
+        ]
+      const tell = (to: WorkspaceView, other: WorkspaceView, mine: Collision['mine'], theirs: Collision['theirs']) =>
+        void call('send', { target: to.id, whenIdle: true, text: `Heads up: workspace ${wsName(other)} (branch ${other.branch}) also changes ${c.file}, ${spanText(theirs)}, where you change ${spanText(mine)}. Both will merge into ${to.base}. Read its change with \`laki diff ${other.id}\` and keep yours compatible with it; tell me if you can't.` }).then(() => toast(`Sent to ${wsName(to)}'s agent`), () => {})
+      return [
+        ...(i ? [null] : []),
+        { head: `${wsName(o)} changes ${c.file} too` },
+        { label: `Open ${wsName(o)}`, icon: 'arrowUpRight', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, run: () => setWsId(o.id) },
+        { label: "Tell this one's agent", icon: 'send', tip: `Sends it where ${wsName(o)}'s change is, to build on`, run: () => tell(w, o, c.mine, c.theirs) },
+        { label: `Tell ${wsName(o)}'s agent`, icon: 'send', run: () => tell(o, w, c.theirs, c.mine) },
+        hide,
+      ]
+    })
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3183,6 +3216,12 @@ export function App() {
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
+        {(n => n > 0 && (
+          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), openMenu(e, radarMenu(w)))}>
+            <Icon name="gitCompare" size={11} />
+            {n}
+          </span>
+        ))(new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size)}
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />

@@ -1432,6 +1432,17 @@ laki flow check .laki/workflows               # check workflow files (a folder: 
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
+### Collision radar
+
+Worktrees keep agents out of each other's files until merge day. Every 15 seconds Laki compares what each worktree
+changes (against its base) with the project's other worktrees, and with what landed on its base since it branched. Where
+two change the same lines, or lines side by side (git would call that a conflict), or both add the same new file, both
+rows get an orange ⇄ with how many others they meet; hover it for the files and lines. A click: *Open* the other
+workspace, *Tell this one's agent* or *Tell* the other's (it's sent where the other's change is, and `laki diff` reads
+it), or, for a base that moved, *Ask the agent to merge main in*. *Hide until it changes* hides one until either side
+changes those lines. Lockfiles don't count. Settings › Git & worktrees › *Collision radar* turns it off. Not on SSH
+hosts or codespaces; the base is what this clone has (nothing is fetched for it).
+
 ### Bird view
 
 On unless Settings › General › *Pages* turns it off; the eye beside Help (⌘K too) opens it. Every live session, agents
@@ -1642,7 +1653,7 @@ lit for a moment.
   off: a PR's status changes only with its right click › *Refresh PR status*, if `gh` asks for an SSH passphrase or
   GitHub rate-limits you; the PR switches need it on), *Keep the Mac awake while agents work* (off: while any agent works
   or waits for your answer, the Mac doesn't sleep, on battery too; the screen still turns off and locks, and closing the
-  lid still sleeps it), *Delete archived workspaces* (Never, or after a day to a month:
+  lid still sleeps it), *Collision radar* (on: worktrees whose changes meet, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens

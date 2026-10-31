@@ -766,6 +766,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(2000, core.shellTick)
   every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
+  every(Number(process.env.LAKI_OVERLAP_MS || 15000), core.scanOverlaps) // Collision radar
   every(Number(process.env.LAKI_METER_MS || 10000), core.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))

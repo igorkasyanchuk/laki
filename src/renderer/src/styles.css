@@ -2052,6 +2052,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-run.live:hover { background: var(--hover); }
 .sched-more { align-self: flex-start; }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
+/* Collision radar: other workspaces (or the base) whose changes meet this one's; a click: its menu */
+.ws-radar { display: inline-flex; align-items: center; gap: 2px; flex: none; color: var(--tc-orange); font-size: 10.5px; font-variant-numeric: tabular-nums; cursor: pointer; border-radius: 4px; }
+.ws-radar:hover { background: var(--hover); }
 .ws-cs { align-items: center; gap: 3px; font-size: 10px; } .ws-cs.bad { color: var(--error); opacity: 1; } /* a cloud workspace's state, unless it's on */
 .ws-ext { display: inline-flex; align-items: center; gap: 3px; flex: none; max-width: 9ch; overflow: hidden; white-space: nowrap; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; } /* an extension's mark (place row) */
 .ws-ext.bad, .ws-ext.t-bad { color: var(--error); } .ws-ext.t-good { color: var(--done); } .ws-ext.t-warn { color: var(--waiting); } .ws-ext.t-accent { color: var(--accent-ink, var(--accent)); } /* its data's tone */
@@ -2062,7 +2065,7 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 /* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, 👀 you commented */
 .ws-yes { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--done); }
 .ws-eyes { font-size: calc(var(--ws-icon, calc(13px * var(--icon-k, 1))) - 1px); line-height: 1; }
-.ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes) :is(.icon-svg, .avatar) { width: var(--ws-icon, calc(13px * var(--icon-k, 1))); height: var(--ws-icon, calc(13px * var(--icon-k, 1))); } /* --icon-k: Appearance's icon size, unless the sidebar's own is set */
+.ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes, .ws-radar) :is(.icon-svg, .avatar) { width: var(--ws-icon, calc(13px * var(--icon-k, 1))); height: var(--ws-icon, calc(13px * var(--icon-k, 1))); } /* --icon-k: Appearance's icon size, unless the sidebar's own is set */
 .pr-by { display: inline-flex; align-items: center; gap: 4px; }
 /* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
    Approve plain with GitHub's green check; GitHub and ⋯ square */

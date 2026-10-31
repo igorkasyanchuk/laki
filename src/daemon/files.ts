@@ -6,6 +6,7 @@ import { closeSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, rea
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
+import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
 import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
@@ -332,6 +333,56 @@ export async function scanStats(): Promise<void> {
     statting = false
   }
   if (restat) (restat = false), await scanStats()
+}
+
+// ---------- Collision radar (settings.radar, on unless false): what each live worktree changes, by its base's lines
+// (shared/overlap.ts), against the project's other worktrees and against what landed on its base since it branched.
+// ponytail: two worktrees off different merge bases are compared by each one's own lines; no fetch (the base as this
+// clone has it); not on SSH hosts or codespaces
+
+export const collisions = new Map<string, Collision[]>()
+let radaring = false
+let baseCache = new Map<string, Ranges>() // a base's changes from a merge base to its tip, by both
+const U0 = ['--no-optional-locks', '-c', 'core.quotePath=false', 'diff', '-U0', '--no-color', '--no-prefix', '--no-ext-diff', '-M']
+async function rangesOfWs(w: Workspace) {
+  const from = await diffBase(w)
+  const [d, fresh] = await Promise.all([git(w, ...U0, from), git(w, '--no-optional-locks', '-c', 'core.quotePath=false', 'ls-files', '--others', '--exclude-standard')])
+  const r = rangesOf(d)
+  for (const f of fresh.split('\n').filter(Boolean)) if (!RADAR_SKIP.test(f)) r[f] = [[0, 0]]
+  return { from, r }
+}
+export async function scanOverlaps(): Promise<void> {
+  if (radaring) return
+  radaring = true
+  try {
+    const live = state.settings?.radar === false ? [] : state.workspaces.filter(w => w.kind === 'worktree' && !w.archived && !w.host && !away(w) && existsSync(w.path))
+    const got = new Map<string, Awaited<ReturnType<typeof rangesOfWs>>>()
+    for (const w of live) await rangesOfWs(w).then(x => got.set(w.id, x), () => {})
+    const cache = new Map<string, Ranges>()
+    const next = new Map<string, Collision[]>()
+    for (const w of live) {
+      const mine = got.get(w.id)
+      if (!mine) continue
+      const out: Collision[] = []
+      for (const o of live) if (o !== w && o.project === w.project && got.has(o.id)) for (const x of overlaps(mine.r, got.get(o.id)!.r)) out.push({ ...x, ws: o.id })
+      const tip = await git(w, 'rev-parse', '--verify', '-q', `${w.base}^{commit}`).catch(() => '')
+      if (tip && tip !== mine.from) {
+        const key = `${mine.from}..${tip}`
+        const b = cache.get(key) ?? baseCache.get(key) ?? rangesOf(await git(w, ...U0, mine.from, tip).catch(() => ''))
+        cache.set(key, b)
+        for (const x of overlaps(mine.r, b)) out.push({ ...x, base: w.base })
+      }
+      if (out.length) next.set(w.id, out)
+    }
+    baseCache = cache
+    if (JSON.stringify([...next]) !== JSON.stringify([...collisions])) {
+      collisions.clear()
+      for (const [k, v] of next) collisions.set(k, v)
+      changed()
+    }
+  } finally {
+    radaring = false
+  }
 }
 
 // ---------- files: the side panel's tree, changed files marked

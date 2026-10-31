@@ -2,6 +2,12 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Collision radar: two worktrees that change the same lines (or a base that changed them since one branched) get an
+  orange ⇄ on their rows, with the files and lines; open the other, tell either agent, or ask it to merge the base in.
+  Settings › Git & worktrees turns it off.
+
 ## 0.36.0 · Oct 31, 2026
 
 - Settings › General › Storage's *Delete files after* is *Never* unless you pick a time (0.35 deleted after 90 days).

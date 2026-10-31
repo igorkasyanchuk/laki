@@ -1,4 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
+import type { Collision } from './overlap.ts'
 import type { Layout, SavedLayout } from './layout.ts'
 import { type Rule, stamp } from './when.ts'
 import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
@@ -494,6 +495,7 @@ export type Settings = {
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
+  radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
@@ -779,7 +781,7 @@ export type NamedTunnel = { name?: string; domain?: string }
 export type Stat = { add: number; del: number; files: number; dirty: number }
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -879,5 +881,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 125
+export const API = 126
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
