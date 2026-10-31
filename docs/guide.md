@@ -61,7 +61,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   HTML, CSS and screenshot, goes to the agent), and a booted iOS Simulator or Android emulator live, to tap and type
   in (Settings › Simulators turns it on). Markdown files preview rendered or raw; changed images show before and after. ⌘P finds a file by name.
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
-  browser of the app's, take screenshots, click, fill in fields and read the page.
+  browser of the app's, take screenshots, click, fill in fields and read the page. A click, a fill or an open says
+  what it caused: the page it moved to, popups and links off localhost it refused, the page's console errors, and the
+  lines of text that came and went (or *(no changes)*), so the agent needs fewer screenshots.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
   a workspace, a tab or a page of the app.
 - **Board**: every workspace in a column by where it is (running, needs you, done, PR open, merged), and to-dos

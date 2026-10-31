@@ -189,7 +189,10 @@ from the disk here. Its agents run there and have no \`laki\`.
 
 \`laki browser open /\` loads the workspace's dev server (\`$PORT\`; start it with \`laki run <ws>\`) in a hidden
 browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css>"\`, \`fill "<css>" "<text>"\`,
-\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open.
+\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. \`open\`, \`click\` and
+\`fill\` print what they caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost),
+\`console error:\` lines, and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that
+before taking a screenshot.
 
 ## Schedule work
 

@@ -123,7 +123,9 @@ test('cli: browser ops through the app’s window, each one’s answer as text',
             ? { url: e.home, png: png.toString('base64') }
             : e.selector === '#gone'
               ? undefined
-              : {}
+              : e.op === 'click' // what main says a click caused
+                ? { url: `${e.home}done`, title: 'Done', nav: { url: `${e.home}done`, title: 'Done' }, errors: ['TypeError: x is undefined'], changed: ['+ Thanks', '- Sign in'] }
+                : { url: e.home, title: 'Shop', changed: [] }
     app.notify('browseDone', result ? { id: e.req, ok: true, result } : { id: e.req, ok: false, error: 'no element matches #gone' })
   })
   const home = `http://localhost:${ws.port}`
@@ -132,9 +134,9 @@ test('cli: browser ops through the app’s window, each one’s answer as text',
   r = await rig.cli('browser', 'web', 'open')
   assert.equal(r.out, `${home}/\n`) // no URL: $PORT's page; no title, none shown
   r = await rig.cli('browser', 'web', 'click', 'button', '.primary')
-  assert.equal(r.out, 'ok\n', r.err)
+  assert.equal(r.out, `→ ${home}/done  Done\nconsole error: TypeError: x is undefined\n+ Thanks\n- Sign in\n`, r.err)
   r = await rig.cli('browser', 'web', 'fill', 'input[name=q]', 'two', 'words')
-  assert.equal(r.out, 'ok\n', r.err)
+  assert.equal(r.out, `${home}/  Shop\n(no changes)\n`, r.err)
   r = await rig.cli('browser', 'web', 'text')
   assert.equal(r.out, 'Hello from the page\n', r.err)
   r = await rig.cli('browser', 'web', 'screenshot')

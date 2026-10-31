@@ -194,7 +194,9 @@ another repo (a PR of the workspace's own branch shows by itself once pushed). R
   laki pr . https://github.com/acme/shop/pull/118`,
   browser: `A hidden browser on the workspace's localhost (the app must be open): open loads a path on its $PORT (laki run
 starts the dev server) or a localhost URL; screenshot prints a PNG's path; click and fill take a CSS selector; text
-prints the page's text. In a tab, <ws> is its own.
+prints the page's text. Open, click and fill print what they caused: → <url> when the page moved, blocked: (a popup
+or a link off localhost), console error: lines, and the text lines added (+) and gone (-), or (no changes). In a tab,
+<ws> is its own.
 
   laki browser open /settings
   laki browser fill "#email" "a@b.co"

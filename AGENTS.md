@@ -1427,7 +1427,12 @@ DuckDuckGo search).
 The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, the preview's
 partition, sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
 click and fill run in the page (`pageJs`: the first match, scrolled into view; fill sets the value through the
-native setter and fires input and change), then wait 300 ms.
+native setter and fires input and change), then wait 300 ms (`settle`: and a load it started, 5 s at most). Open,
+click and fill answer with what they caused (shared/types.ts `BrowseDid`): `nav` (moved), `errors` (`console-message`
+errors), `blocked` (popups, and navigations off localhost, refused), 20 of each, this op's only; click and fill also
+`changed`, `pageChanges` over the page's innerText lines before and after (+ added, - gone, `CHANGED_MAX` 20, then
+how many more). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON. ponytail: main's code, no test
+drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-more.test.ts`.
 
 ### Widgets
 

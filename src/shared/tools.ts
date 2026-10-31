@@ -142,7 +142,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_browser',
     description:
-      "Drive a browser on the workspace's dev server (this Mac's localhost only; needs the Laki app open): open a URL or path (default: http://localhost:$PORT/), screenshot (a PNG's path, to read), click or fill an element by CSS selector, or read the page's text.",
+      "Drive a browser on the workspace's dev server (this Mac's localhost only; needs the Laki app open): open a URL or path (default: http://localhost:$PORT/), screenshot (a PNG's path, to read), click or fill an element by CSS selector, or read the page's text. Open, click and fill answer with what they caused: nav (the page it moved to), errors (the page's console errors), blocked (popups and links off localhost refused) and, for click and fill, changed (the page's text lines added + and gone -; [] is no change): read it before taking a screenshot.",
     inputSchema: obj(
       {
         ws: str('a workspace id'),

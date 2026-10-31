@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -294,7 +294,7 @@ async function main() {
       if (!ws || !ops.includes(op)) throw new Error('usage: laki browser [ws] open [url|/path] | screenshot | click <selector> | fill <selector> <text> | text')
       const p = op === 'open' ? { url: more[0] } : op === 'click' ? { selector: more.join(' ') } : op === 'fill' ? { selector: more[0], text: more.slice(1).join(' ') } : {}
       const r = await rpc('browse', { ws, op, ...p }, 45000)
-      return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : op === 'open' ? `${r.url}${r.title ? `  ${r.title}` : ''}` : 'ok')
+      return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : browseSays(r)) // what it caused: read it before a screenshot
     }
     case 'rm':
     case 'archive':

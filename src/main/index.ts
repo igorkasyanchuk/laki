@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
-import type { View } from '../shared/types.ts'
+import { type BrowseDid, pageChanges, type View } from '../shared/types.ts'
 import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -382,17 +382,21 @@ ipcMain.on('sound', (e, name: string) => {
 // the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
 // to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
 type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string }
-const agentWins = new Map<string, { w: BrowserWindow; idle?: ReturnType<typeof setTimeout> }>()
+// errors, blocked: what the page did during an op (its answer's), 20 of each
+const agentWins = new Map<string, { w: BrowserWindow; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[] }>()
 const pageJs = (f: string, ...args: unknown[]) => `(${f})(${args.map(a => JSON.stringify(a)).join(',')})`
 ipcMain.handle('browse', async (e, r: Browse) => {
   if (e.sender !== win?.webContents) throw new Error('not the app window')
   let a = agentWins.get(r.ws)
   if (!a || a.w.isDestroyed()) {
     const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: PREVIEW, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
-    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-    w.webContents.on('will-navigate', (ev, u) => !local(u) && ev.preventDefault())
-    w.webContents.on('will-redirect', (ev, u) => !local(u) && ev.preventDefault())
-    agentWins.set(r.ws, (a = { w }))
+    const made = { w, errors: [] as string[], blocked: [] as string[] }
+    const block = (u: string) => made.blocked.length < 20 && made.blocked.push(u.slice(0, 300))
+    w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))
+    w.webContents.on('will-navigate', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
+    w.webContents.on('will-redirect', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
+    w.webContents.on('console-message', ev => ev.level === 'error' && made.errors.length < 20 && made.errors.push(ev.message.slice(0, 300)))
+    agentWins.set(r.ws, (a = made))
   }
   const entry = a
   clearTimeout(entry.idle)
@@ -400,8 +404,15 @@ ipcMain.handle('browse', async (e, r: Browse) => {
     if (agentWins.get(r.ws) === entry) agentWins.delete(r.ws)
     if (!entry.w.isDestroyed()) entry.w.destroy()
   }, 10 * 60e3)
+  entry.errors.length = entry.blocked.length = 0 // this op's only
   const wc = entry.w.webContents
-  const settle = () => new Promise(ok => setTimeout(ok, 300)) // what a click starts gets a moment
+  // what a click starts gets a moment; a page it loads, until it's loaded (5 s at most)
+  const settle = async () => {
+    await new Promise(ok => setTimeout(ok, 300))
+    if (wc.isLoading()) await new Promise<void>(ok => (setTimeout(ok, 5000), wc.once('did-stop-loading', () => ok())))
+  }
+  const lines = () => wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 200000)`).then((t: string) => t.split('\n').map(l => l.trim()).filter(Boolean), () => [] as string[])
+  const caused = () => ({ ...(entry.errors.length > 0 && { errors: [...entry.errors] }), ...(entry.blocked.length > 0 && { blocked: [...entry.blocked] }) })
   if (r.op === 'open' || !wc.getURL()) {
     const u = r.url ?? r.home
     if (!local(u)) throw new Error(`only this Mac's localhost: ${u}`)
@@ -409,15 +420,18 @@ ipcMain.handle('browse', async (e, r: Browse) => {
       throw new Error(/ERR_CONNECTION_REFUSED/.test(String(err)) ? `nothing listens on ${new URL(u).host}: start the dev server (laki run)` : String(err.message ?? err))
     })
   }
+  if (r.op === 'open') await settle() // its scripts' first errors
   const page = { url: wc.getURL(), title: wc.getTitle() }
-  if (r.op === 'open') return page
+  if (r.op === 'open') return { ...page, ...caused() }
   if (r.op === 'screenshot') {
     const img = await wc.capturePage()
     if (img.isEmpty()) throw new Error('nothing painted yet: try again')
     return { url: page.url, png: img.toPNG().toString('base64') }
   }
   if (r.op === 'text') return { ...page, text: await wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 20000)`) }
-  // click, fill: the first element the selector finds, scrolled into sight; fill types as a user would (input events)
+  // click, fill: the first element the selector finds, scrolled into sight; fill types as a user would (input events);
+  // its answer says what it caused: the page it moved to, popups and links refused, errors, the text that changed
+  const was = await lines()
   const found = await wc.executeJavaScript(
     pageJs(
       String((sel: string, op: string, text: string) => {
@@ -440,7 +454,8 @@ ipcMain.handle('browse', async (e, r: Browse) => {
   )
   if (found) throw new Error(found)
   await settle()
-  return { url: wc.getURL(), title: wc.getTitle() }
+  const now = { url: wc.getURL(), title: wc.getTitle() }
+  return { ...now, ...(now.url !== page.url && { nav: now }), ...caused(), changed: pageChanges(was, await lines()) } satisfies BrowseDid
 })
 ipcMain.handle('pick-folder', async e => {
   if (!from(e)) return null

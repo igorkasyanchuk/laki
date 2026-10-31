@@ -26,6 +26,8 @@ version it builds, with the date. -->
   `checkout.workers`), on SSH hosts too.
 - A scheduled task that makes a new workspace each run can start it off another branch (a release branch, develop):
   the form's base chip, `laki schedule add --base`. A branch gone by then fails that run, saying so.
+- `laki browser` says what a click, a fill or an open did: the page it moved to, a popup or a link off localhost it
+  refused, the page's console errors, and the lines of text added and gone (or *(no changes)*).
 
 ## 0.36.0 · Oct 31, 2026
 

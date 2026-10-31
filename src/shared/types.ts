@@ -902,3 +902,32 @@ export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or 
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
 export const API = 130
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
+
+// the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
+// page's console errors meanwhile; blocked: popups and links off localhost refused; changed: click and fill's
+// pageChanges ([]: none)
+export type BrowseDid = { url: string; title: string; nav?: { url: string; title: string }; errors?: string[]; blocked?: string[]; changed?: string[] }
+export const CHANGED_MAX = 20
+// a page's text lines added (+, in the new page's order) and gone (-), CHANGED_MAX at most, then how many more
+// ponytail: counted as a multiset, so a line that only moved is neither (a list reordered says nothing)
+export function pageChanges(was: string[], now: string[]) {
+  const minus = (a: string[], b: string[]) => {
+    const n = new Map<string, number>()
+    for (const l of b) n.set(l, (n.get(l) ?? 0) + 1)
+    return a.filter(l => {
+      const c = n.get(l) ?? 0
+      n.set(l, c - 1)
+      return c <= 0
+    })
+  }
+  const all = [...minus(now, was).map(l => `+ ${l}`), ...minus(was, now).map(l => `- ${l}`)].map(l => (l.length > 200 ? `${l.slice(0, 199)}…` : l))
+  return all.length > CHANGED_MAX ? [...all.slice(0, CHANGED_MAX), `… ${all.length - CHANGED_MAX} more`] : all
+}
+// the CLI's lines for it: where it is (→ when it moved), what was refused, the errors, what changed
+export const browseSays = (r: BrowseDid) =>
+  [
+    `${r.nav ? '→ ' : ''}${r.url}${r.title ? `  ${r.title}` : ''}`,
+    ...(r.blocked ?? []).map(u => `blocked: ${u}`),
+    ...(r.errors ?? []).map(e => `console error: ${e}`),
+    ...(r.changed ? (r.changed.length ? r.changed : ['(no changes)']) : []),
+  ].join('\n')

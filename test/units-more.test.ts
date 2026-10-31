@@ -12,7 +12,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { fillTemplate, isAgent, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
+import { browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -282,4 +282,16 @@ test('copyTree: files read until they end, modes and links as they are, a filter
   writeFileSync(join(a, 'run.sh'), 'new')
   copyTree(a, join(d, 'b'), p => !p.endsWith('node_modules')) // over what's there
   assert.equal(readFileSync(join(d, 'b', 'run.sh'), 'utf8'), 'new')
+})
+
+test("laki browser's report: the lines a click added and took away, 20 at most; the CLI's words for it", () => {
+  assert.deepEqual(pageChanges(['Cart', 'Pay now', 'Total 3'], ['Cart', 'Paid', 'Total 3']), ['+ Paid', '- Pay now'])
+  assert.deepEqual(pageChanges(['a', 'b'], ['b', 'a']), []) // moved: neither
+  assert.deepEqual(pageChanges(['x'], ['x', 'x']), ['+ x']) // counted
+  const many = pageChanges([], Array.from({ length: 25 }, (_, i) => `row ${i}`))
+  assert.deepEqual([many.length, many[19], many[20]], [21, '+ row 19', '… 5 more'])
+  assert.equal(pageChanges([], ['y'.repeat(300)])[0].length, 200)
+  assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop', changed: [] }), 'http://localhost:3100/  Shop\n(no changes)')
+  assert.equal(browseSays({ url: 'http://localhost:3100/done', title: '', nav: { url: 'http://localhost:3100/done', title: '' }, blocked: ['https://pay.example'], errors: ['boom'], changed: ['+ Done'] }), '→ http://localhost:3100/done\nblocked: https://pay.example\nconsole error: boom\n+ Done')
+  assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop' }), 'http://localhost:3100/  Shop') // open, or an older app: no changed
 })
