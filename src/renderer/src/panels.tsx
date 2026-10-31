@@ -1312,7 +1312,7 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
         <label>
           Message
           <span className="pi-wrap">
-            <textarea ref={box} rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails · @ a file, # a PR, / a template" onChange={e => (setText(e.target.value), cmp.look())} onSelect={cmp.look} onBlur={cmp.blur} onKeyDown={e => !cmp.key(e) && e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
+            <textarea ref={box} rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails · @ a file, # a PR, / a template" onChange={e => (setText(e.target.value), cmp.look())} onSelect={cmp.look} onBlur={cmp.blur} onKeyDown={e => !cmp.key(e) && e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} data-voice-send="" />
             {cmp.menu}
           </span>
         </label>

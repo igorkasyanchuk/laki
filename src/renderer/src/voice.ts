@@ -12,6 +12,9 @@ let settings: VoiceSettings = {}
 let tabs: TabView[] = [] // which terminal's agent shows a menu (its ask): no typing into it
 api.on(m => void (m.ev === 'state' && ((settings = m.view?.settings?.voice ?? {}), (tabs = m.view?.tabs ?? []))))
 export const cloudVoice = () => settings.on !== false && settings.engine === 'cloud' // off: the mic is macOS dictation
+// Send as you stop talking (settings' send): where the text goes, it's sent too (insert, below)
+// ponytail: cloud only; macOS dictation's stop is macOS's, so its text is only typed
+export const voiceSends = () => cloudVoice() && settings.send === true
 
 const RATE = 16000 // what speech models take; a minute is about 2 MB of WAV
 const MAX_MS = 5 * 60000 // a recording stops by itself after this
@@ -104,10 +107,14 @@ const base64 = (b: Uint8Array) => {
 // as typed where the cursor was: a field gets a space before it after a word; a terminal or a one-line field gets one
 // line (a newline there is Enter: it would run or send what's half said), and no field anything but newlines and tabs
 // of the control characters. No field (the focus went nowhere), or a terminal whose agent shows a menu (its keys pick
-// an option, as `send` refuses then too): the clipboard, else the text on the bar to type
+// an option, as `send` refuses then too): the clipboard, else the text on the bar to type.
+// Send as you stop talking: an idle agent tab's terminal gets it as send gives it (typed, then Enter, refused while it
+// asks: then only typed); a box that sends (data-voice-send: a PromptInput with onSubmit, Send later's) its ⌘⏎ once its
+// state has the text. Never a shell, nor any other field
 async function insert(text: string, el: HTMLElement | null) {
   const term = !!el?.classList.contains('xterm-helper-textarea')
-  const menu = term && tabs.find(t => t.id === el!.closest<HTMLElement>('[data-pane]')?.dataset.pane)?.ask
+  const tab = term ? tabs.find(t => t.id === el!.closest<HTMLElement>('[data-pane]')?.dataset.pane) : undefined
+  const menu = tab?.ask
   if (menu || !el?.isConnected || !(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el.isContentEditable)) {
     const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
     const shown = text.length > 300 ? `${text.slice(0, 298)}…` : text
@@ -118,7 +125,20 @@ async function insert(text: string, el: HTMLElement | null) {
   const t = line ? text.replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').replace(/ {2,}/g, ' ').trim() : text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
   const field = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el : null
   const before = field && !term ? field.value.slice(0, field.selectionStart ?? 0) : ''
+  const sends = !!t && voiceSends()
+  let why = ''
+  if (sends && tab?.kind === 'agent' && tab.status === 'idle') {
+    why = await api.call('send', { target: tab.id, text: t, agent: true }).then(() => '', e => (e as Error).message)
+    if (!why) return say(`Sent to ${tab.name}`)
+  }
   if (t) document.execCommand('insertText', false, (before && !/\s$/.test(before) ? ' ' : '') + t)
+  if (why) return say(`Typed, not sent: ${why}`)
+  if (sends && el.dataset.voiceSend !== undefined) {
+    await new Promise(ok => setTimeout(ok, 50)) // its box's state takes the text first
+    if (!el.isConnected) return
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', metaKey: true, bubbles: true, cancelable: true }))
+    say('Sent')
+  }
 }
 
 // hold Fn to talk (cloud, settings' fn unset or on): held HOLD_MS, the mic opens; its keyup inserts. A tap, or another

@@ -9,7 +9,7 @@ import { bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, useMenu } from './ui'
-import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
+import { cloudVoice, useVoice, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
@@ -336,6 +336,7 @@ export function PromptInput(p: {
         onBlur={cmp.blur}
         onPaste={paste}
         onKeyDown={(e: KeyboardEvent) => !cmp.key(e) && e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing)) && (e.preventDefault(), p.onSubmit?.())}
+        data-voice-send={p.onSubmit ? '' : undefined} // Send as you stop talking: voice.ts presses its ⌘⏎
       />
       {cmp.menu}
       {p.images.length > 0 && (
@@ -387,7 +388,7 @@ export function VoiceBar() {
   if (v.phase === 'idle' && !v.said) return null
   return (
     <div className={`voice-bar ${v.phase}`} role="status">
-      {v.phase === 'idle' ? v.said : <><Icon name="mic" /> {v.phase === 'listening' ? 'Listening… let go of Fn, or click the mic, to insert; Esc drops it' : 'Writing it down… Esc drops it'}</>}
+      {v.phase === 'idle' ? v.said : <><Icon name="mic" /> {v.phase === 'listening' ? `Listening… let go of Fn, or click the mic, to ${voiceSends() ? 'send' : 'insert'}; Esc drops it` : 'Writing it down… Esc drops it'}</>}
     </div>
   )
 }

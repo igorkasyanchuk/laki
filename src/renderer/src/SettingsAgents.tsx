@@ -140,6 +140,13 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
             )}
           </Group>
           )}
+          <Group title="When you stop talking">
+            <div className="setting-box">
+              <Switch className="switch-row" on={v.send === true} onChange={send => onChange({ ...v, send })}>
+                <Says title="Send as you stop talking" hint="Letting go of Fn, or the mic's stop, sends what you said: a prompt box's message, or an idle agent's prompt in its terminal. A shell, any other field, or an agent asking something just gets the text. Esc still drops it" />
+              </Switch>
+            </div>
+          </Group>
           <Group title="OpenRouter API key" hint={KEY_HINT}>
             <OpenRouterKey has={has} save={k => keyApi.key(k).then(r => (setHas(r.key), r))} />
           </Group>

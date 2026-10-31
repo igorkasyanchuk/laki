@@ -1669,7 +1669,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘, | settings |
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
-| hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it) |
+| hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it; *Send as you stop talking* sends it too) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -1943,7 +1943,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Transcribe and others, or *Another model…* for any id). Neither the audio nor the text is kept. *Hold Fn to talk*
   (on): hold Fn anywhere in Laki, talk, let go, and the text is typed where your cursor is; another key while you
   hold it, or Esc, drops it. Set System Settings › Keyboard › *Press 🌐 key to* to *Do Nothing*, so macOS doesn't
-  open its emoji picker or dictation as well (*Open Keyboard settings*).
+  open its emoji picker or dictation as well (*Open Keyboard settings*). *Send as you stop talking* (off): letting go
+  of Fn, or the mic's stop, sends it too: a prompt box's message (the new-workspace page, Laki AI, Send later, the
+  Board's to-do), or an idle agent's prompt in its terminal; a shell, any other field, or an agent asking something
+  just gets the text.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

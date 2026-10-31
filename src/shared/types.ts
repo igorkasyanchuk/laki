@@ -606,7 +606,7 @@ export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
 // model's id (unset: VOICE_MODEL). fn: cloud only, hold Fn to talk anywhere in Laki, let go to insert (unset: on)
 // on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
-export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean }
+export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean } // send: Send as you stop talking (cloud, off unless true: voice.ts)
 export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
 export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false // Settings › Voice: on unless turned off
 

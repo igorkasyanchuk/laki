@@ -427,7 +427,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   contenteditable, xterm's textarea; a terminal or an input gets one line, no control characters), else copies it, as
   it does for a terminal whose agent shows a menu (`ask`: its keys would pick an option); `VoiceBar` (PromptInput.tsx)
   says what it's doing in the app and the new-workspace and AI windows (`html.away` doesn't pause it). Settings › Voice's
-  Hold Fn group shows on a Mac only;
+  Hold Fn group shows on a Mac only. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
+  `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused: typed, and said), a box
+  with `data-voice-send` (PromptInput with `onSubmit`, Send later's) a synthetic ⌘⏎ keydown 50 ms after the
+  `insertText` (its React state has the text by then); never a shell, another field, or under `SHORT_MS`;
 - the project's scripts besides run (`RUN_SCRIPTS`: test, lint, format, deploy; `ProjectConfig`, `.laki.json`,
   Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
