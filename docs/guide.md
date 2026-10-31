@@ -1462,7 +1462,7 @@ step* turns it off.
 in the project's settings › *Done check*: its *format*, *lint* and *test* scripts (the ones Run ▾ has, set under
 Scripts), and *A second agent's review* (Claude Code or Codex). As an agent's turn ends having changed files, Laki
 runs the ticked scripts in the worktree (format, then lint, then test; the first that fails stops it), then, if they
-pass, the reviewer reads the diff (read-only, no tools, none of your MCP servers) and lists real problems. The scripts run
+pass, the reviewer reads the diff (no tools, not even Codex's shell, none of your MCP servers) and lists real problems. The scripts run
 as you, on whatever the agent changed: an agent you only let edit files can make them run anything, so turn it on where
 you'd run the agent's changes yourself.
 

@@ -545,6 +545,10 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
   }
 }
 
+// Codex's own tools, on without any config.toml (--ignore-user-config): a shell (its read-only sandbox reads any file),
+// ChatGPT's apps, a browser, the screen. -c, not --disable: an older codex takes it and says nothing of a name it lacks
+const CODEX_TOOLS = ['shell_tool', 'unified_exec', 'apps', 'browser_use', 'computer_use']
+
 // one question, one answer, outside any chat and with no tools (memory's compaction, Done check's review): Settings ›
 // AI's backend, OpenRouter through aiComplete, or claude -p / codex exec with nothing but the prompt: no tools, no MCP
 // server, not the user's config (their preset's account and env, as the chat's); logged among Laki AI's calls. preset:
@@ -567,9 +571,9 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const args =
     backend === 'claude'
       ? ['-p', '--output-format', 'json', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(userCfg ? ['--mcp-config', JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm! }) } }), '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
-      : ['exec', '--json', '--skip-git-repo-check', ...(userCfg ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
+      : ['exec', '--json', '--skip-git-repo-check', ...(userCfg ? [] : ['--ignore-user-config', ...CODEX_TOOLS.flatMap(f => ['-c', `features.${f}=false`])]), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
-  const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
+  const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)), ...(!userCfg && backend === 'claude' && { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }) } // claude.ai's connectors: --strict-mcp-config keeps them out too, this for an older claude
   let answer = ''
   try {
     const out = await new Promise<string>((ok, no) => {

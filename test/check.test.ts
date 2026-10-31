@@ -27,6 +27,7 @@ test('a turn that changed files is checked: a failing test goes back to the agen
   assert.match(passed.review.note, /Found it/)
   // the reviewer reads a diff an agent wrote: no tools, no MCP server of the user's
   const reviewer = rig.fakeLog().find(l => l.bin === 'claude' && l.args[0] === '-p' && l.args.includes('--append-system-prompt'))
+  assert.ok(reviewer, 'the reviewer ran')
   assert.equal(reviewer.args[reviewer.args.indexOf('--tools') + 1], '')
   assert.ok(reviewer.args.includes('--strict-mcp-config') && !reviewer.args.includes('--allowedTools'))
   // a turn that changes nothing isn't checked again

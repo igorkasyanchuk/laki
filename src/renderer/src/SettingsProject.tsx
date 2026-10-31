@@ -412,7 +412,7 @@ export function ProjectSection(p: {
                 <option value="claude">Claude Code</option>
                 <option value="codex">Codex</option>
               </select>
-              <Says title="A second agent's review" hint="Once the scripts pass, it reads the diff (read-only, no tools) and lists real problems. Its notes show under the tab; they go to the agent only when you send them. Each review is a call to that agent" />
+              <Says title="A second agent's review" hint="Once the scripts pass, it reads the diff (no tools, none of your MCP servers or config) and lists real problems. Its notes show under the tab; they go to the agent only when you send them. Each review is a call to that agent" />
             </label>
           </div>
         </Group>

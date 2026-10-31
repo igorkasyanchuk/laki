@@ -524,7 +524,8 @@ const notAgent = (p: any, what: string) => {
 // agent starts with (an agent adds learned ones through memoryAdd, never the user's: --mine); its notes, name, groups
 // and looks stay an agent's to change, and projectTrust's read (no hash). prThreads' all and prTalk: everyone's
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
-// Done check's Check again and Stop: its scripts and its verdict are the user's
+// Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
+// kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
 const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check' }
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
