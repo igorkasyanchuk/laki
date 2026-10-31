@@ -165,6 +165,7 @@ export type AppSettings = Paint & {
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees (unset: on)
+  reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
   nextStep?: boolean // One next step: the toolbar's button and the rows' chips; off: the old toolbar (unset: on)
   livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
@@ -384,6 +385,7 @@ const FIND: [string, string, string?][] = [
   ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
   ['appearance', 'One next step', 'next step button toolbar chip row what now answer merge ship archive fix ci ⌘g'],
   ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
@@ -1648,6 +1650,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.nextStep !== false} onChange={v => set({ nextStep: v })}>
                   <Says title="One next step" hint="The toolbar's one button for what the workspace needs from you now: answer, fix CI, merge, ship, archive… (⌘G), the same on each sidebar row. The toolbar's other buttons go into its ⋯, their keys still work. Off: the toolbar as before, no row chips" />
+                </Switch>
+                <Switch className="switch-row" on={s.reader !== false} onChange={v => set({ reader: v })}>
+                  <Says title="Reader view" hint="A Terminal | Reader switch on each Claude Code and Codex tab: Reader shows its chat as a conversation, your messages, its answers as text, its steps folded, a box to write in. Each tab remembers which; a phone opens them in Reader" />
                 </Switch>
                 <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>
                   <Says title="The agent's plan, live" hint="An agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row. A plan it asks you to approve shows as a card you can edit: your changes go back to it. Claude Code and Codex" />

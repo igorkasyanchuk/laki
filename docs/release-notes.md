@@ -7,6 +7,8 @@ version it builds, with the date. -->
 - Done check: tick a project's lint, test and format scripts (its settings › *Done check*), and a second agent's review,
   and they run as each agent's turn ends having changed files. A failure goes back to the agent with its output, a
   strip under the terminal shows each step, and the notification says *done and checked*.
+- Reader view: a *Terminal | Reader* switch on each Claude Code and Codex tab shows its chat as a conversation, its
+  tool calls folded, with buttons for its questions and a box to reply; phones open in it.
 - One next step: the toolbar's first button is what the workspace needs from you now (answer, fix CI, resolve
   conflicts, merge, review changes, ship, archive), ⌘G, and each sidebar row says it too. The other toolbar buttons
   moved into its ⋯; their keys still work.

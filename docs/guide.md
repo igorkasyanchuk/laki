@@ -1432,6 +1432,15 @@ laki flow check .laki/workflows               # check workflow files (a folder: 
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
+### Reader view
+
+Each Claude Code and Codex tab has a *Terminal | Reader* switch at its top right. Reader shows its chat as a
+conversation, read from the agent's own transcript: your messages on the right, its answers as formatted text, each run
+of tool calls folded into one line (click for the list), and what it's doing now. When it asks something, its choices
+are buttons; otherwise a box at the bottom sends it a message (while it works, it gets it when the turn ends). The
+terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
+open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off.
+
 ### One next step
 
 The toolbar's first button is the one thing the workspace needs from you now: *Answer claude* or *Approve the plan*
@@ -1439,7 +1448,7 @@ while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *A
 *Merge #42* once checks pass, *Review changes* when the agent is done, *Ship* when there's something to ship, *Archive*
 once its PR is merged or closed. While an agent works it shows the step under way (from its plan) and there's nothing
 to click; *CI runs* and *In review* open the PR. ⌘G does what it says. Each sidebar row gets the same as a small chip
-(none while it works). With it on, the toolbar is that button, ⋯ and Run: Layout, Full screen, Open in, Info, Preview,
+(none while it works, nor for conflicts, failing CI or an overlap: the row's own marks show those). With it on, the toolbar is that button, ⋯ and Run: Layout, Full screen, Open in, Info, Preview,
 the side panel, Ship and Commands are at the top of ⋯, and their keys work as before. Settings › Appearance › *One next
 step* turns it off.
 

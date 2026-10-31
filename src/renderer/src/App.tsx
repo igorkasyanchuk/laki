@@ -36,6 +36,7 @@ import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { planCount } from '../../shared/todos'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
+import { Reader, type ReaderApi, readable } from './Reader'
 import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -71,6 +72,7 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
 type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
+const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
 const STEP_ICON: Record<StepId, IconName> = { answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', collide: 'gitCompare', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
@@ -528,6 +530,7 @@ export function App() {
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
   // Collision radar's overlaps you hid, until they change (each one's radarKey)
   const [radarHid, setRadarHid] = useState<string[]>(() => load('laki.radarHide', []))
+  const [readMode, setReadMode] = useState<Record<string, 'reader' | 'term'>>(() => load('laki.reader', {})) // Reader view: each agent tab's, as you left it
   const [checkHid, setCheckHid] = useState<string[]>([]) // Done means checked: strips hidden (workspace:at)
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
@@ -736,6 +739,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.strips', JSON.stringify(strips)), [strips])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.branchFull', JSON.stringify(branchFull)), [branchFull])
+  useEffect(() => store('laki.reader', (o => (Object.keys(o).length ? o : undefined))(Object.fromEntries(Object.entries(readMode).filter(([id]) => !view || view.tabs.some(t => t.id === id))))), [readMode]) // closed tabs' go
   useEffect(() => store('laki.radarHide', radarHid.length ? radarHid.slice(-200) : undefined), [radarHid]) // ponytail: the newest 200, none pruned as they go
   // a new workspace, and the one selected before it, stay in sight: their projects and seps unfold once the view has them
   const [reveal, setReveal] = useState<string[]>([])
@@ -2662,6 +2666,15 @@ export function App() {
   ]
 
   // right click on a tab (or a pane header: one session)
+  // Reader view (Reader.tsx): a claude or codex tab as its chat; a phone opens them so, else the terminal
+  const readerOn = settings.reader !== false
+  const inReader = (id: string) => readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader'
+  const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
+  const readerApi: ReaderApi = {
+    read: (tab, v) => api.call('chatRead', { tab, v }),
+    send: (tab, text) => call('send', { target: tab, text, whenIdle: true }),
+    answer: (tab, n) => void call('answer', { tab, n }).catch(() => {}),
+  }
   const tabMenu = (ids: string[]): MenuItem[] => {
     const ts = ids.map(byId).filter((t): t is TabView => !!t)
     const g = groups.find(g => tabsOf(g).includes(ids[0]))
@@ -2672,6 +2685,7 @@ export function App() {
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
       { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: ts[0].muted ? 'It notifies you again' : 'No notifications or Dock count from this tab', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
       { label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => ts.forEach(t => markUnread(t.id)) },
+      ...(readerOn && ts.length === 1 && readable(ts[0]) ? [(r => ({ label: r ? 'Show the terminal' : 'Show as a chat (Reader)', icon: r ? 'terminal' : 'file', tip: r ? 'Its terminal, as the agent draws it' : 'Its chat as a conversation: your messages, its answers, its steps folded', run: () => setRead(ts[0].id, r ? 'term' : 'reader') }) as MenuItem)(inReader(ts[0].id))] : []),
       ...(bridge?.floatTab && ts.length === 1 ? [floated.includes(ts[0].id) ? ({ label: 'Back from its own window', icon: 'popIn', run: () => floatTab(ts[0].id, false) } as MenuItem) : ({ label: 'Float in its own window', icon: 'popOut', sub: 'Over every app, so you can watch it from anywhere', run: () => floatTab(ts[0].id) } as MenuItem)] : []),
       ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', tip: 'Types a message into it at a time you pick, or once its turn ends', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(ts.length === 1 ? [{ label: 'Copy contents', icon: 'copy', sub: 'Its whole terminal as text, the scrollback too', run: () => copyTab(ts[0]) } as MenuItem] : []),
@@ -3248,7 +3262,7 @@ export function App() {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {stepsOn && !projOf(w)?.kind && !w.term && (st => st && !st.busy && st.id !== 'collide' /* its ⇄ says it */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={st.tip} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{st.label}</span>)(stepOf(w))}
+        {stepsOn && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['collide', 'conflict', 'ci'].includes(st.id) /* its ⇄, ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -4275,10 +4289,11 @@ export function App() {
                     </div>
                   </div>
                 ) : (
+                  <>
                   <Term
                     key={transparent() ? 'clear' : 'solid' /* xterm takes allowTransparency only as it opens */}
                     tab={id}
-                    active={id === tab?.id && !dialog && !reviewOn}
+                    active={id === tab?.id && !dialog && !reviewOn && !inReader(id)}
                     findSeq={finds[id] ?? 0}
                     fontSize={narrow ? Math.min(sizeOf(id), 11) : sizeOf(id) /* ponytail: a phone's own size, not a setting */}
                     fontFamily={settings.fontFamily}
@@ -4291,6 +4306,16 @@ export function App() {
                     image={peekImage(id)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
                   />
+                  {readerOn && readable(byId(id)) && (
+                    <>
+                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} />}
+                      <div className="reader-switch" role="group" aria-label="Show it as">
+                        <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
+                        <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>
+                      </div>
+                    </>
+                  )}
+                  </>
                 )}
                 foot={id =>
                   (t =>

@@ -196,7 +196,7 @@ issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link,
 `GhCard`): a terminal link's hover card (LinkPeek.tsx). 125: a tab's `alias` (`tabSet` `alias`, `ALIAS`: one live tab each; `resolveTarget` `@name`; the CLI's `laki name`,
 `agents`, `ask`, shared/tools.ts `askAgent`, MCP's `laki_name`, `laki_ask_agent`; dropped as its workspace archives), a
 workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` (main.ts `TEST_CLOCK`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
-`linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). A setting the renderer adds
+`linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -806,10 +806,15 @@ the code, the seconds it ran, its last lines.
   `will`, so App waits for the `check` event to notify (passed, over, skipped; failed: none). `CheckRun` in the view as
   a workspace's `check`; panels.tsx `CheckStrip` at the pane's foot; App's `offerCheck` (once per project,
   `laki.checkOffered`); SettingsProject.tsx' *Done check* group. `checkTidy`: hourly, the index files of gone workspaces.
+- Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
+  `chatOf` as shares read, `v` moving with it, the newest 400; `{ none }` without a transcript): Reader.tsx over the
+  pane's `Term` (still attached; its `active` off meanwhile), `readable` (claude, codex), asked every 1.5 s while shown;
+  App's `readMode` (`laki.reader`: `reader` or `term` per tab, unset: `narrow`'s Reader), `.reader-switch`, the tab
+  menu's item; its box is `send` `whenIdle`, its ask `answer`. Tested in `test/reader.test.ts`.
 - One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check`, PR and
   the radar's count to one `Step`, `busy` while an agent or CI works): App's `stepOf`/`doStep`, the toolbar's
-  `.step-btn` (⌘G, `KEYS`' `step`: its click) with `STEP_ICON`, a row's `.ws-step` chip (not busy, not `collide`: its
-  ⇄ says it; not Terminals' or Browsers'). On, the toolbar is it, ⋯ (`.ws-more`) and Run: `tucked()` puts Layout, Full
+  `.step-btn` (⌘G, `KEYS`' `step`: its click) with `STEP_ICON`, a row's `.ws-step` chip (`STEP_CHIP`'s words; not busy, nor
+  `collide`, `conflict`, `ci`: its ⇄, ⚠ and red mark say those; not Terminals' or Browsers'). On, the toolbar is it, ⋯ (`.ws-more`) and Run: `tucked()` puts Layout, Full
   screen, Open in, Info, Preview, the panel, Ship and Commands at the top of ⋯ (the `layout` key opens its menu at ⋯
   without `.layout-btn`). Tested in `test/next-step.test.ts`.
 - The agent's plan, live (`settings.livePlan`, on unless false; shared/todos.ts `planFrom`): claude's to-do tools from
@@ -2083,6 +2088,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     - `laki.aiDock`: the chat button minimized into the status bar (App's `dock`: `fly` down, `DOCK_MS`; `.sb-ai`, sticky at
       the bar's end; its right click, or ⌘K where no status bar shows it, floats it again).
     - `laki.checkOffered`: projects Done check was offered for (its toast, once each).
+    - `laki.reader`: each claude or codex tab's Reader view or terminal (`reader`, `term`; unset: Reader on a phone).
     - `laki.radarHide`: Collision radar's overlaps you hid (`radarKey`: both sides' lines; a change shows it again), the newest 200.
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.aiDrafts`: Laki AI's composers' unsent text and images (paths, shown again through `aiImage`), by chat:
@@ -2679,6 +2685,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc`; the daemon's `readJson`, `writeAtomic` (a temp file, then a rename) and `move` (across volumes too) |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
+| `src/renderer/src/Reader.tsx` | Reader view: an agent tab's chat as a conversation, its ask as buttons, a box that sends |
 | `src/shared/nextStep.ts` | One next step: what a workspace needs from you now, from its tabs, check, PR and the radar |
 | `src/shared/todos.ts` | the agent's plan, live: a tab's to-do list from its tools' calls, `planCount`, `planNow` |
 | `src/shared/overlap.ts` | Collision radar: a -U0 diff's base lines per file, where two diffs meet |
@@ -2690,7 +2697,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/tools.ts` | the tools for agents (`tools`, `skillTools`, `state`): MCP's and Laki AI's, through `rpc` |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon` (and by topic: `agents` (each agent's hooks), `presets` (how agents start), `restart`, `worktrees`), `api` (errors, edge cases, daemon start, tunnels, remote access), `shells` (shell tabs, Terminals and Browsers), `pr` (PR feedback), `cli`, `cli-agents` (the CLI from an agent's tab), `workflow`, `workflow-runs`, `workflow-agents`, `workflow-events`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `keys` (Settings › Keys' resolution, matching, clashes), `radar` (Collision radar), `check` (Done check), `plan` (the agent's plan, live), `next-step` (One next step), `load-order` (every daemon module imported first, each in a process of its own: none reads another's const or let as it loads), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `flows.ts` (the workflows' tests' shared files); `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon` (and by topic: `agents` (each agent's hooks), `presets` (how agents start), `restart`, `worktrees`), `api` (errors, edge cases, daemon start, tunnels, remote access), `shells` (shell tabs, Terminals and Browsers), `pr` (PR feedback), `cli`, `cli-agents` (the CLI from an agent's tab), `workflow`, `workflow-runs`, `workflow-agents`, `workflow-events`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `keys` (Settings › Keys' resolution, matching, clashes), `radar` (Collision radar), `check` (Done check), `plan` (the agent's plan, live), `next-step` (One next step), `reader` (Reader view), `load-order` (every daemon module imported first, each in a process of its own: none reads another's const or let as it loads), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `flows.ts` (the workflows' tests' shared files); `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
 
 ## Conventions

@@ -8,7 +8,7 @@ import { planDone } from '../shared/todos.ts'
 import { type Tab, type TabView, type Today } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, dir, presetOf, state } from './core.ts'
-import { dayOf, type Meter, meterNew, meterOf, transcriptOf } from './share.ts'
+import { chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -42,6 +42,22 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
   const cut = buf.lastIndexOf(10) + 1
   t.pos! += cut
   return buf.subarray(0, cut).toString('utf8')
+}
+
+// Reader view: a claude or codex tab's chat as what was said (share.ts' chatOf), read on as it grows; v moves with it
+// (the renderer asks every 1.5 s with the v it has: the same, no said back); none: no transcript (another agent, a
+// host's, not written yet). ponytail: the newest 400 sent whole at each change
+type Reader = Tail & { said: Said[]; v: number }
+const readers = new Map<string, Reader>()
+export function chatRead(p: { tab: string; v?: number }) {
+  const tab = state.tabs.find(t => t.id === p.tab)
+  if (!tab) throw new Error('no such tab')
+  for (const id of readers.keys()) if (!state.tabs.some(t => t.id === id)) readers.delete(id) // closed tabs'
+  const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0 }), readers.get(tab.id)!)
+  const text = tailOf(tab, r, () => ((r.said = []), r.v++))
+  if (text === undefined) return { none: true }
+  if (text) chatOf(tab.preset!, text, r.said), r.v++
+  return p.v === r.v ? { v: r.v } : { v: r.v, said: r.said.slice(-400) }
 }
 
 // the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on
