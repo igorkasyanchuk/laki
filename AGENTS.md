@@ -197,8 +197,8 @@ issue's link, any repo; `gh pr|issue view <url> --json`, kept a minute per link,
 `agents`, `ask`, shared/tools.ts `askAgent`, MCP's `laki_name`, `laki_ask_agent`; dropped as its workspace archives), a
 workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored only with `LAKI_TEST_PARENT` (main.ts `TEST_CLOCK`; `LAKI_TEST_CLOCK=0`: a test's daemon that takes none), `tabSet` in `FROM` (an agent names its own tab only),
 `linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). 130: a schedule's `base` (`scheduleSet`
-keeps it for `ws` new only, refused for another, '' clears it; `runSchedule`: `wsNew` `base`, origin's when only there,
-gone: a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
+keeps it for `ws` new only, refused for another, '' or null clears it; `runSchedule`: `wsNew` `base`, whose check (below) makes
+one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
 base chip, `SchedulesApi.branches`, a new task's the repo's `main`). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
@@ -303,8 +303,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `origin`, `git fetch origin <base>`, then the worktree off `origin/<base>` (`--no-track`: a push never goes to the
   base) and that as its `base`; `ff`, `git fetch origin <base>:<base>` first (git refuses one checked out or not a
   fast-forward: then as `origin`). A fetch has a minute; one that fails leaves the base as it was;
+- a `wsNew` `base` (the page's, `laki new --base`, a scheduled task's; not a PR's) that isn't a commit here (`hasRef`,
+  after `synced`): `origin/<b>` (`--no-track`) when origin has it, else refused, `base <b> not found in <project>`;
 - `worktreeAdd` (`wsNew`'s and `wsRestore`'s `git worktree add`): `-c checkout.workers=0` (a worker per core) unless the
-  project's `git config --get checkout.workers` says something (`ownWorkers`: read once per project per daemon, a host's
+  project's `git config --get checkout.workers` says something (`ownWorkers`: read once per repo per daemon, by host and path, a host's
   there); tested with a logging `git` in the rig's `$HOME/bin` (`test/worktrees.test.ts`);
 - files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
@@ -428,9 +430,9 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   it does for a terminal whose agent shows a menu (`ask`: its keys would pick an option); `VoiceBar` (PromptInput.tsx)
   says what it's doing in the app and the new-workspace and AI windows (`html.away` doesn't pause it). Settings › Voice's
   Hold Fn group shows on a Mac only. `voice.send` (*Send as you stop talking*, cloud, off unless true: `voiceSends`):
-  `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused: typed, and said), a box
+  `insert` sends it too: an idle `agent` tab's terminal through `send` `agent: true` (refused, it began asking meanwhile: copied, never typed there), a box
   with `data-voice-send` (PromptInput with `onSubmit`, Send later's) a synthetic ⌘⏎ keydown 50 ms after the
-  `insertText` (its React state has the text by then); never a shell, another field, or under `SHORT_MS`;
+  `insertText` (its React state has the text by then); never a shell, another field, under `SHORT_MS`, or a stop of the `MAX_MS` cap's or the window's blur (`voiceStop`'s `only`: typed, not sent);
 - the project's scripts besides run (`RUN_SCRIPTS`: test, lint, format, deploy; `ProjectConfig`, `.laki.json`,
   Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
   a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
@@ -1001,7 +1003,7 @@ on one only (off: a failed run), a fetch awaited (one already fetching: that one
 `widget-say`. A task with `workflow` (and `source`) starts that workflow instead
 (`flowHooks.start`/`find`, which workflow.ts sets: no import cycle) with the prompt as its task, trigger
 `schedule <id>`, skipped while its last run is live. A run (ws) makes a new workspace
-(`new`: `wsNew` with the preset, the prompt and the task's `base`, checked first: gone, a failed run that says so;
+(`new`: `wsNew` with the preset, the prompt and the task's `base`: gone, `wsNew` refuses it, a failed run that says so;
 only on origin, `origin/<b>`; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
 it: the sidebar's clock),
 or a new session in the project's own folder (`local-new`: `wsNew` `local` + `another`, a local workspace beside the one
@@ -1434,7 +1436,7 @@ native setter and fires input and change), then wait 300 ms (`settle`: and a loa
 click and fill answer with what they caused (shared/types.ts `BrowseDid`): `nav` (moved), `errors` (`console-message`
 errors), `blocked` (popups, and navigations off localhost, refused), 20 of each, this op's only; click and fill also
 `changed`, `pageChanges` over the page's innerText lines before and after (+ added, - gone, `CHANGED_MAX` 20, then
-how many more). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON. ponytail: main's code, no test
+how many more); a click that changed nothing on the same page looks once more a second later (a fetch's answer). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON. ponytail: main's code, no test
 drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-more.test.ts`.
 
 ### Widgets

@@ -27,7 +27,7 @@ const subs = new Set<() => void>()
 const set = (v: VoicePhase) => ((now = v), subs.forEach(f => f()))
 export const useVoice = () => useSyncExternalStore(f => (subs.add(f), () => void subs.delete(f)), () => now)
 
-let rec: { stop: (send: boolean) => void } | null = null
+let rec: { stop: (send: boolean, only?: boolean) => void } | null = null
 let saidT: ReturnType<typeof setTimeout> | undefined
 
 export async function voiceStart() {
@@ -53,8 +53,9 @@ export async function voiceStart() {
     const chunks: Blob[] = []
     const at = Date.now()
     let send = false
-    const stop = (s: boolean) => ((send = s), r.state !== 'inactive' && r.stop())
-    const limit = setTimeout(() => stop(true), MAX_MS)
+    let only = false // typed, never sent (Send as you stop talking): the cap, the window's blur
+    const stop = (s: boolean, o = false) => ((send = s), (only = o), r.state !== 'inactive' && r.stop())
+    const limit = setTimeout(() => stop(true, true), MAX_MS)
     r.ondataavailable = e => chunks.push(e.data)
     r.onstop = () => {
       clearTimeout(limit)
@@ -63,7 +64,7 @@ export async function voiceStart() {
       if (!send) return set({ phase: 'idle' })
       if (Date.now() - at < SHORT_MS) return say('Too short: hold Fn, or the mic, while you talk')
       set({ phase: 'writing' })
-      void write(new Blob(chunks, { type: r.mimeType }), target)
+      void write(new Blob(chunks, { type: r.mimeType }), target, !only)
     }
     rec = { stop }
     r.start()
@@ -73,12 +74,12 @@ export async function voiceStart() {
     say(`Microphone: ${(e as Error).message}`)
   }
 }
-// send: write it down and insert it; else drop it (Esc)
-export const voiceStop = (send = true) => rec?.stop(send)
+// send: write it down and insert it; else drop it (Esc). only: insert it, never send it (Send as you stop talking)
+export const voiceStop = (send = true, only = false) => rec?.stop(send, only)
 
 // the write under way; Esc while it works makes it another's, so its text goes nowhere
 let writing = 0
-async function write(audio: Blob, target: HTMLElement | null) {
+async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
   const mine = ++writing
   try {
     // decoding resamples to the context's rate: 16 kHz, its first channel
@@ -86,7 +87,7 @@ async function write(audio: Blob, target: HTMLElement | null) {
     const { text } = await api.call<{ text: string }>('voiceText', { audio: base64(wavOf(buf.getChannelData(0), RATE)) })
     if (mine !== writing) return
     set({ phase: 'idle' })
-    if (text) await insert(text, target)
+    if (text) await insert(text, target, may)
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }
@@ -108,10 +109,10 @@ const base64 = (b: Uint8Array) => {
 // line (a newline there is Enter: it would run or send what's half said), and no field anything but newlines and tabs
 // of the control characters. No field (the focus went nowhere), or a terminal whose agent shows a menu (its keys pick
 // an option, as `send` refuses then too): the clipboard, else the text on the bar to type.
-// Send as you stop talking: an idle agent tab's terminal gets it as send gives it (typed, then Enter, refused while it
-// asks: then only typed); a box that sends (data-voice-send: a PromptInput with onSubmit, Send later's) its ⌘⏎ once its
+// Send as you stop talking (may: not the cap's or a blur's): an idle agent tab's terminal gets it as send gives it
+// (typed, then Enter; refused, it began asking meanwhile: copied, never typed there, its keys would pick); a box that sends (data-voice-send: a PromptInput with onSubmit, Send later's) its ⌘⏎ once its
 // state has the text. Never a shell, nor any other field
-async function insert(text: string, el: HTMLElement | null) {
+async function insert(text: string, el: HTMLElement | null, may: boolean) {
   const term = !!el?.classList.contains('xterm-helper-textarea')
   const tab = term ? tabs.find(t => t.id === el!.closest<HTMLElement>('[data-pane]')?.dataset.pane) : undefined
   const menu = tab?.ask
@@ -125,14 +126,14 @@ async function insert(text: string, el: HTMLElement | null) {
   const t = line ? text.replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').replace(/ {2,}/g, ' ').trim() : text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
   const field = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement ? el : null
   const before = field && !term ? field.value.slice(0, field.selectionStart ?? 0) : ''
-  const sends = !!t && voiceSends()
-  let why = ''
+  const sends = may && !!t && voiceSends()
   if (sends && tab?.kind === 'agent' && tab.status === 'idle') {
-    why = await api.call('send', { target: tab.id, text: t, agent: true }).then(() => '', e => (e as Error).message)
+    const why = await api.call('send', { target: tab.id, text: t, agent: true }).then(() => '', e => (e as Error).message)
     if (!why) return say(`Sent to ${tab.name}`)
+    const copied = await navigator.clipboard?.writeText(t).then(() => true, () => false)
+    return say(`Not sent: ${why}${copied ? '. Copied, paste it' : ''}`)
   }
   if (t) document.execCommand('insertText', false, (before && !/\s$/.test(before) ? ' ' : '') + t)
-  if (why) return say(`Typed, not sent: ${why}`)
   if (sends && el.dataset.voiceSend !== undefined) {
     await new Promise(ok => setTimeout(ok, 50)) // its box's state takes the text first
     if (!el.isConnected) return
@@ -150,7 +151,7 @@ async function insert(text: string, el: HTMLElement | null) {
 const HOLD_MS = 200
 let held = false
 let soon: ReturnType<typeof setTimeout> | undefined // Fn is down, the mic not open yet
-const release = (send: boolean) => ((held = false), clearTimeout(soon), voiceStop(send))
+const release = (send: boolean, only = false) => ((held = false), clearTimeout(soon), voiceStop(send, only))
 const isFn = (e: KeyboardEvent) => e.key === 'Fn' || e.code === 'Fn'
 // immediate: the app's other window listeners (Settings' Esc, popovers') come after this one, on the same target
 const eat = (e: KeyboardEvent) => (e.preventDefault(), e.stopImmediatePropagation())
@@ -176,4 +177,4 @@ window.addEventListener(
   },
   true,
 )
-window.addEventListener('blur', () => held && release(true))
+window.addEventListener('blur', () => held && release(true, true)) // typed, not sent: Fn wasn't let go

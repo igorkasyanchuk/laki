@@ -732,6 +732,7 @@ export async function git(at: At, ...args: string[]): Promise<string> {
   const { stdout } = await exec(at, 'git', args)
   return stdout.trim()
 }
+const hasRef = (at: At, ref: string) => git(at, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
 
 // git worktree add, its files written by one worker per core (checkout.workers=0: about 1.5-2x on a big repo; git
 // before 2.32 ignores the key) unless the project's own git config, here or on its host, sets checkout.workers
@@ -1844,9 +1845,9 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
   const ok = (args: string[]) => exec(proj, 'git', args, { timeout: 60000 }).then(() => true, e => (step(`git ${args.join(' ')}: ${firstLine(e)}`), false)) // a minute at most: a slow remote never holds the workspace up long
   if (how === 'ff' && name === base && (await ok(['fetch', '--quiet', 'origin', `${name}:${name}`]))) return step(`${name} fast-forwarded to origin's`), base
   if (!(await ok(['fetch', '--quiet', 'origin', name]))) return base
-  if (!(await git(proj, 'rev-parse', '--verify', '--quiet', `refs/remotes/origin/${name}`).then(Boolean, () => false))) return base
+  if (!(await hasRef(proj, `refs/remotes/origin/${name}`))) return base
   // a local branch with commits origin hasn't: it stays the base (origin's would leave them out)
-  if (name === base && (await git(proj, 'rev-parse', '--verify', '--quiet', `refs/heads/${name}`).then(Boolean, () => false)) && !(await git(proj, 'merge-base', '--is-ancestor', name, `origin/${name}`).then(() => true, () => false)))
+  if (name === base && (await hasRef(proj, `refs/heads/${name}`)) && !(await git(proj, 'merge-base', '--is-ancestor', name, `origin/${name}`).then(() => true, () => false)))
     return step(`${name} has commits origin/${name} hasn't: off it, as it is`), base
   step(`off origin/${name}, just fetched`)
   return `origin/${name}`
@@ -1936,7 +1937,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     let branch = `${branchPrefix()}${id}`
     if (!proj.host) mkdirSync(dirname(path), { recursive: true, mode: 0o700 }) // only the folders it makes (yours stay as they are); git makes a host's
     if (!pr) base = await synced(proj, base, step)
-    const has = (ref: string) => git(proj, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
+    const has = (ref: string) => hasRef(proj, ref)
     // a base asked for (the page's, laki new --base, a scheduled task's) that isn't here: origin's when it has one,
     // else refused in words (git's are "invalid reference"), never off another branch
     if (o.base && !pr && !(await has(`${base}^{commit}`))) {

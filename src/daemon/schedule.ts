@@ -192,7 +192,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
   }
   // a base branch: a new workspace's only ('' clears it; a task moved elsewhere drops it)
   // ponytail: a branch that isn't there is a failed run, not a refusal here (syncBase may fetch it by then)
-  if (s.base !== undefined && typeof s.base !== 'string') throw new Error('base? a branch name')
+  if (s.base != null && typeof s.base !== 'string') throw new Error('base? a branch name') // null: cleared, as ''
   s.base = s.base?.trim() || undefined
   if (s.base?.startsWith('-')) throw new Error(`base ${s.base}? a branch, not an option`)
   if (s.ws !== 'new' || s.workflow || s.widget) {

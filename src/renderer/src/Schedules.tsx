@@ -94,8 +94,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const offBranch = makes && form?.ws === 'new'
   const [branches, setBranches] = useState<{ project: string; branches: string[]; main: string; current: string }>()
   useEffect(() => {
-    if (form?.project && project?.git !== false) api.branches(form.project).then(r => setBranches({ project: form.project, ...r }), () => setBranches(undefined))
-  }, [form?.project])
+    if (offBranch && form?.project && branches?.project !== form.project) api.branches(form.project).then(r => setBranches({ project: form.project, ...r }), () => setBranches(undefined))
+  }, [form?.project, offBranch])
   const listed = branches?.project === form?.project ? branches : undefined
   const base = form?.base ?? (form?.id ? '' : (listed?.main ?? ''))
 

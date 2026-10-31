@@ -466,8 +466,16 @@ async function browseOp(entry: AgentWin, r: Browse) {
   )
   if (found) throw new Error(found)
   await settle()
-  const now = { url: wc.getURL(), title: wc.getTitle() }
-  return { ...now, ...(now.url !== page.url && { nav: now }), ...caused(), changed: pageChanges(was, await lines()) } satisfies BrowseDid
+  let now = { url: wc.getURL(), title: wc.getTitle() }
+  let changed = pageChanges(was, await lines())
+  // a click that changed nothing yet, on the same page: a fetch it started may answer a moment later (one more look)
+  // ponytail: one second; a slower answer still reads as (no changes)
+  if (r.op === 'click' && !changed.length && now.url === page.url) {
+    await new Promise(ok => setTimeout(ok, 1000))
+    now = { url: wc.getURL(), title: wc.getTitle() }
+    changed = pageChanges(was, await lines())
+  }
+  return { ...now, ...(now.url !== page.url && { nav: now }), ...caused(), changed } satisfies BrowseDid
 }
 ipcMain.handle('pick-folder', async e => {
   if (!from(e)) return null

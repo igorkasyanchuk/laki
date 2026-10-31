@@ -251,8 +251,18 @@ test("scheduled tasks: a new workspace each run off the branch picked; that bran
   const gone = await rig.rpc('scheduleRun', { id: s.id })
   assert.deepEqual([gone.ok, gone.what, gone.ws], [false, `base release/2.0 not found in ${p.name}`, undefined])
   assert.equal((await rig.rpc('state')).workspaces.length, 0)
-  // '' clears it; moved into a workspace, it's dropped
+  // only on origin: off origin's, not tracking it
+  git('update-ref', 'refs/remotes/origin/release/2.0', 'HEAD')
+  const remote = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(remote.ok, true, remote.what)
+  const rw = (await rig.rpc('state')).workspaces.find((w: any) => w.id === remote.ws)
+  assert.equal(rw.base, 'origin/release/2.0')
+  assert.throws(() => git('config', '--get', `branch.${rw.branch}.remote`), 'no upstream') // unset: git exits 1
+  await rig.rpc('wsRm', { id: remote.ws })
+  // '' clears it, null too; moved into a workspace, it's dropped
   assert.equal((await rig.rpc('scheduleSet', { id: s.id, base: '' })).base, undefined)
+  await rig.rpc('scheduleSet', { id: s.id, base: 'main' })
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, base: null })).base, undefined)
   await rig.rpc('scheduleSet', { id: s.id, base: 'main' })
   const into = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   assert.equal((await rig.rpc('scheduleSet', { id: s.id, ws: into.id })).base, undefined)
