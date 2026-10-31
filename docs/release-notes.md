@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.39.0 · Nov 1, 2026
 
 - A workspace's right click is shorter: *Workspace ›* holds Rename, Info, the copies (branch, path), Mute, Remind me,
   the pins, Logs and *Show ›*; Archive shows once, at the bottom. A double-click on a row renames it.
