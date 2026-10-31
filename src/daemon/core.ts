@@ -733,6 +733,16 @@ export async function git(at: At, ...args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+// git worktree add, its files written by one worker per core (checkout.workers=0: about 1.5-2x on a big repo; git
+// before 2.32 ignores the key) unless the project's own git config, here or on its host, sets checkout.workers
+// ponytail: read once per project per daemon; a config changed meanwhile counts after a restart
+const ownWorkers = new Map<string, Promise<boolean>>()
+function worktreeAdd(proj: Project, ...args: string[]) {
+  let own = ownWorkers.get(proj.id)
+  if (!own) ownWorkers.set(proj.id, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
+  return own.then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
+}
+
 // a command in a folder: here, or on its SSH host (with the PATH its login shell has)
 export async function exec(at: At, cmd: string, args: string[], o: { timeout?: number; maxBuffer?: number } = {}) {
   if (!at.host) return run(cmd, args, { cwd: at.path, maxBuffer: 64 << 20, ...o })
@@ -1927,7 +1937,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     if (!pr) base = await synced(proj, base, step)
     const add = pr ? ['--detach', path] : [path, '-b', branch, ...(base.startsWith('origin/') ? ['--no-track'] : []), base] // --no-track: a push never goes to origin's base
     step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
-    await git(proj, 'worktree', 'add', ...add).catch(e => {
+    await worktreeAdd(proj, ...add).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
     if (pr) {
@@ -2254,7 +2264,7 @@ export async function wsRestore(ref: string) {
   if (!ws.archived) return ws
   const proj = findProject(ws.project)
   if (ws.codespace === undefined)
-    await git(proj, 'worktree', 'add', ws.path, ws.branch).catch(e => {
+    await worktreeAdd(proj, ws.path, ws.branch).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
   if (ws.host) await readHostCfgs(ws)

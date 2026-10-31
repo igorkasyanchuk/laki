@@ -309,3 +309,24 @@ test('worktrees go to Settings’ folder (~: home), a folder per project, or the
   const ws = (await rig.rpc('state')).workspaces
   assert.deepEqual(ws.map((w: any) => w.path), [a.path, b.path, c.path])
 })
+
+test('git worktree add checks out with every core (checkout.workers=0) unless the project sets checkout.workers, a restore too', async t => {
+  const rig = await fresh(t)
+  const log = join(rig.home, 'git.log')
+  writeFileSync(join(rig.home, 'bin', 'git'), `#!/bin/sh\necho "$*" >> ${log}\nexec /usr/bin/git "$@"\n`, { mode: 0o755 })
+  const adds = () => readFileSync(log, 'utf8').split('\n').filter(l => / worktree add /.test(` ${l}`))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.match(adds()[0], /^-c checkout\.workers=0 worktree add /)
+  await rig.rpc('wsArchive', { id: a.id })
+  await rig.rpc('wsRestore', { id: a.id })
+  assert.match(adds()[1], /^-c checkout\.workers=0 worktree add .* laki\//)
+  // a repo whose own config says how many: git's word, no -c
+  const own = join(rig.home, 'own')
+  execFileSync('/usr/bin/git', ['init', '-q', '-b', 'main', own], { env: rig.env })
+  execFileSync('/usr/bin/git', ['-C', own, 'config', 'checkout.workers', '2'], { env: rig.env })
+  execFileSync('/usr/bin/git', ['-C', own, 'commit', '-q', '--allow-empty', '-m', 'init'], { env: rig.env })
+  const q = await rig.rpc('projectAdd', { path: own })
+  await rig.rpc('wsNew', { project: q.id, preset: 'none' })
+  assert.match(adds()[2], /^worktree add /)
+})

@@ -22,6 +22,8 @@ version it builds, with the date. -->
   Settings › Git & worktrees turns it off.
 - A Claude tab no longer flashes *Needs you* while subagents it started in the background still work (a code review's reviewers): it stays working until they're done.
 - The ✕ on an agent's card under its terminal, and on the Done check's strip, is a full-size button again: it was squeezed to a sliver.
+- New worktrees are ready sooner in a big repo: git writes their files with every CPU core (unless your git config sets
+  `checkout.workers`), on SSH hosts too.
 
 ## 0.36.0 · Oct 31, 2026
 

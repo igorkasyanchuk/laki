@@ -300,6 +300,9 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `origin`, `git fetch origin <base>`, then the worktree off `origin/<base>` (`--no-track`: a push never goes to the
   base) and that as its `base`; `ff`, `git fetch origin <base>:<base>` first (git refuses one checked out or not a
   fast-forward: then as `origin`). A fetch has a minute; one that fails leaves the base as it was;
+- `worktreeAdd` (`wsNew`'s and `wsRestore`'s `git worktree add`): `-c checkout.workers=0` (a worker per core) unless the
+  project's `git config --get checkout.workers` says something (`ownWorkers`: read once per project per daemon, a host's
+  there); tested with a logging `git` in the rig's `$HOME/bin` (`test/worktrees.test.ts`);
 - files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is
