@@ -26,7 +26,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   workspace; notifications and a count on the Dock icon and in the menu bar; pushes to your phone; a follow-up queue; resume after a restart; usage limits wait
   and continue; a model and effort per workspace; turn timers (off by default); ⌘J jumps to the next tab that
   needs you. An agent's numbered choices (a permission prompt, a question) are buttons under the terminal and on its
-  notification (and, if you opt in, on a Telegram or ntfy push). *Send a message later* (⌘L, the toolbar's clock) types a
+  notification (and, if you opt in, on a Telegram or ntfy push). *Send a message later* (⌘L, the toolbar's ⋯) types a
   message into an agent, or asks Laki AI, at a time you pick. *Mark as unread* puts a tab's ● back.
 - **Race**: one prompt to several agents (claude, codex…), each in its own worktree; *Compare* lays them side by
   side (status, diff size, what each said last, the files it changed) and *Keep this one* archives the rest.
@@ -92,10 +92,10 @@ changing it: [AGENTS.md](../AGENTS.md).
   or the menu bar's item (its keys beside it), picks a part of the screen; Laki AI's window opens with it attached and the mic listening. Say what
   to do, then send.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
-- **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
+- **A break**: the smiley at the start of the status bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance hides it.
-- **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 1 minute to an hour (or any length), as
-  many as you like; each shows as a bar over the bottom buttons (⏸ pauses it) and then rings: a sound and a dialog,
+- **Timers**: the timer at the start of the status bar starts a countdown, 1 minute to an hour (or any length), as
+  many as you like; each shows as a bar at the bottom of the sidebar (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
 - **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 4 cells
@@ -103,7 +103,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
   Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
   Extensions › *New ▾*, or My Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
-- **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
+- **A video while you work**: the play button at the start of the status bar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
 ## Install
@@ -319,7 +319,7 @@ selected workspace's PR is in the status bar.
 - *Timer* at its bottom starts a countdown (1, 5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length, a message or a
   command…*: 25, 1h 30m, 90s, a message if you like (*Go out*: on its bar, and the title of what it says as it ends),
   and its *Then run a command* switch with the command, run as it ends in the workspace in front);
-  start as many as you like. Each is a bar above the bottom buttons, like the minimized video, with its time left;
+  start as many as you like. Each is a bar at the bottom of the sidebar, like the minimized video, with its time left;
   ⏸ pauses it and ▷ goes on (a paused one stays paused across a restart); its pencil (or a right click) pauses it too,
   adds 5 minutes, adds or changes its message, starts it over with another length and picks what happens as it ends: a sound and Laki's dialog
   (*Again* starts the same timer over), or a macOS notification instead (Settings › General › Timers: what it shows
@@ -330,13 +330,13 @@ selected workspace's PR is in the status bar.
   timer…* and *Stop all timers* are in ⌘K. They're kept when Laki quits; one that ends while it's closed is dropped, its action not run.
 - *Remind me…* (a workspace's right click, or ⌘K for the one in front): in 20 minutes, 1 hour, 3 hours, tomorrow at
   9:00, or any length; then a notification about it (a click opens it) and a message with *Open*. Meanwhile it's a bar
-  over the bottom buttons (its menu: open it, 15 more minutes, cancel) and a timer mark on the workspace's row. A
+  at the bottom of the sidebar (its menu: open it, 15 more minutes, cancel) and a timer mark on the workspace's row. A
   reminder that came due while Laki was closed comes as it opens.
-- *Send a message later…* (⌘L, the toolbar's clock, the ⋯, a tab's right click, ⌘K; when the workspace has an agent
+- *Send a message later…* (⌘L, the toolbar's ⋯, a tab's right click, ⌘K; when the workspace has an agent
   or Laki AI is on): pick who gets it (the agent tab in front first, or *Laki AI*), the message (or one of Run ▾'s
   agent actions, a click: *Review the code*) and when: in a length (10m, 2h, 1h 30m; or 15 min, 30 min, 1 h, 2 h) or
   at a time (15:30, 3pm: today, or tomorrow once it's past). The AI page's clock does the same for what's typed
-  there. Until then it's a timer bar over the bottom buttons with the message (its whole text on hover), and a strip
+  there. Until then it's a timer bar at the bottom of the sidebar with the message (its whole text on hover), and a strip
   at the foot of the tab it goes to (*Send later to claude*: each one's time left and text); its menu and the strip's
   buttons: *Send now*, *Edit…* (the message, who gets it, the time), *Cancel it*. As it's due the message goes in, or waits in
   the agent's queue while it's busy (Laki AI: asked once it's free), and a notification says so (Laki AI's: once it
@@ -582,7 +582,7 @@ email address only, unless you leave the email out on purpose (below).
 - It stops on its own when the time is up, when you stop it, or with the daemon. Each start makes a new key, so
   an old link never works again.
 
-**Board** (the columns icon at the bottom of the sidebar, *Board* in ⌘K, `laki://board`): every workspace as a card in
+**Board** (the columns icon on the rail, or at the start of the status bar without it, *Board* in ⌘K, `laki://board`): every workspace as a card in
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
 *Merged*; with its last answer, its PR and checks, and its turn's time when timers are on (Terminals and Browsers
 aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on hover) to open, archive or delete it;
@@ -650,7 +650,7 @@ default) turned off hides the money on the AI page: asks and tokens only.
 *Your instructions* (Settings › AI) is your own context for it, added after Laki's instructions at every ask: who you
 are, how you name things, what it should know. It can't lift what Laki AI may not do.
 
-**Scheduled tasks** (the clock at the bottom of the sidebar, *Schedule* on the rail in Rail and list, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
+**Scheduled tasks** (*Schedule* on the rail, or the clock at the start of the status bar without it, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
 the project, where it runs and a name as chips, the way the new-workspace page has them. A form you leave (Esc, a click elsewhere) is there when the page opens again;
 *Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't). It's a page of
@@ -747,7 +747,7 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
   the review saw (else *changed since the review*, and nothing is written); *Apply all* does each of a file's open
   suggestions at once. The toast has *Undo*. Nothing is committed, pushed or resolved: it goes in with your next
   commit (or the agent's). An outdated thread, or one on removed lines, has no *Apply*.
-- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first; the address bar takes
+- *Preview* (also the toolbar's ⋯ › *Preview*, or its globe with One next step off): the workspace's dev server in a browser: `$PORT` first; the address bar takes
   a path (`/admin`), another port (`:5173`), `localhost:8080/x` or any website (type `example.com` or a whole URL; in
   the app, not in a browser elsewhere); back, forward, reload, open in your browser. The devices button opens the
   sizes: *Fit* (the panel's), iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`, Enter):
@@ -1672,7 +1672,7 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 
 ## Settings
 
-⌘, or the gear at the bottom of the sidebar opens the settings page. Changes save as you make them, into
+⌘, or the gear on the rail (at the end of the status bar without it) opens the settings page. Changes save as you make them, into
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
@@ -1707,7 +1707,7 @@ lit for a moment.
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
-  button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
+  button*: the smiley at the start of the status bar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), *Interface* (a preview of a tab, a menu, a tooltip and the status bar, then the font: SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Laki's own, Inter, Geist, IBM Plex Sans, Roboto and more, then the developer fonts (the terminal's monospace ones), then every other font on this Mac, the sidebar's and the project names' pickers too; and *Text size*: 9 to 16 px for tabs, menus and dropdowns, the status bar, tooltips and the side panel's tabs as one, theirs by default), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,

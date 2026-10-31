@@ -2174,7 +2174,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     `place` puts them; Esc closes the page and they stay until `wsNew`/`wsFan` answers (a dialog opened meanwhile stays).
   - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes` (unset: on): `.dim-panes` on `.app`.
   - While a video plays, a closed sidebar is hidden (`hidden`), not unmounted, so it plays on. The video (`Video` in
-    panels.tsx, the foot's play button and ⌘K, the `video` dialog): `text.ts` `youtubeEmbed` turns a link into a `youtube-nocookie.com/embed` URL
+    panels.tsx, the status bar's play button and ⌘K, the `video` dialog): `text.ts` `youtubeEmbed` turns a link into a `youtube-nocookie.com/embed` URL
     (else refused), an iframe sandboxed without top navigation; the CSP's `frame-src` allows that host, and main sets a
     `Referer` on its requests (`dev.laki.app`): from a `file://` page YouTube's player refuses to play (Error 153).
     `min`: only its bar (the iframe `hidden`, playing on). Its src has `enablejsapi=1`: `videoCommand` (panels.tsx)
@@ -2190,8 +2190,9 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   - Tabs (`tabList`) go in the top bar, or a `.tabstrip` (`data-tabbar`, a drop target too) under or beside the terminals:
     `settings.tabsAt`, top on a phone. `settings.hoverFocus` (unset: on): a pane the mouse enters (no button held, window focused)
     gets the keyboard (`Panes` `onPointerEnter`).
-  - `.side-head` (top): hide, open a project, help; `.side-foot` (pinned at the bottom): Schedule, Board, Video, Meme (`settings.fun`),
-    Timer, Settings, with words (`IconButton` `label`) unless `settings.sideLook.labels === false`; one row: App's `fit`
+  - `.side-head` (top): hide, open a project, help; App's `footButtons` (Schedule, Board, Video, Meme (`settings.fun`),
+    Timer, Settings): off a phone the full-width status bar's start (`.sb-foot`, `wideBar`, always: Settings' switch went
+    in dfc0ac0), on a phone `.side-foot` (pinned at the sidebar's bottom), with words (`IconButton` `label`) unless `settings.sideLook.labels === false`; one row: App's `fit`
     (a `ResizeObserver`, and the theme's font) sets `data-bare`, how many buttons from the right lose their words, until
     it fits.
   - The project and workspace order is the daemon's (`reorder`).
@@ -2562,11 +2563,11 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `off`; `SETTINGS_KEPT`), written whole by App (`achSet`; `sent`, shown and built on until the view has it); Settings' own save leaves it out, so an
   unlock while it's open stays. The unlock toast (`.ach-toast`, over pages) groups one action's unlocks. Tested in
   `test/achievements.test.ts`.
-- **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
+- **`Board.tsx`**: the Board page (`Page` `wide`; the rail's Board or the status bar's columns icon, ⌘K, `laki://board`): the
   workspaces (not Terminals' or Browsers') in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one (a right
   click or `.board-more`: `BoardApi.menu`, App's open, archive, delete; Merged's ⋯: `archiveAll`, one by one), and To
   do (`view.todos`): ▷ or an HTML5 drag onto a column runs `wsNew` with the default agent, then `todoRm`.
-- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar foot's clock, ⌘K, a project's ⋯ menu:
+- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the rail's Schedule or the status bar's clock, ⌘K, a project's ⋯ menu:
   App's `schedulesOf`, the dialog `{ schedules: <project> }`): `.sched-hero` (icon, what it is, filter, New task),
   `.sched-stats` (tasks, on, the next run `soon`, runs ok), a project filter (`only`, starting at `project`, a chip's menu), the form (the
   new-workspace page's `.nw-composer` with the agent's `.nw-pick`, a When field (`.sched-when`; `EXAMPLES` until
@@ -2605,7 +2606,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   (`SITE`, the version from `package.json`, the build's time: `__BUILT__`, electron.vite.config.ts' `define`, none
   under `dev:web`; *Open-source licenses*: the build's notices through main's `open-path`, else the summary on GitHub;
   the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
-  `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the sidebar foot's
+  `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the status bar's
   smiley: `meme`, Next; a right click on it: copy (a PNG drawn on a canvas, the clipboard takes no other),
   download through an `<a download>`, open on Reddit). A PR's branch is `laki new --pr` (the CLI): the page has no PR field.
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).

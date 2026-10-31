@@ -14,7 +14,9 @@ Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linu
 - **See every agent at once**: running, needs you, done, on every tab and sidebar row; answer an agent from a
   notification, the bubbles over other apps or your phone.
 - **From diff to merge in one window**: review the diff, comment on lines, send it back to the agent, ship (commit,
-  push, PR), watch CI and reviews, merge.
+  push, PR), watch CI and reviews, merge. One button says each workspace's next step.
+- **Done means checked**: your tests and a second agent's review run as an agent finishes, failures go back to it;
+  two worktrees changing the same lines are flagged before merge day.
 - **Agents keep running** when the window is closed: a daemon holds the terminals, and they resume after a restart or a
   usage limit.
 - **Drive it from anywhere**: `laki` on the command line (an MCP server too), Laki AI in plain words, your phone over
