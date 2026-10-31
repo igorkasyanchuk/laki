@@ -41,6 +41,7 @@ const pushed = (remote: string, branch: string) => {
 
 test('gates: a no holds a ship (nothing pushed), says why, gate.held; ok lets it through; the CLI exits 1; force is yours only', async t => {
   const { rig, remote, p } = await shipRig(t)
+  await rig.rpc('settingsSet', { bgRefresh: false }) // no PR scan meanwhile: fake gh's #42 would be the gate's pr (a loaded run's race)
   gate(rig, 'g', ['ship'])
   make(rig, 'seen', { name: 'seen', on: { 'gate.held': 'keep' }, actions: { keep: `cat > "${rig.env.HOME}/held.json"` } })
   await on(rig, 'g', 'seen')
