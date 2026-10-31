@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.37.0 · Oct 31, 2026
 
 - A long menu (a workspace's right click) uses the window's whole height and packs its rows before it scrolls, so
   *Delete workspace* at its end is in sight; *Run workflow* answers W again.
