@@ -304,6 +304,7 @@ export function ProjectSection(p: {
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
 }) {
   const [name, setName] = useState(p.project.name)
+  const name0 = useRef(name) // sent only once changed here: the sidebar's Rename may have saved since
   const [notes, setNotes] = useState(p.project.notes ?? '')
   const notes0 = useRef(notes) // sent only once changed here: the Notes dialog or another client may have saved since
   const [c, setC] = useState<ProjectConfig>(p.project.config ?? {})
@@ -326,8 +327,10 @@ export function ProjectSection(p: {
     if (first.current) return void (first.current = false)
     const save = () => {
       const changedHere = notes !== notes0.current
+      const renamed = p.rename && name !== name0.current
       notes0.current = notes // sent once: a later save of the config leaves the Notes dialog's edits be
-      return p.onSave({ name: p.rename && name.trim() ? name.trim() : undefined, config: c, ...(changedHere && { notes }) })
+      name0.current = name
+      return p.onSave({ ...(renamed && { name: name.trim() }), config: c, ...(changedHere && { notes }) }) // '': its folder's name
     }
     unsaved.current = save
     const t = setTimeout(() => ((unsaved.current = null), save()), 400)
@@ -348,8 +351,8 @@ export function ProjectSection(p: {
         </div>
       </div>
       {p.rename && (
-        <Group title="Name" hint="As the sidebar shows it">
-          <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
+        <Group title="Name" hint="As the sidebar shows it; optional: empty, its folder's name">
+          <input value={name} aria-label="Name" placeholder={p.project.path.split('/').filter(Boolean).pop()} onChange={e => setName(e.target.value)} />
         </Group>
       )}
       <Group title="Color and icon" hint="Its mark before its name in the sidebar, menus, the palette and the window's title (an emoji there); the color also on its workspaces' bar where they have none of their own, rail pins and the bubbles">

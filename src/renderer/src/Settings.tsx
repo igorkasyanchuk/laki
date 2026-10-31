@@ -95,6 +95,37 @@ const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: 
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
 const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
+// a sidebar row's marks, each on or off: Appearance › Sidebar rows and a sidebar right click's Show › (App's showItems).
+// Older ones keep their own settings (prIcon, prMarks, diffStat), the rest are rowMarks: on unless false, but the next
+// step's chip (off unless true); conflicts and failing checks, unset: as the PR's mark
+export type RowMark = 'step' | 'pr' | 'author' | 'approved' | 'mine' | 'commented' | 'conflict' | 'ci' | 'radar' | 'plan' | 'stat'
+export const ROW_MARKS: [RowMark, string, string][] = [
+  ['step', 'Next step', 'A chip with what it needs from you now: Merge, Archive, Answer… (its ⋯ menu has it first either way)'],
+  ['pr', 'Pull request', "GitHub's mark: green open, purple merged, red closed, gray draft"],
+  ['author', "Author's picture", "The PR author's GitHub picture beside the mark"],
+  ['approved', '✓ Approved', 'Its reviews approve it (GitHub\'s decision, or an approval where none is required)'],
+  ['mine', '✓✓ Approved by you too', 'Approved, and your approval is one of them'],
+  ['commented', '👀 You commented', "Someone else's PR you commented on or reviewed with comments"],
+  ['conflict', 'Conflicts', 'A warning when its PR has merge conflicts'],
+  ['ci', 'Failing checks', 'A red mark when its PR\'s checks fail'],
+  ['radar', 'Overlaps', 'How many other workspaces change the same lines (Collision radar)'],
+  ['plan', "The agent's plan", 'n/m of its to-do list'],
+  ['stat', 'Diff size', 'Lines added and removed against its base, new files too; checked every 10 seconds'],
+]
+export function rowMarkOn(s: Pick<AppSettings, 'prIcon' | 'prMarks' | 'diffStat' | 'rowMarks'>, m: RowMark): boolean {
+  if (m === 'pr') return s.prIcon !== false
+  if (m === 'approved' || m === 'mine' || m === 'commented') return s.prMarks?.[m] !== false
+  if (m === 'stat') return s.diffStat === true
+  if (m === 'step') return s.rowMarks?.step === true
+  if (m === 'conflict' || m === 'ci') return s.rowMarks?.[m] ?? s.prIcon !== false
+  return s.rowMarks?.[m] !== false
+}
+// one that can show at all: its feature on (One next step, Collision radar, the live plan; the author's: GitHub pictures
+// and the PR's mark), else no switch for it here or in Show ›
+export const rowMarkUsed = (s: Pick<AppSettings, 'nextStep' | 'radar' | 'livePlan' | 'avatars' | 'prIcon' | 'prMarks' | 'diffStat' | 'rowMarks'>, m: RowMark) =>
+  m === 'step' ? s.nextStep !== false : m === 'radar' ? s.radar !== false : m === 'plan' ? s.livePlan !== false : m === 'author' ? s.avatars !== false && rowMarkOn(s, 'pr') : true
+export const rowMarkSet = (s: Pick<AppSettings, 'prMarks' | 'rowMarks'>, m: RowMark, v: boolean): Partial<AppSettings> =>
+  m === 'pr' ? { prIcon: v } : m === 'approved' || m === 'mine' || m === 'commented' ? { prMarks: { ...s.prMarks, [m]: v } } : m === 'stat' ? { diffStat: v } : { rowMarks: { ...s.rowMarks, [m]: v } }
 const CTX_LOOKS: [string, string][] = [['line', 'A line under its tab'], ['ring', 'A ring on its tab'], ['status', 'The status bar only'], ['off', 'Off']] // the context meter's
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
@@ -129,6 +160,7 @@ export type AppSettings = Paint & {
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
+  rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan', boolean>> // the sidebar rows' other marks (ROW_MARKS)
   timers?: boolean // a turn's time on its tab and row (unset: off)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
   costs?: boolean // what each chat used, tokens and ≈ API price, and today's (unset: on)
@@ -165,7 +197,7 @@ export type AppSettings = Paint & {
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees (unset: on)
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
-  nextStep?: boolean // One next step: the toolbar's button and the rows' chips; off: the old toolbar (unset: on)
+  nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
   livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
   copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
@@ -192,6 +224,9 @@ export type AppSettings = Paint & {
   floaterMenu?: 'stack' | 'card' // its actions: stacked in the drop, or a menu beside it (unset: stack)
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
+  videoButton?: boolean // the foot's YouTube button (unset: on)
+  timerButton?: boolean // the foot's timers button (unset: on)
+  statusBar?: boolean // the status bar (unset: on; off: its foot buttons at the sidebar's foot)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetAgent?: string // the claude or codex profile an AI source runs (unset: the first claude one)
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
@@ -375,17 +410,18 @@ const FIND: [string, string, string?][] = [
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Design', 'layout frame window cards sections tiles inset soft rounded corners padding gaps style variation'],
-  ['appearance', 'Fun button', 'meme reddit smiley break joke'],
-  ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
+  ['appearance', 'Sidebar rows', 'marks row sidebar show hide next step chip merge archive pr github icon author avatar approved approval check double eyes commented review conflicts failing checks ci overlaps radar plan diff size lines'],
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
-  ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
+  ['appearance', 'Status bar', 'bottom bar footer hide show status'],
+  ['appearance', 'Video button', 'youtube watch video hide'],
+  ['appearance', 'Meme button', 'fun meme reddit smiley break joke'],
+  ['appearance', 'Timer button', 'timer countdown stopwatch hide'],
   ['appearance', 'Turn timers', 'elapsed time'],
-  ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
   ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
-  ['appearance', 'One next step', 'next step button toolbar chip row what now answer merge ship archive fix ci ⌘g'],
+  ['appearance', 'One next step', 'next step menu what now answer merge ship archive fix ci ⌘g'],
   ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
   ['appearance', 'Tokens and cost', 'tokens cost price dollars spend usage today api estimate money'],
@@ -403,7 +439,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
   ['appearance', 'Browsers', 'rail browser web button show hide list'],
   ['appearance', 'Sidebar', 'status guide line divider indent row height space spacing gap between rows projects project row height font size bigger dotted dashed text size icon size avatar github style compact extended cards'],
-  ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
+  ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words buttons and bars'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
   ['appearance', 'Glow', 'glass colors'],
@@ -947,6 +983,9 @@ export function SettingsPage(p: {
   useEffect(() => setS(x => (x.fontSize === settings.fontSize ? x : { ...x, fontSize: settings.fontSize })), [settings.fontSize])
   useEffect(() => setS(x => (x.pageZoom === settings.pageZoom ? x : { ...x, pageZoom: settings.pageZoom })), [settings.pageZoom])
   useEffect(() => setS(x => (x.notify === settings.notify ? x : { ...x, notify: settings.notify })), [settings.notify]) // ⌘K's switch
+  // a sidebar right click's Show ›: its marks as saved there, so this page's next save keeps them
+  const marks = JSON.stringify([settings.prIcon, settings.prMarks, settings.diffStat, settings.rowMarks])
+  useEffect(() => setS(x => (JSON.stringify([x.prIcon, x.prMarks, x.diffStat, x.rowMarks]) === marks ? x : { ...x, prIcon: settings.prIcon, prMarks: settings.prMarks, diffStat: settings.diffStat, rowMarks: settings.rowMarks })), [marks])
   // the page grows with the terminal's font size, from 13px as 100%, times its own size (Appearance)
   const scale = ((s.fontSize ?? FONT_SIZE) / FONT_SIZE) * (PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom! : 1) * (p.own ?? 1)
   const project = p.projects?.find(x => `project:${x.id}` === sec)
@@ -1621,31 +1660,59 @@ export function SettingsPage(p: {
                   {lookRows('projectLook', PROJECT_LOOK)}
                 </div>
               </div>
-              <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
-                <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
-              </Switch>
-              <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
-                <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Schedule, Board, Video, Timer, Settings (Rail and list: Video, Meme, Timer); the last ones drop theirs when the row is too narrow" />
-              </Switch>
+              </Group>
+              <Group title="Sidebar rows" hint="What a workspace's row shows after its name; a right click on a row or a project › Show turns them on and off too">
+              <div className="setting-box">
+                {ROW_MARKS.map(([m, title, hint]) => (!rowMarkUsed(s, m) ? null : (
+                  <Fragment key={m}>
+                    <Switch className={`switch-row ${m === 'author' ? 'sub' : ''}`} on={rowMarkOn(s, m)} onChange={v => set(rowMarkSet(s, m, v))}>
+                      <Says title={title} hint={hint} />
+                    </Switch>
+                    {m === 'author' && rowMarkOn(s, 'author') && (
+                      <Switch className="switch-row sub" on={s.ownAvatar !== false} onChange={v => set({ ownAvatar: v })}>
+                        <Says title="Your picture on your PRs" hint="Your GitHub picture beside the mark on your own PRs, as others' show theirs; off: the mark alone on yours" />
+                      </Switch>
+                    )}
+                  </Fragment>
+                )))}
+                <label>
+                  Where ✓, ✓✓ and 👀 go
+                  <select value={s.prMarks?.at ?? 'end'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
+                    {MARKS_AT.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              </Group>
+              <Group title="Buttons and bars" hint="The buttons at the bottom of the sidebar, or first in the status bar">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.statusBar !== false} onChange={v => set({ statusBar: v })}>
+                  <Says title="Status bar" hint="The bar along the bottom: plan limits, ports, the branch and PR, artifacts. Off: none at all, its buttons at the sidebar's foot" />
+                </Switch>
+                <Switch className="switch-row" on={s.videoButton !== false} onChange={v => set({ videoButton: v })}>
+                  <Says title="Video button" hint="A YouTube video beside your work, paused and played by timers" />
+                </Switch>
+                <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
+                  <Says title="Meme button" hint="A random meme from r/memes for a break (→ or N for another)" />
+                </Switch>
+                <Switch className="switch-row" on={s.timerButton !== false} onChange={v => set({ timerButton: v })}>
+                  <Says title="Timer button" hint="Countdowns and stopwatches; the ones running stay until they end" />
+                </Switch>
+                <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
+                  <Says title="Button labels" hint="Words beside the buttons: Schedule, Board, Video, Timer, Settings (Rail and list: Video, Meme, Timer); the last ones drop theirs when the row is too narrow" />
+                </Switch>
+              </div>
               </Group>
               <Group title="What the window shows">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
-                  <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
-                </Switch>
-                <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
-                  <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
-                </Switch>
-                {s.prIcon !== false && (
-                  <Switch className="switch-row sub" on={s.ownAvatar !== false} onChange={v => set({ ownAvatar: v })}>
-                    <Says title="Your picture on your PRs" hint="Your GitHub picture beside the mark on your own PRs, as others' show theirs; off: the mark alone on yours" />
-                  </Switch>
-                )}
                 <Switch className="switch-row" on={s.avatars !== false} onChange={v => set({ avatars: v })}>
                   <Says title="GitHub pictures" hint="PR authors' and reviewers' pictures, loaded from avatars.githubusercontent.com; off: GitHub never sees the app ask for them" />
                 </Switch>
                 <Switch className="switch-row" on={s.nextStep !== false} onChange={v => set({ nextStep: v })}>
-                  <Says title="One next step" hint="The toolbar's one button for what the workspace needs from you now: answer, fix CI, merge, ship, archive… (⌘G), the same on each sidebar row. The toolbar's other buttons go into its ⋯, their keys still work. Off: the toolbar as before, no row chips" />
+                  <Says title="One next step" hint="What the workspace needs from you now (answer, fix CI, merge, ship, archive…) first in its ⋯ menus, and ⌘G does it; Sidebar rows › Next step puts it on each row too" />
                 </Switch>
                 <Switch className="switch-row" on={s.reader !== false} onChange={v => set({ reader: v })}>
                   <Says title="Reader view" hint="A Terminal | Reader switch on each Claude Code and Codex tab: Reader shows its chat as a conversation, your messages, its answers as text, its steps folded, a box to write in. Each tab remembers which; a phone opens them in Reader" />
@@ -1674,29 +1741,6 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.costs !== false} onChange={v => set({ costs: v })}>
                   <Says title="Tokens and cost" hint="What each Claude Code and Codex chat used, on its tab's tooltip, and today's in the plan limits' popup: tokens, and ≈ what they'd cost at API prices (an estimate; your plan bills its own way)" />
                 </Switch>
-              </div>
-              </Group>
-              <Group title="Pull request marks" hint="On a workspace whose open PR is approved, or one you looked at: in the sidebar, at a glance">
-              <div className="setting-box">
-                <Switch className="switch-row" on={s.prMarks?.approved !== false} onChange={v => set({ prMarks: { ...s.prMarks, approved: v } })}>
-                  <Says title="✓ Approved" hint="Its reviews approve it (GitHub's decision, or an approval where none is required)" />
-                </Switch>
-                <Switch className="switch-row" on={s.prMarks?.mine !== false} onChange={v => set({ prMarks: { ...s.prMarks, mine: v } })}>
-                  <Says title="✓✓ Approved by you too" hint="Approved, and your approval is one of them" />
-                </Switch>
-                <Switch className="switch-row" on={s.prMarks?.commented !== false} onChange={v => set({ prMarks: { ...s.prMarks, commented: v } })}>
-                  <Says title="👀 You commented" hint="Someone else's PR you commented on or reviewed with comments" />
-                </Switch>
-                <label>
-                  Where they go
-                  <select value={s.prMarks?.at ?? 'end'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
-                    {MARKS_AT.map(([v, name]) => (
-                      <option key={v} value={v}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
               </Group>
               <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">

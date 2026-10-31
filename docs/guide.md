@@ -95,7 +95,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   to do, then send.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the start of the status bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
-  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance hides it.
+  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance › *Buttons and bars* hides it, the video's and the timers' buttons, and the status bar itself (its buttons then at the sidebar's foot).
 - **Timers**: the timer at the start of the status bar starts a countdown, 1 minute to an hour (or any length), as
   many as you like; each shows as a bar at the bottom of the sidebar (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
@@ -225,7 +225,7 @@ npm link
 an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
-  else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them by the status circle or after the name instead.
+  else's PR. Settings › Appearance › *Sidebar rows* (or a right click › *Show ›*) turns each off; it also puts them by the status circle or after the name instead.
 
   | mark | meaning |
   |---|---|
@@ -255,15 +255,15 @@ selected workspace's PR is in the status bar.
   deletes them (asked first), and dragging one of them moves them all. Esc or a plain click lets them go.
 - A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
   a guide line beside them; none by default).
-- *Diff size in the sidebar* (Settings › Appearance › Sidebar, off by default) puts each workspace's diff size on its row
+- *Diff size* (Settings › Appearance › *Sidebar rows*, or a right click › *Show ›*; off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
   agent's last answer (or what it asks), its PR (author, state, checks, review, conflicts, lines added and removed),
   its diff size, ports and marks (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
   *Open*, *PR #n on GitHub* (or the PR's title), ⋯ its menu.
-- Archiving with nothing uncommitted happens at once, with *Undo* in the message that follows; with uncommitted
-  changes it asks first (they go with the worktree; the branch stays).
+- Archiving asks first, saying what goes (the worktree, uncommitted changes with it) and what stays (the branch, its
+  artifacts); *Undo* is in the message that follows. Several at once (picked rows, the Board's *Archive all*) ask once.
 - Click a project's arrow to fold its workspaces away (its busiest status and their count stay), again to unfold;
   *Collapse all projects* and *Expand all projects* are in ⌘K. (Terminals and Browsers fold on a click anywhere.)
 - Click a project's name for its page (also ⋯ › *Open project page*), in tabs: *Notes* (yours, in Markdown; *Edit*,
@@ -358,7 +358,7 @@ selected workspace's PR is in the status bar.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. With the rail, each kind (Projects,
   Terminals, Browsers) keeps its own width. ⌘B (or the sidebar icon) hides and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
-- Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id), *Rename with
+- Right click a workspace (or its ⋯) for its next step first, then a color, *Show ›* (what the rows show after their names: the next step, the PR, its author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan, the diff size; also Settings › Appearance › *Sidebar rows*), *Rename…* (the name it shows; its folder and branch keep the id), *Rename with
   AI* (with an agent tab: it names the workspace from its PR's title and description, else its task, once its turn ends),
   *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
   *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and browsers
@@ -374,7 +374,8 @@ selected workspace's PR is in the status bar.
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it), *Copy contents* (its whole terminal as text, the scrollback
   too; ⌘K's *Copy the tab's contents*) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
-- A project's ⋯ (or a right click on it) › *Color*, *Icon…* (find an icon by name, or type or paste an emoji;
+- A project's ⋯ (or a right click on it) › its color (the swatches at the top: a bar and a tint on its head, as a workspace's), *Rename…* (the name it shows;
+  empty: its folder's name again; also its page's Settings › *Name*), *Icon…* (find an icon by name, or type or paste an emoji;
   *No icon*) and *Emoji…* (a grid of common ones, found by a word: rocket, bug, fire), also in Settings › the project: its mark before its name in the sidebar, the new-workspace page's project
   menu, the palette (⌘K) and Settings, and an emoji before the window's title (🛒 web · fix-login). The color tints its
   icon, its workspaces' bar where they have no color of their own, their rail pins (the project's mark at the corner)
@@ -382,7 +383,7 @@ selected workspace's PR is in the status bar.
 - Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
   half: before it), and the list scrolls as you near its top or bottom.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
-  many it holds. *Sort workspaces* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
+  many it holds. *Sort workspaces ›* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the
   project* gives it back), and a drag still moves a workspace into a group. A workspace's menu › *Move to group ›*: one of the project's groups (first in it), or *Out of its group*. A click folds it: they hide, the selected one too (the
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
@@ -474,9 +475,10 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
   *Open in* for one of its folders (Xcode for the iOS repo, Cursor for the web one), else Settings › Open in's
   default; Settings › Open in › *Per project* shows and changes each project's;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
-- ship: commit, push and open a PR, in a *ship* tab;
+- ship: commit, push and open a PR, in a *ship* tab (nothing uncommitted and no commit the base lacks: *nothing to
+  ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo);
 - search: the command palette (⌘K);
-- ⋯: split right/down, fork, archive, delete;
+- ⋯: the next step first (One next step, below), then split right/down, fork, archive, delete;
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
   opens `localhost:$PORT` or edits the scripts. With no run script, Run opens the project's scripts. The project's
   *Test*, *Lint*, *Format* and *Deploy* scripts (when set) are in ▾ too, each in a tab named as it (run again, the
@@ -752,7 +754,7 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
   the review saw (else *changed since the review*, and nothing is written); *Apply all* does each of a file's open
   suggestions at once. The toast has *Undo*. Nothing is committed, pushed or resolved: it goes in with your next
   commit (or the agent's). An outdated thread, or one on removed lines, has no *Apply*.
-- *Preview* (also the toolbar's ⋯ › *Preview*, or its globe with One next step off): the workspace's dev server in a browser: `$PORT` first; the address bar takes
+- *Preview* (the toolbar's globe): the workspace's dev server in a browser: `$PORT` first; the address bar takes
   a path (`/admin`), another port (`:5173`), `localhost:8080/x` or any website (type `example.com` or a whole URL; in
   the app, not in a browser elsewhere); back, forward, reload, open in your browser. The devices button opens the
   sizes: *Fit* (the panel's), iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`, Enter):
@@ -1448,13 +1450,11 @@ open in Reader. A tab's right click has it too. Settings › Appearance › *Rea
 
 ### One next step
 
-The toolbar's first button is the one thing the workspace needs from you now: *Answer claude* or *Approve the plan*
+The first item of a workspace's ⋯ menus (the toolbar's, its row's, its right click) is the one thing it needs from you now: *Answer claude* or *Approve the plan*
 while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *Address the review*, *Overlaps another*,
 *Merge #42* once checks pass, *Review changes* when the agent is done, *Ship* when there's something to ship, *Archive*
-once its PR is merged or closed. While an agent works it shows the step under way (from its plan) and there's nothing
-to click; *CI runs* and *In review* open the PR. ⌘G does what it says. Each sidebar row gets the same as a small chip
-(none while it works, nor for conflicts, failing CI or an overlap: the row's own marks show those). With it on, the toolbar is that button, ⋯ and Run: Layout, Full screen, Open in, Info, Preview,
-the side panel, Ship and Commands are at the top of ⋯, and their keys work as before. Settings › Appearance › *One next
+once its PR is merged or closed (Archive asks first). While an agent works it shows the step under way (from its plan); *CI runs* and *In review* open the PR. ⌘G does what it says. Settings › Appearance › *Sidebar rows* › *Next step* (or a right click › *Show ›*) puts it on each sidebar row as a small chip
+(none while it works, nor for conflicts, failing CI or an overlap: the row's own marks show those). Settings › Appearance › *One next
 step* turns it off.
 
 ### Done check
@@ -1650,7 +1650,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘J | the next tab that needs you (waiting first, then done unseen), across workspaces |
-| ⌘G | the workspace's next step (the toolbar's first button) |
+| ⌘G | the workspace's next step (first in its ⋯) |
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
@@ -1712,9 +1712,12 @@ lit for a moment.
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
-  and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
-  ✓, ✓✓ and 👀, each on by default, and where they go; *Fun
-  button*: the smiley at the start of the status bar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
+  and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),
+  *Sidebar rows* (what a row shows after its name, each on or off, as a right click › *Show ›* does: *Next step* (off
+  by default), *Pull request* (GitHub's mark), *Author's picture* with *Your picture on your PRs*, ✓, ✓✓ and 👀,
+  *Conflicts*, *Failing checks*, *Overlaps*, *The agent's plan*, *Diff size* (off by default), and where ✓, ✓✓ and 👀
+  go), *Buttons and bars* (*Status bar*: off, none at all, its buttons at the sidebar's foot; *Video button*, *Meme
+  button*, *Timer button*, each on by default; *Button labels*), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), *Interface* (a preview of a tab, a menu, a tooltip and the status bar, then the font: SF Pro by default, whatever the theme; *The theme's own* gives a theme its own type; Laki's own, Inter, Geist, IBM Plex Sans, Roboto and more, then the developer fonts (the terminal's monospace ones), then every other font on this Mac, the sidebar's and the project names' pickers too; and *Text size*: 9 to 16 px for tabs, menus and dropdowns, the status bar, tooltips and the side panel's tabs as one, theirs by default), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,

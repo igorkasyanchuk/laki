@@ -60,7 +60,7 @@ export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClos
         {tab === 'specs' && api.specs && <Specs key={p.id} specs={api.specs} />}
         {tab === 'settings' && (
           <div className="settings-main form pp-settings">
-            <ProjectSection key={p.id} project={{ ...p, git: p.git !== false }} noNotes file={api.file} global={api.global} onGlobal={api.onGlobal} onSave={api.saveSettings} />
+            <ProjectSection key={p.id} project={{ ...p, git: p.git !== false }} noNotes rename file={api.file} global={api.global} onGlobal={api.onGlobal} onSave={api.saveSettings} />
           </div>
         )}
       </div>

@@ -351,6 +351,7 @@ test('ship: commits everything, pushes the branch, opens the PR; again replaces 
   execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: rig.repo, env: rig.env })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x' }), /nothing to ship/) // nothing changed, nothing committed
   writeFileSync(join(ws.path, 'feature.txt'), 'done\n')
   const tab = await rig.rpc('ship', { ws: ws.id, message: 'Add the feature' })
   assert.equal(tab.name, 'ship')
@@ -942,6 +943,9 @@ test("project notes: projectSet keeps them, blank drops them; ls --json leaves t
   assert.equal((await rig.rpc('state')).projects[0].notes, '# Links\n- Staging: https://staging.example\n')
   await rig.rpc('projectSet', { id: p.id, name: 'App' }) // another field: the notes stay
   assert.match((await rig.rpc('state')).projects[0].notes, /^# Links/)
+  assert.equal((await rig.rpc('state')).projects[0].name, 'App')
+  await rig.rpc('projectSet', { id: p.id, name: '  ' }) // empty: its folder's name again
+  assert.equal((await rig.rpc('state')).projects[0].name, p.name)
   const ls = await rig.cli('ls', '--json')
   assert.equal(ls.code, 0, ls.err)
   assert.ok(!ls.out.includes('staging.example'), 'agents never see them')

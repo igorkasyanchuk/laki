@@ -9,7 +9,7 @@ import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
-import { AGENT_COLORS, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
+import { AGENT_COLORS, copyImage, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -408,18 +408,11 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
       .finally(() => setBusy(false))
   }
   useEffect(next, [])
-  // the clipboard takes PNG only: a JPEG (or a GIF's first frame) drawn again as one
-  const copy = () => {
-    const i = img.current!
-    const c = document.createElement('canvas')
-    ;[c.width, c.height] = [i.naturalWidth, i.naturalHeight]
-    c.getContext('2d')!.drawImage(i, 0, 0)
-    const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
-    navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]).then(
+  const copy = () =>
+    void copyImage(img.current!).then(
       () => (setCopied(true), setTimeout(() => setCopied(false), 1500)),
       e => setErr((e as Error).message),
     )
-  }
   // saved where the browser saves (the app asks where), named after its title
   const download = () => {
     if (!m) return

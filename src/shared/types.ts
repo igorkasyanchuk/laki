@@ -461,6 +461,7 @@ export type Settings = {
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
+  rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan', boolean>> // a sidebar row's other marks, each on unless false (step: off unless true; conflict, ci: unset, as prIcon)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   usageAt?: number // a plan limit's % that notifies (notifyOn.usage): 75, 90, 95 (unset: USAGE_AT, 90)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
@@ -512,7 +513,7 @@ export type Settings = {
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   doneCheck?: boolean // Done means checked: projects' checks as agents' turns end (on unless false; each project's steps off until ticked)
   reader?: boolean // Reader view: an agent tab as its chat (chatRead), a Terminal | Reader switch on each (on unless false)
-  nextStep?: boolean // One next step: the toolbar's button (⌘G) and each row's chip, the rest of the toolbar in its ⋯ (on unless false)
+  nextStep?: boolean // One next step: first in a workspace's ⋯ menus, ⌘G (on unless false); a row's chip with rowMarks.step
   livePlan?: boolean // the agent's plan, live: its to-do list on its tab and row, a plan it asks you to approve as a card (on unless false)
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
@@ -557,6 +558,9 @@ export type Settings = {
   floaterMenu?: 'stack' | 'card' // the +'s actions: stacked in the drop over it, or a menu beside it (unset: stack)
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
+  videoButton?: boolean // the foot's YouTube button (unset: on)
+  timerButton?: boolean // the foot's timers button (unset: on)
+  statusBar?: boolean // the status bar (unset: on; off: none, its foot buttons at the sidebar's foot)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   widgetDev?: string[] // laki widget dev's folders: your own code, scanned first and watched
   widgetDevAgent?: string[] // of those, the ones an agent linked (N10): trusted as a repo's extensions; only widgetDev writes it
@@ -900,7 +904,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 130
+export const API = 131
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

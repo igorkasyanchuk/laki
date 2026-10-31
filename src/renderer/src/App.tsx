@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, In
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
+import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
 import { Picker, PICKER_KEY } from './Picker'
@@ -51,7 +51,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
-import { AGENT_COLORS, ask, askText, AskHost, Boundary, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -1019,6 +1019,18 @@ export function App() {
   }
   const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
   const fail = (e: unknown) => toast((e as Error).message)
+  // a picture in a viewer (a terminal link's card and its larger view, the file preview, Changes' zoom, the artifacts'
+  // and Laki AI's big views): its right click copies it, unless the viewer has a menu of its own
+  useEffect(() => {
+    const f = (e: MouseEvent) => {
+      const img = e.target instanceof HTMLImageElement && e.target.closest('.lp-img, .lp-big, .art-big, .pv-image, .img-zoom') ? e.target : null
+      if (!img || e.defaultPrevented || !img.complete || !img.naturalWidth) return
+      e.preventDefault()
+      openMenu(new DOMRect(e.clientX, e.clientY - 4, 0, 0), [{ label: 'Copy image', icon: 'copy', run: () => void copyImage(img).then(() => done('Copied the image'), (err: Error) => toast(`Couldn't copy the image: ${err.message}`)) }])
+    }
+    window.addEventListener('contextmenu', f)
+    return () => window.removeEventListener('contextmenu', f)
+  }, [])
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
 
   // a tab's queue (QueueStrip): the whole list again, with what it was (a delivery meanwhile refuses it)
@@ -1502,22 +1514,26 @@ export function App() {
   }
   // what Delete takes with it, said first, a line each: where it is, uncommitted files, commits not pushed, its PR, agents
   // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
-  const rmFacts = async (w: WorkspaceView): Promise<Fact[]> => {
-    type Peek = { dirty?: number; ahead?: number; unpushed?: number }
-    const pk: Peek = (view?.api ?? 0) >= 94 ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {}
+  type Peek = { dirty?: number; ahead?: number; unpushed?: number }
+  const peekWs = async (w: WorkspaceView): Promise<Peek> => ((view?.api ?? 0) >= 94 ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {})
+  // archive: the same, but the storage folder stays (archive keeps it), and a codespace is stopped, its files kept
+  const rmFacts = async (w: WorkspaceView, archive = false, pk?: Peek): Promise<Fact[]> => {
+    pk ??= await peekWs(w)
+    const cs = w.codespace !== undefined
+    const stops = archive && cs // what's in it stays
     const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
     const tabs = view?.tabs.filter(t => t.workspace === w.id && t.status !== 'exited') ?? []
     const busy = tabs.filter(t => t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting'))
     const facts: Fact[] = [{ label: 'Project', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
-    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (${w.codespace !== undefined ? 'only what was pushed stays' : 'stays'})` })
-    facts.push(w.codespace !== undefined ? { label: 'Codespace', value: `${w.codespace || '(being made)'}: deleted on GitHub` } : { label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
-    if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: lost` : 'none uncommitted' })
+    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
+    facts.push(cs ? { label: 'Codespace', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
+    if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept' : 'lost'}` : 'none uncommitted' })
     if (pk.ahead) facts.push({ label: 'Commits', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (w.pr) facts.push({ label: 'PR', value: `#${w.pr.number} ${w.pr.draft ? 'draft' : w.pr.state.toLowerCase()}${w.pr.title ? ` · ${w.pr.title}` : ''} (stays on GitHub)` })
     if (w.pr?.author) facts.push({ label: 'Author', value: `${w.pr.author}${w.pr.mine ? ' (you)' : ''}` })
     facts.push({ label: 'Tabs', value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
     if (w.ports.length) facts.push({ label: 'Servers', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
-    if (w.artifacts) facts.push(view?.settings?.keepStorage ? { label: 'Artifacts', value: `${n(w.artifacts, 'file')} (kept)` } : { label: 'Artifacts', value: `${n(w.artifacts, 'file')}: deleted` })
+    if (w.artifacts) facts.push(archive || view?.settings?.keepStorage ? { label: 'Artifacts', value: `${n(w.artifacts, 'file')} (kept)` } : { label: 'Artifacts', value: `${n(w.artifacts, 'file')}: deleted` })
     facts.push({ label: 'Created', value: ago(w.created) })
     return facts
   }
@@ -1557,12 +1573,16 @@ export function App() {
     if (!(await ask(`${{ ship: 'Ship', merge: 'Merge', archive: 'Archive' }[step]} ${wsName(w)} anyway?`, { text: `Past what ${held.map(h => h.name).join(', ')} said.`, ok: 'Do it anyway', danger: true }))) return
     return f(true)
   }
-  // archive: at once when nothing is uncommitted (Undo brings it back), else asked first: the worktree goes, with them
-  const archive = async (w: WorkspaceView) => {
-    const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there: ask
+  // archive: asked first, with what goes (its uncommitted changes, with the worktree) and what stays; Undo brings it
+  // back. One that changed since it was asked is asked again. asked: the caller asked already (several at once)
+  const archive = async (w: WorkspaceView, asked = false) => {
+    const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there
+    const pk = asked ? {} : await peekWs(w)
+    const cs = w.codespace !== undefined // its codespace stops, its files stay
+    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay. Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, facts: await rmFacts(w, true, pk), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
     let forced = false
     const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
-    const r = old ? { dirty: -1 } : await gated(w, 'archive', go(true))
+    const r = old && asked ? { dirty: -1 } : await gated(w, 'archive', go(!old && !pk.dirty)) // the changes it was asked about go
     if (r === undefined) return // the toast says why, or it wasn't done
     if (r?.dirty) {
       const lost = r.dirty > 0 ? `${r.dirty} uncommitted ${r.dirty === 1 ? 'change goes' : 'changes go'} with the worktree` : 'the worktree is removed'
@@ -1593,6 +1613,7 @@ export function App() {
   useEffect(() => setPicked(p => (p.some(id => !live.some(w => w.id === id)) ? p.filter(id => live.some(w => w.id === id)) : p)), [live]) // archived or deleted meanwhile
   const pickedArchive = async () => {
     const ws_ = pickedWs()
+    if (!(await ask(`Archive ${ws_.length === 1 ? wsName(ws_[0]) : `${ws_.length} workspaces`}?`, { text: `${ws_.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay). Ones with uncommitted changes are asked about again.`, ok: 'Archive' }))) return
     setPicked([])
     const res = await busyWith(ws_.map(w => w.id), 'archiving', () => Promise.all(ws_.map(w => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean: true }).then(r => ({ w, r }), () => ({ w, r: undefined })))))
     const dirty = res.filter(x => x.r?.dirty).map(x => x.w)
@@ -2030,7 +2051,7 @@ export function App() {
     const to = live.find(w => w.id === lastIn.current[k]) ?? order.find(w => kindOf(w) === k)
     if (to) setWsId(to.id)
   }
-  useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
+  useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, settings.videoButton, settings.timerButton, settings.statusBar, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
   const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
   // a plan limit past settings.usageAt as Usage.tsx reads them: a toast, and a notification unless you're looking (or
   // notify is off); once per window per reset (laki.limitsTold), told or not as it crosses (seen: each window's last %)
@@ -2423,10 +2444,15 @@ export function App() {
   // Sort workspaces: a project's (unset: as dragged), or a group's (unset: the project's, its own way named)
   const SORTS: [WsSort, string][] = [['manual', 'As dragged'], ['created', 'Newest first'], ['activity', 'Last active first'], ['name', 'By name']]
   const sortItems = (cur: WsSort | undefined, pick: (s: WsSort | undefined) => void, inherit?: WsSort): MenuItem[] => [
-    null,
-    { head: 'Sort workspaces' },
-    ...(inherit ? [{ label: `Like the project (${SORTS.find(x => x[0] === inherit)![1].toLowerCase()})`, icon: 'sort', hint: cur ? undefined : ON, run: () => pick(undefined) } as MenuItem] : []),
-    ...SORTS.map(([k, label]) => ({ label, icon: 'sort', hint: (cur ?? (inherit ? undefined : 'manual')) === k ? ON : undefined, run: () => pick(k) }) as MenuItem),
+    {
+      label: 'Sort workspaces',
+      icon: 'sort',
+      hint: cur ? SORTS.find(x => x[0] === cur)![1].toLowerCase() : inherit ? 'like the project' : undefined,
+      items: [
+        ...(inherit ? [{ label: `Like the project (${SORTS.find(x => x[0] === inherit)![1].toLowerCase()})`, icon: 'sort', hint: cur ? undefined : ON, run: () => pick(undefined) } as MenuItem] : []),
+        ...SORTS.map(([k, label]) => ({ label, icon: 'sort', hint: (cur ?? (inherit ? undefined : 'manual')) === k ? ON : undefined, run: () => pick(k) }) as MenuItem),
+      ],
+    },
   ]
   const sepMenu = (p: Project, s: Sep): MenuItem[] => [
     { colors: TAB_COLORS, value: s.color, pick: c => call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === s.id ? { ...x, color: c } : x)) }) },
@@ -2499,6 +2525,7 @@ export function App() {
       .then(r => done(r?.sent ? `Asked ${t.name} to name it` : `${t.name} names it when its turn ends`), fail)
   const detachPr = (w: WorkspaceView) => void call('prDetach', { ws: w.id }).then(() => done(w.prLinked ? 'Only related now: its own PR, once opened, is its PR' : `PR #${w.pr?.number ?? ''} detached: only related`), () => {}) // call toasts a failure
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
+    ...stepItem(w),
     ...laterItems(w),
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: w.id }) },
@@ -2518,6 +2545,7 @@ export function App() {
     ...(w.pinned ? [] : groupItems(w)),
     ...runItems(w),
     ...flowMenu(w),
+    ...showItems(),
     null,
     ...(w.kind === 'worktree'
       ? [
@@ -2872,7 +2900,7 @@ export function App() {
       // the sidebar's filter: open, its box focused; pressed again in the box: closed
       filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),
       next: nextNeed,
-      step: stepsOn && !!ws && !dialog && (() => document.querySelector<HTMLElement>('.step-btn')?.click()),
+      step: stepsOn && !!ws && !dialog && (() => (st => st && doStep(ws, st))(stepOf(ws))),
       later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
       artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
       full: () => toggleFull(), // full screen, or back
@@ -2880,7 +2908,7 @@ export function App() {
       forward: historyOn && !field && (() => travel(hist.current.i + 1)),
       settings: () => toSettings(),
       help: () => setDialog(d => (d === 'help' ? null : 'help')),
-      layout: !dialog && (() => (b => (b ? b.click() : (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())))(document.querySelector<HTMLElement>('.layout-btn'))), // in the ⋯ with One next step: its menu there
+      layout: !dialog && (() => (b => (b ? b.click() : (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())))(document.querySelector<HTMLElement>('.layout-btn'))), // a phone (no button): its menu at ⋯
     }
     const id = force ?? (fixed ? undefined : keyFor(e, kb))
     const run = id && bound[id]
@@ -2972,9 +3000,16 @@ export function App() {
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
   // fold a project's workspaces away, or back; ids of removed projects go
   const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => x === 'needs' || view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x)))) // needs: the Needs you list
+  // a project's name in Laki, any you like; empty: its folder's again (the daemon's projectSet)
+  const renameProject = async (p: Project) => {
+    const name = await askText(`Rename ${p.name}`, { text: `Its folder ${shortPath(p.path)} stays as it is. Empty: the folder's name.`, value: p.name, placeholder: p.path.split('/').filter(Boolean).pop(), ok: 'Rename' })
+    if (name === null || name.trim() === p.name) return
+    call('projectSet', { id: p.id, name: name.trim() }).then(() => done(name.trim() ? `Renamed to ${name.trim()}` : "Named after its folder again"), () => {})
+  }
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
+      { colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) },
       { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : kh('newWs'), run: () => newIn(p) },
       ...(!p.kind && termsOk ? [{ label: 'New terminal', icon: 'terminal', key: 't', hint: termWhere(p), tip: 'A shell in the project\'s own folder, listed with its workspaces', run: () => termIn(p) } as MenuItem] : []),
       ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', tip: 'Its notes, scheduled tasks, memory and settings', run: () => setDialog({ project: p.id }) } as MenuItem]),
@@ -2982,9 +3017,10 @@ export function App() {
       { label: 'Add a group', icon: 'sep', tip: 'A named head in its list: drop workspaces under it', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', tip: 'Your Markdown notes for this project; agents don\'t see them', run: () => setDialog({ notes: p.id }) },
-      { label: 'Color', icon: 'palette', items: [{ colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) }] },
+      ...(p.kind ? [] : [{ label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; empty: its folder\'s. The folder stays as it is', run: () => renameProject(p) } as MenuItem]),
       ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
       ...(p.kind ? [] : sortItems(p.sort ?? 'manual', sort => call('projectSet', { id: p.id, sort: sort ?? 'manual' }))),
+      ...(p.kind ? [] : showItems()),
       null,
       ...(p.kind ? [] : [{ label: 'Settings', icon: 'settings', key: 's', run: () => setDialog({ project: p.id, tab: 'settings' }) } as MenuItem]), // its page's Settings tab; Terminals and Browsers have none
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), tip: 'Prompts that run in it on a schedule', run: () => setDialog({ schedules: p.id }) },
@@ -3212,12 +3248,15 @@ export function App() {
     })
   // One next step (shared/nextStep.ts): the toolbar's button (⌘G) and a row's chip; a click does it
   const stepsOn = settings.nextStep !== false
+  // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
+  const mark = (m: RowMark) => rowMarkOn(settings, m)
+  const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })) }]
   const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), overlaps: new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size, git: projOf(w)?.git !== false })
   const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
     const at = () => (setWsId(w.id), setDialog(null))
     if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
     if (s.id === 'conflict' || s.id === 'ci' || s.id === 'review') return void prFix(w, s.id)
-    if (s.id === 'collide') return e ? openMenu(e, radarMenu(w)) : at()
+    if (s.id === 'collide') return e ? openMenu(e, radarMenu(w)) : (r => (r?.width ? openMenu(r, radarMenu(w), 'right') : at()))(document.querySelector('.tabbar .ws-more')?.getBoundingClientRect()) // ⌘G: at the toolbar's ⋯ (hidden in full screen: none)
     if (s.id === 'merge') return void prAct(w, 'merge')
     if (s.id === 'archive') return void archive(w)
     if (s.id === 'look') return at(), showPanel('changes')
@@ -3225,6 +3264,10 @@ export function App() {
     if (s.id === 'wait' && w.pr) return openExternal(w.pr.url)
     at()
   }
+  // the step as the first item of a workspace's ⋯ (the toolbar's, a row's and its right click), a line under it;
+  // overlaps: the radar's menu beside it
+  const stepItem = (w: WorkspaceView): MenuItem[] =>
+    (st => (st ? [{ label: st.label, icon: STEP_ICON[st.id], hint: w.id === ws?.id ? kh('step') : undefined, tip: st.tip, ...(st.id === 'collide' ? { items: radarMenu(w) } : { run: () => doStep(w, st) }) } as MenuItem, null] : []))(stepsOn && !projOf(w)?.kind && !w.term ? stepOf(w) : undefined)
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3262,7 +3305,7 @@ export function App() {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {stepsOn && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['collide', 'conflict', 'ci'].includes(st.id) /* its ⇄, ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
+        {stepsOn && mark('step') && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['collide', 'conflict', 'ci'].includes(st.id) /* its ⇄, ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -3272,8 +3315,8 @@ export function App() {
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
-        {(t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
-        {(n => n > 0 && (
+        {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
+        {mark('radar') && (n => n > 0 && (
           <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), openMenu(e, radarMenu(w)))}>
             <Icon name="gitCompare" size={11} />
             {n}
@@ -3320,12 +3363,12 @@ export function App() {
             {pill.text}
           </span>
         )}
-        {!words && w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
+        {!words && w.pr?.conflict && w.pr.state === 'OPEN' && mark('conflict') && (
           <span className="ws-pr conflict" data-tip={`PR #${w.pr.number} has merge conflicts`}>
             <Icon name="conflict" size={11} />
           </span>
         )}
-        {!words && w.pr?.checks === 'fail' && w.pr.state === 'OPEN' && settings.prIcon !== false && (
+        {!words && w.pr?.checks === 'fail' && w.pr.state === 'OPEN' && mark('ci') && (
           <span className="ws-pr ci" data-tip={(n => `PR #${w.pr!.number}: ${n ? `${n} failing check${n > 1 ? 's' : ''}` : 'CI is failing'}`)(w.pr.list?.filter(c => c.state === 'fail').length)}>
             <Icon name="ciFail" size={11} />
           </span>
@@ -3336,9 +3379,9 @@ export function App() {
           </span>
         )}
         {marksAt === 'end' && yes}
-        {!words && w.pr && settings.prIcon !== false && (
+        {!words && w.pr && mark('pr') && (
           <span className={`ws-pr ${prState(w.pr)}`} /* failing checks: their own mark, before it; red here is a closed PR */>
-            {(!w.pr.mine || settings.ownAvatar !== false) && <Avatar login={w.pr.author} size={16} />}
+            {mark('author') && (!w.pr.mine || settings.ownAvatar !== false) && <Avatar login={w.pr.author} size={16} />}
             <Icon name="github" size={11} />
           </span>
         )}
@@ -3747,23 +3790,9 @@ export function App() {
   const aiNames = view.workspaces.filter(w => !w.archived).flatMap(w => [...new Set([w.name || w.id, wsName(w)])].map(name => ({ id: w.id, name })))
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const ownWidgets = shownWidgets.filter(w => (!w.project || w.project === ws?.project) && !(w.on && w.hidden)) // a repo's (.laki/extensions): only while a workspace of its project is selected; hidden: its data says so
-  // the tab bar's ⋯: on a phone, the top bar's extensions too (no room for their strip), each as its button's click
-  // with One next step, what the toolbar had besides it, ⋯ and Run: its keys still work
-  const tucked = (): MenuItem[] =>
-    stepsOn && ws && ws.browser === undefined && project?.kind !== 'shells'
-      ? [
-          ...(narrow ? [] : [{ label: 'Layout', icon: 'layers', hint: kh('layout'), tip: 'The agent with Preview, Changes, the dev server or a shell; yours', items: layoutMenu() } as MenuItem]),
-          { label: 'Full screen', icon: 'maximize', hint: kh('full'), tip: 'Just this tab', run: () => toggleFull(true) },
-          { label: 'Open in', icon: 'code', hint: '⌘E', tip: `Its folder in ${editorName} or another app`, items: openInItems() },
-          { label: 'Workspace info', icon: 'info', hint: kh('info'), run: () => showInfo(true) },
-          { label: `Preview localhost:${ws.port}`, icon: 'globe', run: () => showPanel('preview') },
-          { label: 'Side panel', icon: 'panel', hint: kh('panel'), tip: 'Info, files, changes, review, preview', run: () => togglePanel() },
-          ...(ws.kind === 'worktree' ? [{ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') } as MenuItem] : []),
-          { label: 'Commands', icon: 'search', hint: kh('palette'), run: () => setDialog('palette') },
-          null,
-        ]
-      : []
-  const wsMore = (): MenuItem[] => [...tucked(), ...(tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))]
+  // the tab bar's ⋯: One next step first; on a phone, the top bar's extensions too (no room for their strip), each as
+  // its button's click
+  const wsMore = (): MenuItem[] => [...(ws ? stepItem(ws) : []), ...(narrow && ws?.kind === 'worktree' && !(stepsOn && stepOf(ws)?.id === 'ship') ? [{ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') } as MenuItem] : []), ...(tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))]
   const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
@@ -3872,8 +3901,11 @@ export function App() {
     </div>
   )
   // the status bar, full width (Zed's way): one bar under the sidebar and the main area, over every page too, the
-  // sidebar's foot buttons first (with their words) and AI and Settings at its end; a phone's under the main area
-  const wideBar = !narrow
+  // sidebar's foot buttons first (with their words) and AI and Settings at its end; a phone's under the main area.
+  // Off (Settings › Appearance › Status bar): none, its foot buttons at the sidebar's foot; a lost connection still
+  // says so, as a phone's bar
+  const noBar = settings.statusBar === false
+  const wideBar = !narrow && !noBar
   const pageHere = dialog !== null && isPlace(dialog) && view ? placeName({ d: dialog, ws: ws?.id ?? null }) : ''
   const pageBar = wideBar && !!pageHere // a page over the workspace: the bar says only what isn't the workspace's
   // the sidebar's foot buttons (Schedule, Board… without the rail; Video, Meme, Timer, its extensions, Settings), there
@@ -3889,9 +3921,9 @@ export function App() {
               {aiOn(settings) && !bar && <IconButton icon="ai" title={AI_TIP} label={words ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
             </>
           )}
-          <IconButton icon="youtube" title="Watch a YouTube video while you work" label={words ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
+          {(settings.videoButton !== false || !!video) && <IconButton icon="youtube" title="Watch a YouTube video while you work (off: Settings › Appearance)" label={words ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />}
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={words ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
-          <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={words ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
+          {(settings.timerButton !== false || timers.length + watches.length > 0) && <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)" label={words ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />}
           <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
           {!rail && !bar && (
             <>
@@ -3901,7 +3933,7 @@ export function App() {
           )}
     </>
   )
-  const statusBar = view && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
+  const statusBar = view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
           {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
@@ -4116,7 +4148,8 @@ export function App() {
             return (
             <div key={p.id} className={`project ${rows.at('project', p.id)}`} data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
               <div
-                className="project-head"
+                className={`project-head ${p.color && p.color !== 'none' ? 'tinted' : ''}`}
+                style={colorVar(p.color)}
                 data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · ${p.kind ? `click to ${shut ? 'expand' : 'collapse'}` : `click for its page (notes, tasks, memory, settings) · the arrow ${shut ? 'expands' : 'collapses'} it`} · drag to move`}
                 onPointerDown={e => rows.start(e, 'project', p.id)}
                 onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && (p.kind || (e.target as Element).closest('.project-chev') ? fold(p.id) : setDialog({ project: p.id }))}
@@ -4209,8 +4242,8 @@ export function App() {
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
           {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
-          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && !stepsOn && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
-          {ws && !(stepsOn && ws.browser === undefined && project?.kind !== 'shells') && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
+          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
+          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
               <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
@@ -4218,29 +4251,17 @@ export function App() {
           )}
           {ws && ws.browser === undefined && project?.kind !== 'shells' && (
             <div className="actions nodrag">
-              {stepsOn ? (
-                (st =>
-                  st && (
-                    <button className={`step-btn t-${st.tone ?? 'none'}${st.busy ? ' busy' : ''}`} data-tip={kt(st.tip ?? st.label, 'step')} onClick={e => doStep(ws, st, e)}>
-                      {st.id === 'working' ? <Glyph s="running" /> : <Icon name={STEP_ICON[st.id]} size={13} />}
-                      <span>{st.label}</span>
-                    </button>
-                  ))(stepOf(ws))
-              ) : (
+              {!narrow && ( // a phone: in ⌘K's palette (the search button)
                 <>
-                {!narrow && ( // a phone: in ⌘K's palette (the search button)
-                  <>
-                    <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-                    <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
-                    <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
-                  </>
-                )}
-                <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
-                {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
-                <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
-                {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
+                  <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
+                  <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
+                  <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
                 </>
               )}
+              <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
+              {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
+              <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
+              {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
               <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
               <RunButton
                 running={devRunning}
@@ -4751,7 +4772,7 @@ export function App() {
                   ...(w.kind === 'worktree' ? [{ label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(w) } as MenuItem] : []),
                   { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
                 ]),
-              archiveAll: (e, merged) => openMenu(e, [{ label: `Archive all ${merged.length}`, icon: 'archive', key: 'a', run: async () => { for (const w of merged) await archive(w) } }], 'right'), // one by one: one with changes asks
+              archiveAll: (e, merged) => openMenu(e, [{ label: `Archive all ${merged.length}`, icon: 'archive', key: 'a', run: async () => { if (await ask(`Archive all ${merged.length} merged?`, { text: `${merged.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay).`, ok: 'Archive' })) for (const w of merged) await archive(w, true) } }], 'right'), // asked once, then one by one: one with changes asks again
             }}
           />
         )}
@@ -4891,12 +4912,12 @@ export function App() {
                 <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />
               </AiFloat>
             )}
-            {!aiDock && (
+            {!(aiDock && !noBar) && ( // no status bar: no button to minimize into
               <FabCorner key={ws?.id ?? ''} className={`ai-fab-wrap ${fly}`}>
-                <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => openMenu(e, [{ label: 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
+                <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => noBar || openMenu(e, [{ label: 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
                   <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
                 </button>
-                {!aiFloat && (
+                {!aiFloat && !noBar && (
                   <button type="button" className="ai-fab-min" aria-label="Minimize to the status bar" data-tip="Minimize to the status bar" onClick={() => dock(true)}>
                     <Icon name="minus" size={10} />
                   </button>

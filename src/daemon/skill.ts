@@ -233,7 +233,8 @@ more than 30 minutes late is skipped and logged as missed).
 
 - Ask the user before \`rm\`, \`archive\`, \`ship\` or \`stop\`: they end agents, delete worktrees or push. An
   extension's gate may hold \`ship\` or \`archive\`: it prints why and exits 1; fix what it says or tell the user
-  (\`--force\` is theirs, refused in your tab).
+  (\`--force\` is theirs, refused in your tab). \`ship\` with nothing to commit and no commit the base lacks says
+  *nothing to ship*: there's no PR to open.
 - Schedule a task only when the user asks for one: it starts agents later, unattended. One you add is saved off: say
   they turn it on in Scheduled tasks (\`on\` and \`run\` are theirs), and when it would first run.
 - From your tab, \`laki new\` and \`laki tab\` start an agent or a shell, never a command (\`--cmd\`, a command

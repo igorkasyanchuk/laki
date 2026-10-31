@@ -890,7 +890,8 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
-  if (o.name?.trim()) p.name = o.name.trim()
+  // its name in Laki; '' (the ⋯'s Rename, Settings' Name emptied): its folder's again, a host's with the host; Terminals' and Browsers' keep theirs
+  if (typeof o.name === 'string' && (o.name.trim() || !p.kind)) p.name = Array.from(o.name.trim()).slice(0, 80).join('') || (p.host ? `${basename(p.path)} (${p.host})` : basename(p.path))
   if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
   if (Array.isArray(o.memory)) {
     // the whole list, as the page has it: each with an id and some text; the user's MEMORY_MAX at most (refused past it,
@@ -3197,17 +3198,26 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
   if (!message?.trim()) throw new Error('a commit message is needed')
+  // nothing to commit and no commit the base hasn't: gh would open no PR (no commits between them), so said here, before
+  // any gate runs
+  const pk = await wsPeek(ws.id)
+  if (pk.dirty === 0 && pk.ahead === 0) throw new Error(`nothing to ship: no changes, and no commits that ${ws.base} doesn't have`)
   const h = await gated('ship', ws, o)
   if (h) return h
+  // gh asks which repo a PR goes to when origin's network has two (a fork and its parent) and none was picked (gh repo
+  // set-default, git's remote.<name>.gh-resolved): origin's, as the PR scans take it; one you picked stays yours
+  const picked = await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')
+  const repo = picked.trim() ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
+  const R = repo ? ' -R "$LAKI_REPO"' : ''
   const script = [
     'set -e',
     'git add -A',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
-    'gh pr view "$LAKI_BRANCH" --json url -q .url 2>/dev/null || gh pr create --fill',
+    `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

@@ -199,7 +199,7 @@ workspace's `icon` (`wsSet` `icon`: its rail pin's), the RPC's `now` honored onl
 `linkRm` in `FROM` (an agent's refused), `editorCmd`/`editors` in `REMOTE_KEYS`, `STORAGE_DAYS` 0. 126: a workspace's `overlaps` (Collision radar, below). 127: a workspace's `check`, a project's `check` (kept by `projectSet`), `checkAgain`/`checkStop`, the `check` event and `turn`'s `checking` (Done check, below). 128: a tab's `plan` and `planAsk` (the agent's plan, live, below). 129: `chatRead` (`tab`, `v`: Reader view; an agent's refused, `AGENT_NO`). 130: a schedule's `base` (`scheduleSet`
 keeps it for `ws` new only, refused for another, '' or null clears it; `runSchedule`: `wsNew` `base`, whose check (below) makes
 one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedule add --base`, MCP's `base`; Schedules.tsx'
-base chip, `SchedulesApi.branches`, a new task's the repo's `main`). A setting the renderer adds
+base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `projectSet` `name` '' (its folder's name again; Terminals' and Browsers' keep theirs), 80 characters at most. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -823,11 +823,14 @@ the code, the seconds it ran, its last lines.
   App's `readMode` (`laki.reader`: `reader` or `term` per tab, unset: `narrow`'s Reader), `.reader-switch`, the tab
   menu's item; its box is `send` `whenIdle`, its ask `answer`. Tested in `test/reader.test.ts`.
 - One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check`, PR and
-  the radar's count to one `Step`, `busy` while an agent or CI works): App's `stepOf`/`doStep`, the toolbar's
-  `.step-btn` (⌘G, `KEYS`' `step`: its click) with `STEP_ICON`, a row's `.ws-step` chip (`STEP_CHIP`'s words; not busy, nor
-  `collide`, `conflict`, `ci`: its ⇄, ⚠ and red mark say those; not Terminals' or Browsers'). On, the toolbar is it, ⋯ (`.ws-more`) and Run: `tucked()` puts Layout, Full
-  screen, Open in, Info, Preview, the panel, Ship and Commands at the top of ⋯ (the `layout` key opens its menu at ⋯
-  without `.layout-btn`). Tested in `test/next-step.test.ts`.
+  the radar's count to one `Step`, `busy` while an agent or CI works): App's `stepOf`/`doStep`, `stepItem` (with `STEP_ICON`)
+  first in `wsMore` (the toolbar's ⋯) and `wsMenu` (a row's ⋯ and right click; overlaps: the radar's menu as its
+  submenu), ⌘G (`KEYS`' `step`: `doStep`), a row's `.ws-step` chip only with `rowMarks.step` (`STEP_CHIP`'s words; not
+  busy, nor `collide`, `conflict`, `ci`: its ⇄, ⚠ and red mark say those; not Terminals' or Browsers'). Tested in
+  `test/next-step.test.ts`.
+- A sidebar row's marks (Settings.tsx `ROW_MARKS`, `rowMarkOn`, `rowMarkSet`: `prIcon`, `prMarks`, `diffStat`, the rest
+  `settings.rowMarks`, on unless false but `step`, off unless true; `conflict`, `ci` unset: as `prIcon`): App's `mark` in
+  `wsRow`, `showItems` (*Show ›* in `wsMenu` and `projectActions`), Settings › Appearance › *Sidebar rows*.
 - The agent's plan, live (`settings.livePlan`, on unless false; shared/todos.ts `planFrom`): claude's to-do tools from
   its Pre/PostToolUse payloads in `turn()` (TodoWrite and update_plan the whole list before they run; TaskCreate after,
   for its id; TaskUpdate by `taskId`; a subagent's, `agent_id`, left out), codex's `update_plan` from its transcript
@@ -2179,8 +2182,9 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     (after `<emoji> <project>` when its project's icon is an emoji),
     then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
-    and no red); `archive` asks `wsArchive` with
-    `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is). Deleting a
+    and no red); `archive` asks first (`peekWs`, `rmFacts` with `archive`: the storage folder kept, a codespace
+    stopped), then `wsArchive` with `ifClean` unless it was dirty when asked, and offers Undo (`wsRestore`); one dirty
+    since is asked again; `asked`: the caller asked once for several (`pickedArchive`, the Board's `archiveAll`). Deleting a
     workspace and removing a project say so too. `busyWith` puts `going` on the rows meanwhile (a spinner and
     *archiving…* / *deleting…*), Compare's *Keep this one* too.
   - A new workspace stays in sight (`showNew`, from the new-workspace page, a fork, a restore): `reveal` unfolds the
@@ -2207,9 +2211,11 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   - Tabs (`tabList`) go in the top bar, or a `.tabstrip` (`data-tabbar`, a drop target too) under or beside the terminals:
     `settings.tabsAt`, top on a phone. `settings.hoverFocus` (unset: on): a pane the mouse enters (no button held, window focused)
     gets the keyboard (`Panes` `onPointerEnter`).
-  - `.side-head` (top): hide, open a project, help; App's `footButtons` (Schedule, Board, Video, Meme (`settings.fun`),
-    Timer, Settings): off a phone the full-width status bar's start (`.sb-foot`, `wideBar`, always: Settings' switch went
-    in dfc0ac0), on a phone `.side-foot` (pinned at the sidebar's bottom), with words (`IconButton` `label`) unless `settings.sideLook.labels === false`; one row: App's `fit`
+  - `.side-head` (top): hide, open a project, help; App's `footButtons` (Schedule, Board, Video (`settings.videoButton`),
+    Meme (`settings.fun`), Timer (`settings.timerButton`; each on unless false, a running video or timer keeps its own),
+    Settings): off a phone the full-width status bar's start (`.sb-foot`, `wideBar`), on a phone or with
+    `settings.statusBar === false` (`noBar`: no status bar at all but while disconnected, as a phone's; the AI button
+    then can't minimize into it) `.side-foot` (pinned at the sidebar's bottom), with words (`IconButton` `label`) unless `settings.sideLook.labels === false`; one row: App's `fit`
     (a `ResizeObserver`, and the theme's font) sets `data-bare`, how many buttons from the right lose their words, until
     it fits.
   - The project and workspace order is the daemon's (`reorder`).

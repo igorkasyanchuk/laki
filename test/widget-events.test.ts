@@ -453,6 +453,7 @@ test("a workspace an agent made: its workspace.new and its tabs' tab.new are the
   // laki run, laki ship and laki archive from an agent's tab: their tabs' tab.new, ship.done and workspace.archived
   const me = { ws: ws.id, tab: tab.id }
   await rig.rpc('run', { ws: two.id, caller: me })
+  writeFileSync(join(two.path, 'shipped.txt'), 'x\n') // something to ship
   await rig.rpc('ship', { ws: two.id, message: 'm', from: me })
   assert.deepEqual((await evs('tab.new', two.id)).slice(2).map((e: any) => agentOf(e)), ['claude', 'claude'], 'its run and ship tabs')
   const [shipped] = await until(() => evs('ship.done', two.id).then(l => l.length && l), 'ship.done')

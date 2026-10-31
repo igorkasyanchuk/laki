@@ -212,7 +212,7 @@ or a link off localhost), console error: lines, and the text lines added (+) and
 
   laki run a1b2
   laki run a1b2 test`,
-  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
+  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). Nothing uncommitted and no commit its base doesn't have: refused, nothing to ship. A fork with no gh repo set-default: the PR opens on origin's repo. An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
 
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes

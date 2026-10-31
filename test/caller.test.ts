@@ -30,6 +30,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
     await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
     return readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
   }
+  writeFileSync(join(ws.path, 'feature.txt'), 'done\n') // something to ship: its force is what's refused
   const [on, ship, sched] = await agent(curl('widgetSet', { id, on: true }), curl('ship', { ws: ws.id, message: 'x', force: true }), curl('scheduleRun', { id: 'nope' }))
   assert.match(on.error, /only you can turn an extension on/)
   assert.match(ship.error, /an agent never overrides a gate/)

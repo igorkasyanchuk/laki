@@ -442,6 +442,14 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 // (a project's ProjectMark).
 // { filter } puts a box on top (its placeholder): what's typed keeps the items it matches, and keys are for the box
 export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
+// a picture to the clipboard as a PNG, the one kind it takes: a JPEG, a GIF's first frame or an SVG drawn again as one
+export async function copyImage(img: HTMLImageElement) {
+  const c = document.createElement('canvas')
+  ;[c.width, c.height] = [img.naturalWidth || img.width, img.naturalHeight || img.height]
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+  const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+}
 type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
 export type MenuItem =
   | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)

@@ -14,6 +14,25 @@ export function Markdown({ src, html }: { src: string; html?: boolean }) {
   return <div className="md">{tree.map(mdBlock)}</div>
 }
 
+// plain text with its web addresses as links that open in the browser (Reader's messages and steps); an address ends
+// before the punctuation after it, as markdown.ts' bare ones do
+const URL_IN = /\bhttps?:\/\/[^\s<>"'`]*[^\s<>"'`.,:;!?)\]}*_~]/g
+export function linkify(s: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let at = 0
+  for (const m of s.matchAll(URL_IN)) {
+    out.push(s.slice(at, m.index), webLink(m[0], m.index, m[0]))
+    at = m.index + m[0].length
+  }
+  out.push(s.slice(at))
+  return out
+}
+const webLink = (href: string, k: number, kids: React.ReactNode) => (
+  <a key={k} href={href} data-tip={href} onClick={e => (e.preventDefault(), openExternal(href))}>
+    {kids}
+  </a>
+)
+
 // Markdown in a few lines (a PR's description, a review comment), Show more for the rest
 export function Folded({ text, lines, html }: { text: string; lines: number; html?: boolean }) {
   const el = useRef<HTMLDivElement>(null)
@@ -164,8 +183,8 @@ function mdBlock(b: Block, k: number): React.ReactNode {
 function mdInline(x: Inline, k: number): React.ReactNode {
   if (typeof x === 'string') return x
   switch (x.t) {
-    case 'code':
-      return <code key={k}>{x.text}</code>
+    case 'code': // a web address in backticks: a link still
+      return /^https?:\/\/\S+$/.test(x.text) ? webLink(x.text, k, <code>{x.text}</code>) : <code key={k}>{x.text}</code>
     case 'b':
       return <strong key={k}>{x.kids.map(mdInline)}</strong>
     case 'i':

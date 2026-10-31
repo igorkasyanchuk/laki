@@ -33,8 +33,8 @@ time and AI money per run (`budget: 60 min, $5`).
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
   write in; a switch per tab, phones open in it.
-- **One next step**: one toolbar button (⌘G) and a chip on each row for what a workspace needs from you now: answer,
-  fix CI, resolve conflicts, merge, review its changes, ship, archive.
+- **One next step**: first in a workspace's ⋯ menus (⌘G does it) and, if you like, a chip on each row: what it needs
+  from you now: answer, fix CI, resolve conflicts, merge, review its changes, ship, archive.
 - **The agent's plan, live**: an agent's own to-do list under its tab, ticking off as it goes, and *2/5* on its row; a
   plan it asks you to approve is a card you can edit, your version sent back.
 - **Done check**: as an agent's turn ends having changed files, the project's lint, test and format scripts you tick run

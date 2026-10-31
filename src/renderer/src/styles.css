@@ -419,6 +419,8 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .grid5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-head .ib { opacity: 0; }
+/* a project's color (its ⋯'s swatches), as a workspace's: a bar at its left and a tint fading out (--tab-c, set inline) */
+.project-head.tinted { border-radius: min(var(--radius), 10px); background-image: linear-gradient(color-mix(in srgb, var(--tab-c) 70%, transparent), color-mix(in srgb, var(--tab-c) 70%, transparent)), linear-gradient(90deg, color-mix(in srgb, var(--tab-c) 16%, transparent), transparent 85%); background-size: 3px 55%, auto; background-position: 0 50%, 0 0; background-repeat: no-repeat; }
 .project-head:hover .ib, .project-head .ib:focus-visible { opacity: 1; }
 /* a row: inset and rounded, so hover and the selection read as one item each; the selected one gets a short bar at its
    left in its color or the accent (--ws-bar), a workspace's color (--tab-c, set inline) that bar dimmer and a tint, its
@@ -1433,14 +1435,6 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-resolved[open] > summary { margin-bottom: 6px; }
 .sp-resolved .sp-thread { opacity: 0.75; }
 .side-panel h3 .ib { width: 20px; height: 20px; }
-.step-btn { display: inline-flex; align-items: center; gap: 6px; height: 24px; max-width: 280px; margin-right: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--side)); color: var(--fg); font: inherit; font-size: 12px; cursor: pointer; } /* One next step (App's stepOf) */
-.step-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.step-btn:hover { background: var(--hover); }
-.step-btn.t-ask { border-color: color-mix(in srgb, var(--waiting) 55%, var(--line)); } .step-btn.t-ask .icon-svg { color: var(--waiting); }
-.step-btn.t-bad { border-color: color-mix(in srgb, var(--error) 55%, var(--line)); } .step-btn.t-bad .icon-svg { color: var(--error); }
-.step-btn.t-go { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); } .step-btn.t-go:hover { filter: brightness(1.08); }
-.step-btn.busy { color: var(--muted); }
-.narrow .step-btn { max-width: 140px; padding: 0 8px; }
 .ws-step { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; line-height: 15px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); cursor: pointer; } /* a row's next step */
 .ws-step:hover { color: var(--fg); background: var(--hover); }
 .ws-step.t-ask { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 45%, transparent); }

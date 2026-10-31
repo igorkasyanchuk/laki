@@ -2,6 +2,23 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- One next step moved into the ⋯ menus (the toolbar's, a row's, its right click: first there; ⌘G still does it), and
+  the toolbar has its buttons back: Layout, Full screen, Open in, Info, Preview, the panel, Ship, Commands.
+- Sidebar rows: a right click › *Show ›*, or Settings › Appearance › *Sidebar rows*, turns each mark on or off: the
+  next step's chip (off now), the PR, its author's picture, ✓, ✓✓, 👀, conflicts, failing checks, overlaps, the plan,
+  the diff size.
+- Archive asks first, saying what goes (the worktree, uncommitted changes) and what stays.
+- Ship says *nothing to ship* when there's nothing to commit or push, and opens the PR on origin's repo when gh can't
+  tell which (a fork with no `gh repo set-default`).
+- A project's name can differ from its folder: its ⋯ › *Rename…*, or its page's Settings › *Name* (empty: the folder's).
+- A project's color sits at the top of its ⋯, as a workspace's, and tints its head; *Sort workspaces* is a submenu.
+- Reader view links web addresses in your messages and its steps, and one in backticks anywhere Markdown shows.
+- A right click on a picture in a viewer (a link's hover card, its larger view, the file preview) copies it.
+- Settings › Appearance › *Buttons and bars*: the Video, Meme and Timer buttons each on or off, and the status bar
+  itself (off: its buttons at the sidebar's foot).
+
 ## 0.37.0 · Oct 31, 2026
 
 - A long menu (a workspace's right click) uses the window's whole height and packs its rows before it scrolls, so

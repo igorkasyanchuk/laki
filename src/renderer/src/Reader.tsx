@@ -4,7 +4,7 @@
 // terminal stays attached under it: Terminal brings it back as it was
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Glyph } from './Glyph'
-import { Markdown } from './MarkdownView'
+import { linkify, Markdown } from './MarkdownView'
 import { planNow } from '../../shared/todos'
 import type { TabView } from '../../shared/types'
 
@@ -57,14 +57,14 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
           {said?.map((x, i) =>
             x.who === 'you' ? (
               <div key={i} className="rd-you">
-                {x.text}
+                {linkify(x.text)}
               </div>
             ) : x.who === 'tool' ? (
               <details key={i} className="rd-tool">
                 <summary>
                   {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)} · {x.text.split('\n').at(-1)}
                 </summary>
-                <pre>{x.text}</pre>
+                <pre>{linkify(x.text)}</pre>
               </details>
             ) : (
               <div key={i} className="rd-agent">

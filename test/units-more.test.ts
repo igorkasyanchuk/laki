@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, s
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { copyTree } from '../src/shared/conn.ts'
+import { repoOf } from '../src/daemon/codespace.ts'
 import { ntfyReplies, pushRequest, pushText, replies, tapSig } from '../src/daemon/push.ts'
 import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
@@ -294,4 +295,14 @@ test("laki browser's report: the lines a click added and took away, 20 at most; 
   assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop', changed: [] }), 'http://localhost:3100/  Shop\n(no changes)')
   assert.equal(browseSays({ url: 'http://localhost:3100/done', title: '', nav: { url: 'http://localhost:3100/done', title: '' }, blocked: ['https://pay.example'], errors: ['boom'], changed: ['+ Done'] }), '→ http://localhost:3100/done\nblocked: https://pay.example\nconsole error: boom\n+ Done')
   assert.equal(browseSays({ url: 'http://localhost:3100/', title: 'Shop' }), 'http://localhost:3100/  Shop') // open, or an older app: no changed
+})
+
+test("ship's -R: a remote's URL as [HOST/]OWNER/REPO, none for a path", () => {
+  assert.equal(repoOf('git@github.com:igor/olauncher-plus.git'), 'github.com/igor/olauncher-plus')
+  assert.equal(repoOf('https://github.com/igor/laki.git'), 'github.com/igor/laki')
+  assert.equal(repoOf('https://user:tok@ghe.corp.com/team/app/'), 'ghe.corp.com/team/app')
+  assert.equal(repoOf('ssh://git@gitlab.com:2222/a/b.git'), 'gitlab.com/a/b')
+  assert.equal(repoOf('/Users/me/remote.git'), null)
+  assert.equal(repoOf('file:///srv/repo.git'), null)
+  assert.equal(repoOf(''), null)
 })

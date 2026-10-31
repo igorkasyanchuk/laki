@@ -242,6 +242,7 @@ test("gates: one that fails holds an agent's ship and a workflow's archive; your
     await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} ship ${ws.id} -m mine > ${out} 2>&1; echo "exit $?" >> ${out}` })
     return until(() => (s => /exit \d+/.test(s) && s)(readFileSync(out, 'utf8')), 'the agent shipped', 30000) as Promise<string>
   }
+  writeFileSync(join(ws.path, 'feature.txt'), 'done\n') // something to ship
   const said = await agentShip()
   assert.match(said, /Not shipped:\n {2}Slow: its gate failed: timed out after 1\.5 s/)
   assert.match(said, /exit 1/)

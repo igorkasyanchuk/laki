@@ -17,6 +17,9 @@ export const CS_ROOT = process.env.LAKI_CS_ROOT || '/workspaces'
 export const sshF = () => (existsSync(CONFIG) ? ['-F', CONFIG] : [])
 // owner/repo of a github.com remote (https, ssh or scp's form)
 export const ghRepo = (url: string) => /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1]
+// a remote's URL as gh's -R takes it, [HOST/]OWNER/REPO: git@host:o/r.git, ssh://git@host:22/o/r, https://host/o/r.git;
+// none for a path or anything else
+export const repoOf = (url: string) => (m => m && `${m[1]}/${m[2]}`)(/^(?:[a-z][\w+.-]*:\/\/)?(?:[^@/\s]+@)?([^/:\s]+)(?::\d+)?[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/i.exec(url.trim()))
 
 export const SCOPE = 'gh needs the codespace scope: run gh auth refresh -s codespace'
 // gh here (cwd: create's, the project's folder, which fakes/gh clones); its failure as a line you can act on: the
