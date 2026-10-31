@@ -735,11 +735,12 @@ export async function git(at: At, ...args: string[]): Promise<string> {
 
 // git worktree add, its files written by one worker per core (checkout.workers=0: about 1.5-2x on a big repo; git
 // before 2.32 ignores the key) unless the project's own git config, here or on its host, sets checkout.workers
-// ponytail: read once per project per daemon; a config changed meanwhile counts after a restart
+// ponytail: read once per repo per daemon (by its host and path); a config changed meanwhile counts after a restart
 const ownWorkers = new Map<string, Promise<boolean>>()
 function worktreeAdd(proj: Project, ...args: string[]) {
-  let own = ownWorkers.get(proj.id)
-  if (!own) ownWorkers.set(proj.id, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
+  const key = `${proj.host ?? ''}:${proj.path}`
+  let own = ownWorkers.get(key)
+  if (!own) ownWorkers.set(key, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
   return own.then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
 }
 
@@ -1935,6 +1936,13 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     let branch = `${branchPrefix()}${id}`
     if (!proj.host) mkdirSync(dirname(path), { recursive: true, mode: 0o700 }) // only the folders it makes (yours stay as they are); git makes a host's
     if (!pr) base = await synced(proj, base, step)
+    const has = (ref: string) => git(proj, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
+    // a base asked for (the page's, laki new --base, a scheduled task's) that isn't here: origin's when it has one,
+    // else refused in words (git's are "invalid reference"), never off another branch
+    if (o.base && !pr && !(await has(`${base}^{commit}`))) {
+      if (!(await has(`origin/${base}^{commit}`))) throw new Error(`base ${o.base} not found in ${proj.name}`)
+      base = `origin/${base}`
+    }
     const add = pr ? ['--detach', path] : [path, '-b', branch, ...(base.startsWith('origin/') ? ['--no-track'] : []), base] // --no-track: a push never goes to origin's base
     step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
     await worktreeAdd(proj, ...add).catch(e => {
@@ -1950,7 +1958,6 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       branch = (proj.host ? await git(at, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => '') : headOf(path)) || local! // as syncBranches reads it (rev-parse may say heads/<b> beside a remote's <b>)
       base = pr.baseRefName
       // a base you have no branch of (a release branch): origin's, for the diff
-      const has = (ref: string) => git(at, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
       if (!(await has(`refs/heads/${base}`)) && (await has(`refs/remotes/origin/${base}`))) base = `origin/${base}`
     }
     ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }), ...(!want && { untitled: true }) } // untitled: ws-<tail>, named by its first prompt

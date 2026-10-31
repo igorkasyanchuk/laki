@@ -7,7 +7,7 @@ import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Re
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, git, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
@@ -191,6 +191,8 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     s.ws = ws.id
   }
   // a base branch: a new workspace's only ('' clears it; a task moved elsewhere drops it)
+  // ponytail: a branch that isn't there is a failed run, not a refusal here (syncBase may fetch it by then)
+  if (s.base !== undefined && typeof s.base !== 'string') throw new Error('base? a branch name')
   s.base = s.base?.trim() || undefined
   if (s.base?.startsWith('-')) throw new Error(`base ${s.base}? a branch, not an option`)
   if (s.ws !== 'new' || s.workflow || s.widget) {
@@ -251,15 +253,8 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     } else if (s.ws === 'new' || s.ws === 'local-new') {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
-      // its base branch gone: the run fails and says so, never off another branch; one only on origin: origin's
-      // ponytail: origin/<base> as last fetched (settings.syncBase fetches it again in wsNew)
-      let base = s.ws === 'new' ? s.base : undefined
-      if (base) {
-        const has = (ref: string) => git(findProject(s.project), 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`).then(Boolean, () => false)
-        if (!(await has(base))) base = (await has(`origin/${base}`)) ? `origin/${base}` : undefined
-        if (!base) throw new Error(`base ${s.base} not found in ${findProject(s.project).name}`)
-      }
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(base && { base }), ...(s.ws === 'local-new' && { local: true, another: true }) })
+      // its base branch gone: wsNew refuses it, so the run fails and says so (never off another branch)
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'new' && s.base && { base: s.base }), ...(s.ws === 'local-new' && { local: true, another: true }) })
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''

@@ -382,15 +382,17 @@ ipcMain.on('sound', (e, name: string) => {
 // the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
 // to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
 type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string }
-// errors, blocked: what the page did during an op (its answer's), 20 of each
-const agentWins = new Map<string, { w: BrowserWindow; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[] }>()
+// errors, blocked: what the page did during an op (its answer's), 20 of each; turn: the op before (one at a time: two
+// at once would mix their clicks and their reports)
+type AgentWin = { w: BrowserWindow; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown> }
+const agentWins = new Map<string, AgentWin>()
 const pageJs = (f: string, ...args: unknown[]) => `(${f})(${args.map(a => JSON.stringify(a)).join(',')})`
 ipcMain.handle('browse', async (e, r: Browse) => {
   if (e.sender !== win?.webContents) throw new Error('not the app window')
   let a = agentWins.get(r.ws)
   if (!a || a.w.isDestroyed()) {
     const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: PREVIEW, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
-    const made = { w, errors: [] as string[], blocked: [] as string[] }
+    const made: AgentWin = { w, errors: [], blocked: [], turn: Promise.resolve() }
     const block = (u: string) => made.blocked.length < 20 && made.blocked.push(u.slice(0, 300))
     w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))
     w.webContents.on('will-navigate', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
@@ -404,12 +406,22 @@ ipcMain.handle('browse', async (e, r: Browse) => {
     if (agentWins.get(r.ws) === entry) agentWins.delete(r.ws)
     if (!entry.w.isDestroyed()) entry.w.destroy()
   }, 10 * 60e3)
+  const go = entry.turn.then(() => browseOp(entry, r))
+  entry.turn = go.catch(() => {})
+  return go
+})
+async function browseOp(entry: AgentWin, r: Browse) {
   entry.errors.length = entry.blocked.length = 0 // this op's only
   const wc = entry.w.webContents
   // what a click starts gets a moment; a page it loads, until it's loaded (5 s at most)
   const settle = async () => {
     await new Promise(ok => setTimeout(ok, 300))
-    if (wc.isLoading()) await new Promise<void>(ok => (setTimeout(ok, 5000), wc.once('did-stop-loading', () => ok())))
+    if (wc.isLoading())
+      await new Promise<void>(ok => {
+        const done = () => (clearTimeout(t), wc.off('did-stop-loading', done), ok())
+        const t = setTimeout(done, 5000)
+        wc.once('did-stop-loading', done)
+      })
   }
   const lines = () => wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 200000)`).then((t: string) => t.split('\n').map(l => l.trim()).filter(Boolean), () => [] as string[])
   const caused = () => ({ ...(entry.errors.length > 0 && { errors: [...entry.errors] }), ...(entry.blocked.length > 0 && { blocked: [...entry.blocked] }) })
@@ -456,7 +468,7 @@ ipcMain.handle('browse', async (e, r: Browse) => {
   await settle()
   const now = { url: wc.getURL(), title: wc.getTitle() }
   return { ...now, ...(now.url !== page.url && { nav: now }), ...caused(), changed: pageChanges(was, await lines()) } satisfies BrowseDid
-})
+}
 ipcMain.handle('pick-folder', async e => {
   if (!from(e)) return null
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender) ?? win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button
