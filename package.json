@@ -32,7 +32,7 @@
     "demo": "node --experimental-strip-types --no-warnings scripts/demo.ts"
   },
   "dependencies": {
-    "@lydell/node-pty": "1.2.0-beta.15",
+    "@lydell/node-pty": "1.2.0-beta.18",
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",
     "ws": "^8.22.0"
@@ -41,7 +41,7 @@
     "@blocknote/core": "^0.56.0",
     "@blocknote/mantine": "^0.56.0",
     "@blocknote/react": "^0.56.0",
-    "@mantine/core": "^9.7.3",
+    "@mantine/core": "^9.7.4",
     "@mantine/hooks": "^9.7.3",
     "@types/node": "^26",
     "@types/react": "^19",
@@ -54,7 +54,7 @@
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.12.0",
-    "electron": "^45.0.0",
+    "electron": "^45.1.0",
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "html-to-image": "^1.11.13",
