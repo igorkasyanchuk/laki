@@ -954,6 +954,14 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .show-strip .show-text { padding: 2px 12px 6px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: 12.5px; } /* laki show's card (panels.tsx ShowStrip) */
 .show-strip .show-open { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
 .show-strip .show-open button { display: inline-flex; align-items: center; gap: 6px; }
+.check-strip.s-failed, .check-strip.s-over { border-top-color: color-mix(in srgb, var(--error) 45%, var(--line)); } /* Done means checked (panels.tsx CheckStrip) */
+.check-strip .queue-head .icon-svg { color: var(--waiting); } .check-strip.s-passed .queue-head .icon-svg { color: var(--done); }
+.check-list li { flex-wrap: wrap; } .check-list li .queue-text { flex: 1; }
+.check-mark { flex: none; width: 14px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.check-list .c-pass .check-mark { color: var(--done); } .check-list .c-fail .check-mark { color: var(--error); }
+.check-out { flex-basis: 100%; margin-left: 20px; } .check-out summary { cursor: pointer; color: var(--muted); }
+.check-out pre, .check-note { margin: 4px 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; }
+.check-note { margin: 0 12px 8px; font-family: inherit; font-size: 12.5px; }
 .queue-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; color: var(--muted); }
 .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-what b { color: var(--fg); font-weight: 600; }

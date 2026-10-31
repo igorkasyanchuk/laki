@@ -4,7 +4,7 @@ import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
 import { Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
-import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
+import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
 
@@ -98,7 +98,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; check?: DoneCheck } // check: Done means checked; expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
 
 const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
@@ -396,6 +396,27 @@ export function ProjectSection(p: {
       <Group title="Scripts" hint="For workspace setup, teardown, the Run button and Run ▾'s Test, Lint, Format and Deploy; empty: the repo's .laki.json">
         <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
       </Group>
+      {p.project.git && !p.project.host && (checkNow => (
+        <Group title="Done check" hint="As an agent's turn ends having changed files, these run in its worktree before you're told it's done. A failing script goes back to the agent with its output, 3 times in a row, then it's over to you. None ticked: off (a repo's .laki.json can bring its own check)">
+          <div className="setting-box">
+            {CHECK_STEPS.map(k => (
+              (has => (
+                <Switch key={k} className="switch-row" disabled={!has} on={!!checkNow.steps?.includes(k)} onChange={v => setC(y => ({ ...y, check: { ...checkNow, steps: CHECK_STEPS.filter(x => (x === k ? v : checkNow.steps?.includes(x))) } }))}>
+                  <Says title={`Run ${k}`} hint={has ? `${c[k]?.trim() || file[k]}${k === 'format' ? ' (it may change files)' : ''}` : `Set the ${k} script under Scripts first`} />
+                </Switch>
+              ))(!!(c[k]?.trim() || file[k]?.trim()))
+            ))}
+            <label className="switch-row">
+              <select value={checkNow.review ?? ''} aria-label="A second agent's review" onChange={e => setC(y => ({ ...y, check: { ...checkNow, review: (e.target.value || undefined) as DoneCheck['review'] } }))}>
+                <option value="">None</option>
+                <option value="claude">Claude Code</option>
+                <option value="codex">Codex</option>
+              </select>
+              <Says title="A second agent's review" hint="Once the scripts pass, it reads the diff (read-only, no tools) and lists real problems. Its notes show under the tab; they go to the agent only when you send them. Each review is a call to that agent" />
+            </label>
+          </div>
+        </Group>
+      ))(c.check ?? file.check ?? {})}
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </Group>

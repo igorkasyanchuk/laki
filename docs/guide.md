@@ -1432,6 +1432,24 @@ laki flow check .laki/workflows               # check workflow files (a folder: 
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
+### Done check
+
+"Done" usually means the agent stopped talking. With a project's Done check, it means its work passed. Tick what runs
+in the project's settings › *Done check*: its *format*, *lint* and *test* scripts (the ones Run ▾ has, set under
+Scripts), and *A second agent's review* (Claude Code or Codex). As an agent's turn ends having changed files, Laki
+runs the ticked scripts in the worktree (format, then lint, then test; the first that fails stops it), then, if they
+pass, the reviewer reads the diff (read-only, no tools) and lists real problems.
+
+A strip under the agent's terminal shows each step as it runs. A failing script goes back to the agent with its output,
+and its fix is checked again, 3 times in a row; then it's *over to you* (a notification, and a phone push if you have
+one), with *Send to the agent* and *Check again*. The reviewer's notes show in the strip; *Send to the agent* sends them
+(never on their own). The turn's notification waits for the check: *done and checked*, or the plain *done* when nothing
+changed. A turn that changed nothing since the last check that passed isn't checked again. A repo can bring its own in
+`.laki.json` (`"check": { "steps": ["lint", "test"], "review": "codex" }`), trusted like its setup script; the
+project's settings win. The first time a turn ends in a project with a test or lint script and no check, a toast offers
+to turn one on. Settings › Git & worktrees › *Done check* turns them all off. Not on SSH hosts or codespaces, nor for a
+workflow's agent blocks (they have their own loops).
+
 ### Collision radar
 
 Worktrees keep agents out of each other's files until merge day. Every 15 seconds Laki compares what each worktree
@@ -1653,7 +1671,7 @@ lit for a moment.
   off: a PR's status changes only with its right click › *Refresh PR status*, if `gh` asks for an SSH passphrase or
   GitHub rate-limits you; the PR switches need it on), *Keep the Mac awake while agents work* (off: while any agent works
   or waits for your answer, the Mac doesn't sleep, on battery too; the screen still turns off and locks, and closing the
-  lid still sleeps it), *Collision radar* (on: worktrees whose changes meet, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
+  lid still sleeps it), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (on: worktrees whose changes meet, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens

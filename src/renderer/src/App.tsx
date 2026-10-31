@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, LaterStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -525,6 +525,7 @@ export function App() {
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
   // Collision radar's overlaps you hid, until they change (each one's radarKey)
   const [radarHid, setRadarHid] = useState<string[]>(() => load('laki.radarHide', []))
+  const [checkHid, setCheckHid] = useState<string[]>([]) // Done means checked: strips hidden (workspace:at)
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
   const [full, setFull] = useState(false)
@@ -1240,7 +1241,17 @@ export function App() {
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, actions)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
-        else post()
+        else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
+      } else if (m.ev === 'check') {
+        // Done means checked: the turn's notification, now that its check is over (skipped: nothing changed; failed: sent
+        // back to the agent, which works again, so none)
+        const t = viewRef.current?.tabs.find(t => t.id === m.tab)
+        const s = viewRef.current?.settings
+        const w = viewRef.current?.workspaces.find(w => w.id === m.ws)
+        if (!t || m.status === 'failed' || s?.notify === false || t.muted || w?.muted) return
+        if (m.status !== 'over' && (s?.notifyOn?.done === false || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
+        const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, String(body).slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound)
       } else if (m.ev === 'flow') {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
@@ -3141,6 +3152,17 @@ export function App() {
   const needNext = needAfter()
   const needsShown = !find && (!rail || railKind === 'projects') && settings.needsList !== false && !folded.includes('needs')
   const needWs = needsShown ? undefined : needNext?.workspace
+  // Done means checked, offered once per project (laki.checkOffered) as a turn ends in one with a test or lint script
+  // and no check of its own yet
+  const offerCheck = (wsId?: string) => {
+    const v = viewRef.current
+    const w = v?.workspaces.find(x => x.id === wsId)
+    const p = v?.projects.find(x => x.id === w?.project)
+    const steps = (['lint', 'test'] as const).filter(k => w?.scripts?.includes(k))
+    if (!w || !p || !steps.length || p.config?.check || v?.settings.doneCheck === false || load<string[]>('laki.checkOffered', []).includes(p.id)) return
+    store('laki.checkOffered', [...load<string[]>('laki.checkOffered', []), p.id])
+    toast(`Check ${p.name}'s work before you're told it's done? Its ${steps.join(' and ')} run as each turn ends; failures go back to the agent`, () => void call('projectSet', { id: p.id, config: { ...p.config, check: { steps } } }).then(() => done(`${p.name}: checked before you're told (Settings › ${p.name})`), () => {}), 'Turn on')
+  }
   // Collision radar: where a workspace's changes meet another live worktree's, or what landed on its base since it
   // branched (the daemon's scanOverlaps); one you hid stays hidden while it reads the same
   const radarKey = (w: WorkspaceView, c: Collision) => [w.id, c.ws ?? c.base, c.file, c.mine, c.theirs].join('|')
@@ -4228,6 +4250,7 @@ export function App() {
                       <>
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
+                        {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
                         <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />
                       </>

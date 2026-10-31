@@ -81,7 +81,22 @@ export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: s
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
 // ports: names for the status bar's ports ({"3000": "web"})
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
+// Done means checked (daemon/verify.ts): a project's check, run as an agent's turn ends having changed files: its
+// format, lint and test scripts that are ticked (in that order, the first failure stops it), then, if they pass, a
+// read-only review of the diff by another agent. Set in the app (ProjectConfig.check) or a trusted .laki.json's check
+export const CHECK_STEPS = ['format', 'lint', 'test'] as const
+export type CheckStepName = (typeof CHECK_STEPS)[number]
+export type DoneCheck = { steps?: CheckStepName[]; review?: 'claude' | 'codex' }
+export const checkOk = (c: unknown): DoneCheck | undefined => {
+  if (!c || typeof c !== 'object') return undefined
+  const o = c as DoneCheck
+  const review = o.review === 'claude' || o.review === 'codex' ? o.review : undefined
+  return { steps: CHECK_STEPS.filter(k => Array.isArray(o.steps) && o.steps.includes(k)), ...(review && { review }) } // none ticked: off, over the repo's
+}
+export type CheckStep = { name: CheckStepName; state: 'wait' | 'run' | 'pass' | 'fail' | 'skip'; ms?: number; out?: string }
+// a workspace's last check: the agent tab whose turn it checked, how it went, how many failures in a row went back
+export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' | 'over'; steps: CheckStep[]; review?: { agent: string; state: 'wait' | 'run' | 'pass' | 'note' | 'fail'; note?: string }; tries: number; at: number }
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -495,6 +510,7 @@ export type Settings = {
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
+  doneCheck?: boolean // Done means checked: projects' checks as agents' turns end (on unless false; each project's steps off until ticked)
   radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
@@ -781,7 +797,7 @@ export type NamedTunnel = { name?: string; domain?: string }
 export type Stat = { add: number; del: number; files: number; dirty: number }
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; artifacts?: number; links?: Link[]; artKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
@@ -881,5 +897,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 126
+export const API = 127
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

@@ -31,6 +31,9 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+- **Done check**: as an agent's turn ends having changed files, the project's lint, test and format scripts you tick run
+  in its worktree, then a second agent (Claude Code or Codex) reviews the diff; a failure goes back to the agent (3
+  times, then over to you), and you're told *done and checked*.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Orchestrate**: the orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
