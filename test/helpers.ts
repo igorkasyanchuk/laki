@@ -148,7 +148,13 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       const { pid } = rig.info()
       if (await rig.rpc('shutdown').then(() => true, () => false)) await until(() => !running(pid), 'autostarted daemon gone').catch(() => {})
     }
-    rmSync(home, { recursive: true, force: true })
+    // a child the daemon started (a PR scan's gh) may still write here a moment after it stopped
+    for (let i = 0; ; i++) {
+      try { rmSync(home, { recursive: true, force: true }); break } catch (e) {
+        if (i === 4) throw e
+        await new Promise(r => setTimeout(r, 300))
+      }
+    }
   })
   await rig.start()
   return rig
