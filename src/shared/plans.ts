@@ -12,6 +12,20 @@ export const BRAINSTORM_OUTPUT = `Explore the idea, don't build it. Write what y
 - <name>.diagram.json for an architecture or a flow worth editing by hand. ${DIAGRAM_FORMAT}
 Ask the user when the direction depends on them.`
 
+// how to brainstorm with the user (the laki-specs skill's, Laki AI's brainstorm chats'): the method of obra/superpowers'
+// brainstorming skill (Jesse Vincent, MIT; as aitmpl.com's development/brainstorming 2.0 has it), in Laki's words, its
+// output a Laki spec or brainstorm instead of a repo's docs/plans file
+export const BRAINSTORM_METHOD = `Find out what the user wants and why before anything is built: what you think they want is usually thinner than it feels, and with the why you can make the unsaid choices their way. Everything already in the request (a one-line, fully said task): just do it.
+1. Look before you ask. Read what you were given (the brief, its files, the project's code) until you can say how it works today and what the change touches. Never ask what the project already answers.
+2. First message. A detailed ask: say it back in your own words in about 200 words (what, for whom, why), what you found, anything that would change it (a constraint, a conflict, a cheaper way), then the one question whose answer changes the most. A thin ask: one open question about the biggest unsettled thing, and why you ask. Not asked to brainstorm: offer in a line to just start instead.
+3. One question per message, one sentence, in the user's words, no list of sample answers and no talk of this method. Open questions first; a short menu only when they're stuck; "just guess": propose something concrete. A proposal they can correct, with its reason, often beats a question. Settle early which choices are theirs (platform, libraries, look) and build on what exists; a choice you make is written down as yours, never as agreed. Cover, as it comes up: what it is, why now and what success looks like, goals, non-goals and what would make it a failure even if it works, what they liked or hated elsewhere, what they tried.
+4. Show, don't tell: for screens, flows or options that would look different, offer once a mockup (a prototype page, a diagram); declined, stay in words.
+5. Approaches, in a message of their own, before writing anything up: think of several, drop the weak ones, give the 2-3 left with what each trades off, lead with your pick and why, and ask which. Only one sensible way: say so and why.
+6. Play it back: once a part is clear, say it back in 200-300 words (only what they said is theirs; what you filled in is marked as your proposal), then ask what's wrong or missing.
+7. Size it once they've picked: a small change gets a short design in the chat (a line or two a point); a project gets it written into Laki (below). Both say the approaches, the pick and why. It grows: say so. Several independent projects: agree an order, one at a time.
+8. Nothing is built until they approve the written design: no code, scaffolding, installs or new projects; reading, exploring and agreed mockups are fine. A throwaway spike they agreed to may be built; keeping it is a new ask. After approval the next step is the plan (a spec's Steps), not code.
+Write it into Laki: an idea to explore is a brainstorm (its README.md is the user's brief; your options, prototypes and diagrams are files beside it); a design to build is a spec, written for a capable builder to work from alone: ## Goal (and why), ## Context, ## Decisions (the user's, as they said them; yours marked as yours), ## Approaches (considered, the pick, why), ## Steps as a - [ ] checklist, ## How to verify, ## Not doing. YAGNI: cut what nobody asked for. The user reads, edits and approves it in Laki.`
+
 const where = (p: Pick<Plan, 'path'>) => `${p.path}/README.md`
 
 // the spec's Start: the new-workspace page's prompt (the user picks the agent and can change it)
@@ -21,7 +35,7 @@ export const specPrompt = (p: Plan) => `Implement the spec "${p.title}": ${where
 
 // the brainstorm's button: the first ask in its own chat with Laki AI (the chat's instructions name the brainstorm too)
 export const brainstormPrompt = (p: Plan) =>
-  `Brainstorm session for "${p.title}": read the brief with laki_plan_read (project ${p.project}, kind brainstorm, slug ${p.slug}), and the project's code where it helps, then write your options into it with laki_plan_write. End with the options in a sentence each, and which files you wrote.`
+  `Brainstorm session for "${p.title}": read the brief with laki_plan_read (project ${p.project}, kind brainstorm, slug ${p.slug}), and the project's code where it helps. When the brief leaves something big open, ask me first, one question at a time; once it's clear, write your options into it with laki_plan_write and end with them in a sentence each, and which files you wrote.`
 
 // a spec's or brainstorm's own chat with Laki AI (daemon/ai.ts keeps it in its folder, .chat.json)
 export const planChat = (p: { project: string; kind: string; slug: string }) => `plan:${p.project}/${p.kind}/${p.slug}`

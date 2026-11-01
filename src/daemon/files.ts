@@ -487,10 +487,15 @@ export function artifactFile(id: string, rel: string) {
 
 export const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
 export const MAX_TEXT = 512 << 10
+// audio and video the preview and the artifacts viewer play: a file's kind always, its data URL with media: true
+// ponytail: whole files as data URLs, MEDIA_MAX each; a streaming route with Range if bigger ones matter
+export const MEDIA: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', ogv: 'video/ogg' }
+export const MEDIA_MAX = 25 << 20
 
-// fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image
-// as it was where the workspace's changes start (diff's base, through git show), for Changes' before and after
-export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean }) {
+// fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), audio or video (`media`, its
+// kind; `src`, its data URL, only asked for: media true, MEDIA_MAX), or only its size. base: an image as it was where
+// the workspace's changes start (diff's base, through git show), for Changes' before and after
+export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean; media?: boolean }) {
   let ws = findWs(o.ws)
   if (o.storage) {
     // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own
@@ -514,11 +519,13 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
     if (stdout.length > 10 << 20) throw new Error('over 10 MB')
     return { size: stdout.length, image: `data:${mime};base64,${stdout.toString('base64')}` }
   }
-  if (ws.host) return hostFileRead(ws, abs, o.path)
+  if (ws.host) return hostFileRead(ws, abs, o.path, o.media)
   const st = statSync(abs)
   if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
   const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
   if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
+  const av = MEDIA[extname(abs).slice(1).toLowerCase()]
+  if (av) return { size: st.size, media: av.split('/')[0], ...(o.media && st.size <= MEDIA_MAX && { src: `data:${av};base64,${readFileSync(abs).toString('base64')}` }) }
   let buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))
   const fd = openSync(abs, 'r')
   try {
@@ -537,9 +544,10 @@ export function textOf(buf: Buffer, size: number) {
 }
 
 // fileRead on an SSH host: the same answers, read there (base64: text over ssh)
-async function hostFileRead(ws: Workspace, abs: string, rel: string) {
-  const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
-  const max = mime ? 10 << 20 : MAX_TEXT
+async function hostFileRead(ws: Workspace, abs: string, rel: string, media?: boolean) {
+  const av = MEDIA[extname(abs).slice(1).toLowerCase()]
+  const mime = IMAGES[extname(abs).slice(1).toLowerCase()] ?? av
+  const max = av ? (media ? 10 << 20 : 0) : mime ? 10 << 20 : MAX_TEXT // media: 10 MB here, its base64 within exec's 16 MB
   const read = `[ -f "$1" ] || { echo "$3 isn't a file" >&2; exit 3; }; n=$(wc -c < "$1"); echo $n; if [ "$2" = text ] || [ "$n" -le "$4" ]; then head -c "$4" "$1" | base64; fi`
   const { stdout } = await exec(ws, 'sh', ['-c', read, 'sh', abs, mime ? 'image' : 'text', rel, String(max)]).catch(e => {
     throw new Error(String(e.stderr || e.message).trim().split('\n').at(-1))
@@ -547,6 +555,7 @@ async function hostFileRead(ws: Workspace, abs: string, rel: string) {
   const nl = stdout.indexOf('\n')
   const size = Number(stdout.slice(0, nl).trim())
   const buf = Buffer.from(stdout.slice(nl + 1), 'base64')
+  if (av) return { size, media: av.split('/')[0], ...(media && size <= max && { src: `data:${av};base64,${buf.toString('base64')}` }) }
   if (mime) return size > max ? { size } : { size, image: `data:${mime};base64,${buf.toString('base64')}` }
   if (buf.subarray(0, 8000).includes(0)) return { size } // binary
   return textOf(buf, size)

@@ -68,7 +68,7 @@ export function Term({
   onSelection?: (text: string, how: SelectionUse) => void // ⌥ held by Reply: the selection as a new workspace's, tab's or Laki AI's prompt
   onCode?: (path: string, line: number | undefined, other: boolean) => void // a file path in its text clicked (other: ⌥ held)
   codeTo?: 'preview' | 'editor' // where a click opens one (Settings' fileClick), for its hover's words
-  image?: (path: string) => Promise<string | undefined> // a hovered picture's data URL (an absolute path)
+  image?: (path: string) => Promise<string | undefined | null> // a hovered picture's data URL (an absolute path); null: no card
   cwd?: string // the workspace's folder: a relative picture path's
 }) {
   const copy = useRef(copyOnSelect)

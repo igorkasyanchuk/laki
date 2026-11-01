@@ -9,7 +9,7 @@ import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
-import { AGENT_COLORS, copyImage, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
+import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -1024,7 +1024,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               }
               send={send}
               inserts={inserts?.(p.project) /* the project picked: its repo's extensions too */}
-              complete={completeOf(view, { project: p.project, files: true })}
+              complete={completeOf(view, { project: p.project, files: true, agent: starts })}
             />
           ) : (
             <>
@@ -1658,10 +1658,10 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown> } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown> } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
-type Seen = { size: number; text?: string; image?: string } | { error: string }
+type Seen = { size: number; text?: string; image?: string; media?: string } | { error: string }
 const HTML = /\.html?$/i
 export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these (Settings › General › Artifacts open)
 
@@ -1747,6 +1747,16 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const at = here && i >= 0 ? here[i] : null
   const step = (d: number) => here?.length && i >= 0 && setBig(here[(i + d + here.length) % here.length].path)
   useEffect(() => void (at && !linkOf(at.path) && need(at)), [at])
+  // audio or video shown big: its data URL, asked for then (the strip's previews never carry it); one at a time
+  const [play, setPlay] = useState<{ key: string; src?: string; done?: boolean; err?: string } | null>(null)
+  const atSeen = at ? seen[key(at)] : undefined
+  useEffect(() => {
+    if (!at || !atSeen || 'error' in atSeen || !atSeen.media || play?.key === key(at)) return
+    const k = key(at)
+    setPlay({ key: k })
+    const end = (src?: string, err?: string) => setPlay(p => (p?.key === k ? { key: k, src, done: true, err } : p))
+    api.current.read(at.path, true).then(c => end(c.src), e => end(undefined, `couldn't read it: ${e?.message ?? e}`))
+  }, [at, atSeen])
   useEffect(() => {
     if (big === null) return
     const f = (e: KeyboardEvent) => {
@@ -1766,6 +1776,8 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     e.preventDefault()
     openMenu(e, items)
   }
+  // shown big as a FileCard (audio, video, a kind it can't draw): the card has Show in Finder
+  const card = (f: Artifact) => (c => !!c && !('error' in c) && c.text === undefined && !c.image && !(HTML.test(f.path) && a.page?.(f.path)))(seen[key(f)])
   const look = (f: Artifact, full = false) => {
     const l = linkOf(f.path)
     if (l)
@@ -1786,6 +1798,24 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if (c.image) return <img src={c.image} alt={f.path} />
     if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
     if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} html /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
+    if (full)
+      return (
+        <FileCard
+          path={f.path}
+          meta={sizeOf(f.size)}
+          media={c.media}
+          src={play?.key === key(f) ? play.src : undefined}
+          big={play?.key === key(f) && !!play.done && !play.src && (play.err ?? true)}
+          acts={[...(a.open ? [{ label: 'Open', icon: 'file', run: () => a.open!(f.path), primary: true } as FileAct] : []), ...(a.editor ? [{ label: 'Open in editor', icon: 'code', run: () => a.editor!(f.path) } as FileAct] : []), ...(a.reveal ? [{ label: 'Show in Finder', icon: 'folder', run: () => a.reveal!(f.path) } as FileAct] : [])]}
+        />
+      )
+    if (c.media)
+      return (
+        <span className="art-link">
+          <Icon name={c.media === 'audio' ? 'music' : 'film'} size={20} />
+          <span className="art-host">{f.path.split('.').pop()}</span>
+        </span>
+      )
     return <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
   }
   return (
@@ -1878,7 +1908,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
                 <>
                   <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
                   {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}
-                  {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
+                  {a.reveal && !card(at) && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
                   {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
                 </>
               ))(linkOf(at.path))}

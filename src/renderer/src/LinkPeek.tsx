@@ -13,7 +13,7 @@ import { imgVia } from './Widgets'
 export const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 // what a hovered link shows: a GitHub card, an image, or nothing
 export const peekOf = (uri: string) => (GH_LINK.test(uri) ? 'gh' : IMAGE.test(uri.split(/[?#]/)[0]) ? 'img' : undefined)
-export type Peek = { uri: string; x: number; y: number; image?: () => Promise<string | undefined> } // image: a local file's data URL
+export type Peek = { uri: string; x: number; y: number; image?: () => Promise<string | undefined | null> } // image: a local file's data URL; null: nothing to show (no card)
 
 export type Big = { src: string; name: string; size: string } // an image opened larger (Term's modal)
 export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnter: () => void; onLeave: () => void; onOpen: (b: Big) => void }) {
@@ -22,15 +22,17 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
   const [size, setSize] = useState('')
   const [err, setErr] = useState('')
   const [n, setN] = useState(0) // Retry
+  const [none, setNone] = useState(false) // image() said null: no card at all
   const kind = peekOf(peek.uri)
   useEffect(() => {
     let live = true
     setErr('')
+    setNone(false)
     const fail = (e: unknown) => live && setErr(String((e as Error)?.message ?? e))
     if (kind === 'gh') api.call<GhCard>('ghCard', { url: peek.uri }).then(c => live && setCard(c), fail)
     else if (/^https:/i.test(peek.uri)) (via => (via ? setSrc(via) : fail('Web pictures need the daemon')))(imgVia(peek.uri))
     else
-      (peek.image?.() ?? Promise.reject(new Error('Not a file of this workspace'))).then(s => live && (s ? setSrc(s) : fail('Not shown: over 10 MB')), fail)
+      (peek.image?.() ?? Promise.reject(new Error('Not a file of this workspace'))).then(s => live && (s ? setSrc(s) : s === null ? setNone(true) : fail('Not shown: over 10 MB')), fail)
     return () => void (live = false)
   }, [peek.uri, n])
   // below the pointer, or above it in the screen's lower part; never off the window's right edge
@@ -40,6 +42,7 @@ export function LinkPeek({ peek, onEnter, onLeave, onOpen }: { peek: Peek; onEnt
   const state = card && (card.draft && card.state === 'open' ? 'draft' : card.state)
   const file = decodeURIComponent(peek.uri.split(/[?#]/)[0].split('/').pop() ?? '')
   const open = () => src && onOpen({ src, name: file, size })
+  if (none) return null
   return createPortal(
     <div className={`link-peek ${kind}`} style={style} onMouseEnter={onEnter} onMouseLeave={onLeave}>
       {kind === 'gh' ? (

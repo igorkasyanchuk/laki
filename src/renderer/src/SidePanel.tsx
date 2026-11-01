@@ -10,7 +10,7 @@ import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, Dif
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
+import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -18,7 +18,7 @@ export type Changes = { base: string; files: { path: string; status: string; add
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
 export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
-export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean } // lossy: not UTF-8
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true)
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
 // keeps it: a workspace switch doesn't lose it)
 export type Edit = { text: string; was: string }
@@ -1208,6 +1208,9 @@ export function FilePreview(p: {
   save: (text: string, was: string, force?: boolean) => Promise<unknown> // over the file, unless it changed since was
   openLabel?: string // the open button's words (an artifact: in its app)
   readOnly?: boolean // no edit (an artifact)
+  onDefault?: () => void // a file it can't show: in its default app, the editor (else onOpen, unless readOnly), or Finder (the card's buttons)
+  onEditor?: () => void
+  onReveal?: () => void
 }) {
   const [f, setF] = useState<FileContent | null>(null)
   const [err, setErr] = useState('')
@@ -1358,7 +1361,16 @@ export function FilePreview(p: {
             </div>
           ))}
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
-        {f && f.text === undefined && !f.image && <div className="muted small pad">Not shown here ({sizeText(f.size)}): open it in the editor or Finder.</div>}
+        {f && f.text === undefined && !f.image && (
+          <FileCard
+            path={p.path}
+            meta={sizeText(f.size)}
+            media={f.media}
+            src={f.src}
+            big={!!f.media && !f.src}
+            acts={[...(p.onDefault ? [{ label: 'Open', icon: 'file', run: p.onDefault, primary: true } as FileAct] : []), ...(p.onEditor ? [{ label: 'Open in editor', icon: 'code', run: p.onEditor } as FileAct] : p.readOnly ? [] : [{ label: p.openLabel ?? 'Open in editor', icon: 'code', run: p.onOpen } as FileAct]), ...(p.onReveal ? [{ label: 'Show in Finder', icon: 'folder', run: p.onReveal } as FileAct] : [])]}
+          />
+        )}
       </div>
       )}
     </div>

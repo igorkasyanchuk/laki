@@ -600,7 +600,8 @@ export function triggerAt(v: string, caret: number): Trigger | null {
 export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue' }
 // the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
 // templates by name
-export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
+export type AgentCommand = { name: string; sub: string; skill?: boolean } // the daemon's agentCommands: /name (codex's skills $name)
+export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[]; commands?: AgentCommand[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
   const q = t.q.toLowerCase()
   if (t.ch === '@') {
     const changed = new Set(o.changed ?? [])
@@ -614,7 +615,10 @@ export function completions(t: Trigger, o: { files?: string[]; changed?: string[
       .slice(0, max)
       .map(r => ({ label: `#${r.n} ${r.title}`, sub: r.kind, value: r.url }))
   }
-  return (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).slice(0, max).map(x => ({ label: `/${x.name}`, sub: x.text.split('\n')[0].slice(0, 60), value: x.text, template: x }))
+  // your templates first, then the agent's own commands and skills (picked: /name as typed for the agent to run)
+  const tpl = (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).map(x => ({ label: `/${x.name}`, sub: x.text.split('\n')[0].slice(0, 60), value: x.text, template: x }))
+  const cmd = (o.commands ?? []).filter(c => c.name.toLowerCase().replace(/^\$/, '').includes(q)).map(c => (n => ({ label: n, sub: [c.skill ? 'skill' : 'command', c.sub].filter(Boolean).join(' · '), value: n }))(c.name.startsWith('$') ? c.name : `/${c.name}`))
+  return [...tpl, ...cmd].slice(0, max)
 }
 // a pick put in: the trigger's word replaced by a path or URL and a space, or by a template's text, the caret where
 // its {{prompt}} was (else at its end)

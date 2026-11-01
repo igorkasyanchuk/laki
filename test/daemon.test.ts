@@ -102,7 +102,7 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })
   const states = (s: { state: string }[]) => s.map(x => x.state)
-  assert.deepEqual(states(await rig.rpc('skills')), Array(15).fill('missing')) // laki's, laki-widget's, then laki-orchestrate's
+  assert.deepEqual(states(await rig.rpc('skills')), Array(20).fill('missing')) // laki's, laki-widget's, laki-orchestrate's, then laki-specs'
   assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: true })).slice(0, 2)), ['installed', 'missing'])
   const at = join(rig.home, '.claude/skills/laki')
   assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)

@@ -65,6 +65,33 @@ export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
   return since < Infinity ? <Elapsed since={since} /> : null
 }
 
+// a file Laki doesn't draw as text or a picture: audio and video play (src, the daemon's data URL); anything else, or
+// one too big to play here, its kind and size with the ways to open it (the file preview's, the artifacts' big view)
+export type FileAct = { label: string; icon: IconName; run: () => void; primary?: boolean }
+// big: audio or video too big to play here, or (a string) why it won't play (else, with no src yet: still loading)
+export function FileCard({ path, meta, media, src, big, acts }: { path: string; meta?: string; media?: string; src?: string; big?: boolean | string; acts: FileAct[] }) {
+  const ext = /\.([^./]+)$/.exec(path)?.[1].toUpperCase() ?? 'File'
+  return (
+    <div className={`file-card ${src && media === 'video' ? 'video' : ''}`}>
+      {src && media === 'video' ? <video controls preload="metadata" src={src} /> : <Icon name={media === 'audio' ? 'music' : media === 'video' ? 'film' : 'file'} size={30} />}
+      <div className="file-card-name">{path.split('/').pop()}</div>
+      <div className="muted small">
+        {[ext, meta, media && !src ? (typeof big === 'string' ? big : big ? 'too big to play here' : 'loading…') : !media ? "Laki can't show this kind of file" : ''].filter(Boolean).join(' · ')}
+      </div>
+      {src && media === 'audio' && <audio controls preload="metadata" src={src} />}
+      {acts.length > 0 && (
+        <div className="file-card-acts">
+          {acts.map(a => (
+            <button key={a.label} className={`small ${a.primary ? 'primary' : ''}`} onClick={a.run}>
+              <Icon name={a.icon} size={13} /> {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // an on/off switch: the status bar's auto toggles, Settings' options (a row: className="switch-row")
 export function Switch({ on, onChange, tip, className = '', disabled, children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; disabled?: boolean; children?: ReactNode }) {
   return (

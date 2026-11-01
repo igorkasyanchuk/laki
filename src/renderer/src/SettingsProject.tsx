@@ -98,7 +98,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; check?: DoneCheck } // check: Done means checked; expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; check?: DoneCheck; workflows?: boolean } // workflows: Applicable for Workflows (its menus' Run workflow ›, off unless true); check: Done means checked; expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs; simulator: the Simulator tab here (unset: Settings')
 
 const PR_PERMS: [keyof PRAllow, string, string][] = [
   ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
@@ -297,7 +297,7 @@ export function ProjectSection(p: {
   file?: (id: string) => Promise<ProjectConfig>
   rename?: boolean
   script?: keyof Scripts
-  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean } // Settings' own, which go with this project's (simulator: its switch, which this project's may override)
+  global?: { actions?: RunAction[]; templates?: Template[]; simulator?: boolean; flows?: boolean } // Settings' own, which go with this project's (simulator: its switch, which this project's may override; flows: Workflows on)
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
@@ -423,6 +423,15 @@ export function ProjectSection(p: {
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </Group>
+      {p.global?.flows !== false && (
+        <Group title="Workflows">
+          <div className="setting-box">
+            <Switch className="switch-row" on={c.workflows === true} onChange={v => setC(y => ({ ...y, workflows: v || undefined }))}>
+              <Says title="Applicable for Workflows" hint="Run workflow › in this project's workspace menus. Off: the menus leave it out; the Workflows page and ⌘K still run them" />
+            </Switch>
+          </div>
+        </Group>
+      )}
       <Group title="Simulator" hint="The side panel's Simulator tab in this project's workspaces: as Settings › Simulators says, or on or off here alone">
         <select value={c.simulator === undefined ? '' : c.simulator ? 'on' : 'off'} aria-label="Simulator tab" onChange={e => setC(y => ({ ...y, simulator: e.target.value ? e.target.value === 'on' : undefined }))}>
           <option value="">As in Settings ({p.global?.simulator ? 'on' : 'off'})</option>

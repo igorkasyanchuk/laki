@@ -304,7 +304,7 @@ export function AiSection({ api, ai, glow, onGlow, presets, onChange, imageDays,
   )
 }
 
-export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
+export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's), laki-widget, laki-orchestrate or laki-specs
 
 // Settings › Agents & profiles' accounts (the daemon's accounts.ts): who each signs in as, and what to do with them
 export type AccountsApi = { load: () => Promise<AccountView[]>; usage: () => Promise<AgentUsage[]>; add: (agent: AccountAgent, name: string) => Promise<Account>; rename: (id: string, name: string) => Promise<unknown>; remove: (a: AccountView) => Promise<unknown>; login: (a: AccountView) => Promise<unknown> }
@@ -354,6 +354,7 @@ const SKILL_KINDS: [string, string, string][] = [
   ['laki', 'Laki', 'list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all through the command line'],
   ['laki-widget', 'Extension creator', "make and change the sidebar's extensions: the files, the template language, JS ones, actions, checking them with laki widget"],
   ['laki-orchestrate', 'Orchestrator', 'split work across several agents at once, a workspace each: plan it, start them, follow them up and bring their results together (in Laki’s Claude tabs also /laki:orchestrate, in its OpenCode tabs /laki-orchestrate)'],
+  ['laki-specs', 'Specs & brainstorms', "brainstorm with you one question at a time (approaches, then a design you approve) and write it into Laki as a spec or a brainstorm; read and work from yours (laki plan)"],
 ]
 
 // the skill that teaches the agents about the app, in each one's folder in the user's home

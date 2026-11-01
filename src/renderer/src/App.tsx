@@ -247,7 +247,7 @@ const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 
 // where a folder opens: editors (one of them is ⌘E's), Finder, terminals
 const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'antigravity', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
-type Where = { ws?: string; project?: string; widget?: string; file?: string } // what Open in opens: a folder (a widget's too), or a file in a workspace
+type Where = { ws?: string; project?: string; widget?: string; file?: string; storage?: boolean } // what Open in opens: a folder (a widget's too), or a file in a workspace
 const WEB = /\.(x?html?|svg|pdf|xml|json|png|jpe?g|gif|webp)$/i // what browsers show
 const PICTURE = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i // what Copy puts on the clipboard as a picture (main's PICS)
 const PLAIN = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|css|svg|[cm]?[jt]sx?|py|rb|go|rs|sh|sql|diff|patch)$/i // Copy text: files that are text
@@ -442,7 +442,8 @@ export function App() {
     setFly(to)
     setTimeout(() => setFly(f => (f === to ? '' : f)), DOCK_MS)
   }
-  const dock = (on: boolean) => (on && !matchMedia('(prefers-reduced-motion: reduce)').matches ? (setFly('down'), setTimeout(() => docked(true), DOCK_MS - 20)) : docked(on))
+  // no status bar (settings.statusBar false): minimized to a small AI pill in the button's corner instead, no flight
+  const dock = (on: boolean) => (on && viewRef.current?.settings.statusBar !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches ? (setFly('down'), setTimeout(() => docked(true), DOCK_MS - 20)) : docked(on))
   // another app in front: the window's animations (spinners, lines, a look's effects) stop where they are, so a window
   // in sight but not in use draws only what changes (styles.css' html.away); the bubbles say who's at work meanwhile
   useEffect(() => {
@@ -620,11 +621,19 @@ export function App() {
   // what's on screen stays there: a pick that's gone (archived, removed) or not in the view yet falls back to the one
   // shown, not to the first row, which a new workspace (placed on top, or sorted by last active) would take
   const shownWs = useRef<string | null>(null)
-  // one closed, archived or removed: the next row (else the one before), of its project first
+  // a kind whose rail button is off (Settings › Appearance › Rail): its projects go in Projects' list
+  const railOf = (k?: RailKind): RailKind => ((k === 'shells' && view?.settings.railShells === false) || (k === 'browsers' && view?.settings.railBrowsers === false) ? 'projects' : (k ?? 'projects'))
+  const rawKind = (w: WorkspaceView): RailKind => view?.projects.find(p => p.id === w.project)?.kind ?? 'projects'
+  const kindOf = (w: WorkspaceView): RailKind => railOf(rawKind(w))
+  // one closed, archived or removed: the next row (else the one before), of its project first, then of its rail kind;
+  // none of its kind: none (`gone`), so the rail stays where it was and shows the empty view, not another kind's list
   const lastRows = useRef<WorkspaceView[]>([])
   const nextWs = (id: string | null) =>
-    (o => (i => (i < 0 ? undefined : (near => near.find(w => w.project === o[i].project) ?? near[0])([...o.slice(i + 1), ...o.slice(0, i).reverse()].map(w => live.find(x => x.id === w.id)).filter((w): w is WorkspaceView => !!w))))(o.findIndex(w => w.id === id)))(lastRows.current)
-  const ws = live.find(w => w.id === wsId) ?? live.find(w => w.id === shownWs.current) ?? nextWs(shownWs.current) ?? order[0] ?? null
+    (o => (i => (i < 0 ? undefined : (near => near.find(w => w.project === o[i].project) ?? near.find(w => kindOf(w) === kindOf(o[i])))([...o.slice(i + 1), ...o.slice(0, i).reverse()].map(w => live.find(x => x.id === w.id)).filter((w): w is WorkspaceView => !!w))))(o.findIndex(w => w.id === id)))(lastRows.current)
+  const gone = !!shownWs.current && !live.some(w => w.id === shownWs.current) && lastRows.current.some(w => w.id === shownWs.current)
+  // wsId '': none on purpose (the last of its kind went), until one is picked
+  const ws = live.find(w => w.id === wsId) ?? live.find(w => w.id === shownWs.current) ?? nextWs(shownWs.current) ?? (gone || wsId === '' ? null : order[0]) ?? null
+  useEffect(() => void (gone && !ws && setWsId('')), [gone, ws])
   shownWs.current = ws?.id ?? null
   lastRows.current = order
   const wsFiles = ws ? openFiles.filter(f => f.ws === ws.id) : [] // this workspace's open files, its tabs
@@ -839,7 +848,7 @@ export function App() {
       const tab = viewRef.current?.tabs.find(x => x.id === t.tab)
       const say = (text: string, ok?: boolean) => (notify('Message for later', text, ok ? t.tab! : '', () => tab && selectTab(tab.id), viewRef.current?.settings.notifySound), toast(text, undefined, undefined, ok))
       if (!tab) return say(`Not sent: its agent tab is gone (${clip(t.text!)})`)
-      return void api.call<{ queued?: number }>('send', { target: tab.id, text: stamp(t.text!, Date.now()), whenIdle: true }).then(
+      return void api.call<{ queued?: number }>('send', { target: tab.id, text: stamp(t.text!, Date.now()), whenIdle: true, steer: true }).then(
         r => say(`${r?.queued ? `Queued for ${tab.name}, busy now` : `Sent to ${tab.name}`}: ${clip(t.text!)}`, true),
         e => say(`Not sent to ${tab.name}: ${e.message}`),
       )
@@ -1778,12 +1787,28 @@ export function App() {
     if ((t.kind === 'agent' || t.runs) && t.status !== 'exited') return [t]
     return tabs.filter(x => x.workspace === t.workspace && x.id !== t.id && x.kind === 'agent' && x.status !== 'exited')
   }
-  // a picture hovered in a tab's terminal (LinkPeek): a file of its workspace or its storage folder, else a pasted one
-  // (aiImage: the daemon's own <data>/images only)
+  // a picture's path hovered in a terminal: the workspace's file, its storage folder's, a pasted one. One not there (an
+  // agent names og.png, it's site/og.png): the workspace's one file of that name or tail; none or several: null, no card
+  const fileLists = useRef(new Map<string, { at: number; list: Promise<FileList | null> }>()) // a workspace's files, a minute: one listing for many hovers
+  const filesOf = (ws: string, within = 60_000) => {
+    const c = fileLists.current.get(ws)
+    if (c && Date.now() - c.at < within) return c.list
+    const list = api.call<FileList>('files', { ws }).catch(() => null)
+    fileLists.current.set(ws, { at: Date.now(), list })
+    return list
+  }
   const peekImage = (id: string) => (path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
-    const read = (storage: boolean) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path, storage }).then(r => r.image)
-    if (w && path.startsWith(`${w.path}/`)) return read(false)
+    const read = (storage: boolean, p = path) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r.image)
+    if (w && path.startsWith(`${w.path}/`))
+      return read(false).catch(async e => {
+        if (!/ENOENT|no such file/i.test(String(e?.message ?? e))) throw e // a real failure is said, not hidden
+        const rel = path.slice(w.path.length + 1)
+        const hit = (l: FileList | null) => l?.files.filter(f => f === rel || f.endsWith(`/${rel}`)) ?? []
+        let hits = hit(await filesOf(w.id))
+        if (!hits.length) hits = hit(await filesOf(w.id, 3000)) // none in a list read a while ago: one the agent just made, read again
+        return hits.length === 1 ? read(false, hits[0]) : null
+      })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
     return api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture')))
   }
@@ -1843,7 +1868,7 @@ export function App() {
       done(`Applied ${edits.length === 1 ? 'the suggestion' : `${edits.length} suggestions`} to ${path.split('/').pop()}`, () => void call('fileWrite', { ws: w.id, path, text: was, was: text }).then(() => (then?.(), done('Back as it was')), () => {}))
     },
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => (earn('comment'), toast(`Commented on PR #${w.pr?.number}`))),
-    toAgent: (text, line, tab) => api.call('send', { target: tab ?? w.id, text, whenIdle: true }).then(() => (line && earn('comment'), toast(`Sent to ${(tab && view?.tabs.find(t => t.id === tab)?.name) || 'the agent'}`))),
+    toAgent: (text, line, tab) => api.call('send', { target: tab ?? w.id, text, whenIdle: true, steer: true }).then(() => (line && earn('comment'), toast(`Sent to ${(tab && view?.tabs.find(t => t.id === tab)?.name) || 'the agent'}`))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     sim: p => api.call('sim', p),
@@ -2058,10 +2083,6 @@ export function App() {
   const sideKind: RailKind = rail ? railKind : 'projects' // a phone's drawer, or no rail: one width
   const sideW = sideWs[sideKind] ?? SIDE
   const setSideW = (w: number) => setSideWs(m => ({ ...m, [sideKind]: w }))
-  // a kind whose rail button is off (Settings › Appearance › Rail): its projects go in Projects' list
-  const railOf = (k?: RailKind): RailKind => ((k === 'shells' && settings.railShells === false) || (k === 'browsers' && settings.railBrowsers === false) ? 'projects' : (k ?? 'projects'))
-  const rawKind = (w: WorkspaceView): RailKind => view?.projects.find(p => p.id === w.project)?.kind ?? 'projects'
-  const kindOf = (w: WorkspaceView): RailKind => railOf(rawKind(w))
   const isTerm = (w: WorkspaceView) => !!w.term || rawKind(w) === 'shells' // a terminal: closed, not deleted
   useEffect(() => void (railOf(railKind) !== railKind && setRailKind('projects')), [railKind, settings.railShells, settings.railBrowsers])
   // the full review (settings.fullReview, FullReview.tsx): the tab bar's first tab while a git workspace has changes
@@ -2636,7 +2657,7 @@ export function App() {
   // terminal's, a browser's, a host's or an archived one)
   const flowsHere = (w: WorkspaceView) => flowItems.filter(f => f.source === 'yours' || f.project === w.project)
   const flowMenu = (w: WorkspaceView): MenuItem[] =>
-    !flowsOn || rawKind(w) !== 'projects' || w.term || w.host || w.archived
+    !flowsOn || rawKind(w) !== 'projects' || w.term || w.host || w.archived || view?.projects.find(p => p.id === w.project)?.config?.workflows !== true // its project's Applicable for Workflows (off unless on)
       ? []
       : (l => [{ label: 'Run workflow', icon: 'flow', key: 'w', items: l.length ? l.map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }])(flowsHere(w))
   const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
@@ -2744,7 +2765,7 @@ export function App() {
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   const readerApi: ReaderApi = {
     read: (tab, v) => api.call('chatRead', { tab, v }),
-    send: (tab, text) => call('send', { target: tab, text, whenIdle: true }),
+    send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
     answer: (tab, n) => void call('answer', { tab, n }).catch(() => {}),
   }
   const tabMenu = (ids: string[]): MenuItem[] => {
@@ -4108,7 +4129,7 @@ export function App() {
   )
 
   return (
-    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
+    <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
       {railBar}
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
       <aside className="sidebar" hidden={!sideOpen || listOff || !!strip} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
@@ -4393,8 +4414,9 @@ export function App() {
                 ) : (
                   view.projects.length ? (
                     <>
-                      <p>No workspaces yet.</p>
-                      <button className="primary" onClick={() => newWs()}>New workspace  ⌘N</button>
+                      {/* none picked: a fresh start, or the last of this rail kind went (the rail stays on it) */}
+                      <p>{railKind === 'shells' ? 'No terminals open.' : railKind === 'browsers' ? 'No pages open.' : live.length ? 'No workspace selected.' : 'No workspaces yet.'}</p>
+                      {railKind === 'shells' || railKind === 'browsers' ? <button className="primary" onClick={() => void quickNew(railKind)}>{railKind === 'shells' ? 'New terminal' : 'New browser'}</button> : <button className="primary" onClick={() => newWs()}>New workspace  ⌘N</button>}
                       <StarLaki />
                     </>
                   ) : (
@@ -4446,8 +4468,11 @@ export function App() {
               key={previewed.n}
               path={previewed.path}
               line={previewed.line}
-              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path, storage: previewed.storage })}
+              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path, storage: previewed.storage, media: true })}
               onOpen={() => (previewed.storage ? panelApi(ws).artifacts?.open(previewed.path) : panelApi(ws).openFile(previewed.path))}
+              onDefault={() => openIn('default', { ws: ws.id, file: previewed.path, storage: previewed.storage })}
+              onEditor={previewed.storage ? () => openIn('editor', { ws: ws.id, file: previewed.path, storage: true }) : undefined}
+              onReveal={() => openIn('finder', { ws: ws.id, file: previewed.path, storage: previewed.storage })}
               openLabel={previewed.storage ? 'Open' : undefined}
               readOnly={previewed.storage}
               onClose={closePreview}
@@ -4595,7 +4620,7 @@ export function App() {
               at={reply}
               to={replyTo(t.id)}
               onAdd={(to, text) => call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: finish it there`)))}
-              onSend={(to, text) => call<{ queued?: number }>('send', { target: to.id, text, ...(to.kind === 'agent' && { whenIdle: true }) }).then(r => done(r.queued ? `Queued for ${to.name}: it goes after its turn` : `Sent to ${to.name}`))}
+              onSend={(to, text) => call<{ queued?: number }>('send', { target: to.id, text, ...(to.kind === 'agent' && { whenIdle: true, steer: true }) }).then(r => done(r.queued ? `Queued for ${to.name}: it goes after its turn` : `Sent to ${to.name}`))}
               onClose={() => setReply(null)}
             />
           ))(reply ? byId(reply.tab) : undefined)}
@@ -4695,7 +4720,7 @@ export function App() {
               saveSettings: o => call('projectSet', { id: p.id, ...o }).catch(() => {}),
               ...(aiOn(settings) && { compact: { run: () => call('memoryCompact', { project: p.id }), log: () => api.call<CompactLogLine[]>('memoryCompactLog', { project: p.id }) } }),
               file: id => api.call<ProjectConfig>('projectFile', { id }),
-              global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true },
+              global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true, flows: flowsOn },
               onGlobal: sec => setDialog({ section: sec }),
               schedules: () => setDialog({ schedules: p.id }),
               setSchedule: (id, on) => call('scheduleSet', { id, on }),
@@ -4909,7 +4934,9 @@ export function App() {
             onClose={() => setGallery(null)}
             api={{
               list: () => api.call<Artifact[]>('artifactList', { ws: ws.id }),
-              read: path => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true }),
+              read: (path, media) => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true, media }),
+              open: path => openIn('default', { ws: ws.id, file: path, storage: true }),
+              editor: path => openIn('editor', { ws: ws.id, file: path, storage: true }),
               reveal: bridge?.openPath && (path => revealArt(ws, path)),
               files: artifactsInFiles,
               menu: path => artMenu(ws, path),
@@ -4941,17 +4968,26 @@ export function App() {
                 <AiPage compact settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setAiFloat(false)} context={whereNow} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />
               </AiFloat>
             )}
-            {!(aiDock && !noBar) && ( // no status bar: no button to minimize into
+            {!aiDock ? (
               <FabCorner key={ws?.id ?? ''} className={`ai-fab-wrap ${fly}`}>
-                <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => noBar || openMenu(e, [{ label: 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
+                <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)} onContextMenu={e => openMenu(e, [{ label: noBar ? 'Minimize' : 'Minimize to the status bar', icon: 'minimize', run: () => dock(true) }])}>
                   <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
                 </button>
-                {!aiFloat && !noBar && (
-                  <button type="button" className="ai-fab-min" aria-label="Minimize to the status bar" data-tip="Minimize to the status bar" onClick={() => dock(true)}>
+                {!aiFloat && (
+                  <button type="button" className="ai-fab-min" aria-label={noBar ? 'Minimize' : 'Minimize to the status bar'} data-tip={noBar ? 'Minimize: a small AI pill here' : 'Minimize to the status bar'} onClick={() => dock(true)}>
                     <Icon name="minus" size={10} />
                   </button>
                 )}
               </FabCorner>
+            ) : (
+              noBar && ( // minimized with no status bar to hold it: a small pill in the button's corner, like the Terminal | Reader switch
+                <FabCorner key={ws?.id ?? ''} className="ai-mini-wrap">
+                  <button type="button" className={`ai-mini ${aiFloat ? 'on' : ''}`} data-tip={`${aiFloat ? 'Close Laki AI (Esc)' : 'Ask Laki AI about what is on screen'} · right click: float the button again`} onClick={() => setAiFloat(o => !o)} onContextMenu={e => openMenu(e, [{ label: 'Float the button again', icon: 'popOut', run: () => dock(false) }])}>
+                    <Icon name="ai" size={11} />
+                    AI
+                  </button>
+                </FabCorner>
+              )
             )}
           </>
         )}
@@ -4997,7 +5033,7 @@ export function App() {
         />
       )}
       {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
-      {dialog === 'palette' && <Palette items={palette} forName={ws && wsName(ws)} onClose={() => setDialog(null)} />}
+      {dialog === 'palette' && <Palette items={palette} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
       <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
       {dialog === 'ship' && ws && (
         <Prompt
@@ -5083,7 +5119,7 @@ export function App() {
             at={old?.end}
             picks={picks}
             inserts={to => (t => extInserts(to === 'ai' ? hereCtx() : { ws: t?.workspace, tab: t?.id }))(view.tabs.find(x => x.id === to))}
-            complete={to => (to === 'ai' ? completeOf(view, { project: w?.project }) : completeOf(view, { ws: view.tabs.find(x => x.id === to)?.workspace }))}
+            complete={to => (to === 'ai' ? completeOf(view, { project: w?.project }) : (t => completeOf(view, { ws: t?.workspace, agent: t?.kind === 'agent' ? t.preset : undefined }))(view.tabs.find(x => x.id === to)))}
             onClose={() => setDialog(dialog.back ?? null)}
             onPick={o => {
               if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))

@@ -12,7 +12,7 @@ import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
 import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
-import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
+import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, modelCheck, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
@@ -70,6 +70,7 @@ function aboutPlan(plan: ReturnType<typeof planOfChat>) {
     `This chat is about one ${plan.kind} of the user's, "${got?.plan.title ?? plan.slug}" (project ${plan.project}, kind ${plan.kind}, slug ${plan.slug}, folder ${plan.folder}): every ask in it is about it, even one that doesn't name it. Put your work into it with laki_plan_write; laki_plan_read reads it again, or one of its files.`,
     md && `Its README.md (the user's ${plan.kind === 'spec' ? 'spec' : 'brief'}) as it is now:\n<readme>\n${md.slice(0, BRIEF_MAX)}${md.length > BRIEF_MAX ? '\n… (cut: laki_plan_read has the rest)' : ''}\n</readme>`,
     got?.files.length && `Files in its folder: ${got.files.slice(0, 60).map(f => f.path).join(', ')}.`,
+    plan.kind === 'brainstorm' && `How to brainstorm with the user (the laki-specs skill's method; a decision that's theirs goes to laki_ask):\n${BRAINSTORM_METHOD}`,
   ].filter(Boolean).join('\n')
 }
 // a widget chat's (an extension page's: widget:<id>), at each ask: which extension, the rules, the format with the UI kit's

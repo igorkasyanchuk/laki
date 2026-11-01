@@ -45,6 +45,7 @@ const PROJECT_LOOK: [Exclude<keyof ProjectLook, 'font'>, string, [string, string
   ['spacing', 'Letter spacing', [['theme', "Theme's"], ['0', 'None'], ['0.4px', 'Tight'], ['1px', 'Normal'], ['2px', 'Wide'], ['3px', 'Wider']]],
   ['size', 'Size', [['theme', "Theme's"], ...[9, 10, 11, 12, 13, 14, 15, 16, 18, 20].map((n): [string, string] => [`${n}px`, String(n)])]],
   ['weight', 'Weight', [['theme', "Theme's"], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Heavy']]],
+  ['color', 'Color', [['auto', 'Accent (default)'], ['theme', "Theme's"], ['own', "Each project's own"]]],
 ]
 // the sidebar's lines and rows (SideLook): CSS values, App.tsx puts them on the sidebar as the variables looks set
 const SIDE_LOOK: [Exclude<keyof SideLook, 'labels' | 'font'>, string, [string, string][]][] = [
@@ -168,6 +169,7 @@ export type AppSettings = Paint & {
   costs?: boolean // what each chat used, tokens and ≈ API price, and today's (unset: on)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: on)
+  paneInset?: boolean // Terminal › Inset panes: each pane a rounded card with room around it (off unless true; not on a phone)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
   splitNew?: boolean // a new tab opens beside the pane you're on (the daemon's layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
@@ -387,7 +389,7 @@ function TermPreview({ s }: { s: AppSettings }) {
 }
 
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
-const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
+const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', paneInset: false, dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
 
@@ -769,7 +771,7 @@ export function SettingsPage(p: {
   const lookRows = (key: 'projectLook' | 'sideLook', rows: [string, string, [string, string][]][]) =>
     rows.map(([k, label, opts]) => (
       <label key={k} className="switch-row">
-        <select value={String((s[key] as Record<string, unknown> | undefined)?.[k] ?? 'theme')} onChange={e => set({ [key]: { ...s[key], [k]: e.target.value } })}>
+        <select value={(v => (opts.some(o => o[0] === v) ? v : opts[0][0]))(String((s[key] as Record<string, unknown> | undefined)?.[k] ?? '')) /* unset, or one the list no longer has (Color's accent): the first, the default */} onChange={e => set({ [key]: { ...s[key], [k]: e.target.value } })}>
           {opts.map(([v, name]) => (
             <option key={v} value={v}>
               {name}
@@ -1023,7 +1025,7 @@ export function SettingsPage(p: {
               file={p.projectFile}
               rename={p.renameProjects}
               script={p.script}
-              global={{ actions: s.actions, templates: s.templates, simulator: s.simulator === true }}
+              global={{ actions: s.actions, templates: s.templates, simulator: s.simulator === true, flows: flowsOn(s) }}
               taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
@@ -1397,6 +1399,11 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+              </div>
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.highContrast} onChange={v => paint({ highContrast: v })}>
+                  <Says title="High contrast mode" hint="Hints, labels and lines nearly as strong as the text, and the accent as text darker or lighter until it reads clearly, in every theme" />
+                </Switch>
               </div>
               </Group>
               <Group title="Icons" hint="The app's line icons, and the ones in extensions. A project's or an extension's icon is a name, the same in every pack, so it follows the one you pick; a name a pack lacks is drawn by Laki's own">
@@ -1870,6 +1877,9 @@ export function SettingsPage(p: {
               <Group title="Panes and tabs">
                 <div className="setting-box">
                   {seg('Padding', 'Room between the text and the pane\'s edges', 'termPad', 'normal', [['tiny', 'Tiny'], ['normal', 'Normal'], ['roomy', 'Roomy']])}
+                  <Switch className="switch-row" on={!!s.paneInset} onChange={v => set({ paneInset: v })}>
+                    <Says title="Inset panes" hint="Each pane a rounded card with a margin around it, its title bar inside" />
+                  </Switch>
                   <Switch className="switch-row" on={s.dimPanes !== false} onChange={v => set({ dimPanes: v })}>
                     <Says title="Dim other panes" hint="In a split, the panes you're not typing in fade back" />
                   </Switch>
@@ -2224,6 +2234,11 @@ export function SettingsPage(p: {
                         {pr.agent !== 'command' && FAST[pr.agent] && (
                           <Switch className="switch-row" on={!!pr.fast} onChange={on => setPreset(i, { fast: on || undefined })}>
                             <Says title="Fast mode" hint="Quicker answers, at a higher price (a workspace may turn it off)" />
+                          </Switch>
+                        )}
+                        {(pr.agent === 'claude' || pr.agent === 'codex') && (
+                          <Switch className="switch-row" on={pr.steer !== false} onChange={on => setPreset(i, { steer: on ? undefined : false })}>
+                            <Says title="Send into the running turn" hint="What you send while it works (Send later, the Reader's box, a reply, a review comment) goes in at once and it reads it mid-turn, instead of waiting in the queue. Not while it asks you something or has a queue; Laki's own messages (PR fixes, workflows) still wait for its turn to end" />
                           </Switch>
                         )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (

@@ -1065,13 +1065,14 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number }
-const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize'] as const
+export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
 // macOS's Accessibility › Display: Reduce transparency turns glass and the see-through sidebar off (its blur would be
-// plain grey), Increase contrast makes secondary text and lines stronger; App repaints as either changes
+// plain grey), Increase contrast makes secondary text and lines stronger (Appearance's High contrast mode, more so, and
+// the accent as text at 7:1); App repaints as either changes
 export const LESS_CLEAR = '(prefers-reduced-transparency: reduce)'
 export const MORE_CONTRAST = '(prefers-contrast: more)'
 const asked = (q: string) => !!globalThis.matchMedia?.(q).matches
@@ -1176,7 +1177,7 @@ export function applyTheme(p: string | Paint = '') {
   const side = t.c?.side ?? rootVar('--side')
   // and on the sidebar (a project's name in some looks), see-through over the window's background
   const bgs = [...ends, t.c?.panel ?? rootVar('--panel'), ...(/^#[\da-f]{6}([\da-f]{2})?$/i.test(side) ? ends.map(e => flat(side, e)) : [])]
-  if (/^#[\da-f]{6}$/i.test(accent) && bgs.every(b => /^#[\da-f]{6}$/i.test(b))) st.setProperty('--accent-ink', readable(accent, bgs))
+  if (/^#[\da-f]{6}$/i.test(accent) && bgs.every(b => /^#[\da-f]{6}$/i.test(b))) st.setProperty('--accent-ink', readable(accent, bgs, o.highContrast ? 7 : 4.5))
   // labels on a waiting or error fill (the restart bar, a count, Delete)
   if (t.c) st.setProperty('--on-waiting', onAccent(t.c.waiting)), st.setProperty('--on-error', onAccent(t.c.error))
   if (o.glass) {
@@ -1206,11 +1207,12 @@ export function applyTheme(p: string | Paint = '') {
     st.setProperty('--side', alpha(side, 100 - clear))
     st.setProperty('--rail-bg', rail(side, 100 - clear))
   }
-  if (asked(MORE_CONTRAST)) {
-    // halfway to the text: hints and labels, and lines between things (the theme's, or glass's tint)
+  if (o.highContrast || asked(MORE_CONTRAST)) {
+    // halfway to the text (High contrast mode: most of the way): hints and labels, and lines between things (the theme's,
+    // or glass's tint)
     const fg = t.c?.fg ?? rootVar('--fg')
-    st.setProperty('--muted', `color-mix(in srgb, ${t.c?.muted ?? rootVar('--muted')} 50%, ${fg})`)
-    st.setProperty('--line', `color-mix(in srgb, ${st.getPropertyValue('--line') || t.c?.line || rootVar('--line')} 55%, ${fg})`)
+    st.setProperty('--muted', `color-mix(in srgb, ${t.c?.muted ?? rootVar('--muted')} ${o.highContrast ? 30 : 50}%, ${fg})`)
+    st.setProperty('--line', `color-mix(in srgb, ${st.getPropertyValue('--line') || t.c?.line || rootVar('--line')} ${o.highContrast ? 40 : 55}%, ${fg})`)
   }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t

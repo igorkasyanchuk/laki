@@ -2,6 +2,30 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Audio and video play in Laki: the file preview and the Artifacts viewer get a player (up to 25 MB). A file Laki can't
+  show gets a card with *Open*, *Open in editor* and *Show in Finder* instead of a bare extension.
+- Send into the running turn: what you send a working Claude or Codex agent (Send later, the Reader's box, a reply, a
+  review comment) goes in at once and it reads it mid-turn, instead of waiting in the queue. A profile's switch turns
+  it off; Laki's own messages (PR fixes, workflows) still wait for the turn to end.
+- The `/` menu in prompt boxes lists the agent's own commands and skills under your templates (Claude Code's, your
+  project's `.claude`, Laki's `/laki:…`; Codex's prompts and skills).
+- *Specs & brainstorms* skill (Settings › Agent skill): an agent brainstorms with you one question at a time, offers
+  approaches, plays the design back and writes it into Laki as a spec or brainstorm for you to approve. Laki AI's
+  brainstorm chats work the same way. `laki plan` lists, reads and writes specs and brainstorms.
+- Project settings › *Applicable for Workflows* (off by default): only then does a workspace's menu offer *Run workflow*.
+- Settings › Terminal › *Inset panes*: each pane a rounded card with a margin around it.
+- Appearance › *High contrast mode* (off by default): hints, labels and lines nearly as strong as the text, and the
+  accent as text made to read at 7:1, in every theme.
+- Project names in the sidebar take the theme's accent color in every theme, but the few whose look draws the
+  project row as a band of its own (Appearance › Project names › Color: the theme's, or each project's own).
+- With the status bar hidden, Laki AI's button minimizes to a small *AI* pill in its corner.
+- Deleting a project's last workspace keeps you on Projects, with the empty view, instead of jumping to Browsers.
+- A picture's name in an agent's answer (`og.png`) previews on hover when the repo has exactly one file of that name;
+  Claude and Codex are asked to write paths from the workspace's root.
+- Electron 45.2.1 (Chromium and V8 security fixes for every page Laki shows).
+
 ## 0.39.0 · Nov 1, 2026
 
 - A workspace's right click is shorter: *Workspace ›* holds Rename, Info, the copies (branch, path), Mute, Remind me,

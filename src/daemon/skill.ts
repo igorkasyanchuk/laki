@@ -1,12 +1,13 @@
 // The agent skill: SKILL.md and a launcher for the CLI in each agent's skills folder (~/.claude/skills/laki,
 // ~/.codex/…, ~/.gemini/…, ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
 // when the user asks (Settings), and again as a daemon starts when a Laki update changed one installed for it
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, type Dirent, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { BRAINSTORM_METHOD, BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { groupRule } from '../shared/tools.ts'
 import { USAGE } from '../shared/usage.ts'
-import { cliArgv, cliEnv, dir, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
+import { cliArgv, cliEnv, dir, findProject, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 import { BUILTIN } from './widgets.ts'
@@ -21,9 +22,9 @@ const AGENTS = {
   opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
 }
 export type SkillAgent = keyof typeof AGENTS
-// the skills, each installed on its own: laki (drive Laki), laki-widget (make widgets) and laki-orchestrate (several
-// agents on one piece of work, a workspace each)
-const SKILLS = ['laki', 'laki-widget', 'laki-orchestrate'] as const
+// the skills, each installed on its own: laki (drive Laki), laki-widget (make widgets), laki-orchestrate (several
+// agents on one piece of work, a workspace each) and laki-specs (brainstorm with the user, write specs and brainstorms)
+const SKILLS = ['laki', 'laki-widget', 'laki-orchestrate', 'laki-specs'] as const
 export type SkillName = (typeof SKILLS)[number]
 // mcp: what adds Laki as the agent's MCP server (laki's rows), which the user runs or pastes (we never write the
 // agents' config): a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
@@ -42,11 +43,12 @@ function files(at: string, k: SkillName): Record<string, string> {
   const laki = `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`
   if (k === 'laki-widget') return { laki, 'SKILL.md': widgetSkill(cli) }
   if (k === 'laki-orchestrate') return { laki, 'SKILL.md': orchestrateSkill(cli) }
+  if (k === 'laki-specs') return { laki, 'SKILL.md': specsSkill(cli) }
   return {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
 ---
 
 # Laki
@@ -128,7 +130,8 @@ workspace (Laki may ask the user first; denied: don't try again unasked).
 
 Specs and brainstorms (on unless the user turned them off: Settings › General › Pages) are the user's own pages,
 folders outside the repo, each with a README.md: a spec says what to build, a brainstorm what to explore. A prompt that
-names one (\`Spec: <path>/README.md\`) means: read it and the files beside it first, then do what it says. Over MCP
+names one (\`Spec: <path>/README.md\`) means: read it and the files beside it first, then do what it says. \`laki plan\`
+lists, reads and writes them (the laki-specs skill: brainstorming with the user, then a spec). Over MCP
 (\`laki mcp\`): \`laki_plans\` lists them, \`laki_plan_read\` reads one, \`laki_plan_new\` writes a new one for the user,
 \`laki_plan_write\` puts a file beside one (ideas, a prototype, a diagram); never README.md or spec.json, the user's.
 
@@ -311,6 +314,43 @@ Extensions) and what it fetches how often: each fetch may call an API. To show o
 a plain setting of any extension, \`laki widget set\` (no file to write; never a secret, its source or network access).
 `
 
+// laki-specs: the user's specs and brainstorms through laki plan, and how to brainstorm with them first (shared/plans.ts'
+// BRAINSTORM_METHOD, Laki AI's brainstorm chats follow it too)
+const specsSkill = (cli: string) => `---
+name: laki-specs
+description: Brainstorm an idea or a feature with the user, one question at a time, and write the result into Laki as a spec (what to build, for an agent to implement) or a brainstorm (options, prototypes, diagrams), or work from one of theirs. Use when the user asks to brainstorm, design, plan, scope or spec something before it's built, to write a spec or brainstorm in Laki, or when a prompt names one ("Spec: <folder>/README.md", "Brainstorm: …"). Not for a fully said one-line task: do that.
+---
+
+# Specs and brainstorms in Laki
+
+Laki keeps the user's **specs** (what to build) and **brainstorms** (ideas to explore) per project, each a folder outside
+the repo with a README.md: the user's own text, which they write and edit in Laki (Specs & Brainstorms in its rail),
+never you. Beside it: their attachments, and your work.
+
+Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`. Below, \`laki\` stands for it;
+\`.\` is your workspace's project (\`$LAKI_WORKSPACE\`), else name the project (\`laki ls\` lists them).
+
+    laki plan .                                         # its specs and brainstorms: kind, slug, title, folder
+    laki plan read . <spec|brainstorm> <slug> [file]    # README.md and the files' names, or one file's text
+    laki plan new . <spec|brainstorm> "<title>" -       # a new one for the user, its Markdown on stdin
+    laki plan write . <spec|brainstorm> <slug> <file> - # a file beside one, on stdin (never README.md or spec.json)
+
+## Working from one
+
+A prompt that names a spec: read its README.md and the files beside it, then do what it says; ask the user when it's
+unclear. A brainstorm to explore: read the brief and the project's code, then write your options into its folder:
+
+${BRAINSTORM_OUTPUT}
+
+## Brainstorming with the user
+
+${BRAINSTORM_METHOD}
+
+The written design goes into Laki, not the repo (no docs/plans file unless the user asks for one): \`laki plan new .
+spec "<title>" -\` for a design to build, \`laki plan new . brainstorm …\` and \`laki plan write\` for an idea with options.
+Then tell the user its title and that it waits for them in Specs & Brainstorms.
+`
+
 // laki-orchestrate: a coordinator's protocol over Laki's workspaces (Superset's orchestrate, in Laki's commands), a skill
 // of its own; in Laki's claude tabs also /laki:orchestrate, only you start it, its laki commands unasked (another
 // workspace's screen or a message to it: Laki asks you, unless this workspace started it)
@@ -447,4 +487,63 @@ export function skillSet(o: { agent: SkillAgent; on: boolean; skill?: SkillName 
     if (!readdirSync(at).length) rmdirSync(at)
   }
   return skills()
+}
+
+// the prompt boxes' / menu (PromptInput's commands): an agent's own commands and skills, each with its description.
+// claude: ~/.claude's and the project's .claude commands (a folder's as dir:name) and skills, and Laki's plugin's
+// /laki:…; codex: its prompts as /prompts:<name> and its skills as $<name>. ponytail: no other plugins', no built-ins
+export function agentCommands(o: { agent: string; project?: string }): { name: string; sub: string; skill?: boolean }[] {
+  const p = o.project ? findProject(o.project) : undefined
+  const proj = p && !p.host && !p.kind ? p.path : undefined
+  // its description: the frontmatter's (a block scalar's, | or >, its indented lines), else its first line; its first 4 KB only
+  const said = (file: string) => {
+    let t = ''
+    try {
+      const fd = openSync(file, 'r')
+      try {
+        const b = Buffer.alloc(4096)
+        t = b.subarray(0, readSync(fd, b, 0, b.length, 0)).toString('utf8').replace(/\r\n/g, '\n')
+      } finally {
+        closeSync(fd)
+      }
+    } catch {
+      return ''
+    }
+    const fm = /^---\n([\s\S]*?)\n---/.exec(t)
+    const d = fm && /^description:[ \t]*(?:[|>][-+]?[ \t]*\n((?:[ \t]+.*\n?)+)|["']?(.*?)["']?[ \t]*$)/m.exec(fm[1])
+    const desc = d && (d[1] ? d[1].split('\n').map(l => l.trim()).filter(Boolean).join(' ') : d[2])
+    return (desc || t.replace(/^---\n[\s\S]*?\n---\n?/, '').split('\n').find(l => l.trim())?.replace(/^#+\s*/, '') || '').slice(0, 90)
+  }
+  const out = new Map<string, { name: string; sub: string; skill?: boolean }>()
+  const add = (name: string, file: string, skill?: boolean) => out.has(name) || out.set(name, { name, sub: said(file), skill })
+  // commands: every .md under it, a folder's as its name and a colon (claude's namespacing)
+  const commands = (at: string, prefix = '', ns = '') => {
+    let es: Dirent[] = []
+    try {
+      es = readdirSync(at, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of es.slice(0, 300))
+      if (e.isDirectory() && !ns) commands(join(at, e.name), prefix, `${e.name}:`)
+      else if ((e.isFile() || e.isSymbolicLink()) && e.name.endsWith('.md')) add(`${prefix}${ns}${e.name.slice(0, -3)}`, join(at, e.name))
+  }
+  const skillsIn = (at: string, sign: string) => {
+    try {
+      for (const e of readdirSync(at, { withFileTypes: true }).slice(0, 300)) if ((e.isDirectory() || e.isSymbolicLink()) && existsSync(join(at, e.name, 'SKILL.md'))) add(`${sign}${e.name}`, join(at, e.name, 'SKILL.md'), true)
+    } catch {}
+  }
+  if (o.agent === 'claude') {
+    const home = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+    if (proj) commands(join(proj, '.claude', 'commands'))
+    commands(join(home, 'commands'))
+    commands(join(dir, 'claude-plugin', 'commands'), 'laki:')
+    if (proj) skillsIn(join(proj, '.claude', 'skills'), '')
+    skillsIn(join(home, 'skills'), '')
+  } else if (o.agent === 'codex') {
+    const home = process.env.CODEX_HOME || join(homedir(), '.codex')
+    commands(join(home, 'prompts'), 'prompts:')
+    skillsIn(join(home, 'skills'), '$')
+  }
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name))
 }

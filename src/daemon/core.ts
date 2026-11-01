@@ -330,6 +330,7 @@ const LAKI_NOTE = () =>
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
 - \`laki name <name>\`, \`laki agents\`, \`laki ask @<name> "<question>"\` (prints its reply), \`laki send @<name> "<text>"\`: talk to other agents in Laki by name, when the user asks you to work with them.
+- When you name a file in an answer (a screenshot, an image, code), write its path relative to the workspace's root (\`site/og.png\`, not \`og.png\`) or in full: Laki previews pictures and opens files from the paths in your answers.
 - \`laki show "<what to look at>" --open <folder|file|url>\`: a card under your tab in Laki with a button that opens it (a folder in Finder, a file in its app, a page in the browser), instead of asking the user to run \`open …\`; \`--open\` again for more (4 at most).
 - ${STORAGE_NOTE}${widgetTools().length ? TOOLS_NOTE : ''}`
 // laki show: an agent's card under its tab (Card), one a tab (a newer one replaces it), kept in memory until you close
@@ -927,6 +928,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       pr: prAllowOk(o.config.pr),
       check: checkOk(o.config.check),
       simulator: typeof o.config.simulator === 'boolean' ? o.config.simulator : undefined,
+      workflows: o.config.workflows === true || undefined, // Applicable for Workflows: the workspace menu's Run workflow ›
       layout: typeof o.config.layout === 'string' && o.config.layout.trim() ? o.config.layout.trim().slice(0, 100) : undefined, // a saved layout's name (settings.layouts): new workspaces start as it
       mergeMethod: p.config?.mergeMethod, // prAct's only: a page opened before a merge would send an older one
     }
@@ -1640,7 +1642,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   for (const [k, v] of Object.entries(set)) {
     if (v === '' || v === null) delete next[k]
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
-    else if (k === 'fast' || k === 'off' || k === 'laki') next[k] = !!v
+    else if (k === 'fast' || k === 'off' || k === 'laki' || k === 'steer') next[k] = !!v
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
   }
@@ -1709,34 +1711,36 @@ export function apps() {
 
 // open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
 // macOS's for the file
-// log: an extension's log file (its Logs tab's Show in Finder)
+// log: an extension's log file (its Logs tab's Show in Finder); storage: the file is the workspace's storage folder's
+// (an artifact the viewer can't show: its card's Open in editor), never on a host
+const openFail = (e: any): never => {
+  throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
+}
 const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar)\/?$/i
-export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string }) {
+export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string; storage?: boolean }) {
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
-  const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
+  const inWs = (w: Workspace) => (o.storage ? (w.storage && !w.host ? { ...w, path: w.storage } : openFail({ message: 'no storage folder' })) : w)
+  const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(inWs(findWs(o.ws!)), o.file!) : o.ws ? inWs(findWs(o.ws)).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const pid = o.ws ? findWs(o.ws).project : o.widget ? undefined : findProject(o.project ?? '').id // editors are by id
   const app = o.app === 'editor' ? (pid && s.editors?.[pid]) || s.editor || 'cursor' : o.app // the project's, else Settings'
-  const fail = (e: any) => {
-    throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
-  }
-  const host = o.ws ? findWs(o.ws).host : o.widget ? undefined : findProject(o.project ?? '').host
+  const host = o.ws ? (o.storage ? undefined : findWs(o.ws).host) : o.widget ? undefined : findProject(o.project ?? '').host
   if (host) {
     // a folder or file on an SSH host: the editors with Remote - SSH open it there
     const scheme = ({ vscode: 'vscode', cursor: 'cursor', windsurf: 'windsurf' } as Record<string, string>)[app]
     if (!scheme) throw new Error(`${APPS[app] ?? BROWSERS[app] ?? 'That app'} can't open a folder on ${host}: Cursor, VS Code or Windsurf can (Remote - SSH)`)
-    return void (await run('open', [`${scheme}://vscode-remote/ssh-remote+${host}${path.split('/').map(encodeURIComponent).join('/')}`]).catch(fail))
+    return void (await run('open', [`${scheme}://vscode-remote/ssh-remote+${host}${path.split('/').map(encodeURIComponent).join('/')}`]).catch(openFail))
   }
   if (app === 'custom') {
     if (!s.editorCmd?.trim()) throw new Error('set the editor command in Settings (⌘,)')
-    return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(fail))
+    return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(openFail))
   }
   const name = APPS[app] ?? BROWSERS[app]
   if (!name && app !== 'default') throw new Error(`no app ${app}`)
   // L11: a file that would run (an app, a .command, an executable) is shown in Finder, never opened, by default
   const runs = file && app === 'default' && (LAUNCH.test(path) || (st => !!st?.isFile() && (st.mode & 0o111) !== 0)(statSync(path, { throwIfNoEntry: false })))
   const args = app === 'default' || app === 'finder' ? [...((file && app === 'finder') || runs ? ['-R'] : []), path] : ['-a', name, file && TERMINALS.includes(app) && !statSync(path, { throwIfNoEntry: false })?.isDirectory() ? dirname(path) : path]
-  await run('open', args).catch(fail)
+  await run('open', args).catch(openFail)
 }
 
 export function closeTab(id: string) {
@@ -2634,7 +2638,9 @@ function textFor(tab: Tab, text: string): string | Promise<string> {
 // enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
 // agent: only an agent's tab, and not typed into a question it asks (MCP's laki_send, Laki AI's: a model steered by
 // what it reads must not run a shell command or answer a permission prompt)
-export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean; vars?: boolean }) {
+// steer: the user's own follow-up from the app (Send later, Reader, a reply, a review comment): with its profile's Send into
+// the running turn it goes in now; Laki's own sends (PR fixes, workflows, laki ask, schedules) keep turn boundaries: queued
+export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean; vars?: boolean; steer?: boolean }) {
   const tab = resolveTarget(p.target)
   if (p.vars) p = { ...p, text: varsIn(tab, p.text) } // an action's: its {{branch}}… now, queued or not
   if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: an agent's messages go to agents only (ask the user to run it there)`)
@@ -2650,6 +2656,13 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
   }
   if (p.whenIdle || woke) {
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
+    // its profile's Send into the running turn (claude, codex, on unless false: both read what's typed while they work): typed now,
+    // unless it asks something, hit a limit, is waking, or has a queue (that goes first, in order)
+    if (p.steer && r.status === 'running' && !r.limit && !woke && !tab.queue?.length && (tab.preset === 'claude' || tab.preset === 'codex') && presetOf(tab)?.steer !== false) {
+      typeInto(s, textFor(tab, p.text))
+      changed()
+      return { tab: tab.id, sent: true, steered: true }
+    }
     if (r.status !== 'idle' || r.limit || tab.queue?.length) {
       tab.queue = [...(tab.queue ?? []), p.text]
       save()

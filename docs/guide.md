@@ -1204,7 +1204,13 @@ ones that come with Laki only turn off.
 ### Specs & Brainstorms
 
 On unless Settings › General › *Pages* turns them off; then nothing of them shows. The editor (BlockNote, the diagrams)
-loads only as the page opens.
+loads only as the page opens. Agents read and write them with `laki plan` (and the *Specs & brainstorms* skill):
+```bash
+laki plan [.]                                   # this project's specs and brainstorms
+laki plan read . brainstorm onboarding [file]   # README.md and its files, or one file
+laki plan new . spec "CSV export" -             # a new one for you, its Markdown on stdin
+laki plan write . brainstorm onboarding ideas.md - < ideas.md   # a file beside one; never README.md
+```
 
 A **spec** is what you want built, written like a Notion page: headings, checklists, tables, code, images (paste or
 drop them in) and diagrams (type `/` for the menu: flowchart, architecture, state, ER, swimlane, screen flow and
@@ -1748,12 +1754,14 @@ lit for a moment.
   it comes, the rest of the app's icons scaled with it; an icon you pick for a project, a Desk tab or an extension is a
   name, drawn by whichever pack is on, Laki's own where a pack lacks it), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
   keeps them on top), *Animations* (*Low* by default; *High*: pages, dialogs, menus and lists come in with a little
-  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *The sidebar* (a preview of a project and
+  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *High contrast mode* (off by default:
+  hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
   three rows as you set them; its font, any on this Mac; its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,
   double or nothing; the indent, row height, the space between rows, text size (9-18), icon size, a project's row
   height and the space between projects, each the theme's unless you pick one; *Project names*: font (the theme's,
-  the interface's, monospace or any on this Mac), case, letter spacing, size 9-20 and weight; the style:
+  the interface's, monospace or any on this Mac), case, letter spacing, size 9-20, weight and color (the accent by
+  default, the theme's, or each project's own); the style:
   Compact, Default, Extended, Cards or Status (the row's edge in the color of what its agent is doing, and a line under
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
   beside Schedule, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
@@ -1848,7 +1856,7 @@ lit for a moment.
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
   Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (every tab's; ⌘+ / ⌘− / ⌘0 change one tab's, which keeps it),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
-  cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
+  cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Inset panes* (each pane a rounded card with a margin around it), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
   ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
   Editing has them; on by default), *A file path clicked* (in a terminal's text: Laki's preview at its line, the
@@ -1985,7 +1993,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   (`skills/laki-orchestrate`, on its own too) teaches an agent to split work across several agents at once, a
   workspace each: plan the tasks and what waits on what, start them (`laki new`), read and follow them up (`laki
   screen`, `laki send`), take each one's `LAKI_WORKER_DONE` / `LAKI_WORKER_BLOCKED` report and bring the results
-  together; in Laki's Claude Code tabs it's also `/laki:orchestrate <the work>`, in its OpenCode tabs `/laki-orchestrate <the work>`. An agent reads and messages the
+  together; in Laki's Claude Code tabs it's also `/laki:orchestrate <the work>`, in its OpenCode tabs `/laki-orchestrate <the work>`. *Specs & brainstorms*
+  (`skills/laki-specs`, on its own) teaches an agent to brainstorm with you before building: what you want and why, one
+  question at a time, two or three approaches with a pick, the design played back, then written into Laki as a spec or a
+  brainstorm for you to approve (`laki plan`), nothing built until you do; Laki AI's brainstorm chats follow the same
+  method (adapted from obra/superpowers' brainstorming skill, MIT). An agent reads and messages the
   workspaces it started without Laki asking you; any other workspace, Laki asks first. Agents can also talk by name:
   `laki name <name>` in one's tab makes it `@<name>` for the others (`laki agents` lists them), `laki ask @<name>
   "<question>"` asks it and prints its reply, `laki send @<name>` tells it something; MCP's `laki_name` and

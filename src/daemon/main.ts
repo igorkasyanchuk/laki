@@ -14,7 +14,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
-import { refreshSkills, skills, skillSet } from './skill.ts'
+import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
@@ -314,6 +314,7 @@ const api: Record<string, Handler> = {
   fileUndo: p => core.fileUndo(p),
   hunkRedo: p => core.hunkRedo(p),
   skills: () => skills(),
+  agentCommands: p => agentCommands(p), // the prompt boxes' / menu
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),
   prReview: p => core.prReview(p),

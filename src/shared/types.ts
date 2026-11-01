@@ -97,7 +97,7 @@ export const checkOk = (c: unknown): DoneCheck | undefined => {
 export type CheckStep = { name: CheckStepName; state: 'wait' | 'run' | 'pass' | 'fail' | 'skip'; ms?: number; out?: string }
 // a workspace's last check: the agent tab whose turn it checked, how it went, how many failures in a row went back
 export type CheckRun = { tab: string; status: 'checking' | 'passed' | 'failed' | 'over'; steps: CheckStep[]; review?: { agent: string; state: 'wait' | 'run' | 'pass' | 'note' | 'fail'; note?: string }; tries: number; at: number }
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod; simulator?: boolean; layout?: string; check?: DoneCheck; workflows?: boolean } // worktrees, pr, mergeMethod, simulator, layout (a saved layout's name, for new workspaces), workflows (Applicable for Workflows: its workspaces' Run workflow ›, off unless true): the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way; the side panel's Simulator tab over Settings' (unset: Settings')
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -425,7 +425,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; account?: string }
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; account?: string; steer?: boolean } // steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -520,6 +520,7 @@ export type Settings = {
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
+  paneInset?: boolean // Settings › Terminal › Inset panes: each pane a rounded card with a margin (off unless true)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
   splitNew?: boolean // a new tab opens as a split beside the pane you're on, not a tab of its own (layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
@@ -533,6 +534,7 @@ export type Settings = {
   iconPack?: string // Appearance's Icons (icons.ts lookOf, ICON_PACKS): tabler (unset), lucide or laki; iconWidth: its stroke as at a 24 grid (ICON_WIDTHS, unset: 2, each pack's own); iconSize: the app's icons (ICON_SIZES, unset: 14)
   iconWidth?: number
   iconSize?: number
+  highContrast?: boolean // Appearance's High contrast mode (themes.ts' Paint): hints, labels and lines most of the way to the text, the accent as text at 7:1 (off unless true)
   motion?: 'high' | 'low' | 'none' // Appearance's Animations (themes.ts' Paint, html[data-motion]): more of them, the usual (unset), or none
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
@@ -656,7 +658,7 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
 export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string; answerOff?: boolean; detail?: 'titles' } // detail titles: who needs you only, nothing off the screen (no question, choices or buttons); answerOff: answers turned off as Laki updated (a public ntfy.sh topic), Settings says why
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
-export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* any other: a font's name */ case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
+export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* any other: a font's name */ case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string; color?: 'auto' | 'theme' | 'accent' | 'own' } // color: the theme's accent as text (unset, auto; accent: an earlier build's), the theme's own ('theme'), or each project's own color; not over a look whose head is a filled band
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
 export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
@@ -907,7 +909,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 132
+export const API = 133
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -41,6 +41,8 @@ for (let i = 0; i < argv.length; i++) {
   else args.push(a)
 }
 const json = !!flags.json
+// all of stdin as text (decoded whole: a character split across chunks stays one)
+const stdinText = () => new Promise<string>(r => { const b: Buffer[] = []; process.stdin.on('data', d => b.push(Buffer.from(d))).on('end', () => r(Buffer.concat(b).toString('utf8'))).on('error', () => r(Buffer.concat(b).toString('utf8'))) })
 const out = (v: unknown, text?: string) => console.log(json || text === undefined ? JSON.stringify(v, null, 2) : text)
 
 // laki flow check [file.md… | folder]: each workflow file read and checked as Laki does (parse, then check), with no
@@ -330,6 +332,43 @@ async function main() {
       const mem = p.memory ?? []
       const line = (m: Memory) => `${m.id}  ${new Date(m.at).toISOString().slice(0, 10)}  ${m.text.replace(/\s*\n\s*/g, ' ')}`
       return out(mem, [`${p.name}: yours`, ...mem.filter(m => !m.auto).map(line), '', 'learned by agents', ...mem.filter(m => m.auto).map(line)].join('\n'))
+    }
+    case 'plan':
+    case 'plans': {
+      // specs and brainstorms (the laki-specs skill's): laki plan [ls] [<project>|.] | read <project>|. <kind> <slug> [file]
+      // | new <project>|. <kind> "<title>" [text|-] | write <project>|. <kind> <slug> <file> [text|-]; `.` the tab's project
+      const [a, ...more] = rest
+      const sub = ['ls', 'read', 'new', 'write'].includes(a) ? a : 'ls'
+      const args = sub === 'ls' && a !== 'ls' ? rest : more
+      const v: View = await rpc('state')
+      const proj = (ref?: string) => {
+        const id = !ref || ref === '.' ? v.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project : (v.projects.find(x => x.id === ref || x.name === ref)?.id ?? ref)
+        if (!id) throw new Error(`which project? laki plan ${sub} <project>|. … (\`.\`: only in a Laki tab)`)
+        return id
+      }
+      const kindOf = (k?: string) => (k === 'spec' || k === 'brainstorm' ? k : (() => { throw new Error(`kind: spec or brainstorm, not ${k ?? 'none'}`) })())
+      const body = async (t?: string) => (t === '-' ? (process.stdin.isTTY ? (() => { throw new Error('the text on stdin: … - < file, or as an argument') })() : await stdinText()) : (t ?? ''))
+      if (sub === 'ls') {
+        const list: Plan[] = await rpc('planList', args[0] ? { project: proj(args[0]) } : {})
+        return out(list, list.map(x => `${x.project}  ${x.kind.padEnd(10)}  ${x.slug}  ${x.title}  ${x.path}`).join('\n') || 'none yet')
+      }
+      if (sub === 'read') {
+        const [ref, k, slug, file] = args
+        if (!slug) throw new Error('usage: laki plan read <project>|. <spec|brainstorm> <slug> [file]')
+        const o = { project: proj(ref), kind: kindOf(k), slug }
+        if (file) return (f => out(f, f.text ?? `${file}: not text (${f.size} bytes)`))(await rpc<{ size: number; text?: string }>('planFile', { ...o, path: file }))
+        const g = await rpc<{ plan: Plan; markdown: string; files: { path: string }[] }>('planGet', o)
+        return out(g, `${g.plan.path}\n\n${g.markdown}${g.files?.length ? `\nFiles: ${g.files.map(f => f.path).join(', ')}` : ''}`)
+      }
+      if (sub === 'new') {
+        const [ref, k, title, text] = args
+        if (!title) throw new Error('usage: laki plan new <project>|. <spec|brainstorm> "<title>" [text|-]')
+        const pl: Plan = await rpc('planNew', { project: proj(ref), kind: kindOf(k), title, text: await body(text) })
+        return out(pl, `${pl.kind} ${pl.slug}: ${pl.path}`)
+      }
+      const [ref, k, slug, file, text] = args
+      if (!file) throw new Error('usage: laki plan write <project>|. <spec|brainstorm> <slug> <file> [text|-]')
+      return out(await rpc('planWrite', { project: proj(ref), kind: kindOf(k), slug, path: file, text: await body(text ?? '-') }), `wrote ${file}`)
     }
     case 'remind':
     case 'reminders': {
@@ -669,10 +708,7 @@ async function main() {
         // an event of your own: custom.<name>, its data as an argument or on stdin (-); from an extension's command, its
         // LAKI_WIDGET and the event it handles (LAKI_EVENT_HOPS: a loop stops)
         if (!id) throw new Error('usage: laki widget emit <name> [json | -] [--ws <workspace>]')
-        const text = action === '-' ? await new Promise<string>(r => {
-          let s = ''
-          process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
-        }) : [action, ...arg].filter(x => x !== undefined).join(' ')
+        const text = action === '-' ? await stdinText() : [action, ...arg].filter(x => x !== undefined).join(' ')
         let data: unknown
         try {
           data = text.trim() ? JSON.parse(text) : undefined
@@ -690,10 +726,7 @@ async function main() {
       if (sub === 'push') {
         // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)
         if (!id) throw new Error('usage: laki widget push <id> [json | -] [--ws <workspace>] [--merge]')
-        const text = action === undefined || action === '-' ? await new Promise<string>(r => {
-          let s = ''
-          process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
-        }) : [action, ...arg].join(' ')
+        const text = action === undefined || action === '-' ? await stdinText() : [action, ...arg].join(' ')
         let data: unknown
         try {
           data = JSON.parse(text)

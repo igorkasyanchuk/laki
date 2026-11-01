@@ -7,7 +7,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState, type Clipb
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
-import { completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
+import { type AgentCommand, completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceSends, voiceStart, voiceStop } from './voice'
 
@@ -96,6 +96,8 @@ export type Complete = {
   files?: () => Promise<{ files: string[]; changed?: string[] }>
   refs?: () => Promise<Ref[]>
   templates?: () => Template[]
+  commands?: () => Promise<AgentCommand[]> // the agent's own commands and skills, under the templates
+  agent?: string // whose commands: another agent's are read anew (the files and refs stay)
 }
 
 // @ # / for a text box (PromptInput's, Send later's): the trigger the caret is in (one Esc closed stays closed: shut,
@@ -105,13 +107,15 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
   const [trig, setTrig] = useState<Trigger | null>(null)
   const [shut, setShut] = useState(-1)
   const [lit, setLit] = useState(0)
-  const [got, setGot] = useState<{ files?: string[]; changed?: string[]; refs?: Ref[]; err?: string; loading?: boolean }>({})
+  const [got, setGot] = useState<{ files?: string[]; changed?: string[]; refs?: Ref[]; commands?: AgentCommand[]; err?: string; loading?: boolean }>({})
   const read = useRef<Record<string, number>>({})
   const whose = complete?.key ?? ''
   const now = useRef(whose)
   now.current = whose
+  const agentNow = useRef(complete?.agent) // likewise for the commands: another agent picked meanwhile drops the answer
+  agentNow.current = complete?.agent
   useEffect(() => ((read.current = {}), setGot({})), [whose]) // another project or agent picked: not the last one's
-  const source = (t: Trigger | null) => t && (t.ch === '@' ? complete?.files : t.ch === '#' ? complete?.refs : complete?.templates)
+  const source = (t: Trigger | null) => t && (t.ch === '@' ? complete?.files : t.ch === '#' ? complete?.refs : complete?.templates ?? complete?.commands)
   const look = () => {
     const el = box.current
     if (!complete || !el) return
@@ -122,16 +126,20 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
     setTrig(next)
   }
   useEffect(() => {
-    const k = trig?.ch === '@' ? 'files' : trig?.ch === '#' ? 'refs' : ''
-    if (!k || !complete || Date.now() - (read.current[k] ?? 0) < 60_000) return
-    read.current[k] = Date.now()
+    const k = trig?.ch === '@' ? 'files' : trig?.ch === '#' ? 'refs' : trig?.ch === '/' && complete?.commands ? 'commands' : ''
+    const rk = k === 'commands' ? `commands:${complete?.agent ?? ''}` : k // per agent
+    if (!k || !complete || Date.now() - (read.current[rk] ?? 0) < 60_000) return
+    read.current[rk] = Date.now()
     const of = whose
-    const put = (x: Partial<typeof got>) => now.current === of && setGot(g => ({ ...g, ...x, loading: false })) // an answer for the one picked before: dropped
+    const ag = complete.agent
+    // an answer for the one picked before: dropped (another agent's commands: read again when it's picked again)
+    const put = (x: Partial<typeof got>) => now.current === of && (k === 'commands' && agentNow.current !== ag ? ((read.current[rk] = 0), setGot(g => ({ ...g, loading: false }))) : setGot(g => ({ ...g, ...x, loading: false })))
     setGot(g => ({ ...g, err: undefined, loading: true }))
-    ;(k === 'files' ? complete.files!().then(r => put({ files: r.files, changed: r.changed })) : complete.refs!().then(refs => put({ refs }))).catch(e => ((read.current[k] = 0), put({ err: String(e?.message ?? e) })))
-  }, [trig?.ch, whose])
+    ;(k === 'files' ? complete.files!().then(r => put({ files: r.files, changed: r.changed })) : k === 'refs' ? complete.refs!().then(refs => put({ refs })) : complete.commands!().then(commands => put({ commands }))).catch(e => ((read.current[rk] = 0), put({ err: String(e?.message ?? e) })))
+  }, [trig?.ch, whose, complete?.agent])
+  useEffect(() => setGot(g => (g.commands ? { ...g, commands: undefined } : g)), [complete?.agent]) // another agent picked: not the last one's
   const shown = trig && trig.from !== shut ? trig : null
-  const rows = shown ? completions(shown, { ...got, templates: shown.ch === '/' ? complete?.templates?.() : undefined }) : []
+  const rows = shown ? completions(shown, { ...got, templates: shown.ch === '/' ? complete?.templates?.() : undefined, commands: shown.ch === '/' ? got.commands : undefined }) : []
   const pick = (r: (typeof rows)[number]) => {
     const el = box.current
     if (!el || !shown) return
@@ -166,13 +174,15 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
 
 // what a box can complete from the view: a workspace's files (else, files: true, the project's own folder's), the
 // project's open PRs and issues (a git one), its prompt templates and the global ones. None outside a project
-export function completeOf(view: View | null, o: { ws?: string; project?: string; files?: boolean }): Complete | undefined {
+// agent: whose own / commands and skills come after the templates (claude, codex)
+export function completeOf(view: View | null, o: { ws?: string; project?: string; files?: boolean; agent?: string }): Complete | undefined {
   const w = o.ws ? view?.workspaces.find(x => x.id === o.ws) : undefined
   const proj = view?.projects.find(x => x.id === (w?.project ?? o.project))
   if (!view || !proj || proj.kind) return undefined
   type Item = { number: number; title: string; url: string }
   return {
     key: w?.id ?? proj.id,
+    agent: o.agent,
     files: w || o.files ? () => api.call<{ files: string[]; changed: Record<string, string> }>('files', w ? { ws: w.id } : { project: proj.id }).then(r => ({ files: r.files, changed: Object.keys(r.changed) })) : undefined,
     refs:
       proj.git !== false
@@ -182,6 +192,7 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
             )
         : undefined,
     templates: () => templatesFor(view.settings?.templates, proj.config?.templates),
+    commands: o.agent === 'claude' || o.agent === 'codex' ? () => api.call<AgentCommand[]>('agentCommands', { agent: o.agent, project: proj.id }) : undefined,
   }
 }
 

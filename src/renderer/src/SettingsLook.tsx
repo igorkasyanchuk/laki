@@ -12,7 +12,11 @@ import { Icon } from './ui'
 const own = (pl: ProjectLook | undefined, k: keyof ProjectLook) => (pl?.[k] && pl[k] !== 'theme' ? pl[k] : undefined)
 const named = (f?: string) => !!f && f !== 'ui' && f !== 'mono'
 const fontVar = (f: string) => `${JSON.stringify(f)}, var(--ui-font)`
-export const phAttrs = (pl?: ProjectLook) => Object.fromEntries((['font', 'case', 'spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`data-ph-${k}`, k === 'font' ? (named(own(pl, k)) ? 'custom' : own(pl, k)) : k === 'case' ? own(pl, k) : '']] : [])))
+// color: unset is auto (the accent, in every theme but a look whose head is a band: styles.css), else as set
+export const phAttrs = (pl?: ProjectLook) => ({
+  ...Object.fromEntries((['font', 'case', 'spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`data-ph-${k}`, k === 'font' ? (named(own(pl, k)) ? 'custom' : own(pl, k)) : k === 'case' ? own(pl, k) : '']] : []))),
+  ...(pl?.color !== 'theme' && { 'data-ph-color': pl?.color ?? 'auto' }),
+})
 export const phVars = (pl?: ProjectLook) => ({ ...Object.fromEntries((['spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`--ph-${k}`, own(pl, k)]] : []))), ...(named(own(pl, 'font')) && { '--ph-font': fontVar(own(pl, 'font')!) }) }) as CSSProperties
 // …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's; its font
 const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon', head: '--ph-h', gap: '--proj-gap', rowGap: '--ws-gap' } as const

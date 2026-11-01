@@ -25,6 +25,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
   laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours, not in an agent's tab)
   laki memory rm <project>|. <id>             forget one agents learned
+  laki plan [<project>|.]                     the user's specs and brainstorms (kind, slug, title, folder)
+  laki plan read <project>|. <kind> <slug> [file]   one's README.md and files, or one file's text (kind: spec, brainstorm)
+  laki plan new <project>|. <kind> "<title>" [text|-]   write a new one for the user (text: its Markdown; -: stdin)
+  laki plan write <project>|. <kind> <slug> <file> [text|-]   a file beside one (ideas.md, a prototype); never README.md
   laki preset [ls]                            the agent profiles (Settings › Agents & profiles), your default marked
   laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast]
             [--cmd c] [--env KEY=value…] [--account id] [--name new]   a new profile, or change one ('' drops a field)
@@ -176,6 +180,15 @@ never task notes, progress or secrets. rm takes an id laki memory prints, a lear
   laki memory .
   laki memory add . "Run the e2e tests with npm run e2e -- --headed; they need port 5173 free"
   laki memory rm . m3k9`,
+  plan: `The user's specs (what to build) and brainstorms (ideas to explore): each a folder outside the repo with README.md
+(the user's text, never written here) and the files beside it. . is this tab's project. read prints README.md and the
+files' names, or one file's text; new writes one for the user to edit in Laki; write puts a file beside one (ideas.md,
+prototype-<option>.html, <name>.diagram.json). Text from - (or none, for write) is read from stdin.
+
+  laki plan .
+  laki plan read . brainstorm onboarding
+  laki plan new . spec "CSV export" - < spec.md
+  laki plan write . brainstorm onboarding ideas.md - < ideas.md`,
   preset: `Agent profiles (presets): how a tab's agent starts (its agent, args, model, effort, permission mode, fast
 mode, env, account). laki new --preset <name> and laki tab --preset start one. From an agent's tab, add, set, on, off
 and rm ask the user in the app first (its args and env run in every tab of it), and need the app open.

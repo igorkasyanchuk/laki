@@ -408,6 +408,11 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 :where(.sidebar[data-ph-size]) .project-name { font-size: var(--ph-size); }
 :where(.sidebar[data-ph-weight]) .project-name { font-weight: var(--ph-weight); }
 :where(.sidebar[data-ph-font='custom']) .project-name { font-family: var(--ph-font); } /* a font picked by name (Appearance › Sidebar) */
+/* Color: the accent as text (readable on the sidebar: themes.ts readable), unset (auto) too; Each project's own: its color.
+   Every theme but the looks whose head is a filled band of their own (its text there is theirs) */
+:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar:is([data-ph-color='auto'], [data-ph-color='accent'])) .project-name,
+:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar[data-ph-color='own']) .project-head:not(.tinted) .project-name { color: var(--accent-ink); }
+:where(html:not([data-look='starship'], [data-look='luna'], [data-look='mission'], [data-look='islander']) .sidebar[data-ph-color='own']) .project-head.tinted .project-name { color: var(--tab-c); } /* its own color (⋯ › Color) */
 .sidebar[data-side-font] { font-family: var(--side-font); } /* the sidebar's own font, over the interface's */
 /* Appearance › Interface › Text size (themes.ts' --ui-size): tabs, menus, dropdowns, the status bar, tooltips and the
    side panel's tabs as one, their small print a step under it; unset, each keeps its own */
@@ -960,6 +965,13 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .pane-head .x { background: none; border: none; padding: 0 5px; color: var(--muted); }
 .pane-head .x:hover { color: var(--fg); }
 .pane-body { flex: 1; position: relative; min-height: 0; }
+/* Settings › Terminal › Inset panes: each pane a rounded card with room around it (the transparent border is the gap,
+   the outline its edge, over the content), the space between them the sidebar's color; not on a phone */
+.app[data-inset]:not(.narrow) .term-wrap { background: var(--side); }
+.app[data-inset]:not(.narrow) .panes { inset: 3px; }
+.app[data-inset]:not(.narrow) .pane { border: 5px solid transparent; border-radius: calc(var(--rs, 10px) + 5px); background: var(--term-bg) padding-box; outline: 1px solid var(--line); outline-offset: -6px; overflow: hidden; }
+.app[data-inset]:not(.narrow) .pane.active { outline-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.app[data-inset]:not(.narrow) .pane-head { background: color-mix(in srgb, var(--tab-c, transparent) 8%, var(--term-bg)); }
 /* a tab's queue (panels.tsx' QueueStrip) under its terminal: its own height, at most a third of the pane, the rest scrolls */
 .queue-strip { flex: none; max-height: 34%; padding-right: 48px; /* clear of the floating AI button */ display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--side); font-size: 12px; }
 .show-strip .show-text { padding: 2px 12px 6px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: 12.5px; } /* laki show's card (panels.tsx ShowStrip) */
@@ -1147,6 +1159,13 @@ kbd { font-family: var(--mono); }
 .art-big pre { align-self: stretch; width: 100%; margin: 0; font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .art-big .art-md { align-self: stretch; width: 100%; }
 .art-big .art-ext { padding: 40px 0; font-size: 20px; }
+.file-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 36px 16px; text-align: center; color: var(--fg); }
+.file-card > .icon-svg { color: var(--muted); }
+.file-card-name { font-weight: 600; word-break: break-all; }
+.file-card audio { width: min(440px, 100%); margin-top: 6px; }
+.file-card.video { padding-top: 12px; }
+.file-card video { max-width: 100%; max-height: 62vh; border-radius: var(--rs, 8px); background: #000; }
+.file-card-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
 .pr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .pr-sends button, .pr-send { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
 .pr-block { display: flex; flex-direction: column; gap: 4px; }
@@ -1984,6 +2003,10 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 /* minimize: a small – on its corner while hovered, into the status bar (App's dock, DOCK_MS) */
 .ai-fab-min { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 18px; height: 18px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); opacity: 0; transform: scale(0.6); transition: opacity 0.12s, transform 0.12s; }
 .ai-fab-wrap:hover .ai-fab-min, .ai-fab-min:focus-visible { opacity: 1; transform: none; }
+.ai-mini-wrap { position: absolute; right: calc(var(--fab-r, 0px) + 14px); bottom: 10px; z-index: 41; }
+.ai-mini { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-height: 0; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--muted); font: 11px var(--ui-font); opacity: 0.7; cursor: pointer; transition: opacity 0.15s; }
+.ai-mini:hover, .ai-mini:focus-visible, .ai-mini.on { opacity: 1; color: var(--accent-ink); }
+.app:has(.overlay) .ai-mini-wrap { visibility: hidden; }
 .ai-fab-min:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--panel)); }
 .ai-fab-wrap.down { pointer-events: none; animation: ai-dock 0.32s cubic-bezier(0.55, 0, 0.75, 0.3) forwards; } /* down to the status bar's end, where its item lands */
 .ai-fab-wrap.up { animation: ai-dock 0.32s cubic-bezier(0.16, 1, 0.3, 1) reverse; }
