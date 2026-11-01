@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.40.0 · Nov 1, 2026
 
 - Audio and video play in Laki: the file preview and the Artifacts viewer get a player (up to 25 MB). A file Laki can't
   show gets a card with *Open*, *Open in editor* and *Show in Finder* instead of a bare extension.
