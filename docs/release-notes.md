@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.41.0 · Nov 2, 2026
 
 - Specs & Brainstorms: ⌘S saves at once; a width button (normal, wide, full); Esc no longer closes the page (Board's
   neither). The brainstorm chat types without lag and takes more messages while Laki AI answers (sent together after).
