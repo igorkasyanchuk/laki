@@ -452,6 +452,9 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .page-body.wide > .plans-index { max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 .page-body.wide > .plan { max-width: 1100px; width: 100%; margin: 0 auto; }
 .page-body.wide > .plan.with-chat { max-width: 1560px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 24px; align-items: start; }
+.page-body.wide > .plan.w-wide { max-width: 1500px; } /* the head's width button: normal, wide, full */
+.page-body.wide > .plan.w-wide.with-chat { max-width: 1960px; }
+.page-body.wide > .plan.w-full { max-width: none; }
 .plan-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 /* a brainstorm's chat with Laki AI: beside it, as tall as the page, its thread scrolling on its own */
 .plan-chat { position: sticky; top: 0; height: calc(100vh - 96px); display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); overflow: hidden; }
@@ -538,7 +541,10 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .sd-block .eyebrow, .sd-toolbar .eyebrow { font: 600 12px var(--ui-font); color: var(--fg); }
 .sd-toolbar .hint { color: var(--muted); }
 .sd-toolbar kbd { font: 11px var(--mono); padding: 0 3px; border: 1px solid var(--line); border-radius: 3px; }
-.sd-modal { z-index: 1000; }
+.sd-modal { z-index: 1000; -webkit-app-region: no-drag; } /* over the page's head, a drag region: its clicks would move the window */
+:root:has(.app.electron:not(.full)) .sd-modal > .sd-toolbar { min-height: 38px; padding-left: 84px; } /* the traffic lights' room */
 .narrow .plans-meta { display: none; }
 .narrow .page-body.wide > .plan.with-chat { grid-template-columns: minmax(0, 1fr); }
 .narrow .plan-chat { position: static; height: 70vh; }
+:root:has(.sd-modal) .overlay { z-index: 1001; } /* an ask (Close without saving?) over the diagram editor */
+.plan-saved { color: var(--done); }

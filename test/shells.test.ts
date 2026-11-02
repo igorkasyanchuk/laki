@@ -26,8 +26,8 @@ test('a shell tab running a command is running until its prompt is back', async 
     `#!/usr/bin/env node
 const say = (s, ms) => setTimeout(() => process.stdout.write('\\x1b[2J\\x1b[H' + s), ms)
 say('✻ Working… (esc to interrupt)\\r\\n', 0)
-say('> \\r\\n', 5000)
-say('Do it?\\r\\n❯ 1. Yes\\r\\n  2. No\\r\\n', 10000)
+say('› 1. production\\r\\n  2. /admin', 5000)
+say('\\x1b[?25lDo it?\\r\\n❯ 1. Yes\\r\\n  2. No\\r\\n', 10000)
 setTimeout(() => {}, 60000)
 `,
     { mode: 0o755 },
@@ -37,6 +37,9 @@ setTimeout(() => {}, 60000)
   await until(async () => (await sh()).runs === 'claude' && (await sh()).status === 'running', 'working', 5000)
   await until(async () => (await sh()).status === 'idle', 'idle: no spinner', 7000)
   assert.equal((await sh()).done, true, 'done: no one was looking')
+  // a list typed into its prompt, the cursor on it: no menu (its real menus hide the cursor, as below)
+  assert.match(await rig.screen(shell.id), /1\. production/)
+  assert.equal((await sh()).status, 'idle')
   await until(async () => (await sh()).status === 'waiting', 'its menu', 8000)
   assert.deepEqual((await sh()).ask.options.map((o: any) => o.label), ['Yes', 'No'])
   await rig.rpc('input', { tab: shell.id, data: '\x03' })

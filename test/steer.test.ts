@@ -14,6 +14,10 @@ test("send into the running turn: the user's own follow-up types in now, Laki's 
   assert.deepEqual(await rig.rpc('send', { target: tab.id, text: 'next task', whenIdle: true }), { tab: tab.id, queued: 1 })
   assert.deepEqual(await rig.rpc('send', { target: tab.id, text: 'and this', whenIdle: true, steer: true }), { tab: tab.id, queued: 2 })
   await rig.rpc('queueClear', { target: tab.id })
+  // another agent's steer: queued all the same (an Enter typed into a turn could answer a menu it just drew)
+  const other = await rig.rpc('tabNew', { ws: w.id, preset: 'claude' })
+  assert.deepEqual(await rig.rpc('send', { target: tab.id, text: 'from an agent', whenIdle: true, steer: true, from: { tab: other.id } }), { tab: tab.id, queued: 1 })
+  await rig.rpc('queueClear', { target: tab.id })
   // the profile's switch off: queued
   const presets = (await rig.rpc('state')).settings.presets ?? [{ name: 'claude', agent: 'claude' }, { name: 'codex', agent: 'codex' }]
   await rig.rpc('settingsSet', { presets: presets.map((x: any) => (x.name === 'claude' ? { ...x, steer: false } : x)) })

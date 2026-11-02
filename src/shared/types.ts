@@ -516,7 +516,7 @@ export type Settings = {
   reader?: boolean // Reader view: an agent tab as its chat (chatRead), a Terminal | Reader switch on each (on unless false)
   nextStep?: boolean // One next step: first in a workspace's ⋯ menus, ⌘G (on unless false); a row's chip with rowMarks.step
   livePlan?: boolean // the agent's plan, live: its to-do list on its tab and row, a plan it asks you to approve as a card (on unless false)
-  radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (on unless false)
+  radar?: boolean // Collision radar: worktrees whose changes meet another's, or what landed on their base (off unless true; overlapCheck asks for one)
   fullReview?: boolean // the tab bar's Review tab, a workspace's whole diff in three columns (on unless false)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
@@ -909,7 +909,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 133
+export const API = 134
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

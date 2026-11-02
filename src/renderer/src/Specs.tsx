@@ -5,7 +5,7 @@
 // the new-workspace page with a prompt naming its README.md; a brainstorm has its own chat with Laki AI in a side panel
 // (daemon/ai.ts: it ends after 12 hours unused). New ones start empty or from a template (Templates, settings.planTemplates).
 // Loaded as the page opens (App's lazy import).
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planRef } from '../../shared/plans'
 import { type AiMsg, PLAN_KINDS, type Plan, type PlanFile, type PlanKind, type PlanTemplate, type Project } from '../../shared/types'
 import { ago } from '../../shared/widget'
@@ -56,6 +56,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Ref | null>(at?.project && at.kind && at.slug ? { project: at.project, kind: at.kind, slug: at.slug } : null)
   const [selTitle, setSelTitle] = useState('')
+  const [width, setWidth] = useState<PlanWidth>(() => (w => (WIDTHS.includes(w) ? w : 'normal'))(stored<PlanWidth>('laki.planWidth', 'normal'))) // an open one's: normal, wide, full
   const refresh = () => api.call<Plan[]>('planList', {}).then(setList, () => setList([]))
   useEffect(() => void (sel && selTitle && api.pinned?.(sel) && api.pin!({ ...sel, title: selTitle }, true)), [selTitle]) // a pin's tip follows a rename
   const pinItem = (p: Ref & { title: string }): MenuItem[] => (api.pin ? [api.pinned!(p) ? { label: 'Unpin from the rail', icon: 'pin', run: () => api.pin!(p, false) } : { label: 'Pin to the rail', icon: 'pin', sub: 'A click away, whatever page is open', run: () => api.pin!(p, true) }] : [])
@@ -121,18 +122,20 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       head={crumbs}
       tools={
         <>
+          {sel && (n => <IconButton icon="columns" on={width !== 'normal'} title={`Width: ${width} (click: ${n})`} onClick={() => (setWidth(n), keep('laki.planWidth', n))} />)(WIDTHS[(WIDTHS.indexOf(width) + 1) % WIDTHS.length])}
           {sel && api.pin && (on => <IconButton icon="pin" on={on} title={on ? 'Unpin from the rail' : 'Pin to the rail: a click away, whatever page is open'} onClick={() => api.pin!({ ...sel, title: selTitle || 'Untitled' }, !on)} />)(api.pinned!(sel))}
           <IconButton icon={api.full ? 'minimize' : 'maximize'} title={api.full ? 'Exit full screen (⌘⇧⏎)' : 'Full screen: just this page (⌘⇧⏎)'} onClick={api.toggleFull} />
         </>
       }
       wide
+      esc={false} /* a page to stay on, as the rail's others: Esc is the editor's */
       onClose={onClose}
     >
       {menu}
       {level === 'templates' && !sel ? (
         <Templates templates={api.templates} save={api.saveTemplates} />
       ) : sel ? (
-        <PlanView key={`${sel.project}/${sel.kind}/${sel.slug}`} at={sel} api={api} projectName={name(sel.project)} onTitle={setSelTitle} onSaved={refresh} onGone={() => up(null)} />
+        <PlanView key={`${sel.project}/${sel.kind}/${sel.slug}`} at={sel} width={width} api={api} projectName={name(sel.project)} onTitle={setSelTitle} onSaved={refresh} onGone={() => up(null)} />
       ) : (
         <div className="plans-index">
           <header className="sched-hero">
@@ -244,10 +247,17 @@ function Templates({ templates, save }: { templates: PlanTemplate[]; save: (t: P
   )
 }
 
-// a refusal before it asked (off, busy, no key): said by the panel; a failure while it worked is in the chat
-const REFUSED = /^(Laki AI is|ask something|the AI is still|no OpenRouter|not connected|Specs & Brainstorms are off)/
+type PlanWidth = 'normal' | 'wide' | 'full'
+const WIDTHS: PlanWidth[] = ['normal', 'wide', 'full']
 
-function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref; api: SpecsApi; projectName: string; onTitle: (t: string) => void; onSaved: () => void; onGone: () => void }) {
+// a refusal before it asked (off, busy, no key, a full queue): said by the panel; a failure while it worked is in the chat
+const REFUSED = /^(Laki AI is|ask something|the AI is still|no OpenRouter|not connected|Specs & Brainstorms are off|\d+ messages wait already)/
+
+// the editor drawn once per key (load): the files' poll (every 2 s while Laki AI works) redraws the page, not BlockNote;
+// its callbacks work through refs, so the first ones hold
+const StillEditor = memo(SpecEditor, () => true)
+
+function PlanView({ at, width, api, projectName, onTitle, onSaved, onGone }: { at: Ref; width: PlanWidth; api: SpecsApi; projectName: string; onTitle: (t: string) => void; onSaved: () => void; onGone: () => void }) {
   const [got, setGot] = useState<Got | null>(null)
   const [err, setErr] = useState('')
   const [title, setTitle] = useState('')
@@ -277,9 +287,21 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
     clearTimeout(timer.current)
     const p = pending.current
     pending.current = null
-    if (p) return api.call('planSave', { ...at, title: titleRef.current, ...p }).then(onSaved, () => {})
+    if (p) return api.call('planSave', { ...at, title: titleRef.current, ...p }).then(() => (onSaved(), true), () => false) // false: not saved (⌘S says nothing)
   }
   useEffect(() => () => void flush(), []) // leaving it saves
+  // ⌘S: now, not 600 ms later (the diagram editor over it takes its own)
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    let off: ReturnType<typeof setTimeout>
+    const k = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 's' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.defaultPrevented || document.querySelector('.sd-modal')) return
+      e.preventDefault()
+      void Promise.resolve(flush()).then(ok => ok !== false && (setSaved(true), clearTimeout(off), (off = setTimeout(() => setSaved(false), 1800))))
+    }
+    window.addEventListener('keydown', k)
+    return () => (window.removeEventListener('keydown', k), clearTimeout(off))
+  }, [])
   const later = (p: { blocks: unknown[]; markdown: string }) => {
     latest.current = p
     pending.current = p
@@ -312,14 +334,14 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
     void flush() // the brief as it is now
     setChatErr('')
     showChat(true)
-    return api.call('aiAsk', { chat, text, images }).then(
+    return api.call('aiAsk', { chat, text, images, queue: true }).then( // while it answers: queued, all of it the next ask
       () => (get(), true),
       e => (REFUSED.test(e.message) ? (setChatErr(e.message), false) : (get(), true)),
     )
   }
   const brainstorm = p.kind === 'brainstorm'
   return (
-    <div className={`plan ${brainstorm && chatOn ? 'with-chat' : ''}`}>
+    <div className={`plan w-${width} ${brainstorm && chatOn ? 'with-chat' : ''}`}>
       <div className="plan-main">
       <div className="plan-head">
         <input
@@ -354,6 +376,7 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
       </div>
       <div className="muted small plan-meta">
         {projectName} · {p.kind} · <span className="mono">{shortPath(p.path)}</span>
+        {saved && <span className="plan-saved"> · saved</span>}
       </div>
       {asking && !chatOn && (
         <div className="plan-bar">
@@ -371,7 +394,7 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
           <span className="muted small">Loading it brings diagrams back as text.</span>
         </div>
       ) : (
-        <SpecEditor
+        <StillEditor
           key={load}
           initial={load === 'doc' && got.doc ? { blocks: got.doc.blocks } : { markdown: got.markdown }}
           files={{
@@ -400,7 +423,7 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
   )
 }
 
-type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number }
+type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number; queue?: string[] }
 // a brainstorm's own chat with Laki AI, beside it: the thread, the composer; kept mounted while hidden, so its ask is followed
 function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidden: boolean; chat: string; plan: Plan; api: SpecsApi; err: string; ask: (text: string, images?: string[]) => Promise<boolean>; onBusy: (b: boolean) => void; onClose: () => void }) {
   const [d, setD] = useState<ChatData>()
@@ -413,7 +436,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
     void load()
     return daemon.on(m => {
       if (m.ev === 'open') return void load()
-      if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended }) // another chat's ask doesn't hold this one up
+      if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended, queue: m.queue }) // another chat's ask doesn't hold this one up
     })
   }, [])
   useEffect(() => onBusy(!!d?.busy), [d?.busy])
@@ -423,7 +446,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
     if (el) el.scrollTop = el.scrollHeight
   }, [d?.chat.length, d?.busy, hidden])
   const send = () => {
-    if (saving || d?.busy || (!text.trim() && !images.length)) return
+    if (saving || (!text.trim() && !images.length)) return // while it answers: queued (askAi's)
     const sent = { text, images }
     setText('')
     setImages([])
@@ -433,6 +456,11 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
   const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
   const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
   const say = err || oops
+  // the thread drawn again only as it changes, not at each key typed in the box (every message's Markdown parsed)
+  const shown = useMemo(
+    () => (d?.chat.length ? turns(d.chat).map((g, i, all) => (Array.isArray(g) ? <Tools key={i} list={g} live={d.busy && i === all.length - 1} /> : <Message key={i} m={g} link={same} busy={d.busy || !api.aiOn || !!d.ended || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />)) : null),
+    [d, api.aiOn],
+  )
   return (
     <aside className="plan-chat" hidden={hidden} aria-label="Laki AI on this brainstorm">
       <div className="plan-chat-head">
@@ -457,7 +485,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             )}
           </div>
         ) : (
-          turns(d.chat).map((g, i, all) => (Array.isArray(g) ? <Tools key={i} list={g} live={d.busy && i === all.length - 1} /> : <Message key={i} m={g} link={same} busy={d.busy || !api.aiOn || !!d.ended || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
+          shown
         )}
         {d?.ended && (
           <div className="plan-bar small">
@@ -478,6 +506,17 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
         )}
       </div>
       <div className="plan-chat-dock">
+        {!!d?.queue?.length && (
+          <div className="ai-queue" aria-label="Waiting to be sent">
+            <span className="muted small">{d.busy ? 'Sent together when this answer ends:' : 'Sending…'}</span>
+            {d.queue.map((q, i) => (
+              <div key={i} className="ai-queued">
+                <span className="ai-queued-text">{q}</span>
+                <IconButton icon="x" title="Don't send it" onClick={() => api.call('aiUnqueue', { chat, i, text: q }).catch(e => setOops(e.message))} />
+              </div>
+            ))}
+          </div>
+        )}
         <div className={`nw-card nw-composer ai-composer ${api.aiOn ? '' : 'off'}`}>
           <PromptInput
             value={text}
@@ -493,7 +532,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             rows={2}
             placeholder={d?.chat.length ? 'Ask for more: another option, a darker prototype…' : 'Or say what to explore…'}
             tools={
-              <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={!api.aiOn || !!d?.busy || saving || (!text.trim() && !images.length)} onClick={send}>
+              <button className="primary ai-send" aria-label="Ask (⏎)" data-tip={d?.busy ? 'Queue it (⏎): sent with any others when this answer ends' : 'Ask (⏎) · ⇧⏎ a new line'} disabled={!api.aiOn || saving || (!text.trim() && !images.length)} onClick={send}>
                 <Icon name="arrowRight" size={14} />
               </button>
             }
@@ -516,7 +555,8 @@ const fileData = (f: File) =>
 
 // a file of a brainstorm's: Markdown as a page (its mermaid diagrams drawn), a prototype in a sandboxed frame, a diagram
 // drawn, an image; anything else by name
-function OutFile({ at, dir, f, api, pageKey }: { at: Ref; dir: string; f: PlanFile; api: SpecsApi; pageKey?: string }) {
+const OutFile = memo(OutFileNow, (a, b) => a.f.path === b.f.path && a.f.at === b.f.at && a.dir === b.dir && a.pageKey === b.pageKey) // the files' poll: only a changed one again
+function OutFileNow({ at, dir, f, api, pageKey }: { at: Ref; dir: string; f: PlanFile; api: SpecsApi; pageKey?: string }) {
   const ext = f.path.toLowerCase().match(/\.diagram\.json$|\.[^.]+$/)?.[0] ?? ''
   const [body, setBody] = useState<{ text?: string; image?: string } | null>(null)
   const [big, setBig] = useState(false)

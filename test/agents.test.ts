@@ -163,11 +163,17 @@ test('opencode: Laki\'s plugin reports its session and turns (not a subagent\'s)
 test("opencode's model: in its inline config, not -m (some TUIs refuse it), over a profile's own config", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await rig.rpc('wsNew', { project: p.id, name: 'glm', preset: 'opencode', model: 'openrouter/z-ai/glm-5.3', prompt: 'hi' })
+  const ws = await rig.rpc('wsNew', { project: p.id, name: 'glm', preset: 'opencode', model: 'openrouter/z-ai/glm-5.3', prompt: 'hi' })
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'opencode'), 'opencode up')
   assert.deepEqual([run.args, JSON.parse(run.config)], [['--prompt', 'hi'], { model: 'openrouter/z-ai/glm-5.3' }])
   await rig.rpc('settingsSet', { presets: [{ name: 'kimi', agent: 'opencode', model: 'openrouter/moonshotai/kimi-k3', env: { OPENCODE_CONFIG_CONTENT: '{"theme":"x","model":"old"}' } }] })
   await rig.rpc('wsNew', { project: p.id, name: 'kimi', preset: 'kimi', prompt: 'hi' })
   const two = await until(() => rig.fakeLog().filter(l => l.bin === 'opencode')[1], 'the profile one')
   assert.deepEqual(JSON.parse(two.config), { theme: 'x', model: 'openrouter/moonshotai/kimi-k3' })
+  // one opencode doesn't know (it would start on its last used one, saying nothing): refused before anything is made, the close ones named
+  const before = (await rig.rpc('state')).workspaces.length
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'guess', preset: 'opencode', model: 'openrouter/mistralai/mistral-large-4', prompt: 'hi' }), /opencode doesn't know the model openrouter\/mistralai\/mistral-large-4: [^]*close: openrouter\/mistralai\/mistral-large-4-0, openrouter\/mistralai\/mistral-large-2512/)
+  assert.equal((await rig.rpc('state')).workspaces.length, before)
+  await assert.rejects(rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'openrouter/nope/x' }), /doesn't know the model/)
+  assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'opencode/beam-free' })).model, 'opencode/beam-free')
 })

@@ -175,11 +175,29 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
       delete rig.env.LAKI_TAB
     }
   }
-  for (const args of [['new', '.', '--cmd', 'touch x', '--local'], ['new', '.', '--preset', 'sh-x', 'go'], ['tab', ws.id, '--cmd', 'touch x'], ['tab', ws.id, '--preset', 'sh-x']]) {
+  for (const args of [['new', '.', '--cmd', 'touch x', '--local'], ['new', '.', '--preset', 'sh-x', 'go'], ['tab', ws.id, '--preset', 'sh-x']]) {
     const r = await as(...args)
     assert.notEqual(r.code, 0, args.join(' '))
     assert.match(r.err, /an agent can't start a command of its own/, args.join(' '))
   }
+  // a plain command in a terminal tab (an orchestrator's dev server): the user allows it in the app, each time; no window: refused
+  const r = await as('tab', ws.id, '--cmd', 'touch x')
+  assert.notEqual(r.code, 0)
+  assert.match(r.err, /isn't open: ask the user to run it/)
+  const app = await connect(rig)
+  for (const allow of ['deny', 'once'] as const) {
+    const going = as('new', '.', '--preset', 'none', '--name', `orch-${allow}`, '--tab', 'claude', '--tab', 'npm run dev')
+    const ask = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'cmd' && !m.seen), 'asked in the app', 30000)
+    ask.seen = true
+    assert.deepEqual([ask.text, ask.to, ask.from], ['npm run dev', `orch-${allow}`, 'one'])
+    await rig.rpc('widgetToolAnswer', { req: ask.req, allow })
+    const done = await going
+    const made = { id: done.out.split(/\s/)[0] }
+    const kinds = (await rig.rpc('state')).tabs.filter((x: any) => x.workspace === made.id).map((x: any) => x.cmd ?? x.preset)
+    if (allow === 'deny') assert.deepEqual([done.code, /--tab npm run dev: the user said no/.test(done.err), kinds], [1, true, ['claude']])
+    else assert.deepEqual([done.code, kinds], [0, ['claude', 'npm run dev']], done.err)
+  }
+  app.close()
   // nor a profile that never asks: its mode, or its flags
   await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'sh-x', agent: 'command', cmd: 'echo hi' }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'yolo2', agent: 'claude', args: '--dangerously-skip-permissions' }] })
   for (const args of [['new', '.', '--preset', 'yolo', 'go'], ['tab', ws.id, '--preset', 'yolo'], ['tab', ws.id, '--preset', 'yolo2']]) {
@@ -194,6 +212,12 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
   assert.equal(mine.code, 0, mine.err)
   const n = await rig.cli('new', p.id, '--cmd', 'sleep 5', '--name', 'mine')
   assert.equal(n.code, 0, n.err)
+  // yours: --tab again and again, an agent (agent:model), a shell, a command; none asked
+  const multi = await rig.cli('new', p.id, '--preset', 'none', '--name', 'multi', '--tab', 'codex:gpt-5.5', '--tab', 'shell', '--tab', 'sleep 5')
+  assert.equal(multi.code, 0, multi.err)
+  assert.match(multi.out, /\n {2}\+ codex/)
+  const mw = { id: multi.out.split(/\s/)[0] }
+  assert.deepEqual((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === mw.id).map((x: any) => [x.preset ?? x.kind, x.model ?? x.cmd ?? '']), [['codex', 'gpt-5.5'], ['shell', ''], ['custom', 'sleep 5']])
 })
 
 // M5: who calls is the tab its process runs in, not what its env says

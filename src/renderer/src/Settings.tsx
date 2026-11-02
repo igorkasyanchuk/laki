@@ -125,7 +125,7 @@ export function rowMarkOn(s: Pick<AppSettings, 'prIcon' | 'prMarks' | 'diffStat'
 // one that can show at all: its feature on (One next step, Collision radar, the live plan; the author's: GitHub pictures
 // and the PR's mark), else no switch for it here or in Show ›
 export const rowMarkUsed = (s: Pick<AppSettings, 'nextStep' | 'radar' | 'livePlan' | 'avatars' | 'prIcon' | 'prMarks' | 'diffStat' | 'rowMarks'>, m: RowMark) =>
-  m === 'step' ? s.nextStep !== false : m === 'radar' ? s.radar !== false : m === 'plan' ? s.livePlan !== false : m === 'author' ? s.avatars !== false && rowMarkOn(s, 'pr') : true
+  m === 'step' ? s.nextStep !== false : m === 'radar' ? s.radar === true : m === 'plan' ? s.livePlan !== false : m === 'author' ? s.avatars !== false && rowMarkOn(s, 'pr') : true
 export const rowMarkSet = (s: Pick<AppSettings, 'prMarks' | 'rowMarks'>, m: RowMark, v: boolean): Partial<AppSettings> =>
   m === 'pr' ? { prIcon: v } : m === 'approved' || m === 'mine' || m === 'commented' ? { prMarks: { ...s.prMarks, [m]: v } } : m === 'stat' ? { diffStat: v } : { rowMarks: { ...s.rowMarks, [m]: v } }
 const CTX_LOOKS: [string, string][] = [['line', 'A line under its tab'], ['ring', 'A ring on its tab'], ['status', 'The status bar only'], ['off', 'Off']] // the context meter's
@@ -199,7 +199,7 @@ export type AppSettings = Paint & {
   prScan?: number // minutes between PR checks
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
-  radar?: boolean // Collision radar: overlapping changes between worktrees (unset: on)
+  radar?: boolean // Collision radar: overlapping changes between worktrees, checked on its own (unset: off; a workspace's Check overlaps asks)
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
   nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
   livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
@@ -1078,8 +1078,8 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.doneCheck !== false} onChange={v => set({ doneCheck: v })}>
                   <Says title="Done check" hint="As an agent's turn ends having changed files, its project's check runs before you're told it's done: the scripts and second opinion a project ticks in its settings › Done check. Off: none runs anywhere" />
                 </Switch>
-                <Switch className="switch-row" on={s.radar !== false} onChange={v => set({ radar: v })}>
-                  <Says title="Collision radar" hint="Every 15 seconds, compares what each worktree changes with the project's other worktrees and with what landed on its base since it branched. Where two change the same lines, both rows get a mark: open the other, or tell either agent, before merge day. Lockfiles don't count" />
+                <Switch className="switch-row" on={s.radar === true} onChange={v => set({ radar: v })}>
+                  <Says title="Collision radar" hint="Off: a worktree's ⋯ › Workspace › Check overlaps looks once, when you ask. On: every 15 seconds it compares what each worktree changes with the project's other worktrees and with what landed on its base since it branched, and where two change the same lines both rows get a mark. Lockfiles don't count" />
                 </Switch>
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />

@@ -4,7 +4,6 @@
 import { randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { askOf } from '../shared/ask.ts'
 import { answerOk, type Tab, type Webhook } from '../shared/types.ts'
 import { answer, dir, log, rtOf, sessions, state } from './core.ts'
 import { pushTo, replies } from './push.ts'
@@ -25,7 +24,7 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   const go = () => {
     const s = sessions.get(tab.id)
     if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
-    const ask = kind === 'waiting' ? askOf(s!.screenText(16)) : undefined
+    const ask = kind === 'waiting' ? s!.ask() : undefined
     const nonce = ask && nonceFor(w)
     if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
     pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
@@ -94,7 +93,7 @@ export async function phoneTick() {
       }
       if (!a.tab) continue
       const s = sessions.get(a.tab)
-      const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? askOf(s.screenText(16)) : undefined
+      const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? s.ask() : undefined
       const o = now && JSON.stringify(now.options) === a.key ? now.options.find(x => x.n === tap.n) : undefined
       if (!o) continue // it moved on
       await answer({ tab: a.tab, n: o.n, label: o.label }).then(

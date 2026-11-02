@@ -55,7 +55,7 @@ function NeedCard({ t, w, api, next }: Need & { api: NeedsApi; next: boolean }) 
   const waiting = t.status === 'waiting'
   const opts = waiting ? (t.ask?.options ?? []) : []
   const allow = waiting && !opts.length && api.permission(t)
-  const stop = (e: MouseEvent) => e.stopPropagation()
+  const stop = (e: MouseEvent) => (e.target as HTMLElement).closest('button') && e.stopPropagation() // a button's own click; the row's room around it opens the tab
   const key = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return // a button of its own has the key
     const o = opts.find(o => String(o.n) === e.key)

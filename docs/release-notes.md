@@ -2,6 +2,24 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Specs & Brainstorms: ⌘S saves at once; a width button (normal, wide, full); Esc no longer closes the page (Board's
+  neither). The brainstorm chat types without lag and takes more messages while Laki AI answers (sent together after).
+- Spell check: right-click a red-underlined word in a spec, a note or any text box for suggestions and *Learn*.
+- Diagrams: every toolbar button clicks (the window's title bar took some), the toolbar clears the window's buttons,
+  Esc no longer closes the editor, and *Close* asks before dropping unsaved changes; ⌘S saves.
+- Overlaps (Collision radar) are off by default: a worktree's ⋯ › Workspace › *Check overlaps…* looks once, in a dialog.
+  Settings › Git & worktrees turns the automatic scan back on.
+- `laki new --tab codex --tab "npm run dev"`: more agents or commands in a new workspace at once. An agent's command
+  tab asks you first instead of being refused; the orchestrate skill knows both.
+- OpenCode models: Laki checks the name against `opencode models` and refuses one OpenCode doesn't know (it would have
+  started on its last used model, saying nothing), naming the close ones.
+- The Needs you card opens its tab from anywhere on it. Long menu hints (a path) give way to the label. The status
+  bar's *linked PR* says plainly what it means. A numbered list typed into Codex's prompt no longer shows as a question.
+- Security: another agent's messages queue instead of typing into a running turn; `.fileloc`, `.inetloc` and
+  `.webloc` files are shown in Finder, not opened.
+
 ## 0.40.0 · Nov 1, 2026
 
 - Audio and video play in Laki: the file preview and the Artifacts viewer get a player (up to 25 MB). A file Laki can't

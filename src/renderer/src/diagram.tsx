@@ -11,6 +11,7 @@ import type { Node, Edge, NodeProps, EdgeProps, Connection, XYPosition, NodeChan
 import '@xyflow/react/dist/style.css'
 import { toBlob } from 'html-to-image'
 import type { Diagram, DiagramEdge } from './specmd'
+import { ask } from './ui'
 
 export type { Diagram }
 
@@ -783,6 +784,11 @@ function Editor({ value, onSave, onCancel }: EditorProps) {
   }
   const kind = KINDS[value.kind] ? value.kind : 'flowchart'
   const catalog = !!KINDS[kind].catalog
+  // Close with unsaved changes asks first (Esc never closes it: SpecEditor's Modal)
+  const base = useMemo(() => JSON.stringify(fromFlow(kind, init.nodes, init.edges)), [kind, init])
+  const close = async () => {
+    if (JSON.stringify(fromFlow(kind, nodes, edges)) === base || (await ask('Close without saving?', { text: 'What you changed in this diagram goes. Save keeps it.', ok: 'Discard changes', danger: true }))) onCancel()
+  }
 
   const onConnect = useCallback((c: Connection) => setEdges((es) => addEdge({ ...c, ...edgeLook({}) }, es)), [setEdges])
   const addAt = (shape: string, p: XYPosition) => {
@@ -830,6 +836,7 @@ function Editor({ value, onSave, onCancel }: EditorProps) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && !e.altKey && !e.shiftKey) return void (e.preventDefault(), saveNow.current()) // ⌘S: Save, from a label being typed too
       if ((e.target as HTMLElement).isContentEditable || (e.target as Element).closest('input, textarea')) return
       const sel = (rf.getNodes() as FNode[]).filter((n) => n.selected)
       const key = e.metaKey || e.ctrlKey ? e.key.toLowerCase() : ''
@@ -873,6 +880,8 @@ function Editor({ value, onSave, onCancel }: EditorProps) {
     setBusy(true)
     try { await onSave(fromFlow(kind, nodes, edges), await exportPng(nodes).catch(() => null)) } finally { setBusy(false) }
   }
+  const saveNow = useRef(save)
+  saveNow.current = busy ? async () => {} : save // ⌘S's: this render's nodes, not the first's
 
   return (
     <div className="sd-modal">
@@ -896,7 +905,7 @@ function Editor({ value, onSave, onCancel }: EditorProps) {
             dbl-click canvas <b>+{KINDS[kind].def}</b> · <kbd>Tab</kbd> / click dot: add connected · dbl-click edit · drag select · <kbd>Space</kbd>+drag pan · <kbd>⌘C</kbd> / <kbd>⌘V</kbd> copy, paste · <kbd>Del</kbd> delete
           </span>}
         <span className="grow" />
-        <button onClick={onCancel}>Cancel</button>
+        <button onClick={() => void close()} title="Close (asks first when something isn't saved)">Close</button>
         <button className="primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
       </div>
       <div className="sd-body">

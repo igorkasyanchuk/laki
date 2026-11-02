@@ -8,6 +8,8 @@
 import pty from '@lydell/node-pty'
 import headless from '@xterm/headless'
 import serializeAddon from '@xterm/addon-serialize'
+import { askOf } from '../shared/ask.ts'
+import type { Ask } from '../shared/types.ts'
 
 export type Client = { id: number; send(msg: unknown): void }
 
@@ -203,6 +205,21 @@ export class Session {
     for (let i = from; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) ?? '')
     while (out.length && !out.at(-1)!.trim()) out.pop()
     return out.slice(-lines).join('\n')
+  }
+
+  // the line the cursor is on, counted as screenText(lines) counts them; none while it's hidden
+  cursorLine(lines = 20): number | undefined {
+    if ((this.term as any)._core?.coreService?.isCursorHidden) return
+    const b = this.term.buffer.active
+    let end = b.length
+    while (end > 0 && !b.getLine(end - 1)?.translateToString(true).trim()) end--
+    return b.baseY + b.cursorY - Math.max(0, end - lines)
+  }
+
+  // a waiting agent's menu on screen (askOf); typing: one under the shown cursor is a prompt being typed, not a menu
+  // (a shell tab's agent, whose status is read off its screen; a hooked one's wait is its hook's)
+  ask(typing = false): Ask | undefined {
+    return askOf(this.screenText(16), typing ? this.cursorLine(16) : undefined)
   }
 
   // all of it, the scrollback too, each wrapped line joined again: a tab's Copy contents

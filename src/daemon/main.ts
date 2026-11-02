@@ -217,6 +217,7 @@ const api: Record<string, Handler> = {
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
+  overlapCheck: p => core.overlapCheck(String(p.ws ?? '')), // the workspace menu's Check overlaps: one worktree's now, the radar on or off
   wsStat: p => core.wsStat(p), // a row's hover card: its diff's size now
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
@@ -233,8 +234,12 @@ const api: Record<string, Handler> = {
   wsFork: p => core.wsFork(p.id),
   tabNew: async ({ caller, from, run: _run, hops: _hops, cwd: _cwd, cwdOf, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's; cwd: only cwdOf's shell's
     const by = core.agentCaller(caller) ?? core.saidFrom(from) // as wsNew's (byCaller)
-    if (by) core.agentNoCmd(p) // an agent's: no command of its own
+    // an agent's: no command of its own, but a plain one (an orchestrator's dev server, laki new --tab) once you allow it
+    const at = core.findWs(String(p.ws ?? '')) // one that isn't there: refused before any question
+    if (by && p.cmd?.trim() && (!p.preset || p.preset === 'custom')) await cmdAsk(caller, by, at.id, p.cmd)
+    else if (by) core.agentNoCmd(p)
     if (p.prompt) await crossAsk({ ws: p.ws, from: caller }, 'send', null, p.prompt) // a prompt into another workspace: asked, as a send is
+    await core.modelKnown(core.presetNamed(p.preset || '')?.agent ?? p.preset ?? '', p.model?.trim() || core.presetNamed(p.preset || '')?.model, at)
     const cwd = cwdOf === undefined ? undefined : await core.shellCwd(p.ws, cwdOf)
     // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
     const t = core.addTab(p.ws, { ...p, cwd, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
@@ -551,6 +556,7 @@ const crossOk = new Set<string>()
 function agentSend(p: any) {
   const tab = core.resolveTarget(String(p.target ?? ''))
   const by = core.agentCaller(p.from)
+  if (by) delete p.steer // into a running turn is your follow-ups' only: an agent's waits its turn (an Enter typed now could answer a menu just drawn)
   if (!by) core.youTyped(tab.id, String(p.text ?? ''))
   else if (core.tracked(tab)) p.agent = true
   else if (tab.workspace !== by) throw new Error(`${tab.name} isn't an agent, and it's in another workspace: an agent's messages go to agents only (ask the user to run it there)`)
@@ -604,6 +610,17 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said?.slice(0, 2000), ws: by, tab: p.from.tab })
   if (how === 'always') crossOk.add(`${kind}:${by}>${to}`)
   else if (how !== 'once') throw new Error(`${tab ? `${tab.name} is in ${name(to)}` : `${what} is for ${name(to)}`}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+}
+
+// an agent's command in a new terminal tab (tabNew's cmd): it runs as you, past the agent's own permission prompts, so
+// you allow it in the app each time (no Always); no window, no answer or a no: refused
+async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
+  const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
+  const to = ws
+  if (!core.clients.size) throw new Error("an agent's command runs once the user allows it in Laki's window, and it isn't open: ask the user to run it")
+  const agent = core.state.tabs.find(t => t.id === from?.tab)?.name ?? 'An agent'
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'cmd', agent, from: name(by), to: name(to), target: 'a command', text: cmd.slice(0, 2000), ws: by, tab: from?.tab })
+  if (how !== 'once') throw new Error(`${how === 'deny' ? 'the user said no to' : 'no answer from the user for'} the command: ask them to run it themselves`)
 }
 
 // the ticks' now (storageTidy, archivedTidy, scheduleTick…): a test's daemon only (the rig's LAKI_TEST_PARENT); any

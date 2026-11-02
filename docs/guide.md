@@ -1237,7 +1237,9 @@ its *Specs & Brainstorms* tab. The page is one list, newest first, each row with
 when it changed: a filter, a project, *All* / *Specs* / *Brainstorms* (with their counts) and *New* ▾ over it. A click
 opens one alone, the page's whole width, with the way back as breadcrumbs at the top (*Specs & Brainstorms › the
 spec*). The ⤢ at the top (⌘⇧⏎) puts the
-page alone in the window, without the sidebar. Each is a folder outside your repo and its worktrees,
+page alone in the window, without the sidebar; the width button beside it goes normal, wide, full. It saves as you type,
+⌘S at once; Esc doesn't close it (the ✕ or another page does). A misspelled word's right click offers fixes. In a
+diagram's editor Esc does nothing, ⌘S saves, and *Close* asks before dropping changes. Each is a folder outside your repo and its worktrees,
 `<data>/plans/<project>/specs|brainstorms/<name>/`: `spec.json` (the editor's), `README.md` (the same as Markdown,
 written on each save: what agents read; a diagram is its nodes and edges, with its picture in `files/`) and the files
 beside them. A README.md changed by someone else (an agent) since: the spec asks *Load it* or *Keep mine*.
@@ -1503,13 +1505,15 @@ workflow's agent blocks (they have their own loops).
 
 ### Collision radar
 
-Worktrees keep agents out of each other's files until merge day. Every 15 seconds Laki compares what each worktree
-changes (against its base) with the project's other worktrees, and with what landed on its base since it branched. Where
-two change the same lines, or lines side by side (git would call that a conflict), or both add the same new file, both
-rows get an orange ⇄ with how many others they meet; hover it for the files and lines. A click: *Open* the other
+Worktrees keep agents out of each other's files until merge day. A worktree's ⋯ › Workspace › *Check overlaps…*
+compares what it changes (against its base) with the project's other worktrees, and with what landed on its base since
+it branched, and lists where two change the same lines, or lines side by side (git would call that a conflict), or both
+add the same new file. Settings › Git & worktrees › *Collision radar* (off by default) does that every 15 seconds for
+every worktree: both rows get an orange ⇄ with how many others they meet; hover it for the files and lines. In the
+dialog, or a click on the mark: *Open* the other
 workspace, *Tell this one's agent* or *Tell* the other's (it's sent where the other's change is, and `laki diff` reads
 it), or, for a base that moved, *Ask the agent to merge main in*. *Hide until it changes* hides one until either side
-changes those lines. Lockfiles don't count. Settings › Git & worktrees › *Collision radar* turns it off. Not on SSH
+changes those lines (with the radar on). Lockfiles don't count. Not on SSH
 hosts or codespaces; the base is what this clone has (nothing is fetched for it).
 
 ### The agent's plan, live
@@ -1737,7 +1741,7 @@ lit for a moment.
   off: a PR's status changes only with its right click › *Refresh PR status*, if `gh` asks for an SSH passphrase or
   GitHub rate-limits you; the PR switches need it on), *Keep the Mac awake while agents work* (off: while any agent works
   or waits for your answer, the Mac doesn't sleep, on battery too; the screen still turns off and locks, and closing the
-  lid still sleeps it), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (on: worktrees whose changes meet, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
+  lid still sleeps it), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
@@ -2107,6 +2111,8 @@ laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's 
 laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki new app --no-setup --prompt "…"                    # without the setup script (laki run <ws> setup: later)
+laki new app --prompt "…" --tab codex --tab "npm run dev"  # more tabs there: an agent (agent:model) or a command
+laki new app --preset opencode --model openrouter/moonshotai/kimi-k3  # opencode's model as `opencode models` lists it
 laki new app --perm acceptEdits --fast --prompt "…"     # its permission mode (auto, acceptEdits, plan, bypassPermissions) and fast mode
 laki new app --template review --group Reviews --prompt "#57"  # through a prompt template, under a sidebar group (its template and agent too)
 laki new app --action "PR+audit" --prompt "the login page"     # an agent action's prompt, then these words

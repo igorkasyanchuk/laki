@@ -144,8 +144,8 @@ export const ago = (t?: string | number) => {
 export function AutoToggles({ w, onToggle, names = ['fix CI', 'review', 'fix conflicts', 'merge when green'], row, keys = w.allow?.land ? [...FIXES, 'autoLand'] : FIXES }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void; names?: string[]; row?: (k: AutoKey) => ReactNode; keys?: AutoKey[] }) {
   if (w.prLinked)
     return (
-      <span className="muted small" data-tip="The prompt named this PR, or it was attached: its branch isn't checked out here, so the agent couldn't push to it (laki new --pr gives the switches). A prompt's gives way to a PR of this workspace's own branch, once pushed.">
-        linked, not checked out
+      <span className="muted small" data-tip="Linked: the prompt named this PR, or you attached it. This workspace has its own branch, not the PR's, so the agent can't push to the PR and the auto-fix switches are off. To work on the PR itself: a new workspace from it (laki new --pr). Once this branch has a PR of its own, that one takes over.">
+        linked PR
       </span>
     )
   const when = `Checked every ${w.prScan === 1 ? 'minute' : `${w.prScan} minutes`} and after each turn; the prompt and pace: Settings › Pull requests.`

@@ -58,7 +58,7 @@ test('overlaps: lines that meet or sit side by side, a new file both make, nothi
   assert.equal(spanText([0, 0]), 'a new file')
 })
 
-test('the daemon marks two worktrees that change the same lines, and one whose base changed them since; off: none', async t => {
+test('Check overlaps asks for one now; the radar, turned on, marks two worktrees that change the same lines, and one whose base changed them since; off: none', async t => {
   const rig = await fresh(t, { env: { LAKI_OVERLAP_MS: '300' } })
   const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, env: rig.env })
   const lines = (n: number, f = (i: number) => `line ${i}`) => Array.from({ length: n }, (_, i) => f(i + 1)).join('\n') + '\n'
@@ -74,6 +74,14 @@ test('the daemon marks two worktrees that change the same lines, and one whose b
   writeFileSync(join(b.path, 'cart.ts'), lines(30, i => (i === 13 ? 'b 13' : `line ${i}`))) // right after a's: they'd conflict
   writeFileSync(join(c.path, 'other.ts'), lines(30, i => (i === 2 ? 'c 2' : `line ${i}`))) // apart from both
   const view = async (id: string) => (await rig.rpc('state')).workspaces.find((w: { id: string }) => w.id === id)
+  // off unless turned on: no marks; the workspace menu's Check overlaps reads one now
+  await new Promise(r => setTimeout(r, 900))
+  assert.equal((await view(a.id)).overlaps, undefined)
+  assert.deepEqual(await rig.rpc('overlapCheck', { ws: a.id }), [{ file: 'cart.ts', mine: [10, 12], theirs: [13, 13], ws: b.id }])
+  assert.deepEqual(await rig.rpc('overlapCheck', { ws: c.id }), [])
+  const local = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
+  await assert.rejects(rig.rpc('overlapCheck', { ws: local.id }), /a live worktree on this Mac only/)
+  await rig.rpc('settingsSet', { radar: true })
   const got = await until(async () => (await view(a.id)).overlaps, 'a marked')
   assert.deepEqual(got, [{ file: 'cart.ts', mine: [10, 12], theirs: [13, 13], ws: b.id }])
   assert.deepEqual((await view(b.id)).overlaps, [{ file: 'cart.ts', mine: [13, 13], theirs: [10, 12], ws: a.id }])

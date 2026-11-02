@@ -257,8 +257,9 @@ test('apps and open in: Finder, an app, a file, the editor; errors', async t => 
   // L11: a file that would run, by default: shown in Finder, not opened
   writeFileSync(join(ws.path, 'go.command'), 'echo hi')
   writeFileSync(join(ws.path, 'build'), '#!/bin/sh\necho hi', { mode: 0o755 })
-  for (const f of ['go.command', 'build']) await rig.rpc('openIn', { ws: ws.id, app: 'default', file: f })
-  assert.deepEqual(readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open ')).slice(-2), [`open -R ${join(ws.path, 'go.command')}`, `open -R ${join(ws.path, 'build')}`])
+  writeFileSync(join(ws.path, 'run.fileloc'), '<plist/>') // opens its target: a script there would run
+  for (const f of ['go.command', 'build', 'run.fileloc']) await rig.rpc('openIn', { ws: ws.id, app: 'default', file: f })
+  assert.deepEqual(readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open ')).slice(-3), [`open -R ${join(ws.path, 'go.command')}`, `open -R ${join(ws.path, 'build')}`, `open -R ${join(ws.path, 'run.fileloc')}`])
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'zed', file: 'gone.txt' }), /The file \S+gone\.txt does not exist\./)
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'emacs' }), /no app emacs/)
   // a project's own editor (Open in's pick for its folder) over Settings': its workspaces' and the project's folder

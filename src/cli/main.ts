@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -20,6 +20,7 @@ const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
 const envs: string[] = [] // laki preset's --env KEY=value, again and again
+const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
@@ -34,6 +35,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
+  else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
@@ -282,12 +284,22 @@ async function main() {
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       // a race: the same prompt to each preset, a worktree each
       if (flags.fan) {
+        if (tabs.length) throw new Error('--tab: one workspace at a time, not with --fan')
         const presets = String(flags.fan).split(',').map(p => p.trim()).filter(Boolean)
         const made: Workspace[] = await rpc('wsFan', { ...o, presets }, 120000 * Math.max(1, presets.length))
         return out(made, made.map(line).join('\n'))
       }
+      // --tab: an agent or profile (agent:model) starts there with no prompt (laki send gives it one), anything else
+      // is a command in a terminal tab (an agent's: the user allows it in the app first)
+      const known = tabs.length ? new Set(['shell', ...AGENTS, ...(((await rpc('state')) as View).settings?.presets ?? []).map(p => p.name)]) : new Set<string>()
+      const specs = tabs.map(t => t.trim()).filter(Boolean)
+      const tabOf = (t: string) => (([who, model]) => (known.has(who) ? { preset: who, model: model || undefined } : { cmd: t }))(t.includes(' ') ? [t] : [t.slice(0, (t + ':').indexOf(':')), t.slice((t + ':').indexOf(':') + 1)])
       const ws: Workspace = await rpc('wsNew', o, 120000)
-      return out(ws, line(ws))
+      const more: { name: string; id: string }[] = []
+      const bad: string[] = []
+      for (const t of specs) await rpc('tabNew', { ws: ws.id, ...tabOf(t), caller: o.caller }, 150000).then(x => more.push(x), e => bad.push(`--tab ${t}: ${(e as Error).message}`))
+      if (bad.length) (process.exitCode = 1), console.error(bad.join('\n'))
+      return specs.length ? out({ ...ws, tabs: more }, [line(ws), ...more.map(x => `  + ${x.name} (${x.id})`)].join('\n')) : out(ws, line(ws))
     }
     case 'browser': {
       // laki browser [ws] open [url] | screenshot | click <selector> | fill <selector> <text> | text; in a tab, its workspace
@@ -438,7 +450,7 @@ async function main() {
       // no --preset then: your default agent, as MCP's laki_new_tab
       const prompt = (flags.prompt as string | undefined) || rest.slice(1).join(' ') || undefined
       const preset = flags.preset || (prompt && !flags.cmd ? ((await rpc('state')) as View).settings?.agent || 'claude' : undefined)
-      const t = await rpc('tabNew', { ws: rest[0], preset, cmd: flags.cmd, prompt, name: flags.name, model: flags.model, effort: flags.effort, perm: flags.perm, fast: flags.fast ? true : undefined, caller: caller() })
+      const t = await rpc('tabNew', { ws: rest[0], preset, cmd: flags.cmd, prompt, name: flags.name, model: flags.model, effort: flags.effort, perm: flags.perm, fast: flags.fast ? true : undefined, caller: caller() }, 150000) // an agent's --cmd, or a prompt into another workspace: the user is asked first
       return out(t, `${t.name} (${t.id})`)
     }
     case 'send': {

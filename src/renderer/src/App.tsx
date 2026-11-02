@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, PrCard, prState, PRStatus, REVIEW, reviewersText, short, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -530,6 +530,7 @@ export function App() {
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
   // Collision radar's overlaps you hid, until they change (each one's radarKey)
   const [radarHid, setRadarHid] = useState<string[]>(() => load('laki.radarHide', []))
+  const [overlapsAt, setOverlapsAt] = useState<{ w: string; list?: Collision[]; err?: string } | null>(null) // Check overlaps' dialog: one workspace's, as asked (list: none yet)
   const [readMode, setReadMode] = useState<Record<string, 'reader' | 'term'>>(() => load('laki.reader', {})) // Reader view: each agent tab's, as you left it
   const [checkHid, setCheckHid] = useState<string[]>([]) // Done means checked: strips hidden (workspace:at)
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
@@ -2334,6 +2335,14 @@ export function App() {
       toolLine.add({ req: m.req, title, text: `Every tab started on it runs with its args and env.\n\n${m.text}`, picks, answer })
       return toolShow()
     }
+    if (m.cross === 'cmd') {
+      // an agent's command in a new terminal tab (main.ts' cmdAsk: laki tab --cmd, laki new --tab): once only
+      const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`
+      const picks: Pick[] = [{ label: 'Run it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, String(m.text ?? '').slice(0, 200), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      toolLine.add({ req: m.req, title, text: `In a new terminal tab of ${m.to}, as you: the agent's own permission prompts don't see it.\n\n$ ${m.text}`, picks, answer })
+      return toolShow()
+    }
     if (m.cross) {
       // an agent's send or screen into another workspace's tab (main.ts' crossAsk): what it sends, or that it reads; an
       // event for another workspace (emit): its workflows and extensions run there
@@ -2588,7 +2597,8 @@ export function App() {
     ...((t => (t ? [{ label: 'Rename with AI', icon: 'agent', sub: `${t.name} names it from its PR, else its task`, run: () => aiRename(w, t) } as MenuItem] : []))(liveAgent(w))),
     { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
     ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
-    ...(w.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (w.host ? `${w.host}:` : '') + shortPath(w.path), run: () => copy((w.host ? `${w.host}:` : '') + w.path) } as MenuItem] : []),
+    ...(w.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (w.host ? `${w.host}:` : '') + shortPath(w.path), tip: (w.host ? `${w.host}:` : '') + w.path, run: () => copy((w.host ? `${w.host}:` : '') + w.path) } as MenuItem] : []),
+    ...(canOverlap(w) ? [{ label: 'Check overlaps…', icon: STEP_ICON.collide, key: 'o', tip: "Where its changes meet another worktree's of the project, or what its base gained since it branched", run: () => checkOverlaps(w) } as MenuItem] : []),
     null,
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
@@ -3058,7 +3068,7 @@ export function App() {
           : []),
         ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: kh('later'), tip: 'Types a message into an agent at a time you pick, or once its turn ends', run: () => sendLater() } as Action] : []),
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; the branch and folder stay', run: () => setDialog({ renameWs: ws.id }) },
-        ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
+        ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), tip: (ws.host ? `${ws.host}:` : '') + ws.path, run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
         { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', tip: ws.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
         rmItem(ws) as Action,
       ]
@@ -3288,40 +3298,50 @@ export function App() {
   const radarOf = (w: WorkspaceView) => (w.overlaps ?? []).filter(c => !radarHid.includes(radarKey(w, c)))
   const radarWhose = (c: Collision) => (c.ws ? wsName(view.workspaces.find(x => x.id === c.ws) ?? { id: c.ws }) : c.base!)
   const radarTip = (w: WorkspaceView) => radarOf(w).map(c => `${c.file}: ${c.ws ? `${radarWhose(c)} changes it too` : `${c.base} changed it since this branched`} (${spanText(c.theirs)}; here ${spanText(c.mine)})`).join('\n')
-  const radarMenu = (w: WorkspaceView): MenuItem[] =>
-    radarOf(w).flatMap((c, i): MenuItem[] => {
+  // inDialog: Check overlaps' (no Hide: that's the radar's marks; Open closes it)
+  const radarMenu = (w: WorkspaceView, list = radarOf(w), inDialog = false): MenuItem[] =>
+    list.flatMap((c, i): MenuItem[] => {
       const o = c.ws ? view.workspaces.find(x => x.id === c.ws) : undefined
       const where = `${c.file} (${spanText(c.theirs)} there, ${spanText(c.mine)} here)`
-      const hide = { label: 'Hide until it changes', icon: 'eye', tip: 'Shows again when either side changes those lines', run: () => setRadarHid(h => [...h, radarKey(w, c)]) } as MenuItem
+      const hide: MenuItem[] = inDialog ? [] : [{ label: 'Hide until it changes', icon: 'eye', tip: 'Shows again when either side changes those lines', run: () => setRadarHid(h => [...h, radarKey(w, c)]) }]
       if (!o)
         return [
           ...(i ? [null] : []),
           { head: `${c.base} changed ${c.file} since this branched` },
           { label: `Ask the agent to merge ${c.base} in`, icon: 'gitMerge', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, tip: 'Sent when its turn ends', run: () => void call('send', { target: w.id, whenIdle: true, text: `${c.base} has changed ${where} since this branch started, where you change it too. Merge ${c.base} in now (git merge ${c.base}; no rebase, no force push), resolve any conflicts keeping what both sides meant, run what you can locally, then say what changed.` }).then(() => toast('Sent to the agent'), () => {}) },
-          hide,
+          ...hide,
         ]
       const tell = (to: WorkspaceView, other: WorkspaceView, mine: Collision['mine'], theirs: Collision['theirs']) =>
         void call('send', { target: to.id, whenIdle: true, text: `Heads up: workspace ${wsName(other)} (branch ${other.branch}) also changes ${c.file}, ${spanText(theirs)}, where you change ${spanText(mine)}. Both will merge into ${to.base}. Read its change with \`laki diff ${other.id}\` and keep yours compatible with it; tell me if you can't.` }).then(() => toast(`Sent to ${wsName(to)}'s agent`), () => {})
       return [
         ...(i ? [null] : []),
         { head: `${wsName(o)} changes ${c.file} too` },
-        { label: `Open ${wsName(o)}`, icon: 'arrowUpRight', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, run: () => setWsId(o.id) },
+        { label: `Open ${wsName(o)}`, icon: 'arrowUpRight', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, run: () => (setWsId(o.id), inDialog && setOverlapsAt(null)) },
         { label: "Tell this one's agent", icon: 'send', tip: `Sends it where ${wsName(o)}'s change is, to build on`, run: () => tell(w, o, c.mine, c.theirs) },
         { label: `Tell ${wsName(o)}'s agent`, icon: 'send', run: () => tell(o, w, c.theirs, c.mine) },
-        hide,
+        ...hide,
       ]
     })
+  // Check overlaps (a worktree's Workspace ›, its row's mark): the daemon's overlapCheck now, in a dialog (the radar's own
+  // scan, every 15 s, only with Settings' Collision radar on)
+  const checkOverlaps = (w: WorkspaceView) => {
+    setOverlapsAt({ w: w.id })
+    api.call<Collision[]>('overlapCheck', { ws: w.id }).then(
+      list => setOverlapsAt(o => (o?.w === w.id ? { w: w.id, list } : o)),
+      e => setOverlapsAt(o => (o?.w === w.id ? { w: w.id, err: (e as Error).message } : o)),
+    )
+  }
+  const canOverlap = (w: WorkspaceView) => w.kind === 'worktree' && !w.host && !w.archived && projOf(w)?.git !== false
   // One next step (shared/nextStep.ts): the toolbar's button (⌘G) and a row's chip; a click does it
   const stepsOn = settings.nextStep !== false
   // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
   const mark = (m: RowMark) => rowMarkOn(settings, m)
   const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })) }]
-  const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), overlaps: new Set(radarOf(w).map(c => c.ws ?? `base:${c.base}`)).size, git: projOf(w)?.git !== false })
+  const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), git: projOf(w)?.git !== false }) // overlaps aren't a step: Check overlaps, the row's mark
   const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
     const at = () => (setWsId(w.id), setDialog(null))
     if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
     if (s.id === 'conflict' || s.id === 'ci' || s.id === 'review') return void prFix(w, s.id)
-    if (s.id === 'collide') return e ? openMenu(e, radarMenu(w)) : (r => (r?.width ? openMenu(r, radarMenu(w), 'right') : at()))(document.querySelector('.tabbar .ws-more')?.getBoundingClientRect()) // ⌘G: at the toolbar's ⋯ (hidden in full screen: none)
     if (s.id === 'merge') return void prAct(w, 'merge')
     if (s.id === 'archive') return void archive(w)
     if (s.id === 'look') return at(), showPanel('changes')
@@ -3329,10 +3349,9 @@ export function App() {
     if (s.id === 'wait' && w.pr) return openExternal(w.pr.url)
     at()
   }
-  // the step as the first item of a workspace's ⋯ (the toolbar's, a row's and its right click), a line under it;
-  // overlaps: the radar's menu beside it
+  // the step as the first item of a workspace's ⋯ (the toolbar's, a row's and its right click), a line under it
   const stepItem = (w: WorkspaceView): MenuItem[] =>
-    (st => (st ? [{ label: st.label, icon: STEP_ICON[st.id], hint: w.id === ws?.id ? kh('step') : undefined, tip: st.tip, ...(st.id === 'collide' ? { items: radarMenu(w) } : { run: () => doStep(w, st) }) } as MenuItem, null] : []))(stepsOn && !projOf(w)?.kind && !w.term ? (st => (st?.id === 'archive' && w.kind === 'worktree' ? undefined : st))(stepOf(w)) : undefined)
+    (st => (st ? [{ label: st.label, icon: STEP_ICON[st.id], hint: w.id === ws?.id ? kh('step') : undefined, tip: st.tip, run: () => doStep(w, st) } as MenuItem, null] : []))(stepsOn && !projOf(w)?.kind && !w.term ? (st => (st?.id === 'archive' && w.kind === 'worktree' ? undefined : st))(stepOf(w)) : undefined)
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -3383,7 +3402,7 @@ export function App() {
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
         {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
         {mark('radar') && (n => n > 0 && (
-          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), openMenu(e, radarMenu(w)))}>
+          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), setOverlapsAt({ w: w.id, list: radarOf(w) }))}>
             <Icon name="gitCompare" size={11} />
             {n}
           </span>
@@ -5050,6 +5069,34 @@ export function App() {
           }}
         />
       )}
+      {overlapsAt &&
+        (w =>
+          w && (
+            <Modal title={`Overlaps · ${wsName(w)}`} onClose={() => setOverlapsAt(null)}>
+              {overlapsAt.err ? (
+                <p className="warn small">{overlapsAt.err}</p>
+              ) : !overlapsAt.list ? (
+                <p className="muted small">Comparing its changes with {projOf(w)?.name}'s other worktrees and with {w.base ?? 'its base'}…</p>
+              ) : !overlapsAt.list.length ? (
+                <p className="muted small">None: no other worktree of {projOf(w)?.name} changes the same lines, and {w.base ?? 'its base'} hasn't changed them since it branched.</p>
+              ) : (
+                <div className="overlaps">
+                  {radarMenu(w, overlapsAt.list, true).map((it, i) =>
+                    !it ? null : 'head' in it ? (
+                      <b key={i} className="overlaps-head">
+                        {it.head}
+                      </b>
+                    ) : 'run' in it && it.run ? (
+                      <button key={i} className="overlaps-act" data-tip={it.tip} onClick={it.run}>
+                        {it.icon && <Icon name={it.icon} />} {it.label}
+                        {it.sub && <span className="muted small">{it.sub}</span>}
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              )}
+            </Modal>
+          ))(view.workspaces.find(x => x.id === overlapsAt.w))}
       {dialog === 'video' && (
         <Prompt
           title="Watch a YouTube video"

@@ -37,3 +37,14 @@ test('ask: what it asks, the line or two above its menu', () => {
   assert.equal(askOf('❯ 1. A\n  2. B')?.question, undefined)
   assert.equal(askOf(`${'x'.repeat(300)}\n❯ 1. A\n  2. B`)?.question?.length, 200)
 })
+
+test('ask: a numbered list typed into a prompt box is no menu (the cursor shows on it)', () => {
+  // codex's box: its › before what you type, your own list; shell 2 asked "1. production" back at you
+  const typed = 'Please answer these questions by number.\n\n› 1. production, http://candy.ai/\n  2. /admin\n  3.\n\n  GPT-6-Sol high · ~/w'
+  assert.equal(askOf(typed)?.options.length, 2) // the text alone reads as a menu
+  assert.equal(askOf(typed, 4), undefined) // the cursor on "3.": you're typing
+  assert.equal(askOf(typed, 3), undefined) // on "2. /admin"
+  assert.equal(askOf(typed, 2), undefined) // on its first line
+  assert.equal(askOf(typed, 0)?.at, 1) // above it: the menu stands (a box under a menu)
+  assert.equal(askOf(typed, undefined)?.at, 1) // hidden, as in claude's and codex's menus
+})

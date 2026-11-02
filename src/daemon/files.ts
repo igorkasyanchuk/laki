@@ -347,7 +347,8 @@ export async function scanStats(): Promise<void> {
   if (restat) (restat = false), await scanStats()
 }
 
-// ---------- Collision radar (settings.radar, on unless false): what each live worktree changes, by its base's lines
+// ---------- Collision radar (settings.radar, off unless true; overlapCheck: one workspace's now, asked from its menu):
+// what each live worktree changes, by its base's lines
 // (shared/overlap.ts), against the project's other worktrees and against what landed on its base since it branched.
 // ponytail: two worktrees off different merge bases are compared by each one's own lines; no fetch (the base as this
 // clone has it); not on SSH hosts or codespaces
@@ -363,29 +364,43 @@ async function rangesOfWs(w: Workspace) {
   for (const f of fresh.split('\n').filter(Boolean)) if (!RADAR_SKIP.test(f)) r[f] = [[0, 0]]
   return { from, r }
 }
+type Got = Map<string, Awaited<ReturnType<typeof rangesOfWs>>>
+const radarable = (w: Workspace) => w.kind === 'worktree' && !w.archived && !w.host && !away(w) && existsSync(w.path)
+// w's overlaps with the project's other live worktrees (got: their ranges) and with what its base gained since it branched
+async function collide(w: Workspace, live: Workspace[], got: Got, cache: Map<string, Ranges>) {
+  const mine = got.get(w.id)
+  if (!mine) return []
+  const out: Collision[] = []
+  for (const o of live) if (o !== w && o.project === w.project && got.has(o.id)) for (const x of overlaps(mine.r, got.get(o.id)!.r)) out.push({ ...x, ws: o.id })
+  const tip = await git(w, 'rev-parse', '--verify', '-q', `${w.base}^{commit}`).catch(() => '')
+  if (tip && tip !== mine.from) {
+    const key = `${mine.from}..${tip}`
+    const b = cache.get(key) ?? baseCache.get(key) ?? rangesOf(await git(w, ...U0, mine.from, tip).catch(() => ''))
+    cache.set(key, b)
+    for (const x of overlaps(mine.r, b)) out.push({ ...x, base: w.base })
+  }
+  return out
+}
+// the workspace menu's Check overlaps: one worktree against the others now, whether the radar runs or not
+export async function overlapCheck(ref: string): Promise<Collision[]> {
+  const w = findWs(ref)
+  if (!radarable(w)) throw new Error('overlaps: a live worktree on this Mac only')
+  const live = state.workspaces.filter(o => o.project === w.project && radarable(o))
+  const got: Got = new Map()
+  await Promise.all(live.map(o => rangesOfWs(o).then(x => got.set(o.id, x), () => {})))
+  if (!got.has(w.id)) throw new Error(`overlaps: git couldn't read ${w.name ?? w.id}'s changes`)
+  return collide(w, live, got, new Map())
+}
 export async function scanOverlaps(): Promise<void> {
   if (radaring) return
   radaring = true
   try {
-    const live = state.settings?.radar === false ? [] : state.workspaces.filter(w => w.kind === 'worktree' && !w.archived && !w.host && !away(w) && existsSync(w.path))
-    const got = new Map<string, Awaited<ReturnType<typeof rangesOfWs>>>()
+    const live = state.settings?.radar === true ? state.workspaces.filter(radarable) : []
+    const got: Got = new Map()
     for (const w of live) await rangesOfWs(w).then(x => got.set(w.id, x), () => {})
     const cache = new Map<string, Ranges>()
     const next = new Map<string, Collision[]>()
-    for (const w of live) {
-      const mine = got.get(w.id)
-      if (!mine) continue
-      const out: Collision[] = []
-      for (const o of live) if (o !== w && o.project === w.project && got.has(o.id)) for (const x of overlaps(mine.r, got.get(o.id)!.r)) out.push({ ...x, ws: o.id })
-      const tip = await git(w, 'rev-parse', '--verify', '-q', `${w.base}^{commit}`).catch(() => '')
-      if (tip && tip !== mine.from) {
-        const key = `${mine.from}..${tip}`
-        const b = cache.get(key) ?? baseCache.get(key) ?? rangesOf(await git(w, ...U0, mine.from, tip).catch(() => ''))
-        cache.set(key, b)
-        for (const x of overlaps(mine.r, b)) out.push({ ...x, base: w.base })
-      }
-      if (out.length) next.set(w.id, out)
-    }
+    for (const w of live) (out => out.length && next.set(w.id, out))(await collide(w, live, got, cache))
     baseCache = cache
     if (JSON.stringify([...next]) !== JSON.stringify([...collisions])) {
       collisions.clear()

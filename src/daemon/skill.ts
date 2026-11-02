@@ -390,10 +390,17 @@ own the plan, the order and what counts as done. ${run} Below, \`laki\` stands f
     laki ls --json                                        # projects (ids), workspaces, tabs: status running | waiting | idle | exited, done, last (its last answer)
     laki new <project|.> --name <task-id> --prompt '…'    # a worker: a new worktree and branch, its agent on the prompt; prints its workspace id
          [--preset claude|codex|gemini|grok|opencode|<profile>] [--model m] [--effort e] [--perm acceptEdits (claude's: codex's never asks, not yours to start)] [--base <branch>] [--no-setup]
+         [--tab codex] [--tab opencode:openrouter/moonshotai/kimi-k3] [--tab 'npm run dev']   # more tabs there: an agent (agent:model) waiting for laki send, or a command (the user allows yours in the app)
     laki tab <ws> --preset codex --name review --prompt '…'  # a second agent in a workspace that exists (a review of what the first did)
+    laki tab <ws> --cmd 'npm run dev'                     # a command in a terminal tab of it (the user allows yours in the app, each time)
     laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
     laki send <ws>[/<tab>] --when-idle '…'                # a follow-up, queued until its turn ends (without --when-idle: now)
     laki diff <ws> [--uncommitted]                        # what it changed
+
+Models: claude and codex take their own names (\`--model opus\`, \`--model gpt-5.5\`); opencode takes \`provider/model\`
+exactly as \`opencode models\` lists it (OpenRouter's too: \`openrouter/<org>/<model>\`): run it first, never guess. Laki
+refuses one opencode doesn't know and names the close ones (opencode itself would start on its last used model, saying
+nothing).
 
 \`.\` is your own tab's project (\`$LAKI_WORKSPACE\`). Workers you start come from your workspace (Laki shows it): reading or
 messaging them needs no question; any other workspace, Laki asks the user first. A worker's turn ends when its tab is

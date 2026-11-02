@@ -7,6 +7,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
   laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
+                                    opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused)
             [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode
             [--template <name>]     the prompt through one of your prompt templates
             [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
@@ -17,6 +18,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                     tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
             [--no-setup]            without the project's setup script (.worktreeinclude's files still copied)
+            [--tab <agent[:model]|command>]   another tab there, again and again: an agent (no prompt: laki send
+                                    gives it one) or a command in a terminal tab (an agent's: asked in the app first)
             [--at <when>]           the workspace now, its agent later: tomorrow 9am, in 2h, 2026-10-20 14:30
             [--after-limit]         its agent once the plan limit resets (claude, codex)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
@@ -36,7 +39,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar): in 2h, tomorrow at 9am, every weekday at 9am
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
-                                              a new tab; with a prompt, its agent starts on it
+                                              a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
   laki agents                                 the named agents, wherever they run
@@ -125,6 +128,7 @@ script (laki run <ws> setup runs it later). --at starts its agent later, --after
   laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
   laki new shop --fan claude,codex --prompt "…"        a race: one worktree each
   laki new shop --no-setup --perm acceptEdits --fast --prompt "…"   no setup script; edits without asking, fast
+  laki new . --name api --prompt "…" --tab codex --tab "npm run dev"   a worker with a second agent and its dev server
   laki new shop --group Reviews --template review --prompt "#118"   under Reviews, through your review template
   laki new shop --action "PR+audit" --prompt "the login page"        your agent action's prompt, then these words`,
   send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or

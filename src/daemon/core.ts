@@ -6,7 +6,6 @@
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
-import { askOf } from '../shared/ask.ts'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -566,7 +565,7 @@ export function view(): View {
     else r.waitAt = undefined
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
-    const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
+    const ask = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
@@ -1282,7 +1281,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     if (r.status !== 'waiting' || asking) return
     asking = setTimeout(() => {
       asking = undefined
-      if (r.status === 'waiting' && JSON.stringify(askOf(s.screenText(16)) ?? null) !== r.askKey) changed()
+      if (r.status === 'waiting' && JSON.stringify(s.ask() ?? null) !== r.askKey) changed()
     }, 300)
   }
   r.status = o.prompt && !o.resume ? 'running' : 'idle'
@@ -1343,6 +1342,30 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
   if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
+// opencode starts on its last used model, saying nothing, when it doesn't know the one asked for (an orchestrator's
+// guess): checked against `opencode models` first (its list kept 10 minutes; none read, as when it isn't installed: let
+// through). Not on a host: its opencode isn't this one
+let ocModels: { at: number; list: Promise<string[] | undefined> } | undefined
+export async function modelKnown(agent: string, model?: string, at?: { host?: string }) {
+  if (agent !== 'opencode' || !model || at?.host) return
+  if (!ocModels || Date.now() - ocModels.at > 600000)
+    ocModels = { at: Date.now(), list: run('opencode', ['models'], { timeout: 30000, maxBuffer: 16 << 20 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => /^[^\s/]+\/\S+$/.test(l)), () => undefined) }
+  const c = ocModels
+  const list = await c.list
+  if (!list?.length) return void (c.at = Date.now() - 540000) // none read: let through, read again in a minute
+  if (list.includes(model)) return
+  const tail = (m: string) => m.split('/').pop()!.toLowerCase()
+  const want = tail(model)
+  const same = (m: string) => { // the letters its name shares with the asked one's, from the start
+    const t = tail(m)
+    let i = 0
+    while (i < t.length && t[i] === want[i]) i++
+    return i
+  }
+  const near = list.filter(m => same(m) >= 4).sort((a, b) => same(b) - same(a)).slice(0, 5)
+  throw new Error(`opencode doesn't know the model ${model}: it would start on its last used one instead. Pick one of \`opencode models\`${near.length ? ` (close: ${near.join(', ')})` : ''}`)
+}
+
 // agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
 // cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
 export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
@@ -1395,7 +1418,7 @@ export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'las
   answering.add(t.id)
   try {
     await s.flushed()
-    const a = askOf(s.screenText(16))
+    const a = s.ask()
     if (!a) throw new Error(`${t.name} isn't asking anything with choices now`)
     const n = p.n ?? (p.pick === 'last' ? a.options.at(-1)!.n : a.options[0].n)
     if (!a.options.some(o => o.n === n)) throw new Error(`${t.name} has no choice ${n}`)
@@ -1716,7 +1739,7 @@ export function apps() {
 const openFail = (e: any): never => {
   throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
 }
-const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar)\/?$/i
+const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar|fileloc|inetloc|webloc)\/?$/i // fileloc and its kin open their target: a script there would run
 export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string; storage?: boolean }) {
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
   const inWs = (w: Workspace) => (o.storage ? (w.storage && !w.host ? { ...w, path: w.storage } : openFail({ message: 'no storage folder' })) : w)
@@ -1822,6 +1845,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     presetCheck(p)
     const agent = presetNamed(p)?.agent ?? p
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
+    await modelKnown(agent, o.model?.trim() || presetNamed(p)?.model, proj)
     if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
     if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: claude and codex only) likewise
   }
@@ -1896,6 +1920,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
+  await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, proj)
   if (o.codespace !== undefined) cloudCheck(proj, o)
   if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
@@ -2516,7 +2541,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
         // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
         const s = sessions.get(tab.id)
         if (r.status !== 'waiting') return
-        const options = s && !s.exited ? askOf(s.screenText(16))?.options : undefined
+        const options = s && !s.exited ? s.ask()?.options : undefined
         widgetEvent('turn.waiting', { question: String(pl.message ?? '').slice(0, 2000), options }, tab.workspace, tab)
         for (const f of turnWaits)
           try {
@@ -2986,7 +3011,7 @@ async function shellScan() {
       agents.add(id)
       await s.flushed()
       const was = shellAgents.get(id)
-      const status: Status = askOf(s.screenText(16)) ? 'waiting' : BUSY[agent].test(`${s.title}\n${s.screenText(15)}`) ? 'running' : 'idle'
+      const status: Status = s.ask(true) ? 'waiting' : BUSY[agent].test(`${s.title}\n${s.screenText(15)}`) ? 'running' : 'idle'
       if (was?.status === status && was.agent === agent) continue
       if (status === 'idle' && was && was.status !== 'idle' && !viewed(id)) rtOf(id).done = true
       shellAgents.set(id, { agent, status })

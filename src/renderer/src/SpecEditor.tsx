@@ -59,7 +59,7 @@ const DiagramBlock = createReactBlockSpec(
           {empty ? <div className="sd-empty">Empty: click Edit</div> : <DiagramView value={value} />}
           {open &&
             createPortal(
-              <Modal onEsc={close}>
+              <Modal onEsc={() => {} /* Esc never closes the editor: its Close asks when something isn't saved */}>
                 <DiagramEditor
                   value={value}
                   onCancel={close}

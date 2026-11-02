@@ -52,7 +52,7 @@ time and AI money per run (`budget: 60 min, $5`).
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text and *Reply*: it
   goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
   or issue link shows its card on hover, a picture's path or link the picture (a click opens it larger); a file's path
-  (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees). Collision radar marks two worktrees that change the same lines (or a base that changed them since), while both agents can still adjust. Run ▾ runs the project's
+  (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.

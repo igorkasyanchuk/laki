@@ -156,6 +156,23 @@ function pageMenu(g: Electron.WebContents, p: Electron.ContextMenuParams, app: E
   items.push({ label: 'Inspect Element', click: () => g.inspectElement(p.x, p.y) })
   return Menu.buildFromTemplate(items)
 }
+// a misspelled word right-clicked in the app's own windows (a spec, a note, any text box; Chromium's checker in macOS's
+// languages): its suggestions, Learn, then the edit ones. Any other right click is the renderer's (its menus prevent it)
+function spellMenu(wc: Electron.WebContents) {
+  wc.on('context-menu', (_e, p) => {
+    if (!p.isEditable || !p.misspelledWord) return
+    const fix = p.dictionarySuggestions.slice(0, 6).map((w): MenuItemConstructorOptions => ({ label: w, click: () => wc.replaceMisspelling(w) }))
+    Menu.buildFromTemplate([
+      ...(fix.length ? fix : [{ label: 'No suggestions', enabled: false }]),
+      { type: 'separator' },
+      { label: `Learn “${p.misspelledWord}”`, click: () => wc.session.addWordToSpellCheckerDictionary(p.misspelledWord) },
+      { type: 'separator' },
+      { label: 'Cut', role: 'cut', enabled: p.editFlags.canCut },
+      { label: 'Copy', role: 'copy', enabled: p.editFlags.canCopy },
+      { label: 'Paste', role: 'paste', enabled: p.editFlags.canPaste },
+    ]).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined })
+  })
+}
 // Electron grants a page every permission by default: the preview (which links can take anywhere) gets none of the
 // sensitive ones (camera, microphone, location, clipboard reads, notifications…)
 const PREVIEW_OK = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock'])
@@ -246,6 +263,7 @@ function create() {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', e => e.preventDefault())
+  spellMenu(win.webContents)
   // its renderer crashed or was killed (not a quit): loaded again, at most once a minute (a page that dies as it loads
   // isn't reloaded for good; View › Reload is still there)
   let gone = 0
@@ -911,6 +929,7 @@ function panelWin(query: Record<string, string>, width: number, height: number, 
     webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   pin(w)
+  spellMenu(w.webContents) // the new-workspace and AI windows' prompts
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', e => e.preventDefault()) // a dropped file would load in place, bridge and all
   w.once('ready-to-show', () => (w.show(), w.focus()))

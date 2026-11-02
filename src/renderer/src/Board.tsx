@@ -81,7 +81,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
     },
   })
   return (
-    <Page title="Board" onClose={onClose} wide>
+    <Page title="Board" esc={false} /* a page to stay on, as the rail's others */ onClose={onClose} wide>
       <div className="board">
         <section className="board-col">
           <h3>

@@ -3,6 +3,8 @@
 // events (a subagent's too), as the real one does
 const fs = require('fs'), path = require('path'), { pathToFileURL } = require('url')
 const args = process.argv.slice(2)
+// opencode models: what it knows (Laki refuses another before it starts: opencode would fall back to its last used one)
+if (args[0] === 'models') process.stdout.write(['opencode/beam-free', 'openrouter/mistralai/mistral-large-4-0', 'openrouter/mistralai/mistral-large-2512', 'openrouter/moonshotai/kimi-k3', 'openrouter/z-ai/glm-5.3', ''].join('\n')), process.exit(0)
 // a TUI that refuses -m, as some versions do ("Unrecognized flag"): the model goes in OPENCODE_CONFIG_CONTENT
 if (args.includes('-m')) process.stdout.write('Unrecognized flag: -m in command opencode\r\n'), process.exit(1)
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'opencode', tab: process.env.LAKI_TAB, args, config: process.env.OPENCODE_CONFIG_CONTENT }) + '\n')
