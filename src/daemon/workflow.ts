@@ -420,20 +420,20 @@ export async function flowStart(o: Start) {
   const paused = !wf.untrusted && wf.stats?.paused // by itself only: Run, the CLI and MCP start it by hand
   if (paused && /^(schedule|event) /.test(o.trigger ?? '')) throw new Error(`paused: ${paused.why}; turn it on again in Workflows`)
   if (wf.untrusted && (o.by === 'agent' || (o.event && !o.editor) || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
+  const proj = findProject(pick?.project ?? o.project!)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
     const ag = agentOf(b.agent)
     if (isAgent(ag))
       try {
         modelCheck(ag, b.model, b.effort, permOf(wf, b, ag), b.fast)
-        await modelKnown(ag, b.model) // opencode's: one it doesn't know would start on its last used model
+        await modelKnown(ag, b.model || profileOf(b.agent)?.model?.trim(), pick ?? { path: proj.path, project: proj.id, host: proj.host }, b.agent) // opencode's: one it doesn't know would start on its last used model
       } catch (e) {
         throw new Error(`${wf.name} can't run: ${blockName(b)}: ${(e as Error).message}`)
       }
   }
   const never = bypass(wf).map(blockName)
   if (o.by === 'agent' && never.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${never.join(', ')}): start it yourself`)
-  const proj = findProject(pick?.project ?? o.project!)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
   if (wf.where === 'here' && !pick) throw new Error(`${wf.name} runs in a workspace you have: pick one (its ⋯ › Run workflow, or --ws)`)
   if (wf.where === 'worktree' && !pick && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)

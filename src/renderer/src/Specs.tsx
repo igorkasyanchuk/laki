@@ -283,11 +283,14 @@ function PlanView({ at, width, api, projectName, onTitle, onSaved, onGone }: { a
       e => setErr((e as Error).message),
     )
   }, [])
+  const saving = useRef<Promise<boolean>>(undefined) // the last save: ⌘S after the timer took the change waits for it
   const flush = () => {
     clearTimeout(timer.current)
     const p = pending.current
     pending.current = null
-    if (p) return api.call('planSave', { ...at, title: titleRef.current, ...p }).then(() => (onSaved(), true), () => false) // false: not saved (⌘S says nothing)
+    // false: not saved (⌘S says nothing), the change kept for the next ⌘S or the page's close unless a newer one came
+    if (p) saving.current = api.call('planSave', { ...at, title: titleRef.current, ...p }).then(() => (onSaved(), true), () => ((pending.current ??= p), false))
+    return saving.current
   }
   useEffect(() => () => void flush(), []) // leaving it saves
   // ⌘S: now, not 600 ms later (the diagram editor over it takes its own)

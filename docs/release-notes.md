@@ -2,6 +2,16 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Scheduled tasks: a new workspace each run can skip the project's setup script (Where › *no setup*, `laki schedule add
+  --no-setup`).
+- Changes, Review and Revert read every file's name when your git config sets `diff.mnemonicPrefix` or `diff.noprefix`.
+- `laki new --tab` takes a profile whose name has a space, and refuses `--at` / `--after-limit` (its tabs start now).
+- opencode's model is checked with your Settings, project and profile env, so a provider set up there isn't refused.
+- Menu shortcuts are no longer cut short; ⌘S in a spec says *saved* only once it is.
+- An agent's command longer than the dialog can show is refused, never shown cut short.
+
 ## 0.41.0 · Nov 2, 2026
 
 - Specs & Brainstorms: ⌘S saves at once; a width button (normal, wide, full); Esc no longer closes the page (Board's

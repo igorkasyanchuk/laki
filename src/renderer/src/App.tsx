@@ -73,7 +73,7 @@ type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
-const STEP_ICON: Record<StepId, IconName> = { answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', collide: 'gitCompare', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
+const STEP_ICON: Record<StepId, IconName> = { answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
@@ -2339,7 +2339,9 @@ export function App() {
       // an agent's command in a new terminal tab (main.ts' cmdAsk: laki tab --cmd, laki new --tab): once only
       const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`
       const picks: Pick[] = [{ label: 'Run it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, String(m.text ?? '').slice(0, 200), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      const cmd = String(m.text ?? '')
+      // Run it from the notification only when it shows the whole command; a longer one is read in the dialog
+      notify(title, cmd.length > 200 ? cmd.slice(0, 199) + '…' : cmd, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, cmd.length > 200 ? [] : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
       toolLine.add({ req: m.req, title, text: `In a new terminal tab of ${m.to}, as you: the agent's own permission prompts don't see it.\n\n$ ${m.text}`, picks, answer })
       return toolShow()
     }
@@ -2350,7 +2352,10 @@ export function App() {
       const emit = m.cross === 'emit'
       const title = emit ? `${m.agent} in ${m.from} wants to send ${m.target} to ${m.to}` : `${m.agent} in ${m.from} wants to ${send ? 'send to' : 'read'} ${m.target} in ${m.to}`
       const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always from ${m.from} to ${m.to}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, send || emit ? String(m.text ?? '').slice(0, 200) : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      const said = String(m.text ?? '')
+      // Allow from the notification only when it shows all of what goes; a longer one is read in the dialog
+      const whole = !(send || emit) || said.length <= 200
+      notify(title, send || emit ? (whole ? said : said.slice(0, 199) + '…') : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, whole ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
       toolLine.add({ req: m.req, title, text: `${emit ? `An event: the workflows and extensions listening in ${m.to} would run there, with this:\n\n${m.text}` : send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
       return toolShow()
     }
@@ -2598,7 +2603,7 @@ export function App() {
     { label: 'Info', icon: 'info', key: 'i', tip: 'Its path, branch, port, PR and links, in the right panel', run: () => (setWsId(w.id), showInfo(true)) },
     ...(w.branch && !isTerm(w) ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', tip: w.branch, run: () => copy(w.branch) } as MenuItem] : []),
     ...(w.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (w.host ? `${w.host}:` : '') + shortPath(w.path), tip: (w.host ? `${w.host}:` : '') + w.path, run: () => copy((w.host ? `${w.host}:` : '') + w.path) } as MenuItem] : []),
-    ...(canOverlap(w) ? [{ label: 'Check overlaps…', icon: STEP_ICON.collide, key: 'o', tip: "Where its changes meet another worktree's of the project, or what its base gained since it branched", run: () => checkOverlaps(w) } as MenuItem] : []),
+    ...(canOverlap(w) ? [{ label: 'Check overlaps…', icon: 'gitCompare', key: 'o', tip: "Where its changes meet another worktree's of the project, or what its base gained since it branched", run: () => checkOverlaps(w) } as MenuItem] : []),
     null,
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
@@ -3337,7 +3342,7 @@ export function App() {
   // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
   const mark = (m: RowMark) => rowMarkOn(settings, m)
   const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })) }]
-  const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), git: projOf(w)?.git !== false }) // overlaps aren't a step: Check overlaps, the row's mark
+  const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), git: projOf(w)?.git !== false })
   const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
     const at = () => (setWsId(w.id), setDialog(null))
     if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
@@ -3390,7 +3395,7 @@ export function App() {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {stepsOn && mark('step') && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['collide', 'conflict', 'ci'].includes(st.id) /* its ⇄, ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
+        {stepsOn && mark('step') && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['conflict', 'ci'].includes(st.id) /* its ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (

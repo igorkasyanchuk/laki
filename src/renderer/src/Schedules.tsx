@@ -30,7 +30,7 @@ export const soon = (t: number, now = Date.now()) => {
   const d = Math.round(m / 60 / 24)
   return m < 1 ? 'now' : m < 60 ? `in ${m} min` : h < 24 ? `in ${h} h` : d === 1 ? 'in a day' : `in ${d} days`
 }
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout)
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: Schedule['source']; widget?: string; action?: string; base?: string; noSetup?: boolean } // workflow: a run of it, prompt its task; widget: an extension fetched, or its action run (prompt: its argument); base: a new workspace's (unset on a new task: the repo's main, as the new-workspace page's; '': its checkout); noSetup: its worktree without the setup script
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -92,6 +92,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const makes = !form?.workflow && !form?.widget && (form?.ws === 'new' || form?.ws === 'local-new') // a row of its own each run, named (a workflow's runs: as it names them)
   // a new worktree each run starts off a branch: the project's list, its main on a new task (the new-workspace page's)
   const offBranch = makes && form?.ws === 'new'
+  const skip = offBranch && !!form?.noSetup && !!project?.hasSetup // each run's worktree without the setup script (the where menu's)
   const [branches, setBranches] = useState<{ project: string; branches: string[]; main: string; current: string }>()
   useEffect(() => {
     if (offBranch && form?.project && branches?.project !== form.project) api.branches(form.project).then(r => setBranches({ project: form.project, ...r }), () => setBranches(undefined))
@@ -104,7 +105,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     if (!form || !ready) return
     setSaving(true)
     setErr('')
-    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '' }).then(() => setForm(null), fail) // '': a prompt again; no base
+    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '', widget: form.widget ?? '', action: form.action ?? '', base: offBranch ? base : '', noSetup: skip }).then(() => setForm(null), fail) // '': a prompt again; no base; false: with the setup script
     setSaving(false)
   }
   const run = async (s: Schedule) => {
@@ -117,7 +118,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     // the project's local workspace is its folder; one that's gone: what Where's menu offers, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
     const ws = ['new', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }) })
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }) })
   }
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))}?`, { ok: 'Delete', danger: true }).then(y => y && api.rm(s.id).catch(fail))
   const where = (ws: string) => (ws ? (WHERE.find(x => x[0] === ws)?.[1] ?? `in ${view.workspaces.find(w => w.id === ws)?.name || ws}`) : 'pick a workspace: it has none yet')
@@ -156,7 +157,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     form &&
     openMenu(e, [
       ...(scopedExt ? [] : [{ head: 'Each run' } as MenuItem]),
-      ...WHERE.filter(([k]) => !scopedExt && (k !== 'new' || project?.git !== false)).map(([k, label, icon]) => ({ label: label[0].toUpperCase() + label.slice(1), icon, hint: form.ws === k ? ON : undefined, run: () => set({ ws: k }) }) as MenuItem),
+      ...WHERE.filter(([k]) => !scopedExt && (k !== 'new' || project?.git !== false)).flatMap(([k, label, icon]) => [
+        { label: label[0].toUpperCase() + label.slice(1), icon, hint: form.ws === k && !(k === 'new' && skip) ? ON : undefined, run: () => set({ ws: k, noSetup: undefined }) } as MenuItem,
+        // as the new-workspace page's New worktree, no setup: a prompt's task, where the project has a setup script
+        ...(k === 'new' && !form.workflow && !form.widget && project?.hasSetup ? [{ label: 'A new workspace each run, no setup', icon, sub: "Without the project's setup script", hint: skip ? ON : undefined, run: () => set({ ws: k, noSetup: true }) } as MenuItem] : []),
+      ]),
       ...(wsOf(form.project).length ? [null, { head: 'In one of its workspaces' }, ...wsOf(form.project).map(w => ({ label: w.name || w.id, icon: 'terminal', hint: form.ws === w.id ? ON : undefined, run: () => set({ ws: w.id }) }) as MenuItem)] : []),
     ])
   const runnable = flows.filter(w => !w.problems.length && (w.source === 'yours' || w.project === form?.project)) // a project's: in that project only
@@ -275,7 +280,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               {!form.workflow && (!form.widget || scopedExt) && (
                 <button type="button" className="nw-chip" aria-haspopup="menu" data-tip={form.ws.startsWith('local') && project ? `Where each run goes: ${project.path}` : 'Where each run goes'} onClick={whereMenu}>
                   <Icon name={WHERE.find(x => x[0] === form.ws)?.[2] ?? 'terminal'} />
-                  <span className="nw-chip-text">{where(form.ws)}</span>
+                  <span className="nw-chip-text">{where(form.ws)}{skip ? ', no setup' : ''}</span>
                   <Icon name="chevron" size={11} />
                 </button>
               )}
@@ -357,6 +362,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                           <span className="tag">{s.preset}</span>
                           <span className="tag">{where(s.ws)}</span>
                           {s.base && <span className="tag">off {s.base}</span>}
+                          {s.noSetup && <span className="tag">no setup</span>}
                         </>
                       )}
                     </span>

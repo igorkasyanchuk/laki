@@ -1,14 +1,14 @@
-// One next step (git: its project's a repo; merge: the project lets the app merge; overlaps: the radar's, not hidden):
-// the single thing a workspace needs from you now, from its tabs, its Done check, its PR and the radar:
+// One next step (git: its project's a repo; merge: the project lets the app merge):
+// the single thing a workspace needs from you now, from its tabs, its Done check and its PR:
 // the toolbar's button (⌘G) and a chip on its sidebar row. busy: nothing for you yet (an agent works, CI runs), the
 // button says so and the row shows no chip. The palette's *For <workspace>* lists every one that applies; this picks one.
 import { planNow } from './todos.ts'
 import type { TabView, WorkspaceView } from './types.ts'
 
-export type StepId = 'answer' | 'plan' | 'check' | 'conflict' | 'ci' | 'review' | 'collide' | 'merge' | 'archive' | 'look' | 'ship' | 'working' | 'wait'
+export type StepId = 'answer' | 'plan' | 'check' | 'conflict' | 'ci' | 'review' | 'merge' | 'archive' | 'look' | 'ship' | 'working' | 'wait'
 export type Step = { id: StepId; label: string; tip?: string; tab?: string; busy?: boolean; tone?: 'ask' | 'bad' | 'go' }
 
-export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; overlaps?: number; git?: boolean } = {}): Step | undefined {
+export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): Step | undefined {
   if (w.archived) return
   const mine = tabs.filter(t => t.workspace === w.id)
   const waits = mine.find(t => t.status === 'waiting')
@@ -23,7 +23,6 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   if (pr?.conflict) return { id: 'conflict', label: 'Resolve conflicts', tip: `#${pr.number} conflicts with ${pr.base ?? 'its base'}: the agent merges it in`, tone: 'bad' }
   if (pr?.checks === 'fail') return { id: 'ci', label: 'Fix CI', tip: `#${pr.number}'s failing checks, sent to the agent`, tone: 'bad' }
   if (pr?.review === 'CHANGES_REQUESTED') return { id: 'review', label: 'Address the review', tip: `Changes asked for on #${pr.number}${pr.changes?.length ? ` by ${pr.changes.join(', ')}` : ''}: its comments, sent to the agent`, tone: 'bad' }
-  if (o.overlaps) return { id: 'collide', label: 'Overlaps another', tip: `Changes the same lines as ${o.overlaps === 1 ? 'another worktree, or its base' : `${o.overlaps} others`}` }
   if (pr?.checks === 'pending') return { id: 'wait', label: 'CI runs', tip: `#${pr.number}'s checks are running`, busy: true }
   if (pr && pr.draft) return { id: 'wait', label: 'Draft PR', tip: `#${pr.number} is a draft`, busy: true }
   if (pr && pr.ready !== false && pr.review !== 'REVIEW_REQUIRED' && o.merge) return { id: 'merge', label: `Merge #${pr.number}`, tip: `${pr.title ?? ''}${pr.title ? ': ' : ''}checks pass, no conflicts`, tone: 'go' }

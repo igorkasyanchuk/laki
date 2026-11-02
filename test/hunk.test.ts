@@ -244,3 +244,20 @@ test("Uncommitted: only what isn't committed (against HEAD), its hunks and files
   assert.equal(read(ws, 'b.txt'), 'b\n')
   assert.deepEqual((await rig.rpc('diff', { ws: ws.id, uncommitted: true })).files, [])
 })
+
+test("the user's diff.mnemonicPrefix or diff.noprefix: each file read by its name, a hunk still reverts", async t => {
+  const rig = await fresh(t)
+  const ws = await setup(rig, { 'a.txt': lines(5) })
+  for (const c of ['diff.mnemonicPrefix', 'diff.noprefix']) {
+    gitIn(rig, ws, 'config', c, 'true')
+    writeFileSync(join(ws.path, 'a.txt'), lines(5, i => (i === 2 ? 'two!' : `line ${i}`)))
+    writeFileSync(join(ws.path, 'new.txt'), 'n\n')
+    const d = await rig.rpc('diff', { ws: ws.id })
+    assert.deepEqual(d.diff.split('\n').filter((l: string) => l.startsWith('diff --git ')), ['diff --git a/a.txt b/a.txt', 'diff --git a/new.txt b/new.txt'], c)
+    const [h] = await hunks(rig, ws, 'a.txt')
+    await rig.rpc('hunkUndo', { ws: ws.id, path: 'a.txt', hunk: h })
+    assert.equal(read(ws, 'a.txt'), lines(5), c)
+    unlinkSync(join(ws.path, 'new.txt'))
+    gitIn(rig, ws, 'config', '--unset', c)
+  }
+})

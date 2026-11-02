@@ -300,3 +300,28 @@ test('scheduled tasks: an extension fetched, or one of its actions run; only one
   const back = await rig.rpc('scheduleSet', { id: act.id, widget: '', prompt: 'do it', preset: 'claude' })
   assert.deepEqual([back.widget, back.action], [undefined, undefined], "'' makes it an agent's again")
 })
+
+test("scheduled tasks: a new workspace each run without the project's setup script", async t => {
+  const rig = await fresh(t, { config: { setup: 'touch .setup-ran' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const task = (o: object) => rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'look', when: 'fridays at 5pm', ...o })
+  await assert.rejects(task({ ws: 'local', noSetup: true }), /for a new workspace each run/)
+  await assert.rejects(task({ noSetup: 'yes' }), /true or false/)
+  const s = await task({ noSetup: true })
+  assert.equal(s.noSetup, true)
+  const r = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(r.ok, true, r.what)
+  const v = await rig.rpc('state')
+  assert.equal(v.workspaces.find((w: any) => w.id === r.ws).noSetup, true)
+  assert.deepEqual(v.tabs.filter((x: any) => x.workspace === r.ws).map((x: any) => x.kind), ['agent'], 'no setup tab')
+  // false clears it, null too; moved into a workspace, it's dropped
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, noSetup: false })).noSetup, undefined)
+  await rig.rpc('scheduleSet', { id: s.id, noSetup: true })
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, noSetup: null })).noSetup, undefined)
+  await rig.rpc('scheduleSet', { id: s.id, noSetup: true })
+  assert.equal((await rig.rpc('scheduleSet', { id: s.id, ws: r.ws })).noSetup, undefined)
+  // the CLI's --no-setup
+  const cli = await rig.cli('schedule', 'add', p.id, '--when', 'weekdays at 9am', '--no-setup', 'triage')
+  assert.equal(cli.code, 0, cli.err)
+  assert.match(cli.out, /claude · new, no setup/)
+})

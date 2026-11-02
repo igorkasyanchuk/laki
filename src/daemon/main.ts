@@ -235,12 +235,15 @@ const api: Record<string, Handler> = {
   tabNew: async ({ caller, from, run: _run, hops: _hops, cwd: _cwd, cwdOf, ...p }) => { // run, hops: a workflow run's (core.Cause), never an RPC's; cwd: only cwdOf's shell's
     const by = core.agentCaller(caller) ?? core.saidFrom(from) // as wsNew's (byCaller)
     // an agent's: no command of its own, but a plain one (an orchestrator's dev server, laki new --tab) once you allow it
-    const at = core.findWs(String(p.ws ?? '')) // one that isn't there: refused before any question
+    // what addTab would refuse (no such workspace, a preset, a model…): before any question
+    const at = core.findWs(String(p.ws ?? ''))
+    if (at.archived) throw new Error(`${at.name ?? at.id} is archived: restore it first`)
+    const spec = core.tabSpec(at, p)
+    await core.modelKnown(spec.preset, spec.kind === 'agent' ? spec.model || spec.pr?.model?.trim() : undefined, at, p.preset)
+    const cwd = cwdOf === undefined ? undefined : await core.shellCwd(p.ws, cwdOf)
     if (by && p.cmd?.trim() && (!p.preset || p.preset === 'custom')) await cmdAsk(caller, by, at.id, p.cmd)
     else if (by) core.agentNoCmd(p)
     if (p.prompt) await crossAsk({ ws: p.ws, from: caller }, 'send', null, p.prompt) // a prompt into another workspace: asked, as a send is
-    await core.modelKnown(core.presetNamed(p.preset || '')?.agent ?? p.preset ?? '', p.model?.trim() || core.presetNamed(p.preset || '')?.model, at)
-    const cwd = cwdOf === undefined ? undefined : await core.shellCwd(p.ws, cwdOf)
     // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
     const t = core.addTab(p.ws, { ...p, cwd, agent: core.callerAgent(caller) ?? (by ? 'agent' : core.agentIn(p.agent)) })
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
@@ -607,19 +610,21 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
   if (!core.clients.size) throw new Error(`${name(to)} is another workspace: the user allows that in Laki's window, and it isn't open`)
   const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
   const said = kind === 'send' ? String(text ?? '') : kind === 'emit' ? JSON.stringify(p.data ?? {}) : undefined
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said?.slice(0, 2000), ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(to), target: what, text: said && said.length > 2000 ? `${said.slice(0, 2000)}\n… and ${said.length - 2000} more characters` : said, ws: by, tab: p.from.tab })
   if (how === 'always') crossOk.add(`${kind}:${by}>${to}`)
   else if (how !== 'once') throw new Error(`${tab ? `${tab.name} is in ${name(to)}` : `${what} is for ${name(to)}`}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
 
 // an agent's command in a new terminal tab (tabNew's cmd): it runs as you, past the agent's own permission prompts, so
 // you allow it in the app each time (no Always); no window, no answer or a no: refused
+const CMD_ASK = 2000
 async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
   const to = ws
+  if (cmd.length > CMD_ASK) throw new Error(`the command is longer than ${CMD_ASK} characters, too long to show the user whole: ask them to run it, or put it in a script`) // you allow what you read, all of it
   if (!core.clients.size) throw new Error("an agent's command runs once the user allows it in Laki's window, and it isn't open: ask the user to run it")
   const agent = core.state.tabs.find(t => t.id === from?.tab)?.name ?? 'An agent'
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'cmd', agent, from: name(by), to: name(to), target: 'a command', text: cmd.slice(0, 2000), ws: by, tab: from?.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'cmd', agent, from: name(by), to: name(to), target: 'a command', text: cmd, ws: by, tab: from?.tab })
   if (how !== 'once') throw new Error(`${how === 'deny' ? 'the user said no to' : 'no answer from the user for'} the command: ask them to run it themselves`)
 }
 

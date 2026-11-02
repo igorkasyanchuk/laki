@@ -1343,15 +1343,26 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
 }
 
 // opencode starts on its last used model, saying nothing, when it doesn't know the one asked for (an orchestrator's
-// guess): checked against `opencode models` first (its list kept 10 minutes; none read, as when it isn't installed: let
-// through). Not on a host: its opencode isn't this one
-let ocModels: { at: number; list: Promise<string[] | undefined> } | undefined
-export async function modelKnown(agent: string, model?: string, at?: { host?: string }) {
-  if (agent !== 'opencode' || !model || at?.host) return
-  if (!ocModels || Date.now() - ocModels.at > 600000)
-    ocModels = { at: Date.now(), list: run('opencode', ['models'], { timeout: 30000, maxBuffer: 16 << 20 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => /^[^\s/]+\/\S+$/.test(l)), () => undefined) }
-  const c = ocModels
-  const list = await c.list
+// guess): checked against `opencode models` first, run as its tab would be (the folder, Settings', the project's and the
+// profile's env, Laki's config dir: a provider of their own is listed), kept 10 minutes per folder and env; a miss reads
+// it again unless it was just read (a model added meanwhile). None read, as when it isn't installed: let through. Not on
+// a host: its opencode isn't this one
+const ocModels = new Map<string, { at: number; list: Promise<string[] | undefined> }>()
+export async function modelKnown(agent: string, model: string | undefined, at: { path: string; project: string; host?: string }, preset?: string) {
+  if (agent !== 'opencode' || !model || at.host) return
+  const env = { ...plainEnv(), ...state.settings?.env, ...projectConfig({ project: at.project } as Workspace).env, ...presetNamed(preset)?.env, OPENCODE_CONFIG_DIR: join(dir, 'opencode') }
+  const key = JSON.stringify([at.path, env])
+  const read = (fresh: number) => {
+    let c = ocModels.get(key)
+    if (!c || Date.now() - c.at > fresh) {
+      for (const [k, x] of ocModels) if (Date.now() - x.at > 600000) ocModels.delete(k) // each folder's (a workspace's) kept while fresh
+      ocModels.set(key, (c = { at: Date.now(), list: run('opencode', ['models'], { cwd: at.path, env, timeout: 30000, maxBuffer: 16 << 20 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => /^[^\s/]+\/\S+$/.test(l)), () => undefined) }))
+    }
+    return c
+  }
+  let c = read(600000)
+  let list = await c.list
+  if (list?.length && !list.includes(model)) list = await (c = read(5000)).list // a miss: read again, unless just read
   if (!list?.length) return void (c.at = Date.now() - 540000) // none read: let through, read again in a minute
   if (list.includes(model)) return
   const tail = (m: string) => m.split('/').pop()!.toLowerCase()
@@ -1366,21 +1377,30 @@ export async function modelKnown(agent: string, model?: string, at?: { host?: st
   throw new Error(`opencode doesn't know the model ${model}: it would start on its last used one instead. Pick one of \`opencode models\`${near.length ? ` (close: ${near.join(', ')})` : ''}`)
 }
 
-// agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
-// cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
-  const ws = findWs(wsRef)
+// what addTab makes of a tab's options, checked (a browser page, its preset, model, effort…): tabNew's too, before it
+// asks you anything
+export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string; cmd?: string; model?: string; effort?: string; perm?: string; fast?: boolean }) {
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
+  if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`) // spawnTab's, before anyone's asked
   if (!o.kind) presetCheck(o.preset, o.cmd)
   const pr = o.kind ? undefined : presetNamed(o.preset)
-  if (pr?.agent === 'command') o = { ...o, cmd: pr.cmd || 'true' }
-  const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (o.cmd ? 'custom' : 'shell')
-  const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
+  const cmd = pr?.agent === 'command' ? pr.cmd || 'true' : o.cmd
+  const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (cmd ? 'custom' : 'shell')
+  const kind = o.kind ?? (preset === 'shell' && !cmd ? 'shell' : 'agent')
   const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
   const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
   const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
   modelCheck(preset, model, effort, perm, fast)
+  return { pr, cmd, preset, kind, model, effort, perm, fast }
+}
+
+// agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
+// cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
+  const ws = findWs(wsRef)
+  const { pr, cmd, preset, kind, model, effort, perm, fast } = tabSpec(ws, o)
+  if (cmd !== o.cmd) o = { ...o, cmd }
   // a name with its task: an agent's prompt's words (not the workspace's first agent's: the workspace's name says it, and
   // it's titled as it is), a command's first words (npm run dev)
   const given = typeof o.name === 'string' ? o.name.trim().slice(0, 40) : ''
@@ -1739,7 +1759,7 @@ export function apps() {
 const openFail = (e: any): never => {
   throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
 }
-const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar|fileloc|inetloc|webloc)\/?$/i // fileloc and its kin open their target: a script there would run
+const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar|fileloc|inetloc|webloc|afploc|ftploc|mailloc|newsloc|vncloc|atloc|prefpane|saver|mobileconfig)\/?$/i // fileloc and its kin open their target (a script there would run); a pane, saver or profile installs
 export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string; storage?: boolean }) {
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
   const inWs = (w: Workspace) => (o.storage ? (w.storage && !w.host ? { ...w, path: w.storage } : openFail({ message: 'no storage folder' })) : w)
@@ -1845,7 +1865,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     presetCheck(p)
     const agent = presetNamed(p)?.agent ?? p
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
-    await modelKnown(agent, o.model?.trim() || presetNamed(p)?.model, proj)
+    await modelKnown(agent, o.model?.trim() || presetNamed(p)?.model, { path: proj.path, project: proj.id, host: proj.host }, p)
     if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
     if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: claude and codex only) likewise
   }
@@ -1920,7 +1940,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
-  await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, proj)
+  await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, { path: proj.path, project: proj.id, host: proj.host }, preset)
   if (o.codespace !== undefined) cloudCheck(proj, o)
   if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't

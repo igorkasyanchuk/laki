@@ -197,9 +197,13 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
     if (allow === 'deny') assert.deepEqual([done.code, /--tab npm run dev: the user said no/.test(done.err), kinds], [1, true, ['claude']])
     else assert.deepEqual([done.code, kinds], [0, ['claude', 'npm run dev']], done.err)
   }
+  // a command longer than the ask shows: refused, never shown cut
+  const long = await as('tab', ws.id, '--cmd', `echo ${'x'.repeat(2000)}`)
+  assert.match(long.err, /too long to show the user whole/)
+  assert.equal(app.events.filter(m => m.ev === 'toolAsk' && m.cross === 'cmd' && !m.seen).length, 0)
   app.close()
   // nor a profile that never asks: its mode, or its flags
-  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'sh-x', agent: 'command', cmd: 'echo hi' }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'yolo2', agent: 'claude', args: '--dangerously-skip-permissions' }] })
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'sh-x', agent: 'command', cmd: 'echo hi' }, { name: 'yolo', agent: 'claude', perm: 'bypassPermissions' }, { name: 'yolo2', agent: 'claude', args: '--dangerously-skip-permissions' }, { name: 'Claude fast', agent: 'claude' }] })
   for (const args of [['new', '.', '--preset', 'yolo', 'go'], ['tab', ws.id, '--preset', 'yolo'], ['tab', ws.id, '--preset', 'yolo2']]) {
     const r = await as(...args)
     assert.notEqual(r.code, 0, args.join(' '))
@@ -213,11 +217,14 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
   const n = await rig.cli('new', p.id, '--cmd', 'sleep 5', '--name', 'mine')
   assert.equal(n.code, 0, n.err)
   // yours: --tab again and again, an agent (agent:model), a shell, a command; none asked
-  const multi = await rig.cli('new', p.id, '--preset', 'none', '--name', 'multi', '--tab', 'codex:gpt-5.5', '--tab', 'shell', '--tab', 'sleep 5')
+  const multi = await rig.cli('new', p.id, '--preset', 'none', '--name', 'multi', '--tab', 'codex:gpt-5.5', '--tab', 'shell', '--tab', 'sleep 5', '--tab', 'Claude fast', '--tab', 'Claude fast:opus')
   assert.equal(multi.code, 0, multi.err)
   assert.match(multi.out, /\n {2}\+ codex/)
   const mw = { id: multi.out.split(/\s/)[0] }
-  assert.deepEqual((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === mw.id).map((x: any) => [x.preset ?? x.kind, x.model ?? x.cmd ?? '']), [['codex', 'gpt-5.5'], ['shell', ''], ['custom', 'sleep 5']])
+  assert.deepEqual((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === mw.id).map((x: any) => [x.profile ?? x.preset ?? x.kind, x.model ?? x.cmd ?? '']), [['codex', 'gpt-5.5'], ['shell', ''], ['custom', 'sleep 5'], ['Claude fast', ''], ['Claude fast', 'opus']]) // a profile's name with a space is a profile, not a command
+  // its tabs start now: not with a later start
+  const later = await rig.cli('new', p.id, '--preset', 'claude', '--after-limit', '--tab', 'shell', 'hi')
+  assert.match(later.err, /not with --at or --after-limit/)
 })
 
 // M5: who calls is the tab its process runs in, not what its env says

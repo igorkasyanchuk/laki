@@ -155,8 +155,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -223,6 +223,12 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     if (o.base?.trim()) throw new Error('a base branch is for a new workspace each run')
     delete s.base
   }
+  // no setup script: likewise (false or null clears it)
+  if (s.noSetup != null && typeof s.noSetup !== 'boolean') throw new Error('noSetup? true or false')
+  if (!s.noSetup || s.ws !== 'new' || s.workflow || s.widget) {
+    if (o.noSetup) throw new Error('without the setup script is for a new workspace each run')
+    delete s.noSetup
+  }
   s.prompt = s.prompt?.trim() ?? ''
   if (!s.prompt && !ext) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
   s.name = s.name?.trim() || undefined
@@ -278,7 +284,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
       // its base branch gone: wsNew refuses it, so the run fails and says so (never off another branch)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'new' && s.base && { base: s.base }), ...(s.ws === 'local-new' && { local: true, another: true }) })
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'new' && s.base && { base: s.base }), ...(s.ws === 'new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) })
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''

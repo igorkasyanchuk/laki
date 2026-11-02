@@ -18,8 +18,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                     tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
             [--no-setup]            without the project's setup script (.worktreeinclude's files still copied)
-            [--tab <agent[:model]|command>]   another tab there, again and again: an agent (no prompt: laki send
-                                    gives it one) or a command in a terminal tab (an agent's: asked in the app first)
+            [--tab <agent[:model]|command>]   another tab there, again and again: an agent or profile (no prompt:
+                                    laki send gives it one) or a command in a terminal tab (an agent's: asked in the
+                                    app first); started now, so not with --at or --after-limit
             [--at <when>]           the workspace now, its agent later: tomorrow 9am, in 2h, 2026-10-20 14:30
             [--after-limit]         its agent once the plan limit resets (claude, codex)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
@@ -58,7 +59,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a hidden browser on the workspace's localhost (the app must be open);
                                               screenshot prints a PNG's path; in a tab, <ws> is its own
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--base <branch>] [--name n] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--base <branch>] [--no-setup] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
@@ -235,6 +236,7 @@ or a link off localhost), console error: lines, and the text lines added (+) and
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
 late is skipped). --where: new (a worktree each run), folder, folder-new, or a workspace id (its agent gets it).
 --base: the branch a new worktree starts off (new only; gone when it runs: that run fails and says so).
+--no-setup: each new worktree without the project's setup script (new only).
 {{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
 
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"

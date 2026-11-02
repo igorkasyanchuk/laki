@@ -282,6 +282,7 @@ async function main() {
         caller: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB }, // an agent's (its tab, or typed in a shell: the daemon's agentCaller): the prompt's PRs are only related; yours in a shell aren't
       }
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
+      if (tabs.length && o.startAt !== undefined) throw new Error('--tab starts its tabs now: not with --at or --after-limit (add them with laki tab once it starts)')
       // a race: the same prompt to each preset, a worktree each
       if (flags.fan) {
         if (tabs.length) throw new Error('--tab: one workspace at a time, not with --fan')
@@ -293,7 +294,8 @@ async function main() {
       // is a command in a terminal tab (an agent's: the user allows it in the app first)
       const known = tabs.length ? new Set(['shell', ...AGENTS, ...(((await rpc('state')) as View).settings?.presets ?? []).map(p => p.name)]) : new Set<string>()
       const specs = tabs.map(t => t.trim()).filter(Boolean)
-      const tabOf = (t: string) => (([who, model]) => (known.has(who) ? { preset: who, model: model || undefined } : { cmd: t }))(t.includes(' ') ? [t] : [t.slice(0, (t + ':').indexOf(':')), t.slice((t + ':').indexOf(':') + 1)])
+      // a profile's whole name first (it may have spaces), then <agent or profile>:<model>
+      const tabOf = (t: string) => (who => (known.has(t) ? { preset: t } : known.has(who) ? { preset: who, model: t.slice(who.length + 1) || undefined } : { cmd: t }))(t.split(':')[0])
       const ws: Workspace = await rpc('wsNew', o, 120000)
       const more: { name: string; id: string }[] = []
       const bad: string[] = []
@@ -516,7 +518,7 @@ async function main() {
     case 'schedule': {
       const [sub = 'ls', id, ...words] = rest
       const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.base ? ` off ${s.base}` : ''}`}  ${s.name || s.prompt}`
+      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.base ? ` off ${s.base}` : ''}${s.noSetup ? ', no setup' : ''}`}  ${s.name || s.prompt}`
       if (sub === 'ls' || sub === 'log') {
         const v: View = await rpc('state')
         if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
@@ -525,7 +527,7 @@ async function main() {
       if (sub === 'add') {
         if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
         const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
-        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, name: flags.name, prompt: flags.prompt || words.join(' ') })
+        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, name: flags.name, prompt: flags.prompt || words.join(' ') })
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)

@@ -686,7 +686,8 @@ run fails, saying so.
   agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
   while it works, or a new tab starts), the base branch a new workspace starts off (its chip: the repo's main on a new
   task, any branch typed or picked; empty, the one the project has checked out; a branch gone by the time it runs fails
-  that run, saying so, `laki schedule add … --base release/2.0`), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
+  that run, saying so, `laki schedule add … --base release/2.0`), whether it skips the project's setup script (Where's *A new
+  workspace each run, no setup*, when the project has one; the row says *no setup*; `--no-setup`), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
   `mon, wed and fri at 18:30`, `every 2 hours from 9am to 6pm`, `every 30 minutes`, `hourly on weekends`,
   `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). Until it reads, a few
   examples sit under *When* (a click fills it in); then the form says how it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
@@ -1477,10 +1478,10 @@ open in Reader. A tab's right click has it too. Settings › Appearance › *Rea
 ### One next step
 
 The first item of a workspace's ⋯ menus (the toolbar's, its row's, its right click) is the one thing it needs from you now: *Answer claude* or *Approve the plan*
-while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *Address the review*, *Overlaps another*,
+while an agent waits, *Fix the failing check*, *Resolve conflicts*, *Fix CI*, *Address the review*,
 *Merge #42* once checks pass, *Review changes* when the agent is done, *Ship* when there's something to ship, *Archive*
 once its PR is merged or closed (Archive asks first). While an agent works it shows the step under way (from its plan); *CI runs* and *In review* open the PR. ⌘G does what it says. Settings › Appearance › *Sidebar rows* › *Next step* (or a right click › *Show ›*) puts it on each sidebar row as a small chip
-(none while it works, nor for conflicts, failing CI or an overlap: the row's own marks show those). Settings › Appearance › *One next
+(none while it works, nor for conflicts or failing CI: the row's own marks show those). Settings › Appearance › *One next
 step* turns it off.
 
 ### Done check

@@ -18,12 +18,14 @@ import { away, hostUp, sshIn } from './hosts.ts'
 const diffBase = (ws: Workspace, uncommitted?: boolean) => (ws.kind === 'worktree' && !uncommitted ? git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
 
 // the text as git wrote it but its last newline (git() trims: a last line's trailing spaces would go, and a hunk to
-// revert would no longer match the file)
+// revert would no longer match the file); a/ and b/ whatever the user's config says (diff.mnemonicPrefix, noprefix,
+// srcPrefix): Changes, Review and Revert read each file's name off them
+const AB = ['--src-prefix=a/', '--dst-prefix=b/']
 export async function diff(ref: string, uncommitted?: boolean) {
   const ws = findWs(ref)
   const from = await diffBase(ws, uncommitted)
   const [text, numstat, untracked] = await Promise.all([
-    exec(ws, 'git', ['diff', '--no-color', '--no-ext-diff', '-M', from]).then(r => r.stdout.replace(/\n$/, '')),
+    exec(ws, 'git', ['diff', '--no-color', '--no-ext-diff', ...AB, '-M', from]).then(r => r.stdout.replace(/\n$/, '')),
     git(ws, 'diff', '--numstat', '-M', from),
     git(ws, 'ls-files', '--others', '--exclude-standard'),
   ])
@@ -37,11 +39,11 @@ export async function diff(ref: string, uncommitted?: boolean) {
   let out = text
   const newFiles = untracked.split('\n').filter(Boolean).slice(0, 100)
   // a host's in one go, each after a NUL (git's diff of a file with one says Binary files … differ)
-  const each = 'for f; do printf "\\000"; git diff --no-color --no-index -- /dev/null "$f"; done; true'
+  const each = 'for f; do printf "\\000"; git diff --no-color --src-prefix=a/ --dst-prefix=b/ --no-index -- /dev/null "$f"; done; true'
   const diffs = !ws.host
     ? await Promise.all(
         newFiles.map(f =>
-          run('git', ['diff', '--no-color', '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
+          run('git', ['diff', '--no-color', ...AB, '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
             r => r.stdout,
             e => String(e.stdout ?? ''), // exit 1: there are differences
           ),
@@ -387,7 +389,7 @@ export async function overlapCheck(ref: string): Promise<Collision[]> {
   if (!radarable(w)) throw new Error('overlaps: a live worktree on this Mac only')
   const live = state.workspaces.filter(o => o.project === w.project && radarable(o))
   const got: Got = new Map()
-  await Promise.all(live.map(o => rangesOfWs(o).then(x => got.set(o.id, x), () => {})))
+  for (let i = 0; i < live.length; i += 4) await Promise.all(live.slice(i, i + 4).map(o => rangesOfWs(o).then(x => got.set(o.id, x), () => {}))) // 4 gits at a time: a project may have dozens
   if (!got.has(w.id)) throw new Error(`overlaps: git couldn't read ${w.name ?? w.id}'s changes`)
   return collide(w, live, got, new Map())
 }

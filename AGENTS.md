@@ -202,7 +202,10 @@ one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedu
 base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `projectSet` `name` '' (its folder's name again; Terminals' and Browsers' keep theirs), 80 characters at most. 132: `wsStat` (`ws`: files.ts' `statOf` now, a row's
 hover card; none off git, archived, a codespace away), a `Stat`'s `made` and `gone` (`--summary`'s create and delete
 lines, untracked files made too), a reminder's `every` (`reminderAdd`/`reminderSet` `every`, or `at` in words that
-repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`), opencode's model checked against `opencode models` (core's `modelKnown`). A setting the renderer adds
+repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
+for `ws` new only, refused for another, false or null clears it; `runSchedule`: `wsNew` `noSetup`; the CLI's `laki schedule add
+--no-setup`, MCP's `no_setup`; Schedules.tsx' where menu's *A new workspace each run, no setup*, shown for the project's
+`hasSetup`, a row's *no setup* tag). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
@@ -825,11 +828,11 @@ the code, the seconds it ran, its last lines.
   pane's `Term` (still attached; its `active` off meanwhile), `readable` (claude, codex), asked every 1.5 s while shown;
   App's `readMode` (`laki.reader`: `reader` or `term` per tab, unset: `narrow`'s Reader), `.reader-switch`, the tab
   menu's item; its box is `send` `whenIdle`, its ask `answer`. Tested in `test/reader.test.ts`.
-- One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check`, PR and
-  the radar's count to one `Step`, `busy` while an agent or CI works): App's `stepOf`/`doStep`, `stepItem` (with `STEP_ICON`)
-  first in `wsMore` (the toolbar's ⋯) and `wsMenu` (a row's ⋯ and right click; overlaps: the radar's menu as its
-  submenu), ⌘G (`KEYS`' `step`: `doStep`), a row's `.ws-step` chip only with `rowMarks.step` (`STEP_CHIP`'s words; not
-  busy, nor `collide`, `conflict`, `ci`: its ⇄, ⚠ and red mark say those; not Terminals' or Browsers'). Tested in
+- One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check` and PR
+  to one `Step`, `busy` while an agent or CI works; overlaps aren't one: Check overlaps, the row's ⇄): App's
+  `stepOf`/`doStep`, `stepItem` (with `STEP_ICON`) first in `wsMore` (the toolbar's ⋯) and `wsMenu` (a row's ⋯ and right
+  click), ⌘G (`KEYS`' `step`: `doStep`), a row's `.ws-step` chip only with `rowMarks.step` (`STEP_CHIP`'s words; not
+  busy, nor `conflict`, `ci`: its ⚠ and red mark say those; not Terminals' or Browsers'). Tested in
   `test/next-step.test.ts`.
 - A sidebar row's marks (Settings.tsx `ROW_MARKS`, `rowMarkOn`, `rowMarkSet`: `prIcon`, `prMarks`, `diffStat`, the rest
   `settings.rowMarks`, on unless false but `step`, off unless true; `conflict`, `ci` unset: as `prIcon`): App's `mark` in
@@ -2725,7 +2728,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc`; the daemon's `readJson`, `writeAtomic` (a temp file, then a rename) and `move` (across volumes too) |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/renderer/src/Reader.tsx` | Reader view: an agent tab's chat as a conversation, its ask as buttons, a box that sends |
-| `src/shared/nextStep.ts` | One next step: what a workspace needs from you now, from its tabs, check, PR and the radar |
+| `src/shared/nextStep.ts` | One next step: what a workspace needs from you now, from its tabs, check and PR |
 | `src/shared/todos.ts` | the agent's plan, live: a tab's to-do list from its tools' calls, `planCount`, `planNow` |
 | `src/shared/overlap.ts` | Collision radar: a -U0 diff's base lines per file, where two diffs meet |
 | `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |

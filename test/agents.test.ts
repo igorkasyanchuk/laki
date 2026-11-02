@@ -176,4 +176,7 @@ test("opencode's model: in its inline config, not -m (some TUIs refuse it), over
   assert.equal((await rig.rpc('state')).workspaces.length, before)
   await assert.rejects(rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'openrouter/nope/x' }), /doesn't know the model/)
   assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'opencode/beam-free' })).model, 'opencode/beam-free')
+  // its list is read as the tab would run it: a provider only Settings' env (a key) brings is known
+  await rig.rpc('settingsSet', { env: { FAKE_OC_MORE: 'mine/own-model' } })
+  assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'mine/own-model' })).model, 'mine/own-model')
 })

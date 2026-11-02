@@ -673,7 +673,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
           </span>
           {it.sub && <span className="menu-sub">{it.sub}</span>}
         </span>
-        {it.hint && !on && <span className="menu-hint">{it.hint}</span>}
+        {it.hint && !on && <span className={`menu-hint${String(it.hint).length > 12 ? ' long' : ''}`}>{it.hint}</span>}
         {it.pill && <span className={`menu-pill ${it.tone ?? ''}`}>{it.pill}</span>}
         {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
         {it.items && <Icon name="chevronRight" size={12} />}
