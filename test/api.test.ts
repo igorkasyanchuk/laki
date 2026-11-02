@@ -238,6 +238,27 @@ test('claude StopFailure on a usage limit: ◷ until it resets; a time gone by i
   c.close()
 })
 
+test('claude PreCompact: the tab says compacting (and runs) until its next hook', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x.resumeId && x.status === 'idle' && x
+  }, 'claude up')
+  const hooks = JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8')).hooks
+  assert.match(hooks.PreCompact[0].hooks[0].command, / hook compacting$/)
+  await rig.rpc('hook', { tab: tab.id, state: 'compacting', payload: { hook_event_name: 'PreCompact', trigger: 'auto' } })
+  const x = await rig.tab(ws.id)
+  assert.equal(x.status, 'running')
+  assert.equal(x.compacting, true)
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { hook_event_name: 'SessionStart', source: 'compact', session_id: tab.resumeId } })
+  assert.equal((await rig.tab(ws.id)).compacting, undefined) // done: back to working
+  await rig.rpc('hook', { tab: tab.id, state: 'compacting' })
+  await rig.rpc('hook', { tab: tab.id, state: 'idle' })
+  assert.equal((await rig.tab(ws.id)).compacting, undefined)
+})
+
 test('apps and open in: Finder, an app, a file, the editor; errors', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

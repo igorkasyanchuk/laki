@@ -1,6 +1,6 @@
 // The laki CLI from an agent's tab: Laki's plugin, what agents are told, project memory, what an agent may start.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
@@ -331,4 +331,44 @@ test("cli: laki show puts a card under the agent's tab (a folder, a file, a link
   await assert.rejects(rig.rpc('checkAgain', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't run the Done check/)
   await assert.rejects(rig.rpc('checkStop', { ws: ws.id, from: { ws: ws.id, tab: tab.id } }), /an agent can't stop the Done check/)
   assert.equal(await rig.rpc('ping'), 'pong') // still up
+})
+
+test('laki secret: a masked card on the tab; the value only in a 0600 file in its storage, the agent gets its path', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.resumeId && x.status === 'idle' && x
+  }, 'claude up')
+  await assert.rejects(rig.rpc('secretAsk', { label: 'x' }), /runs in a Laki tab/)
+  await assert.rejects(rig.rpc('secretAsk', { label: '  ', from: { tab: tab.id } }), /what is it/)
+  await rig.rpc('hook', { tab: tab.id, state: 'running' }) // its Bash tool runs laki secret
+  const asked = rig.rpc('secretAsk', { label: 'Stripe test key', from: { tab: tab.id } })
+  const shown = await until(async () => (await rig.tab(ws.id)).secret, 'the card')
+  assert.equal(shown.label, 'Stripe test key')
+  assert.equal((await rig.tab(ws.id)).status, 'waiting') // Needs you
+  await assert.rejects(rig.rpc('secretAsk', { label: 'another', from: { tab: tab.id } }), /asks for Stripe test key already/)
+  await assert.rejects(rig.rpc('secretGive', { id: shown.id, value: '' }), /empty/)
+  await rig.rpc('secretGive', { id: shown.id, value: 'sk_test_51abc\n' })
+  const { path } = await asked
+  assert.equal(readFileSync(path, 'utf8'), 'sk_test_51abc')
+  assert.equal(statSync(path).mode & 0o777, 0o600)
+  assert.match(path, /\/\.laki-secrets\/stripe-test-key-[0-9a-f]{6}$/)
+  const v = await rig.rpc('state')
+  assert.ok(!JSON.stringify(v).includes('sk_test_51abc'), 'never in the view')
+  const after = v.tabs.find((x: any) => x.id === tab.id)
+  assert.equal(after.secret, undefined)
+  assert.equal(after.status, 'running') // its command goes on
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).artifacts ?? 0, 0) // hidden: no artifact
+  // refused: the agent hears no
+  const again = rig.rpc('secretAsk', { label: 'GitHub token', from: { tab: tab.id } })
+  again.catch(() => {}) // asserted below
+  const s2 = await until(async () => (await rig.tab(ws.id)).secret, 'the card again')
+  await rig.rpc('secretGive', { id: s2.id, refuse: true })
+  await assert.rejects(again, /didn't give GitHub token: refused/)
+  await assert.rejects(rig.rpc('secretGive', { id: s2.id, value: 'late' }), /that ask is gone/)
+  assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 3600e3 }), 0)
+  assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 1) // a day on: gone
+  assert.ok(!existsSync(path))
 })

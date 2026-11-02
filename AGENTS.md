@@ -205,14 +205,28 @@ lines, untracked files made too), a reminder's `every` (`reminderAdd`/`reminderS
 repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
 for `ws` new only, refused for another, false or null clears it; `runSchedule`: `wsNew` `noSetup`; the CLI's `laki schedule add
 --no-setup`, MCP's `no_setup`; Schedules.tsx' where menu's *A new workspace each run, no setup*, shown for the project's
-`hasSetup`, a row's *no setup* tag). A setting the renderer adds
+`hasSetup`, a row's *no setup* tag). 136: `worktreeList`/`worktreeImport` (a project's ⋯ › *Import worktrees…*), the view's
+`whenDone` (settings.whenDone's countdown), a tab's `compacting` (claude's PreCompact), `suggest` (settings.nextPrompt),
+`secret` (`secretAsk`/`secretGive`, `secretsTidy`: `laki secret`) and `changes` (`turnDiff`, `turnUndo`), `tabHandover`
+(turns.ts, below). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
+- when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
+  worktrees' *When everything is done*): core.ts `whenDone` at each view, beside `keepAwake`: armed by something going
+  (an agent running or waiting, a live workflow run, a scheduled task or a workspace's late start due within the hour),
+  then, once none is, the view's `whenDone` (`{ act, at }`: App's bar with Cancel, `settingsSet` `whenDone: 'off'`) for
+  `WHEN_DONE_WAIT` (`LAKI_WHEN_DONE_MS`: tests'), anything going again cancels it; then `pmset sleepnow`,
+  `pmset displaysleepnow` (the lock) or loginwindow's shut down, and the setting goes back to off. Tested with a `pmset`
+  in the rig's `$HOME/bin` (`test/resources.test.ts`);
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
   `keepAwake` at each view (`changed()`): while a tab of an agent (`tracked`, or a shell's `runs`) is running or waiting,
   one `caffeinate -i -w <daemon pid>` (the screen may sleep; it ends with the daemon, a crash too); none found (not a
   Mac): said once. Tested with `test/fakes/caffeinate` in `test/resources.test.ts`;
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
+- `worktreeList` (`project`: `git worktree list --porcelain`, each on a branch, its folder there, not the project's own
+  nor any Laki workspace's, archived too, by realpath; this Mac's git projects) and `worktreeImport` (`project`, `paths`:
+  each one listed as a workspace as it is, its folder's name its id, the project's `main` its base; no setup, nothing
+  copied; archive and delete remove it as any other's): a project's ⋯ › *Import worktrees…* (panels.tsx `ImportWorktrees`);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
   and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
   refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; `notes`: the user's Markdown, the
@@ -549,6 +563,36 @@ prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MC
 `laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
 their own (`varsOf`). Settings' chips under an action or a template list them.
 
+### Turns
+
+`daemon/turns.ts` (main.ts imports it; core's `turnStarts`, claude's UserPromptSubmit, and `turnEnds`), core keeping
+what the view shows on the tab's runtime:
+- each turn's changes (`settings.turnChanges`, on unless false): the worktree as a tree through an index of its own,
+  `<data>/turns/<ws>.index` (`treeOf`: first a copy of the worktree's own index, for git's stat cache; `git add -A`,
+  `write-tree`, one at a time per workspace; the worktree's own index never touched; Done check's tree too; `turnsTidy`,
+  hourly: gone workspaces' indexes, closed tabs' turns), as a claude turn starts (the last turn's card and Undo go then) and as any claude or codex turn ends (codex: the
+  last end, or Undo's tree, is its start); a tab's
+  `changes` (`TurnChanges`: `n`, `add`, `del`, the first `TURN_FILES` files, git's A/M/D, no renames). The Reader's
+  `TurnCard` (Review: Changes' *This turn*, `Scope` `turn`, the `laki-scope` event, `turnDiff`, read only; Undo:
+  `turnUndo`, after `ask`: refused while it runs or once one of its files changed since, then `git restore
+  --source=<before> --worktree` and its added files removed, `inside`). ponytail: the last turn per tab, in memory;
+  this Mac's git workspaces only;
+- the next prompt (`settings.nextPrompt`, off unless true; Settings › AI's *Guess my next prompt*): at a claude or codex
+  turn's end with an answer (yours: not a workflow's, nothing queued; Laki AI on, with a key for OpenRouter), `aiOnce`
+  with your last message (`Runtime.asked`: UserPromptSubmit's, codex's `input-messages`) and the answer's end; a line
+  but NONE is the tab's `suggest` while it's idle; the Reader's box shows it as its placeholder, Tab takes it, Esc hides it;
+- `tabHandover` (`tab`, `to`: the other of claude and codex; the tab menu's *Continue in Codex / Claude Code*, refused
+  from an agent): a handover in the storage folder (`handover-<from>-to-<to>-<stamp>.md`: `chatRead`'s your messages and
+  its answers, the newest `HANDOVER_MAX`, and `diff`'s files), then `addTab` of the other agent's first profile told to
+  read it (a host's: in the prompt). Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
+
+`daemon/secrets.ts`: `laki secret <what>` (MCP's `laki_secret`; `SECRET_WAIT`, the CLI's rpc waits as long):
+`secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`) on the tab (waiting while
+its command runs: Needs you, a notification, a phone push), panels.tsx `SecretStrip` at the pane's foot, a password
+field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<storage>/.laki-secrets/<slug>-<hex>`, 0600
+(hidden: no artifact) and the agent gets its path; `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
+memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
+
 ### Asks
 
 A waiting tab's view has `ask` (`shared/ask.ts` `askOf`, over the bottom 16 lines of its screen): numbered options
@@ -633,6 +677,7 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 | Notification (permission prompts) | waiting |
 | Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
 | StopFailure | usage limit (`limits.ts`) |
+| PreCompact | running and `compacting` (the tab and row say *Compacting…*) until its next hook (SessionStart, source compact) |
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
 
@@ -815,14 +860,15 @@ the code, the seconds it ran, its last lines.
   `settings.doneCheck`, on unless false): a project's `check` (`DoneCheck`, `checkOk`: `steps` of `CHECK_STEPS` in that
   order, `review` claude or codex; the app's over a trusted `.laki.json`'s; a step without its script dropped:
   `checkOf`). A tracked agent's turn end (not a limit or failure, not a workflow's tab, nothing queued) whose worktree
-  changed (`treeOf`: `git add -A` into `<data>/check/<ws>.index`, `write-tree`; the same as the last check's, or the
+  changed (turns.ts' `treeOf`, the turns' index, below: the same as the last check's, or the
   merge base's the first time, unless that check failed: skipped, `check` event `skipped`) runs each step as a workflow's
   run block would (`$SHELL -lc`, the workspace's env, `CI=1`, its group, `LAKI_CHECK_MIN` minutes), then `aiOnce` with
   that agent's first preset over `diff` (`DIFF_MAX`; LGTM or notes). A failure `send`s the agent its output (`fence`d,
   untrusted) `whenIdle`, `CHECK_TRIES` in a row, then `over` (a phone push). `turn`'s broadcast says `checking` when
   `will`, so App waits for the `check` event to notify (passed, over, skipped; failed: none). `CheckRun` in the view as
   a workspace's `check`; panels.tsx `CheckStrip` at the pane's foot; App's `offerCheck` (once per project,
-  `laki.checkOffered`); SettingsProject.tsx' *Done check* group. `checkTidy`: hourly, the index files of gone workspaces.
+  `laki.checkOffered`); SettingsProject.tsx' *Done check* group. `checkTidy`: hourly, gone workspaces' last trees and
+  `<data>/check` (each check's own index before 0.42).
 - Reader view (`settings.reader`, on unless false; meters.ts `chatRead`: a `Reader` per tab, `tailOf` and share.ts'
   `chatOf` as shares read, `v` moving with it, the newest 400; `{ none }` without a transcript): Reader.tsx over the
   pane's `Term` (still attached; its `active` off meanwhile), `readable` (claude, codex), asked every 1.5 s while shown;
@@ -2689,6 +2735,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/widgetDev.ts` | runs, mock data and fixtures, `laki widget dev`'s links, `widgetNew`, the checker |
 | `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page; the meters' `meterOf`: a transcript's context and tokens |
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
+| `src/daemon/turns.ts` | what agents' turns leave: each turn's changes (Undo), the next prompt guessed, a chat handed to the other agent |
+| `src/daemon/secrets.ts` | `laki secret`: an agent asks you for a token on a masked card, gets a 0600 file's path |
 | `src/daemon/verify.ts` | Done check: a project's scripts and a second agent's review as an agent's turn ends, failures sent back |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/notes.ts` | notes and To-dos: one JSON file each, their pasted files, the list with search |

@@ -59,6 +59,16 @@ export function Elapsed({ since }: { since: number }) {
   return <span className="elapsed">{s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`}</span>
 }
 
+// seconds left until `to`, ticking
+export function Countdown({ to }: { to: number }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return <span className="elapsed">{Math.max(0, Math.ceil((to - now) / 1000))} s</span>
+}
+
 // the turn timer (settings.timers): since the earliest turn going among these tabs
 export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
   const since = Math.min(...tabs.map(t => t.runAt ?? Infinity))

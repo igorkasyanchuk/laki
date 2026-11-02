@@ -12,7 +12,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
@@ -92,7 +92,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number } // bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -101,6 +101,8 @@ export const prOf = (ws: string) => prs.get(ws)
 // what follows agents' turns (workflows): each turn's end, its last answer, a usage limit's reset, a failure
 export const checks = new Map<string, CheckRun>() // Done means checked (verify.ts): each workspace's last check
 export const checkHooks: { will?: (tab: Tab) => boolean } = {} // verify.ts': a check follows this turn's end (the app waits for it to notify)
+// each turn's start (claude's UserPromptSubmit: its first hook, before any edit) and end
+export const turnStarts = new Set<(tab: Tab) => void>()
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
 // and each turn that stops to ask (a moment after its hook: the menu it draws, askOf's options; none read: none)
 export const turnWaits = new Set<(tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => void>()
@@ -216,6 +218,7 @@ export function hookFiles(h: Hooks): Record<string, string> {
       Notification: c('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
       Stop: c('idle'),
       StopFailure: c('failed'),
+      PreCompact: c('compacting'), // a long chat summed up (auto or /compact): the tab says so until the next hook
     },
     // Progress on tabs, and the Laki note's rename and PR of its own workspace: claude runs them without asking each time
     // (this Mac's CLI only: a host has none)
@@ -567,7 +570,7 @@ export function view(): View {
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   return {
     projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
@@ -593,6 +596,7 @@ export function view(): View {
     api: API,
     built: BUILT,
     today: todayView(),
+    ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
   }
 }
 
@@ -612,7 +616,9 @@ export function changed() {
     const v = view()
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
     for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
-    keepAwake(v.tabs.some(t => (t.status === 'running' || t.status === 'waiting') && (tracked(t) || !!t.runs)))
+    const agents = agentsBusy(v)
+    keepAwake(agents)
+    whenDone(agents)
     if (!clients.size) return void (sent = '') // nobody to send it to
     const json = JSON.stringify({ ev: 'state', view: v }) // once for every client
     if (json === sent) return
@@ -636,6 +642,53 @@ function keepAwake(on: boolean) {
   p.on('error', e => ((noCaffeinate = true), log(`keep awake: ${e.message}`)))
   p.on('exit', () => awake === p && (awake = undefined))
   awake = p
+}
+
+// settings.whenDone: once all that was going is done (an agent working or asking you, a workflow run, a scheduled task
+// or a workspace's late start due within the hour), a countdown of WHEN_DONE_WAIT (the view's whenDone: App's bar,
+// whose Cancel turns the setting off), then the Mac sleeps, locks or shuts down and the setting goes off: once, not
+// every evening. Something going while it's set arms it; set with nothing going, it waits for the next.
+// ponytail: macOS only (pmset, loginwindow's shut down); lock is the display's sleep, which locks under macOS's default
+// "require password after the display turns off: immediately"
+const WHEN_DONE_AHEAD = 60 * 60_000
+const WHEN_DONE_CMD: Record<Exclude<WhenDone, 'off'>, [string, string[]]> = {
+  sleep: ['pmset', ['sleepnow']],
+  lock: ['pmset', ['displaysleepnow']],
+  shutdown: ['osascript', ['-e', 'tell application "loginwindow" to «event aevtrsdn»']],
+}
+let doneArmed = false
+let doneSoon: { act: Exclude<WhenDone, 'off'>; at: number; timer: NodeJS.Timeout } | undefined
+const doneWait = () => Number(process.env.LAKI_WHEN_DONE_MS) || WHEN_DONE_WAIT
+const agentsBusy = (v: View) => v.tabs.some(t => (t.status === 'running' || t.status === 'waiting') && (tracked(t) || !!t.runs))
+function goingNow(agents: boolean) {
+  const soon = Date.now() + WHEN_DONE_AHEAD
+  return (
+    agents ||
+    (state.flows ?? []).some(r => r.status === 'running' || r.status === 'waiting' || r.status === 'queued' || r.status === 'paused') ||
+    (state.schedules ?? []).some(s => s.on && s.next !== undefined && s.next <= soon) ||
+    state.workspaces.some(w => !w.archived && w.pending && !w.pending.failed && (w.pending.at === undefined || w.pending.at <= soon))
+  )
+}
+function whenDone(agents: boolean) {
+  const act = state.settings?.whenDone ?? 'off'
+  const going = goingNow(agents)
+  if (act === 'off' || going || doneSoon?.act !== act) doneSoon && (clearTimeout(doneSoon.timer), (doneSoon = undefined), changed())
+  if (act === 'off') return void (doneArmed = false)
+  if (going) return void (doneArmed = true)
+  if (!doneArmed || doneSoon) return
+  const timer = setTimeout(() => {
+    doneSoon = undefined
+    if (goingNow(agentsBusy(view()))) return void changed() // a hook within the last view's 30 ms: armed still, it counts again once that's done
+    doneArmed = false
+    state.settings = { ...state.settings, whenDone: 'off' }
+    save()
+    changed()
+    const [cmd, args] = WHEN_DONE_CMD[act]
+    log(`when done: ${act}`)
+    execFile(cmd, args, e => e && log(`when done: ${act}: ${e.message}`))
+  }, doneWait())
+  doneSoon = { act, at: Date.now() + doneWait(), timer }
+  changed()
 }
 
 // when each workspace's agents worked (the last 50 stretches): comments under your name made then are the agent's
@@ -2052,6 +2105,53 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   return ws
 }
 
+// worktrees made outside Laki (git worktree list): the project's ⋯ › Import worktrees… lists them, worktreeImport makes
+// each picked one a workspace as it is (no setup, nothing copied: it's set up already; archive and delete remove it as
+// any other's). Each on a branch, in a folder that's there, not the project's own nor one of Laki's (archived too)
+// ponytail: this Mac's git projects only, branches only (a detached one is left out)
+export async function worktreeList(projectRef: string) {
+  const p = findProject(projectRef)
+  if (p.git === false || p.host || p.kind) return []
+  const real = (x: string) => {
+    try {
+      return realpathSync(x)
+    } catch {
+      return x
+    }
+  }
+  const have = new Set(state.workspaces.filter(w => w.project === p.id).map(w => real(w.path)))
+  const main = real(p.path)
+  const out = await git(p, 'worktree', 'list', '--porcelain')
+  return out
+    .split(/\n\n+/)
+    .map(b => Object.fromEntries(b.split('\n').map(l => [l.split(' ')[0], l.slice(l.indexOf(' ') + 1)])) as Record<string, string>)
+    .filter(e => e.worktree && e.branch?.startsWith('refs/heads/') && !('bare' in e) && !('prunable' in e) && existsSync(e.worktree))
+    .map(e => ({ path: e.worktree, branch: e.branch.slice('refs/heads/'.length) }))
+    .filter(e => real(e.path) !== main && !have.has(real(e.path)))
+}
+export async function worktreeImport(o: { project: string; paths: string[] }) {
+  const p = findProject(o.project)
+  const list = await worktreeList(p.id)
+  const picked = [...new Set(Array.isArray(o.paths) ? o.paths : [])].map(path => list.find(x => x.path === path) ?? path)
+  const bad = picked.find(x => typeof x === 'string')
+  if (bad !== undefined) throw new Error(`${bad} isn't a worktree of ${p.name} that Laki can import`)
+  if (!picked.length) throw new Error('which worktrees? none picked')
+  const { main } = await branches(p.id)
+  const made: Workspace[] = []
+  for (const e of picked as { path: string; branch: string }[]) {
+    const ws: Workspace = { id: await uniqueWsId(slug(basename(e.path)), p), project: p.id, path: e.path, branch: e.branch, base: main || e.branch, kind: 'worktree', port: allocPort(), created: Date.now() }
+    state.workspaces.push(ws)
+    placeWs(ws)
+    made.push(ws)
+    wsLog(ws, `imported: ${e.path}, branch ${e.branch}`)
+  }
+  save()
+  changed()
+  for (const ws of made) widgetEvent('workspace.new', { imported: true }, ws.id)
+  void scanPRs() // their PRs now, not at the minute's scan
+  return made
+}
+
 // a later start: a time from now on (a minute's slack), or limit for claude and codex (their plan limits); an agent to
 // start, not in a codespace (it may not be up then)
 export function startCheck(at: unknown, preset: string, agent: string, codespace?: string) {
@@ -2524,7 +2624,12 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     return changed()
   }
   if (p.state !== 'start') r.bg = undefined
+  r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
   switch (p.state) {
+    case 'compacting':
+      if (r.status !== 'waiting') r.status = 'running'
+      r.compacting = Date.now()
+      break
     case 'start':
       if (pl.session_id && pl.session_id !== tab.resumeId) {
         tab.resumeId = pl.session_id
@@ -2533,9 +2638,17 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       return changed()
     case 'running':
       r.status = 'running'
-      r.limit = r.escAt = undefined
+      r.limit = r.escAt = r.suggest = undefined
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
         titleFrom(tab, pl.prompt) // claude's, gemini's
+        if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
+        if (pl.hook_event_name === 'UserPromptSubmit')
+          for (const f of turnStarts)
+            try {
+              f(tab)
+            } catch (e) {
+              log(`turn ${tab.id}: ${(e as Error).message}`)
+            }
         if (r.plan) r.plan.stale = true // the list it had is an earlier turn's until it writes one
         r.planAsk = undefined
       }
@@ -2579,6 +2692,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       r.planAsk = undefined
       if (r.plan && planDone(r.plan)) r.plan = undefined // every step done: the list goes as the turn ends
       if (Array.isArray(pl['input-messages'])) titleFrom(tab, pl['input-messages'][0]) // codex's, at its first turn's end
+      if (Array.isArray(pl['input-messages']) && typeof pl['input-messages'].at(-1) === 'string') r.asked = pl['input-messages'].at(-1).slice(0, 4000)
       const id = pl['thread-id']
       if (id && id !== tab.resumeId) {
         tab.resumeId = id
@@ -2877,6 +2991,7 @@ export const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && 
 // without hooks it's how every turn ends: done, as a hook would say (ponytail: a turn under 8s, likely Enter on a
 // menu, ends without a notification)
 const BG_MAX = 60 * 60_000 // a pause on subagents past this: the screen's word again (one that never reported back)
+const COMPACT_MAX = 5 * 60_000
 export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
@@ -2889,6 +3004,7 @@ export function sweepRunning(now = Date.now()) {
     }
     if (!s || s.exited || r?.status !== 'running' || !tracked(t) || now - s.lastOutput < QUIET) continue
     if (r.bg && now - r.bg < BG_MAX) continue // its subagents work (turn): its next turn says when it's done
+    if (r.compacting && now - r.compacting < COMPACT_MAX) continue // summing up a long chat may print nothing for a while
     if (BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue
     if (screen && now - (r.since ?? 0) > 2 * QUIET) {
       turn({ tab: t.id, state: 'idle' })

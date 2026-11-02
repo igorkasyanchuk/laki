@@ -330,3 +330,68 @@ test('git worktree add checks out with every core (checkout.workers=0) unless th
   await rig.rpc('wsNew', { project: q.id, preset: 'none' })
   assert.match(adds()[2], /^worktree add /)
 })
+
+test('worktrees made outside Laki: listed (not the repo, Laki\'s own or a detached one), imported as workspaces as they are', async t => {
+  const rig = await fresh(t, { config: { setup: 'touch ran-setup' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const g = (...a: string[]) => execFileSync('git', ['-C', rig.repo, ...a], { stdio: 'pipe' })
+  const outside = join(rig.home, 'elsewhere', 'feature-x')
+  mkdirSync(dirname(outside), { recursive: true })
+  g('worktree', 'add', '-q', outside, '-b', 'feature-x')
+  g('worktree', 'add', '-q', '--detach', join(rig.home, 'elsewhere', 'loose'))
+  const list = await rig.rpc('worktreeList', { project: p.id })
+  assert.deepEqual(list.map((x: any) => [realpathSync(x.path), x.branch]), [[realpathSync(outside), 'feature-x']])
+  assert.ok(!list.some((x: any) => x.path === mine.path))
+  await assert.rejects(rig.rpc('worktreeImport', { project: p.id, paths: [rig.repo] }), /isn't a worktree of .* that Laki can import/)
+  const [ws] = await rig.rpc('worktreeImport', { project: p.id, paths: [list[0].path] })
+  assert.equal(ws.id, 'feature-x')
+  assert.equal(ws.branch, 'feature-x')
+  assert.equal(ws.base, 'main')
+  assert.equal(ws.kind, 'worktree')
+  assert.ok(!existsSync(join(outside, 'ran-setup'))) // set up already: no setup script
+  assert.ok((await rig.rpc('state')).workspaces.some((w: any) => w.id === 'feature-x'))
+  assert.deepEqual(await rig.rpc('worktreeList', { project: p.id }), []) // Laki's now
+})
+
+test("a turn's changes: the worktree as it starts and ends; This turn's diff; Undo while they're as it left them", async t => {
+  const rig = await fresh(t)
+  writeFileSync(join(rig.repo, 'gone.txt'), 'bye\n')
+  execFileSync('git', ['-C', rig.repo, 'add', '-A'])
+  execFileSync('git', ['-C', rig.repo, 'commit', '-qm', 'more'])
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x.status === 'idle' && x)(await rig.tab(ws.id)), 'claude up')
+  writeFileSync(join(ws.path, 'mine.txt'), 'before the turn\n') // yours, before it: not the turn's
+  const turn = async (edit: () => void) => {
+    await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'go' } })
+    await sleep(300) // its snapshot first, as claude's first tool call comes after the hook
+    edit()
+    await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
+  }
+  await turn(() => {
+    writeFileSync(join(ws.path, 'README.md'), 'hello\nworld\n')
+    writeFileSync(join(ws.path, 'new.ts'), 'a\nb\n')
+    execFileSync('rm', [join(ws.path, 'gone.txt')])
+  })
+  const ch = await until(async () => (await rig.tab(ws.id)).changes, 'its changes')
+  assert.deepEqual(ch.files.map((f: any) => `${f.status} ${f.path} +${f.add} -${f.del}`).sort(), ['A new.ts +2 -0', 'D gone.txt +0 -1', 'M README.md +1 -0'])
+  assert.deepEqual([ch.n, ch.add, ch.del], [3, 3, 1])
+  const d = await rig.rpc('turnDiff', { ws: ws.id })
+  assert.match(d.diff, /\+world/)
+  assert.ok(!d.diff.includes('mine.txt'))
+  writeFileSync(join(ws.path, 'README.md'), 'edited after\n')
+  await assert.rejects(rig.rpc('turnUndo', { tab: tab.id }), /changed since the turn: README\.md/)
+  await assert.rejects(rig.rpc('turnUndo', { tab: tab.id, from: { tab: tab.id } }), /undo an agent's turn/)
+  writeFileSync(join(ws.path, 'README.md'), 'hello\nworld\n')
+  assert.deepEqual(await rig.rpc('turnUndo', { tab: tab.id }), { files: 3 })
+  assert.equal(readFileSync(join(ws.path, 'README.md'), 'utf8'), 'hello\n')
+  assert.equal(readFileSync(join(ws.path, 'gone.txt'), 'utf8'), 'bye\n')
+  assert.ok(!existsSync(join(ws.path, 'new.ts')))
+  assert.equal(readFileSync(join(ws.path, 'mine.txt'), 'utf8'), 'before the turn\n') // yours stays
+  assert.equal((await rig.tab(ws.id)).changes, undefined)
+  assert.equal(execFileSync('git', ['-C', ws.path, 'diff', '--cached', '--name-only'], { encoding: 'utf8' }), '') // nothing staged
+  await turn(() => {}) // a turn that changes nothing: no card
+  await sleep(500)
+  assert.equal((await rig.tab(ws.id)).changes, undefined)
+})

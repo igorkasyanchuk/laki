@@ -2547,6 +2547,8 @@ button.board-name:hover { background: none; }
 @media (prefers-reduced-motion: reduce) { .shown-pop { animation: none; } }
 .share-pop { top: 64px; left: 50%; transform: translateX(-50%); width: 420px; }
 /* Reply on a terminal's selected text: Term's pill, then panels.tsx' ReplyPop */
+.tab-compact { flex: none; margin-left: 4px; color: var(--muted); font-size: 0.9em; font-style: italic; } /* claude's PreCompact: summing up its chat */
+.ws-sched.ws-compact { flex: 0 100 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85em; font-style: italic; } /* gives way before the name does */
 .tab-alias { flex: none; margin-left: 4px; color: var(--accent-ink); font: 600 0.9em var(--mono); } /* a tab's @name (laki name) */
 .term-jump { position: absolute; top: 10px; right: 18px; z-index: 9; /* over xterm's layers (they go to 8) */ display: none; place-items: center; width: 26px; height: 26px; padding: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); cursor: pointer; }
 .pane-body:hover > .term-jump, .term-jump.end, .term-jump:focus-visible { display: grid; } /* the scroll button: on hover; scrolled up (↓ back to the newest), always */
@@ -3155,3 +3157,23 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .overlaps-head:first-child { margin-top: 0; }
 .overlaps-act { display: flex; align-items: center; gap: 8px; text-align: left; font-size: 12.5px; }
 .overlaps-act .muted { margin-left: auto; }
+
+/* a project's ⋯ › Import worktrees… (panels.tsx ImportWorktrees) */
+.wt-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow: auto; }
+.form .wt-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 6px 4px; margin: 0; border-radius: var(--rs, 6px); cursor: pointer; }
+.form .wt-row input { margin: 0; width: auto; }
+.form .wt-row b { color: var(--fg); font-size: 13px; }
+.wt-row:hover { background: var(--hover, color-mix(in srgb, var(--fg) 6%, transparent)); }
+.wt-row .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-dir { color: var(--muted); } /* Changes' tree view: a folder's row (text.ts fileTree) */
+.sp-dir .sp-name { color: var(--fg); }
+.rd-box textarea.rd-ghost::placeholder { font-style: italic; } /* settings.nextPrompt's guess: Tab takes it */
+.secret-strip .secret-row { display: flex; gap: 6px; margin: 4px 0; } /* laki secret's card (panels.tsx SecretStrip) */
+.secret-strip .secret-row input { flex: 1; min-width: 0; font-family: var(--mono); }
+/* the Reader's card of a turn's changes (Reader.tsx TurnCard) */
+.rd-turn { margin: 4px 0 12px; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); }
+.rd-turn-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.rd-turn-head button:not(.link) { padding: 2px 10px; }
+.rd-turn-files { border-top: 1px solid var(--line); padding: 4px 10px 6px; }
+.rd-turn-file { display: flex; align-items: baseline; gap: 8px; padding: 1px 0; }
+.rd-turn-file .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

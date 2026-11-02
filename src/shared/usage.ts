@@ -46,6 +46,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki agents                                 the named agents, wherever they run
   laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
+  laki secret <what it is>                    in an agent's tab: the user types a token on a masked card; prints only
+                                              the path of a 0600 file that holds it (gone after 24 hours)
   laki show <text> [--open <folder|file|url>…] [--title t]   in a tab: a card under it in Laki, a button per --open
                                               (a folder in Finder, a file in its app, a page in the browser)
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
@@ -172,6 +174,12 @@ or the words after <ws>) its agent starts on it, as a new workspace's does; --na
 ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
 
   laki progress 40 "Parser done, writing tests"`,
+  secret: `In an agent's tab: ask the user for a secret (an API key, a token, a password) without it going into the chat.
+They type it on a masked card under your tab; you get only the path of a 0600 file in $LAKI_STORAGE_FOLDER that holds
+it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat "$path"). Waits up to 15 minutes;
+exits 1 if they refuse.
+
+  path=$(laki secret "Stripe test key") && STRIPE_KEY=$(cat "$path") npm test`,
   show: `In a Laki tab: a card under it in the app with your words and a button per --open the user clicks: a folder
 opens in Finder, a file in its app, an http(s) link in the browser (4 at most; a path: absolute, or from where you
 are). Use it instead of asking the user to run open: for evidence, a report, a page to check. A newer card replaces it.

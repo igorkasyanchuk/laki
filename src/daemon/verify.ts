@@ -4,20 +4,19 @@
 // row, then it's over to you; the review's notes are shown, never sent on their own. main.ts imports it (turnEnds,
 // checkHooks), core doesn't: core keeps the results (checks) for the view.
 
-import { type ChildProcess, execFile, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { type ChildProcess, spawn } from 'node:child_process'
+import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
 import { type CheckRun, type CheckStepName, checkOk, type DoneCheck, type Preset, type Tab, type Workspace } from '../shared/types.ts'
 import { broadcast, changed, checkHooks, checks, diff, dir, git, killGroup, phone, plainEnv, presets, projectConfig, send, settingUp, shell, state, storageOf, tracked, turnEnds, wsLog } from './core.ts'
 import { aiOnce } from './ai.ts'
+import { treeOf } from './turns.ts'
 
 export const CHECK_TRIES = 3 // failures in a row sent back to the agent, then it's over to you
 const STEP_MIN = Number(process.env.LAKI_CHECK_MIN) || 10 // a script's minutes (tests' fewer)
 const OUT_LINES = 60
 const DIFF_MAX = 60000 // what the reviewer reads of the diff
 
-const execP = promisify(execFile)
 const running = new Map<string, ChildProcess | 'review'>() // a workspace's check under way: its script, or the review
 const again = new Set<string>() // a turn ended while its check ran: once more after
 const lastTree = new Map<string, string>() // the worktree as the last check saw it: the same again, nothing to check
@@ -40,15 +39,6 @@ const wants = (tab: Tab) => {
 
 // the worktree's whole state as a tree (its own index file under <data>/check: git's stat cache keeps it quick), and
 // what it's compared with the first time: the merge base's tree (a worktree) or HEAD's
-async function treeOf(ws: Workspace) {
-  mkdirSync(join(dir, 'check'), { recursive: true })
-  const idx = join(dir, 'check', `${ws.id}.index`)
-  const env = { ...process.env, GIT_INDEX_FILE: idx }
-  const g = (...a: string[]) => execP('git', a, { cwd: ws.path, env, maxBuffer: 16 << 20 }).then(r => r.stdout.trim())
-  if (!existsSync(idx)) await g('read-tree', 'HEAD')
-  await g('add', '-A')
-  return g('write-tree')
-}
 async function baseTree(ws: Workspace) {
   const from = ws.kind === 'worktree' ? await git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : 'HEAD'
   return git(ws, 'rev-parse', `${from}^{tree}`).catch(() => '')
@@ -189,12 +179,12 @@ export function checkStop(o: { ws: string }) {
   return {}
 }
 
-// the index files of workspaces gone or archived (main.ts: hourly and at start); a check makes one again
+// main.ts: hourly and at start. The worktree's tree is turns.ts' (one index for both): <data>/check, where each check
+// kept one of its own before 0.42, goes
 export function checkTidy() {
-  const d = join(dir, 'check')
-  const live = new Set(state.workspaces.filter(w => !w.archived).map(w => `${w.id}.index`))
-  for (const f of existsSync(d) ? readdirSync(d) : []) if (!live.has(f)) rmSync(join(d, f), { force: true })
-  for (const id of lastTree.keys()) if (!live.has(`${id}.index`)) lastTree.delete(id)
+  rmSync(join(dir, 'check'), { recursive: true, force: true })
+  const live = new Set(state.workspaces.filter(w => !w.archived).map(w => w.id))
+  for (const id of lastTree.keys()) if (!live.has(id)) lastTree.delete(id)
 }
 
 checkHooks.will = tab => wants(tab)

@@ -4,6 +4,20 @@ version it builds, with the date. -->
 
 ## Next
 
+- When everything is done (Settings › Git & worktrees): sleep, lock or shut down the Mac once every agent, workflow run
+  and scheduled task that was going is done, after a minute's countdown you can cancel. Once, then it's off again.
+- Each turn's changes: under a Claude Code or Codex turn that changed files, the Reader shows *Edited 3 files +42 −7*,
+  *Review* (Changes › *This turn*) and *Undo* (the files back as they were before the turn).
+- Continue in Codex / Claude Code (a tab's right click): the other agent takes over in the same worktree, with a
+  handover of the chat and the changes so far.
+- `laki secret "Stripe key"`: an agent asks you for a token on a masked card under its tab and gets only a 0600 file's
+  path (gone after 24 hours), so the value never goes into its chat.
+- Guess my next prompt (Settings › AI, off): as a turn ends, the Reader's empty box shows what you'd likely send next;
+  Tab takes it.
+- A project's ⋯ › *Import worktrees…*: worktrees made outside Laki become workspaces.
+- Changes and the Review tab list files as a tree by folder, or as a list.
+- A tab and its row say *Compacting…* while Claude Code compacts a long chat.
+
 - Scheduled tasks: a new workspace each run can skip the project's setup script (Where › *no setup*, `laki schedule add
   --no-setup`).
 - Changes, Review and Revert read every file's name when your git config sets `diff.mnemonicPrefix` or `diff.noprefix`.

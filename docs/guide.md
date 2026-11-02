@@ -391,6 +391,9 @@ selected workspace's PR is in the status bar.
   and the floating bubbles.
 - Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
   half: before it), and the list scrolls as you near its top or bottom.
+- *Import worktrees…* (a project's ⋯): the repo's worktrees made outside Laki (`git worktree add` in a terminal,
+  another tool), each on a branch; the ones you tick become workspaces as they are (no setup script, nothing copied).
+  Laki treats them as its own from then on: archiving or deleting one removes its folder.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
   many it holds. *Sort workspaces ›* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the
@@ -743,7 +746,8 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
   *Collapse all* closes them); the button beside it shows the diffs in two columns, old and new side by side like
-  GitHub's split view, and Laki remembers it. *Branch* / *Uncommitted* (a worktree's) switch between everything
+  GitHub's split view, and Laki remembers it; the tree button groups the files by folder (a folder holding only one
+  folder is one row with it; a click folds it), here and in the Review tab's file list, and that's remembered too. *Branch* / *Uncommitted* (a worktree's) switch between everything
   against the base and only what isn't committed yet (against the last commit; its Revert puts a file or hunk back
   to that commit); Changes and the Review tab each remember theirs. With a PR, *PR #n* switches to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
@@ -1475,6 +1479,27 @@ are buttons; otherwise a box at the bottom sends it a message (while it works, i
 terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
 open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off.
 
+A turn that changed files gets a card under its last answer: *Edited 3 files +42 −7*, the files (a click on the count
+folds them), *Review* (the side panel's Changes on *This turn*: only that turn's diff) and *Undo* (asked first: the files
+back as they were before the turn, the ones it made removed; refused once one of them changed since, and nothing is
+committed or staged). Laki notes the worktree as each turn starts and ends (Codex has no start: its last turn's end),
+with an index of its own; Settings › Git & worktrees › *Each turn's changes* turns it off.
+
+With Settings › AI › *Guess my next prompt* (off: it's one more request to Laki AI's model per turn), the empty box shows,
+greyed out, what you'd likely send next, guessed from your last message and the answer: Tab takes it, Esc hides it.
+
+**Continue in Codex** (or *Claude Code*): a Claude Code or Codex tab's right click starts the other agent in a tab beside
+it, in the same worktree, told to read a handover first: a file in the workspace's storage folder with the chat so far
+(your messages and its answers) and the files changed against the base. For a usage limit or a stuck agent; the first
+tab stays as it was.
+
+**Secrets**: an agent that needs a token runs `laki secret "Stripe test key"` (or MCP's `laki_secret`). Its tab then
+needs you: a card under it asks for that, with a masked field. What you type goes to a 0600 file in the workspace's
+storage folder (hidden, deleted after 24 hours) and the agent gets only the file's path, so the value never enters
+its chat or the model's context. *Refuse* says no; after 15 minutes it's a no.
+
+While Claude Code compacts a long chat, its tab and row say *Compacting…*.
+
 ### One next step
 
 The first item of a workspace's ⋯ menus (the toolbar's, its row's, its right click) is the one thing it needs from you now: *Answer claude* or *Approve the plan*
@@ -1742,7 +1767,11 @@ lit for a moment.
   off: a PR's status changes only with its right click › *Refresh PR status*, if `gh` asks for an SSH passphrase or
   GitHub rate-limits you; the PR switches need it on), *Keep the Mac awake while agents work* (off: while any agent works
   or waits for your answer, the Mac doesn't sleep, on battery too; the screen still turns off and locks, and closing the
-  lid still sleeps it), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
+  lid still sleeps it), *When everything is done* (Do nothing, the default; Sleep, Lock the screen or Shut down: once
+  every agent working or asking you, workflow run and scheduled task due within the hour that was going is done, a
+  bar counts down a minute with *Cancel*, then the Mac does it, and the setting goes back to Do nothing: leave it on for
+  the night, not for good), *Each turn's changes* (on: the Reader's card of what each turn changed, [Reader
+  view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
@@ -2126,6 +2155,7 @@ laki name backend                                       # in an agent's tab: oth
 laki agents                                             # the named agents: where, which agent, what they're doing
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
+path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
 laki screen fix-the-login/claude
 laki diff fix-the-login [--uncommitted] | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki run fix-the-login test                             # the project's test script (lint, format, deploy, setup) in its tab

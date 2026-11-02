@@ -5,7 +5,7 @@ short version.
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
-  agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too.
+  agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
@@ -32,7 +32,10 @@ time and AI money per run (`budget: 60 min, $5`).
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
-  write in; a switch per tab, phones open in it.
+  write in; a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
+  (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
+  *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
+  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path.
 - **One next step**: first in a workspace's ⋯ menus (⌘G does it) and, if you like, a chip on each row: what it needs
   from you now: answer, fix CI, resolve conflicts, merge, review its changes, ship, archive.
 - **The agent's plan, live**: an agent's own to-do list under its tab, ticking off as it goes, and *2/5* on its row; a
@@ -52,7 +55,7 @@ time and AI money per run (`budget: 60 min, $5`).
   out in a window of its own, over every app (its right click › *Float in its own window*). Select text and *Reply*: it
   goes to the agent, quoted, with your words; hold ⌥ for a new workspace, a new agent tab or Laki AI with it. A GitHub PR
   or issue link shows its card on hover, a picture's path or link the picture (a click opens it larger); a file's path
-  (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
+  (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees), or let it sleep, lock or shut down once everything is done (a minute's countdown first, once). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
@@ -63,7 +66,7 @@ time and AI money per run (`budget: 60 min, $5`).
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; one column or two side by side; comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what

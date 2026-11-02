@@ -440,6 +440,12 @@ export type AccountView = { id: string; agent: AccountAgent; name: string; dir: 
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit; a plan limit nearly used (the app's own: usage)
 export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
+export type TurnFile = { path: string; add: number; del: number; status: string } // status: git's A, M, D (no renames)
+export type TurnChanges = { at: number; add: number; del: number; n: number; files: TurnFile[] } // n: how many files; files: the first TURN_FILES
+export const WHEN_DONE = ['sleep', 'lock', 'shutdown'] as const
+export type WhenDone = (typeof WHEN_DONE)[number] | 'off'
+export const SECRET_WAIT = 15 * 60_000 // laki secret's wait for your answer, then no (daemon/secrets.ts)
+export const WHEN_DONE_WAIT = 60_000 // the countdown before it acts, which Cancel stops
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
 export type Settings = {
@@ -540,6 +546,9 @@ export type Settings = {
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
   keepAwake?: boolean // the Mac doesn't sleep while an agent works or waits for you (core's keepAwake: caffeinate -i; unset: off)
+  turnChanges?: boolean // each claude or codex turn's changes, from a snapshot of the worktree as it starts and ends (turns.ts; unset: on)
+  nextPrompt?: boolean // as a claude or codex turn ends, Laki AI's model guesses your next message: the Reader's box shows it greyed out, Tab takes it (turns.ts; a request per turn; unset: off)
+  whenDone?: WhenDone // once every agent, workflow run and scheduled task that was going is done: the Mac sleeps, locks or shuts down after WHEN_DONE_WAIT (core's whenDone; then off again; unset: off)
   copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
   copyUntracked?: boolean // and the untracked ones (unset: off)
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
@@ -786,7 +795,7 @@ export type Ask = { options: { n: number; label: string }[]; at: number; questio
 // laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a
 // page in the browser); kind: what a target is (url: http(s); folder, file: an absolute path on this Mac)
 export type Card = { id: string; title?: string; text: string; open: { label: string; target: string; kind: 'url' | 'folder' | 'file' }[]; at: number }
-export type TabView = Tab & { card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { changes?: TurnChanges; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -888,7 +897,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today } // built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
@@ -909,7 +918,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 135
+export const API = 136
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -10,7 +10,7 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, PrCard, prState, PRStatus, REVIEW, reviewersText, short, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -37,6 +37,7 @@ import { Glyph, rollup } from './Glyph'
 import { planCount } from '../../shared/todos'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { Reader, type ReaderApi, readable } from './Reader'
+import { turnNext } from './Diff'
 import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -51,7 +52,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
-import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -174,6 +175,7 @@ function AiFloat({ children }: { children: ReactNode }) {
     </div>
   )
 }
+const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
 const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
 const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
@@ -214,7 +216,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -903,7 +905,7 @@ export function App() {
   }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
   const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
-  const needsYou = (t: TabView) => (t.status === 'waiting' || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
+  const needsYou = (t: TabView) => (t.status === 'waiting' || !!t.secret || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
   // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
   const needing = view?.tabs.filter(needsYou) ?? []
@@ -1846,6 +1848,7 @@ export function App() {
     preview: (path, line) => openFile({ ws: w.id, path, line }),
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
+    turnChanges: () => api.call<Changes>('turnDiff', { ws: w.id }),
     prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base, uncommitted) => api.call<FileContent>('fileRead', { ws: w.id, path, base, uncommitted }),
@@ -2782,6 +2785,9 @@ export function App() {
     read: (tab, v) => api.call('chatRead', { tab, v }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
     answer: (tab, n) => void call('answer', { tab, n }).catch(() => {}),
+    review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
+    undo: t =>
+      void ask(`Undo ${t.name}'s last turn?`, { text: `${t.changes!.n} file${t.changes!.n === 1 ? '' : 's'} back as they were before it: ${t.changes!.files.slice(0, 4).map(f => f.path).join(', ')}${t.changes!.n > 4 ? '…' : ''}. Files it made are removed. Nothing is committed.`, ok: 'Undo', danger: true }).then(ok => void (ok && call<{ files: number }>('turnUndo', { tab: t.id }).then(r => done(`${r.files} file${r.files === 1 ? '' : 's'} back as before the turn`), () => {}))),
   }
   const tabMenu = (ids: string[]): MenuItem[] => {
     const ts = ids.map(byId).filter((t): t is TabView => !!t)
@@ -2817,6 +2823,12 @@ export function App() {
           ? [{ label: 'Separate panes', icon: 'unsplit', tip: 'Each pane back in a tab of its own', run: () => setGroups(groups.flatMap(x => (x === g ? tabsOf(x).map(tab => ({ tab })) : [x]))) } as MenuItem]
           : [{ label: 'Move to its own tab', icon: 'unsplit', tip: 'Out of this split, into a tab of its own', run: () => setGroups(move(groups, ids[0], false, 'bar')) } as MenuItem]
         : []),
+      ...((t => {
+        const other = t?.kind === 'agent' && (t.preset === 'claude' ? 'codex' : t.preset === 'codex' ? 'claude' : undefined)
+        return other && view?.presets.some(p => p.agent === other && !p.off)
+          ? [{ label: `Continue in ${other === 'codex' ? 'Codex' : 'Claude Code'}`, icon: 'agent', tip: `A ${other === 'codex' ? 'Codex' : 'Claude Code'} tab beside it that reads this chat and the changes so far, then carries on: for a usage limit or a stuck agent. This one stays`, run: () => void call<{ tab: string; name: string }>('tabHandover', { tab: t!.id, to: other }).then(r => (selectTab({ id: r.tab, workspace: t!.workspace }), done(`${r.name} takes over from ${t!.name}`)), () => {}) } as MenuItem]
+          : []
+      })(ts.length === 1 ? ts[0] : undefined)),
       ...(ended.length ? [{ label: 'Restart', icon: 'restore', tip: 'Starts it again (an agent resumes its chat)', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
       ...(ts.length === 1 && accountsOf(ts[0].preset).length > 1 && !view?.workspaces.find(w => w.id === ts[0].workspace)?.host
         ? [{ label: 'Restart on another account', icon: 'restore', tip: 'The same chat, resumed on another sign-in (Settings › Agents & profiles)', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
@@ -3095,6 +3107,7 @@ export function App() {
       ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', tip: 'Its notes, scheduled tasks, memory and settings', run: () => setDialog({ project: p.id }) } as MenuItem]),
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', tip: 'A named head in its list: drop workspaces under it', run: () => setDialog({ sep: p.id }) },
+      ...(p.kind || p.git === false || p.host ? [] : [{ label: 'Import worktrees…', icon: 'fork', tip: 'Worktrees of this repo made outside Laki, as workspaces', run: () => setDialog({ importWt: p.id }) } as MenuItem]),
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', tip: 'Your Markdown notes for this project; agents don\'t see them', run: () => setDialog({ notes: p.id }) },
       ...(p.kind ? [] : [{ label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; empty: its folder\'s. The folder stays as it is', run: () => renameProject(p) } as MenuItem]),
@@ -3417,6 +3430,11 @@ export function App() {
             <Icon name="bellOff" size={11} />
           </span>
         )}
+        {!more && wt.some(t => t.compacting) && (
+          <span className="ws-sched ws-compact" data-tip="Claude Code is compacting its chat: summing up a long one takes a few seconds">
+            compacting…
+          </span>
+        )}
         {w.pending && (
           <span className={`ws-mark ${w.pending.failed ? 'err' : ''}`} data-tip={`${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`}>
             <Icon name="clock" size={11} />
@@ -3482,7 +3500,7 @@ export function App() {
         {more && (
           <div className="ws-sub">
             {(w.branch || w.kind !== 'worktree') && <span className="ws-branch">{w.branch || 'folder'}</span>}
-            <span className={`ws-state g-${state}`}>{w.setup ? 'setting up' : (STATE_WORDS[state] ?? state)}</span>
+            <span className={`ws-state g-${state}`}>{w.setup ? 'setting up' : wt.some(t => t.compacting) ? 'compacting…' : (STATE_WORDS[state] ?? state)}</span>
             {wt.map(t => t.progress && <span key={t.id}>{t.progress.pct}%</span>)}
             {w.pr && <span className="ws-sub-pr">#{w.pr.number} {w.pr.title}</span>}
             {w.stat && (w.stat.add > 0 || w.stat.del > 0) && (
@@ -3684,10 +3702,11 @@ export function App() {
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
             data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
-            data-tip={[...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.compacting).map(t => `${t.name} is compacting its chat: summing up a long one takes a few seconds`), ...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
+            {ts.some(t => t.compacting) && <span className="tab-compact">Compacting…</span>}
             {ts.filter(t => t.alias).map(t => <span key={t.id} className="tab-alias">@{t.alias}</span> /* laki name: what other agents call it */)}
             {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}
@@ -4344,6 +4363,15 @@ export function App() {
           )}
         </div>
         {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {connected && view.whenDone && (
+          <div className="stale-bar soft" role="alert">
+            <Icon name={view.whenDone.act === 'lock' ? 'lock' : view.whenDone.act === 'sleep' ? 'moon' : 'power'} size={16} />
+            <span>
+              <b>Everything is done.</b> The Mac {WHEN_DONE_WORDS[view.whenDone.act]} in <Countdown to={view.whenDone.at} />.
+            </span>
+            <button onClick={() => void api.call('settingsSet', { whenDone: 'off' })}>Cancel</button>
+          </div>
+        )}
         {connected && !staleDaemon(view) && oldSkills.length > 0 && (
           <div className="stale-bar soft" role="status">
             <Icon name="import" size={16} />
@@ -4416,6 +4444,7 @@ export function App() {
                   (t =>
                     t && (
                       <>
+                        <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
@@ -4515,6 +4544,7 @@ export function App() {
               onTab={setPanelTab}
               api={panelApi(ws)}
               sim={project?.config?.simulator ?? settings.simulator === true} /* the project's own over Settings' */
+              turn={view.tabs.some(t => t.workspace === ws.id && t.changes)}
               width={panelW}
               onWidth={setPanelW}
               onClose={() => setPanelOpen(false)}
@@ -5258,6 +5288,19 @@ export function App() {
         )
       })()}
       {dialog && typeof dialog === 'object' && 'notes' in dialog && (p => p && <ProjectNotes name={p.name} notes={p.notes ?? ''} onSave={notes => call('projectSet', { id: p.id, notes })} onClose={() => setDialog(null)} />)(view?.projects.find(p => p.id === dialog.notes))}
+      {dialog && typeof dialog === 'object' && 'importWt' in dialog && (p =>
+        p && (
+          <ImportWorktrees
+            name={p.name}
+            load={() => call('worktreeList', { project: p.id })}
+            onClose={() => setDialog(null)}
+            onImport={async paths => {
+              const made = await call<{ id: string }[]>('worktreeImport', { project: p.id, paths })
+              setDialog(null)
+              done(`${made.length} worktree${made.length === 1 ? '' : 's'} imported`)
+            }}
+          />
+        ))(view.projects.find(p => p.id === dialog.importWt))}
       {dialog && typeof dialog === 'object' && 'attachPr' in dialog && (w => w && (
         <Prompt
           title="Attach a pull request"

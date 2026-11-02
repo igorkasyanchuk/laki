@@ -9,7 +9,7 @@ import { planNow } from '../../shared/todos'
 import type { TabView } from '../../shared/types'
 
 type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
-export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[] }>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void }
+export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[] }>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void } // review, undo: its last turn's changes (the card)
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
@@ -18,6 +18,8 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const [said, setSaid] = useState<Said[]>()
   const [none, setNone] = useState(false)
   const [text, setText] = useState('')
+  const [hid, setHid] = useState<string>() // the guess Esc hid (settings.nextPrompt's tab.suggest)
+  const ghost = !text && tab.status === 'idle' && tab.suggest && tab.suggest !== hid ? tab.suggest : undefined
   const v = useRef<number>(undefined)
   const scroll = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
@@ -72,6 +74,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
               </div>
             ),
           )}
+          {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
           {tab.status === 'running' && (
             <div className="rd-working muted">
               <Glyph s="running" /> {now ?? 'Working'}…
@@ -98,14 +101,60 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
             ref={box}
             value={text}
             rows={Math.min(6, text.split('\n').length)}
-            placeholder={tab.status === 'running' ? `Message ${tab.name}: it reads it when this turn ends` : `Message ${tab.name}`}
+            className={ghost ? 'rd-ghost' : undefined}
+            placeholder={ghost ?? (tab.status === 'running' ? `Message ${tab.name}: it reads it when this turn ends` : `Message ${tab.name}`)}
+            data-tip={ghost ? 'Laki AI\'s guess at your next message · Tab takes it, Esc hides it' : undefined}
             onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), send())}
+            onKeyDown={e => {
+              if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
+              if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) (e.preventDefault(), send())
+            }}
           />
           <button type="submit" className="primary" disabled={!text.trim()}>
             Send
           </button>
         </form>
+      )}
+    </div>
+  )
+}
+
+// what its last turn changed (turns.ts): under its last answer, Review (Changes' This turn) and Undo
+function TurnCard({ tab, api }: { tab: TabView; api: ReaderApi }) {
+  const c = tab.changes!
+  const [open, setOpen] = useState(c.n <= 5)
+  return (
+    <div className="rd-turn">
+      <div className="rd-turn-head">
+        <span className="muted small">This turn</span>
+        <button type="button" className="link" onClick={() => setOpen(o => !o)}>
+          Edited {c.n} file{c.n === 1 ? '' : 's'}
+        </button>
+        <span className="mono small">
+          <span className="add">+{c.add}</span> <span className="del">−{c.del}</span>
+        </span>
+        <span className="grow" />
+        <button type="button" onClick={() => api.review(tab)}>
+          Review
+        </button>
+        <button type="button" onClick={() => api.undo(tab)} data-tip="Puts these files back as they were before the turn (only while they're as it left them)">
+          Undo
+        </button>
+      </div>
+      {open && (
+        <div className="rd-turn-files">
+          {c.files.map(f => (
+            <div key={f.path} className="rd-turn-file">
+              <span className={`st st-${f.status}`}>{f.status}</span>
+              <span className="mono small grow">{f.path}</span>
+              <span className="mono small">
+                {f.add > 0 && <span className="add">+{f.add}</span>} {f.del > 0 && <span className="del">−{f.del}</span>}
+              </span>
+            </div>
+          ))}
+          {c.n > c.files.length && <div className="muted small">and {c.n - c.files.length} more</div>}
+        </div>
       )}
     </div>
   )

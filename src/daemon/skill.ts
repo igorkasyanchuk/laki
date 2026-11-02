@@ -117,6 +117,9 @@ ${USAGE}
 5. Talk to other agents by name: \`laki name <name>\` names you (others reach you as \`@<name>\`), \`laki agents\`
    lists the named ones, \`laki ask @<name> "<question>"\` asks one and prints its reply, \`laki send @<name> "<text>"\`
    tells it something. Asked a question that way, your reply is the answer: say it plainly in your last message.
+6. Need a secret (an API key, a token, a password)? Never ask for it in the chat: \`path=$(laki secret "<what it is>")\`
+   has the user type it on a masked card in Laki and prints only a file's path; use it where it's needed without
+   printing it: \`KEY=$(cat "$path") <command>\`.
 
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.

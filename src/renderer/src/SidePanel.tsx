@@ -6,10 +6,10 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
-import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, ScopeSeg, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
+import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
+import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
@@ -30,6 +30,7 @@ export type PanelApi = {
   preview: (path: string, line?: number) => void // in the app
   changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
+  turnChanges: () => Promise<Changes> // an agent's last turn's (turns.ts turnDiff)
   prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
   setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
   read: (path: string, base?: boolean, uncommitted?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image; uncommitted: HEAD's)
@@ -229,11 +230,17 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
-function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; worktree: boolean; onOpen: (url: string) => void }) {
-  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree)
-  const all = scope === 'pr'
+function ChangesTab({ api: wsApi, ws, pr, linked, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
+  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree, turn)
+  useEffect(() => {
+    const f = (e: Event) => ((turnNext.on = false), setScope((e as CustomEvent<Scope>).detail)) // the Reader's card's Review: This turn
+    window.addEventListener('laki-scope', f)
+    return () => window.removeEventListener('laki-scope', f)
+  }, [])
+  const inTurn = scope === 'turn'
+  const all = scope === 'pr' || inTurn // read only: nothing to revert against the worktree (the card's Undo undoes a turn)
   const api = atHead(wsApi, scope === 'uncommitted') // its reads and reverts against HEAD
-  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${scope}`, all ? 60000 : 8000) // gh's: once a minute
+  const [d, err, reload] = useLoad(inTurn ? api.turnChanges : scope === 'pr' ? api.prChanges : api.changes, `${ws}#${scope}`, scope === 'pr' ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
   useEffect(() => (setOpen(new Set()), setAt(null)), [ws, scope])
@@ -258,48 +265,27 @@ function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: Pan
   const files = d?.files ?? []
   // expand arrows (the full review's): the worktree's file, or the PR head's for the PR's diff
   const keys = useMemo(() => new Map([...byFile].map(([p, fd]) => [p, `${all}#${fd.hunks.join('\n')}`])), [byFile, all]) // once per diff: the arrows ask it often
-  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), p => keys.get(p) ?? '')
+  const xp = useExpand(p => (all ? api.prFile(p) : api.read(p)), p => !inTurn && !IMAGE.test(p) && !/^[AD?]/.test(files.find(f => f.path === p)?.status ?? 'A'), p => keys.get(p) ?? '') // a turn's: its files as it left them aren't read
   // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims
   const vw = useGhViewed(api, ws, pr?.number)
   const viewedOf = vw.viewedOf
   const inPR = files.filter(f => viewedOf(f.path))
   const viewed = inPR.filter(f => viewedOf(f.path) === 'VIEWED').length
   const mark = (p: string, on: boolean) => (vw.mark([p], on), on && setOpen(o => (o.delete(p), new Set(o))))
-  return (
-    <>
-      <div className="sp-tools">
-        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} />
-        {(sum => (
-          <span className="sp-sum muted small grow" data-tip={sum && files.length ? `${sum} · click a line to comment` : undefined}>
-            {sum || (err ? '' : 'Loading…')}
-            {sum && files.length > 0 && <span className="sp-sum-more"> · click a line to comment</span>}
-          </span>
-        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : scope === 'uncommitted' ? ' not committed' : ` changed vs ${d.base}`}` : '')}
-        {inPR.length > 0 && (
-          <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
-            {viewed}/{inPR.length}
-            <span className="sp-viewed-w"> viewed</span>
-          </span>
-        )}
-        <IconButton icon={split ? 'unsplit' : 'splitRight'} title={split ? 'One column: the changes in one' : 'Two columns: before and after side by side'} on={split} onClick={() => pickSplit(!split)} />
-        {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
-        {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title={viewed ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setOpen(new Set(files.filter(f => viewedOf(f.path) !== 'VIEWED').map(f => f.path)))} />}
-        <IconButton icon="refresh" title="Refresh" onClick={reload} />
-      </div>
-      <div className="sp-body" ref={findAt} data-find>
-        <DiffFind at={findAt} unfold={w => setOpen(o => (n => (n.size === o.size ? o : n))(new Set([...o, ...[...byFile].filter(([, fd]) => fd.hunks.some(h => h.toLowerCase().includes(w))).map(([p]) => p)])))} />
-        {err && <div className="warn small pad">{err}</div>}
-        {vw.err && <div className="warn small pad">{vw.err}</div>}
-        {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
-        {files.map(f => (
+  // the files by folder (text.ts fileTree), the last one picked (laki.diffTree), each folder folded with a click
+  const [tree, setTree] = useState(() => localStore('laki.diffTree') === 'tree')
+  const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
+  const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
+  const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
+  const fileEl = (f: (typeof files)[number], depth?: number) => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
-            <div className="sp-row" onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
+            <div className="sp-row" style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
               <span className="sp-chev">
                 <Icon name={open.has(f.path) ? 'chevron' : 'chevronRight'} />
               </span>
               <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
               <span className="sp-name">
-                {f.path.slice(f.path.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f.path)}</span>
+                {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}
               </span>
               {f.add !== undefined && !IMAGE.test(f.path) /* git counts no lines in an image */ && (
                 <span className="mono small">
@@ -338,7 +324,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: Pan
                     </>
                   )
                 })(byFile.get(f.path) ?? NO_DIFF)}
-                {f.status[0] !== 'D' && !all /* this workspace's copy needn't be the PR's */ && (
+                {f.status[0] !== 'D' && scope !== 'pr' /* this workspace's copy needn't be the PR's */ && (
                   <span className="row">
                     <button className="link small" onClick={() => api.preview(f.path)}>
                       show the file
@@ -351,7 +337,50 @@ function ChangesTab({ api: wsApi, ws, pr, linked, worktree, onOpen }: { api: Pan
               </div>
             )}
           </div>
-        ))}
+  )
+  return (
+    <>
+      <div className="sp-tools">
+        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} turn={turn} />
+        {(sum => (
+          <span className="sp-sum muted small grow" data-tip={sum && files.length ? `${sum} · click a line to comment` : undefined}>
+            {sum || (err ? '' : 'Loading…')}
+            {sum && files.length > 0 && <span className="sp-sum-more"> · click a line to comment</span>}
+          </span>
+        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${inTurn ? ` · ${d.base}` : all ? '' : scope === 'uncommitted' ? ' not committed' : ` changed vs ${d.base}`}` : '')}
+        {inPR.length > 0 && (
+          <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
+            {viewed}/{inPR.length}
+            <span className="sp-viewed-w"> viewed</span>
+          </span>
+        )}
+        {files.length > 1 && <IconButton icon={tree ? 'list' : 'tree'} title={tree ? 'A list: every file with its folder' : 'A tree: the files by folder'} on={tree} onClick={() => pickTree(!tree)} />}
+        <IconButton icon={split ? 'unsplit' : 'splitRight'} title={split ? 'One column: the changes in one' : 'Two columns: before and after side by side'} on={split} onClick={() => pickSplit(!split)} />
+        {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
+        {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title={viewed ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setOpen(new Set(files.filter(f => viewedOf(f.path) !== 'VIEWED').map(f => f.path)))} />}
+        <IconButton icon="refresh" title="Refresh" onClick={reload} />
+      </div>
+      <div className="sp-body" ref={findAt} data-find>
+        <DiffFind at={findAt} unfold={w => setOpen(o => (n => (n.size === o.size ? o : n))(new Set([...o, ...[...byFile].filter(([, fd]) => fd.hunks.some(h => h.toLowerCase().includes(w))).map(([p]) => p)])))} />
+        {err && <div className="warn small pad">{err}</div>}
+        {vw.err && <div className="warn small pad">{vw.err}</div>}
+        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
+        {tree
+          ? fileTree(files, dirsShut).map(r =>
+              'dir' in r ? (
+                <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} onClick={() => shutDir(r.dir)} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
+                  <span className="sp-chev">
+                    <Icon name={dirsShut.has(r.dir) ? 'chevronRight' : 'chevron'} />
+                  </span>
+                  <Icon name={dirsShut.has(r.dir) ? 'folder' : 'folderOpen'} />
+                  <span className="sp-name">{r.name}</span>
+                  <span className="muted small">{r.n}</span>
+                </div>
+              ) : (
+                fileEl(r.file, r.depth)
+              ),
+            )
+          : files.map(f => fileEl(f))}
         {rv.bar}
       </div>
       {menu}
@@ -418,6 +447,7 @@ export function SidePanel(p: {
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
   ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
   sim?: boolean // the Simulator tab (settings.simulator)
+  turn?: boolean // an agent's last turn changed files: Changes' This turn
 }) {
   const tabs = TABS.filter(t => (t.id === 'device' ? p.sim : p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview'))
   const ext = p.ext?.find(x => x.id === p.tab)
@@ -441,7 +471,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
-      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} worktree={p.w.kind === 'worktree'} onOpen={p.onOpen} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} worktree={p.w.kind === 'worktree'} turn={p.turn} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
       {tab === 'device' && <DeviceTab api={p.api} ws={p.w.id} />}

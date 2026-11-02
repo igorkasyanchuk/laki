@@ -12,7 +12,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -305,4 +305,13 @@ test("ship's -R: a remote's URL as [HOST/]OWNER/REPO, none for a path", () => {
   assert.equal(repoOf('/Users/me/remote.git'), null)
   assert.equal(repoOf('file:///srv/repo.git'), null)
   assert.equal(repoOf(''), null)
+})
+
+test('fileTree: folders first, one-folder chains joined, a folded folder\'s insides left out', () => {
+  const f = (path: string) => ({ path })
+  const files = ['README.md', 'src/renderer/src/App.tsx', 'src/renderer/src/ui.tsx', 'src/daemon/core.ts', 'docs/a/b/c.md'].map(f)
+  const show = (rows: ReturnType<typeof fileTree<{ path: string }>>) => rows.map(r => ('dir' in r ? `${'  '.repeat(r.depth)}${r.name}/ (${r.n})` : `${'  '.repeat(r.depth)}${r.file.path}`))
+  assert.deepEqual(show(fileTree(files)), ['docs/a/b/ (1)', '  docs/a/b/c.md', 'src/ (3)', '  daemon/ (1)', '    src/daemon/core.ts', '  renderer/src/ (2)', '    src/renderer/src/App.tsx', '    src/renderer/src/ui.tsx', 'README.md'])
+  assert.deepEqual(show(fileTree(files, new Set(['src/renderer/src', 'docs/a/b']))), ['docs/a/b/ (1)', 'src/ (3)', '  daemon/ (1)', '    src/daemon/core.ts', '  renderer/src/ (2)', 'README.md'])
+  assert.deepEqual(fileTree([]), [])
 })

@@ -75,7 +75,7 @@ function NeedCard({ t, w, api, next }: Need & { api: NeedsApi; next: boolean }) 
       </div>
       {waiting ? (
         <>
-          <div className="need-q">{t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
+          <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
           {(opts.length > 0 || allow) && (
             <div className="need-opts" onClick={stop}>
               {opts.map(o => (

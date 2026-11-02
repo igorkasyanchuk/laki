@@ -1142,6 +1142,58 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
 }
 
 // picks: selects under the field (a group's default template and agent), their values given with the text ('' none)
+// a project's ⋯ › Import worktrees…: the worktrees made outside Laki (worktreeList), the ones ticked made workspaces
+export function ImportWorktrees({ name, load, onClose, onImport }: { name: string; load: () => Promise<{ path: string; branch: string }[]>; onClose: () => void; onImport: (paths: string[]) => Promise<unknown> }) {
+  const [list, setList] = useState<{ path: string; branch: string }[] | null>(null)
+  useEffect(() => void load().then(setList, () => setList([])), [])
+  const [on, setOn] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  return (
+    <Modal title={`Import worktrees · ${name}`} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={e => {
+          e.preventDefault()
+          if (!on.length || busy) return
+          setBusy(true)
+          onImport(on).catch(() => setBusy(false))
+        }}
+      >
+        <div className="muted small">Worktrees of this repo made outside Laki. Each one you tick becomes a workspace as it is (no setup script, nothing copied). Laki then treats it as its own: archiving or deleting it removes the folder.</div>
+        {list === null ? (
+          <div className="muted">Looking…</div>
+        ) : !list.length ? (
+          <div className="muted">None: every worktree of this repo is in Laki already.</div>
+        ) : (
+          <div className="wt-list">
+            {list.map(x => (
+              <label key={x.path} className="wt-row">
+                <input type="checkbox" checked={on.includes(x.path)} onChange={e => setOn(o => (e.target.checked ? [...o, x.path] : o.filter(y => y !== x.path)))} />
+                <b>{x.branch}</b>
+                <span className="muted mono small">{x.path}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <div className="buttons">
+          {!!list?.length && (
+            <button type="button" className="ghost" onClick={() => setOn(on.length === list.length ? [] : list.map(x => x.path))}>
+              {on.length === list.length ? 'None' : 'All'}
+            </button>
+          )}
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!on.length || busy}>
+            {busy ? <span className="btn-spin" /> : null} Import{on.length > 1 ? ` ${on.length}` : ''}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export function Prompt({ title, hint, placeholder, initial = '', picks = [], busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; picks?: { label: string; none: string; options: string[]; value?: string }[]; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string[]) => Promise<void> }) {
   const [v, setV] = useState(initial)
   const [picked, setPicked] = useState(() => picks.map(x => x.value ?? ''))
@@ -1993,6 +2045,36 @@ export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from:
 // laki show: what the tab's agent put there for you (the view's card), under its terminal like the queue: its words and
 // a button per thing to open, which opens only on your click (a folder in Finder, a file in its app, a page in the
 // browser); ✕ closes it. In a browser elsewhere (no bridge) a path's button copies it
+// laki secret: what an agent asks you for, typed into a masked field; it gets only a file's path (daemon/secrets.ts)
+export function SecretStrip({ tab, onGive }: { tab: TabView; onGive: (id: string, value?: string) => Promise<unknown> }) {
+  const [v, setV] = useState('')
+  const [busy, setBusy] = useState(false)
+  const s = tab.secret
+  useEffect(() => setV(''), [s?.id])
+  if (!s) return null
+  const give = (value?: string) => (setBusy(true), void onGive(s.id, value).then(() => setV(''), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
+  return (
+    <form className="queue-strip secret-strip" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), v && give(v))}>
+      <div className="queue-head">
+        <Icon name="lock" size={13} />
+        <span className="queue-what">
+          <b>{tab.name}</b> asks for <b>{s.label}</b>
+        </span>
+      </div>
+      <div className="secret-row">
+        <input type="password" value={v} autoComplete="off" spellCheck={false} placeholder="Paste or type it" aria-label={s.label} onChange={e => setV(e.target.value)} />
+        <button type="submit" className="primary" disabled={!v || busy}>
+          Give it
+        </button>
+        <button type="button" disabled={busy} onClick={() => give()}>
+          Refuse
+        </button>
+      </div>
+      <div className="muted small">It goes to a file only you and the agent's commands can read, deleted after 24 hours; the agent gets the file's path, never the value.</div>
+    </form>
+  )
+}
+
 export function ShowStrip({ tab, onClose, onCopy }: { tab: TabView; onClose: () => void; onCopy: (text: string) => void }) {
   const c = tab.card
   if (!c) return null

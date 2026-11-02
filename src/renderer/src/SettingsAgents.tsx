@@ -157,7 +157,7 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
 }
 
 // presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
-export function AiSection({ api, ai, glow, onGlow, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
+export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; glow: boolean; onGlow: (on: boolean) => void; next: boolean; onNext: (on: boolean) => void; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
   const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
@@ -269,6 +269,9 @@ export function AiSection({ api, ai, glow, onGlow, presets, onChange, imageDays,
         <div className="setting-box">
           <Switch className="switch-row" on={ai.float !== false} onChange={v => onChange({ ...ai, float: v })}>
             <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
+          </Switch>
+          <Switch className="switch-row" on={next} onChange={onNext}>
+            <Says title="Guess my next prompt" hint="As a Claude Code or Codex turn ends, Laki AI's model guesses what you'd send next; the Reader's empty box shows it greyed out: Tab takes it, Esc hides it. One more request to the model per turn" />
           </Switch>
         </div>
       </Group>

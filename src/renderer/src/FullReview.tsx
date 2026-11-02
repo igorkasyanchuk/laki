@@ -21,6 +21,7 @@ import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
+import { fileTree } from './text'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
@@ -104,6 +105,12 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
     return [...ls.filter(f => at(f.path) >= 0).sort((a, b) => at(a.path) - at(b.path)), ...ls.filter(f => at(f.path) < 0)]
   }, [files, matches, pins])
   const lastPin = listed.filter(f => pins.includes(f.path)).at(-1)?.path
+  // the files column by folder (text.ts fileTree; the pinned ones first, as they are), the last one picked (laki.diffTree,
+  // Changes' too)
+  const [tree, setTree] = useState(() => localStore('laki.diffTree') === 'tree')
+  const pickTree = (on: boolean) => (setTree(on), localStore('laki.diffTree', on ? 'tree' : 'list'))
+  const [dirsShut, setDirsShut] = useState<Set<string>>(new Set())
+  const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
 
   // Viewed: GitHub's for a file of the PR, else this Mac's while its diff is the one ticked
   const gh = useGhViewed(api, ws, pr?.number)
@@ -409,6 +416,21 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
     }) as HTMLAttributes<HTMLDivElement>
   // an expanded line: its numbers (a thread's or a comment's jump), the file's right click; no comment or Revert
   const ctxAttrs = (path: string, l: DiffLine) => ({ 'data-old': l.old, 'data-new': l.new, onContextMenu: (e: MouseEvent) => fileMenu(e, path, l) }) as HTMLAttributes<HTMLDivElement>
+  const fileRow = (f: (typeof files)[number], depth?: number) => (
+            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} onClick={() => go(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
+              <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
+              <span className="sp-name">
+                {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}
+              </span>
+              {(notes.some(n => n.path === f.path) || live.some(t => t.path === f.path)) && <Icon name="message" size={11} />}
+              <button type="button" className={`fr-pin ${pins.includes(f.path) ? 'on' : ''}`} aria-label={pins.includes(f.path) ? 'Unpin' : 'Pin to the top'} data-tip={pins.includes(f.path) ? 'Pinned: first in both lists · click: unpin' : 'Pin to the top (p)'} onClick={e => (e.stopPropagation(), pinGo(f.path))}>
+                <Icon name="pin" size={11} />
+              </button>
+              <label className="sp-viewed" onClick={e => e.stopPropagation()}>
+                <input type="checkbox" checked={viewed(f.path)} onChange={e => mark([f.path], e.target.checked)} />
+              </label>
+            </div>
+  )
   return (
     <div className="full-review" ref={root} tabIndex={-1} data-find>
       <div className="fr-head">
@@ -454,6 +476,7 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
               onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), q ? setQ('') : e.currentTarget.blur())}
               data-tip="Words in a path, or a glob: spec/**, *.rb, **/*_test.go (no /: the file's name)"
             />
+            {files.length > 1 && <IconButton icon={tree ? 'list' : 'tree'} title={tree ? 'A list: every file with its folder' : 'A tree: the files by folder'} on={tree} onClick={() => pickTree(!tree)} />}
             <IconButton icon="chevronsLeft" title="Hide the files" onClick={() => hideFiles(true)} />
           </div>
           <div className={`fr-viewed muted small ${files.length && nViewed === files.length ? 'all' : ''}`}>
@@ -466,21 +489,22 @@ export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi,
               </button>
             )}
           </div>
-          {listed.map(f => (
-            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} onClick={() => go(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
-              <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
-              <span className="sp-name">
-                {f.path.slice(f.path.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f.path)}</span>
-              </span>
-              {(notes.some(n => n.path === f.path) || live.some(t => t.path === f.path)) && <Icon name="message" size={11} />}
-              <button type="button" className={`fr-pin ${pins.includes(f.path) ? 'on' : ''}`} aria-label={pins.includes(f.path) ? 'Unpin' : 'Pin to the top'} data-tip={pins.includes(f.path) ? 'Pinned: first in both lists · click: unpin' : 'Pin to the top (p)'} onClick={e => (e.stopPropagation(), pinGo(f.path))}>
-                <Icon name="pin" size={11} />
-              </button>
-              <label className="sp-viewed" onClick={e => e.stopPropagation()}>
-                <input type="checkbox" checked={viewed(f.path)} onChange={e => mark([f.path], e.target.checked)} />
-              </label>
-            </div>
-          ))}
+          {tree
+            ? [
+                ...listed.filter(f => pins.includes(f.path)).map(f => fileRow(f)),
+                ...fileTree(listed.filter(f => !pins.includes(f.path)), dirsShut).map(r =>
+                  'dir' in r ? (
+                    <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} onClick={() => shutDir(r.dir)} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
+                      <Icon name={dirsShut.has(r.dir) ? 'folder' : 'folderOpen'} size={12} />
+                      <span className="sp-name">{r.name}</span>
+                      <span className="muted small">{r.n}</span>
+                    </div>
+                  ) : (
+                    fileRow(r.file, r.depth)
+                  ),
+                ),
+              ]
+            : listed.map(f => fileRow(f))}
           {query && !listed.length && <div className="muted small pad">No file matches.</div>}
         </div>
         )}

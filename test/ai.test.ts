@@ -654,3 +654,34 @@ test("ai: a command for a shell (laki_run, laki_shell's run) asks first; Laki ru
   assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), { ran: true })
   await until(() => rig.rpc('screen', { target: tab, lines: 10 }).then((x: string) => x.includes('\nnew-2')), 'run in the new shell')
 })
+
+test('nextPrompt: as a claude turn ends, the next message guessed from it shows on the tab until a turn starts', async t => {
+  const or = await openrouter(t, [reply({ content: '"Now add a test for it"' }), reply({ content: 'NONE' })])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.resumeId && x.status === 'idle' && x
+  }, 'claude up')
+  const turn = async (prompt: string, answer: string) => {
+    await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt } })
+    await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: answer } })
+  }
+  await turn('fix the login redirect', 'Fixed it in src/auth.ts.')
+  await sleep(500)
+  assert.equal(or.hits.length, 0) // off unless turned on
+  await rig.rpc('settingsSet', { nextPrompt: true })
+  await turn('fix the login redirect', 'Fixed it in src/auth.ts.')
+  assert.equal((await until(async () => (await rig.tab(ws.id)).suggest, 'a guess')), 'Now add a test for it')
+  const ask = or.hits[0].body.messages.at(-1).content
+  assert.match(ask, /fix the login redirect/)
+  assert.match(ask, /Fixed it in src\/auth\.ts/)
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
+  assert.equal((await rig.tab(ws.id)).suggest, undefined) // a turn started: gone
+  await turn('thanks', 'You are welcome.')
+  await until(() => or.hits.length === 2, 'asked again')
+  await sleep(300)
+  assert.equal((await rig.tab(ws.id)).suggest, undefined) // NONE: no guess
+})

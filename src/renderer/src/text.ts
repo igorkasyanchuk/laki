@@ -271,6 +271,43 @@ export const browserUrl = (s: string) => {
   return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`
 }
 
+// changed files as a tree (Changes' and the full review's tree view): a folder's row, then what's in it a level down,
+// folders first; a folder that holds one folder and no file is one row with it (src/renderer/src); a folded one's
+// insides left out. n: how many files are under a folder
+export type TreeRow<T> = { dir: string; name: string; depth: number; n: number } | { file: T; depth: number }
+type TreeNode<T> = { dirs: Map<string, TreeNode<T>>; files: T[]; n: number }
+export function fileTree<T extends { path: string }>(files: T[], folded: ReadonlySet<string> = new Set()): TreeRow<T>[] {
+  const node = (): TreeNode<T> => ({ dirs: new Map(), files: [], n: 0 })
+  const root = node()
+  for (const f of files) {
+    let at = root
+    for (const part of f.path.split('/').slice(0, -1)) {
+      at.n++
+      at = at.dirs.get(part) ?? (at.dirs.set(part, node()), at.dirs.get(part)!)
+    }
+    at.n++
+    at.files.push(f)
+  }
+  const rows: TreeRow<T>[] = []
+  const walk = (at: TreeNode<T>, prefix: string, depth: number) => {
+    for (const [first, d0] of [...at.dirs].sort(([a], [b]) => a.localeCompare(b))) {
+      let name = first
+      let d = d0
+      while (!d.files.length && d.dirs.size === 1) {
+        const [[k, v]] = d.dirs
+        name += `/${k}`
+        d = v
+      }
+      const dir = prefix + name
+      rows.push({ dir, name, depth, n: d.n })
+      if (!folded.has(dir)) walk(d, `${dir}/`, depth + 1)
+    }
+    for (const f of at.files) rows.push({ file: f, depth })
+  }
+  walk(root, '', 0)
+  return rows
+}
+
 // a diff's lines side by side, as GitHub's split view: a context line on both sides, a run of removed lines beside the
 // added lines right after it, pair by pair; anything else (a hunk's @@, "\ No newline") across both
 export type SplitRow<T> = { left?: T; right?: T; full?: T }

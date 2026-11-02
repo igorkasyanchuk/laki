@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { FIND, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook } from '../../shared/types'
+import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
@@ -199,6 +199,9 @@ export type AppSettings = Paint & {
   prScan?: number // minutes between PR checks
   bgRefresh?: boolean // PR checks on their own (unset: on)
   keepAwake?: boolean // the Mac awake while agents work or wait (unset: off)
+  turnChanges?: boolean // each turn's changes: the Reader's card, This turn, Undo (unset: on)
+  nextPrompt?: boolean // as a turn ends, its next prompt guessed for the Reader's box (unset: off)
+  whenDone?: WhenDone // sleep, lock or shut down once all that was going is done, then off again (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees, checked on its own (unset: off; a workspace's Check overlaps asks)
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
   nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
@@ -280,6 +283,13 @@ const PR_KINDS: [FixWhat, string, string][] = [
   ['ci', 'Fix CI', 'the failing checks and the end of their logs go after it'],
   ['review', 'Review', 'the open review threads go after it'],
   ['conflict', 'Fix conflicts', ''],
+]
+
+const WHEN_DONE_SAYS: readonly (readonly [WhenDone, string])[] = [
+  ['off', 'Do nothing'],
+  ['sleep', 'Sleep'],
+  ['lock', 'Lock the screen'],
+  ['shutdown', 'Shut down'],
 ]
 
 const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
@@ -1083,6 +1093,19 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.keepAwake === true} onChange={v => set({ keepAwake: v })}>
                   <Says title="Keep the Mac awake while agents work" hint="While an agent works or waits for your answer, the Mac doesn't go to sleep, on battery too. The screen still turns off and locks as usual, and closing the lid still sleeps it" />
+                </Switch>
+                <label className="switch-row">
+                  <select value={s.whenDone ?? 'off'} onChange={e => set({ whenDone: e.target.value as WhenDone })}>
+                    {WHEN_DONE_SAYS.map(([k, t]) => (
+                      <option key={k} value={k}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <Says title="When everything is done" hint="Once every agent working or asking you, workflow run and scheduled task due within the hour is done, a minute's countdown you can cancel, then the Mac sleeps, locks or shuts down. Once: it goes back to Do nothing after" />
+                </label>
+                <Switch className="switch-row" on={s.turnChanges !== false} onChange={v => set({ turnChanges: v })}>
+                  <Says title="Each turn's changes" hint="As a Claude Code or Codex turn ends having changed files, a card under its last answer in the Reader: what it changed, Review (Changes › This turn) and Undo. Laki notes the worktree as each turn starts and ends, with an index of its own: yours is never touched" />
                 </Switch>
               </div>
               </Group>
@@ -2074,7 +2097,7 @@ export function SettingsPage(p: {
               </div>
             </>
           )}
-          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
+          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} glow={s.aiGlow !== false} onGlow={aiGlow => set({ aiGlow })} next={s.nextPrompt === true} onNext={nextPrompt => set({ nextPrompt })} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (

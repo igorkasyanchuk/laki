@@ -5,7 +5,7 @@ import { rpc as conn } from './conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
+import { AI_ACTS, DEVICE_OPS, SECRET_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -212,6 +212,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "Say how far along your task is, shown on your tab in Laki: an estimate of the whole task (0-100) and what you're on. When LAKI_PROGRESS is set, call it every 20-30 seconds of work; 100 when done.",
     inputSchema: obj({ pct: { type: 'number', description: '0 to 100: how much of the whole task is done' }, note: str('what you are on now, a few words') }, ['pct']),
     run: a => rpc('progress', { tab: process.env.LAKI_TAB, pct: a.pct, note: a.note }),
+  },
+  {
+    name: 'laki_secret',
+    description: "Ask the user for a secret (an API key, a token, a password) without it going into this chat: they type it on a masked card under your tab in Laki, and you get only the path of a 0600 file that holds it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat \"$path\"). Waits up to 15 minutes; an error if they refuse.",
+    inputSchema: obj({ label: str('what it is, a few words: Stripe test key') }, ['label']),
+    run: a => rpc('secretAsk', { label: a.label, from: { ws: from, tab: process.env.LAKI_TAB } }, SECRET_WAIT + 30_000),
   },
   // a project's memory (agents': Laki AI keeps the user's with laki_memory_write)
   {

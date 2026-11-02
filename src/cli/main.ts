@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { AGENTS, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, SECRET_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -486,6 +486,12 @@ async function main() {
       if (!rest[0]) throw new Error('usage: laki progress <0-100> [what you are on]')
       const r = await rpc('progress', { tab: flags.tab || process.env.LAKI_TAB, pct: String(rest[0]).replace(/%$/, ''), note: rest.slice(1).join(' ') || undefined })
       return out(r, `${r.pct}%`) // as the tab shows it: 0 to 100, whole
+    }
+    case 'secret': {
+      // laki secret <what it is>: the user types it on a masked card in the app; only its file's path comes back (secrets.ts)
+      if (!rest.length) throw new Error('usage: laki secret <what it is>, e.g. laki secret "Stripe test key"')
+      const r = await rpc('secretAsk', { label: rest.join(' '), from: caller() }, SECRET_WAIT + 30_000)
+      return out(r, r.path)
     }
     case 'screen': {
       // laki screen shot [app] | windows | tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe: the iOS
