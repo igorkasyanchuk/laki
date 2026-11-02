@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.42.0 · Nov 3, 2026
 
 - When everything is done (Settings › Git & worktrees): sleep, lock or shut down the Mac once every agent, workflow run
   and scheduled task that was going is done, after a minute's countdown you can cancel. Once, then it's off again.
