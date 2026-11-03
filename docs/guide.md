@@ -104,8 +104,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 4 cells
   across), in the top bar, the status bar or on My Desk, or buttons on the rail and the status bar's start: a count, a
   chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
-  Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
-  Extensions › *New ▾*, or My Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
+  Extensions). Make them from a starter (Settings › Extensions › *New ▾*), with Laki AI (*New ▾*, or My Desk's *Build
+  with AI*) or the *Extension creator* agent skill; *Remix* copies any one to change.
 - **A video while you work**: the play button at the start of the status bar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -596,7 +596,8 @@ email address only, unless you leave the email out on purpose (below).
 - With a PIN instead (*Sign in with* › *PIN (Laki)*; the email stays the default): no Cloudflare sign-in and no
   email. Each start makes a new 6-digit PIN, shown big beside the QR code; the page asks for it before it opens
   Laki (the link's key alone gets nothing else). A wrong PIN counts down: after 2 (or what you pick: 1, 2, 3, 5 or 10)
-  remote access stops, the link and the PIN die with it, and Laki says so here and in a notification.
+  remote access stops, the link and the PIN die with it, and Laki says so here and in a notification. Copy the link
+  and the PIN apart (to send them two ways), or *Copy all* for both in one message.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
@@ -661,7 +662,7 @@ the command and the tab, and *Yes, run it* runs it there. Ask it for an extensio
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
 so you look and turn it on in Settings › Extensions, or it asks you in the chat, with what it
 runs, and *Yes, turn it on* does it; the chat on an extension's page has it rewrite one of yours the same way. It
-also arranges any extension for you: *put My PRs on My Desk*, a size, how often it fetches, a setting. It never archives or deletes
+also arranges any extension for you: *put my PR list on My Desk*, a size, how often it fetches, a setting. It never archives or deletes
 workspaces, ships or merges, and it does nothing until you ask. With the claude backend, when it wants a tool it may not
 use on its own (reading a file outside its folder), it asks in the chat while it works: *Allow once*, *Always in this
 chat* (that tool, until *New chat*) or *Deny*; no answer in about 5 minutes is a no. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
@@ -1077,7 +1078,7 @@ bars are a line high, as wide as its cells across. On the rail (among its icons;
 or at the status bar's start (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
 its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
-half that: ½, a thin line, like *Links*, its sites as plain words with a rule between them, wrapping when they don't fit),
+half that: ½, a thin line, like a row of links as plain words with a rule between them, wrapping when they don't fit),
 plain values on the sidebar (no tiles; Settings › Extensions turns them on and off). A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its settings).
 Links open in the browser; an extension's buttons can run commands its `widget.json` names (*Review in Laki*). Its
@@ -1119,19 +1120,12 @@ per-workspace one shows the selected workspace's, and can read that workspace's 
 diff, its commits, its agents) without a git or gh call of its own, fetched again as they change; an extension can
 also hand the workspace's agent a message, which the app shows and asks you about first (docs/extensions.md).
 
-Every extension, yours too, starts off: turn it on in Settings › Extensions. Two come with Laki:
-- *My PRs*: your open PRs in a repo (*Repo*, which it needs: turned on without one, its page opens at it, and its cell
-  says *Set Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login; blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
-  view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
-  in review, drafts, each with its labels, CI, review and date.
-- *Links*: sites you open often, a click away in your default browser (Linear, New Relic, lunch): each chip of
-  *Links* is `Label: https://…` (a bare URL: its host as the label; `mailto:` links open your mail).
-
-My PRs takes *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
+Every extension starts off: turn it on in Settings › Extensions. None come with Laki: make one from a starter, or
+ask Laki AI for one.
 
 A **right click** on any extension (a sidebar cell, a rail or sidebar-foot button, a My Desk tile's head) has the same
 menu: Fetch now, Inspect, Logs, Edit, turn it on or off, *Show in ›* (its places, ticked), *Size ›* for a cell, *Edit
-with Laki AI* (one of yours), *Remix* and *Delete…* (to the trash, with Undo; not one that comes with Laki or a repo).
+with Laki AI* (one of yours), *Remix* and *Delete…* (to the trash, with Undo; not a repo's).
 
 Each extension has a **page of its own**: a click on its row in Settings › Extensions (or ⚙ in its full view, *Edit*
 on a My Desk tile or in its right click). It shows how it looks where it sits, and its full view, either live or with **made-up data**
@@ -1144,7 +1138,7 @@ or Esc, goes back where you came from (Settings, My Desk).
 *Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a
 file, a URL), shows the data, and its examples (its sample and each `fixtures/*.json`: *Show it with this*); the
 preview's *Sample* picks one. Its **Files** tab edits its files: *Edit*, then *Save* or ⌘S (JSON is checked first, it
-reloads at once, and *Undo* in its head keeps the version before). One that comes with Laki: *Remix it…* there
+reloads at once, and *Undo* in its head keeps the version before). A repo's: *Remix it…* there
 makes a copy that's yours to change (`laki widget remix <id> [new-id]` too), with Laki AI on or off.
 Settings › Extensions › *Icons* shows every icon an extension can name, with a search; a click copies the name.
 
@@ -1240,8 +1234,8 @@ Close the page while Laki AI builds and it goes on: Settings › Extensions › 
 extension's chat) lists what you're making that isn't saved yet, or that it works on now; a click goes back to its
 page, the trash can lets one go. You can start another meanwhile: Laki AI works in up to 4 chats at once.
 
-To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). The
-ones that come with Laki only turn off.
+To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). A
+repo's goes with its repo.
 
 ### Specs & Brainstorms
 
@@ -2101,7 +2095,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   the agent's own settings, which Laki never writes); OpenCode's `mcp add` only asks questions, so it gets the
   lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
-- *Extensions*: the extensions in two lists, *Yours* (with *New extension*, above) and *Built in*, a row each (its name,
+- *Extensions*: the extensions in lists, *Yours* (with *New extension*, above) and each repo's, a row each (its name,
   what it shows, its size, how often it fetches, the last fetch; *Fetch now* on hover) with its switch: on or off; the
   folders they're found in (Laki's own, and more of yours, one per line), *Reload extensions* and *Working hours*. A
   click on one opens its page (above): the preview, live or with its sample, and its settings: its size (cells across

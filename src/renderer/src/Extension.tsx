@@ -64,7 +64,7 @@ export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, 
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
-  const mine = !!w && !w.builtin && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
+  const mine = !!w && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
   const guarded = !!(w?.project || w?.agentDev) // a repo's or an agent-linked folder's: turned on through App's repoSheet (every file it runs), never run once while off
   const aiOn = ai?.on !== false
   const [pick, setPick] = useState<Pick>()
@@ -272,7 +272,7 @@ function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: strin
     ? { title: 'What should it show?', text: 'Describe it, or start from a starter: Laki AI writes it with made-up data to look at. It stays off until you try it and turn it on.', examples: EXAMPLES }
     : mine
       ? { title: `Change ${w.name}`, text: 'Say what to change: Laki AI rewrites it, checks it, and the preview shows it with its sample data. Undo puts the last version back.', examples: ['Show the count in red when it is over 10', 'Add a refresh button to the full view', 'Make the full view a table with sorting'] }
-      : { title: `Ask about ${w.name}`, text: `It ${w.builtin ? 'comes with Laki' : w.project ? `comes with ${w.repo ?? 'its repo'}` : 'lives in a folder of yours'}, so Laki AI can't change it here: Remix makes a copy that's yours, with a chat of its own.`, examples: ['What does it run, and how often?', 'Where does its data come from?'] }
+      : { title: `Ask about ${w.name}`, text: `It ${w.project ? `comes with ${w.repo ?? 'its repo'}` : 'lives in a folder of yours'}, so Laki AI can't change it here: Remix makes a copy that's yours, with a chat of its own.`, examples: ['What does it run, and how often?', 'Where does its data come from?'] }
   return (
     <div className={`ext-ai ${d?.busy ? 'busy' : ''}`} ref={box}>
       <div className="ai-win-head">
@@ -1097,7 +1097,7 @@ function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; 
 
 // its files: the list, and the picked one's text (colored; Markdown rendered). Edit: the text in a box (⌘S saves, Esc
 // stops), saved as it is (widgetFileSave: refused when the file changed meanwhile, Save anyway; a .json one must parse);
-// one that comes with Laki, or too big to show, is read-only
+// a repo's, or one too big to show, is read-only
 type Draft = { path: string; text: string; was: string }
 const UNSHOWN = /^\((over 64 KB|binary): not shown\)$/ // widgetFiles' words for one it doesn't give
 function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: WidgetView; cfg: WidgetsApi; files: Record<string, string>; sel: string; onSel: (f: string) => void; draft: Draft | null; setDraft: (d: Draft | null) => void; onSaved: () => void }) {
@@ -1108,7 +1108,7 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
   const lines = useMemo(() => (md ? [] : highlight(sel, text)), [sel, text, md])
   const edit = draft?.path === sel ? draft : null
   const dirty = !!edit && edit.text !== edit.was
-  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : w.repo ? `It's ${w.repo}'s (.laki/extensions): change it there, or Remix it` : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
+  const why = w.repo ? `It's ${w.repo}'s (.laki/extensions): change it there, or Remix it` : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
   const leave = async () => !dirty || (await ask('Discard your changes?', { text: `${sel} has changes you haven't saved.`, ok: 'Discard', danger: true }))
   const pick = async (f: string) => f !== sel && (await leave()) && (setDraft(null), setErr(''), onSel(f))
   const stop = async () => (await leave()) && (setDraft(null), setErr(''))
@@ -1144,8 +1144,8 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
                 {busy ? 'Saving…' : 'Save'}
               </button>
             </>
-          ) : (w.builtin || w.repo) && cfg.remix ? (
-            <button className="sm" data-tip={`It comes with ${w.repo ? `${w.repo}'s repo` : 'Laki'}: a copy of it to change, yours`} onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
+          ) : w.repo && cfg.remix ? (
+            <button className="sm" data-tip={`It comes with ${w.repo}'s repo: a copy of it to change, yours`} onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
               <Icon name="copy" size={12} /> Remix it…
             </button>
           ) : (

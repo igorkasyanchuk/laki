@@ -56,8 +56,15 @@ Out of scope:
 - A repo's extension isn't trusted as its `node_modules/` (its installed packages) or what widget.json's `state`
   names: code it runs from there can change without turning it off.
 - An agent can still change most settings (Global memory, PR prompts, actions, Laki AI's; not env, profiles, the
-  phone webhook, extension folders or what Open in editor runs, nor a project's scripts, env, trust or memory list),
-  and ask Laki AI, which acts as you, but not in an extension's page chat.
+  phone webhook, extension folders, what Open in editor runs, *When everything is done*, the Done check, Recording
+  mode and what it hides, *Guess my next prompt*, keep awake, how long storage files, archived workspaces and pasted
+  images are kept, memory's compaction, updates, the background picture, or reset the interface, nor a project's
+  scripts, env, trust or memory list), and ask Laki AI,
+  which acts as you, but not in an extension's page chat. It can't import worktrees either (a delete removes their
+  folder); an imported one's folder is removed only by `git worktree remove`, which checks it's that repo's.
+- A tab's state (its hooks: a turn's start and end, a tool call) is taken with that tab's own key (`LAKI_HOOK`, new each
+  start), or from a process of that tab or of none. The key is in the agent's environment, which another process of
+  yours can read: it keeps an agent from reporting another tab's turns by name, not a determined one.
 - An extension that's on stays on when Laki AI rewrites it only from its own page chat (the extension's *Edit* chat,
   which an agent can't ask in). Changed anywhere else (Laki AI's other chats, an agent, an MCP client), it turns off,
   and loses network access, once what it runs changes.

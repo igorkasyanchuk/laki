@@ -95,7 +95,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget tools [--json]                  the extensions' tools for agents: each one's input and when to use it
   laki widget tool <id> <action> [json] [--ws <ws>]  call one: Laki asks you first, unless it says never; its output back
   laki widget check [id|folder] [--no-run] [--ws <ws>]  what's wrong with one: widget.json, its ui against its data, its fetch once
-  laki widget remix <id> [new-id]            a copy of one (a built-in too) to change: yours, off
+  laki widget remix <id> [new-id]            a copy of one (a repo's too) to change: yours, off
   laki widget trash | restore <trash-id>      the extensions deleted in the last 30 days | put one back
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
@@ -281,8 +281,8 @@ their tools, and change where one shows and its settings (laki widget set; not a
 access); turning one on is the user's. Places: side, top, status, rail, foot, desk, panel, row (per workspace). To make
 one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
 
-  laki widget set my-prs --place desk --size 3x2   a tile on the Desk, 3 cells across, 2 down
-  laki widget set my-prs --every 10 repo=acme/api   fetch every 10 minutes, its repo setting
+  laki widget set prs --place desk --size 3x2      a tile on the Desk, 3 cells across, 2 down
+  laki widget set prs --every 10 repo=acme/api      fetch every 10 minutes, its repo setting
   laki widget tools                             what the user's extensions let you do, each tool's input
   laki widget tool <id> <action> '{"query":"…"}'   in a tab, for its workspace; Laki may ask the user first
   laki widget check <id>`,

@@ -187,7 +187,7 @@ merge base: Changes' and the Review tab's *Uncommitted*, Diff.tsx `useScope`/`at
 --uncommitted`, MCP's `laki_diff`), settings' `editors` (a project's own editor by its id: `openIn` `editor` takes it
 first; App's `editorOf`, a folder's Open in pick sets it), `customCss` in `REMOTE_KEYS`. 123: `presetSave` (`laki
 preset`: one profile by name, `add`, `rm`, `set`; an agent's asked in the app first, main.ts' `presetAsk`, a `toolAsk`
-`cross: 'preset'`), `storageInfo` and `storageTidy` (settings' `storageDays`, `STORAGE_DAYS` 0, never (0.35: 90): a storage folder's
+`cross: 'preset'`: its notification has no Allow, the profile is read in the app), `storageInfo` and `storageTidy` (settings' `storageDays`, `STORAGE_DAYS` 0, never (0.35: 90): a storage folder's
 file not changed for so long goes, hourly, only `ws.storage` folders), links in one hidden `.laki-links.json` per storage
 folder (artifacts.ts `LINKS`: a `.url` file moved into it, `fileUrls`; a `Link`'s `path` is `link:<url>`, not a file;
 `artifactList` files only; `linkRm`), `show`/`showDone` (`laki show`: a tab's `card`, `Card`), `prDetach` of a branch's
@@ -202,7 +202,8 @@ one gone a failed run, `base <b> not found in <project>`; the CLI's `laki schedu
 base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `projectSet` `name` '' (its folder's name again; Terminals' and Browsers' keep theirs), 80 characters at most. 132: `wsStat` (`ws`: files.ts' `statOf` now, a row's
 hover card; none off git, archived, a codespace away), a `Stat`'s `made` and `gone` (`--summary`'s create and delete
 lines, untracked files made too), a reminder's `every` (`reminderAdd`/`reminderSet` `every`, or `at` in words that
-repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
+repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`; refused with a
+character you wouldn't see, `HIDDEN`; the notification's *Run it* only for one line of App's `CMD_NOTIFY`, no run of spaces), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
 for `ws` new only, refused for another, false or null clears it; `runSchedule`: `wsNew` `noSetup`; the CLI's `laki schedule add
 --no-setup`, MCP's `no_setup`; Schedules.tsx' where menu's *A new workspace each run, no setup*, shown for the project's
 `hasSetup`, a row's *no setup* tag). 136: `worktreeList`/`worktreeImport` (a project's ⋯ › *Import worktrees…*), the view's
@@ -244,7 +245,11 @@ needs no bump: `settingsSet` keeps any field.
   (an agent running or waiting, a live workflow run, a scheduled task or a workspace's late start due within the hour),
   then, once none is, the view's `whenDone` (`{ act, at }`: App's bar with Cancel, `settingsSet` `whenDone: 'off'`) for
   `WHEN_DONE_WAIT` (`LAKI_WHEN_DONE_MS`: tests'), anything going again cancels it; then `pmset sleepnow`,
-  `pmset displaysleepnow` (the lock) or loginwindow's shut down, and the setting goes back to off. Tested with a `pmset`
+  `pmset displaysleepnow` (the lock) or loginwindow's shut down, and the setting goes back to off. `settingsSet` refuses
+  a value but those (one already saved is off); an agent can't change it (main.ts' `AGENT_KEYS`, with `doneCheck`,
+  `recording`, `nextPrompt`, `keepAwake`, the tidies' `storageDays`, `archivedDays`, `imageDays`, `memoryCompact`,
+  `updateCheck`, `updateDelay`; nor a workspace's or project's `private`, `bgSet`, `sideNew`, `uiReset`; remote access
+  can: Cancel). Tested with a `pmset`
   in the rig's `$HOME/bin` (`test/resources.test.ts`);
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
   `keepAwake` at each view (`changed()`): while a tab of an agent (`tracked`, or a shell's `runs`) is running or waiting,
@@ -254,7 +259,9 @@ needs no bump: `settingsSet` keeps any field.
 - `worktreeList` (`project`: `git worktree list --porcelain`, each on a branch, its folder there, not the project's own
   nor any Laki workspace's, archived too, by realpath; this Mac's git projects) and `worktreeImport` (`project`, `paths`:
   each one listed as a workspace as it is, its folder's name its id, the project's `main` its base; no setup, nothing
-  copied; archive and delete remove it as any other's): a project's ⋯ › *Import worktrees…* (panels.tsx `ImportWorktrees`);
+  copied; `imported`: archive and delete leave its folder to `git worktree remove`, never `rmSync` (a forged
+  `.git/worktrees/<x>/gitdir` may name any folder); refused from an agent, `AGENT_NO`): a project's ⋯ › *Import
+  worktrees…* (panels.tsx `ImportWorktrees`);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
   and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
   refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; `notes`: the user's Markdown, the
@@ -406,14 +413,14 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view; `sample`: filled with widget.json's `sample` and `sampleConfig` over its settings, `at` two minutes ago,
   `sample: true`), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes;
-  `name`: written in widget.json (`rename`: 60 characters, empty drops it; not a built-in's nor one file's; the history's
+  `name`: written in widget.json (`rename`: 60 characters, empty drops it; not a repo's nor one file's; the history's
   `snapshot` first, then `scanWidgets`, nothing fetched), `WidgetCard`'s name field;
   `ai`: the Extension page's chat sets it before each ask, one of the user's in `widgetHome()` (else refused) gets the
   store's `aiMay` (an hour), which lets `widgetWrite` rewrite it; `agent`, or `from` an agent's tab: MCP's and Laki AI's
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
   never `on: true`, `net: true`, `source`, `ai`, a secret setting or one a source or an AI action's prompt reads (`steering`: its `{{config.x}}`); a place it doesn't know is refused), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on; Widgets.tsx' `act` likewise
 refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
-  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (Laki AI from its own page's chat, `page`: `aiRpc`'s `by: 'ai'` and `chat` `widget:<id>`, whatever changed; any other writer, `agent` (an agent's tab, main.ts' `FROM`, or an MCP client outside Laki) or Laki AI in another chat, only while `widgetTrust.ts` `runsOf` is the same, else off and its `net` dropped: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a repo's (`repoSays`) nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again, on or off as it was, `from` an agent off, its grants dropped and a `note`; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; a new one saved off, one that was on stays on (Laki AI from its own page's chat, `page`: `aiRpc`'s `by: 'ai'` and `chat` `widget:<id>`, whatever changed; any other writer, `agent` (an agent's tab, main.ts' `FROM`, or an MCP client outside Laki) or Laki AI in another chat, only while `widgetTrust.ts` `runsOf` is the same, else off and its `net` dropped: its manifest's commands, prompts, handlers and settings, every file but widget.html without a script, fixtures and Markdown; `widgetUndo` likewise) with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on; `from` an agent: off, nothing run, a `note`),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki, laki-widget, laki-specs (`specsSkill`: `laki plan`, shared/plans.ts' `BRAINSTORM_METHOD`) or laki-orchestrate (the coordinator's protocol over `laki new`, `screen`, `send`: skill.ts
@@ -677,7 +684,9 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
 - `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
 - an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
-- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`;
+- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`; `LAKI_HOOK` (a key per start, the Session's `hookKey`: `laki hook` sends it, and
+  main.ts' `hookWho` takes a tab's state with its key only, else from a process of that tab or of none (`peerOf`: tests'
+  direct `hook` calls), never another tab's; never from remote access, `REMOTE_NO`);
 - `LAKI_STORAGE_FOLDER` (`storageOf`; `STORAGE_NOTE`, the start note's and the laki skill's words: files, and a
   link for each thing an agent publishes, kept in its `LINKS`, `.laki-links.json`; a `.url` file it saves is moved in, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
@@ -1547,7 +1556,8 @@ gets `{ config, last }`; what it throws goes to stderr as its message alone, and
 trailer), `actions`) and `widget.html`. A setting is kept and given to a fetch as text (`textOf`: a bool `1` or empty,
 a list deduped and joined by commas; `configOf`, the view's `config`), and to a page or a script typed (`typedOf`: a boolean, a
 number or null, an array). `scanWidgets` reads `widgetRoots()` (`<data>/widgets`,
-`settings.widgetDirs`, then the repo's `widgets/`, `BUILTIN`, off until turned on; the first of an id wins) at start,
+`settings.widgetDirs`; none come with Laki since 0.44: links and my-prs are `test/widgets/`, tests' fixtures through
+helpers.ts' `fixtureWidgets`; the first of an id wins) at start,
 on `widgetReload` and when `widgetDirs` changes; only that list stays in memory. Each widget's storage,
 `<data>/widget-data/<id>.json` (`Store`): the user's on, size, every, view, config and the last fetch's `data`, `at`, `error`.
 `exec` runs a fetch or an action (`/bin/sh -c`: the widget's own scripts in any language, `python3 fetch.py`; the
@@ -1589,7 +1599,7 @@ action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` 
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
-two `Group`s, *Yours* (its head's `act`: *New extension*, `WidgetsApi.page('')`) and *Built in*, of Scheduled tasks'
+`Group`s, *Yours* (its head's `act`: *New extension*, `WidgetsApi.page('')`) and each repo's, of Scheduled tasks'
 `.sched-row`s, each with its switch, a click `page(id)`; past 3 a search (`hay`: name, id, places and their words,
 project), the `failing` first in each group (a `devError`, or one that's on with an `error`, a `missing` setting or a
 `logErr` in the hour) with a red `.widget-dot` on its icon, `failWhy` its tip; `WidgetCard`: a head (its switch, name, buttons), then `WcSec`s of `WcRow`s (a title and what it does, its control):
@@ -1610,13 +1620,9 @@ off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it 
 *Undo* (yours: `widgetUndo`), *Try it live* and *Turn on* (off: `TrySheet`, below; a repo's or an agent-linked one's
 *Turn on* is `extCfg.set`'s `repoSheet`, every file it runs, and no *Try it live*: `widgetRun` `once` refuses it). A new one's page has `Start` (the
 steps, the UI kit's card (SettingsExtensions.tsx' `KitHero`, Settings › Extensions' too: `WidgetsApi.kit`, its crumb back the page's name), and, with Laki AI off (no chat beside it), *Copy the prompt*: `widgetPrompt`, which the laki-widget skill's SKILL.md shares as `widgetFormat`); with
-its name and no files yet, *Not saved yet* (a failed first ask, a starter's or Remix's before the next view). App hides the floating chat there. The
-ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
-browser; no fetch; 4×½),
-`widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
-drafts, conflicts and `label1`–`label3`'s counts, and `groups`, each PR in the first of conflict, failing CI, changes,
-approved, in review, a draft first of all; its `ui`, no widget.html; its `sample`) are tested on the fake gh's `pr list` (`$FAKE_GH/prlist.json`,
-`--author` and `--jq` applied with the real jq) in `test/widget.test.ts`. The browser pane doesn't paint cross-origin frames: check a JS
+its name and no files yet, *Not saved yet* (a failed first ask, a starter's or Remix's before the next view). App hides the floating chat there. The test fixtures `test/widgets/links` (a JS page, a `links` chip list) and
+`test/widgets/my-prs` (shell, gh `--jq`, its `ui` and `sample`) are tested on the fake gh's `pr list` (`$FAKE_GH/prlist.json`) in
+`test/widget.test.ts`. The browser pane doesn't paint cross-origin frames: check a JS
 widget's page in Chrome (headless `--screenshot`).
 
 The UI kit (`shared/widgetUi.ts`; the SDK's words: `docs/extensions.md` › The UI kit): widget.json's `ui`, one element
@@ -1674,9 +1680,9 @@ both bars, the button), `Inspector` (Data: Source (`SourceField`), its data (`wi
 Live), `Examples` (the sample and each fixture: *Show it with this*, *Use as its data*: a static source); Runs, every 2 s
 while shown; Env; Files: `widgetFiles`' texts, editable (`FileView`: ⌘S, Esc, *Save anyway*; the draft is
 `ExtensionPage`'s, asked before it's lost) through `widgetFileSave` (`path` one of `widgetFiles`' names, `was`: refused
-as "changed since you opened it" unless `force`; JSON parsed first; never a built-in (Remix it), a link or a file over
+as "changed since you opened it" unless `force`; JSON parsed first; never a repo's (Remix it), a link or a file over
 64 KB; the history's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
-widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then SettingsExtensions.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell (App's *Edit* opens its page, Laki AI's chat there), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a built-in's, a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
+widget's right click (`WidgetApi.menu` over `items`, App's: Fetch now, Inspect, Logs, Edit, then SettingsExtensions.tsx' `extMenuItems`: Turn on/off, *Show in ›* its places ticked, *Size ›* for a cell (App's *Edit* opens its page, Laki AI's chat there), Remix (not one file), *Delete…* (`WidgetsApi.rm`: asked, Undo; not a repo's or a dev link's); on a cell, a `CellButton`, a rail or foot button, a panel, and after a Desk tile's own items, its head's right click and ⋯) and `laki://settings/widgets/<id>[/inspect]`
 (links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`
@@ -1993,7 +1999,7 @@ the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when 
 *Can hold*), `widgetWhat`'s text.
 
 Repo extensions (`test/widget-repo.test.ts`): `repoRoots` (each project not `kind` nor `host`: `<path>/.laki/extensions`,
-its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scanWidgets` (a dev or `widgetDirs` root
+its own folder, not a worktree's: ponytail) after yours in `scanWidgets` (a dev or `widgetDirs` root
 under one, `repoOf`, by path or realpath, is that project's too; `widgetDev` leaves them off), each an `Entry` with `project`
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` of the project's `.laki`, recursive, a change under `extensions/`; while `.laki` is missing, the project's folder, flat: a branch without it and back reads them again (macOS says nothing to a watch of `.laki/extensions` itself as git removes it); 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
@@ -2802,7 +2808,6 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab and floated simulator windows (`?window=new`, `ai`, `tab`, `sim`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
 | `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |
-| `widgets/` | the widgets that come with Laki (packaged with the app) |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |

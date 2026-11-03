@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { aiRpc, type Rpc, skillTools, tools } from '../src/shared/tools.ts'
 import { aiTotals } from '../src/shared/types.ts'
-import { connect, fresh, sleep, until } from './helpers.ts'
+import { connect, fixtureWidgets, fresh, sleep, until } from './helpers.ts'
 
 // a fake OpenRouter: each request to `answers`' next, recorded
 async function openrouter(t: { after: (f: () => void) => void }, answers: object[]) {
@@ -418,6 +418,7 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' }), call('c4', 'laki_extension_on', { id: 'sh' }), call('c5', 'laki_extension_on', { id: 'src' })])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await fixtureWidgets(rig)
   await rig.rpc('settingsSet', { ai: { on: true }, desk: false })
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
   const tool = (name: string): ((a: object) => Promise<any>) => [...tools(rig.rpc), ...skillTools(rig.rpc)].find(x => x.name === name)!.run

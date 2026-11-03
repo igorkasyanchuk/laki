@@ -6,7 +6,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh } from './helpers.ts'
+import { fixtureWidgets, fresh } from './helpers.ts'
 
 const manifest = (name: string) =>
   JSON.stringify({ name, every: 5, size: [3, 2], fetch: 'echo \'{"prs": [{"title": "Live one", "ci": "passing"}]}\'', ui: { type: 'list', each: 'prs', title: '{{title}}', accessories: [{ tag: '{{ci}}' }] }, sample: { prs: [{ title: 'Fix the date picker', ci: 'failing' }] } })
@@ -75,11 +75,12 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   assert.ok(!(await view(id)))
   await assert.rejects(rig.rpc('widgetUndo', { id }), /nothing to undo/)
 
-  // Remix: a copy of a built-in, yours, off, Laki AI may rewrite it (more than once in its hour)
+  // Remix: a copy of one in a folder of yours, in Laki's, off, Laki AI may rewrite it (more than once in its hour)
+  const fx = await fixtureWidgets(rig)
   const { id: copy } = await rig.rpc('widgetRemix', { id: 'links' })
   assert.equal(copy, 'links-copy')
   w = await view(copy)
-  assert.ok(w && !w.on && !w.byAi && !w.builtin && w.name.endsWith('(copy)'))
+  assert.ok(w && !w.on && !w.byAi && w.dir.endsWith(`/widgets/${copy}`) && w.name.endsWith('(copy)'))
   await rig.rpc('widgetWrite', { id: copy, files: { 'notes.txt': 'one' } })
   await rig.rpc('widgetWrite', { id: copy, files: { 'notes.txt': 'two' } })
   assert.ok(!(await view(copy)).byAi, 'still yours')
@@ -104,7 +105,7 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   mkdirSync(real)
   writeFileSync(join(real, 'widget.json'), JSON.stringify({ name: 'Linked' }))
   symlinkSync(real, join(rig.home, 'exts', 'linked'))
-  await rig.rpc('settingsSet', { widgetDirs: [join(rig.home, 'exts')] })
+  await rig.rpc('settingsSet', { widgetDirs: [fx, join(rig.home, 'exts')] })
   const { id: twin } = await rig.rpc('widgetRemix', { id: 'linked' })
   assert.ok(!lstatSync(join(rig.data, 'widgets', twin)).isSymbolicLink(), 'a folder of its own')
   assert.equal(JSON.parse(readFileSync(join(real, 'widget.json'), 'utf8')).name, 'Linked', 'the original untouched')

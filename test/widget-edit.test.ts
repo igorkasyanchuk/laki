@@ -5,11 +5,11 @@ import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { STARTER_KINDS } from '../src/shared/widgetStarters.ts'
-import { fresh, until } from './helpers.ts'
+import { fixtureWidgets, fresh, until } from './helpers.ts'
 
 const find = async (rig: any, id: string) => ((await rig.rpc('state')).widgets ?? []).find((w: any) => w.id === id)
 
-test('files edited by hand: saved in place, read again; refused when changed meanwhile, not JSON, or built in', async t => {
+test('files edited by hand: saved in place, read again; refused when changed meanwhile or not JSON', async t => {
   const rig = await fresh(t)
   const { id } = await rig.rpc('widgetNew', { kind: 'number', name: 'Visits' })
   await until(async () => !(await find(rig, id)).running, 'its first fetch')
@@ -32,7 +32,6 @@ test('files edited by hand: saved in place, read again; refused when changed mea
   await assert.rejects(rig.rpc('widgetFileSave', { id, path: 'fixtures/spike.json', text: 'nope', was: readFileSync(join(dir, 'fixtures/spike.json'), 'utf8') }), /not JSON/)
   await assert.rejects(rig.rpc('widgetFileSave', { id, path: '../../state.json', text: '{}' }), /not one of its files/)
   await assert.rejects(rig.rpc('widgetFileSave', { id, path: 'new.sh', text: 'echo' }), /not one of its files/)
-  await assert.rejects(rig.rpc('widgetFileSave', { id: 'my-prs', path: 'widget.json', text: '{}' }), /comes with Laki: Remix/)
 
   // a script keeps its mode; a fixture edited shows as its sample
   const sh = readFileSync(join(dir, 'fetch.sh'), 'utf8')
@@ -45,6 +44,7 @@ test('files edited by hand: saved in place, read again; refused when changed mea
 
 test('made-up variants: each starter with data has three more fixtures, My PRs too; a preview shows one by name', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   for (const kind of STARTER_KINDS) {
     if (kind === 'launcher' || kind === 'onefile') continue // no data of its own, one file
     const { id } = await rig.rpc('widgetNew', { kind, name: `v ${kind}` })

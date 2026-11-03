@@ -8,7 +8,7 @@ import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, w
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { fresh, type Rig, until } from './helpers.ts'
+import { fixtureWidgets, fresh, type Rig, until } from './helpers.ts'
 
 const cliPath = fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))
 
@@ -226,6 +226,7 @@ function widget(rig: Rig, id: string, json: object, html: string) {
 
 test('cli: widget ls, reload, run, on/off, render, action, as the app would show them', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   const cnt = widget(
     rig,
     'cnt',
@@ -258,7 +259,7 @@ test('cli: widget ls, reload, run, on/off, render, action, as the app would show
   assert.match(r.out, new RegExp(`^cnt {2}on {3}\\d+×\\d+ {2}every 5m {2}✓ {2}${cnt}$`, 'm'))
   assert.match(r.out, new RegExp(`^bad {2}on {3}\\d+×\\d+ {2}every \\d+m {2}✗ oops {2}${bad}$`, 'm'))
   assert.match(r.out, new RegExp(`^still {2}on {3}\\d+×\\d+ {2}no fetch {4}${still}$`, 'm'))
-  assert.match(r.out, /^my-prs {2}off /m, 'the ones that come with Laki: off')
+  assert.match(r.out, /^my-prs {2}off /m, 'a folder of yours: off')
 
   assert.deepEqual([(r = await rig.cli('widget', 'run', 'cnt')).code, r.out], [0, 'fetched\n'])
   assert.deepEqual([(r = await rig.cli('widget', 'run', 'bad')).code, r.out], [0, '✗ oops\n'])

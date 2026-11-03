@@ -4,6 +4,17 @@ version it builds, with the date. -->
 
 ## Next
 
+- No extensions come with Laki any more: *Links* and *My PRs* are gone (one you turned on goes too). Make your own
+  from a starter (Settings › Extensions › *New ▾*) or ask Laki AI for one like them.
+- Settings › Remote access with a PIN: *Copy all* puts the link and the PIN in one message to send; the link and the
+  PIN each still copy alone.
+- Safer with agents: they can't set *When everything is done* (sleep, lock or shut down), the Done check, Recording
+  mode (or what it hides), *Guess my next prompt*, keep awake, how long files are kept, updates or the background
+  picture, reset the interface, nor import worktrees; a tab's turns come only from its own agent (a key
+  of its own each start), and deleting an imported worktree never removes a folder git doesn't call its worktree.
+- An agent's profile change no longer has *Allow* on its notification (open Laki to see what changes), and an
+  agent's command has *Run it* there only when it's one short line; one with hidden characters (direction, zero-width,
+  controls) is refused.
 - Big specs and brainstorms open at once: charts, mind maps, diagrams and prototypes are drawn as you scroll to them,
   and the app stays responsive meanwhile (a brainstorm of 56 charts froze it for about 40 seconds). Laki AI's chat and
   the Reader no longer draw every message again as you type or as an agent writes.

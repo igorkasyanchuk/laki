@@ -297,7 +297,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj({}),
     max: 16000,
     // where each shows and its settings too, for laki_extension_set (a secret's value never: whether it has one)
-    run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, builtin: w.builtin, byAi: w.byAi, places: placesOf(w), scope: w.scope, size: w.size.join('x'), every: w.every, view: w.full ? w.view : undefined, hide: w.hide, settings: w.options.length ? w.options.map(o => ({ key: o.key, type: o.type, label: o.label, choices: o.choices, value: o.type === 'secret' ? (o.set ? '(set)' : '') : w.config[o.key] })) : undefined, missing: w.missing, error: w.error })),
+    run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, byAi: w.byAi, places: placesOf(w), scope: w.scope, size: w.size.join('x'), every: w.every, view: w.full ? w.view : undefined, hide: w.hide, settings: w.options.length ? w.options.map(o => ({ key: o.key, type: o.type, label: o.label, choices: o.choices, value: o.type === 'secret' ? (o.set ? '(set)' : '') : w.config[o.key] })) : undefined, missing: w.missing, error: w.error })),
   },
   {
     name: 'laki_extension_set',
@@ -330,11 +330,11 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: 'How a Laki extension (a widget) is made (widget.json, widget.html, its fetch command or JS script, the template language, JS pages). Read it before laki_extension_write.',
     inputSchema: obj({}),
     max: 60000, // the whole guide: its catalog and examples too
-    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, its ui and sample). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user looks at it (its page shows it with its sample) and turns it on in Settings › Extensions (laki://settings/widgets). Where any extension shows, its size, how often it fetches and its settings: laki_extension_set, no file to write.\n\n${widgetFormat()}`,
+    run: async () => `Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user looks at it (its page shows it with its sample) and turns it on in Settings › Extensions (laki://settings/widgets). Where any extension shows, its size, how often it fetches and its settings: laki_extension_set, no file to write.\n\n${widgetFormat()}`,
   },
   {
     name: 'laki_extension_read',
-    description: "An extension's files as text: an example to copy (links, my-prs) or one to change.",
+    description: "An extension's files as text: one to learn from or to change.",
     inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
     max: 24000,
     run: a => rpc('widgetFiles', { id: a.id }),

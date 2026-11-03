@@ -92,7 +92,7 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean; fr
   const agent = !!agentCaller(o.from) // an agent's link: its widgets off until you look at them, then off again as they change (N10; one that shadows an installed one too: they share its store); yours makes it yours again
   if (agent) {
     // over one you have installed it would share its store and secrets: refused; the others off before the scan, so none starts
-    const yours = found.map(x => widgets.get(idOf(x))).find(w => w && !w.agentDev) // installed, built in or your own dev link: only its own earlier link's may come again
+    const yours = found.map(x => widgets.get(idOf(x))).find(w => w && !w.agentDev) // installed or your own dev link: only its own earlier link's may come again
     if (yours) throw new Error(`${folder} has ${yours.id}: it would cover your ${yours.m.name || yours.id} (its settings and secrets). Pick another id`)
     for (const x of found) if (statOf(storePath(idOf(x)))) writeStore(idOf(x), { ...readStore(idOf(x)), on: false })
   }

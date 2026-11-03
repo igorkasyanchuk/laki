@@ -46,7 +46,7 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
 
   // listed with its project, off
   const w = await find()
-  assert.deepEqual([w.on, w.project, w.repo, w.builtin], [false, p.id, p.name, undefined])
+  assert.deepEqual([w.on, w.project, w.repo], [false, p.id, p.name])
   assert.ok(!(await rig.rpc('state')).widgets.some((x: any) => x.id === 'deploys'), 'never under its own id')
 
   // on: only after a look, and only for what was shown; never an agent's; nor run once unlooked (check, Try it)

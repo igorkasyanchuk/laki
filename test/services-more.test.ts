@@ -254,7 +254,7 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
   const ws = await rig.rpc('widgetReload')
   const by = (id: string) => ws.find((w: any) => w.id === id)
   assert.deepEqual(
-    ws.filter((w: any) => !w.builtin).map((w: any) => [w.id, w.name]),
+    ws.map((w: any) => [w.id, w.name]),
     [
       ['acts', 'acts'],
       ['dup', 'Mine'],

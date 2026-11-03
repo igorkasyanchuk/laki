@@ -1,7 +1,7 @@
 // Test rig: a temp LAKI_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -39,6 +39,14 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
 }
 
 export type Rig = Awaited<ReturnType<typeof fresh>>
+// links and my-prs (test/widgets: extensions that came with Laki before 0.44), copied into this rig as a folder of yours
+// (Settings' extension folders), never the repo's own files; off until turned on, as any
+export async function fixtureWidgets(rig: Rig) {
+  const d = join(rig.home, 'fixture-widgets')
+  cpSync(join(root, 'test', 'widgets'), d, { recursive: true })
+  await rig.rpc('settingsSet', { widgetDirs: [d] })
+  return d
+}
 
 export async function fresh(t: TestContext, o: { setup?: string; config?: object; env?: Record<string, string> } = {}) {
   const home = mkdtempSync('/tmp/laki-')

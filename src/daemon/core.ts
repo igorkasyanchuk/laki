@@ -4,7 +4,7 @@
 // schedule. None of the modules in this cycle reads another's const or let as it loads (test/load-order.test.ts);
 // the data folder is dir.ts', out of it.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
@@ -670,7 +670,8 @@ function goingNow(agents: boolean) {
   )
 }
 function whenDone(agents: boolean) {
-  const act = state.settings?.whenDone ?? 'off'
+  const set = state.settings?.whenDone
+  const act: WhenDone = set && Object.hasOwn(WHEN_DONE_CMD, set) ? set : 'off' // one it doesn't know (an older file's): off
   const going = goingNow(agents)
   if (act === 'off' || going || doneSoon?.act !== act) doneSoon && (clearTimeout(doneSoon.timer), (doneSoon = undefined), changed())
   if (act === 'off') return void (doneArmed = false)
@@ -1299,9 +1300,11 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const wait = tab.kind === 'agent' && existsSync(marker) ? `printf '\\033[2mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ` : ''
   let file = shell
   let args: string[]
-  const hookKey = ws.host ? randomBytes(12).toString('hex') : undefined // what its hooks' escape codes carry (hostTab)
+  // what its hooks carry, new each start: an SSH host's escape codes (hostTab), a local one's laki hook (LAKI_HOOK,
+  // main.ts' hookWho): another tab's process can't report this one's turns
+  const hookKey = randomBytes(12).toString('hex')
   let argEnv: Record<string, string> | undefined // an agent's values (agentCmd)
-  if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey!)]]
+  if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
   else if (tab.kind === 'shell') args = ['-l']
   else {
     const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, o.prompt, !!o.resume) : undefined
@@ -1313,14 +1316,15 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv }), ...lastSize })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey }) }), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
+  s.hookKey = hookKey
   sessions.set(tab.id, s)
   const born = Date.now()
   const r = rtOf(tab.id)
   // a hook on the host: OSC 7717 ; key ; state ; base64 JSON. Only with this start's key: a file shown in the tab
   // can't make one up
-  if (hookKey)
+  if (ws.host)
     s.onHook = d => {
       const [key, st, b64 = ''] = d.split(';')
       if (key !== hookKey || !st) return
@@ -1738,6 +1742,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 // own: Laki's own call (widgetDev), the only one that writes widgetDevAgent
 export function settingsSet(o: Settings, own = false) {
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
+  if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
@@ -2177,7 +2182,7 @@ export async function worktreeImport(o: { project: string; paths: string[] }) {
   const { main } = await branches(p.id)
   const made: Workspace[] = []
   for (const e of picked as { path: string; branch: string }[]) {
-    const ws: Workspace = { id: await uniqueWsId(slug(basename(e.path)), p), project: p.id, path: e.path, branch: e.branch, base: main || e.branch, kind: 'worktree', port: allocPort(), created: Date.now() }
+    const ws: Workspace = { id: await uniqueWsId(slug(basename(e.path)), p), project: p.id, path: e.path, branch: e.branch, base: main || e.branch, kind: 'worktree', port: allocPort(), created: Date.now(), imported: true }
     state.workspaces.push(ws)
     placeWs(ws)
     made.push(ws)
@@ -2341,7 +2346,10 @@ async function teardown(ws: Workspace) {
   if (ws.kind === 'worktree' && ws.codespace === undefined) {
     const proj = state.projects.find(p => p.id === ws.project)
     if (proj) await git(proj, 'worktree', 'remove', '--force', ws.path).catch(() => {})
-    if (!ws.host) rmSync(ws.path, { recursive: true, force: true })
+    // what git didn't remove: only a folder Laki made. An imported one's is git's alone to remove, which checks it's
+    // that repo's worktree (its .git file points back): .git/worktrees/<x>/gitdir, which any agent can write, may name
+    // any folder of yours (~/Documents), and git worktree list then shows it
+    if (!ws.host) ws.imported || rmSync(ws.path, { recursive: true, force: true }) // ponytail: a locked one stays (git wants -f twice): your lock
     else if (ws.path.includes(`/.laki-host/${mac()}/worktrees/`)) await exec({ host: ws.host, path: '/' }, 'rm', ['-rf', '--', ws.path]).catch(() => {}) // only one Laki made
     // after the dir is gone: drops the registration a failed remove left, which would block re-adding the branch
     if (proj) await git(proj, 'worktree', 'prune').catch(() => {})
@@ -2622,6 +2630,12 @@ function whenPrompt(s: Session, then: () => void, from = s.born) {
 
 // ---------- agent status (hooks)
 
+// a laki hook's key: its tab's live session's, this start's (spawnTab); a late hook of a start before is another's
+export function hookOk(tab: string, key: unknown) {
+  const own = Buffer.from(sessions.get(tab)?.hookKey ?? '')
+  const said = Buffer.from(typeof key === 'string' ? key : '')
+  return own.length > 0 && own.length === said.length && timingSafeEqual(own, said)
+}
 export function hook(p: { tab: string; state: string; payload?: any }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true

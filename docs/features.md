@@ -94,7 +94,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
   anyone with the link, if you type *confirm* (a red warning says what that risks; 24 hours at most); or through Tailscale, for your
-  tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet. Its link opens once, in one tab.
+  tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet. Its link opens once, in one tab;
+  copy the link and the PIN apart, or *Copy all* for both in one message.
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([headless.md](headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
@@ -106,7 +107,7 @@ time and AI money per run (`budget: 60 min, $5`).
   accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), and your own CSS for
   the rest; tabs on top, bottom, left or right; each project's own editor for ⌘E (Xcode for the iOS repo).
 - **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar, the status bar or on My Desk, laid out as you drag them (your
-  PRs counted and grouped, links you open often, or any you make with Laki AI on the extension's own page, an agent's
+  PRs counted and grouped, links you open often: any you make from a starter, with Laki AI on the extension's own page, an agent's
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and at the start of the status bar (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.

@@ -10,7 +10,6 @@ import { USAGE } from '../shared/usage.ts'
 import { cliArgv, cliEnv, dir, findProject, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
-import { BUILTIN } from './widgets.ts'
 
 // home: the agent's folder in ~ (its skills/ is where it looks); add: its `mcp add` for the user's scope, before the
 // command (gemini's takes no --: the command's arguments follow its name)
@@ -284,9 +283,8 @@ Extension and widget are two names for one thing: the app says extension (Settin
 
     ${join(dir, 'widgets')}/<id>/
 
-(the user can add more folders in Settings › Extensions). Two complete examples come with Laki, read them first:
-${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq; its ui: stats, and a grouped list in the full view; its sample) and \`${join(BUILTIN, 'links')}\` (a JS page, no fetch, a list setting)` : 'my-prs and links in the app'}.
-Don't edit those: copy one to a new id.
+(the user can add more folders in Settings › Extensions). To begin, \`${run} widget new <name> --kind <k>\` makes a working
+starter in it (kinds: ${STARTER_KINDS.join(', ')}): read its files first.
 
 ${widgetFormat()}
 ## Check your work

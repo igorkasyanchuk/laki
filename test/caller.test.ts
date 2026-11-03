@@ -262,3 +262,68 @@ test("M5 on Linux: the caller's process by /proc (its socket's inode among a pro
   assert.equal(await procPeer(0xc352, 0x1f90, proc), undefined, 'no such socket')
   rmSync(proc, { recursive: true, force: true })
 })
+
+// 0.43's review: what would sleep, lock or shut the Mac down, the Done check, Recording mode, the next prompt and keep
+// awake are the user's settings; importing worktrees too (a delete removes their folder); a tab's state comes from its
+// own agent: with its start's key (LAKI_HOOK), else from that tab's process or none (yours, this test's)
+test("an agent can't set When everything is done or its like, import worktrees, or report another tab's state", async t => {
+  const rig = await fresh(t)
+  // a regression mustn't sleep this Mac: the rig's own pmset and osascript first on PATH
+  for (const b of ['pmset', 'osascript']) writeFileSync(join(rig.home, 'bin', b), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  const other = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${other}` })).includes('> '), "the other's prompt")
+  const { port, token } = rig.info()
+  const out = join(rig.home, 'agent-out')
+  const curl = (method: string, params: object) =>
+    `curl -s -H 'Origin: file://' -H 'Authorization: Bearer ${token}' --data '${JSON.stringify({ method, params })}' http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}`
+  // its own tab's state with its own key, as its hooks send it (the env's, so in a script of its own)
+  const own = join(rig.home, 'own-hook.sh')
+  writeFileSync(own, `curl -s -H 'Authorization: Bearer ${token}' --data "{\\"method\\":\\"hook\\",\\"params\\":{\\"tab\\":\\"$LAKI_TAB\\",\\"state\\":\\"running\\",\\"key\\":\\"$LAKI_HOOK\\"}}" http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}\n`)
+  await rig.rpc('send', {
+    target: `${ws.id}/${tab}`,
+    text: `run ${[
+      curl('settingsSet', { whenDone: 'shutdown' }),
+      curl('settingsSet', { doneCheck: false }),
+      curl('settingsSet', { recording: false }),
+      curl('settingsSet', { nextPrompt: true }),
+      curl('settingsSet', { keepAwake: true }),
+      curl('settingsSet', { storageDays: 0.001 }),
+      curl('settingsSet', { updateCheck: false }),
+      curl('worktreeImport', { project: p.id, paths: [rig.home] }),
+      curl('hook', { tab: other, state: 'waiting', payload: { message: 'Claude needs your permission' } }),
+      curl('hook', { tab: other, state: 'waiting', key: 'a guess' }),
+      curl('hook', { tab, state: 'running' }),
+      `sh ${own}`,
+      curl('wsSet', { ws: ws.id, private: false }),
+      curl('projectSet', { id: p.id, private: true }),
+      curl('bgSet', { data: 'x' }),
+      curl('sideNew', { tab }),
+      curl('uiReset', {}),
+    ].join('; ')}; echo done >> ${out}`,
+  })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  const said = readFileSync(out, 'utf8').trim().split('\n').slice(0, -1).map(l => JSON.parse(l))
+  for (const i of [0, 1, 2, 3, 4, 5, 6]) assert.equal(said[i].error, "an agent can't change that setting: it's the user's (ask them)")
+  assert.match(said[7].error, /an agent can't import worktrees as workspaces/)
+  assert.equal(said[8].error, "a tab's state comes from its own agent")
+  assert.equal(said[9].error, "not this tab's start: a tab's state comes from its own agent")
+  assert.equal(said[10].error, undefined) // its own tab, no key: found by its process
+  assert.equal(said[11].error, undefined) // its own key
+  for (const i of [12, 13]) assert.equal(said[i].error, "an agent can't change what Recording mode hides: it's the user's (ask them)")
+  assert.match(said[14].error, /an agent can't set the app's background picture/)
+  assert.match(said[15].error, /an agent can't start the user's side chat over/)
+  assert.match(said[16].error, /an agent can't reset the user's settings/)
+  const st = await rig.rpc('state')
+  for (const k of ['whenDone', 'doneCheck', 'recording', 'nextPrompt', 'keepAwake', 'storageDays', 'updateCheck']) assert.equal(st.settings[k], undefined, k)
+  assert.notEqual(st.tabs.find((x: any) => x.id === other).status, 'waiting')
+  await until(() => rig.out.includes(`hook refused: ${tab} reported ${other}'s state`), 'said in its log')
+
+  // yours (no tab): any of them, and a When everything is done it knows; one it doesn't is refused, never kept
+  await assert.rejects(rig.rpc('settingsSet', { whenDone: 'reboot' }), /sleep, lock, shutdown or off, not "reboot"/)
+  assert.equal((await rig.rpc('settingsSet', { whenDone: 'off', doneCheck: false })).doneCheck, false)
+  await rig.rpc('hook', { tab: other, state: 'idle' })
+})

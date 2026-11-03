@@ -26,7 +26,8 @@ try {
 } catch {}
 const gated = state === 'running' && (payload as { hook_event_name?: unknown })?.hook_event_name === 'PreToolUse' && existsSync(join(dataDir(), 'tool-gates'))
 if (gated) clearTimeout(quit), (quit = setTimeout(() => process.exit(0), TOOL_WAIT + 100))
-const said = await rpc('hook', { tab, state, payload }, gated ? TOOL_WAIT : 700).catch(() => undefined)
+const key = process.env.LAKI_HOOK // this tab's start's (core.ts spawnTab): the daemon takes a tab's state with it only
+const said = await rpc('hook', { tab, state, payload, ...(key && { key }) }, gated ? TOOL_WAIT : 700).catch(() => undefined)
 // a pipe's write past its buffer ends later (macOS): exit once it's out, a second at most
 if (gated && said && typeof said === 'object' && 'hookSpecificOutput' in said) clearTimeout(quit), (quit = setTimeout(() => process.exit(0), 1000)), process.stdout.write(JSON.stringify(said), () => process.exit(0))
 else process.exit(0)

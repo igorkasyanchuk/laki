@@ -309,7 +309,7 @@ export function extMenuItems(w: WidgetView, api: WidgetsApi): MenuItem[] {
     null,
     ...(api.remix && !w.oneFile ? [{ label: 'Remix', icon: 'copy', sub: 'a copy of it to change, yours', run: () => void api.remix!(w.id) } as MenuItem] : []),
     // a repo's goes with its repo, a dev link's is your folder: neither to the trash from here
-    ...(api.rm && !w.builtin && !w.project && !w.dev ? [{ label: 'Delete…', icon: 'trash', danger: true, sub: 'to the trash: Undo brings it back', run: () => void api.rm!(w.id) } as MenuItem] : []),
+    ...(api.rm && !w.project && !w.dev ? [{ label: 'Delete…', icon: 'trash', danger: true, sub: 'to the trash: Undo brings it back', run: () => void api.rm!(w.id) } as MenuItem] : []),
   ]
 }
 
@@ -328,8 +328,8 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? 'On: turn it off' : 'Off: turn it on'} />
         <div className="wc-title">
           <span className="wc-name">
-            {w.builtin || w.oneFile ? (
-              <b data-tip={w.builtin ? 'Comes with Laki: Remix it to rename a copy' : 'One file: its name is its <laki.name> tag'}>{w.name}</b>
+            {w.oneFile ? (
+              <b data-tip="One file: its name is its <laki.name> tag">{w.name}</b>
             ) : (
               // its name, written in widget.json as you leave the field; empty: its id
               <input
@@ -351,7 +351,6 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
                 }}
               />
             )}
-            {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
             {w.scope === 'workspace' && <span className="tag-soft" data-tip="An instance per workspace, its own data">per workspace</span>}
           </span>
           <span className={`wc-state small ${w.on ? 'on' : ''}`}>{w.on ? 'On: it runs and shows where you picked' : 'Off: nothing of it runs, and it shows nowhere'}</span>
@@ -360,7 +359,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
           {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
           {api.logs && <IconButton icon="file" title={w.log ? 'Its log: what it did, its runs and stderr' : 'Its log (off: Keep a log turns it on)'} onClick={() => api.logs!(w.id)} />}
-          {api.rm && !w.builtin && (
+          {api.rm && (
             <>
               <span className="wc-sep" />
               <IconButton icon="trash" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
@@ -575,8 +574,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean)
   const hay = (w: WidgetView) => [w.name, w.id, w.repo, w.project, ...placesOf(w).flatMap(p => [p, PLACES.find(x => x[0] === p)?.[1] ?? ''])].join(' ').toLowerCase()
   const shown = api.list.filter(w => words.every(x => hay(w).includes(x))).sort((a, b) => +failing(b) - +failing(a)) // stable: the rest as they were
-  const mine = shown.filter(w => !w.builtin && !w.project)
-  const theirs = shown.filter(w => w.builtin)
+  const mine = shown.filter(w => !w.project)
   const repos = [...new Set(shown.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
   const [menu, openMenu] = useMenu()
   const [starters, setStarters] = useState(false)
@@ -614,7 +612,6 @@ function WidgetList({ api }: { api: WidgetsApi }) {
           {list(ws)}
         </Group>
       ))(api.list.filter(w => w.project === p)))}
-      {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
     </>
   )
   function list(ws: WidgetView[]) {
@@ -634,7 +631,6 @@ function WidgetList({ api }: { api: WidgetsApi }) {
                 </span>
               )}
               <span className="sched-tags">
-                {w.builtin && <span className="tag">built-in</span>}
                 {w.changed && !w.on && <span className="tag tag-closed" data-tip={`Its files changed ${w.repo ? 'in the repo' : 'in the folder an agent linked'}: off until you look`}>changed</span>}
                 {w.dev && <span className={`tag ${w.devError ? 'bad' : ''}`} data-tip={w.devError ? `Last good version kept: ${w.devError}` : 'Linked by laki widget dev: your folder, watched'}>dev</span>}
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}

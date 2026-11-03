@@ -4,7 +4,7 @@ import { strict as assert } from 'node:assert'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, sleep, until } from './helpers.ts'
+import { fixtureWidgets, fresh, sleep, until } from './helpers.ts'
 
 const make = (rig: any, id: string, m: object) => {
   mkdirSync(join(rig.data, 'widgets', id), { recursive: true })
@@ -124,13 +124,14 @@ test('a notice is said once a window is open to see it, and only while on', asyn
   assert.equal(store(rig, 'tell').told, 'build broke')
 })
 
-test('laki widget remix: a copy of a built-in, yours and off, with Laki AI off too', async t => {
+test("laki widget remix: a copy in Laki's folder, yours and off, with Laki AI off too", async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   const r = await rig.cli('widget', 'remix', 'links', 'my-links')
   assert.equal(r.code, 0, r.out)
   assert.match(r.out, /made my-links, a copy of links: yours, off/)
   const w = await find(rig, 'my-links')
   assert.equal(w.on, false)
-  assert.ok(!w.builtin && w.dir.endsWith('/widgets/my-links'))
+  assert.ok(w.dir.endsWith('/widgets/my-links'))
   assert.match((await rig.cli('widget', 'remix')).err, /usage: laki widget remix <id> \[new-id\]/)
 })

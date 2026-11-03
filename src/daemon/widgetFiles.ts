@@ -39,16 +39,14 @@ export function widgetFiles(o: { id: string }) {
     const buf = statSync(p).size > 64 << 10 ? null : readFileSync(p)
     files[n] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
   }
-  return { id: w.id, builtin: w.builtin || undefined, files, hash }
+  return { id: w.id, files, hash }
 }
 
 // the inspector's Files, edited by hand: one of the files widgetFiles lists, written in place (its mode stays). was: the
 // text the edit started from (changed meanwhile: refused unless force); a .json one must parse (widget.json: an object),
-// so a slip doesn't take the extension away. Not one that comes with Laki (an update would undo it: Remix makes a copy);
-// one of Laki's folder is kept for the studio's Undo first. Read again at once (a dev one: its watch does it)
+// so a slip doesn't take the extension away. One of Laki's folder is kept for the studio's Undo first. Read again at once (a dev one: its watch does it)
 export function widgetFileSave(o: { id: string; path: string; text: string; was?: string; force?: boolean }) {
   const w = find(o.id)
-  if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: Remix it to change a copy`)
   if (w.project) throw new Error(repoSays(w, 'change it'))
   const names = w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]
   if (typeof o.path !== 'string' || !names.includes(o.path)) throw new Error(`${o.path}: not one of its files`)
@@ -107,7 +105,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown>; age
   }
   const d = join(widgetHome(), o.id)
   const had = widgets.get(o.id)
-  if (had && had.dir !== d) throw new Error(`${o.id} is ${had.builtin ? 'one that comes with Laki' : `in ${had.dir}`}: write a new one under another id`)
+  if (had && had.dir !== d) throw new Error(`${o.id} is in ${had.dir}: write a new one under another id`)
   const was = readStore(o.id)
   const theirs = !!statOf(d) && was.by !== 'ai' // the user's own: only after a fresh ask in its page's chat, and it stays theirs
   if (theirs && !(was.aiMay && Date.now() - was.aiMay < AI_MAY)) throw new Error(`${o.id} is the user's own (Laki AI didn't make it): write a new one under another id`) // theirs isn't overwritten
@@ -206,7 +204,7 @@ export function widgetUndo(o: { id: string; after?: number; agent?: boolean }) {
   wLog({ id: o.id }, `undone: back to before ${new Date(at).toLocaleTimeString()}`)
   return { ok: true, at, gone: !widgets.has(o.id) }
 }
-// Remix: a copy in Laki's folder under a new id (any one's: built-in, a folder of yours), the user's own (not by Laki
+// Remix: a copy in Laki's folder under a new id (any one's: a repo's, a folder of yours), the user's own (not by Laki
 // AI), off, with Laki AI's leave to rewrite it (aiMay). Not a one-file extension's (its file name is its id)
 export function widgetRemix(o: { id: string; newId?: string }) {
   const w = find(String(o.id))
@@ -255,11 +253,10 @@ export const widgetChatFile = (chat: string) => {
 }
 
 // Settings › Extensions' Delete: its folder (a link: only the link; a one-file extension: its file), its store, its
-// instances, its history, its chat and its secrets go to the trash (widgetRestore puts them back: Undo). Not one that
-// comes with Laki (turn it off), nor a folder that holds more than it (your home, Laki's own). Its grants go for good
+// instances, its history, its chat and its secrets go to the trash (widgetRestore puts them back: Undo). Not a folder
+// that holds more than it (your home, Laki's own). Its grants go for good
 export async function widgetRm(o: { id: string }) {
   const w = find(o.id)
-  if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
   if (w.project) throw new Error(repoSays(w, 'remove it'))
   if (w.dev) throw new Error(`${w.m.name || w.id} is your code, linked by laki widget dev: unlink it instead (laki widget dev --off ${w.id})`)
   if (agents.has(w.id)) {

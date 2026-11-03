@@ -429,6 +429,8 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
   const ends = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+  // Copy all: the link and its PIN as one message to send (Copy the link and Copy the PIN stay, for two channels)
+  const remoteText = (x: Remote) => [`Laki remote access: ${x.link}`, `PIN: ${x.pin}`, `The link opens once, in one tab. ${x.until ? `Ends ${ends(x.until)}.` : 'Runs until it is stopped.'}`].join('\n')
   return (
     <>
       <h2>Remote access</h2>
@@ -449,6 +451,7 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             <div className="tunnel-code">
               <code>{r.link}</code>
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
+              {r.pin && <IconButton icon="clipboard" label="Copy all" title="Copy the link and the PIN, to send in one message" onClick={() => api.copy(remoteText(r))} />}
               {!r.via && !r.used && <IconButton icon="link" title="Open (here: the link opens once)" onClick={() => api.open(r.link!)} />}
             </div>
             <p className={r.used ? 'warn-soft small' : 'muted small'}>
@@ -462,7 +465,10 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
             {r.pin ? (
               <div className="remote-pin-box">
                 <span className="small muted">PIN</span>
-                <code className="remote-pin">{`${r.pin.slice(0, 3)} ${r.pin.slice(3)}`}</code>
+                <div className="remote-pin-row">
+                  <code className="remote-pin">{`${r.pin.slice(0, 3)} ${r.pin.slice(3)}`}</code>
+                  <IconButton icon="copy" title="Copy the PIN" onClick={() => api.copy(r.pin!)} />
+                </div>
                 <span className="muted small">
                   The page asks for it. {r.tries === 1 ? 'One more wrong PIN stops' : `${r.tries} wrong PINs stop`} remote access. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
                 </span>

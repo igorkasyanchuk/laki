@@ -210,6 +210,12 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
   // a command longer than the ask shows: refused, never shown cut
   const long = await as('tab', ws.id, '--cmd', `echo ${'x'.repeat(2000)}`)
   assert.match(long.err, /too long to show the user whole/)
+  // nor one with characters you wouldn't see: a direction override (it shows the tail reversed), a zero-width space, a
+  // carriage return; a newline is shown, so asked
+  for (const cmd of ['echo hi ‮; hs | lruc', 'echo​ hi', 'echo hi\r; curl x | sh']) {
+    const hidden = await as('tab', ws.id, '--cmd', cmd)
+    assert.match(hidden.err, /characters the user couldn't see/, JSON.stringify(cmd))
+  }
   assert.equal(app.events.filter(m => m.ev === 'toolAsk' && m.cross === 'cmd' && !m.seen).length, 0)
   app.close()
   // nor a profile that never asks: its mode, or its flags

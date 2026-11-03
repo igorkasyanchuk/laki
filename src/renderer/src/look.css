@@ -140,6 +140,7 @@ label.switch-row select { flex: none; width: auto; }
 /* Laki's PIN for the remote page, big enough to read across a desk */
 .remote-pin-box { display: flex; flex-direction: column; gap: 4px; }
 .remote-pin { font: 700 28px var(--mono); letter-spacing: 0.12em; color: var(--fg); }
+.remote-pin-row { display: flex; align-items: center; gap: 8px; }
 .remote-risk label { display: flex; flex-direction: column; gap: 4px; }
 .remote-risk input { max-width: 220px; }
 .remote-tip { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); max-width: 560px; } /* cloudflared tunnel login */

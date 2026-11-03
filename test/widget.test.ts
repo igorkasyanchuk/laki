@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { ago, hasFull, hasScript, pageOf, render, sayOf, spark, viewOf } from '../src/shared/widget.ts'
-import { fresh, type Rig, until } from './helpers.ts'
+import { fixtureWidgets, fresh, type Rig, until } from './helpers.ts'
 
 test('widget toasts and modals: sayOf keeps what the app can show', () => {
   assert.equal(sayOf(null), null)
@@ -75,13 +75,14 @@ const find = async (rig: Rig, id: string) => ((await rig.rpc('state')).widgets ?
 
 test('widgets: found in folders, fetched on schedule into storage, rendered, set, reloaded', async t => {
   const rig = await fresh(t)
-  // the ones Laki comes with: listed, off
+  // a folder of yours (Settings' extension folders): listed, off
+  const fx = await fixtureWidgets(rig)
   let v = await rig.rpc('state')
-  const builtin = v.widgets.find((w: any) => w.id === 'my-prs')
-  assert.ok(builtin?.builtin && !builtin.on && builtin.full && builtin.every === 5)
-  assert.deepEqual(builtin.config, { repo: '', author: '@me', label1: '', label2: '', label3: '', only: '', hide: '' })
+  const prs = v.widgets.find((w: any) => w.id === 'my-prs')
+  assert.ok(prs && !prs.on && prs.full && prs.every === 5)
+  assert.deepEqual(prs.config, { repo: '', author: '@me', label1: '', label2: '', label3: '', only: '', hide: '' })
   assert.deepEqual(
-    builtin.options.map((o: any) => [o.key, o.type, o.label]),
+    prs.options.map((o: any) => [o.key, o.type, o.label]),
     [
       ['repo', 'text', 'Repo'],
       ['author', 'text', 'Author'],
@@ -92,8 +93,8 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
       ['hide', 'list', 'Hide with labels'],
     ],
   )
-  assert.deepEqual(builtin.size, [4, 1])
-  assert.equal(builtin.view, 'l')
+  assert.deepEqual(prs.size, [4, 1])
+  assert.equal(prs.view, 'l')
   assert.equal(v.widgetHome, join(rig.data, 'widgets'))
 
   widget(
@@ -157,12 +158,14 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
   mkdirSync(join(extra, 'one'), { recursive: true })
   writeFileSync(join(extra, 'one', 'widget.json'), '{"name":"One"}')
   writeFileSync(join(extra, 'one', 'widget.html'), 'one')
-  await rig.rpc('settingsSet', { widgetDirs: ['', ` ${extra} `] })
+  await rig.rpc('settingsSet', { widgetDirs: ['', fx, ` ${extra} `] })
   v = await rig.rpc('state')
   assert.deepEqual(
-    v.widgets.filter((w: any) => !w.builtin).map((w: any) => [w.id, w.every]),
+    v.widgets.map((w: any) => [w.id, w.every]),
     [
       ['hello', 1],
+      ['links', undefined],
+      ['my-prs', 5],
       ['one', undefined],
     ],
   )
@@ -287,8 +290,9 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.match((await rig.rpc('widgetRun', { id: 'js' })).error, /^Cannot read properties of null/)
 })
 
-test('widgets that come with Laki: My PRs, Links', async t => {
+test('widget fixtures: My PRs, Links', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   mkdirSync(rig.env.FAKE_GH, { recursive: true })
   const pr = (number: number, login: string, mergeable: string, o: object = {}) => ({
     number,
@@ -367,8 +371,9 @@ test('widgets that come with Laki: My PRs, Links', async t => {
   assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links').key}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
 })
 
-test('widget sizes: half a cell down is kept (a thin line), other fractions round, Auto for a bar; Links comes as one', async t => {
+test('widget sizes: half a cell down is kept (a thin line), other fractions round, Auto for a bar; Links is one', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   const links = async () => (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
   assert.deepEqual((await links()).size, [4, 0.5], 'Links: a line across')
   await rig.rpc('widgetSet', { id: 'links', size: [2, 0.7] })
@@ -386,13 +391,14 @@ test('widget sizes: half a cell down is kept (a thin line), other fractions roun
 
 test('extensions Laki AI writes: in its own folder only, saved off (one on stays on; an agent’s change to what it runs turns it off), read back; never over another folder’s', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   const json = JSON.stringify({ name: 'NY clock', fetch: 'echo "{\\"t\\": 1}"', every: 1, sample: { t: 7 } })
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': JSON.stringify({ name: 'NY clock', fetch: 'date' }) } }), /a sample too/, 'a fetch without made-up data for its preview')
   await assert.rejects(rig.rpc('widgetWrite', { id: 'My Clock', files: { 'widget.json': json } }), /an id/)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { '../x.sh': 'x' } }), /no folders/)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': 'x' } }), /needs widget.json/)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': '{nope' } }), /widget.json/)
-  await assert.rejects(rig.rpc('widgetWrite', { id: 'my-prs', files: { 'widget.json': json } }), /comes with Laki/)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'my-prs', files: { 'widget.json': json } }), /my-prs is in .*: write a new one under another id/)
   const w = await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': json, 'widget.html': '<template preview>{{data.t}}</template>', 'fetch.sh': '#!/bin/sh\necho "{}"' } })
   assert.deepEqual([w.id, w.on, w.byAi, w.every], ['ny', false, true, 1], 'saved off')
   assert.equal(w.sample, true)
@@ -449,14 +455,14 @@ test('extensions Laki AI writes: in its own folder only, saved off (one on stays
   await rig.rpc('widgetWrite', { id: 'ny', files: { 'notes.md': 'echo "{\\"t\\": 3}"' }, from })
   assert.equal((await find(rig, 'ny')).on, false, 'a Markdown file its fetch runs counts as what it runs')
   assert.deepEqual(Object.keys((await rig.rpc('widgetFiles', { id: 'ny' })).files).sort(), ['fetch.sh', 'notes.md', 'widget.html', 'widget.json'], 'files left out stay')
-  assert.match((await rig.rpc('widgetFiles', { id: 'links' })).files['widget.json'], /"name"/, 'an example that comes with Laki')
+  assert.match((await rig.rpc('widgetFiles', { id: 'links' })).files['widget.json'], /"name"/, 'one in a folder of yours: read too')
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: ['x'] }), /1 to 20 files/)
   mkdirSync(join(rig.data, 'widgets', 'mine'))
   writeFileSync(join(rig.data, 'widgets', 'mine', 'widget.json'), json)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.json': json } }), /the user's own/)
   // an ask in its page's chat: rewrites for its hour (a write, a check, a fix), then it's theirs again
   await rig.rpc('widgetReload')
-  await assert.rejects(rig.rpc('widgetSet', { id: 'links', ai: true }), /Laki's folder/, 'one that comes with Laki: never')
+  await assert.rejects(rig.rpc('widgetSet', { id: 'links', ai: true }), /isn't in Laki's folder/, 'one in a folder of yours: never')
   await rig.rpc('widgetSet', { id: 'mine', ai: true })
   await rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': '<template preview>new</template>' } })
   await rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': '<template preview>fixed</template>' } })
@@ -492,8 +498,7 @@ test('extensions: a place (sidebar, top bar, status bar), network access for a J
   await rig.rpc('widgetSet', { id: 'plain', net: true })
   assert.equal((await find(rig, 'plain')).net, undefined, 'a template widget has no page of its own')
 
-  // delete: its folder and its storage go; one that comes with Laki only turns off
-  await assert.rejects(rig.rpc('widgetRm', { id: 'links' }), /comes with Laki/)
+  // delete: its folder and its storage go
   const dir = join(rig.data, 'widgets', 'net')
   assert.ok(existsSync(join(rig.data, 'widget-data', 'net.json')))
   assert.equal((await rig.rpc('widgetRm', { id: 'net' })).deleted, 'net')

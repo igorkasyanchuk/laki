@@ -95,7 +95,7 @@ async function aboutWidget(id: string) {
     return `<file name="${n}">\n${s}${s.length < t.length ? '\n… (cut: laki_extension_read has all of it)' : ''}\n</file>`
   })
   return [
-    `This chat is on the page of ${v ? `the Laki extension "${v.name}" (id ${id})` : `a new Laki extension: its id is ${id}`}. Beside it the user sees its preview (with its sample data), its settings and its inspector: every ask in it is about it, even one that doesn't name it.${v && v.dir !== `${widgetHome()}/${id}` ? " It isn't in Laki's own folder (it comes with Laki, or it's in a folder of the user's): you can't write it; the page's Remix makes a copy you can." : ''}`,
+    `This chat is on the page of ${v ? `the Laki extension "${v.name}" (id ${id})` : `a new Laki extension: its id is ${id}`}. Beside it the user sees its preview (with its sample data), its settings and its inspector: every ask in it is about it, even one that doesn't name it.${v && v.dir !== `${widgetHome()}/${id}` ? " It isn't in Laki's own folder (it's in a folder of the user's, or a repo's): you can't write it; the page's Remix makes a copy you can." : ''}`,
     `Rules here:
 1. Write only ${id}, with laki_extension_write.
 2. Prefer ui (the UI kit's elements); widget.html only for a look of its own.

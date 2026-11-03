@@ -11,9 +11,8 @@ once on sample data; change its fetch and its `ui` from there (below: *Starters*
 This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New ▾ ›
 With Laki AI…* while Laki AI is off (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), in
 `/laki:extension <what it shows or does>` in Laki's Claude Code tabs, and in
-[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which they're all made from. Two examples come with Laki,
-in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, its `ui`, its
-sample).
+[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which they're all made from. To begin,
+`laki widget new <name> --kind <k>` makes a working starter of each kind (Settings › Extensions › *New ▾* too).
 
 ## How it works
 
@@ -86,9 +85,9 @@ the workspace: `{{config.repo}}`, `{{workspace.path}}/TODO.md`. A failed read ke
 Each setting is a default or `{ "type", "label", "hint", "default", "choices", "required" }`, `type` one of `text`, `number`,
 `bool`, `choice`, `list`, `secret`. You fill them in Settings › Extensions; the fetch gets them as `$WIDGET_<NAME>` (text) and
 `$LAKI_WIDGET_CONFIG` (all of them, typed, as JSON); a page or a script gets them typed as `config`.
-`"required": true` is one it can't do without (My PRs' *Repo*): while it's empty its cell says *Set Repo*, and turning
-it on opens its page at that field. Its fetch should still fail with a line that says where (`Set Repo in Settings ›
-Extensions › My PRs`).
+`"required": true` is one it can't do without (a PR list's *Repo*): while it's empty its cell says *Set Repo*, and
+turning it on opens its page at that field. Its fetch should still fail with a line that says where (`Set Repo in
+Settings › Extensions › <its name>`).
 An agent (`laki widget set`, MCP's `laki_extension_set`) changes plain settings, never a secret nor one its source or an AI
 action's prompt reads (`{{config.x}}`): those steer what it runs with your tools.
 
@@ -877,9 +876,9 @@ inspector's tabs, the chat still beside them. One page for making it, changing i
   *Try it live*: its *Turn on* shows every file it runs first.
 - **Undo** puts the version before the last change back (the last 20 are kept); each turn's *Undo to here* goes back to
   how it was after that turn.
-- Any extension's page has the chat: one of yours, Laki AI changes; one that isn't (built in, a repo's, a folder of
+- Any extension's page has the chat: one of yours, Laki AI changes; one that isn't (a repo's, a folder of
   yours), it answers about, and the chat's *Remix it* makes a copy to change. **Remix** (a row's, the chat's, or Files'
-  *Remix it…*; any one, built-in too; `laki widget remix <id> [new-id]`) makes a copy that's yours,
+  *Remix it…*; any one, a repo's too; `laki widget remix <id> [new-id]`) makes a copy that's yours,
   in Laki's folder, off, and opens its page. Laki AI isn't needed for it.
 - Close the page while Laki AI builds and it goes on: Settings › Extensions › *Where you left off* (and a new
   extension's chat) lists what you're making that isn't saved yet; a click goes back to its page and chat.
@@ -939,7 +938,7 @@ and commit it. Folders and one-file extensions both work.
   *Show when it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`) and
   *Show a tooltip* (off: nothing on hover), its folder, *Delete*
   (its folder, settings, data, history, chat and secrets go to the trash, with *Undo* in the toast; `laki widget trash`
-  lists the last 30 days', `laki widget restore <trash-id>` puts one back; the ones that come with Laki only turn off), and Laki AI's chat
+  lists the last 30 days', `laki widget restore <trash-id>` puts one back; a repo's goes with its repo), and Laki AI's chat
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Overview), or with Laki AI (without
   it: a page with the prompt for any AI chat). Search
   for *plugin* finds it too.

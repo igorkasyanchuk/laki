@@ -78,6 +78,7 @@ export class Session {
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
   onHook: (data: string) => void = () => {} // OSC 7717: a hook on an SSH host reports through the tab's own terminal (core.ts)
+  hookKey = '' // this start's key, LAKI_HOOK in its env: what its hooks carry (core.ts spawnTab, hookOk)
 
   constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number }) {
     this.tab = tab

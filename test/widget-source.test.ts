@@ -183,7 +183,7 @@ test("an AI source's agent asks for a tool it may not use: the app's dialog; Alw
   await shows(/>deny\|mcp__slack</)
 })
 
-test("an extension's name: written in its widget.json from the page; a built-in's and one file's aren't", async t => {
+test("an extension's name: written in its widget.json from the page", async t => {
   const rig = await fresh(t)
   const dir = join(rig.data, 'widgets', 'notes')
   mkdirSync(dir, { recursive: true })
@@ -194,7 +194,6 @@ test("an extension's name: written in its widget.json from the page; a built-in'
   assert.equal((await rig.rpc('widgetSet', { id: 'notes', name: '' })).name, 'notes', 'empty: its id')
   assert.equal(JSON.parse(readFileSync(join(dir, 'widget.json'), 'utf8')).name, undefined)
   await assert.rejects(rig.rpc('widgetSet', { id: 'notes', name: 'x'.repeat(61) }), /up to 60/)
-  await assert.rejects(rig.rpc('widgetSet', { id: 'links', name: 'Mine' }), /comes with Laki: Remix it/)
 })
 
 test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetch keeps its last data", async t => {

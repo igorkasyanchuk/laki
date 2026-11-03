@@ -352,6 +352,31 @@ test('worktrees made outside Laki: listed (not the repo, Laki\'s own or a detach
   assert.ok(!existsSync(join(outside, 'ran-setup'))) // set up already: no setup script
   assert.ok((await rig.rpc('state')).workspaces.some((w: any) => w.id === 'feature-x'))
   assert.deepEqual(await rig.rpc('worktreeList', { project: p.id }), []) // Laki's now
+
+  // a registration naming a folder of yours (.git/worktrees/<x>/gitdir: anything that writes the repo can) isn't listed:
+  // git calls it prunable, its .git isn't there
+  const docs = join(rig.home, 'Documents')
+  mkdirSync(docs)
+  writeFileSync(join(docs, 'keep.txt'), 'mine\n')
+  const reg = join(rig.repo, '.git', 'worktrees', 'docs')
+  mkdirSync(reg, { recursive: true })
+  g('branch', 'docs-b')
+  writeFileSync(join(reg, 'gitdir'), `${join(docs, '.git')}\n`)
+  writeFileSync(join(reg, 'HEAD'), 'ref: refs/heads/docs-b\n')
+  writeFileSync(join(reg, 'commondir'), '../..\n')
+  assert.deepEqual(await rig.rpc('worktreeList', { project: p.id }), [])
+  await assert.rejects(rig.rpc('worktreeImport', { project: p.id, paths: [docs] }), /isn't a worktree of/)
+  // an imported one's folder is git's to remove: a delete takes a real worktree, and leaves one git won't remove (its
+  // .git gone) where it is, never removed by Laki
+  const broken = join(rig.home, 'elsewhere', 'feature-y')
+  g('worktree', 'add', '-q', broken, '-b', 'feature-y')
+  const [ws2] = await rig.rpc('worktreeImport', { project: p.id, paths: (await rig.rpc('worktreeList', { project: p.id })).map((x: any) => x.path) })
+  execFileSync('rm', [join(broken, '.git')])
+  await rig.rpc('wsRm', { id: ws2.id })
+  assert.ok(existsSync(join(broken, 'README.md')), "a folder git didn't remove stays")
+  await rig.rpc('wsRm', { id: ws.id })
+  assert.ok(!existsSync(outside), 'git removed the real worktree')
+  assert.equal(readFileSync(join(docs, 'keep.txt'), 'utf8'), 'mine\n')
 })
 
 test("a turn's changes: the worktree as it starts and ends; This turn's diff; Undo while they're as it left them", async t => {

@@ -304,6 +304,10 @@ const wsName = wsShown
 // is typed; a wrong one shakes them, a right one turns the ring green with a check while the socket opens. Unlock is
 // always a button: short of six digits it says so
 const PIN_LEN = 6 // remote.ts' PIN
+// what a notification shows whole, so its buttons may answer it: one short line of plain ASCII words, single spaces
+// between (macOS shows about two lines: a newline, a run of spaces or wide glyphs would push a tail out of sight; 40 of
+// its widest letter still fit)
+const shownWhole = (t: string) => t.length <= 40 && /^[!-~]+(?: [!-~]+)*$/.test(t)
 function PinForm({ left }: { left?: number }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
@@ -2365,7 +2369,8 @@ export function App() {
       // an agent's laki preset (main.ts' presetAsk): the profile as it would be; once only
       const title = `${m.agent} in ${m.from} wants to ${m.target}`
       const picks: Pick[] = [{ label: 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, 'Settings › Agents & profiles', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      // no Allow on the notification: it can't show the profile, and one click could add a mode that never asks
+      notify(title, 'Open Laki to see what changes', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
       toolLine.add({ req: m.req, title, text: `Every tab started on it runs with its args and env.\n\n${m.text}`, picks, answer })
       return toolShow()
     }
@@ -2374,8 +2379,8 @@ export function App() {
       const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`
       const picks: Pick[] = [{ label: 'Run it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
       const cmd = String(m.text ?? '')
-      // Run it from the notification only when it shows the whole command; a longer one is read in the dialog
-      notify(title, cmd.length > 200 ? cmd.slice(0, 199) + '…' : cmd, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, cmd.length > 200 ? [] : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      // Run it from the notification only when it shows the whole command (shownWhole); any other is read in the dialog
+      notify(title, cmd.length > 200 ? cmd.slice(0, 199) + '…' : cmd, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, shownWhole(cmd) ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
       toolLine.add({ req: m.req, title, text: `In a new terminal tab of ${m.to}, as you: the agent's own permission prompts don't see it.\n\n$ ${m.text}`, picks, answer })
       return toolShow()
     }
@@ -2387,8 +2392,8 @@ export function App() {
       const title = emit ? `${m.agent} in ${m.from} wants to send ${m.target} to ${m.to}` : `${m.agent} in ${m.from} wants to ${send ? 'send to' : 'read'} ${m.target} in ${m.to}`
       const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always from ${m.from} to ${m.to}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
       const said = String(m.text ?? '')
-      // Allow from the notification only when it shows all of what goes; a longer one is read in the dialog
-      const whole = !(send || emit) || said.length <= 200
+      // Allow from the notification only when it shows all of what goes (shownWhole); any other is read in the dialog
+      const whole = !(send || emit) || shownWhole(said)
       notify(title, send || emit ? (whole ? said : said.slice(0, 199) + '…') : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, whole ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
       toolLine.add({ req: m.req, title, text: `${emit ? `An event: the workflows and extensions listening in ${m.to} would run there, with this:\n\n${m.text}` : send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
       return toolShow()

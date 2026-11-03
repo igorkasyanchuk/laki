@@ -327,7 +327,7 @@ const api: Record<string, Handler> = {
   queueClear: async p => (await crossAsk(p, 'send', p.target, ''), core.clearQueue(p.target)),
   queueSet: async p => (await crossAsk(p, 'send', p.tab, Array.isArray(p.queue) ? p.queue.join('\n\n') : ''), core.queueSet(p)), // the queue strip's edit, reorder, remove
   queueNow: async p => (await crossAsk(p, 'send', p.tab, ''), core.queueNow(p.tab)), // its Send now: the turn stopped, the first one typed
-  hook: p => core.hook(p),
+  hook: ({ key: _, ...p }) => core.hook(p), // hookWho's first
   worktreeList: p => core.worktreeList(p.project),
   worktreeImport: p => core.worktreeImport(p),
   diff: p => core.diff(p.ws, p.uncommitted === true), // uncommitted: against HEAD (Changes' and Review's Uncommitted)
@@ -501,23 +501,25 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'presetSave']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets
+const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
 const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
+// a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
+const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
 const remoteNo = (method: string, p: any) =>
   REMOTE_NO.has(method) ||
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
-  (method === 'settingsSet' && Object.keys(p ?? {}).some(k => REMOTE_KEYS.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k])))
+  (method === 'settingsSet' && changes(p, REMOTE_KEYS))
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
 // Every local connection, its Origin or not (any tab can read daemon.json's token and say Origin: file://), but remote
 // access's page (its own token, REMOTE_NO): the app's window is Electron's process, in no tab, so yours (a dev app
 // started from a Laki tab counts as that tab). Looked up once per connection as a method first needs it (a WebSocket's
-// as it opens), never for a hook's; nothing found, or the client gone before the answer (its port may be another
+// as it opens), a hook's only without its key (hookWho); nothing found, or the client gone before the answer (its port may be another
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop'])
+const FROM = new Set(['wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -559,10 +561,17 @@ const notAgent = (p: any, what: string) => {
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
-const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check' }
+const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off" }
+// settings an agent can't change either (remote access can: they're the user's own on the phone, Cancel's whenDone off
+// too): when everything is done (the Mac sleeps, locks or shuts down), the Done check, Recording mode, the next prompt
+// guessed (your messages to a model), keep awake; how old the tidies let storage files, archived workspaces and pasted
+// images get (a small one deletes them all within the hour); memory's compaction (memories to a model, as
+// memoryCompact); the app's updates (Electron's security fixes come with them)
+const AGENT_KEYS = /^(whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|imageDays|memoryCompact|updateCheck|updateDelay)$/
 function agentNo(method: string, p: any) {
-  if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
+  if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
+  else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
@@ -648,14 +657,37 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
 // an agent's command in a new terminal tab (tabNew's cmd): it runs as you, past the agent's own permission prompts, so
 // you allow it in the app each time (no Always); no window, no answer or a no: refused
 const CMD_ASK = 2000
+// what a dialog or a notification wouldn't show you: controls but tab and newline, direction and zero-width characters
+// (Unicode's format ones), line and paragraph separators
+const HIDDEN = /[\p{Cf}\u2028\u2029]|[^\P{Cc}\t\n]/u
 async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
   const to = ws
+  if (HIDDEN.test(cmd)) throw new Error("the command has characters the user couldn't see (a control, direction or zero-width one): ask them to run it, or put it in a script") // you allow what you read
   if (cmd.length > CMD_ASK) throw new Error(`the command is longer than ${CMD_ASK} characters, too long to show the user whole: ask them to run it, or put it in a script`) // you allow what you read, all of it
   if (!core.clients.size) throw new Error("an agent's command runs once the user allows it in Laki's window, and it isn't open: ask the user to run it")
   const agent = core.state.tabs.find(t => t.id === from?.tab)?.name ?? 'An agent'
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'cmd', agent, from: name(by), to: name(to), target: 'a command', text: cmd, ws: by, tab: from?.tab })
   if (how !== 'once') throw new Error(`${how === 'deny' ? 'the user said no to' : 'no answer from the user for'} the command: ask them to run it themselves`)
+}
+
+// a tab's state (laki hook) comes from that tab's agent: with its start's key (LAKI_HOOK, core's spawnTab), else from a
+// process of that tab or of none (yours: laki hook typed, a test's). Another tab's process, or a key that isn't this
+// start's, is refused: it would end that agent's turn (its queue delivered, a workflow's block ended with words it chose,
+// the Done check), run the tool gates on input it chose and fire tool.call. A hook is looked up only without its key
+// (whoCalls never does: one per tool call). ponytail: the key is in the agent's env, which a process of yours can
+// read; per-tab users are the real fix
+async function hookWho(sock: Socket, p: any) {
+  if (p.key !== undefined) {
+    if (core.hookOk(String(p.tab ?? ''), p.key)) return
+    throw new Error("not this tab's start: a tab's state comes from its own agent")
+  }
+  const tab = await peerOf(sock).catch(() => null)
+  if (tab === null || sock.readableEnded || sock.destroyed) throw new Error(core.WHO)
+  if (tab && tab.id !== p.tab) {
+    log(`hook refused: ${tab.id} reported ${String(p.tab).slice(0, 40)}'s state`)
+    throw new Error("a tab's state comes from its own agent")
+  }
 }
 
 // the ticks' now (storageTidy, archivedTidy, scheduleTick…): a test's daemon only (the rig's LAKI_TEST_PARENT); any
@@ -672,6 +704,7 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   if (sock) params = await whoCalls(sock, method, params)
   if (sock) agentNo(method, params ?? {})
+  if (sock && method === 'hook') await hookWho(sock, params ?? {})
   return await h(params ?? {}, c)
 }
 

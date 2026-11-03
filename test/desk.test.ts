@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { deskLayout } from '../src/shared/types.ts'
-import { fresh } from './helpers.ts'
+import { fixtureWidgets, fresh } from './helpers.ts'
 
 test("the Desk's tiles: each in its cell, gaps kept, one in the way pushed down, unplaced ones as the flow put them", () => {
   const at = (l: ReturnType<typeof deskLayout>) => Object.fromEntries(l.map(t => [t.id, [t.x, t.y, t.w, t.h]]))
@@ -31,6 +31,7 @@ test("the Desk's tiles: each in its cell, gaps kept, one in the way pushed down,
 
 test('extensions: in several places at once (desk among them)', async t => {
   const rig = await fresh(t)
+  await fixtureWidgets(rig)
   const of = async (id: string) => (await rig.rpc('state')).widgets.find((w: any) => w.id === id)
   let w = await of('my-prs')
   assert.deepEqual([w.place, w.places, w.on], ['side', ['side'], false], "widget.json's place (none: the sidebar), off until turned on")
