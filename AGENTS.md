@@ -208,7 +208,19 @@ for `ws` new only, refused for another, false or null clears it; `runSchedule`: 
 `hasSetup`, a row's *no setup* tag). 136: `worktreeList`/`worktreeImport` (a project's ⋯ › *Import worktrees…*), the view's
 `whenDone` (settings.whenDone's countdown), a tab's `compacting` (claude's PreCompact), `suggest` (settings.nextPrompt),
 `secret` (`secretAsk`/`secretGive`, `secretsTidy`: `laki secret`) and `changes` (`turnDiff`, `turnUndo`), `tabHandover`
-(turns.ts, below). A setting the renderer adds
+(turns.ts, below). 137: `bgSet`/`bgGet` (Settings › Appearance › Background image: `<data>/background/<ms>.<ext>`, the one
+before removed, `settings.background` `{ file, dim, blur }`; themes.ts `setBgImage`, `html.has-bg`), `prompts` (your
+prompts, newest first, `<data>/prompts.json`, `PROMPTS_MAX`: core's `promptKeep` from main.ts' user sends, `wsNew`/`wsFan`
+prompts and Laki AI asks, and claude's UserPromptSubmit after your keys (`keysAt`, 5 s); refused from an agent;
+PromptInput.tsx `usePromptHistory`: ↑ in an empty box, Settings › Keys' `history`, the Reader's box too), a workspace's and a
+project's `private` (`wsSet`, `projectSet`) with `settings.recording` (Recording mode: shared/types.ts `veiled`, the view
+App draws; phone.ts skips their pushes; the status bar's `.sb-rec`, ⌘K, the menu bar's checkbox), a sep's `where`
+(`SEP_WHERE`), `perm`, `model`, `effort`, `base` (Edit group: panels.tsx `groupNew` on the new-workspace page),
+`chatList`/`chatImport` (daemon/chats.ts: Claude Code's and Codex's chats run in the project's folders outside Laki, a tab
+each resuming it, `addTab` `resume`), `sideAsk`/`sideState`/`sideNew` (turns.ts' Side chat: claude's chat forked with
+`--fork-session`, read-only tools; others' through Laki AI; SideChat.tsx, the right panel's `side` tab), `browse`
+`expect` (`laki browser --expect-url`, MCP's `expect_url`: shared/types.ts `urlIs`, main's `browseOp` refuses another
+page), settings' `updateDelay` (main's `updater` `auto(on, days)`, `heldUntil`, `skip`) and `modelEfforts`. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -855,7 +867,8 @@ the code, the seconds it ran, its last lines.
   `syncBranches`: each workspace's `branch` follows its folder's HEAD (`headOf` reads the file, no git run; detached
   stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it (a PR only linked
   stays: its branch's own replaces a guessed one once pushed), and scans PRs now.
-  A turn's end scans PRs 2 s later too (`prSoon`, at most every 20 s): `gh pr create` shows up without the minute's wait.
+  A turn's end scans its workspace's PR 2 s later too (`prSoon`, at most every 20 s each; `scanPRs`' `only`, a branch
+  move's too): `gh pr create` shows up without the minute's wait.
 - Done check (`daemon/verify.ts`, main.ts imports it, core doesn't: `turnEnds`, core's `checkHooks.will` and `checks`;
   `settings.doneCheck`, on unless false): a project's `check` (`DoneCheck`, `checkOk`: `steps` of `CHECK_STEPS` in that
   order, `review` claude or codex; the app's over a trusted `.laki.json`'s; a step without its script dropped:
@@ -909,6 +922,9 @@ the code, the seconds it ran, its last lines.
   `reviewersOf`'s (each author's last approval or ask for changes) `approved`, `changes` (the PR section's *Approved by*, the hover card, the status bar's tip); `yoursOn`'s `approvedByMe` and `commentedByMe` (someone else's PR: your approval, your comments or reviews with them; `comments` in `PR_FIELDS`), the sidebar's ✓, ✓✓ and 👀 (`settings.prMarks`: `approved`, `mine`, `commented`, unset on; `at`: start, name or end); `mine`: the author is `ghLogin`'s,
   `gh api user` once per host: no avatar, no Approve), every `settings.prScan` minutes
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
+  A gh failure but *no pull requests found* (a rate limit, the network, a timeout) keeps the last PR; the timer's scans
+  (`scanPRs(true)`) skip a branch gh found none for within `NONE_EVERY` (5 minutes) and all of them for `LIMITED` (5
+  minutes) after gh says rate limit; a turn's end, a branch move and `prRefresh` ask at once.
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. No PR on the
   branch (and no `prUrl`): `prFromSaid`, the one PR link its agent tabs' last answers name (one, of a repo of `git
   remote -v`; each tried once per workspace, `saidTried`), attached as `prAttach` does, marked `prSaid` (one in `related` never: you

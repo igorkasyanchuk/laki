@@ -4,19 +4,21 @@
 import { randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { answerOk, type Tab, type Webhook } from '../shared/types.ts'
+import { answerOk, type Tab, type Webhook, type Workspace } from '../shared/types.ts'
 import { answer, dir, log, rtOf, sessions, state } from './core.ts'
 import { pushTo, replies } from './push.ts'
 import { flowHooks } from './schedule.ts'
 
 // a push to your phone (push.ts) for a turn that waits or is done: once per state change of a tab (pushed: what went
-// since it last ran; view() clears it), never for a muted tab or workspace. ponytail: a turn that starts and ends
+// since it last ran; view() clears it), never for a muted tab or workspace, nor a private one in Recording mode
+// (hidden: a phone on the desk is on camera too). ponytail: a turn that starts and ends
 // within the 30 ms before a view is built looks like the same one, and its end isn't pushed
 export const pushed = new Map<string, string>()
+const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   const w = state.settings?.webhook
   const ws = state.workspaces.find(x => x.id === tab.workspace)
-  if (!w?.url?.trim() || (kind === 'waiting' ? w.waiting === false : w.done !== true) || pushed.get(tab.id) === kind || tab.muted || ws?.muted) return
+  if (!w?.url?.trim() || (kind === 'waiting' ? w.waiting === false : w.done !== true) || pushed.get(tab.id) === kind || tab.muted || ws?.muted || hidden(ws)) return
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
@@ -121,7 +123,7 @@ export function flowPhone(name: string, ws: string | undefined, what: string, te
 export function flowAsk(run: { id: string; name: string; ws?: string }, question: string, options: string[], show?: string) {
   const w = state.settings?.webhook
   const ws = run.ws ? state.workspaces.find(x => x.id === run.ws) : undefined
-  if (!w?.url?.trim() || w.waiting === false || ws?.muted) return
+  if (!w?.url?.trim() || w.waiting === false || ws?.muted || hidden(ws)) return
   const key = flowHooks.waitKey?.(run.id) // its block, question and choices, as phoneTick checks them
   const nonce = key && options.length ? nonceFor(w) : undefined
   if (nonce) awaiting.set(nonce, { flow: run.id, key: key!, until: Date.now() + 864e5 }), listen(w)

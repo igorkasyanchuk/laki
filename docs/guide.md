@@ -63,7 +63,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
   browser of the app's, take screenshots, click, fill in fields and read the page. A click, a fill or an open says
   what it caused: the page it moved to, popups and links off localhost it refused, the page's console errors, and the
-  lines of text that came and went (or *(no changes)*), so the agent needs fewer screenshots.
+  lines of text that came and went (or *(no changes)*), so the agent needs fewer screenshots. `--expect-url /login`
+  (MCP's `expect_url`) on a click or fill says which page it's meant for: on any other it's refused and nothing changes.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
   a workspace, a tab or a page of the app.
 - **Board**: every workspace in a column by where it is (running, needs you, done, PR open, merged), and to-dos
@@ -394,6 +395,13 @@ selected workspace's PR is in the status bar.
 - *Import worktrees…* (a project's ⋯): the repo's worktrees made outside Laki (`git worktree add` in a terminal,
   another tool), each on a branch; the ones you tick become workspaces as they are (no setup script, nothing copied).
   Laki treats them as its own from then on: archiving or deleting one removes its folder.
+- *Import chats…* (a project's ⋯): Claude Code and Codex chats you ran in the project's folder (or a workspace's) from a
+  plain terminal, newest first, each with its first prompt; the ones you tick open as tabs that pick the chat up where
+  it was (`--resume`), in the workspace whose folder it ran in, else the project's own folder.
+- *Private* (a workspace's or a project's ⋯): Recording mode (⌘K, the menu bar icon's *Recording Mode*) hides private
+  workspaces, and every workspace of a private project, from the sidebar, rail pins, the Board, Bird view, the bubbles,
+  ⌘K, the Dock and menu bar counts, notifications and phone pushes, so a screen share or a recording shows none of
+  them; they keep running. The status bar says *Recording* while it's on; a click there turns it off.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
   many it holds. *Sort workspaces ›* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the
@@ -402,7 +410,9 @@ selected workspace's PR is in the status bar.
   that group (a folded one opens). Drag the head like a workspace; double click to rename; its + (on hover, beside ⋯) is *New workspace here…*; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
   put it first in this group), *Edit…* (its name and a default prompt template: *New workspace here…* starts
-  with it; a group without one starts with no template, never the last one used) and *Remove group* (its workspaces stay).
+  with it; a group without one starts with no template, never the last one used; and its defaults for a new workspace
+  there: the agent, where it's made (a new worktree, one without the setup script, or the project's own folder), the
+  permission mode, model, effort and base branch) and *Remove group* (its workspaces stay).
 - A workspace with a PR shows its author's GitHub picture before the PR mark (yours on your own). Settings ›
   Appearance › *GitHub pictures* off: none are loaded.
 
@@ -834,8 +844,10 @@ something to send to the agent now. Its ⋯ has *Not this workspace's PR*: it mo
 it again.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
-1 to 30 minutes), and a couple of seconds after an agent's turn ends (at most every 20 seconds), so a PR the agent just
-opened shows up at once. If an agent switches the workspace to another branch, Laki follows it (the status bar and the
+1 to 30 minutes), and a couple of seconds after an agent's turn ends (its workspace's, at most every 20 seconds), so a
+PR the agent just opened shows up at once. A branch with no PR yet is asked every 5 minutes. When GitHub turns `gh`
+away (its hourly rate limit, the network), each row keeps the PR it had, and Laki pauses its checks for 5 minutes. If an
+agent switches the workspace to another branch, Laki follows it (the status bar and the
 PR are that branch's). Hover a switch for what it does, how often it checks and how many tries it gets.
 
 The three switches in the status bar (and *Info*), each on or off per workspace, act on an open PR after each
@@ -905,7 +917,8 @@ never the last prompt.
   *Custom command…* or *No agent*); the agent menu marks your default and, for another agent, offers *Make … the
   default for new workspaces*.
 - The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
-  name…*; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort and the permission
+  name…*; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort (the one you last
+  picked for a model comes back when you pick that model again) and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
   permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast
   tier), the mic and its ⌄, and ↑. All of them are kept for its restarts and forks. A profile with its own permission
@@ -1488,6 +1501,17 @@ with an index of its own; Settings › Git & worktrees › *Each turn's changes*
 With Settings › AI › *Guess my next prompt* (off: it's one more request to Laki AI's model per turn), the empty box shows,
 greyed out, what you'd likely send next, guessed from your last message and the answer: Tab takes it, Esc hides it.
 
+↑ in an empty prompt box (the Reader's, the new-workspace page's, Laki AI's…) or ⌥↑ anywhere in one (Settings › Keys ›
+*Prompt history*) searches the prompts you've sent: through Laki's boxes, a new workspace's, Laki AI's, and what you
+typed into Claude Code's terminal yourself, the newest first, never an agent's or Laki's own. A pick fills the box to
+edit; nothing is sent until you send it.
+
+*Side chat* (a Claude Code or Codex tab's right click, the right panel's *Side chat* tab): a quick question about what
+the agent is doing ("why a new hook?") answered beside it while it keeps working; its own chat stays as it is. Claude
+Code's is answered by a copy of its chat (forked, reading files but changing nothing), Codex's by Laki AI's model from
+its chat so far. *Send to main chat* under an answer gives it to the agent when its turn ends; + starts the side chat
+over.
+
 **Continue in Codex** (or *Claude Code*): a Claude Code or Codex tab's right click starts the other agent in a tab beside
 it, in the same worktree, told to read a handover first: a file in the workspace's storage folder with the chat so far
 (your messages and its answers) and the files changed against the base. For a usage limit or a stuck agent; the first
@@ -1711,6 +1735,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
+| ↑ in an empty prompt box, ⌥↑ | search your earlier prompts (Settings › Keys › *Prompt history*) |
 | ⌘⇧A | show / hide the workspace's artifacts over the status bar |
 | ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⤢ |
 | ⌘K | palette |
@@ -1741,7 +1766,9 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 ⌘, or the gear on the rail (at the end of the status bar without it) opens the settings page. Changes save as you make them, into
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
-lit for a moment.
+lit for a moment. A setting that assumes agent know-how (Done check, Collision radar, fast and permission modes,
+Merge when green, Send into the running turn…) has a ? after its name: a card of what it does, when to turn it on
+and what it costs.
 - *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, on by default (Laki AI answers it): ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
@@ -1825,7 +1852,8 @@ lit for a moment.
   agents or a new session, nothing chosen until you do; queued while the agent works) or *Always a new session*
   (the new-workspace window with it). With + the drop stays even when no agent is at work. macOS shows
   another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead),
-  *Glass* (a see-through
+  *Background image* (a picture behind the sidebar and terminals in any theme, with *Dim* and *Blur*; Glass shows the
+  desktop instead), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it; every theme's rows, lines, hovers and
   selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
@@ -2164,6 +2192,7 @@ laki screen shot Safari | windows                       # an app's frontmost win
 laki screen tap 120 640 | swipe 200 700 200 200 | type "hi" | describe   # the simulator's hands (idb)
 laki browser fix-the-login open /login                  # the agent browser (the app must be open)
 laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | text | screenshot
+laki browser fix-the-login click "#save" --expect-url /settings   # refused, nothing done, on any other page
 laki archive fix-the-login | restore … | fork … | rm …
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace
 laki pr . 42                                            # attach a PR (URL or number) to the workspace
@@ -2340,7 +2369,8 @@ Laki checks for a new version at launch and every 4 hours (Settings › General 
 turns it off; the app menu's *Check for Updates…* asks now). A new version shows in the status bar (*Update to x.y*,
 a click opens Settings › Updates) until you update, and says so once in a toast; nothing downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
 signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
-your own: the release's page). Pre-releases are never offered.
+your own: the release's page). Pre-releases are never offered. *Update delay* (none, 1, 3, 7, 14 or 30 days) offers a
+release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now.
 
 By hand: quit it (⌘Q: the daemon and your agents keep running), then either `brew upgrade --cask laki` or download
 the new dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and replace

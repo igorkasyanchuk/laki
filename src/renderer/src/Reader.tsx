@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Glyph } from './Glyph'
 import { linkify, Markdown } from './MarkdownView'
+import { historyKey, usePromptHistory } from './PromptInput'
 import { planNow } from '../../shared/todos'
 import type { TabView } from '../../shared/types'
 
@@ -23,6 +24,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const v = useRef<number>(undefined)
   const scroll = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
+  const [histMenu, history] = usePromptHistory(box, setText) // ↑ in the empty box: your prompts
   const pinned = useRef(true) // at the bottom: it stays there as the chat grows
   useEffect(() => {
     let alive = true
@@ -104,16 +106,19 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
             className={ghost ? 'rd-ghost' : undefined}
             placeholder={ghost ?? (tab.status === 'running' ? `Message ${tab.name}: it reads it when this turn ends` : `Message ${tab.name}`)}
             data-tip={ghost ? 'Laki AI\'s guess at your next message · Tab takes it, Esc hides it' : undefined}
+            data-history
             onChange={e => setText(e.target.value)}
             onKeyDown={e => {
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
               if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))
+              if (historyKey(e, !text)) return void (e.preventDefault(), history()) // your prompts
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) (e.preventDefault(), send())
             }}
           />
           <button type="submit" className="primary" disabled={!text.trim()}>
             Send
           </button>
+          {histMenu}
         </form>
       )}
     </div>

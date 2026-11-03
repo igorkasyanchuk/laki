@@ -36,6 +36,11 @@ time and AI money per run (`budget: 60 min, $5`).
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path.
+  *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
+- **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
+- **Recording mode**: mark workspaces or projects *Private*; Recording mode (⌘K, the menu bar) hides them everywhere,
+  notifications and phone pushes too, while they keep running.
+- **Import chats**: Claude Code and Codex chats you ran in a project from a plain terminal open as tabs that resume them.
 - **One next step**: first in a workspace's ⋯ menus (⌘G does it) and, if you like, a chip on each row: what it needs
   from you now: answer, fix CI, resolve conflicts, merge, review its changes, ship, archive.
 - **The agent's plan, live**: an agent's own to-do list under its tab, ticking off as it goes, and *2/5* on its row; a

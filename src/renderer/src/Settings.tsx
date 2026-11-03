@@ -6,15 +6,15 @@ import { FIND, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
-import { RELEASES_URL, type UpdateState } from '../../shared/update'
+import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
+import { applyTheme, BG, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, useToTop } from './ui'
+import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS } from './Usage'
@@ -22,7 +22,7 @@ import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
-import { Group, Says, Scope } from './SettingsKit'
+import { Group, HelpQ, Says, Scope } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
@@ -246,6 +246,9 @@ export type AppSettings = Paint & {
   shotAsk?: boolean // Screenshot to Laki AI (on unless false)
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
+  updateDelay?: number // a release is offered once it's this many days old (Update delay; unset: at once)
+  recording?: boolean // not this page's (⌘K's, the menu bar's): App's onSave leaves it out, as it does modelEfforts
+  modelEfforts?: Record<string, string>
   specs?: boolean // Specs & Brainstorms (Specs.tsx), on unless false
   workflows?: boolean // Workflows (Workflows.tsx), on unless false
   birdView?: boolean // Bird view (Bird.tsx), every live session's screen at once, on unless false
@@ -591,7 +594,7 @@ function HotkeyField(p: { on: boolean; keys: string; def: string; title: string;
 
 // main's update.ts: this version, the newest release (its notes), and the one next step: Download (a signed Mac:
 // here, then Restart to update; elsewhere the release's page), or Check now
-function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }) {
+function UpdatesField({ on, onOn, delay, onDelay }: { on: boolean; onOn: (on: boolean) => void; delay: number; onDelay: (days: number) => void }) {
   const [u, setU] = useState<UpdateState | null>(null)
   const [, tick] = useState(0) // "checked … ago" moves on while the page stays open
   useEffect(() => {
@@ -601,7 +604,7 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
     return () => (clearInterval(t), off())
   }, [])
   if (!u) return null
-  const run = (op: 'check' | 'download' | 'install') =>
+  const run = (op: 'check' | 'download' | 'install' | 'skip') =>
     void bridge!.update!(op).then(setU, (e: Error) => setU(x => x && { ...x, status: 'error', error: e.message }))
   const l = u.latest
   const page = () => openExternal(l?.url ?? RELEASES_URL)
@@ -612,6 +615,7 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
     : u.status === 'ready' ? `${l?.version} is downloaded: restart to finish. Your agents keep running.`
     : u.status === 'error' ? u.error
     : l ? `Laki ${l.version} is out`
+    : u.held ? `Laki ${u.held.version} is out: offered on ${new Date(u.held.until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, by your update delay`
     : u.checked ? `Up to date · checked ${ago(u.checked)}`
     : 'Not checked yet'
   return (
@@ -626,6 +630,10 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
         ) : l && u.status !== 'downloading' && u.status !== 'checking' ? (
           <button type="button" className="primary" onClick={() => (here ? run('download') : page())}>
             {here ? `Update to ${l.version}` : 'Download'}
+          </button>
+        ) : u.held && u.status === 'none' ? (
+          <button type="button" onClick={() => run('skip')} data-tip={`Offer ${u.held.version} now; later releases wait as before`}>
+            Skip the delay once
           </button>
         ) : null}
         <button type="button" disabled={u.status === 'checking' || u.status === 'downloading' || u.status === 'ready'} onClick={() => run('check')}>
@@ -643,6 +651,17 @@ function UpdatesField({ on, onOn }: { on: boolean; onOn: (on: boolean) => void }
       <Switch className="switch-row" on={on} onChange={onOn}>
         <Says title="Check for updates" hint="At launch and every 4 hours Laki asks GitHub for its newest release: the status bar says so until you update, a toast once per version. Nothing downloads until you click Update." />
       </Switch>
+      <div className="row">
+        <Says title="Update delay" hint="Offer a release only once it's this old: others find its problems first. Skip the delay once lets one in now." />
+        <span className="grow" />
+        <select value={delay} onChange={e => onDelay(Number(e.target.value))} aria-label="Update delay">
+          {UPDATE_DELAYS.map(d => (
+            <option key={d} value={d}>
+              {d ? `${d} day${d > 1 ? 's' : ''}` : 'None'}
+            </option>
+          ))}
+        </select>
+      </div>
       <p className="muted small">
         After an update the yellow bar offers to restart Laki's daemon when you're ready. <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>All releases ↗</a>
       </p>
@@ -723,6 +742,7 @@ export function SettingsPage(p: {
   spot?: string // a group's title to open at, lit (Run ▾'s Edit the run script…, Edit actions…)
   skill?: SkillApi
   ai?: AiApi
+  bg?: { url: string; set(file: File | null): Promise<unknown> } // Appearance › Background image: the picture now (App's blob URL), and a new one or none (the daemon's bgSet)
   remote?: RemoteApi
   tunnels?: (n: NamedTunnel) => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck) of the name and domain as typed
   widgets?: WidgetsApi
@@ -793,6 +813,8 @@ export function SettingsPage(p: {
     ))
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
+  const bgInput = useRef<HTMLInputElement>(null)
+  const [bgErr, setBgErr] = useState('')
   // Export / Import (General): every setting in a file, for another Mac; an import goes through the page, so it's
   // painted and saved as if typed
   const [moved, setMoved] = useState('') // what the last export or import did
@@ -822,6 +844,8 @@ export function SettingsPage(p: {
   useEffect(() => setS(x => (x.fontSize === settings.fontSize ? x : { ...x, fontSize: settings.fontSize })), [settings.fontSize])
   useEffect(() => setS(x => (x.pageZoom === settings.pageZoom ? x : { ...x, pageZoom: settings.pageZoom })), [settings.pageZoom])
   useEffect(() => setS(x => (x.notify === settings.notify ? x : { ...x, notify: settings.notify })), [settings.notify]) // ⌘K's switch
+  // the background picture the daemon keeps (bgSet), its sliders this page's
+  useEffect(() => setS(x => (x.background?.file === settings.background?.file ? x : { ...x, background: { ...x.background, file: settings.background?.file } })), [settings.background?.file])
   // a sidebar right click's Show ›: its marks as saved there, so this page's next save keeps them
   const marks = JSON.stringify([settings.prIcon, settings.prMarks, settings.diffStat, settings.rowMarks])
   useEffect(() => setS(x => (JSON.stringify([x.prIcon, x.prMarks, x.diffStat, x.rowMarks]) === marks ? x : { ...x, prIcon: settings.prIcon, prMarks: settings.prMarks, diffStat: settings.diffStat, rowMarks: settings.rowMarks })), [marks])
@@ -844,7 +868,7 @@ export function SettingsPage(p: {
   }, [s])
   useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.settings-page .overlay') && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first; a dialog in it (a widget's) takes it
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.settings-page .overlay') && !cardOpen() && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first; a dialog in it (a widget's) or a setting's ? card takes it
     window.addEventListener('keydown', f, true) // before the preview terminal takes it
     return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
@@ -1149,7 +1173,7 @@ export function SettingsPage(p: {
               </Group>
               {bridge?.update && (
                 <Group title="Updates">
-                  <UpdatesField on={s.updateCheck !== false} onOn={updateCheck => set({ updateCheck })} />
+                  <UpdatesField on={s.updateCheck !== false} onOn={updateCheck => set({ updateCheck })} delay={s.updateDelay ?? 0} onDelay={updateDelay => set({ updateDelay })} />
                 </Group>
               )}
               {bridge?.badge && (
@@ -1765,6 +1789,53 @@ export function SettingsPage(p: {
                     </label>
                   </div>
                 )}
+                {p.bg && (
+                  <div className="sliders">
+                    <Says title="Background image" hint={s.glass ? 'Glass shows the desktop instead: turn it off to see the picture' : 'A picture behind the sidebar and terminals, softly, in any theme'} />
+                    <div className="row bg-pick">
+                      {s.background?.file && p.bg.url && <img className="bg-thumb" src={p.bg.url} alt="" />}
+                      <button type="button" onClick={() => bgInput.current?.click()}>
+                        {s.background?.file ? 'Another picture…' : 'Pick a picture…'}
+                      </button>
+                      {s.background?.file && (
+                        <button type="button" onClick={() => void p.bg!.set(null).catch((e: Error) => setBgErr(e.message))}>
+                          Remove
+                        </button>
+                      )}
+                      <input
+                        ref={bgInput}
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                        hidden
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          e.target.value = '' // the same file again is a change too
+                          if (f) setBgErr(''), void p.bg!.set(f).catch((err: Error) => setBgErr(err.message))
+                        }}
+                      />
+                    </div>
+                    {bgErr && <p className="field-err">{bgErr}</p>}
+                    {s.background?.file &&
+                      (
+                        [
+                          ['dim', 'Dim', BG.dim, 95, '%'],
+                          ['blur', 'Blur', BG.blur, 40, 'px'],
+                        ] as const
+                      ).map(([k, label, d, max, unit]) => {
+                        const v = s.background?.[k] ?? d
+                        return (
+                          <label key={k} className="slider-row">
+                            <span>{label}</span>
+                            <input type="range" className="range" min={0} max={max} step={k === 'dim' ? 5 : 1} value={v} style={{ '--p': (v / max) * 100 } as CSSProperties} onChange={e => paint({ background: { ...s.background, [k]: Number(e.target.value) } })} />
+                            <span className="slider-val">
+                              {v}
+                              {unit}
+                            </span>
+                          </label>
+                        )
+                      })}
+                  </div>
+                )}
               </div>
               </Group>
               <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
@@ -2231,6 +2302,9 @@ export function SettingsPage(p: {
                                   </option>
                                 ))}
                               </select>
+                            )}
+                            {PERMS[pr.agent] && (
+                              <HelpQ title="Permission mode" />
                             )}
                             {isAccountAgent(pr.agent) && (
                               <select value={pr.account ?? ''} aria-label="Account" onChange={e => setPreset(i, { account: e.target.value || undefined })}>

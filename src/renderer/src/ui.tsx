@@ -21,7 +21,10 @@ export const keep = (key: string, v: unknown) => {
 }
 // Esc for a page or a dialog: not one something on it took (a menu, a field's own Esc), nor one that ends dictation or an
 // IME's word
-export const escapes = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && !e.isComposing
+// a setting's ? card (SettingsKit's HelpQ) is open: it takes Esc first (a browser without the Popover API has none, and
+// its querySelector would throw at :popover-open)
+export const cardOpen = () => 'showPopover' in HTMLElement.prototype && !!document.querySelector('.help-card:popover-open')
+export const escapes = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && !e.isComposing && !cardOpen()
 
 export type { IconName }
 export { isIconName } // an extension's icon
@@ -311,9 +314,25 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
 // scroll doesn't bubble) and draws the button (Page, Settings, Help)
 export function useToTop(): [(e: { target: EventTarget }) => void, ReactNode] {
   const [up, setUp] = useState<HTMLElement | null>(null)
+  const btn = useRef<HTMLButtonElement>(null)
   const onScroll = (e: { target: EventTarget }) => (el => el instanceof HTMLElement && el.scrollHeight - el.clientHeight > 400 && setUp(el.scrollTop > 400 ? el : null))(e.target)
+  // at the scrolled list's own bottom right, not the frame's: a chat's thread ends above its composer (Laki AI's send
+  // button was under it); again as it changes size (the composer grows). Rects are zoomed (Settings, Help), styles not
+  useLayoutEffect(() => {
+    const b = btn.current, box = b?.offsetParent
+    if (!b || !up || !(box instanceof HTMLElement)) return
+    const place = () => {
+      const r = up.getBoundingClientRect(), o = box.getBoundingClientRect(), z = box.offsetWidth ? o.width / box.offsetWidth : 1
+      b.style.bottom = `${Math.max(0, o.bottom - r.bottom) / z + 22}px`
+      b.style.right = `${Math.max(0, o.right - r.right) / z + 24}px`
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(up)
+    return () => ro.disconnect()
+  }, [up])
   const button = up?.isConnected && (
-    <button type="button" className="to-top" aria-label="Back to the top" data-tip="Back to the top" onClick={() => (up.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), setUp(null))}>
+    <button ref={btn} type="button" className="to-top" aria-label="Back to the top" data-tip="Back to the top" onClick={() => (up.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), setUp(null))}>
       <Icon name="arrowUp" size={15} />
     </button>
   )
@@ -501,7 +520,7 @@ export async function copyImage(img: HTMLImageElement) {
   const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
 }
-type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
+type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
 export type MenuItem =
   | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -669,7 +688,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         role="menuitem"
         aria-haspopup={it.items ? 'menu' : undefined}
         aria-expanded={it.items ? subOf?.it === it : undefined}
-        className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
+        className={`menu-item ${it.danger ? 'danger' : ''} ${it.good ? 'good' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
         data-tip={it.tip}
         onClick={e => pick(it, e.currentTarget, e.detail === 0, e.metaKey)}
         onPointerEnter={e => hover(it, e.currentTarget)}

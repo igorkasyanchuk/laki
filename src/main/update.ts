@@ -7,15 +7,21 @@ import { app, autoUpdater, net } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { feedName, newer, RELEASES, releaseOf, UPDATE_EVERY, type UpdateState } from '../shared/update.ts'
+import { feedName, heldUntil, newer, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState } from '../shared/update.ts'
 
-const toldFile = () => join(app.getPath('userData'), 'update.json') // the last version the app was told about: one toast each
-const told = () => {
+// update.json: `told`, the last version the app was told about (one toast each); `skip`, the one Skip the delay once let in
+const toldFile = () => join(app.getPath('userData'), 'update.json')
+const kept = (): { told?: string; skip?: string } => {
   try {
-    return String(JSON.parse(readFileSync(toldFile(), 'utf8')).told ?? '')
+    return JSON.parse(readFileSync(toldFile(), 'utf8'))
   } catch {
-    return ''
+    return {}
   }
+}
+const keep = (o: { told?: string; skip?: string }) => {
+  try {
+    writeFileSync(toldFile(), JSON.stringify({ ...kept(), ...o }))
+  } catch {} // unwritable: it may be told again, the check still answered
 }
 // Squirrel.Mac replaces only a signed app: a Developer ID one (an ad-hoc build, a dev run: Download instead)
 const bundle = () => join(app.getPath('exe'), '..', '..', '..') // Laki.app/Contents/MacOS/Laki
@@ -33,6 +39,8 @@ export function updater(send: (s: UpdateState) => void) {
   let autoOn: boolean | undefined
   let launched = false
   let wired = false
+  let delay = 0 // Settings' Update delay, days
+  let fetched: Release | null | undefined // the last check's newest release (null: none published; undefined: no check yet)
 
   // auto: a scheduled check, the only kind that announces a version, and only one no check saw before (update.json)
   async function check(auto = false) {
@@ -42,22 +50,31 @@ export function updater(send: (s: UpdateState) => void) {
     try {
       const r = await net.fetch(`https://api.github.com/repos/${RELEASES}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(30_000) })
       if (!r.ok && r.status !== 404) throw new Error(`GitHub answered ${r.status}`)
-      const latest = r.ok ? releaseOf(await r.json(), process.arch) : null // 404: no release published yet
-      if (!latest || !newer(latest.version, s.version)) {
-        set({ status: 'none', checked: Date.now(), latest: undefined })
-        return s
-      }
-      const fresh = told() !== latest.version // seen by any check: no toast for it later
-      if (fresh) {
-        try {
-          writeFileSync(toldFile(), JSON.stringify({ told: latest.version }))
-        } catch {} // unwritable: it may be told again, the check still answered
-      }
-      const found = auto && fresh
-      set({ status: 'available', checked: Date.now(), latest, found })
+      fetched = r.ok ? releaseOf(await r.json(), process.arch) : null // 404: no release published yet
+      s.checked = Date.now()
+      judge(auto)
     } catch (e) {
       set({ status: 'error', error: `Couldn't check: ${(e as Error).message}` })
     }
+    return s
+  }
+
+  // the last check's release against this version and the delay: offered, held until it's old enough, or none
+  function judge(auto: boolean) {
+    const latest = fetched
+    if (!latest || !newer(latest.version, s.version)) return set({ status: 'none', latest: undefined, held: undefined })
+    const until = kept().skip === latest.version ? undefined : heldUntil(latest.at, delay)
+    if (until) return set({ status: 'none', latest: undefined, held: { version: latest.version, until } }) // not told yet: its toast comes when it's offered
+    const fresh = kept().told !== latest.version // seen by any check: no toast for it later
+    if (fresh) keep({ told: latest.version })
+    set({ status: 'available', latest, found: auto && fresh, held: undefined })
+  }
+
+  // Settings' Skip the delay once: the held release is offered now (kept by its version, so a restart remembers it)
+  function skip() {
+    if (!s.held) return s
+    keep({ skip: s.held.version })
+    judge(false)
     return s
   }
 
@@ -89,8 +106,12 @@ export function updater(send: (s: UpdateState) => void) {
   }
 
   // Settings' Check for updates: at launch (once, a little after), then every UPDATE_EVERY; off stops both. The
-  // same again (a window's reload) keeps the timer
-  function auto(on: boolean) {
+  // same again (a window's reload) keeps the timer. `days`: Settings' Update delay
+  function auto(on: boolean, days = 0) {
+    if (days !== delay) {
+      delay = days // a new delay judges the last check's release again, nothing fetched
+      if (fetched !== undefined && (s.status === 'none' || s.status === 'available')) judge(false)
+    }
     if (on === autoOn) return
     autoOn = on
     clearTimeout(soon)
@@ -100,5 +121,5 @@ export function updater(send: (s: UpdateState) => void) {
     every = setInterval(() => void check(true), UPDATE_EVERY)
   }
 
-  return { state: () => s, check, download, install, auto }
+  return { state: () => s, check, download, install, skip, auto }
 }

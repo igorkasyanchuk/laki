@@ -198,7 +198,8 @@ browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css
 \`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open. \`open\`, \`click\` and
 \`fill\` print what they caused: \`→ <url>\` when the page moved, \`blocked:\` (a popup or a link off localhost),
 \`console error:\` lines, and the page's text lines added (\`+\`) and gone (\`-\`), or \`(no changes)\`: read that
-before taking a screenshot.
+before taking a screenshot. Add \`--expect-url /login\` (a path or a localhost URL) to a click or fill meant for one
+page: on any other it's refused and nothing is done.
 
 ## Schedule work
 

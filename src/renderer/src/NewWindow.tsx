@@ -4,7 +4,7 @@
 // too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
 import { useEffect, useState } from 'react'
-import type { ActionFile, View, WorkspaceView } from '../../shared/types'
+import { type ActionFile, veiled, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, daemonBase, openExternal, reportView } from './api'
 import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
@@ -34,7 +34,7 @@ void daemonBase().then(b => (base = b), () => {})
 function useView() {
   const [view, setView] = useState<View | null>(null)
   useEffect(() => {
-    const off = api.on(m => m.ev === 'state' && setView(m.view))
+    const off = api.on(m => m.ev === 'state' && setView(veiled(m.view))) // Recording mode: a private one's floated tab closes
     api.connect()
     return off
   }, [])

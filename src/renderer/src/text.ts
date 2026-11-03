@@ -1,7 +1,23 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type Agent, AGENT_NAMES, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
+
+// a group's defaults for a new workspace under it (Edit group): where it's made, permission mode ('ask': Ask first),
+// model, effort, base; unset ones leave the page's as they were. agent: what the page starts: another agent's model
+// (one of its MODELS, not this one's) or an effort it hasn't stays out (codex -m opus would fail as it starts)
+export const groupNew = (s?: Sep, agent?: string): { local?: boolean; noSetup?: boolean; perm?: string; model?: string; effort?: string; base?: string } => {
+  if (!s) return {}
+  const mine = MODELS[agent as Agent] ?? []
+  const theirs = !!s.model && !mine.includes(s.model) && Object.values(MODELS).some(l => l?.includes(s.model!))
+  return {
+    ...(s.where && { local: s.where === 'local', noSetup: s.where === 'bare' || undefined }),
+    ...(s.perm && { perm: s.perm === 'ask' ? '' : s.perm }),
+    ...(s.model && !theirs && { model: s.model }),
+    ...(s.effort && EFFORTS[agent as Agent]?.includes(s.effort) && { effort: s.effort }),
+    ...(s.base && { base: s.base }),
+  }
+}
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
 export { fillTemplate, mergeActions, prRef, templated, templatesFor } // shared: laki mcp's (Laki AI's) templates and actions too
@@ -184,7 +200,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', rowMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object', editors: 'object', customCss: 'string' }
+const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', updateDelay: 'number', modelEfforts: 'object', background: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', rowMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object', editors: 'object', customCss: 'string' }
 // what Export leaves out and Import never takes (this Mac's stay): secrets (env and presets' env: API keys; the phone
 // webhook's URL: its token) and what's private (remote access's and tunnels' emails, workflows' variables)
 const PRIVATE = ['env', 'webhook', 'remoteMail', 'tunnelMails', 'flowVars']

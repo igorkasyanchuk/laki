@@ -12,7 +12,7 @@ import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSe
 import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
-export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | `ext:${string}` // ext: an extension placed in panel
+export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
@@ -72,6 +72,7 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'review', label: 'Review', icon: 'review' },
   { id: 'preview', label: 'Preview', icon: 'globe' },
   { id: 'device', label: 'Simulator', icon: 'phone' },
+  { id: 'side', label: 'Side chat', icon: 'messages' },
 ]
 
 type Node = { name: string; path: string; dir: boolean }
@@ -445,11 +446,12 @@ export function SidePanel(p: {
   root: FilesRoot // Files': the worktree, or the Artifacts
   onRoot: (r: FilesRoot) => void
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
+  side?: ReactNode // Side chat (SideChat.tsx): about the workspace's agent tab, while it has one
   ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
   sim?: boolean // the Simulator tab (settings.simulator)
   turn?: boolean // an agent's last turn changed files: Changes' This turn
 }) {
-  const tabs = TABS.filter(t => (t.id === 'device' ? p.sim : p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview'))
+  const tabs = TABS.filter(t => (t.id === 'device' ? p.sim : t.id === 'side' ? !!p.side : p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview'))
   const ext = p.ext?.find(x => x.id === p.tab)
   const tab = ext || tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
@@ -475,6 +477,7 @@ export function SidePanel(p: {
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
       {tab === 'device' && <DeviceTab api={p.api} ws={p.w.id} />}
+      {tab === 'side' && p.side}
       {ext && <div className="sp-ext">{ext.body}</div>}
     </div>
   )

@@ -27,8 +27,8 @@ contextBridge.exposeInMainWorld('laki', {
   // Screenshot to Laki AI's ('' none; false: it's off); macOS only: main's screenshot is screencapture
   ...(process.platform === 'darwin' && { shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label) }),
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
-  update: (op: 'state' | 'check' | 'download' | 'install'): Promise<object | null> => ipcRenderer.invoke('update', op),
-  updateAuto: (on: boolean) => ipcRenderer.send('update-auto', on),
+  update: (op: 'state' | 'check' | 'download' | 'install' | 'skip'): Promise<object | null> => ipcRenderer.invoke('update', op),
+  updateAuto: (on: boolean, days?: number) => ipcRenderer.send('update-auto', on, days),
   onUpdate: (cb: (s: object) => void) => {
     const f = (_e: unknown, s: object) => cb(s)
     ipcRenderer.on('update', f)
@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('laki', {
   onSimFloating: (cb: (devices: string[]) => void) => ipcRenderer.on('sim-floating', (_e, d: string[]) => cb(d)),
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
-  badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),
+  badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean) => ipcRenderer.send('badge', n, items, tray, recording),
   onDeepLink: (cb: (url: string) => void) => {
     ipcRenderer.on('deep-link', (_e, url: string) => cb(url))
     ipcRenderer.send('deep-link-ready') // then main sends one that came first

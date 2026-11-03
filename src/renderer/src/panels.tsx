@@ -5,10 +5,11 @@ import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { planCount, planNow } from '../../shared/todos'
+import { ago } from '../../shared/widget'
 import { Markdown } from './MarkdownView'
 import { THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
-import { clock, fuzzy, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
+import { clock, fuzzy, groupNew, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
 import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
@@ -628,7 +629,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const [p, setP] = useState<NewWsParams>(() => {
     const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
     const d = draft?.p
-    const group = view.projects.find(x => x.id === project)?.seps?.find(s => s.id === initial?.place)?.preset // opened from a group: its agent
+    const sep = view.projects.find(x => x.id === project)?.seps?.find(s => s.id === initial?.place) // opened from a group: its agent and defaults
+    const group = sep?.preset
     // the draft's agent, else the last one, unless Settings › New workspaces start changed since: then that one
     const preset = initial?.preset ?? (group && names.includes(group) ? group : undefined) ?? (d?.preset && names.includes(d.preset) ? d.preset : last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
     const same = preset === last.preset // the model and effort are that agent's
@@ -646,6 +648,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       fast: same ? last.fast : undefined,
       base: '',
       ...(d && { ...d, project: proj, preset, noSetup: undefined, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...(!there && { place: undefined, base: '' }) }),
+      ...groupNew(sep, view.presets.find(x => x.name === preset)?.agent),
       ...(initial && (({ linked: _, ...x }) => x)(initial)),
       ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
@@ -781,7 +784,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         ...(view.projects.length > 6 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
         ...view.projects.flatMap(x => [
         { label: x.name, mark: <ProjectMark p={x} or={x.git === false ? 'folder' : 'fork'} size={14} />, hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
-        ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, sub: s.preset && `starts ${s.preset}`, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }), ...(s.preset && s.preset !== p.preset && view.presets.some(y => y.name === s.preset && !y.off) && { preset: s.preset, model: undefined, effort: undefined, perm: undefined, fast: undefined }) }) }) as MenuItem), // a group's agent comes with it
+        ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, sub: s.preset && `starts ${s.preset}`, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }), ...(s.preset && s.preset !== p.preset && view.presets.some(y => y.name === s.preset && !y.off) && { preset: s.preset, model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...groupNew(s, view.presets.find(y => y.name === (s.preset && view.presets.some(z => z.name === s.preset && !z.off) ? s.preset : p.preset))?.agent) }) }) as MenuItem), // a group's agent and defaults come with it
         ]),
       ],
     )
@@ -819,6 +822,13 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const models = (ag && MODELS[ag]) ?? []
   const efforts = ag && EFFORTS[ag]
   const typed = p.model?.trim()
+  // the effort last picked for a model comes back with it (settings.modelEfforts, by agent:model; '' its default model)
+  const effortKey = (m?: string) => `${ag}:${m?.trim() ?? ''}`
+  const pickModel = (m?: string) => {
+    const e = ag ? view.settings.modelEfforts?.[effortKey(m)] : undefined
+    set({ model: m, ...(e !== undefined && (e === '' || efforts?.includes(e)) && { effort: e }) })
+  }
+  const pickEffort = (x: string) => (set({ effort: x }), ag && void api.call('settingsSet', { modelEfforts: { ...view.settings.modelEfforts, [effortKey(p.model)]: x } }).catch(() => {}))
   const modelRow = canModel && (ownModel || (!!typed && !models.includes(typed))) // the menu has the rest: one picker, not two
   const modelMenu = (e: MouseEvent) =>
     openMenu(
@@ -826,13 +836,13 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       [
         { filter: 'Type to filter…' },
         { head: 'Model' },
-        { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : 'the agent'} picks`, hint: !typed ? ON : undefined, run: () => set({ model: undefined }) },
-        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, mono: true, sub: MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1], tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => set({ model: m }) }) as MenuItem),
+        { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : 'the agent'} picks`, hint: !typed ? ON : undefined, run: () => pickModel(undefined) },
+        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, mono: true, sub: MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1], tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => pickModel(m) }) as MenuItem),
         { label: 'Another model by name…', icon: 'pencil', foot: true, run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
       ],
     )
   const effortMenu = (e: MouseEvent) =>
-    openMenu(e, [{ head: 'Effort' }, { label: 'default', mono: true, sub: 'The model’s own', hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) }, ...(efforts ?? []).map(x => ({ label: x, mono: true, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)])
+    openMenu(e, [{ head: 'Effort' }, { label: 'default', mono: true, sub: 'The model’s own', hint: !p.effort ? ON : undefined, run: () => pickEffort('') }, ...(efforts ?? []).map(x => ({ label: x, mono: true, hint: p.effort === x ? ON : undefined, run: () => pickEffort(x) }) as MenuItem)])
   // how freely it acts: unset, the agent asks as it always does
   const perms = (ag && PERMS[ag]) ?? []
   const perm = perms.find(x => x[0] === permPick)
@@ -1194,7 +1204,64 @@ export function ImportWorktrees({ name, load, onClose, onImport }: { name: strin
   )
 }
 
-export function Prompt({ title, hint, placeholder, initial = '', picks = [], busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; picks?: { label: string; none: string; options: string[]; value?: string }[]; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string[]) => Promise<void> }) {
+// a project's ⋯ › Import chats…: Claude Code's and Codex's sessions run in its folders outside Laki (the daemon's
+// chatList), each one ticked a tab that resumes it (chatImport)
+export type OutsideChat = { agent: string; id: string; title: string; at: number; ws?: string }
+export function ImportChats({ name, wsName, load, onClose, onImport }: { name: string; wsName: (id?: string) => string; load: () => Promise<OutsideChat[]>; onClose: () => void; onImport: (ids: string[]) => Promise<unknown> }) {
+  const [list, setList] = useState<OutsideChat[] | null>(null)
+  useEffect(() => void load().then(setList, () => setList([])), [])
+  const [on, setOn] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  return (
+    <Modal title={`Import chats · ${name}`} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={e => {
+          e.preventDefault()
+          if (!on.length || busy) return
+          setBusy(true)
+          onImport(on).catch(() => setBusy(false))
+        }}
+      >
+        <div className="muted small">Claude Code and Codex chats in this project's folders that no tab of Laki has open: ones you ran in a plain terminal, or a closed tab's. Each one you tick opens as a tab that picks the chat up where it was: in the workspace it ran in, else the project's own folder.</div>
+        {list === null ? (
+          <div className="muted">Looking…</div>
+        ) : !list.length ? (
+          <div className="muted">None: no chat of this project's folders that isn't in Laki already.</div>
+        ) : (
+          <div className="wt-list">
+            {list.map(x => (
+              <label key={x.id} className="wt-row chat-row" title={x.title}>
+                <input type="checkbox" checked={on.includes(x.id)} onChange={e => setOn(o => (e.target.checked ? [...o, x.id] : o.filter(y => y !== x.id)))} />
+                <b>{AGENT_NAMES[x.agent as keyof typeof AGENT_NAMES] ?? x.agent}</b>
+                <span className="cut">{x.title}</span>
+                <span className="muted small">
+                  {wsName(x.ws)} · {ago(x.at)}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        <div className="buttons">
+          {!!list?.length && (
+            <button type="button" className="ghost" onClick={() => setOn(on.length === list.length ? [] : list.map(x => x.id))}>
+              {on.length === list.length ? 'None' : 'All'}
+            </button>
+          )}
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!on.length || busy}>
+            {busy ? <span className="btn-spin" /> : null} Import{on.length > 1 ? ` ${on.length}` : ''}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+export function Prompt({ title, hint, placeholder, initial = '', picks = [], busy, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; picks?: { label: string; none: string; options: string[]; value?: string; names?: Record<string, string>; free?: boolean }[]; busy?: string; onClose: () => void; onSubmit: (v: string, picked: string[]) => Promise<void> }) {
   const [v, setV] = useState(initial)
   const [picked, setPicked] = useState(() => picks.map(x => x.value ?? ''))
   return (
@@ -1211,14 +1278,25 @@ export function Prompt({ title, hint, placeholder, initial = '', picks = [], bus
         {picks.map((pick, i) => (
           <label key={pick.label}>
             {pick.label}
-            <select value={picked[i]} onChange={e => setPicked(x => x.map((y, j) => (j === i ? e.target.value : y)))}>
-              <option value="">{pick.none}</option>
-              {[...new Set([...pick.options, picked[i]])].filter(Boolean).map(o => ( // one gone since stays as it was
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
+            {pick.free ? ( // typed, its options suggested (a model, a branch)
+              <>
+                <input value={picked[i]} placeholder={pick.none} list={`pick-${i}`} spellCheck={false} onChange={e => setPicked(x => x.map((y, j) => (j === i ? e.target.value : y)))} />
+                <datalist id={`pick-${i}`}>
+                  {pick.options.map(o => (
+                    <option key={o} value={o} />
+                  ))}
+                </datalist>
+              </>
+            ) : (
+              <select value={picked[i]} onChange={e => setPicked(x => x.map((y, j) => (j === i ? e.target.value : y)))}>
+                <option value="">{pick.none}</option>
+                {[...new Set([...pick.options, picked[i]])].filter(Boolean).map(o => ( // one gone since stays as it was
+                  <option key={o} value={o}>
+                    {pick.names?.[o] ?? o}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
         ))}
         <div className="buttons">

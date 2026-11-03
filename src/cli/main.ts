@@ -22,7 +22,7 @@ const sets: string[] = [] // --set name=value, again and again: a workflow run's
 const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
-const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at'])
+const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -307,9 +307,10 @@ async function main() {
       // laki browser [ws] open [url] | screenshot | click <selector> | fill <selector> <text> | text; in a tab, its workspace
       const ops = ['open', 'screenshot', 'click', 'fill', 'text']
       const [ws, op, ...more] = ops.includes(rest[0]) && process.env.LAKI_WORKSPACE ? [process.env.LAKI_WORKSPACE, ...rest] : rest
-      if (!ws || !ops.includes(op)) throw new Error('usage: laki browser [ws] open [url|/path] | screenshot | click <selector> | fill <selector> <text> | text')
+      if (!ws || !ops.includes(op)) throw new Error('usage: laki browser [ws] open [url|/path] | screenshot | click <selector> | fill <selector> <text> | text [--expect-url <url|/path>]')
       const p = op === 'open' ? { url: more[0] } : op === 'click' ? { selector: more.join(' ') } : op === 'fill' ? { selector: more[0], text: more.slice(1).join(' ') } : {}
-      const r = await rpc('browse', { ws, op, ...p }, 45000)
+      const expect = typeof flags['expect-url'] === 'string' ? flags['expect-url'] : undefined // refused, nothing done, when the page isn't that
+      const r = await rpc('browse', { ws, op, ...p, expect }, 45000)
       return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : browseSays(r)) // what it caused: read it before a screenshot
     }
     case 'rm':

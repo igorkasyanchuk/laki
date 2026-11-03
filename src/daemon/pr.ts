@@ -23,18 +23,19 @@ export function headOf(path: string): string | undefined {
   } catch {}
 }
 export function syncBranches() {
-  let moved = false
+  const moved = new Set<string>()
   for (const w of state.workspaces) {
     if (w.archived || w.host || state.projects.find(p => p.id === w.project)?.git === false) continue // a host's: hostSync
     const b = headOf(w.path)
     if (!b || b === w.branch) continue
     moveBranch(w, b)
-    moved = true
+    moved.add(w.id)
   }
-  if (moved) save(), changed(), state.settings?.bgRefresh !== false && void scanPRs() // its PR now, not in a minute
+  if (moved.size) save(), changed(), state.settings?.bgRefresh !== false && void scanPRs(false, moved) // their PRs now, not in a minute
 }
 function moveBranch(w: Workspace, b: string) {
   w.branch = b
+  noneAt.delete(w.id) // asked at the next scan
   saidTried.delete(w.id) // a PR named again is tried again
   // a PR only linked (not its branch's: a prompt's, attached, its agent named) stays: a review that checks it out (gh pr
   // checkout) is still about it, and its branch's own PR, once pushed, replaces a guessed one (scanPR). The old
@@ -69,12 +70,12 @@ async function hostSync(ws: Workspace) {
   changed()
 }
 
-// a turn's end may have opened a PR (gh pr create): a scan soon, at most every 20 s
-let prSoonAt = 0
-export function prSoon() {
-  if (state.settings?.bgRefresh === false || Date.now() - prSoonAt < 20000) return
-  prSoonAt = Date.now()
-  setTimeout(() => void scanPRs(), 2000)
+// a turn's end may have opened a PR (gh pr create): its workspace's scan soon, at most every 20 s each
+const soonAt = new Map<string, number>()
+export function prSoon(ws: string) {
+  if (state.settings?.bgRefresh === false || Date.now() - (soonAt.get(ws) ?? 0) < 20000) return
+  soonAt.set(ws, Date.now())
+  setTimeout(() => void scanPRs(false, new Set([ws])), 2000)
 }
 
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)
@@ -113,9 +114,9 @@ const checksOf = (list: Check[]): PR['checks'] =>
 // the timer's scan (every minute): once settings.prScan minutes have gone by (a little early: the timer drifts)
 let prLast = 0
 export function prTick(now = Date.now()) {
-  if (state.settings?.bgRefresh === false || now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000) return
+  if (state.settings?.bgRefresh === false || now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000 || prScan) return // one going (a turn's end's): the next minute's
   prLast = now
-  return scanPRs()
+  return scanPRs(true)
 }
 
 // Attach PR (the app's, for a workspace on a branch with no PR found): a PR by its URL or number in the repo, asked for
@@ -179,21 +180,29 @@ export async function prFromSaid(ws: Workspace) {
 }
 
 let prScan: Promise<void> | null = null
-let prAgain = false
-export function scanPRs(): Promise<void> {
+let prAgain: Set<string> | true | undefined // asked mid-scan: those workspaces (true: all) again as it ends
+// the timer's scans (bg) spare GitHub's GraphQL quota (5000 points an hour, shared with every other gh of yours): a
+// branch gh found no PR for is asked again after NONE_EVERY, and none at all for LIMITED after gh said rate limit. A
+// turn's end, a branch move and Refresh PR ask at once
+const NONE_EVERY = 5 * 60000
+const LIMITED = 5 * 60000
+const noneAt = new Map<string, number>()
+let limitedAt = 0
+export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   if (prScan) {
-    prAgain = true // asked mid-scan (e.g. a ship just opened a PR): scan again when this one ends
+    if (!bg) prAgain = !only || prAgain === true ? true : new Set([...(prAgain ?? []), ...only]) // e.g. a ship just opened a PR
     return prScan
   }
+  const now = Date.now()
+  if (bg && now - limitedAt < LIMITED) return Promise.resolve()
   void csRefresh()
   // workspaces in parallel: each gh call may take seconds
-  const scanned = state.workspaces.filter(ws => !ws.archived && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)))
+  const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY))
   prScan = Promise.all(scanned.map(scanPR)).then(() => {
     prScan = null
-    if (prAgain) {
-      prAgain = false
-      return scanPRs()
-    }
+    const again = prAgain
+    prAgain = undefined
+    if (again) return scanPRs(false, again === true ? undefined : again)
   })
   return prScan
 }
@@ -216,13 +225,13 @@ function yoursOn(j: { author?: { login?: string }; reviews?: { author?: { login?
   return { ...(approved?.includes(me) && { approvedByMe: true }), ...(said && { commentedByMe: true }) }
 }
 
-// who you are on GitHub, per host ('': this Mac): gh api user's login, kept 10 minutes (gh auth switch), a failure
-// not at all
+// who you are on GitHub, per host ('': this Mac): gh api user's login, kept an hour (a gh auth switch shows within it),
+// a failure not at all
 const logins = new Map<string, { at: number; p: Promise<string> }>()
 function ghLogin(at: At) {
   const k = at.host ?? ''
   const had = logins.get(k)
-  if (had && Date.now() - had.at < 600000) return had.p
+  if (had && Date.now() - had.at < 3_600_000) return had.p
   const p = exec(at, 'gh', ['api', 'user', '--jq', '.login'], { timeout: 20000 }).then(r => r.stdout.trim(), () => (logins.delete(k), ''))
   logins.set(k, { at: Date.now(), p })
   return p
@@ -306,11 +315,17 @@ async function scanPR(ws: Workspace) {
     }
   } catch (e) {
     wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
-    if (/no pull requests found/i.test(String((e as { stderr?: string }).stderr ?? (e as Error).message))) prSeen.set(ws.id, null) // none: the next one found is pr.opened
+    const said = String((e as { stderr?: string }).stderr || (e as Error).message)
+    // gh failed (a rate limit, the network, a timeout, an answer that isn't JSON): the last PR stays as it was. ponytail:
+    // not marked stale
+    if (!/no pull requests found/i.test(said)) return void (/rate limit/i.test(said) && (limitedAt = Date.now()))
+    prSeen.set(ws.id, null) // none: the next one found is pr.opened
+    noneAt.set(ws.id, Date.now())
     if (prs.delete(ws.id)) changed()
     if (!ws.prUrl) await prFromSaid(ws)
     return
   }
+  noneAt.delete(ws.id)
   if (!ws.prUrl && ws.prOff && sameRef(pr.url, ws.prOff)) return void (prs.delete(ws.id) && changed()) // detached (prDetach): not followed
   const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0
   wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)

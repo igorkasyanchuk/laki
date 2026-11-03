@@ -1065,11 +1065,16 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast'] as const
+export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
+// Settings › Appearance › Background image: the picture's blob URL in this window (App's, from the daemon's bgGet; none
+// in the other windows), and its sliders' defaults: how much the theme's color covers it (%), its blur (px)
+let bgImage = ''
+export const setBgImage = (url: string) => void (bgImage = url)
+export const BG = { dim: 75, blur: 6 }
 // macOS's Accessibility › Display: Reduce transparency turns glass and the see-through sidebar off (its blur would be
 // plain grey), Increase contrast makes secondary text and lines stronger (Appearance's High contrast mode, more so, and
 // the accent as text at 7:1); App repaints as either changes
@@ -1158,7 +1163,10 @@ export function applyTheme(p: string | Paint = '') {
   // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
-  seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
+  // a background picture (glass shows the desktop instead): behind everything, the surfaces over it see-through
+  const bg = !o.glass && !!o.background?.file && bgImage ? o.background : undefined
+  root.classList.toggle('has-bg', !!bg)
+  seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad || !!bg
   // the interface font: unset, SF Pro (Inter off a Mac) whatever the theme; 'theme': its look's own (look.css' last rules)
   const font = o.uiFont?.trim()
   root.classList.toggle('theme-font', font === 'theme')
@@ -1200,6 +1208,20 @@ export function applyTheme(p: string | Paint = '') {
     st.setProperty('--hover', `color-mix(in srgb, ${v('fg', '--fg')} 9%, transparent)`)
     st.setProperty('--line', `color-mix(in srgb, ${v('fg', '--fg')} 14%, transparent)`)
     st.setProperty('--sel', alpha(v('sel', '--sel'), 70)) // #rrggbbaa: xterm's selection reads it too
+  }
+  if (bg) {
+    // the picture under a veil of the theme's background (styles.css' html.has-bg body::before); the sidebar, rail and
+    // terminals part see-through over it, so it shows softly everywhere
+    const v = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
+    const pct = (n: number | undefined, d: number, hi: number) => Math.min(hi, Math.max(0, Number.isFinite(n) ? n! : d))
+    st.setProperty('--bg-image', `url("${bgImage}")`)
+    st.setProperty('--bg-veil', String(pct(bg.dim, BG.dim, 95) / 100))
+    st.setProperty('--bg-blur', `${pct(bg.blur, BG.blur, 40)}px`)
+    st.setProperty('--app-bg', 'transparent')
+    st.setProperty('--side', alpha(v('side', '--side'), 55))
+    st.setProperty('--rail-bg', rail(v('side', '--side'), 55))
+    st.setProperty('--term-bg', alpha(v('bg', '--bg'), 35))
+    st.setProperty('--tab-sel', alpha(v('fg', '--fg'), 10))
   }
   if (clear) {
     // the sidebar and the rail over the window's blur, the rest solid (styles.css' html.side-clear)

@@ -95,7 +95,14 @@ export function CiMark({ pr }: { pr: PRInfo }) {
 let avatarsOn = true
 export const showAvatars = (on: boolean) => void (avatarsOn = on)
 export const Avatar = ({ login, size = 14 }: { login?: string; size?: number }) =>
-  (m => (avatarsOn && m ? <img className="avatar" src={`https://avatars.githubusercontent.com/${m[2]}${m[1] || m[3] ? '%5Bbot%5D' : ''}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null))(login ? /^(app\/)?([\w-]+)(\[bot\])?$/.exec(login) : null)
+  (m => (avatarsOn && m ? <img className="avatar" src={`https://avatars.githubusercontent.com/${m[2]}${m[1] || m[3] ? '%5Bbot%5D' : ''}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onLoad={e => (e.currentTarget.hidden = false)} onError={e => unpictured(e.currentTarget)} /> : null))(login ? /^(app\/)?([\w-]+)(\[bot\])?$/.exec(login) : null)
+// a picture that didn't load (offline, GitHub's hiccup): hidden, asked again a minute later, 5 times at most (it stayed
+// hidden for good before, until its row was drawn anew)
+function unpictured(img: HTMLImageElement) {
+  img.hidden = true
+  const n = Number(img.dataset.tries ?? 0)
+  if (n < 5) setTimeout(() => img.isConnected && ((img.dataset.tries = String(n + 1)), (img.src = img.src)), 60_000)
+}
 
 export const prState = (pr: PRInfo) => (pr.draft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase())
 export const REVIEW: Record<string, string> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' }

@@ -9,6 +9,7 @@ import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
+import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
@@ -20,7 +21,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
-import { tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
+import { sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
 import { secretAsk, secretGive, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { factsTick, realOf, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -215,7 +216,7 @@ const api: Record<string, Handler> = {
   projectTrust: p => core.projectTrust(p),
   branches: p => core.branches(p.project),
   csMachines: p => core.csMachines(p),
-  wsNew: p => core.wsNew(core.byCaller(p)),
+  wsNew: p => core.wsNew(yours(core.byCaller(p))),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
@@ -223,7 +224,7 @@ const api: Record<string, Handler> = {
   wsStat: p => core.wsStat(p), // a row's hover card: its diff's size now
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
-  wsFan: p => core.wsFan(core.byCaller(p)),
+  wsFan: p => core.wsFan(yours(core.byCaller(p))),
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
   seen: p => core.seen(p.tab), // the Needs you list's Seen: its ● cleared, as a look does
@@ -277,6 +278,8 @@ const api: Record<string, Handler> = {
   wsSet: p => core.wsSet(p),
   reorder: p => core.reorder(p),
   imageSave: p => core.imageSave(p),
+  bgSet: p => core.bgSet(p), // Settings › Appearance › Background image
+  bgGet: () => core.bgGet(),
   fileSave: p => core.fileSave(p),
   prFix: p => core.prFix(p), // { ws, what, job? }: job: only that check's
   prLog: p => core.prLog(p), // { ws, job }: a failing check's log, its steps named (Info's Log)
@@ -286,6 +289,9 @@ const api: Record<string, Handler> = {
   tabHandover: p => tabHandover(p), // a tab's Continue in Codex / Claude Code
   turnDiff: p => turnDiff(p), // Changes' This turn
   turnUndo: p => turnUndo(p), // the Reader's card's Undo
+  sideAsk: p => sideAsk(p), // Side chat: a question about an agent's work beside it (its chat forked)
+  sideState: p => sideState(p),
+  sideNew: p => sideNew(p),
   secretAsk: p => secretAsk(p), // laki secret: resolves as you answer (secrets.ts)
   secretGive: p => secretGive(p),
   secretsTidy: p => secretsTidy(p.now), // tests move the clock
@@ -298,7 +304,7 @@ const api: Record<string, Handler> = {
   uiReset: () => core.uiReset(),
   portKill: p => core.portKill(p),
   meme: () => meme(),
-  aiAsk: ({ from: _, ...p }) => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here; from: whoCalls'
+  aiAsk: ({ from, ...p }) => (core.agentCaller(from) || core.promptKeep(p.text), aiAsk(p, (method, params) => call(method, params) as Promise<any>)), // Laki's own AI (yours: its text in your prompts' history): its tools call this API here; from: whoCalls'
   aiUnqueue: p => aiUnqueue(p), // a message sent while it answered, taken back before it goes
   aiState: p => aiState(p), // chat: a spec's or brainstorm's (planChat), else the AI page's
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
@@ -315,6 +321,9 @@ const api: Record<string, Handler> = {
   aiKey: p => aiKey(p),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
   send: async p => (agentSend(p), await crossAsk(p, 'send'), core.send(p)),
+  prompts: () => core.promptList(), // your prompts, newest first: the prompt boxes' history
+  chatList: p => chatList(p), // Import chats: Claude Code's and Codex's sessions in the project's folders, outside Laki
+  chatImport: p => chatImport(p),
   queueClear: async p => (await crossAsk(p, 'send', p.target, ''), core.clearQueue(p.target)),
   queueSet: async p => (await crossAsk(p, 'send', p.tab, Array.isArray(p.queue) ? p.queue.join('\n\n') : ''), core.queueSet(p)), // the queue strip's edit, reorder, remove
   queueNow: async p => (await crossAsk(p, 'send', p.tab, ''), core.queueNow(p.tab)), // its Send now: the turn stopped, the first one typed
@@ -504,7 +513,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop'])
+const FROM = new Set(['prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop'])
 const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -546,7 +555,7 @@ const notAgent = (p: any, what: string) => {
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
-const AGENT_NO: Record<string, string> = { turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check' }
+const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check' }
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
@@ -566,11 +575,17 @@ const crossOk = new Set<string>()
 // #1: an agent's send goes to agents (agent: true, as MCP's laki_send), or into a terminal of its own workspace, which is
 // then the agent's (core.agentTyped): what it runs there isn't yours. Another workspace's terminal is refused before any
 // ask. Yours gives it back
+// a new workspace's prompt, yours (no agent's tab asked: byCaller's from; no agent said, as MCP and Laki AI do), into
+// your prompts' history
+const yours = <T extends { from?: string; agent?: string; prompt?: string }>(p: T) => (p.from || p.agent || core.promptKeep(p.prompt), p)
 function agentSend(p: any) {
   const tab = core.resolveTarget(String(p.target ?? ''))
   const by = core.agentCaller(p.from)
   if (by) delete p.steer // into a running turn is your follow-ups' only: an agent's waits its turn (an Enter typed now could answer a menu just drawn)
-  if (!by) core.youTyped(tab.id, String(p.text ?? ''))
+  if (!by) {
+    core.youTyped(tab.id, String(p.text ?? ''))
+    if (p.enter !== false && !p.by && core.tracked(tab)) core.promptKeep(p.text, tab.workspace) // a prompt you sent an agent (not an insert, a command, Laki AI's or a side chat's: by)
+  }
   else if (core.tracked(tab)) p.agent = true
   else if (tab.workspace !== by) throw new Error(`${tab.name} isn't an agent, and it's in another workspace: an agent's messages go to agents only (ask the user to run it there)`)
   else core.agentTyped(tab.id)
@@ -578,7 +593,7 @@ function agentSend(p: any) {
 // keys: an agent's into a terminal of its own workspace make it the agent's (as a send does); yours give it back
 function typed(p: any, tab: string, data: string) {
   if (core.agentCaller(p.from)) core.agentTyped(tab)
-  else core.youTyped(tab, data)
+  else core.youTyped(tab, data, true)
 }
 // keys (input) ask as a send does, a terminal attached to as a screen read; an event (emit, #3) with another workspace's
 // ws: its workflows and extensions run there, so it asks as a send does (target: the event, text: its data)

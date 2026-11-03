@@ -49,6 +49,13 @@
 html, body, #root { height: 100%; margin: 0; }
 ::placeholder { color: var(--muted); opacity: 1; } /* a hint, readable on every theme (the browser's grey isn't on some) */
 body { background: var(--app-bg, var(--bg)); color: var(--fg); font: 13px/1.4 var(--ui-font); overflow: hidden; -webkit-font-smoothing: antialiased; }
+/* Settings › Appearance › Background image (themes.ts): the theme's background on the canvas, the picture over it under its
+   veil (--bg-veil: how much of the theme covers it), blurred past its edges; everything else over it */
+html.has-bg { background: var(--bg); }
+html.has-bg body { background: transparent; }
+html.has-bg body::before { content: ''; position: fixed; inset: calc(var(--bg-blur) * -2); z-index: -1; pointer-events: none; background: var(--bg-image) center / cover no-repeat; filter: blur(var(--bg-blur)); opacity: calc(1 - var(--bg-veil)); }
+.bg-pick { gap: 8px; flex-wrap: wrap; align-items: center; } /* Settings › Appearance › Background image */
+.row > .bg-thumb { flex: 0 0 64px; width: 64px; height: 40px; object-fit: cover; border-radius: var(--rs, 6px); border: 1px solid var(--line); }
 /* Sidebar see-through, and glass (applyTheme): the window's blur under the sidebar and the rail, the window's background (glass: its glow) under the main area only */
 html.side-clear body { background: transparent; }
 html.side-clear .main { background: var(--app-bg, var(--bg)); }
@@ -500,6 +507,13 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .to-top { position: absolute; right: 24px; bottom: 22px; z-index: 6; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); cursor: pointer; animation: to-top-in 0.16s ease-out; } /* ui.tsx Page: scrolled well down */
 .to-top:hover { color: var(--accent-ink); border-color: var(--accent); }
 @keyframes to-top-in { from { opacity: 0; transform: translateY(6px); } }
+.help-q { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; vertical-align: 1px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1; cursor: help; } /* SettingsKit's HelpQ: a setting's ? */
+.help-q::after { content: ''; position: absolute; inset: -6px; } /* a bigger target than it looks */
+.help-q:hover, .help-q:focus-visible { color: var(--accent-ink); border-color: var(--accent); outline: none; }
+.help-card { position: fixed; inset: auto; margin: 6px 0; position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; width: min(340px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); color: var(--fg); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); font-size: 12px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; cursor: auto; }
+.help-card:popover-open { display: flex; flex-direction: column; gap: 6px; }
+.help-card b { font-size: 13px; }
+.help-k { margin-right: 4px; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
 .page-body > * { max-width: 760px; margin: 0 auto; }
 .settings-nav { width: 180px; flex: none; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); background: var(--side); }
 .settings-nav button { display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 10px; color: var(--muted); }
@@ -666,6 +680,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu-item.indent { padding-left: 26px; }
 .menu-icon { width: 14px; display: inline-flex; color: var(--muted); }
 .menu-item.danger .menu-icon { color: var(--error); }
+.menu-item.good, .menu-item.good .menu-icon { color: var(--done); } /* an approval: green as a removal is red */
 /* a label, and a line under it (sub); the picked one in the accent with a check */
 .menu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .menu-label { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
@@ -3165,6 +3180,8 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .form .wt-row b { color: var(--fg); font-size: 13px; }
 .wt-row:hover { background: var(--hover, color-mix(in srgb, var(--fg) 6%, transparent)); }
 .wt-row .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.form .wt-row.chat-row { grid-template-columns: auto auto minmax(0, 1fr) auto; color: var(--fg); font-size: 13px; }
+.chat-row .cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sp-dir { color: var(--muted); } /* Changes' tree view: a folder's row (text.ts fileTree) */
 .sp-dir .sp-name { color: var(--fg); }
 .rd-box textarea.rd-ghost::placeholder { font-style: italic; } /* settings.nextPrompt's guess: Tab takes it */
@@ -3177,3 +3194,12 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .rd-turn-files { border-top: 1px solid var(--line); padding: 4px 10px 6px; }
 .rd-turn-file { display: flex; align-items: baseline; gap: 8px; padding: 1px 0; }
 .rd-turn-file .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* SideChat.tsx: the right panel's Side chat */
+.side-chat { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.sc-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.sc-thread { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 10px; }
+.sc-empty { padding: 8px 2px; }
+.sc-you { align-self: flex-end; max-width: 88%; padding: 6px 10px; border-radius: var(--rs, 10px); background: var(--hover); white-space: pre-wrap; }
+.sc-agent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.sc-box { display: flex; gap: 6px; align-items: flex-end; padding: 8px 10px; border-top: 1px solid var(--line); }
+.sc-box textarea { flex: 1; resize: none; min-height: 38px; }

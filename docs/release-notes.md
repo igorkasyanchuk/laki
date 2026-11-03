@@ -2,6 +2,32 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Settings › Updates › *Update delay*: offer a release only once it's 1, 3, 7, 14 or 30 days old; *Skip the delay once*
+  lets one in now.
+- `laki browser … --expect-url /login`: a click or fill meant for one page is refused, nothing done, on any other.
+- The new-workspace page remembers the effort you last picked for each model: pick Opus again and its usual effort
+  comes back.
+- A ? beside settings that assume agent know-how (Done check, Collision radar, permission modes, Merge when green…)
+  opens a card: what it does, when to turn it on, what it costs. Laki AI can quote it.
+- Side chat (a tab's right click, the right panel): ask about what an agent is doing while it works; a copy of its chat
+  answers, its own stays clean, and *Send to main chat* passes an answer on.
+- Prompt history: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box to edit.
+- Recording mode (⌘K, the menu bar): workspaces and projects marked *Private* disappear from the sidebar, Board, bubbles,
+  counts, notifications and phone pushes while they keep running.
+- A project's ⋯ › *Import chats…*: Claude Code and Codex chats run in the project from a plain terminal open as tabs
+  that resume them.
+- Settings › Appearance › *Background image*: a picture behind the sidebar and terminals, in any theme, with Dim and Blur.
+- A group's *Edit…* sets more defaults for a new workspace there: where it's made (worktree, no setup, the project's
+  folder), permission mode, model, effort and base branch.
+- Laki AI's *Back to the top* button no longer covers the send button.
+- A PR menu's *Approve…* is green, as *Remove* is red.
+- A sidebar row's PR marks (its avatar, checks, state) no longer vanish when GitHub turns gh away for a while (its
+  rate limit, the network): the last PR stays shown. Branches with no PR are asked every 5 minutes, not every minute, and
+  a rate limit pauses the scans 5 minutes, so Laki spends less of your GitHub quota. PR authors' pictures are kept a day,
+  and one that fails to load is tried again instead of staying hidden.
+
 ## 0.42.0 · Nov 3, 2026
 
 - When everything is done (Settings › Git & worktrees): sleep, lock or shut down the Mac once every agent, workflow run

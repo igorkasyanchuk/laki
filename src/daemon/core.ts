@@ -12,7 +12,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { readJson } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
@@ -934,7 +934,9 @@ function slugActions(first?: RunAction[]) {
   for (const l of order) for (const a of l) if (a && typeof a === 'object') a.slug = actionSlug(String(a.slug || a.name || ''), taken)
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string }) {
+// a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
+const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean }) {
   const p = findProject(ref)
   // its color (TAB_COLORS') and icon (an ICONS name or an emoji): '' (a color's none too) clears it; anything else is
   // refused before any change
@@ -942,6 +944,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   if (o.icon !== undefined && o.icon !== '' && !isIconName(o.icon) && !emojiOf(o.icon)) throw new Error("a project's icon is an icon's name or an emoji")
   if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
+  if (o.private !== undefined) p.private = o.private === true || undefined // Recording mode hides it and its workspaces
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   // its name in Laki; '' (the ⋯'s Rename, Settings' Name emptied): its folder's again, a host's with the host; Terminals' and Browsers' keep theirs
   if (typeof o.name === 'string' && (o.name.trim() || !p.kind)) p.name = Array.from(o.name.trim()).slice(0, 80).join('') || (p.host ? `${basename(p.path)} (${p.host})` : basename(p.path))
@@ -960,7 +963,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
     p.memory = m.length ? m : undefined
   }
   if (Array.isArray(o.seps)) {
-    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(typeof x.preset === 'string' && x.preset.trim() ? { preset: Array.from(x.preset.trim()).slice(0, 80).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}) }))
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(typeof x.preset === 'string' && x.preset.trim() ? { preset: Array.from(x.preset.trim()).slice(0, 80).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}), ...(SEP_WHERE.includes(x.where as SepWhere) ? { where: x.where } : {}), ...sepWords(x) }))
     p.seps = seps.length ? seps : undefined
     if (!p.seps) p.rows = undefined
   }
@@ -1450,7 +1453,7 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
 
 // agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
 // cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; resume?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
   const ws = findWs(wsRef)
   const { pr, cmd, preset, kind, model, effort, perm, fast } = tabSpec(ws, o)
   if (cmd !== o.cmd) o = { ...o, cmd }
@@ -1465,10 +1468,11 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
   const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }), ...(kind === 'agent' && { usedAt: Date.now() }) }
   const cwd = kind === 'shell' && !o.cmd ? o.cwd : undefined
+  if (o.resume && kind === 'agent') tab.resumeId = o.resume // a chat of its agent's (Import chats): resumed, not a new one
   state.tabs.push(tab)
   save()
   try {
-    spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt, cwd })
+    spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt, cwd, resume: !!tab.resumeId })
   } catch (e) {
     state.tabs = state.tabs.filter(t => t !== tab)
     save()
@@ -1573,7 +1577,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
   const w = findWs(o.id)
   // a later start: null cancels it (the workspace stays, no agent), at moves it (or to the limit's reset), prompt
   // changes what it says; start: now
@@ -1603,6 +1607,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoLand && !w.autoLand && w.fix?.land) retry.add(`${w.id}:land`) // the head it tried may go again
   if (o.autoLand !== undefined) w.autoLand = o.autoLand || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
+  if (o.private !== undefined) w.private = o.private || undefined // Recording mode hides it
   if (o.pinned !== undefined) w.pinned = o.pinned || undefined
   if (o.railPin !== undefined) w.railPin = o.railPin ? (w.railPin ?? Date.now()) : undefined
   if (o.pending === null) delete w.pending
@@ -1644,6 +1649,32 @@ export function imageSave(o: { data: string; ext?: string }) {
   const path = join(images, `${Date.now()}-${randomUUID().slice(0, 6)}.${ext}`)
   writeFileSync(path, buf)
   return path
+}
+// Settings › Appearance › Background image: one picture behind the window, <data>/background/<ms>.<ext> (the one before
+// goes; no data: none). settings.background.file names it, so each window loads it again (bgGet) as it changes
+const BG_FILE = /^\d+\.(png|jpe?g|gif|webp)$/
+export function bgSet(p: { data?: string; ext?: string }) {
+  const at = join(dir, 'background')
+  let file: string | undefined
+  if (p.data) {
+    const ext = String(p.ext ?? '').toLowerCase()
+    if (!['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) throw new Error('a PNG, JPEG, GIF or WebP picture')
+    const buf = Buffer.from(p.data, 'base64')
+    if (!buf.length || buf.length > 20 << 20) throw new Error('a picture up to 20 MB')
+    mkdirSync(at, { recursive: true })
+    writeFileSync(join(at, (file = `${Date.now()}.${ext}`)), buf)
+  }
+  for (const f of existsSync(at) ? readdirSync(at) : []) if (f !== file) rmSync(join(at, f), { force: true })
+  settingsSet({ background: { ...state.settings?.background, file } })
+  return { file }
+}
+// the picture as a data URL (null: none, or its file gone)
+export function bgGet() {
+  const f = state.settings?.background?.file
+  const path = f && BG_FILE.test(f) ? join(dir, 'background', f) : ''
+  if (!path || !existsSync(path)) return null
+  const ext = f!.split('.').pop()
+  return `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${readFileSync(path).toString('base64')}`
 }
 // any other file attached to a prompt (PromptInput's chips): <data>/files/<ms>-<hex>/<its name>, a folder each so the
 // name stays as it was (0700, the file 0600); its path goes into the prompt. The name: its last part only, no control
@@ -2642,6 +2673,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
         titleFrom(tab, pl.prompt) // claude's, gemini's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
+        if (Date.now() - (keysAt.get(tab.id) ?? 0) < 5000 && !typedBy.has(tab.id) && !tab.flow) promptKeep(pl.prompt, tab.workspace) // typed there by you just now
         if (pl.hook_event_name === 'UserPromptSubmit')
           for (const f of turnStarts)
             try {
@@ -2718,7 +2750,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
         } catch (e) {
           log(`turn ${tab.id}: ${(e as Error).message}`)
         }
-      prSoon()
+      prSoon(tab.workspace)
       void keepPublished(tab, r, last ? String(last) : undefined).catch(e => log(`links ${tab.id}: ${e.message}`))
       const w = state.workspaces.find(x => x.id === tab.workspace)
       if (last && w?.schedule && w.kind !== 'worktree') void prFromSaid(w) // a scheduled run's own folder session (a worktree's scan, finding none on its branch, does; the project's lasting local one would keep the first PR named)
@@ -3061,7 +3093,30 @@ export async function treeAgent(tab?: Tab) {
 // mouse reports start with one). ponytail: in memory; a restart forgets it
 const typedBy = new Set<string>()
 export const agentTyped = (tab: string) => typedBy.add(tab)
-export const youTyped = (tab: string, data: string) => !data.includes('\x1b') && typedBy.delete(tab)
+// keys: typed in the terminal (input), not a send: its prompt is the one claude's UserPromptSubmit records (promptKeep)
+export const youTyped = (tab: string, data: string, keys = false) => !data.includes('\x1b') && (keys && keysAt.set(tab, Date.now()), typedBy.delete(tab))
+const keysAt = new Map<string, number>() // when you last typed into a tab: its next prompt (claude's UserPromptSubmit) is yours
+
+// your prompts, for the prompt boxes' history (↑ in an empty box, Settings › Keys' Prompt history): what you send through
+// Laki (a send, a new workspace's or tab's, Laki AI's) and type into claude yourself; never an agent's or Laki's own
+// (PR fixes, checks, workflows). <data>/prompts.json, newest last, the same text again moved to the end, PROMPTS_MAX
+// ponytail: codex's typed in its terminal aren't caught (its notify comes as the turn ends)
+export const PROMPTS_MAX = 500
+let prompts: { text: string; at: number; ws?: string }[] | undefined
+const promptsFile = () => join(dir, 'prompts.json')
+export function promptKeep(text: unknown, ws?: string) {
+  const t = typeof text === 'string' ? text.trim().slice(0, 4000) : ''
+  if (!t || t.startsWith('/')) return // a /command isn't a prompt to send again
+  prompts ??= (readJson(promptsFile()) as typeof prompts) ?? []
+  prompts = [...prompts.filter(x => x.text !== t), { text: t, at: Date.now(), ...(ws && { ws }) }].slice(-PROMPTS_MAX)
+  try {
+    writeFileSync(promptsFile(), JSON.stringify(prompts), { mode: 0o600 })
+  } catch {} // unwritable: kept for this run
+}
+export function promptList() {
+  prompts ??= (readJson(promptsFile()) as typeof prompts) ?? []
+  return [...prompts].reverse()
+}
 export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
 export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
@@ -3265,22 +3320,25 @@ const browsing = new Map<string, { done: (r: { ok: boolean; result?: any; error?
 // Laki AI looked at a tab, or used the agent browser (no tab: a window of its own): the app's glow over that tab's pane,
 // else its window, with Settings › General › Experimental › Laki AI's glow on (the renderer's)
 const peek = (ws: string, tab?: string) => broadcast({ ev: 'peek', ws, tab })
-export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string; by?: string }) {
+export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string; expect?: string; by?: string }) {
   const ws = findWs(p.ws)
   if (p.by === 'ai') peek(ws.id)
   if (!BROWSE_OPS.includes(p.op)) throw new Error(`browser: ${p.op}? one of ${BROWSE_OPS.join(', ')}`)
   if ((p.op === 'click' || p.op === 'fill') && !p.selector?.trim()) throw new Error(`browser ${p.op}: which element? a CSS selector`)
   // a path is on the workspace's $PORT, localhost:3000 gets its http://
-  const u = p.url?.trim()
-  const url = !u ? undefined : u.startsWith('/') ? `http://localhost:${ws.port}${u}` : /^https?:\/\//.test(u) ? u : `http://${u}`
+  const full = (u?: string) => (!u ? undefined : u.startsWith('/') ? `http://localhost:${ws.port}${u}` : /^https?:\/\//.test(u) ? u : `http://${u}`)
+  const url = full(p.url?.trim())
   if (url && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error(`the agent browser opens this Mac's localhost only, not ${url}`)
+  // --expect-url: the page the op is meant for; main refuses it, nothing done, when the browser is elsewhere
+  const expect = full(p.expect?.trim())
+  if (expect && p.op === 'open') throw new Error('browser open: --expect-url is for the ops on a page already open (click, fill, text, screenshot)')
   const host = [...clients].reverse().find(c => c.view?.browse)
   if (!host) throw new Error("the agent browser needs Laki's window: open the app on this Mac")
   const id = randomUUID()
   const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
     const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "the agent browser didn't answer in 30 s" })), 30000)
     browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
-    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text })
+    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text, expect })
   })
   if (!r.ok) throw new Error(r.error || 'the agent browser failed')
   if (p.op !== 'screenshot') return r.result

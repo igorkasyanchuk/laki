@@ -87,6 +87,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words buttons and bars'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
+  ['appearance', 'Background image', 'wallpaper picture photo backdrop dim blur'],
   ['appearance', 'Glow', 'glass colors'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
   ['appearance', 'Favorites', 'theme star starred favorite'],
@@ -157,6 +158,7 @@ export const FIND: [string, string, string?][] = [
   ['git', 'Collision radar', 'overlap conflict collide same lines files worktrees merge base moved'],
   ['general', 'Menu bar icon', 'tray item status bar count waiting needs you hide show'],
   ['general', 'Updates', 'update updates upgrade new version check download release restart latest'],
+  ['general', 'Update delay', 'update delay wait days old release skip once later'],
   ['keys', "Laki's keys", 'keys shortcuts keyboard rebind remap bindings hotkeys record reset conflict cmd command'],
   ['keys', 'Show the keys while ⌘ is held', 'hold command overlay badges cheat sheet hints which key'],
   ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
@@ -188,3 +190,94 @@ export const FIND: [string, string, string?][] = [
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
+
+// the ? beside a setting that assumes agent know-how (SettingsKit's Says, by its title as the page writes it): what it
+// does, when to turn it on, what it costs. Laki AI's laki_settings_find quotes it
+export type SettingHelp = { what: string; when: string; cost: string }
+export const HELP: Record<string, SettingHelp> = {
+  'Done check': {
+    what: "When an agent says it's done and changed files, Laki runs the project's test, lint or format scripts (and, if set, a second agent's review) before telling you. A failure goes back to the agent to fix.",
+    when: 'Projects with fast, trustworthy scripts, where a "done" that breaks the build costs you a round trip.',
+    cost: "The scripts' time after each turn; a review is one more agent call. Tries stop after 3 failures in a row.",
+  },
+  "A second agent's review": {
+    what: "After the Done check's scripts pass, another agent reads the diff and lists real problems. You see its notes; the working agent gets them only when you send them.",
+    when: 'Bigger changes, or an agent you trust less, where a second pair of eyes is worth a short wait.',
+    cost: 'One agent call per checked turn, on your plan or API key.',
+  },
+  'Collision radar': {
+    what: "Compares every worktree's changed lines with the project's other worktrees and its base, and marks rows whose edits would meet in a merge.",
+    when: 'Several agents working in one repo at once, so you hear about a conflict before it happens.',
+    cost: 'A git diff per worktree every 15 seconds: noticeable on very big repos. Nothing is fetched.',
+  },
+  'Fast mode': {
+    what: "Starts this profile's agent in its fast mode: Claude Code's fast mode, Codex's fast tier.",
+    when: 'Short, interactive work where waiting hurts more than the price.',
+    cost: 'A higher price per token. A workspace can turn it off for itself.',
+  },
+  'Permission mode': {
+    what: "How freely the agent acts: Ask first (the agent's own prompts), Auto, Accept edits, Plan (read only) or Bypass permissions (never asks).",
+    when: 'Ask first while you watch; Accept edits for routine work in a worktree; Bypass only in a sandbox you can throw away.',
+    cost: 'Fewer asks means fewer chances to stop a wrong command. Bypass can run anything, outside the worktree too.',
+  },
+  'Send into the running turn': {
+    what: 'A message you send while the agent works goes in at once and it reads it mid-turn, instead of waiting in the queue for the turn to end.',
+    when: "You often correct course while it works (\"use the other table\").",
+    cost: 'Nothing extra. A message typed mid-turn can arrive between two of its steps, so it may finish a step first.',
+  },
+  "Each turn's changes": {
+    what: "Notes the worktree as each Claude Code or Codex turn starts and ends, then shows what that turn changed, with Review and Undo.",
+    when: "On unless your repos are huge: Undo of one turn is the cheapest way back from a bad one.",
+    cost: "A git tree of the worktree at each turn's start and end (its own index, the worktree's is untouched).",
+  },
+  'Guess my next prompt': {
+    what: "As a turn ends, Laki AI's model guesses what you'd send next; the Reader's empty box shows it and Tab takes it.",
+    when: 'Long back-and-forth sessions where your replies are often "go on", "run the tests", "commit it".',
+    cost: "One small Laki AI call per turn (OpenRouter's key, or your Claude Code / Codex plan).",
+  },
+  "The agent's plan, live": {
+    what: "Shows an agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row.",
+    when: 'Long tasks where you want to see how far along it is without reading the chat.',
+    cost: "Nothing extra: it reads the agent's own to-do tools.",
+  },
+  'Keep the Mac awake while agents work': {
+    what: "While any agent runs or waits for you, the Mac doesn't go to sleep (the screen still may). It ends with the work.",
+    when: 'You leave agents working and walk away, or start long runs before bed.',
+    cost: 'Battery, on a laptop off the charger.',
+  },
+  'Sync the base branch': {
+    what: "Fetches the base branch before each new worktree, so it starts from origin's latest instead of your local copy.",
+    when: "Your local main is often behind and agents start from old code.",
+    cost: 'A git fetch (a few seconds) per new workspace. A failed fetch never stops it.',
+  },
+  'Copy ignored files to new worktrees': {
+    what: 'Copies every file .gitignore leaves out (.env, builds, node_modules) from the repo into each new worktree.',
+    when: "New worktrees can't run without your .env or a build; .worktreeinclude is the lighter way for a few files.",
+    cost: 'Disk and time: node_modules alone can be gigabytes per worktree.',
+  },
+  'Copy untracked files to new worktrees': {
+    what: "Copies files git doesn't track yet (new, not ignored) into each new worktree.",
+    when: "You keep notes or scratch files in the repo that agents should see.",
+    cost: 'Time and disk for whatever is lying around untracked.',
+  },
+  'Merge when green': {
+    what: 'A switch per workspace: Laki merges its PR once every check passes, it has no conflicts and it is approved if the repo needs that.',
+    when: "Repos with CI you trust, for small changes you've already read.",
+    cost: 'Nothing waits for your last look: what CI misses is merged.',
+  },
+  'Archive workspace when its PR merges': {
+    what: "A worktree whose PR merged, with nothing uncommitted or unpushed and no agent running, is archived on its own (Undo brings it back).",
+    when: 'You merge many PRs and tidy the sidebar by hand.',
+    cost: 'Its worktree folder goes (the branch stays); its storage folder is kept.',
+  },
+  'Refresh PR status in the background': {
+    what: "Asks GitHub about each workspace's PR every minute or so: checks, reviews, conflicts. The PR switches need it.",
+    when: 'On, unless you hit GitHub rate limits or work offline.',
+    cost: 'gh calls each minute per workspace with a PR.',
+  },
+  'When everything is done': {
+    what: 'Sleeps, locks or shuts down the Mac once every agent, workflow run and scheduled task that was going is done, after a minute you can cancel. Once, then off again.',
+    when: 'You start a long batch at the end of the day.',
+    cost: "A shutdown closes your other apps too, as macOS's own would.",
+  },
+}

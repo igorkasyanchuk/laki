@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
-import { type BrowseDid, pageChanges, type View } from '../shared/types.ts'
+import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
 import { updater } from './update.ts'
 
 // a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
@@ -199,6 +199,11 @@ app.whenReady().then(() => {
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, cb) =>
     cb({ requestHeaders: { ...d.requestHeaders, Referer: d.requestHeaders.Referer || 'https://dev.laki.app/' } }),
   )
+  // PR authors' pictures (Info.tsx Avatar): GitHub says 5 minutes, then each one is asked again (a failure then hid it);
+  // kept a day instead. A picture, not an API call: no rate limit either way
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://avatars.githubusercontent.com/*'] }, (d, cb) =>
+    cb({ responseHeaders: { ...Object.fromEntries(Object.entries(d.responseHeaders ?? {}).filter(([k]) => k.toLowerCase() !== 'cache-control')), 'Cache-Control': ['public, max-age=86400'] } }),
+  )
 })
 
 const daemon = () =>
@@ -355,9 +360,10 @@ app.on('will-quit', () => globalShortcut.unregisterAll())
 const updates = updater(s => win?.webContents.send('update', s))
 autoUpdater.on('before-quit-for-update', () => (quitting = true))
 ipcMain.handle('update', (e, op: unknown) =>
-  !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : updates.state(),
+  !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : op === 'skip' ? updates.skip() : updates.state(),
 )
-ipcMain.on('update-auto', (e, on: unknown) => from(e) && updates.auto(on === true)) // Settings' Check for updates
+// Settings' Check for updates and Update delay (days)
+ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.auto(on === true, typeof days === 'number' && days > 0 && days <= 365 ? days : 0))
 
 ipcMain.handle('conn', async e => {
   if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
@@ -399,7 +405,7 @@ ipcMain.on('sound', (e, name: string) => {
 
 // the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
 // to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
-type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string }
+type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string; expect?: string } // expect: --expect-url's
 // errors, blocked: what the page did during an op (its answer's), 20 of each; turn: the op before (one at a time: two
 // at once would mix their clicks and their reports)
 type AgentWin = { w: BrowserWindow; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown> }
@@ -452,6 +458,7 @@ async function browseOp(entry: AgentWin, r: Browse) {
   }
   if (r.op === 'open') await settle() // its scripts' first errors
   const page = { url: wc.getURL(), title: wc.getTitle() }
+  if (r.expect && !urlIs(page.url, r.expect)) throw new Error(`the agent browser is on ${page.url}, not ${r.expect}: nothing done`)
   if (r.op === 'open') return { ...page, ...caused() }
   if (r.op === 'screenshot') {
     const img = await wc.capturePage()
@@ -543,12 +550,14 @@ ipcMain.on('dock-icon', (e, png: unknown) => {
 // notification's does), Open (with the global hotkey) and Quit. tray false: Settings › General › Menu bar hid it
 let tray: Tray | null = null
 let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
+let recording = false // the last badge's: Recording mode is on (settings.recording), its item ticked
 function trayMenu() {
   tray?.setContextMenu(
     Menu.buildFromTemplate([
       ...trayTabs,
       ...(trayTabs.length ? [{ type: 'separator' as const }] : []),
       { label: 'New Workspace…', click: () => newWsWin() }, // the bubbles' + window: over the app you're in
+      { label: 'Recording Mode', type: 'checkbox', checked: recording, click: () => void rpc('settingsSet', { recording: !recording }).catch(() => {}) }, // private workspaces hidden
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
       ...(shotOn ? [{ label: 'Screenshot to Laki AI…', ...(keys.shot && { accelerator: keys.shot, registerAccelerator: false }), click: shotAsk }] : []),
@@ -559,8 +568,9 @@ function trayMenu() {
   )
 }
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
-ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true) => {
+ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [], on = true, rec: unknown = false) => {
   if (!from(e)) return
+  recording = rec === true
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
   if (!on) return void (tray?.destroy(), (tray = null))

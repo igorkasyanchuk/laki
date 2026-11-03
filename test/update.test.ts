@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { feedName, feedOf, newer, RELEASES, releaseOf } from '../src/shared/update.ts'
+import { feedName, feedOf, heldUntil, newer, RELEASES, releaseOf } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -37,4 +37,14 @@ test("the app checks the repo releases go to (package.json's build.publish)", ()
 test('the app menu\'s Check for Updates… link opens General at its Updates group', () => {
   assert.deepEqual(parseLink('laki://settings/general?spot=Updates'), { to: 'settings', section: 'general', spot: 'Updates' })
   assert.deepEqual(parseLink('laki://settings/general'), { to: 'settings', section: 'general' })
+})
+
+test('heldUntil: a release waits out the update delay from its publish date', () => {
+  const at = '2026-11-01T12:00:00Z'
+  const t = Date.parse(at)
+  assert.equal(heldUntil(at, 3, t + 86_400_000), t + 3 * 86_400_000) // a day old, 3 days asked: held
+  assert.equal(heldUntil(at, 3, t + 3 * 86_400_000), undefined) // old enough: offered
+  assert.equal(heldUntil(at, 0, t), undefined) // no delay
+  assert.equal(heldUntil(undefined, 7, t), undefined) // no date: offered, never held for good
+  assert.equal(heldUntil('not a date', 7, t), undefined)
 })

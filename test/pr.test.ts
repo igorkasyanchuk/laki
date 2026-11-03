@@ -136,6 +136,22 @@ test('a re-run check counts by its newest run (a queued one is the newest), prRe
   assert.deepEqual(now.list.map((c: any) => `${c.name} ${c.state}`), ['test pass', 'lint pending'])
 })
 
+test("gh failing (a rate limit, the network) keeps the PR shown; only gh's none drops it", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const prOf = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr
+  await until(prOf, 'PR scanned')
+  writeFileSync(join(gh, 'pr.json'), 'GraphQL: API rate limit already exceeded for user ID 1.')
+  await rig.rpc('prRefresh')
+  assert.equal((await prOf())?.number, 42, 'kept through a rate limit')
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found for branch "x"')
+  await rig.rpc('prRefresh')
+  assert.equal(await prOf(), undefined)
+})
+
 test('autoFix and autoReview: they wait for an agent; CI goes over to you after 3 fixes in a row; a pass starts over', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

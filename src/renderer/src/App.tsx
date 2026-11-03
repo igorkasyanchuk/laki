@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, neverAsks, PERMS, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, neverAsks, PERMS, veiled, EFFORTS, MODELS, SEP_WHERE, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -10,7 +10,8 @@ import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, PrCard, prState, PRStatus, REVIEW, reviewersText, short, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
-import { About, AddProject, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { SideChat } from './SideChat'
+import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -48,7 +49,7 @@ import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, THEMES, transparent, userCss } from './themes'
+import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
@@ -216,7 +217,9 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+// the events that notify or toast about a workspace: none for one Recording mode hides
+const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -908,14 +911,15 @@ export function App() {
   const needsYou = (t: TabView) => (t.status === 'waiting' || !!t.secret || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
   // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
+  const hid = useRef(new Set<string>()) // Recording mode's hidden workspaces (veiled): their events say nothing
   const needing = view?.tabs.filter(needsYou) ?? []
   const trayItems = [...needing.filter(t => t.status === 'waiting'), ...needing.filter(t => t.status !== 'waiting')].map(t => {
     const w = view?.workspaces.find(w => w.id === t.workspace)
     const asks = t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') || 'waiting for you' : 'finished'
     return { tab: t.id, label: `${w ? wsName(w) : t.workspace} · ${t.name}: ${asks.replace(/\s+/g, ' ').slice(0, 60)}` }
   })
-  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar])
-  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false), [trayKey])
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false, !!view?.settings.recording), [trayKey])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
@@ -926,11 +930,31 @@ export function App() {
     localStorage.setItem('laki.previewW', JSON.stringify(previewW))
   }, [panelOpen, panelTab, panelW, previewW])
 
+  // Settings › Appearance › Background image: the daemon's file as a blob URL here (a short one in the theme's CSS)
+  const bgFile = view?.settings.background?.file
+  const [bgUrl, setBgUrl] = useState('')
+  useEffect(() => {
+    let url = ''
+    let live = true // a late answer, after the file changed or went: dropped
+    if (bgFile)
+      void api.call<string | null>('bgGet').then(
+        d => {
+          if (!d || !live) return
+          const [head, b64] = d.split(',')
+          const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+          setBgUrl((url = URL.createObjectURL(new Blob([bytes], { type: head.slice(5, head.indexOf(';')) }))))
+        },
+        () => {},
+      )
+    else setBgUrl('')
+    return () => void ((live = false), url && URL.revokeObjectURL(url))
+  }, [bgFile])
+  setBgImage(bgUrl)
   // the theme, painted before the terminals read it (their effects run before ours)
   const paint = paintOf(view?.settings)
   const lessClear = useSyncExternalStore(LESS.on, LESS.now)
   const moreContrast = useSyncExternalStore(MORE.on, MORE.now)
-  const theme = paintKey(paint) + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') // terminals repaint when it changes
+  const theme = paintKey(paint) + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') + (bgUrl ? ` ${bgUrl}` : '') // terminals repaint when it changes
   const painted = useRef<string | null>(null)
   const glassed = useRef('')
   if (view && painted.current !== theme) {
@@ -1248,7 +1272,11 @@ export function App() {
   useEffect(() => void (toolAsk.current && earlyAsks.current.splice(0).forEach(m => toolAsk.current!(m))))
   useEffect(() => {
     const off = api.on(m => {
-      if (m.ev === 'state') setView(m.view)
+      if (m.ev === 'state') {
+        const v = veiled(m.view) // Recording mode: private workspaces out of everything drawn
+        hid.current = v === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !v.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
+        setView(v)
+      } else if (QUIET.has(m.ev) && hid.current.has(m.ws)) return // and their notifications and toasts
       else if (m.ev === 'widget-say' && typeof m.notify === 'string') {
         // an extension's notify: its new words, a notification (its click: its full view, else its page) and a toast
         const w = viewRef.current?.widgets?.find(x => x.id === m.widget)
@@ -2072,7 +2100,8 @@ export function App() {
   const shotKey = !view ? null : settings.shotAsk !== false && aiOn(settings) ? settings.shotKey ?? SHOT_KEY : false // Screenshot to Laki AI's (false: off)
   useEffect(() => void (shotKey !== null && bridge?.shotKey?.(shotKey).then(shot => setHeld(h => ({ ...h, shot })))), [shotKey])
   const updateAuto = !view ? null : settings.updateCheck !== false // Settings' Check for updates (null: no settings yet)
-  useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto)), [updateAuto])
+  const updateDelay = settings.updateDelay ?? 0 // and its Update delay, days
+  useEffect(() => void (updateAuto !== null && bridge?.updateAuto?.(updateAuto, updateDelay)), [updateAuto, updateDelay])
   // main's update.ts: a newer release stays in the status bar until you update (every check says so, a restart too);
   // a version a scheduled check found also toasts, once each (main's update.json). Its notes and Download: Settings
   const [upd, setUpd] = useState<UpdateState | null>(null)
@@ -2508,13 +2537,15 @@ export function App() {
   })
   // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
   // template: the default prompt template of a new workspace under it ('' none)
-  const sepName = async (o: { sep: string; id?: string }, name: string, template: string, preset: string) => {
+  // a group's name and defaults (Edit group: template, agent, where, permission mode, model, effort, base; '' none)
+  const sepName = async (o: { sep: string; id?: string }, name: string, d: Partial<Sep>) => {
     const p = view!.projects.find(p => p.id === o.sep)
     if (!p) return
-    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, template, preset } : x)) }))
+    const own = Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v || undefined])) as Partial<Sep> // '' drops it
+    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, ...own } : x)) }))
     const id = `sep-${Math.random().toString(36).slice(2, 10)}`
     const ids = [id, ...rowsOf(p, view!.workspaces).map(x => x.id)]
-    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, template, preset }], rows: ids })
+    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, ...own }], rows: ids })
   }
   // Sort workspaces: a project's (unset: as dragged), or a group's (unset: the project's, its own way named)
   const SORTS: [WsSort, string][] = [['manual', 'As dragged'], ['created', 'Newest first'], ['activity', 'Last active first'], ['name', 'By name']]
@@ -2610,6 +2641,7 @@ export function App() {
     null,
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', tip: w.muted ? 'Its agents notify you again' : 'No notifications or Dock count from its agents', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', tip: 'A notification about it later; a click opens it', run: () => setDialog({ remind: w.id }) },
+    { label: 'Private', icon: 'lock', hint: w.private ? ON : undefined, tip: w.private ? 'Recording mode shows it again' : "Recording mode (⌘K, the menu bar) hides it: from the sidebar, the Board, bubbles, counts, notifications and phone pushes; it keeps running", run: () => call('wsSet', { id: w.id, private: !w.private }) },
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', tip: w.pinned ? 'Back under its project' : 'In the sidebar\'s Pinned, above every project', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
     ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', tip: 'A button on the left rail that opens it from anywhere', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
@@ -2769,7 +2801,7 @@ export function App() {
       ? [
           null,
           ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: 'Merges it on GitHub, after you confirm', run: () => prAct(w, 'merge') } as MenuItem] : []),
-          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
+          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
           ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, tip: 'Closes it on GitHub without merging, after you confirm', run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
@@ -2829,6 +2861,7 @@ export function App() {
           ? [{ label: `Continue in ${other === 'codex' ? 'Codex' : 'Claude Code'}`, icon: 'agent', tip: `A ${other === 'codex' ? 'Codex' : 'Claude Code'} tab beside it that reads this chat and the changes so far, then carries on: for a usage limit or a stuck agent. This one stays`, run: () => void call<{ tab: string; name: string }>('tabHandover', { tab: t!.id, to: other }).then(r => (selectTab({ id: r.tab, workspace: t!.workspace }), done(`${r.name} takes over from ${t!.name}`)), () => {}) } as MenuItem]
           : []
       })(ts.length === 1 ? ts[0] : undefined)),
+      ...(ts.length === 1 && ts[0].kind === 'agent' ? [{ label: 'Side chat', icon: 'messages', tip: 'Ask about what it does in the right panel while it works: its own chat stays as it is', run: () => (selectTab(ts[0].id), showPanel('side')) } as MenuItem] : []),
       ...(ended.length ? [{ label: 'Restart', icon: 'restore', tip: 'Starts it again (an agent resumes its chat)', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
       ...(ts.length === 1 && accountsOf(ts[0].preset).length > 1 && !view?.workspaces.find(w => w.id === ts[0].workspace)?.host
         ? [{ label: 'Restart on another account', icon: 'restore', tip: 'The same chat, resumed on another sign-in (Settings › Agents & profiles)', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
@@ -2994,6 +3027,7 @@ export function App() {
       next: nextNeed,
       step: stepsOn && !!ws && !dialog && (() => (st => st && doStep(ws, st))(stepOf(ws))),
       later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
+      history: (box => !!box && (() => box.dispatchEvent(new CustomEvent('laki-history'))))(document.activeElement?.closest('textarea[data-history]')), // a prompt box's search of your prompts (usePromptHistory)
       artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
       full: () => toggleFull(), // full screen, or back
       back: historyOn && !field && (() => travel(hist.current.i - 1)),
@@ -3108,8 +3142,10 @@ export function App() {
       { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', tip: 'A named head in its list: drop workspaces under it', run: () => setDialog({ sep: p.id }) },
       ...(p.kind || p.git === false || p.host ? [] : [{ label: 'Import worktrees…', icon: 'fork', tip: 'Worktrees of this repo made outside Laki, as workspaces', run: () => setDialog({ importWt: p.id }) } as MenuItem]),
+      ...(p.kind || p.host ? [] : [{ label: 'Import chats…', icon: 'agent', tip: 'Claude Code and Codex chats in this project that no tab has open (a plain terminal\'s, a closed tab\'s), as tabs that pick them up', run: () => setDialog({ importChats: p.id }) } as MenuItem]),
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', tip: 'Your Markdown notes for this project; agents don\'t see them', run: () => setDialog({ notes: p.id }) },
+      { label: 'Private', icon: 'lock', hint: p.private ? ON : undefined, tip: p.private ? 'Recording mode shows it again' : 'Recording mode (⌘K, the menu bar) hides it and all its workspaces; they keep running', run: () => call('projectSet', { id: p.id, private: !p.private }) },
       ...(p.kind ? [] : [{ label: 'Rename…', icon: 'pencil', key: 'r', tip: 'Its name in Laki; empty: its folder\'s. The folder stays as it is', run: () => renameProject(p) } as MenuItem]),
       ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
       ...(p.kind ? [] : sortItems(p.sort ?? 'manual', sort => call('projectSet', { id: p.id, sort: sort ?? 'manual' }))),
@@ -3212,6 +3248,7 @@ export function App() {
       a({ label: 'Stop remote access', icon: 'stop', danger: true, run: () => call('remoteStop').catch(() => {}) })
     }
     a({ label: `Turn macOS notifications ${settings.notify === false ? 'on' : 'off'}`, icon: 'bell', run: () => call('settingsSet', { notify: settings.notify === false }).catch(() => {}) })
+    a({ label: `Recording mode ${settings.recording ? 'off: show private workspaces' : 'on: hide private workspaces'}`, icon: 'lock', run: () => call('settingsSet', { recording: !settings.recording }).catch(() => {}) })
     if (ws) {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
@@ -4127,6 +4164,12 @@ export function App() {
             </button>
           )}
           <span className="spacer" />
+          {settings.recording && ( // Recording mode: private workspaces hidden until this is clicked
+            <button className="sb-rec" data-tip="Recording mode: private workspaces and projects are hidden (they keep running). Click to show them" onClick={() => void call('settingsSet', { recording: false }).catch(() => {})}>
+              <Icon name="lock" size={11} />
+              Recording
+            </button>
+          )}
           {view.remote && ws?.browser === undefined && (
             <button
               className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''}`}
@@ -4557,6 +4600,7 @@ export function App() {
               root={artsIn === ws.id ? 'artifacts' : 'ws'}
               onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
               ext={ownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
+              side={(t => t && <SideChat key={t.id} tab={t} onSent={done} />)(tab?.kind === 'agent' && tab.workspace === ws.id ? tab : view.tabs.find(t => t.workspace === ws.id && t.kind === 'agent'))}
               info={
                 <InfoTab
                 w={infoOf(ws)}
@@ -4606,8 +4650,9 @@ export function App() {
               setSeenSecs(l => (l.includes(id) ? l : [...l, id]))
               if (id === 'resources' || id === 'simulator') earn(id === 'resources' ? 'resources' : 'simTab')
             }}
-            onSave={({ achievements: _, ...s }) => {
-              // achievements: App's own (earn), never this page's copy from when it opened; a profile: the list longer than the one in use
+            onSave={({ achievements: _, recording: __, modelEfforts: ___, ...s }) => {
+              // achievements: App's own (earn), never this page's copy from when it opened (Recording mode and the efforts per
+              // model likewise: ⌘K's, the new-workspace page's); a profile: the list longer than the one in use
               if (s.presets && s.presets.length > (settings.presets ?? view.presets).length) earn('profile')
               call('settingsSet', s).catch(() => {})
             }}
@@ -4620,6 +4665,19 @@ export function App() {
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
             accounts={layoutsOn ? accountsApi : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
+            bg={{
+              url: bgUrl,
+              set: async f => {
+                if (!f) return api.call('bgSet', {})
+                const data = await new Promise<string>((ok, no) => {
+                  const r = new FileReader()
+                  r.onload = () => ok(String(r.result).split(',')[1] ?? '')
+                  r.onerror = () => no(new Error("couldn't read that file"))
+                  r.readAsDataURL(f)
+                })
+                return api.call('bgSet', { data, ext: f.name.split('.').pop() })
+              },
+            }}
             webhookTest={w => api.call('webhookTest', w)}
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
             storage={() => api.call('storageInfo')}
@@ -5269,25 +5327,45 @@ export function App() {
         const p = view.projects.find(p => p.id === dialog.sep)
         const s = p?.seps?.find(x => x.id === dialog.id)
         const tpls = templatesFor(settings.templates, p?.config?.templates)
+        const keys: string[] = [] // each pick's field, in order
         return (
         <Prompt
           title={dialog.id ? 'Edit group' : 'New group'}
           hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
           initial={s?.name}
-          picks={[
-            ...(tpls.length || s?.template ? [{ label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template }] : []),
-            { label: 'Default agent: a new workspace here starts it', none: 'None: the last one used', options: view.presets.filter(x => !x.off).map(x => x.name), value: s?.preset },
-          ]}
+          picks={([
+            ...(tpls.length || s?.template ? [{ key: 'template', label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template }] : []),
+            { key: 'preset', label: 'Default agent: a new workspace here starts it', none: 'None: the last one used', options: view.presets.filter(x => !x.off).map(x => x.name), value: s?.preset },
+            ...(p?.git === false ? [] : [{ key: 'where', label: 'Where: a new workspace here is made', none: 'As last picked', options: [...SEP_WHERE], names: { worktree: 'New worktree', bare: 'New worktree, no setup', local: "Local: the project's folder" }, value: s?.where }]),
+            { key: 'perm', label: 'Permission mode', none: "The agent profile's", options: ['ask', ...new Set(Object.values(PERMS).flatMap(m => m!.map(x => x[0])))], names: { ask: 'Ask first', ...Object.fromEntries(Object.values(PERMS).flatMap(m => m!.map(x => [x[0], x[1]]))) }, value: s?.perm },
+            { key: 'model', label: 'Model', none: "The agent profile's", options: Object.values(MODELS).flat(), value: s?.model, free: true },
+            { key: 'effort', label: 'Effort', none: "The agent profile's", options: [...new Set(Object.values(EFFORTS).flat())], value: s?.effort },
+            ...(p?.git === false ? [] : [{ key: 'base', label: 'Base branch for new worktrees', none: "The repo's main branch", options: [], value: s?.base, free: true }]),
+          ] as ({ key: string; label: string; none: string; options: string[]; value?: string; names?: Record<string, string>; free?: boolean })[]).map(({ key, ...x }) => (keys.push(key), x))}
           onClose={() => setDialog(null)}
           onSubmit={async (name, picked) => {
-            const [template, preset] = tpls.length || s?.template ? picked : ['', picked[0]]
-            await sepName(dialog, name, template, preset)
+            await sepName(dialog, name, Object.fromEntries(keys.map((k, i) => [k, picked[i]?.trim() ?? ''])))
             setDialog(null)
           }}
         />
         )
       })()}
       {dialog && typeof dialog === 'object' && 'notes' in dialog && (p => p && <ProjectNotes name={p.name} notes={p.notes ?? ''} onSave={notes => call('projectSet', { id: p.id, notes })} onClose={() => setDialog(null)} />)(view?.projects.find(p => p.id === dialog.notes))}
+      {dialog && typeof dialog === 'object' && 'importChats' in dialog && (p =>
+        p && (
+          <ImportChats
+            name={p.name}
+            wsName={id => (w => (w ? wsName(w) : "the project's folder"))(view.workspaces.find(w => w.id === id))}
+            load={() => call('chatList', { project: p.id })}
+            onClose={() => setDialog(null)}
+            onImport={async ids => {
+              const made = await call<{ id: string; workspace: string }[]>('chatImport', { project: p.id, ids })
+              setDialog(null)
+              if (made[0]) (showNew(made[0].workspace), selectTab(made[0])) // by ref: the view hasn't the tab yet
+              done(`${made.length} chat${made.length === 1 ? '' : 's'} imported`)
+            }}
+          />
+        ))(view.projects.find(p => p.id === dialog.importChats))}
       {dialog && typeof dialog === 'object' && 'importWt' in dialog && (p =>
         p && (
           <ImportWorktrees

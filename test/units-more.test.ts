@@ -315,3 +315,16 @@ test('fileTree: folders first, one-folder chains joined, a folded folder\'s insi
   assert.deepEqual(show(fileTree(files, new Set(['src/renderer/src', 'docs/a/b']))), ['docs/a/b/ (1)', 'src/ (3)', '  daemon/ (1)', '    src/daemon/core.ts', '  renderer/src/ (2)', 'README.md'])
   assert.deepEqual(fileTree([]), [])
 })
+
+test('urlIs: --expect-url matches its page or one under it, localhost as 127.0.0.1', async () => {
+  const { urlIs } = await import('../src/shared/types.ts')
+  assert.equal(urlIs('http://localhost:3000/login', 'http://localhost:3000/login'), true)
+  assert.equal(urlIs('http://localhost:3000/login?next=/', 'http://localhost:3000/login'), true)
+  assert.equal(urlIs('http://localhost:3000/login/step2', 'http://localhost:3000/login'), true)
+  assert.equal(urlIs('http://localhost:3000/login-old', 'http://localhost:3000/login'), false)
+  assert.equal(urlIs('http://127.0.0.1:3000/', 'http://localhost:3000'), true)
+  assert.equal(urlIs('http://localhost:3001/', 'http://localhost:3000/'), false)
+  assert.equal(urlIs('http://localhost:3000/settings', 'http://localhost:3000/login'), false)
+  assert.equal(urlIs('http://localhost:3000/login', 'http://localhost:3000/'), false, 'the home page is itself only')
+  assert.equal(urlIs('http://localhost:3000/?tab=2', 'http://localhost:3000'), true)
+})

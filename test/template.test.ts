@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, menuKeys, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -145,8 +145,8 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, uiSize: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined, highContrast: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, uiSize: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined, iconPack: undefined, iconWidth: undefined, iconSize: undefined, highContrast: undefined, background: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]')
   // the icons' size: what CSS sizes (a sidebar row's marks) scales by; 14, none
   applyTheme({ iconSize: 18 })
   assert.equal(props.get('--icon-k'), String(18 / 14))
@@ -434,4 +434,12 @@ test('menuKeys: its own key, else a free initial; a key two items claim goes to 
   // a workspace's menu: Rename with AI and Run workflow both said W
   assert.deepEqual(menuKeys([{ label: 'Rename…', key: 'r' }, { label: 'Rename with AI', key: 'w' }, { label: 'Run', key: 'n' }, { label: 'Run workflow', key: 'w' }, { label: 'Delete workspace', key: 'd' }]), ['r', 'w', 'n', 'u', 'd'])
   assert.deepEqual(menuKeys([{ label: 'Open' }, { label: 'Other', key: 'o' }]), ['p', 'o']) // an own key wins over an earlier initial
+})
+
+test("a group's defaults: where, permission mode and base as set; a model or effort another agent's stays out", () => {
+  const g = { id: 'sep-a', name: 'A', where: 'bare' as const, perm: 'ask', model: 'opus', effort: 'high', base: 'dev' }
+  assert.deepEqual(groupNew(g, 'claude'), { local: false, noSetup: true, perm: '', model: 'opus', effort: 'high', base: 'dev' })
+  assert.deepEqual(groupNew({ ...g, effort: 'xhigh' }, 'codex'), { local: false, noSetup: true, perm: '', effort: 'xhigh', base: 'dev' }, "codex -m opus would fail: claude's model left out")
+  assert.deepEqual(groupNew({ id: 'sep-b', name: 'B', model: 'gpt-5.5', effort: 'nope' }, 'codex'), { model: 'gpt-5.5' }, 'a model no list knows goes as typed; an effort the agent lacks stays out')
+  assert.deepEqual(groupNew(undefined, 'claude'), {})
 })

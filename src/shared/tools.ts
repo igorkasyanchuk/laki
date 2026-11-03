@@ -4,7 +4,7 @@
 import { rpc as conn } from './conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
-import { FIND, SECTIONS } from './settingsMap.ts'
+import { FIND, HELP, SECTIONS } from './settingsMap.ts'
 import { AI_ACTS, DEVICE_OPS, SECRET_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
@@ -151,10 +151,11 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         url: str('for open: a URL on localhost, or a path like /login'),
         selector: str('for click and fill: a CSS selector'),
         text: str('for fill: what to type'),
+        expect_url: str('for click, fill, text and screenshot: the page (a localhost URL or a path) it is meant for; refused, nothing done, when the browser is on another'),
       },
       ['ws', 'op'],
     ),
-    run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text }, 45000),
+    run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text, expect: a.expect_url }, 45000),
   },
   {
     name: 'laki_device',
@@ -701,7 +702,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_settings_find',
-    description: "Where a setting of Laki's is: its place in Settings (⌘,), a laki:// link that opens it lit, and the current values of settings whose names match. Use it when the user asks where to change something, or how something is set now, then answer with the place and its link. It changes nothing.",
+    description: "Where a setting of Laki's is: its place in Settings (⌘,), a laki:// link that opens it lit, and the current values of settings whose names match; a setting that assumes agent know-how also has help (what it does, when to turn it on, what it costs). Use it when the user asks where to change something, how something is set now or what a setting is for, then answer with the place and its link. It changes nothing.",
     inputSchema: obj({ q: str('what the user is after, in a few words: dark theme, copy on select, notification sound') }, ['q']),
     run: async a => {
       const words = String(a.q ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 1)
@@ -714,7 +715,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
       const v: View = await rpc('state')
       const named = words.filter(w => !/^(on|off|is|it|to|in|of|at|do|my|me|be|the|and|how|set|now|where|what|turn|change)$/.test(w)) // a key's words, not the question's
       const values = Object.fromEntries(Object.entries(v.settings ?? {}).filter(([k, val]) => said(k, val) && named.some(w => k.toLowerCase().includes(w))))
-      return { settings: hits.map(h => ({ where: `Settings › ${label(h.sec)} › ${h.title}`, link: `laki://settings/${h.sec}?spot=${encodeURIComponent(h.title)}` })), values, note: hits.length ? undefined : 'nothing by those words: try others, or Settings › Find a setting' }
+      return { settings: hits.map(h => ({ where: `Settings › ${label(h.sec)} › ${h.title}`, link: `laki://settings/${h.sec}?spot=${encodeURIComponent(h.title)}`, ...(HELP[h.title] && { help: HELP[h.title] }) })), values, note: hits.length ? undefined : 'nothing by those words: try others, or Settings › Find a setting' }
     },
   },
 ]
@@ -731,7 +732,7 @@ export async function extCall(rpc: Rpc, tool: string, input: unknown, from?: str
 
 // Laki AI's looks at what the user sees (a tab's screen, the agent browser): said as its own (by: 'ai'), so the app can
 // light what it looked at (Settings › AI › Laki AI's glow)
-const AI_LOOKS = ['screen', 'browse']
+const AI_BY = ['screen', 'browse', 'send'] // said as Laki AI's: its looks (the glow), its sends (not the user's prompt history)
 // chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once);
 // a write names it too: one that's on stays on only from its own page's chat (widget:<id>, the user's), else off
-export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : method === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_BY.includes(method) ? { ...params, by: 'ai' } : method === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)

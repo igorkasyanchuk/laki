@@ -151,6 +151,7 @@ label.switch-row select { flex: none; width: auto; }
 .status .remote-badge { display: inline-flex; align-items: center; gap: 5px; flex: none; background: none; border: none; padding: 0; color: var(--done); font: inherit; cursor: pointer; }
 .status .remote-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status .remote-badge.starting { color: var(--waiting); }
+.status .sb-rec { display: inline-flex; align-items: center; gap: 5px; flex: none; background: none; border: none; padding: 0; color: var(--error); font: inherit; cursor: pointer; } /* Recording mode (App's) */
 .status .remote-badge.open { color: var(--error); font-weight: 600; }
 
 /* glass: the window behind shows through, blurred (themes.ts makes the backgrounds see-through, as the sliders

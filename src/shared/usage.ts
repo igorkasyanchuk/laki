@@ -57,9 +57,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki diff <ws> [--uncommitted] | run <ws> [test|lint|format|deploy|setup] | ship <ws> -m <message> [--force]
                                               diff: against its base (--uncommitted: only what isn't committed);
                                               run: the run script (a dev server), or that script in a tab of its own
-  laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
+  laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text [--expect-url <url|/path>]
                                               a hidden browser on the workspace's localhost (the app must be open);
-                                              screenshot prints a PNG's path; in a tab, <ws> is its own
+                                              screenshot prints a PNG's path; in a tab, <ws> is its own;
+                                              --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
   laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--base <branch>] [--no-setup] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
@@ -222,10 +223,11 @@ another repo (a PR of the workspace's own branch shows by itself once pushed). R
 starts the dev server) or a localhost URL; screenshot prints a PNG's path; click and fill take a CSS selector; text
 prints the page's text. Open, click and fill print what they caused: → <url> when the page moved, blocked: (a popup
 or a link off localhost), console error: lines, and the text lines added (+) and gone (-), or (no changes). In a tab,
-<ws> is its own.
+<ws> is its own. --expect-url <url|/path> on click, fill, text or screenshot: the page it's meant for (that address,
+or one under it); on any other page it's refused and nothing is done, so a page that moved meanwhile isn't typed into.
 
   laki browser open /settings
-  laki browser fill "#email" "a@b.co"
+  laki browser fill "#email" "a@b.co" --expect-url /login
   laki browser click "button[type=submit]"
   laki browser screenshot`,
   diff: `Prints the workspace's changes against its base (what ship would put in a PR).`,

@@ -5,10 +5,10 @@
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, type RefObject, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
-import { bytes } from '../../shared/widget'
+import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
-import { Icon, keep, load, useMenu } from './ui'
+import { Icon, keep, load, type MenuItem, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
@@ -196,6 +196,33 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
   }
 }
 
+// your prompts (the daemon's, newest first) for a box: ↑ in an empty one, or Settings › Keys' Prompt history (App sends
+// laki-history to a [data-history] box), a menu to search them; a pick replaces the box's text, for you to edit and
+// send. ponytail: the filter reads a prompt's first 120 characters (the menu's label) and where and when it went
+export function usePromptHistory(box: RefObject<HTMLTextAreaElement | null>, pick: (text: string) => void): [ReactNode, () => void] {
+  const [menu, openMenu] = useMenu()
+  const open = () => {
+    const el = box.current
+    if (!el) return
+    void api.call<{ text: string; at: number; ws?: string }[]>('prompts').then(
+      list =>
+        openMenu(el.getBoundingClientRect(), [
+          { filter: list.length ? `Search your ${list.length} prompts…` : 'No prompts yet' },
+          ...list.slice(0, 300).map(x => ({ label: x.text.replace(/\s+/g, ' ').slice(0, 120), sub: [x.ws, ago(x.at)].filter(Boolean).join(' · '), tip: x.text.length > 120 ? x.text.slice(0, 600) : undefined, run: () => (pick(x.text), requestAnimationFrame(() => (el.focus(), el.setSelectionRange(x.text.length, x.text.length)))) }) as MenuItem),
+        ]),
+      () => {},
+    )
+  }
+  useEffect(() => {
+    const el = box.current
+    el?.addEventListener('laki-history', open)
+    return () => el?.removeEventListener('laki-history', open)
+  })
+  return [menu, open]
+}
+// ↑ in an empty box, no key held: the history's (usePromptHistory)
+export const historyKey = (e: KeyboardEvent, empty: boolean) => e.key === 'ArrowUp' && empty && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey
+
 export function PromptInput(p: {
   value: string
   onChange: (v: string) => void
@@ -229,6 +256,7 @@ export function PromptInput(p: {
   const voice = useVoice()
   const cloud = cloudVoice()
   const talk = () => (voice.phase === 'listening' ? voiceStop() : (box.current?.focus(), void voiceStart()))
+  const [histMenu, history] = usePromptHistory(box, t => p.onChange(t))
   // an extension's text at the cursor (over what's selected), the box focused after it
   const insertText = (t: string) => {
     const el = box.current
@@ -348,10 +376,16 @@ export function PromptInput(p: {
         onSelect={cmp.look}
         onBlur={cmp.blur}
         onPaste={paste}
-        onKeyDown={(e: KeyboardEvent) => !cmp.key(e) && e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing)) && (e.preventDefault(), p.onSubmit?.())}
+        onKeyDown={(e: KeyboardEvent) => {
+          if (cmp.key(e)) return
+          if (historyKey(e, !p.value)) return e.preventDefault(), history() // an empty box: your prompts
+          if (e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing))) e.preventDefault(), p.onSubmit?.()
+        }}
         data-voice-send={p.onSubmit ? '' : undefined} // Send as you stop talking: voice.ts presses its ⌘⏎
+        data-history // App's Prompt history key: laki-history
       />
       {cmp.menu}
+      {histMenu}
       {p.images.length > 0 && (
         <div className="prompt-images">
           {p.images.map(i =>

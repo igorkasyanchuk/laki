@@ -11,6 +11,8 @@ import { promisify } from 'node:util'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
 import { addTab, changed, chatRead, diff, dir, findWs, inside, presets, rtOf, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
 import { aiOnce, hasKey } from './ai.ts'
+import { accountEnv, accountFor } from './accounts.ts'
+import { execGroup, own } from './resources.ts'
 
 const SUGGEST_SYSTEM = `You guess the next message a developer sends their coding agent (Claude Code or Codex), from their last message and the agent's answer. Answer with that message alone: one short line, at most 15 words, in their voice, an instruction or a question ("run the tests", "now add a test for it"). No quotes, no preamble. When the answer asks them to pick or confirm, the likely pick. When there is no clear next step, answer NONE.`
 const ANSWER_MAX = 6000 // the end of a long answer: what it asks is there
@@ -202,4 +204,74 @@ export function turnsTidy() {
   const live = new Set(state.workspaces.filter(w => !w.archived).map(w => `${w.id}.index`))
   for (const f of existsSync(turnDir) ? readdirSync(turnDir) : []) if (!live.has(f)) rmSync(join(turnDir, f), { force: true })
   for (const id of cuts.keys()) if (!state.tabs.some(t => t.id === id)) cuts.delete(id)
+  for (const id of sides.keys()) if (!state.tabs.some(t => t.id === id)) sides.delete(id) // closed tabs' side chats
+}
+
+// Side chat (a tab's menu, the Reader's head: SideChat.tsx): a quick question about what an agent is doing, answered
+// beside it while it works, its own chat clean. Claude Code's: its chat forked (claude -p --resume <its chat>
+// --fork-session, then that fork's own session), read-only tools, in its workspace's folder on its account; Codex's and
+// others': Laki AI's model given its chat so far (chatRead). Send to main chat is the app's (send, whenIdle).
+// ponytail: in memory, a chat per tab; one window's ask is the others' only once they ask sideState
+export type SideSaid = { who: 'you' | 'agent'; text: string; at: number }
+const sides = new Map<string, { session?: string; said: SideSaid[]; busy?: boolean }>()
+const SIDE_NOTE = "The user asks a quick question on the side while the main session goes on: answer it from this chat and the files (you can read them, not change them). Change nothing, run nothing; short answers."
+const SIDE_CHAT = 30000 // the codex chat's end given to Laki AI's model
+// the side chats' own claude sessions (forks in the workspace's folder): Import chats leaves them out
+export const sideSessions = () => new Set([...sides.values()].flatMap(s => (s.session ? [s.session] : [])))
+const forks = (tab: Tab) => tab.preset === 'claude' && !state.workspaces.find(w => w.id === tab.workspace)?.host // its chat forked, else Laki AI given it
+const sideOf = (tab: string) => sides.get(tab) ?? (sides.set(tab, { said: [] }), sides.get(tab)!)
+export function sideState(p: { tab: string }) {
+  const tab = state.tabs.find(t => t.id === p.tab)
+  if (!tab) throw new Error('no such tab')
+  const s = sideOf(tab.id)
+  return { said: s.said, busy: !!s.busy, forks: forks(tab) }
+}
+export function sideNew(p: { tab: string }) {
+  if (sides.get(p.tab)?.busy) throw new Error('it is answering: wait for it')
+  sides.delete(p.tab)
+  return { said: [] }
+}
+export async function sideAsk(p: { tab: string; text: string }) {
+  const tab = state.tabs.find(t => t.id === p.tab)
+  if (!tab || tab.kind !== 'agent') throw new Error('a side chat is about an agent tab')
+  const q = String(p.text ?? '').trim().slice(0, 8000)
+  if (!q) throw new Error('what do you want to ask?')
+  const ws = findWs(tab.workspace)
+  const s = sideOf(tab.id)
+  if (s.busy) throw new Error('it is still answering the last one')
+  s.busy = true
+  s.said = [...s.said, { who: 'you', text: q, at: Date.now() }]
+  changed()
+  try {
+    let text: string
+    if (forks(tab)) {
+      const from = s.session ?? tab.resumeId
+      if (!from) throw new Error(`${tab.name} has no chat yet: ask once it has started one`)
+      const args = ['-p', '--output-format', 'json', '--resume', from, ...(s.session ? [] : ['--fork-session']), '--tools', 'Read,Grep,Glob', '--strict-mcp-config', '--append-system-prompt', SIDE_NOTE, '--', q]
+      const env = { ...process.env, ...state.settings?.env, ...accountEnv(accountFor(tab, tab.profile)) }
+      const out = await new Promise<string>((ok, no) => {
+        const c = execGroup('claude', args, { cwd: ws.path, env, maxBuffer: 16 << 20, timeout: 600_000 }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`claude: ${e.code === 'ENOENT' ? 'not installed (not on PATH)' : e.killed ? 'took too long' : se.trim().split('\n').pop() || e.message}`)) : ok(so))) // aiOnce's words
+        own(c, `Side chat · ${tab.name}`)
+      })
+      const j = JSON.parse(out)
+      if (j.is_error) throw new Error(j.result || j.subtype || 'claude failed')
+      s.session = j.session_id ?? s.session
+      text = String(j.result ?? '').trim()
+    } else {
+      if (!aiOn(state.settings) || ((state.settings?.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) throw new Error("a side chat about this agent uses Laki AI's model: turn Laki AI on (Settings › AI)")
+      const chat = chatRead({ tab: tab.id })
+      if (!('said' in chat) || !Array.isArray(chat.said)) throw new Error(`Laki can't read ${tab.name}'s chat: a side chat works with Claude Code and Codex, on this Mac`)
+      const said = chat.said.map((x: { who: string; text: string }) => `${x.who === 'you' ? 'User' : x.who === 'agent' ? 'Agent' : 'Tool'}: ${x.text}`).join('\n\n')
+      const before = s.said.slice(0, -1).map(x => `${x.who === 'you' ? 'Q' : 'A'}: ${x.text}`).join('\n\n')
+      text = (await aiOnce({ system: `${SIDE_NOTE} You only have the chat below, not the files.`, prompt: `The main chat so far (its end):\n${said.length > SIDE_CHAT ? `…${said.slice(-SIDE_CHAT)}` : said || '(nothing yet)'}\n\n${before ? `Earlier side questions:\n${before}\n\n` : ''}The question: ${q}`, ask: `side chat: ${q.slice(0, 80)}` })).trim()
+    }
+    s.said = [...s.said, { who: 'agent', text: text || '(no answer)', at: Date.now() }]
+    return { text }
+  } catch (e) {
+    s.said = s.said.slice(0, -1) // the question back to the box, not left unanswered
+    throw e
+  } finally {
+    s.busy = false
+    changed()
+  }
 }

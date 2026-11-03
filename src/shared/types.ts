@@ -128,6 +128,7 @@ export type Project = {
   hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's New worktree, no setup
   color?: string // TAB_COLORS': an accent (its icon, its workspaces' bar where they have none of their own, rail pins, bubbles)
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
+  private?: boolean // Recording mode (settings.recording) hides it and its workspaces (veiled)
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
 export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
@@ -141,7 +142,9 @@ export type CompactLogLine = CompactRun & { project: string; was?: string[]; now
 export const COMPACT_DAYS = 7 // settings.memoryCompact.days unset
 // the colors a tab, workspace, group, project, note or Desk tab can have (CSS --tc-<name>; ui.tsx colorVar)
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
-export type Sep = { id: string; name: string; color?: string; template?: string; preset?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; preset: an agent profile's name, likewise (its default agent); sort: its workspaces' (unset: the project's)
+export type Sep = { id: string; name: string; color?: string; template?: string; preset?: string; sort?: WsSort; where?: SepWhere; perm?: string; model?: string; effort?: string; base?: string } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; preset: an agent profile's name, likewise (its default agent); sort: its workspaces' (unset: the project's); where, perm (PERMS' id, '' ask first), model, effort, base: a new workspace's from it likewise (Edit group)
+export const SEP_WHERE = ['worktree', 'bare', 'local'] as const // a new worktree, one without its setup script, the project's own folder
+export type SepWhere = (typeof SEP_WHERE)[number]
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
 export type WsSort = (typeof WS_SORTS)[number]
@@ -188,6 +191,7 @@ export type Workspace = {
   untitled?: boolean // made with no name or prompt: its agent's first prompt names it (core's titleFrom); false: renamed, never
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
+  private?: boolean // Recording mode (settings.recording) hides it (veiled); its project's private too
   pinned?: boolean // the sidebar shows it above the projects, under Pinned
   railPin?: number // on the rail, after a line, for a quick click (RAIL_PINS at most): when it was pinned, their order
   icon?: string // its rail pin's (an ICONS name or an emoji, kept by wsSet), over its initials or a terminal's mark
@@ -600,6 +604,10 @@ export type Settings = {
   shotAsk?: boolean // Screenshot to Laki AI: a global hotkey and a menu bar item, a part of the screen to the AI window with the mic on (on unless false; needs Laki AI)
   shotKey?: string // its keys (unset: ui.tsx SHOT_KEY; '': none, the menu bar's item only)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
+  recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
+  background?: { file?: string; dim?: number; blur?: number } // Settings › Appearance › Background image: <data>/background/<file> (core's bgSet), how much the theme covers it (%) and its blur (px)
+  modelEfforts?: Record<string, string> // the new-workspace page's effort last picked per model, by `<agent>:<model>` ('' the default model; '' effort: the model's own)
+  updateDelay?: number // a release is offered once it's this many days old (shared/update.ts UPDATE_DELAYS; unset or 0: at once)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetAgent?: string // Settings › Extensions' agent: the claude or codex preset an AI source runs (unset: the first claude one)
   widgetLogs?: boolean // Settings › Extensions' Keep logs for every extension (widgetLogs.ts; unset: only those with their own Keep a log)
@@ -918,7 +926,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 136
+export const API = 137
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
@@ -949,3 +957,33 @@ export const browseSays = (r: BrowseDid) =>
     ...(r.errors ?? []).map(e => `console error: ${e}`),
     ...(r.changed ? (r.changed.length ? r.changed : ['(no changes)']) : []),
   ].join('\n')
+// laki browser --expect-url: the page the agent means is the one it's on: the same address, or one under it (a path
+// part, a query, a hash past it; not /login for /login-old); localhost and 127.0.0.1 the same
+export function urlIs(cur: string, want: string): boolean {
+  const n = (u: string) => u.trim().replace(/^(https?:\/\/)127\.0\.0\.1(?=[:/]|$)/, '$1localhost').replace(/^(https?:\/\/[^/?#]+)(?=[?#]|$)/, '$1/')
+  const [c, w] = [n(cur), n(want)]
+  const root = /^https?:\/\/[^/]+\/$/.test(w) // the home page: itself only (every page is under it)
+  return c === w || (c.startsWith(w) && (root ? /^[?#]/.test(c.slice(w.length)) : /[/?#]$/.test(w) || /^[/?#]/.test(c.slice(w.length))))
+}
+
+// Recording mode (settings.recording): private workspaces (theirs, or their project's) out of the view a window draws, so
+// the sidebar, rail pins, Board, Bird view, bubbles, ⌘K, counts, notifications and pages never show them; they keep running
+export function veiled(v: View): View {
+  if (!v.settings?.recording) return v
+  const ps = new Set(v.projects.filter(p => p.private).map(p => p.id))
+  const ws = new Set(v.workspaces.filter(w => w.private || ps.has(w.project)).map(w => w.id))
+  if (!ps.size && !ws.size) return v
+  const ok = (o: { ws?: string; project?: string }) => !(o.ws && ws.has(o.ws)) && !(o.project && ps.has(o.project))
+  return {
+    ...v,
+    projects: v.projects.filter(p => !ps.has(p.id)),
+    workspaces: v.workspaces.filter(w => !ws.has(w.id)),
+    tabs: v.tabs.filter(t => !ws.has(t.workspace)),
+    schedules: v.schedules?.filter(ok),
+    runs: v.runs?.filter(ok),
+    todos: v.todos?.filter(ok),
+    reminders: v.reminders?.filter(ok),
+    flows: v.flows?.filter(f => ok({ ws: f.ws, project: f.project })),
+    today: v.today && { ...v.today, ws: v.today.ws.filter(x => !ws.has(x.ws)) },
+  }
+}

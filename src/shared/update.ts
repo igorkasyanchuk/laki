@@ -15,6 +15,18 @@ export type UpdateState = {
   error?: string
   install: boolean // this copy replaces itself: a Mac, packaged, Developer ID signed; else Download is the release page
   found?: boolean // this state's check found a version not told about before (the app's toast)
+  held?: { version: string; until: number } // a newer release Settings' Update delay holds back until then (ms)
+}
+
+// Settings › Updates' Update delay: a release is offered once it's that many days old (unset: at once)
+export const UPDATE_DELAYS = [0, 1, 3, 7, 14, 30]
+
+// when a release published at `at` is offered under a delay of `days`: undefined once it is (or with no date or delay)
+export function heldUntil(at: string | undefined, days: number, now = Date.now()): number | undefined {
+  const t = at ? Date.parse(at) : Number.NaN
+  if (!(days > 0) || Number.isNaN(t)) return undefined
+  const until = t + days * 86_400_000
+  return until > now ? until : undefined
 }
 
 // 1.2.3 vs 1.2.10, a pre-release before its release (1.3.0-beta.1 < 1.3.0); a leading v allowed

@@ -30,8 +30,8 @@ type Bridge = {
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
-  update?(op: 'state' | 'check' | 'download' | 'install'): Promise<UpdateState | null> // main's update.ts
-  updateAuto?(on: boolean): void // Settings' Check for updates: at launch, then every 4 hours
+  update?(op: 'state' | 'check' | 'download' | 'install' | 'skip'): Promise<UpdateState | null> // main's update.ts
+  updateAuto?(on: boolean, days?: number): void // Settings' Check for updates (at launch, then every 4 hours) and Update delay
   onUpdate?(cb: (s: UpdateState) => void): () => void // its state as it changes; the function stops listening
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)
@@ -40,7 +40,7 @@ type Bridge = {
   simFloating?(): Promise<string[]> // the devices in windows of their own
   onSimFloating?(cb: (devices: string[]) => void): void
   onFloating?(cb: (tabs: string[]) => void): void
-  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
+  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean, recording?: boolean): void // the Dock's count; the menu bar's item (its Recording Mode ticked)
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void

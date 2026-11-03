@@ -24,6 +24,7 @@ export const KEYS = [
   { id: 'next', label: 'Next tab that needs you', key: '⌘J' },
   { id: 'step', label: "Do the workspace's next step", key: '⌘G' },
   { id: 'later', label: 'Send a message later', key: '⌘L' },
+  { id: 'history', label: 'Prompt history (in a prompt box; ↑ in an empty one too)', key: '⌥ArrowUp' },
   { id: 'artifacts', label: 'Show / hide artifacts', key: '⇧⌘A' },
   { id: 'full', label: 'Full screen: just the tab', key: '⇧⌘Enter' },
   { id: 'back', label: 'Back', key: '⌘[' },
