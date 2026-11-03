@@ -3,7 +3,7 @@
 // sign-in, at most every 5 minutes (usage.ts); Settings › Appearance picks the agents. Under them, today's tokens and
 // their ≈ cost at API prices (the daemon's meters, View.today); and the words a tab's context and usage are said in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { IconButton } from './ui'
+import { IconButton, Page } from './ui'
 
 import { type AgentUsage, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
@@ -52,7 +52,7 @@ export function Ring({ p }: { p?: number }) {
 }
 
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
-export function UsageButton({ load, onUse, today }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void; today?: Spent }) {
+export function UsageButton({ load, onUse, onDays, today }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent }) {
   const [rows, setRows] = useState<AgentUsage[] | null>(null)
   const [at, setAt] = useState<DOMRect | null>(null)
   const loader = useRef(load)
@@ -81,7 +81,7 @@ export function UsageButton({ load, onUse, today }: { load: () => Promise<AgentU
       <button className="usage-btn" data-tip={tip} aria-label={tip} onClick={e => setAt(e.currentTarget.getBoundingClientRect())}>
         <Ring p={top} />
       </button>
-      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
+      {at && <UsagePop anchor={at} rows={rows} top={top} today={today} onDays={onDays} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
     </>
   )
 }
@@ -92,7 +92,7 @@ const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent
 // today's, its workspaces by name
 export type Spent = Omit<Today, 'ws'> & { ws: { name: string; tokens: number; cost: number }[] }
 
-function UsagePop({ anchor, rows, top, today, onUse, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; onUse?: (agent: string, account: string) => void; onClose: () => void }) {
+function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
@@ -158,6 +158,11 @@ function UsagePop({ anchor, rows, top, today, onUse, onClose }: { anchor: DOMRec
               <span className="tag" data-tip="What these tokens would cost at the API's list prices, from each chat's transcript: your plan bills its own way">
                 ≈ API price
               </span>
+              {onDays && (
+                <button type="button" className="link small" onClick={() => (onClose(), onDays())}>
+                  By day and model
+                </button>
+              )}
             </div>
             {today.ws.map((w, i) => (
               <div key={i} className="usage-row usage-spent">
@@ -173,5 +178,125 @@ function UsagePop({ anchor, rows, top, today, onUse, onClose }: { anchor: DOMRec
         </p>
       </div>
     </div>
+  )
+}
+
+// the Usage page (the popup's Today › By day and model, ⌘K): what Laki's claude and codex tabs used each day, at the
+// API's list prices, from their transcripts (the daemon's usageDays: USAGE_KEEP days back), for one agent or model or all;
+// a bar a day, then each model's share. Single series in the accent: the filters pick what it is
+export type UsageDay = { day: string; agent: string; model: string; tokens: number; cost: number }
+const RANGES = [7, 30, 90]
+const dayKey = (t: Date) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+const money = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleString()}`
+export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: number; rows: UsageDay[] }>; onClose: () => void }) {
+  const [d, setD] = useState<{ keep: number; rows: UsageDay[] } | null>(null)
+  const [err, setErr] = useState('')
+  const [range, setRange] = useState(30)
+  const [agent, setAgent] = useState('')
+  const [model, setModel] = useState('')
+  const [by, setBy] = useState<'cost' | 'tokens'>('cost')
+  useEffect(() => void load().then(setD, e => setErr(String(e?.message ?? e))), [])
+  const days = Array.from({ length: range }, (_, i) => (t => dayKey(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (range - 1 - i))))(new Date())) // by the calendar: a DST day is still one
+  const inRange = (d?.rows ?? []).filter(r => r.day >= days[0])
+  const agents = [...new Set(inRange.map(r => r.agent))]
+  const models = [...new Set(inRange.filter(r => !agent || r.agent === agent).map(r => r.model))].sort()
+  const rows = inRange.filter(r => (!agent || r.agent === agent) && (!model || r.model === model))
+  const per = new Map(days.map(k => [k, { tokens: 0, cost: 0 }]))
+  for (const r of rows) (x => x && ((x.tokens += r.tokens), (x.cost += r.cost)))(per.get(r.day))
+  const total = { tokens: rows.reduce((n, r) => n + r.tokens, 0), cost: rows.reduce((n, r) => n + r.cost, 0) }
+  const top = Math.max(...[...per.values()].map(x => x[by]), 0)
+  const byModel = [...rows.reduce((m, r) => (x => ((x.tokens += r.tokens), (x.cost += r.cost), m))(m.get(`${r.agent}|${r.model}`) ?? (m.set(`${r.agent}|${r.model}`, { agent: r.agent, model: r.model, tokens: 0, cost: 0 }), m.get(`${r.agent}|${r.model}`)!)), new Map<string, { agent: string; model: string; tokens: number; cost: number }>()).values()].sort((a, b) => b[by] - a[by])
+  const show = (x: { tokens: number; cost: number }) => (by === 'cost' ? money(x.cost) : `${tokensText(x.tokens)} tokens`)
+  const label = (k: string) => new Date(`${k}T12:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  const active = [...per.values()].filter(x => x.tokens > 0).length
+  return (
+    <Page title="Usage" onClose={onClose} wide>
+      <div className="usage-page">
+        <div className="usage-filters" role="toolbar" aria-label="Filters">
+          <span className="seg">
+            {RANGES.filter(n => n <= (d?.keep ?? 90)).map(n => (
+              <button key={n} className={range === n ? 'on' : ''} onClick={() => setRange(n)}>
+                {n} days
+              </button>
+            ))}
+          </span>
+          <span className="seg">
+            {['', ...agents].map(a => (
+              <button key={a} className={agent === a ? 'on' : ''} onClick={() => (setAgent(a), setModel(''))}>
+                {a ? (NAMES[a] ?? a) : 'All agents'}
+              </button>
+            ))}
+          </span>
+          <select value={model} aria-label="Model" onChange={e => setModel(e.target.value)}>
+            <option value="">All models</option>
+            {models.map(m => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <span className="grow" />
+          <span className="seg">
+            <button className={by === 'cost' ? 'on' : ''} onClick={() => setBy('cost')}>$</button>
+            <button className={by === 'tokens' ? 'on' : ''} onClick={() => setBy('tokens')}>Tokens</button>
+          </span>
+        </div>
+        {err && <p className="warn">{err}</p>}
+        {!d && !err && <p className="muted">Loading…</p>}
+        {d && (
+          <>
+            <div className="usage-tiles">
+              <div><span className="muted small">{range} days</span><b>{show(total)}</b></div>
+              <div><span className="muted small">A day it worked</span><b>{active ? show({ tokens: total.tokens / active, cost: total.cost / active }) : '–'}</b></div>
+              <div><span className="muted small">{by === 'cost' ? 'Tokens' : '≈ API price'}</span><b>{by === 'cost' ? tokensText(total.tokens) : money(total.cost)}</b></div>
+            </div>
+            <div className="usage-chart" role="img" aria-label={`${by === 'cost' ? 'Cost' : 'Tokens'} a day, the last ${range} days`}>
+              <span className="usage-max muted small">{top ? show({ tokens: top, cost: top }) : ''}</span>
+              <div className="usage-bars">
+                {days.map(k => {
+                  const x = per.get(k)!
+                  return (
+                    <span key={k} className="usage-col" data-tip={`${label(k)} · ${money(x.cost)} · ${tokensText(x.tokens)} tokens`}>
+                      <i style={{ height: top ? `${Math.max(x[by] ? 2 : 0, (x[by] / top) * 100)}%` : 0 }} />
+                    </span>
+                  )
+                })}
+              </div>
+              <div className="usage-axis muted small">
+                <span>{label(days[0])}</span>
+                <span>Today</span>
+              </div>
+            </div>
+            {byModel.length ? (
+              <table className="usage-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Agent</th>
+                    <th className="num">Tokens</th>
+                    <th className="num">≈ API price</th>
+                    <th className="num">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byModel.map(m => (
+                    <tr key={`${m.agent}|${m.model}`} className={model === m.model ? 'on' : ''} onClick={() => setModel(model === m.model ? '' : m.model)} data-tip={model === m.model ? 'All models again' : 'Only this model'}>
+                      <td className="mono">{m.model}</td>
+                      <td>{NAMES[m.agent] ?? m.agent}</td>
+                      <td className="num">{tokensText(m.tokens)}</td>
+                      <td className="num">{money(m.cost)}</td>
+                      <td className="num">{total[by] ? `${Math.round((m[by] / total[by]) * 100)}%` : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code and Codex tabs, from their transcripts, as they work.</p>
+            )}
+            <p className="muted small">At the API's list prices, from each chat's transcript: your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
+          </>
+        )}
+      </div>
+    </Page>
   )
 }

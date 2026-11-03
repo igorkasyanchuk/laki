@@ -8,6 +8,7 @@
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
+import { Grouped } from './Schedules'
 import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
@@ -149,6 +150,20 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
       null,
       { label: 'Delete', icon: 'trash', danger: true, run: () => void removeWf(w) },
     ])
+  // a group (Grouped's move): written into each file's head (group:), as a save of it; one an agent wrote or that changed
+  // since you allowed it isn't saved from here (that would count as your look): its editor first
+  const regroup = async (keys: string[], group: string) => {
+    for (const w of mine ?? []) {
+      if (!keys.includes(keyOf(w)) || (w.group ?? '') === group) continue
+      const unread = parse(w.text, w.id).problems.length > 0 // a line it couldn't read would go with a save from here
+      if (w.byAgent || w.untrusted || unread) {
+        api.toast(`${w.name}: open it and save it first (${w.byAgent ? 'an agent wrote it' : w.untrusted ? 'it changed since you allowed it' : 'it has lines Laki can’t read'})`)
+        continue
+      }
+      await api.call('flowSave', { id: w.id, source: w.source, project: w.project, text: toFile({ ...w, group: group || undefined }) }).catch(e => api.toast((e as Error).message))
+    }
+    refresh()
+  }
   // a paused one (5 failed runs in a row that started by themselves): events and its schedules start it again
   const turnOn = (w: Sel) => void api.call('flowPause', { id: w.id, source: w.source, project: w.project, on: true }).then(refresh, e => api.toast((e as Error).message))
   // to the trash at once, its toast's Undo puts it back (flowRestore); its runs stay on the list
@@ -279,11 +294,19 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
             {mine === null ? (
               <p className="muted small">Loading…</p>
             ) : mine.length ? (
-              <div className="sched-list">
-                {mine.map(w => {
+              <Grouped
+                items={mine}
+                keyOf={keyOf}
+                groupOf={w => w.group}
+                onOf={w => !w.stats?.paused}
+                store="laki.flowGroups"
+                what="workflows"
+                onMove={(keys, group) => void regroup(keys, group)}
+                onTurn={(keys, on) => void Promise.all(mine.filter(w => keys.includes(keyOf(w))).map(w => api.call('flowPause', { id: w.id, source: w.source, project: w.project, on }))).then(refresh, e => api.toast((e as Error).message))}
+                row={w => {
                   const n = going.filter(r => runOf(r, w)).length
                   return (
-                    <div key={`${w.source}/${w.project}/${w.id}`} className="sched-row">
+                    <div className="sched-row">
                       <span className="sched-icon">
                         <Icon name="flow" />
                       </span>
@@ -312,8 +335,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                       </span>
                     </div>
                   )
-                })}
-              </div>
+                }}
+              />
             ) : (
               <div className="sched-empty">
                 <Icon name="flow" size={18} />

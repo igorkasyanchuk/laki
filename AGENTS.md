@@ -220,7 +220,23 @@ App draws; phone.ts skips their pushes; the status bar's `.sb-rec`, ⌘K, the me
 each resuming it, `addTab` `resume`), `sideAsk`/`sideState`/`sideNew` (turns.ts' Side chat: claude's chat forked with
 `--fork-session`, read-only tools; others' through Laki AI; SideChat.tsx, the right panel's `side` tab), `browse`
 `expect` (`laki browser --expect-url`, MCP's `expect_url`: shared/types.ts `urlIs`, main's `browseOp` refuses another
-page), settings' `updateDelay` (main's `updater` `auto(on, days)`, `heldUntil`, `skip`) and `modelEfforts`. A setting the renderer adds
+page), settings' `updateDelay` (main's `updater` `auto(on, days)`, `heldUntil`, `skip`) and `modelEfforts`. 138: `prDraft`
+(`ws`, `draft`: `gh pr ready [--undo] -- <url>`, the PR ⋯'s *Mark as draft* / *Ready for review*, `laki pr . --draft|--ready`,
+MCP's `laki_pr_draft`; an agent's own workspace's PR only, main.ts' agentNo), `commits` (files.ts: `HEAD --not <base>`,
+a folder's own `--not --remotes`, 200, each `pushed` unless `rev-list HEAD --not <base> --remotes` has it: the side
+panel's Commits) and `commitDiff` (`sha`: `git show --diff-merges=first-parent`, in `diff`'s shape, pr.ts' `diffFiles`),
+`usageDays` (meters.ts: share.ts `meterOf`'s `days` by day and model, kept per chat in `<data>/usage-days.json`,
+`USAGE_KEEP` 90 days, the more of kept and read as today's: Usage.tsx' `UsagePage`, the ring popup's *By day and model*,
+⌘K), a workspace's `fromTab` (`byCaller`'s `agentTab(caller)`, never an RPC's: shared/types.ts `creatorOf`, the tab bar's
+*Created by*, Info, `laki ls`, MCP state's `createdBy`; the parent pane's `WorkerAsks`: its workers' waiting tabs,
+answered there), a schedule's `group` (`scheduleSet`: a group or off take no checks) and a workflow's `group:` (its
+head; Schedules.tsx' `Grouped`, both pages: fold, drag onto a head, ⌘/⇧-click, on/off, move), settings' `hideEmpty`
+(the sidebar leaves out a project with no row: Show › *Empty projects*), the gate `tool` (widgetEvents.ts `toolGate`:
+claude's PreToolUse through core's `preTool`, each tool gate in turn within `TOOL_GATE_MS` 3 s, `{ok: false, why}` a
+deny, `{input}` an `updatedInput` with `permissionDecision: 'ask'`, never allow; an error or timeout goes; an input past
+`TOOL_IN_MAX` (1 MB) shown with its long strings cut (`cutBig`), refused only, never changed; hook.ts waits
+`TOOL_WAIT` only while `<data>/tool-gates` is there, `toolGateFlag` at scan, `widgetSet` and each call) and the
+`tool.call` event (never a workflow's start). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -302,7 +318,9 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   flags or please), `titled`; one without takes its first prompt's words, `titleFrom`: claude's UserPromptSubmit and
   gemini's BeforeAgent `prompt`, codex's first notify `input-messages`, never a bare /command; in an untitled workspace
   (a workspace's `untitled`: made with no name or prompt, a Local one or a worktree's `ws-<tail>`; or a folder's own from
-  before, its project's id; `wsSet` `name` sets it false), that prompt names the workspace instead and the tab keeps its
+  before, its project's id; `wsSet` `name` sets it false; a workspace's `named`: you named it, `wsSet` `name` not from an
+  agent (`wsSet` in `FROM`) or `wsNew` `named` with no `from` (the page's typed name, the CLI's `--name`): an agent's
+  rename refused unless `asked` (`laki rename --asked`), `wsSet` `auto` (a Browsers page's title) passes it by), that prompt names the workspace instead and the tab keeps its
   agent's name; a new Local one is named the name given, else `taskTitle` of its prompt (the renderer's `nameOf` too); MCP's `laki_new_tab` takes a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
   (main.ts `agentSend`): to an agent's tab (`agent: true`), or a terminal of its own workspace, which is then the agent's
   (`agentCaller`, core's `agentTyped`; its keys through `input` too) until you send or type there (`youTyped`: keys with

@@ -5,7 +5,7 @@ import { type CSSProperties, useState } from 'react'
 import type { ProjectLook, SideLook } from '../../shared/types'
 import { UI_FONTS } from './themes'
 import { Glyph } from './Glyph'
-import { Icon } from './ui'
+import { Icon, type MenuItem, ON, useMenu } from './ui'
 
 // Settings › Appearance › Project names: what's not the theme's goes on the sidebar, as data-ph-* (styles.css) and
 // the values as --ph-* (spacing, size, weight: any CSS value; a font by its name: data-ph-font custom, --ph-font)
@@ -37,30 +37,38 @@ async function localFonts() {
 }
 const SHORT = [...new Set([...UI_FONTS.filter(f => f !== 'system'), 'SF Pro', 'SF Mono', 'Menlo', 'Helvetica', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'])].sort((a, b) => a.localeCompare(b))
 const LAKI = ['Inter', 'Geist', 'IBM Plex Sans', 'Roboto', 'Source Sans 3', 'Fira Sans', 'Manrope'] // look.css's own, bundled
-const opt = (f: string) => (
-  <option key={f} value={f}>
-    {f}
-  </option>
-)
-// a select of fonts by name, in groups: first (unset's word, the theme's…), Laki's own, dev (the terminal's monospace
-// ones this Mac draws, Settings' installedFonts), then the rest this Mac has; value '' or one of them
-export function FontPick({ value, first, onChange, label, dev = [] }: { value: string; first: [string, string][]; onChange: (v: string) => void; label?: string; dev?: string[] }) {
-  const [all, setAll] = useState(local ?? [])
-  const load = () => void (!local && localFonts().then(f => f.length && setAll(f)))
-  const mac = (all.length ? all : SHORT).filter(f => !LAKI.includes(f) && !dev.includes(f))
-  const known = [...first.map(f => f[0]), ...LAKI, ...dev, ...mac]
+// a font picked by name from Laki's own menu (a native select's options can't show their font on a Mac), each name drawn
+// in its own typeface, in groups: first (unset's word, the theme's…), Laki's own, dev (the terminal's monospace ones
+// this Mac draws, Settings' installedFonts), then the rest this Mac has (mac false: not those); a filter on top; other:
+// a last item for a name typed (the terminal's Other…). value '' or one of them
+const face = (f: string) => `${JSON.stringify(f)}, var(--ui-font)`
+export function FontPick({ value, first, onChange, label, dev = [], mac: withMac = true, other, shown }: { value: string; first: [string, string, string?][]; onChange: (v: string) => void; label?: string; dev?: string[]; mac?: boolean; other?: () => void; shown?: string }) {
+  const [menu, openMenu] = useMenu()
+  const open = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const at = e.currentTarget.getBoundingClientRect()
+    const all = withMac ? (local ?? (await localFonts())) : []
+    const mac = (all.length ? all : withMac ? SHORT : []).filter(f => !LAKI.includes(f) && !dev.includes(f))
+    const known = [...first.map(f => f[0]), ...LAKI, ...dev, ...mac]
+    const item = (f: string, font = face(f)): MenuItem => ({ label: f, font, hint: f === value ? ON : undefined, run: () => onChange(f) })
+    openMenu(at, [
+      { filter: 'Find a font' },
+      ...first.map(([v, name, font]) => ({ label: name, font, hint: v === value ? ON : undefined, run: () => onChange(v) })),
+      ...(value && !known.includes(value) ? [item(value)] : []),
+      ...(withMac ? [{ head: "Laki's own" }, ...LAKI.map(f => item(f))] : []),
+      ...(dev.length ? [{ head: 'For developers (monospace)' }, ...dev.map(f => item(f, `${JSON.stringify(f)}, monospace`))] : []),
+      ...(mac.length ? [{ head: 'On this Mac' }, ...mac.map(f => item(f))] : []),
+      ...(other ? [{ label: 'Other…', icon: 'pencil', foot: true, sub: 'Any font by its name, as in Font Book', run: other } as MenuItem] : []),
+    ])
+  }
+  const name = first.find(f => f[0] === value)?.[1] ?? (shown || value)
   return (
-    <select value={value} aria-label={label} onPointerDown={load} onFocus={load} onChange={e => onChange(e.target.value)}>
-      {first.map(([v, name]) => (
-        <option key={v} value={v}>
-          {name}
-        </option>
-      ))}
-      {value && !known.includes(value) && opt(value)}
-      <optgroup label="Laki's own">{LAKI.map(opt)}</optgroup>
-      {dev.length > 0 && <optgroup label="For developers (monospace)">{dev.map(opt)}</optgroup>}
-      <optgroup label="On this Mac">{mac.map(opt)}</optgroup>
-    </select>
+    <>
+      <button type="button" className="pick-btn font-pick" aria-haspopup="menu" aria-label={label} onClick={open} style={value && !first.some(f => f[0] === value) ? { fontFamily: face(value) } : undefined}>
+        <span>{name}</span>
+        <Icon name="chevron" size={11} />
+      </button>
+      {menu}
+    </>
   )
 }
 

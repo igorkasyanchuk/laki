@@ -230,6 +230,9 @@ test('workflow files: read back as they are, checks pass; problems are named', (
   assert.deepEqual(check(bypass), ['the loop through c, s has no limit: give one of its blocks a max'])
   assert.match(toFile({ ...bypass, blocks: bypass.blocks.map(b => (b.id === 'a' ? { ...b, question: 'Go\non?' } : b)) }), /^ask: Go on\?$/m, 'one line')
   assert.match(parse('## x\nchoice: answer has "y"\n').problems[0], /choice: <variable> contains/)
+  // a group's name with the head's separator in it: the other settings still read back
+  const grouped = parse(toFile({ ...bypass, on: 'pr.merged', group: 'Release · nightly' })).workflow
+  assert.deepEqual([grouped.on, grouped.where, grouped.group], ['pr.merged', 'worktree', 'Release - nightly'])
   // past 100 blocks: said, before any walk (a chain of thousands would overflow them)
   const huge = Array.from({ length: 5000 }, (_, i) => `## b${i}\nrun: true\nok: b${i + 1}\nfail: b${i + 1}\n`).join('\n')
   assert.deepEqual(check(parse(`## start\ninput: task\nnext: b0\n\n${huge}\n## b5000\nend: success\n`).workflow), ['5002 blocks: 100 at most'])

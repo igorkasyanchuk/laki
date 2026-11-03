@@ -327,6 +327,42 @@ export function fileTree<T extends { path: string }>(files: T[], folded: Readonl
 // a diff's lines side by side, as GitHub's split view: a context line on both sides, a run of removed lines beside the
 // added lines right after it, pair by pair; anything else (a hunk's @@, "\ No newline") across both
 export type SplitRow<T> = { left?: T; right?: T; full?: T }
+// a ```diff block an agent wrote in a chat (Markdown's): its lines with their kinds, each file's name (the +++ line's, a
+// deleted one's ---), and old/new numbers once a @@ head gives them; null when it has no + or - line (plain code then)
+export type ProposalLine = { kind: 'file' | 'hunk' | 'add' | 'del' | 'ctx'; text: string; old?: number; new?: number }
+export function proposalOf(text: string): ProposalLine[] | null {
+  const out: ProposalLine[] = []
+  const ls = text.split('\n')
+  let old = 0
+  let now = 0
+  let numbered = false
+  let changes = false
+  const name = (l: string) => l.slice(4).replace(/\t.*$/, '').trim().replace(/^[ab]\//, '')
+  for (let i = 0; i < ls.length; i++) {
+    const l = ls[i]
+    if (/^(diff --git |index [0-9a-f]+\.\.|new file mode|deleted file mode|similarity index|rename (from|to) )/.test(l)) continue
+    // a file's head: --- then +++, before any hunk or with its @@ next (inside a hunk, '-- x' taken out and '++ y' put in read the same)
+    if (l.startsWith('--- ') && ls[i + 1]?.startsWith('+++ ') && (!numbered || ls[i + 2]?.startsWith('@@ '))) {
+      const to = name(ls[++i])
+      out.push({ kind: 'file', text: to === '/dev/null' ? name(l) : to })
+      numbered = false
+      continue
+    }
+    const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(l)
+    if (h) {
+      old = +h[1]
+      now = +h[2]
+      numbered = true
+      out.push({ kind: 'hunk', text: l })
+    } else if (l.startsWith('\\')) continue // \ No newline at end of file
+    else if (l[0] === '+') (changes = true), out.push({ kind: 'add', text: l.slice(1), ...(numbered && { new: now++ }) })
+    else if (l[0] === '-') (changes = true), out.push({ kind: 'del', text: l.slice(1), ...(numbered && { old: old++ }) })
+    else out.push({ kind: 'ctx', text: l[0] === ' ' ? l.slice(1) : l, ...(numbered && { old: old++, new: now++ }) })
+  }
+  while (out.length && out[out.length - 1].kind === 'ctx' && !out[out.length - 1].text) out.pop() // the block's last newline
+  return changes ? out : null
+}
+
 export function splitRows<T extends { old?: number; new?: number }>(lines: T[]): SplitRow<T>[] {
   const rows: SplitRow<T>[] = []
   const del = (l?: T) => !!l && l.old !== undefined && l.new === undefined

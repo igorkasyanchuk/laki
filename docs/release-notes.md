@@ -4,6 +4,24 @@ version it builds, with the date. -->
 
 ## Next
 
+- *Usage* (the plan ring's popup › *By day and model*, ⌘K): tokens and ≈ cost a day for the last 7, 30 or 90 days,
+  by agent and model, from Laki's Claude Code and Codex tabs.
+- A PR's ⋯ › *Mark as draft* (it went ready too early) or *Ready for review*; `laki pr . --draft` / `--ready`, and
+  agents may for their own workspace's PR.
+- The side panel's *Commits* tab: what the branch adds over its base, each pushed or not, a click for its diff.
+- Scheduled tasks and Workflows in groups: drag rows onto a group, fold it, ⌘-click or ⇧-click to pick several and
+  turn them on or off or move them. A workflow keeps its group in its file (`group: Release`).
+- A ```` ```diff ```` block in an agent's or Laki AI's answer is drawn as a red and green diff, marked *Proposal*.
+- Extensions can see every tool call Claude makes (`tool.call`), and a gate `"tool"` can refuse one or change its
+  input (Claude then asks you); 3 seconds at most, then it goes.
+- A workspace another agent started says *Created by @lead* in its tab bar (a click goes to that tab), in Info and in
+  `laki ls`; when it waits on a question, the asking tab shows it with its buttons, so you answer it there.
+- Font pickers (interface, sidebar, project names, terminal) show each font in its own typeface, with a filter.
+- *Empty projects* (Settings › Appearance › Sidebar rows, or a right click › Show): off hides projects with no
+  workspace to show.
+- A workspace you named (a rename, or the name typed as you made it) keeps its name: agents no longer rename it unless
+  you ask them to, and a Browsers page's title doesn't either.
+
 - Settings › Updates › *Update delay*: offer a release only once it's 1, 3, 7, 14 or 30 days old; *Skip the delay once*
   lets one in now.
 - `laki browser … --expect-url /login`: a click or fill meant for one page is refused, nothing done, on any other.

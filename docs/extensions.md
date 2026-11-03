@@ -213,6 +213,7 @@ when it has them) and its own fields, 64 KB at most:
 | `tab.new` | a tab is opened (not the ones brought back as Laki starts) | `kind` (agent, shell, dev, script, ship) |
 | `port.open` | a port starts listening in a workspace (once each time) | `port`, `pid`, `command`, `name` (`.laki.json`'s `ports`) |
 | `gate.held` | a [gate](#gates-an-actions-gate) held a ship, a merge or an archive | `gate`, `widget`, `why` |
+| `tool.call` | Claude Code is about to make a tool call ([tool gates](#tool-calls-gate-tool-toolcall) can refuse it) | `tool`, `input` |
 | `custom.<name>` | `laki widget emit <name>` (below) | `data`, `from: { widget, tab, agent }` |
 
 PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
@@ -308,6 +309,26 @@ that says no holds it, with its reason.
 - Merge when green held: over to you once per head commit, tried again after a push or once the gate's extension
   changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
   way, the reasons as `{{steps.<id>.output}}`. Each hold sends `gate.held`.
+
+### Tool calls (`"gate": ["tool"]`, `tool.call`)
+
+A gate `"tool"` sees each tool call Claude Code is about to make in a workspace (its PreToolUse hook), and can refuse it
+or change its input:
+
+```json
+{ "actions": { "guard": { "run": "./guard.sh", "gate": ["tool"] } } }
+```
+
+- It gets `{ gate: "tool", ws, tab: { id, name, agent }, tool, input }` on stdin and in `$LAKI_EVENT_FILE` (`tool`:
+  Claude's name for it, `Bash`, `Edit`, `Write`…; `input`: its arguments, `command`, `file_path`…), `$LAKI_GATE`
+  `tool`. An input past 1 MB comes with its long strings cut (`… (cut)`): it can still refuse that call, not change it.
+- `{"ok": false, "why": "no rm -rf here"}` refuses the call: Claude gets the why. `{"input": {…}}` changes its input
+  (say, `git push` with `--dry-run`): Claude then asks you, showing the new input; Laki never allows a tool for you.
+  Anything else lets it go.
+- They run one after another (the next sees the input the one before changed), all within 3 seconds: past that, or
+  on an error, the call goes, logged. Claude's hook waits only while an extension with a tool gate is on.
+- Other agents have no hook before a tool call: `"on": { "tool.call": "<action>" }` sees each of Claude's after the
+  fact (`tool`, `input`; a big one as `{ "cut": true }`). A workflow never starts on `tool.call`.
 - Not gated: deleting a workspace, and archived workspaces' clean-up.
 - A gate is a team rule, not a sandbox: it holds what goes through Laki. An agent with a shell can still run `gh pr
   merge` or `git push` itself; its own permission mode is what stops that.

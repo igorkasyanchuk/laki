@@ -8,7 +8,7 @@ import { planDone } from '../shared/todos.ts'
 import { type Tab, type TabView, type Today } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, dir, presetOf, state } from './core.ts'
-import { chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
+import { type ByModel, chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -89,7 +89,49 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
     s.chats[tab.resumeId!] = { ws: tab.workspace, tokens: r.m.today.tokens, cost: r.m.today.cost }
     writeAtomic(todayPath, JSON.stringify(s))
   }
+  keepDays(tab, r.m)
   return true
+}
+
+// each day's by agent and model, the Usage page's: <data>/usage-days.json by chat, its days USAGE_KEEP back. A chat's
+// day and model: the more of what was kept and what's read now (a restart reads each chat anew), as today's is
+export const USAGE_KEEP = 90
+const daysPath = join(dir, 'usage-days.json')
+type Kept = { chats: Record<string, { ws: string; agent: string; days: Record<string, ByModel> }> }
+let kept: Kept | undefined
+const keptNow = () => (kept ??= (k => (k && typeof k.chats === 'object' ? k : { chats: {} }))(readJson<Kept>(daysPath)))
+const timeOf = (day: string) => (([y, m, d]) => new Date(y, m - 1, d).getTime())(day.split('-').map(Number))
+function keepDays(tab: Tab, m: Meter) {
+  if (!tab.resumeId || !m.days) return
+  const k = keptNow()
+  const c = (k.chats[tab.resumeId] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
+  let moved = false
+  for (const [day, models] of Object.entries(m.days))
+    for (const [model, v] of Object.entries(models)) {
+      const was = c.days[day]?.[model]
+      if (v.tokens > (was?.tokens ?? 0)) ((c.days[day] ??= {})[model] = { tokens: v.tokens, cost: v.cost }), (moved = true)
+    }
+  if (!moved) return
+  const from = Date.now() - USAGE_KEEP * 864e5
+  for (const [id, x] of Object.entries(k.chats)) {
+    for (const d of Object.keys(x.days)) if (timeOf(d) < from) delete x.days[d]
+    if (!Object.keys(x.days).length) delete k.chats[id]
+  }
+  writeAtomic(daysPath, JSON.stringify(k))
+}
+// usageDays: the Usage page's rows, a day, agent and model each (YYYY-MM-DD, this Mac's day), every chat's added up
+export function usageDays() {
+  const sum = new Map<string, { day: string; agent: string; model: string; tokens: number; cost: number }>()
+  for (const c of Object.values(keptNow().chats))
+    for (const [d, models] of Object.entries(c.days))
+      for (const [model, v] of Object.entries(models)) {
+        const day = (([y, m, dd]) => `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`)(d.split('-'))
+        const key = `${day}|${c.agent}|${model}`
+        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, tokens: 0, cost: 0 }), sum.get(key)!)
+        x.tokens += v.tokens
+        x.cost += v.cost
+      }
+  return { keep: USAGE_KEEP, rows: [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 })).sort((a, b) => a.day.localeCompare(b.day)) }
 }
 export function meterTick() {
   if (state.settings?.contextMeter === false && state.settings?.costs === false) return

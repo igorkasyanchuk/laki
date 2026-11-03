@@ -6,7 +6,7 @@ import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { ask, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Schedule>): Promise<Schedule>
@@ -35,6 +35,120 @@ type Form = { id?: string; name: string; project: string; preset: string; ws: st
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
 type Draft = { form: Form; orig: string | null }
+
+// a list in collapsible groups (Scheduled tasks', Workflows'): the ungrouped rows first, then each group under its head
+// (folded ones kept in store). A row dragged onto a head goes into that group, the picked ones with it; ⌘-click picks a
+// row, ⇧-click a run of them: the bar turns them on or off or moves them; a right click on a row or a head does the same
+// for it. A group is only its rows' name: New group… names one as rows go into it
+export function Grouped<T>({ items, keyOf, groupOf, onOf, row, store, what, onMove, onTurn }: { items: T[]; keyOf: (t: T) => string; groupOf: (t: T) => string | undefined; onOf: (t: T) => boolean; row: (t: T) => React.ReactNode; store: string; what: string; onMove: (keys: string[], group: string) => void; onTurn: (keys: string[], on: boolean) => void }) {
+  const [shut, setShut] = useState<string[]>(() => load<string[]>(store, []))
+  const [picked, setPicked] = useState<string[]>([])
+  const [over, setOver] = useState<string | null>(null)
+  const anchor = useRef('')
+  const [menu, openMenu] = useMenu()
+  const groups = [...new Set(items.map(groupOf).filter((g): g is string => !!g))].sort((a, b) => a.localeCompare(b))
+  const loose = items.filter(t => !groupOf(t))
+  const order = [...loose, ...groups.flatMap(g => (shut.includes(g) ? [] : items.filter(t => groupOf(t) === g)))].map(keyOf)
+  const live = picked.filter(k => items.some(t => keyOf(t) === k)) // one deleted meanwhile drops out
+  useEffect(() => {
+    if (!live.length) return
+    const f = (e: KeyboardEvent) => escapes(e) && !document.querySelector('.menu[role=menu], .overlay') && (e.preventDefault(), setPicked([])) // before the page's Esc; a menu or dialog's own first
+    window.addEventListener('keydown', f, true)
+    return () => window.removeEventListener('keydown', f, true)
+  }, [live.length > 0])
+  const fold = (g: string) => setShut(o => (n => (keep(store, n), n))(o.includes(g) ? o.filter(x => x !== g) : [...o, g]))
+  const named = (then: (g: string) => void) => void askText('New group', { placeholder: 'Release, Nightly, Reviews…', ok: 'Move' }).then(g => g?.trim() && then(g.trim()))
+  const moveItems = (keys: string[]): MenuItem[] => [
+    ...groups.map(g => ({ label: g, icon: 'folder', run: () => onMove(keys, g) }) as MenuItem),
+    ...(keys.some(k => groupOf(items.find(t => keyOf(t) === k)!)) ? [{ label: 'No group', icon: 'x', run: () => onMove(keys, '') } as MenuItem] : []),
+    { label: 'New group…', icon: 'plus', run: () => named(g => onMove(keys, g)) },
+  ]
+  const keysMenu = (e: React.MouseEvent, keys: string[]) =>
+    openMenu(e, [
+      { label: keys.length > 1 ? `Turn these ${keys.length} on` : 'Turn on', icon: 'run', run: () => onTurn(keys, true) },
+      { label: keys.length > 1 ? `Turn these ${keys.length} off` : 'Turn off', icon: 'pause', run: () => onTurn(keys, false) },
+      null,
+      { label: 'Move to group', icon: 'folder', items: moveItems(keys) },
+    ])
+  const click = (e: React.MouseEvent, k: string) => {
+    if (!e.metaKey && !e.ctrlKey && !e.shiftKey) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.shiftKey && anchor.current && order.includes(anchor.current)) {
+      const [a, b] = [order.indexOf(anchor.current), order.indexOf(k)].sort((x, y) => x - y)
+      setPicked(p => [...new Set([...p, ...order.slice(a, b + 1)])])
+    } else setPicked(p => (p.includes(k) ? p.filter(x => x !== k) : [...p, k]))
+    anchor.current = k
+  }
+  const dropOn = (g: string) => ({
+    onDragOver: (e: React.DragEvent) => e.dataTransfer.types.includes('laki/row') && (e.preventDefault(), setOver(g)),
+    onDragLeave: () => setOver(o => (o === g ? null : o)),
+    onDrop: (e: React.DragEvent) => {
+      const k = e.dataTransfer.getData('laki/row')
+      setOver(null)
+      if (k) e.preventDefault(), onMove(live.includes(k) ? live : [k], g)
+    },
+  })
+  const rowOf = (t: T) => {
+    const k = keyOf(t)
+    return (
+      <div key={k} className={`grp-row ${live.includes(k) ? 'picked' : ''}`} draggable onDragStart={e => (e.dataTransfer.setData('laki/row', k), (e.dataTransfer.effectAllowed = 'move'))} onClickCapture={e => click(e, k)} onContextMenu={e => keysMenu(e, live.includes(k) ? live : [k])}>
+        {row(t)}
+      </div>
+    )
+  }
+  return (
+    <>
+      <div className="sched-list">
+        {groups.length > 0 && loose.length > 0 && (
+          <div className={`grp-head loose ${over === '' ? 'over' : ''}`} {...dropOn('')}>
+            <span className="grp-name muted">No group</span>
+            <span className="muted small">{loose.length}</span>
+          </div>
+        )}
+        {loose.map(rowOf)}
+        {groups.map(g => {
+          const mine = items.filter(t => groupOf(t) === g)
+          const on = mine.filter(onOf).length
+          return (
+            <div key={`g:${g}`} className="grp">
+              <div className={`grp-head ${over === g ? 'over' : ''}`} {...dropOn(g)} onClick={() => fold(g)} onContextMenu={e => keysMenu(e, mine.map(keyOf))} data-tip={`${mine.length} ${what}, ${on} on · a click ${shut.includes(g) ? 'opens' : 'folds'} it · drop rows here to move them in`}>
+                <Icon name={shut.includes(g) ? 'chevronRight' : 'chevron'} size={12} />
+                <Icon name="folder" size={13} />
+                <span className="grp-name">{g}</span>
+                <span className="muted small">
+                  {mine.length}
+                  {on < mine.length ? ` · ${on} on` : ''}
+                </span>
+                <span className="grow" />
+                <IconButton icon="more" title="This group: turn all on or off, rename, ungroup" onClick={e => (e.stopPropagation(),
+                  openMenu(e, [
+                    { label: 'Turn all on', icon: 'run', run: () => onTurn(mine.map(keyOf), true) },
+                    { label: 'Turn all off', icon: 'pause', run: () => onTurn(mine.map(keyOf), false) },
+                    null,
+                    { label: 'Rename…', icon: 'pencil', run: () => void askText('Rename group', { value: g, ok: 'Rename' }).then(n => n?.trim() && n.trim() !== g && onMove(mine.map(keyOf), n.trim())) },
+                    { label: 'Ungroup', icon: 'x', run: () => onMove(mine.map(keyOf), '') },
+                  ]))} />
+              </div>
+              {!shut.includes(g) && mine.map(rowOf)}
+            </div>
+          )
+        })}
+      </div>
+      {menu}
+      {live.length > 0 && (
+        <div className="pick-bar grp-bar" role="toolbar" aria-label={`${live.length} picked`}>
+          <b>{live.length} picked</b>
+          <span className="grow" />
+          <button type="button" onClick={() => onTurn(live, true)}>Turn on</button>
+          <button type="button" onClick={() => onTurn(live, false)}>Turn off</button>
+          <button type="button" onClick={e => openMenu(e, moveItems(live))}>Move to group</button>
+          <IconButton icon="x" title="Clear (Esc)" onClick={() => setPicked([])} />
+        </div>
+      )}
+    </>
+  )
+}
 
 // project: the filter it opens with (a project's ⋯ menu); onSeen: the newest run, once all projects' runs show (the clock's dot)
 export function SchedulesPage({ view, api, project: start = '', onSeen, onClose }: { view: View; api: SchedulesApi; project?: string; onSeen?: (run: string) => void; onClose: () => void }) {
@@ -331,9 +445,17 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             {schedules.length > 0 && <span className="muted small">{schedules.length}</span>}
           </div>
           {schedules.length ? (
-            <div className="sched-list">
-              {schedules.map(s => (
-                <div key={s.id} className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
+            <Grouped
+              items={schedules}
+              keyOf={s => s.id}
+              groupOf={s => s.group}
+              onOf={s => s.on}
+              store="laki.schedGroups"
+              what="tasks"
+              onMove={(ids, group) => void Promise.all(ids.map(id => api.set({ id, group }))).catch(fail)}
+              onTurn={(ids, on) => void Promise.all(ids.map(id => api.set({ id, on }))).catch(fail)}
+              row={s => (
+                <div className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
                   {((k: IconName) => (
                     <span className="sched-icon" data-kind={k}>
                       <Icon name={k} />
@@ -373,8 +495,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   </span>
                   <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
                 </div>
-              ))}
-            </div>
+              )}
+            />
           ) : (
             <div className="sched-empty">
               <Icon name="clock" size={18} />

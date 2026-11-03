@@ -108,7 +108,7 @@ export type Block = {
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
-export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; when?: string[]; budget?: Budget; vars?: Record<string, string>; blocks: Block[] } // budget: a run's working time and AI money (budgetOf); when: only when: tests on the event's fields, each must hold (whenProblem); vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
+export type Workflow = { id: string; name: string; desc?: string; group?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; when?: string[]; budget?: Budget; vars?: Record<string, string>; blocks: Block[] } // group: the Workflows page's collapsible head it's under (none: no group); budget: a run's working time and AI money (budgetOf); when: only when: tests on the event's fields, each must hold (whenProblem); vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project' | 'builtin' // builtin: a template that comes with Laki (workflows/), never run or saved
 // budget: 60 min, $5 (either part): a run's working time (not while it waits for you, a limit or its turn in the queue)
 // and what its AI calls and decisions cost; past either it asks, as the turns limit does. A string: what's wrong
@@ -276,7 +276,7 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
       const w = /^only when:\s*(.*)$/i.exec(line) // a test's own line: its text may hold " · "
       if (w) return void (wf.when ??= []).push(w[1].trim())
       const kv = pairs(line)
-      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'perm', 'when done', 'on', 'budget'].includes(k))) {
+      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'perm', 'when done', 'on', 'budget', 'group'].includes(k))) {
         for (const [k, v] of kv) {
           if (k === 'runs in') v in WHERES ? (wf.where = v as Workflow['where']) : problems.push(`${at}: runs in: ${Object.keys(WHERES).join(' or ')}`)
           else if (k === 'session') v in SESSIONS ? (wf.session = v as Workflow['session']) : problems.push(`${at}: session: new or shared`)
@@ -284,6 +284,7 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
           else if (k === 'on') wf.on = v || undefined
           else if (k === 'perm') wf.perm = v || undefined
           else if (k === 'when done') wf.done = v || undefined
+          else if (k === 'group') wf.group = v.slice(0, 60) || undefined
           else if (k === 'budget') (b => (typeof b === 'string' ? problems.push(`${at}: ${b}`) : (wf.budget = b)))(budgetOf(v))
           else wf.turns = num(v, at, problems)
         }
@@ -430,7 +431,7 @@ const one = (s = '') => s.replace(/\s*\n\s*/g, ' ') // a field on one line: a ne
 export function toFile(wf: Workflow): string {
   const L = [`# ${one(wf.name)}`]
   if (wf.desc) L.push(one(wf.desc))
-  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.done && `when done: ${wf.done}`, wf.budget && `budget: ${budgetText(wf.budget)}`, wf.on && `on: ${one(wf.on)}`].filter(Boolean).join(' · '))
+  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.done && `when done: ${wf.done}`, wf.budget && `budget: ${budgetText(wf.budget)}`, wf.on && `on: ${one(wf.on)}`, wf.group && `group: ${one(wf.group).replace(/\s+·\s+/g, ' - ')}`].filter(Boolean).join(' · '))
   for (const t of wf.when ?? []) L.push(`only when: ${one(t)}`)
   for (const [k, v] of Object.entries(wf.vars ?? {})) if (VAR_NAME.test(k)) L.push(`var ${k}: ${one(v)}`)
   for (const b of wf.blocks) {
@@ -481,7 +482,7 @@ export function check(wf: Workflow): string[] {
   const by = new Map(wf.blocks.map(b => [b.id, b]))
   const start = wf.blocks.find(b => b.kind === 'start')
   if (!start) return ['no start block (## start)']
-  if (wf.on && !eventOk(wf.on)) out.push(`on: ${wf.on} isn't an event (${WIDGET_EVENTS.join(', ')}, custom.<name> or custom.*)`)
+  if (wf.on && (!eventOk(wf.on) || wf.on === 'tool.call')) out.push(wf.on === 'tool.call' ? "on: tool.call: every tool call an agent makes; a workflow doesn't start on it (an extension's gate \"tool\" sees them)" : `on: ${wf.on} isn't an event (${WIDGET_EVENTS.filter(e => e !== 'tool.call').join(', ')}, custom.<name> or custom.*)`)
   if (wf.when?.length && !wf.on) out.push('only when: tests an event: it needs on: <event>')
   if (wf.budget && ((wf.budget.ms === undefined && wf.budget.usd === undefined) || [wf.budget.ms, wf.budget.usd].some(x => x !== undefined && !(x > 0)))) out.push('budget: a time, dollars or both, more than 0: budget: 60 min, $5')
   for (const t of wf.when ?? []) (p => p && out.push(p))(whenProblem(t))
@@ -922,7 +923,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · when done: archive|keep · budget: 60 min, $5 · on: <event> (budget: a run's working time (not while it waits for the user) and its llm and decide blocks' cost, either part; past either it asks the user: more or stop; runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; when done: archive (a worktree run's default) archives the worktree a run made once it ends done with nothing uncommitted (Restore brings it back), keep keeps it; a failed or stopped run's and a workspace it was given always stay; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
+runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · when done: archive|keep · budget: 60 min, $5 · on: <event> · group: <name> (group: the Workflows page's heading it's under; budget: a run's working time (not while it waits for the user) and its llm and decide blocks' cost, either part; past either it asks the user: more or stop; runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; when done: archive (a worktree run's default) archives the worktree a run made once it ends done with nothing uncommitted (Restore brings it back), keep keeps it; a failed or stopped run's and a workspace it was given always stay; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.filter(e => e !== 'tool.call').join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
 only when: <test> (any number of these lines, after the head line, with on: only: every one must hold of the event or no run starts. A test is a case branch on an event field: event.pr.draft equals "false", event.ws.branch matches "^(feat|fix)/", event.seconds >= 60; no js: or else. A second event from a workspace while a run it started is live (or queued) starts none.)
 The event's fields: every one has event.event, event.at, event.ws.id, .name, .project, .branch, .pr (its URL), event.tab.id, .name, .agent when it's a tab's, event.from (widget, tab, agent) when one sent it. pr.opened, pr.checks.failed, pr.checks.passed, pr.review, pr.merged, pr.closed: event.pr.number, .url, .title, .draft; pr.checks.failed: event.failing (a list of {name, url}); pr.review: event.approved, event.changes (logins). turn.done: event.last (the answer), event.seconds; turn.failed: event.error, event.limit; turn.waiting: event.question, event.options. flow.ended: event.run, event.workflow.id, .name, event.status (done, stopped, failed), event.why. workspace.new: event.prompt, event.agent. tab.new: event.kind. ship.done: event.ok, event.exit, event.pr.url, .number. port.open: event.port, event.command. schedule.ran: event.task.id, .name, event.ok. custom.*: event.data, what laki widget emit sent.
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)

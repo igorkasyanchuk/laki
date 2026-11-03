@@ -572,7 +572,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
         <Icon name="ai" size={13} />
       </span>
       <div className="ai-body">
-        <Markdown src={src} />
+        <Markdown src={src} chat />
         {m.ask && (
           // its options: one pick, then they stay as they were picked
           <div className={`ai-options ${m.ask.looks ? 'looks' : ''}`} role="group" aria-label="Answer">

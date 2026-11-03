@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomBytes } from 'node:crypto'
-import { rmSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetEvent, type WidgetStream, type Workspace } from '../shared/types.ts'
@@ -12,6 +12,7 @@ import { actionCmd, gateOf } from '../shared/widgetSchema.ts'
 import { type Entry, envOf, eventWs, exec, faceOf, type Failed, find, guarded, inProj, instOk, isObj, keep, keyOf, lastLine, onOf, outside, ownFetch, ran, RUN_JS, scoped, shown, sourceOf, tail, trusted, where, widgetAction, widgetRun, widgets, wLog, wsEnv, wsInfo, type WsInfo } from './widgets.ts'
 import { agentIn, broadcast, callerAgent, changed, devLog, killGroup, own, state } from './core.ts'
 import { filesHash } from './widgetTrust.ts'
+import { dir } from './dir.ts'
 import { approve, grant, grantKey } from './widgetTools.ts'
 import { LOG_RUN, xlog } from './widgetLogs.ts'
 
@@ -43,9 +44,10 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   const i = x && wsInfo(x)
   const head = { event: name, at: Date.now(), ...(x && { ws: eventWs(x) }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(o.from && { from: o.from }) }
   const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
+  if (name === 'tool.call' && ![...widgets.values()].some(w => handlerOf(w, name))) return rec // every tool call: kept only when an extension answers it, or it'd be the whole log
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()
-  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent, hops)
+  const flows = name === 'tool.call' ? undefined : eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent, hops) // every tool call: never a workflow's start
   if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
   if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
   const fields = JSON.stringify(extra)
@@ -149,6 +151,75 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
   )
   for (const h of held) widgetEvent('gate.held', { gate: h.gate, widget: h.widget, why: h.why }, x.id)
   return held
+}
+
+// a tool call claude is about to make (its PreToolUse hook, core's hook): each on extension's gate "tool" here sees it,
+// { gate: 'tool', ws, tab, tool, input } on stdin, one after another, all within TOOL_GATE_MS. {"ok": false, "why"}
+// denies it (claude gets the why), {"input": {…}} changes its input (the next gate sees the new one; claude then asks
+// you, showing it), anything else lets it go. An error, a timeout, no time left: it goes, never held past TOOL_GATE_MS.
+// The hook (src/cli/hook.ts) waits that long only while toolFlag's file is there (toolGateFlag: some gate is on)
+export const TOOL_GATE_MS = 3000
+const TOOL_IN_MAX = 1 << 20 // a call's input past it (a big Write): gates see its long strings cut, and can only refuse it
+const CUT_AT = 64 << 10
+const cutBig = (v: unknown) => (isObj(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' && x.length > CUT_AT ? `${x.slice(0, CUT_AT)}… (cut)` : x])) : v)
+export const toolFlag = () => join(dir, 'tool-gates')
+export function toolGateFlag() {
+  const on = [...widgets.values()].some(w => onOf(w) && gatesOf(w, 'tool').length)
+  try {
+    if (on) existsSync(toolFlag()) || writeFileSync(toolFlag(), '')
+    else rmSync(toolFlag(), { force: true })
+  } catch {}
+}
+export async function toolGate(x: Workspace, tab: { id: string; name: string; preset?: string }, tool: string, input: unknown): Promise<{ deny?: string; input?: unknown; by?: string } | undefined> {
+  toolGateFlag()
+  const here = (w: Entry) => inProj(w, x) && (!scoped(w) || instOk(x))
+  const all = [...widgets.values()].filter(w => onOf(w) && here(w)).flatMap(w => gatesOf(w, 'tool').map(([a]) => ({ w, a }))).slice(0, GATE_MAX)
+  if (!all.length) return
+  const big = JSON.stringify(input ?? null).length > TOOL_IN_MAX
+  const end = Date.now() + TOOL_GATE_MS
+  let now = big ? cutBig(input) : input
+  const by: string[] = []
+  for (const { w, a } of all) {
+    const left = end - Date.now()
+    if (left < 100) {
+      wLog(w, `gate ${a} (tool ${tool}): not run, no time left`, 'warn')
+      continue
+    }
+    const name = w.m.name || w.id
+    const body = JSON.stringify({ gate: 'tool', ws: wsInfo(x), tab: { id: tab.id, name: tab.name, agent: tab.preset }, tool, input: now })
+    const file = join(tmpdir(), `laki-gate-${randomBytes(8).toString('hex')}.json`)
+    writeFileSync(file, body, { mode: 0o600 })
+    const k = keyOf(w.id, scoped(w) ? x.id : undefined)
+    const reason = 'gate:tool'
+    const t0 = Date.now()
+    try {
+      const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: 'tool', LAKI_EVENT_FILE: file }, body, left)
+      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+      const j = [out, lastLine(out)]
+        .map(t => {
+          try {
+            return JSON.parse(t ?? '') as unknown
+          } catch {
+            return undefined
+          }
+        })
+        .find(isObj)
+      if (j?.ok === false) {
+        const why = typeof j.why === 'string' && j.why.trim() ? j.why.trim().slice(0, 2000) : 'it said no'
+        wLog(w, `gate ${a} (tool ${tool}): denied: ${why}`, 'warn')
+        return { deny: `${name}: ${why}` }
+      }
+      if (isObj(j?.input) && big) wLog(w, `gate ${a} (tool ${tool}): a change to a cut input isn't taken`, 'warn')
+      else if (isObj(j?.input)) (now = j.input), by.push(name), wLog(w, `gate ${a} (tool ${tool}): changed its input`)
+    } catch (e) {
+      const f = e as Failed
+      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
+      wLog(w, `gate ${a} (tool ${tool}) failed: ${f.message}: went ahead`, 'error')
+    } finally {
+      rmSync(file, { force: true })
+    }
+  }
+  return by.length ? { input: now, by: by.join(', ') } : undefined
 }
 
 // an event of your own (laki widget emit, MCP's laki_extension_emit): custom.<name> with data (64 KB at most), from an

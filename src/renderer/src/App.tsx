@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, neverAsks, PERMS, veiled, EFFORTS, MODELS, SEP_WHERE, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { aiOn, creatorOf, neverAsks, PERMS, veiled, EFFORTS, MODELS, SEP_WHERE, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, In
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { SideChat } from './SideChat'
-import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, WorkerAsks, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -46,13 +46,13 @@ import { Term, xterms, type SelectionUse } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf, allAgents, fillRoles, LAYOUT_PRESETS, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout, toRoles } from '../../shared/layout'
 import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
-import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, usageText } from './Usage'
+import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
 import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 
@@ -219,7 +219,7 @@ function toolShow() {
 }
 // the events that notify or toast about a workspace: none for one Recording mode hides
 const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -240,11 +240,11 @@ const extKey = (e: { extension: string; key?: string }) => e.key ?? (e.extension
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 type Place = { d: Dialog; ws: string | null }
 const HISTORY_MAX = 25
-const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules'])
+const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules', 'usage'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
 // the Extension page's way back, in words
-const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', todos: 'To-dos', calendar: 'Calendar', board: 'Board', achievements: 'Achievements', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
+const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', todos: 'To-dos', calendar: 'Calendar', board: 'Board', achievements: 'Achievements', bird: 'Bird view', schedules: 'Schedule', help: 'Help', usage: 'Usage' }
 const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 // a tab's color: its own, else its agent's ('none' turns that off)
@@ -1618,14 +1618,14 @@ export function App() {
     if (!held) return r
     const fix = held.flatMap(h => (h.fix ? [h.fix] : [])).join('\n\n')
     const agent = !!fix && (view?.tabs ?? []).some(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')
-    const words = { ship: 'shipped', merge: 'merged', archive: 'archived' }[step]
+    const words = { ship: 'shipped', merge: 'merged', archive: 'archived', tool: 'run' }[step]
     const n = await choose(`Not ${words}`, undefined, [{ label: 'Cancel' }, ...(agent ? [{ label: 'Ask the agent to fix it', primary: true }] : []), { label: 'Do it anyway', danger: true }], undefined, undefined, held.map(h => ({ icon: h.icon, label: h.name, value: h.why })))
     if (agent && n === 1) {
       const text = await askText('Ask the agent to fix it', { text: `To ${wsName(w)}'s agent, once it's free. Change it as you like.`, value: fix, multi: true, ok: 'Send' })
       return void (text?.trim() && call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent'), () => {}))
     }
     if (n !== (agent ? 2 : 1)) return
-    if (!(await ask(`${{ ship: 'Ship', merge: 'Merge', archive: 'Archive' }[step]} ${wsName(w)} anyway?`, { text: `Past what ${held.map(h => h.name).join(', ')} said.`, ok: 'Do it anyway', danger: true }))) return
+    if (!(await ask(`${{ ship: 'Ship', merge: 'Merge', archive: 'Archive', tool: 'Run' }[step]} ${wsName(w)} anyway?`, { text: `Past what ${held.map(h => h.name).join(', ')} said.`, ok: 'Do it anyway', danger: true }))) return
     return f(true)
   }
   // archive: asked first, with what goes (its uncommitted changes, with the worktree) and what stays; Undo brings it
@@ -1877,6 +1877,8 @@ export function App() {
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
     turnChanges: () => api.call<Changes>('turnDiff', { ws: w.id }),
+    commits: () => api.call<Commits>('commits', { ws: w.id }),
+    commitDiff: sha => api.call<Changes>('commitDiff', { ws: w.id, sha }),
     prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
     setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base, uncommitted) => api.call<FileContent>('fileRead', { ws: w.id, path, base, uncommitted }),
@@ -2727,7 +2729,7 @@ export function App() {
     return {
       ...w,
       checking: checking === `merge:${w.id}`,
-      from: from && { id: from.id, name: wsName(from) },
+      from: from && { id: from.id, name: wsName(from), tab: creatorOf(w, view?.tabs ?? []) },
       started: view?.workspaces.filter(x => x.from === w.id && !x.archived).map(x => ({ id: x.id, name: wsName(x) })),
       allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
       method: cfg?.mergeMethod,
@@ -2777,6 +2779,7 @@ export function App() {
   const prAct = async (w: WorkspaceView, act: PRAct, method: MergeMethod = cfgOf(w)?.mergeMethod ?? 'squash') => {
     const pr = w.pr
     if (!pr) return
+    if (act === 'draft') return prDraft(w)
     if (act === 'merge') {
       const del = { label: 'Delete the branch on GitHub', on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
@@ -2786,6 +2789,15 @@ export function App() {
     const close = act === 'close'
     if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; it can be reopened on GitHub.'].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
+  }
+  // the waiting tabs of the workspaces this tab's agent started (fromTab), for its pane's foot (WorkerAsks)
+  const workerAsks = (tab: string) => {
+    const mine = view?.workspaces.filter(w => w.fromTab === tab && !w.archived) ?? []
+    return mine.flatMap(w => (view?.tabs ?? []).filter(t => t.workspace === w.id && t.status === 'waiting').map(t => ({ ws: w.id, name: wsName(w), tab: t })))
+  }
+  const prDraft = (w: WorkspaceView) => {
+    const pr = w.pr
+    if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `PR #${pr.number} is ready for review` : `PR #${pr.number} is a draft`, undefined, undefined, true), () => {})
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
     { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', tip: 'Reads its checks, reviews and state again now', run: refreshPR },
@@ -2802,6 +2814,7 @@ export function App() {
           null,
           ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: 'Merges it on GitHub, after you confirm', run: () => prAct(w, 'merge') } as MenuItem] : []),
           ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
+          { label: w.pr.draft ? 'Ready for review' : 'Mark as draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? 'Out of draft on GitHub: reviewers are asked' : 'Back to a draft on GitHub: it went ready too early', run: () => prDraft(w) } as MenuItem,
           ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, tip: 'Closes it on GitHub without merging, after you confirm', run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
@@ -2905,7 +2918,7 @@ export function App() {
   const pageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pageSeen = (id: string, url: string, title: string) => {
     clearTimeout(pageTimers.current[id])
-    pageTimers.current[id] = setTimeout(() => void api.call('wsSet', { id, browser: url, ...(title.trim() && { name: title }) }).catch(() => {}), 400)
+    pageTimers.current[id] = setTimeout(() => void api.call('wsSet', { id, browser: url, ...(title.trim() && { name: title, auto: true }) }) /* auto: not over a name you gave it */.catch(() => {}), 400)
   }
   // Get started (panels.tsx Onboarding): shown once as Laki opens (seen), its steps done by hand (done) or by
   // themselves (onboardDone, kept as they happen); off: Don't show again, and no bar at the sidebar's foot
@@ -3212,6 +3225,7 @@ export function App() {
     const flowWs = flowsOn && ws && flowMenu(ws).length ? ws : undefined
     if (flowsOn) for (const f of flowWs ? flowsHere(flowWs) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: flowWs ? wsName(flowWs) : 'workflow', run: () => runFlow(f, flowWs?.id) })
     if (settings.birdView !== false) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
+    a({ label: 'Usage: tokens and cost by day and model', icon: 'activity', run: () => setDialog('usage') })
     if (settings.calendar !== false) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
     if (settings.desk !== false) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
     if (settings.notes !== false) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
@@ -3391,7 +3405,7 @@ export function App() {
   const stepsOn = settings.nextStep !== false
   // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
   const mark = (m: RowMark) => rowMarkOn(settings, m)
-  const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })) }]
+  const showItems = (): MenuItem[] => [{ label: 'Show', icon: 'eye', tip: 'What the sidebar rows show after their names', items: [...ROW_MARKS.filter(([m]) => rowMarkUsed(settings, m)).map(([m, label, tip]) => ({ label, tip, hint: mark(m) ? ON : undefined, run: () => void call('settingsSet', rowMarkSet(settings, m, !mark(m))).catch(() => {}) })), null, { label: 'Empty projects', tip: 'Projects with no workspace to show (none, all archived, or all pinned); off: only ones with rows', hint: settings.hideEmpty === true ? undefined : ON, run: () => void call('settingsSet', { hideEmpty: settings.hideEmpty !== true }).catch(() => {}) }] }]
   const stepOf = (w: WorkspaceView) => nextStep(w, view!.tabs, { merge: allows(w, 'merge'), git: projOf(w)?.git !== false })
   const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
     const at = () => (setWsId(w.id), setDialog(null))
@@ -4063,7 +4077,7 @@ export function App() {
   const statusBar = view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own
             <>
               {ctxOn && tab?.context && (
@@ -4276,6 +4290,7 @@ export function App() {
             const mine = live.filter(w => w.project === p.id && !w.pinned) // a pinned one is above, under Pinned
             const hits = find && mine.filter(shows) // filtering: only those, folded or not, without the seps
             if (hits && !hits.length) return null
+            if (!hits && settings.hideEmpty === true && !mine.length && ws?.project !== p.id && !making.some(m => m.project === p.id)) return null // Show › Empty projects off: one with no rows here
             const shut = !hits && folded.includes(p.id)
             const sum = shut ? busiest(mine) : 'idle'
             return (
@@ -4373,6 +4388,11 @@ export function App() {
         <div className="tabbar drag" data-tabbar>
           {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
+          {ws && !narrow && (f => f && (by => (
+            <button type="button" className="nodrag created-by" data-tip={`Its agent started this workspace: ${by ? `${by.label} in ` : ''}${wsName(f)} · a click goes there`} onClick={() => (setReveal(r => [...r, f.id]), by ? selectTab({ id: by.id, workspace: f.id }) : setWsId(f.id))}>
+              <Icon name="agent" size={12} /> Created by <b>{by?.label ?? wsName(f)}</b>
+            </button>
+          ))(creatorOf(ws, view.tabs)))(live.find(x => x.id === ws.from))}
           <span className="spacer" />
           {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
           {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
@@ -4488,6 +4508,7 @@ export function App() {
                     t && (
                       <>
                         <SecretStrip tab={t} onGive={(id, value) => call('secretGive', value === undefined ? { id, refuse: true } : { id, value })} />
+                        <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
@@ -4614,6 +4635,7 @@ export function App() {
                 onAttach={attachable(ws) ? () => setDialog({ attachPr: ws.id }) : undefined}
                 onCopy={copy}
                 onWs={id => (setReveal(r => [...r, id]), setWsId(id))}
+                onTab={(w, t) => (setReveal(r => [...r, w]), selectTab({ id: t, workspace: w }))}
                 onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
                 onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
                 onDetach={() => detachPr(ws)}
@@ -4895,6 +4917,7 @@ export function App() {
               />
             </Lazy>
           ))(flowsOf(dialog))}
+        {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[] }>('usageDays')} onClose={() => setDialog(null)} />}
         {dialog === 'bird' && settings.birdView !== false && (
           <BirdPage
             view={view}

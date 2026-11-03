@@ -81,9 +81,11 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
 // what a chat used, from its transcript read on (meters.ts; onto m, what its earlier lines said): used, what its
 // context holds now (claude: the last answer's prompt, its cache's too; codex: its last token_count's) of max (codex's
 // window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) and their
-// cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day)
-type Spent = { tokens: number; cost: number; day: string }
-export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan } // msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+// cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day),
+// and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
+type Spent = { tokens: number; cost: number; day: string; model?: string }
+export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
+export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan } // msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
 export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {
@@ -93,6 +95,10 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     m.tokens += by * s.tokens
     m.cost += by * s.cost
     if (s.day === day) (m.today.tokens += by * s.tokens), (m.today.cost += by * s.cost)
+    const d = ((m.days ??= {})[s.day] ??= {})
+    const x = (d[s.model || 'unknown'] ??= { tokens: 0, cost: 0 })
+    x.tokens += by * s.tokens
+    x.cost += by * s.cost
   }
   for (const line of jsonl.split('\n')) {
     if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' || !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
@@ -113,7 +119,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       // between count it twice)
       if (m.was && j.message.id && j.message.id === m.msg) add(m.was, -1)
       m.msg = j.message.id
-      add((m.was = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at }))
+      add((m.was = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at, model: j.message.model }))
       if (!j.isSidechain) m.used = n.input + n.write + n.read // a subagent's is a context of its own
     } else {
       const p = j.payload
@@ -141,7 +147,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       if (!d('total_tokens')) continue // a rate limit's update: the same totals
       const cost = costOf(m.model, { input: d('input_tokens') - d('cached_input_tokens'), output: d('output_tokens'), read: d('cached_input_tokens') }) // its input has the cached in it
       if (cost !== undefined) m.priced = true
-      add({ tokens: d('total_tokens'), cost: cost ?? 0, day: at })
+      add({ tokens: d('total_tokens'), cost: cost ?? 0, day: at, model: m.model })
     }
   }
   return m

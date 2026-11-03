@@ -130,4 +130,24 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   await rig.start()
   await until(async () => (x => x?.context && x)(await rig.tab(ws.id)), 'the meter again')
   await until(async () => (await rig.rpc('state')).today?.tokens === 447000 + 51000, 'today’s, once')
+  // the Usage page's: by day, agent and model, kept in usage-days.json, counted once over the restart too
+  const d = await rig.rpc('usageDays')
+  const d0 = new Date()
+  const key = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`
+  assert.equal(d.keep, 90)
+  assert.deepEqual(d.rows.map((r: any) => [r.day, r.agent, r.model, r.tokens]).sort(), [[key, 'claude', 'claude-opus-4-6', 447000], [key, 'codex', 'gpt-5-codex', 51000]])
+  assert.ok(d.rows.every((r: any) => r.cost > 0))
+  assert.ok(JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1'].days)
+})
+
+test('meter: each day by model, for the Usage page; a day past and a model of its own each', () => {
+  const m = meterNew(now)
+  const u = (output: number) => ({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output })
+  meterOf('claude', said('a', 'claude-opus-4-6', u(100), 48) + said('b', 'claude-sonnet-4-5', u(10)) + said('b', 'claude-sonnet-4-5', u(30)) + said('c', 'claude-opus-4-6', u(5)), m, now)
+  assert.deepEqual(Object.fromEntries(Object.entries(m.days!).map(([d, x]) => [d, Object.fromEntries(Object.entries(x).map(([k, v]) => [k, v.tokens]))])), {
+    [dayOf(now - 48 * 3600e3)]: { 'claude-opus-4-6': 100 },
+    [dayOf(now)]: { 'claude-sonnet-4-5': 30, 'claude-opus-4-6': 5 }, // b's last block only
+  })
+  const c = meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5-codex' } }) + tokenCount({ total_tokens: 900 }, { total_tokens: 900 }), meterNew(now), now)
+  assert.deepEqual(c.days, { [dayOf(now)]: { 'gpt-5-codex': { tokens: 900, cost: c.cost } } })
 })

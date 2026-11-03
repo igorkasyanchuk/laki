@@ -23,7 +23,7 @@ import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
-import { type GateBy, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
+import { type GateBy, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
@@ -327,7 +327,7 @@ export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's o
 // What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
 const LAKI_NOTE = () =>
   `You run in a tab of Laki, an app that runs coding agents side by side, each task in a workspace of its own (a git worktree or a folder). Its CLI is \`${LAKI_CLI}\`, \`laki\` below (\`laki help\` lists it all); \`.\` is your workspace ($LAKI_WORKSPACE). Use it when it helps, quietly:
-- \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar).
+- \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar). A name the user gave it stays (Laki refuses yours): rename it then only when they ask, with \`--asked\`.
 - \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
@@ -1577,8 +1577,12 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean }) {
   const w = findWs(o.id)
+  // a name you gave it stays: an agent's rename is refused unless you asked for it (asked: laki rename --asked), a
+  // Browsers page's title (auto) passes it by
+  const agent = o.name !== undefined && !!agentCaller(o.from)
+  if (agent && w.named && !o.asked) throw new Error(`the user named this workspace (${w.name ?? w.id}): it keeps that name. Rename it only when they ask you to: laki rename . <name> --asked`)
   // a later start: null cancels it (the workspace stays, no agent), at moves it (or to the limit's reset), prompt
   // changes what it says; start: now
   if ((o.pending !== undefined || o.start) && !w.pending) throw new Error(`${w.id} has no agent waiting to start`)
@@ -1592,10 +1596,11 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
   if (typeof o.unrelate === 'string') unrelate(w, o.unrelate) // the info panel's ✕ on a related link: one at a time
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
-  if (o.name !== undefined) {
+  if (o.name !== undefined && !(o.auto && w.named)) {
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
     w.name = name && name !== w.id ? name : undefined // the id itself: back to it
     w.untitled = false // yours: no prompt renames it
+    if (!o.auto && (!agent || o.asked)) w.named = w.name ? true : undefined // yours (or asked for): kept; back to its id: agents may name it again
   }
   // turned on again: fix CI and fix conflicts get their tries back at the next scan (autoPR: a scan under way would
   // write its own copy of ws.fix over a reset made here)
@@ -1887,7 +1892,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
 // (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
@@ -1992,7 +1997,7 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 // N14: the caller main.ts found by its process wins over what the RPC says; a from it says (MCP's $LAKI_WORKSPACE) is
 // kept only as a non-blank string ('' would skip every agent check: agentNoCmd, cloudCheck, the agent's mark)
 export const saidFrom = (v: unknown) => (typeof v === 'string' && v.trim()) || undefined
-export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? saidFrom(o.from), agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
+export const byCaller = <T extends NewWs>({ caller, flow: _, hops: __, fromTab: ___, ...o }: T): T => ({ ...o, from: agentCaller(caller) ?? saidFrom(o.from), fromTab: agentTab(caller)?.id, agent: callerAgent(caller) ?? agentIn(o.agent) }) as T // an RPC's: never a run's mark; its caller's agent over what it says
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {
@@ -2103,6 +2108,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (o.issued) ws.issue = o.issued
   if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true, ...(o.guessed && { prSaid: true }) })
   if (o.from && state.workspaces.some(w => w.id === o.from)) ws.from = o.from
+  if (o.named && !o.from && o.name?.trim()) ws.named = true // the name you typed: no agent renames it (an agent's laki new --name isn't)
+  if (ws.from && o.fromTab && state.tabs.find(t => t.id === o.fromTab)?.workspace === ws.from) ws.fromTab = o.fromTab // the agent's own tab, as main.ts found it: Created by, and its workers' asks there
   if (!o.issued) for (const u of refsIn(o.prompt)) relate(ws, u) // the other PRs and issues it names (not an issue's text: any)
   if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
   if (o.flow && ws.kind === 'worktree') ws.flow = o.flow // the run's, before workspace.new and its setup tab's tab.new
@@ -2618,6 +2625,8 @@ function whenPrompt(s: Session, then: () => void, from = s.born) {
 export function hook(p: { tab: string; state: string; payload?: any }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true
+  const gate = tab && preTool(tab, p.payload)
+  if (gate) return turn(p), gate
   // codex's notify comes as any of its threads ends a turn: a sub-agent's (multi-agent) or its auto-review's while the
   // chat's own turn goes on, "esc to interrupt" still on screen. Its own turn's end clears that line as it calls
   // notify: busy after a moment more, it's another thread's, dropped (its thread id isn't the chat's either)
@@ -2635,6 +2644,27 @@ export function hook(p: { tab: string; state: string; payload?: any }) {
     if (busy()) return void (r.later = setTimeout(() => (sessions.get(p.tab) !== s0 || busy() || r.status !== 'running' ? wsLog({ id: tab.workspace }, `${tab.name}: a codex thread ended (${p.payload?.['thread-id'] ?? '?'}), not the chat's turn`) : turn(p)), 1500))
   }
   turn(p)
+}
+
+// claude's PreToolUse (state running): the tool.call event (extensions' on, after the fact) and the tool gates
+// (widgetEvents.ts toolGate), whose answer goes back to the hook as claude's own JSON: a deny with its why, or the input
+// an extension changed, asked of you (permissionDecision ask: Laki never grants a tool). None: nothing printed
+function preTool(tab: Tab, pl: any) {
+  if (pl?.hook_event_name !== 'PreToolUse' || typeof pl.tool_name !== 'string') return
+  const input = pl.tool_input ?? {}
+  const shown = JSON.stringify(input)
+  widgetEvent('tool.call', { tool: pl.tool_name, input: shown.length > 16 << 10 ? { cut: true } : input }, tab.workspace, tab)
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  if (!ws) return
+  return toolGate(ws, tab, pl.tool_name, input).then(
+    d =>
+      d && {
+        hookSpecificOutput: d.deny
+          ? { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: d.deny }
+          : { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `${d.by} changed its input (a Laki extension)`, updatedInput: d.input },
+      },
+    () => undefined,
+  )
 }
 
 // a turn's state, from a hook or from the screen (sweepRunning)

@@ -189,6 +189,7 @@ export type Workspace = {
   name?: string // shown instead of the id (which names the worktree and branch)
   term?: boolean // made as a terminal (quickNew's shells): its menus close it, no branch or PR items
   untitled?: boolean // made with no name or prompt: its agent's first prompt names it (core's titleFrom); false: renamed, never
+  named?: true // you named it (renamed it, or typed its name as it was made): an agent's rename is refused unless you asked (laki rename --asked), a page's title never renames it
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
   private?: boolean // Recording mode (settings.recording) hides it (veiled); its project's private too
@@ -208,6 +209,7 @@ export type Workspace = {
   prSaid?: boolean // prUrl a guess, a PR its prompt or its agent (prFromSaid) named, not one attached or asked for (--link): a worktree's branch's own PR, once pushed, replaces it
   related?: string[] // GitHub PRs and issues it's about, not its primary: its prompt's (a session an agent started), a primary its own PR replaced, one you moved off
   from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
+  fromTab?: string // …and that agent's tab (the one that ran laki new): Created by on the worker, its asks in that tab
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
@@ -472,6 +474,7 @@ export type Settings = {
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
+  hideEmpty?: boolean // the sidebar leaves out a project with no row to show (none, all archived, all pinned): Appearance › Sidebar rows › Empty projects off (unset: shown)
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan', boolean>> // a sidebar row's other marks, each on unless false (step: off unless true; conflict, ci: unset, as prIcon)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   usageAt?: number // a plan limit's % that notifies (notifyOn.usage): 75, 90, 95 (unset: USAGE_AT, 90)
@@ -753,7 +756,7 @@ export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[];
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
 // no worktree, one session; 'local-new': a new session, a sidebar row, each run), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
 // when it runs (none: off, or a once that ran)
-export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project'; widget?: string; action?: string; base?: string; noSetup?: boolean } // workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task; widget: an extension fetched (action: one of its actions run instead, prompt its argument), on ones only; base: a new workspace's base branch (ws new only; none: the project's checkout, as wsNew's); noSetup: its worktree without the project's setup script (ws new only, wsNew's noSetup)
+export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project'; widget?: string; action?: string; base?: string; noSetup?: boolean; group?: string } // group: the page's collapsible head it's under (none: no group); workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task; widget: an extension fetched (action: one of its actions run instead, prompt its argument), on ones only; base: a new workspace's base branch (ws new only; none: the project's checkout, as wsNew's); noSetup: its worktree without the project's setup script (ws new only, wsNew's noSetup)
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
@@ -797,6 +800,9 @@ export type PR = {
 
 // runAt: when its turn began (the daemon's clock), while it runs or waits
 // ask: a waiting agent's numbered menu on its screen (a permission prompt, a question): the choices and the highlighted one
+// Created by: the tab whose agent started a workspace (its fromTab: laki new, /laki:orchestrate), as its @name, else
+// its name, while it's open; none: undefined (Info and laki ls then name its workspace, from)
+export const creatorOf = (w: { fromTab?: string }, tabs: { id: string; name: string; alias?: string }[]) => (t => t && { id: t.id, label: t.alias ? `@${t.alias}` : t.name })(w.fromTab ? tabs.find(t => t.id === w.fromTab) : undefined)
 export type Ask = { options: { n: number; label: string }[]; at: number; question?: string } // at: the marked option's n; question: the line or two above the menu
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
@@ -852,9 +858,9 @@ export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtu
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgetEvents.ts widgetEvent)
-export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held'] as const
+export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held', 'tool.call'] as const
 // gates (an action's "gate"): the steps an extension can hold; a hold: who held it and why
-export const GATES = ['ship', 'merge', 'archive'] as const
+export const GATES = ['ship', 'merge', 'archive', 'tool'] as const // tool: each tool call claude makes (widgetEvents.ts toolGate), the others steps of core's gated
 export type Gate = (typeof GATES)[number]
 export type GateHeld = { widget: string; name: string; gate: Gate; why: string; fix?: string; icon?: string }
 // events of your own (laki widget emit): custom.<name>; "custom.*" in on: answers every one
@@ -926,7 +932,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 137
+export const API = 138
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

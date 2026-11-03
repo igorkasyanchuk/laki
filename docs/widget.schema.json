@@ -125,6 +125,7 @@
               "tab.new",
               "port.open",
               "gate.held",
+              "tool.call",
               "custom.*"
             ]
           },
@@ -301,10 +302,11 @@
                   "enum": [
                     "ship",
                     "merge",
-                    "archive"
+                    "archive",
+                    "tool"
                   ]
                 },
-                "description": "Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { \"ok\": false, \"why\", \"fix\" } holds it (the user may do it anyway). Command actions only"
+                "description": "Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { \"ok\": false, \"why\", \"fix\" } holds it (the user may do it anyway). tool: each tool call Claude makes ({ gate, ws, tab, tool, input }): { \"ok\": false, \"why\" } refuses it, { \"input\": {…} } changes it (Claude asks the user); 3 s for all. Command actions only"
               },
               "tool": {
                 "type": "object",

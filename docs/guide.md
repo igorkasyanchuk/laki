@@ -218,6 +218,8 @@ npm link
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
    - The workspace is named after what it's for: the name you give, else its prompt's words. One started with neither
      takes its agent's first prompt's words (never the folder's name), until you rename it.
+   - A name you give it (typed as you make it, or a rename) stays: agents may name a workspace after its task, but not
+     one you named, unless you ask them to (`laki rename . "…" --asked`). A Browsers page's title doesn't rename it either.
 
 ## Using it
 
@@ -227,6 +229,8 @@ an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its ba
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
   else's PR. Settings › Appearance › *Sidebar rows* (or a right click › *Show ›*) turns each off; it also puts them by the status circle or after the name instead.
+- *Empty projects* (the same places, on by default): off leaves out a project with no workspace to show (none, all
+  archived, or all in Pinned); the selected workspace's project and a filter's hits still show.
 
   | mark | meaning |
   |---|---|
@@ -713,6 +717,14 @@ run fails, saying so.
   projects*) narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
 - The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
   minutes late (the Mac asleep, Laki not running) is skipped and logged as missed.
+- Groups: a task's right click › *Move to group* › *New group…* names one; drag a task onto a group's head to move it
+  there, a click on the head folds it, its ⋯ turns all of them on or off, renames or ungroups it. ⌘-click picks tasks
+  (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.
+
+**Usage** (the ring's popup › *By day and model*, or ⌘K): tokens and ≈ cost at the API's list prices a day, for the
+last 7, 30 or 90 days, from each Claude Code and Codex tab's transcript in Laki: a bar a day (*$* or *Tokens*), the
+total, a day's average, and each model's share. *All agents* or one, *All models* or one (a row's click too). Kept 90
+days in `usage-days.json`; your plan bills its own way.
 
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to
@@ -773,6 +785,8 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
   (Esc drops the picks); a file's right click has *Revert this file…* (binaries and images too). Each revert's toast
   has *Undo*; nothing is staged, and a file that changed since you looked is refused (refresh Changes). With an agent at
   work in the workspace, Laki asks first: it may write the file again.
+- *Commits*: what the branch adds over its base, newest first (a folder's own: the commits no remote has), each with a
+  cloud when it's pushed or an arrow up when it isn't; a click shows that commit's files and diff, ← goes back.
 - *Review*: the PR: its title, state, author and size; its labels, and the tag button beside them: the repository's
   labels, a click puts one on or takes it off (as you, by `gh pr edit`; Info's PR has it too); *Merge* ▾, *Approve*,
   GitHub and ⋯; its description,
@@ -874,7 +888,7 @@ Under the PR's title, who approved it and who asked for changes (each one's late
 the row's hover card says the same, and so does the card that comes up as you rest on the status bar's PR (#n).
 
 *Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
-tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Close pull request…*), under the PR's title (the
+tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Mark as draft* or *Ready for review*, *Close pull request…*), under the PR's title (the
 side panel's *Review* and *Info*), in the status bar PR's right click and (approve) a workspace's right click,
 merge, approve or close the open PR with `gh`, as you, after you confirm (each question names the PR; Approve's its
 author and checks). Your own PR has no *Approve* (GitHub refuses it). *Merge* uses the way you
@@ -1007,6 +1021,11 @@ creator's guide. Only you start it (Claude never runs it on its own), and the `l
 turning one on asks you in Claude's prompt first. `/laki:orchestrate <the work>` splits work across several agents in
 parallel, a workspace each, and coordinates them to one result (the orchestrator skill's guide); only you start it,
 and its `laki` commands (`ls`, `new`, `tab`, `send`, `screen`, `diff`, `progress`) run without asking.
+
+A workspace an agent started (`laki new`, `/laki:new`, `/laki:orchestrate`) says *Created by @lead* in its tab bar
+(the tab's `laki name`, else its name; a click goes to that tab), in Info and in `laki ls`. When one of them waits on
+a question, the tab that started it shows the question under its terminal with the same buttons, and *Open*: answer it
+there without hunting for the worker.
 
 With *Progress on tabs* on (Settings › Terminal), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
@@ -1185,6 +1204,11 @@ JSON on stdin. Your own events go out with `laki widget emit deploy.done '{"sha"
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
+**Tool calls**: `"gate": ["tool"]` sees each tool call Claude Code is about to make in a workspace (`{ gate, ws, tab,
+tool, input }` on stdin): `{"ok": false, "why": …}` refuses it (Claude gets the why), `{"input": {…}}` changes its
+input (Claude then asks you, showing the new one: Laki never allows a tool for you). Three seconds for all of them, then
+the call goes; an error goes too. `"on": { "tool.call": "<action>" }` sees each one after the fact, for any use.
+
 **Gates**: an extension's action with `"gate": ["ship", "merge", "archive"]` runs before Laki does that to a
 workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), whatever its exit code, and you can *Do it
 anyway* or ask the agent to fix it. Merge when green held waits for a push; `laki ship` and `laki archive` exit 1 with
@@ -1274,8 +1298,12 @@ On unless Settings › General › *Pages* turns them off; the rail's *Flows* op
 workflows and their runs, like Scheduled tasks; a click opens one, and the breadcrumbs go back. Esc doesn't close it:
 it stays open while runs go (✕ does).
 
+Groups: `group: Release` in a workflow's head puts it under that heading on the page; drag one onto a heading, fold
+it, ⌘-click or ⇧-click several and turn them on or off (off: events and schedules don't start them) or move them, as
+on Scheduled tasks. One an agent wrote, or that changed since you allowed it, moves only once you've saved it.
+
 A workflow can start by itself on an event (*Starts on* in its settings, `on: pr.merged` in its file): any extension
-event, or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project (`runs in: here`: in that workspace),
+event (not `tool.call`), or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project (`runs in: here`: in that workspace),
 its task the event's name, its fields as `{{event.ws.branch}}`, `{{event.data.sha}}`. It doesn't start for an event
 with no workspace, for one its own run sent (a workspace or tab it made too), for a workflow an agent wrote (until
 you save it), or for an agent's event when it runs commands (a run or extension block), a webhook or outward actions (a new workspace or tab an agent made counts as its event); `laki widget
@@ -1490,7 +1518,9 @@ conversation, read from the agent's own transcript: your messages on the right, 
 of tool calls folded into one line (click for the list), and what it's doing now. When it asks something, its choices
 are buttons; otherwise a box at the bottom sends it a message (while it works, it gets it when the turn ends). The
 terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
-open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off.
+open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off. A
+```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,
+marked *Proposal*: what it suggests, not applied.
 
 A turn that changed files gets a card under its last answer: *Edited 3 files +42 −7*, the files (a click on the count
 folds them), *Review* (the side panel's Changes on *This turn*: only that turn's diff) and *Undo* (asked first: the files
@@ -1916,7 +1946,7 @@ and what it costs.
   night teal).
   Terminals take its 16 colors.
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
-  Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (every tab's; ⌘+ / ⌘− / ⌘0 change one tab's, which keeps it),
+  Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name; each font picker, here and in Appearance, shows every name in its own typeface, with a filter on top), font size (every tab's; ⌘+ / ⌘− / ⌘0 change one tab's, which keeps it),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Inset panes* (each pane a rounded card with a margin around it), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
@@ -2195,8 +2225,10 @@ laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | t
 laki browser fix-the-login click "#save" --expect-url /settings   # refused, nothing done, on any other page
 laki archive fix-the-login | restore … | fork … | rm …
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace
+laki rename . "login redirect" --asked                  # an agent, over a name you gave it: only when you asked
 laki pr . 42                                            # attach a PR (URL or number) to the workspace
 laki pr . --detach                                      # its PR only related, kept off this workspace
+laki pr . --draft                                       # its PR back to a draft (--ready: ready for review)
 laki show "Smoke test evidence" --open "$LAKI_STORAGE_FOLDER/smoke"   # in a tab: a card under it, a button opens it
 laki preset ls | preset add claude-ask --perm auto | preset set claude-ask --model opus | preset off codex | preset rm …
 laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the project's memory (Project memory)

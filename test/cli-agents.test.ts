@@ -47,8 +47,18 @@ test('/laki:new and /laki:extension: claude tabs get Laki’s plugin (its comman
   const v = await rig.rpc('state')
   const w = v.workspaces.find((x: { id: string }) => x.id === 'add-the-export-button')
   assert.equal(w.from, ws.id) // its agent started it
+  const lead = v.tabs.find((x: any) => x.workspace === ws.id && x.kind === 'agent')
+  assert.equal(w.fromTab, lead.id) // …from that tab: Created by, its asks there
   const m = v.workspaces.find((x: { id: string }) => x.id === 'mine')
-  assert.deepEqual([m.from, m.prUrl], [undefined, 'https://github.com/o/r/pull/3'])
+  assert.deepEqual([m.from, m.fromTab, m.prUrl], [undefined, undefined, 'https://github.com/o/r/pull/3'])
+  assert.match((await rig.cli('ls')).out, new RegExp(`add-the-export-button .*created by ${lead.name}`))
+  await rig.rpc('tabSet', { id: lead.id, alias: 'lead' })
+  const js = JSON.parse((await rig.cli('ls', '--json')).out)
+  assert.deepEqual(js.workspaces.find((x: any) => x.id === w.id).createdBy, { id: lead.id, label: '@lead' })
+  assert.equal(js.workspaces.find((x: any) => x.id === 'mine').createdBy, undefined)
+  // an RPC's own fromTab is never taken: only the caller's tab
+  const said = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'said', from: ws.id, fromTab: lead.id })
+  assert.equal(said.fromTab, undefined)
   assert.deepEqual([w?.project, w?.kind], [p.id, 'worktree'])
   assert.equal(v.tabs.find((x: { workspace: string }) => x.workspace === w.id)?.preset, 'codex')
 })
@@ -371,4 +381,44 @@ test('laki secret: a masked card on the tab; the value only in a 0600 file in it
   assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 3600e3 }), 0)
   assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 1) // a day on: gone
   assert.ok(!existsSync(path))
+})
+
+test('a name you gave a workspace stays: an agent renames it only when you asked (--asked); a page title never', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'work on the cart' })
+  const tab = await until(async () => await rig.tab(ws.id), 'its tab')
+  const agent = { ws: ws.id, tab: tab.id }
+  const now = async (id = ws.id) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
+  // not named by you: its agent names it after its task
+  await rig.rpc('wsSet', { id: ws.id, name: 'cart totals', from: agent })
+  assert.deepEqual([(await now()).name, (await now()).named], ['cart totals', undefined])
+  // you rename it: kept, an agent's rename refused
+  await rig.rpc('wsSet', { id: ws.id, name: 'Cart' })
+  assert.equal((await now()).named, true)
+  await assert.rejects(rig.rpc('wsSet', { id: ws.id, name: 'something else', from: agent }), /the user named this workspace/)
+  // laki rename in its tab: refused, then --asked (you asked for it)
+  Object.assign(rig.env, { LAKI_WORKSPACE: ws.id, LAKI_TAB: tab.id })
+  t.after(() => (delete rig.env.LAKI_WORKSPACE, delete rig.env.LAKI_TAB))
+  const no = await rig.cli('rename', '.', 'other')
+  assert.notEqual(no.code, 0)
+  assert.match(no.err, /--asked/)
+  assert.equal((await rig.cli('rename', '.', 'Cart v2', '--asked')).code, 0)
+  delete rig.env.LAKI_WORKSPACE
+  delete rig.env.LAKI_TAB
+  assert.deepEqual([(await now()).name, (await now()).named], ['Cart v2', true])
+  // back to its id: agents may name it again
+  await rig.rpc('wsSet', { id: ws.id, name: '' })
+  assert.equal((await now()).named, undefined)
+  await rig.rpc('wsSet', { id: ws.id, name: 'by its agent', from: agent })
+  // typed as it was made: named; an agent's laki new --name isn't
+  assert.equal((await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'Typed', named: true })).named, true)
+  assert.equal((await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'Theirs', named: true, from: ws.id })).named, undefined)
+  // a Browsers page's title follows it until you name it
+  const b = await rig.rpc('quickNew', { kind: 'browsers', url: 'https://example.com' })
+  await rig.rpc('wsSet', { id: b.id, browser: 'https://example.com/a', name: 'Page A', auto: true })
+  assert.equal((await now(b.id)).name, 'Page A')
+  await rig.rpc('wsSet', { id: b.id, name: 'Docs' })
+  await rig.rpc('wsSet', { id: b.id, browser: 'https://example.com/b', name: 'Page B', auto: true })
+  assert.deepEqual([(await now(b.id)).name, (await now(b.id)).browser], ['Docs', 'https://example.com/b'])
 })

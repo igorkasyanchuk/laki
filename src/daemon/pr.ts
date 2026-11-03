@@ -736,6 +736,24 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
   return {}
 }
 
+// prDraft: the PR back to a draft (gh pr ready --undo: an agent's PR went ready too early) or ready for review, by gh as
+// you; shown at once, then a scan. Reversible, so an agent may for its own workspace's (main.ts' agentNo)
+export async function prDraft(o: { ws: string; draft: boolean }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
+  const draft = o.draft === true
+  if (!!pr.draft === draft) return { draft }
+  await exec(ws, 'gh', ['pr', 'ready', ...(draft ? ['--undo'] : []), '--', pr.url], { timeout: 30000 }).catch(e => {
+    throw new Error(ghSays(e, `PR #${pr.number}`))
+  })
+  prs.set(ws.id, { ...pr, draft: draft || undefined })
+  changed()
+  void scanPRs(false, new Set([ws.id]))
+  return { draft }
+}
+
 // a PR's repo as gh's -R takes it, from its URL (host/owner/repo)
 const repoOf = (pr: PR) => (u => `${u.host}/${u.pathname.split('/').slice(1, 3).join('/')}`)(new URL(pr.url))
 const LABEL_COLOR = /^[0-9a-f]{6}$/i // GitHub's; anything else isn't put in the page's CSS
@@ -855,8 +873,8 @@ export async function prFile(ref: string, path: string) {
   return textOf(buf.subarray(0, MAX_TEXT), buf.length)
 }
 
-// a unified diff's files, each with its status (A, D, R, else M) and lines added and taken out
-function diffFiles(text: string) {
+// a unified diff's files, each with its status (A, D, R, else M) and lines added and taken out (files.ts' commitDiff too)
+export function diffFiles(text: string) {
   const files: { path: string; status: string; add: number; del: number }[] = []
   let f: (typeof files)[number] | undefined
   let hunk = false // past the file's header: +++ and --- are lines then

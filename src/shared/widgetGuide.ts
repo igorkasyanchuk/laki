@@ -128,6 +128,8 @@ ${Object.entries(FACTS).map(([k, v]) => `  - \`${k}\`: ${v}`).join('\n')}
   ships, merges or archives a workspace, \`{ gate, ws, pr, stat, by }\` on stdin, \`$LAKI_GATE\` the step; it prints
   \`{"ok": true}\` or \`{"ok": false, "why": "…", "fix": "a prompt for the agent"}\` to hold it (whatever its exit code). 30 s at most; an error or
   no answer lets the step go ahead (print \`ok: false\` yourself to block), except Merge when green. Command actions only.
+- Tool calls: \`"gate": ["tool"]\` sees each tool call Claude Code is about to make (\`{ gate, ws, tab, tool, input }\` on
+  stdin): \`{"ok": false, "why"}\` refuses it, \`{"input": {…}}\` changes it (Claude asks the user). 3 s for all; then it goes.
 - For a team: put it in the repo's \`.laki/extensions/<id>/\` (\`laki widget new <name> --dir .laki/extensions/<id>\`) and
   commit it. Each teammate's Laki lists it as \`<project>.<id>\`, off until they look at what it runs, and off again when
   it changes (every file in its folder, ignored ones and a submodule's too); it shows and runs only in that project's

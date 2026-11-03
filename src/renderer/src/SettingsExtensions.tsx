@@ -513,7 +513,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         </WcSec>
       )}
       {!!w.gates?.length && (
-        <WcSec title={`Can hold: ${w.gates.join(', ')}`} hint="Its gate runs before Laki does that to a workspace; a no holds it, and you can do it anyway" />
+        <WcSec title={`Can hold: ${w.gates.map(g => (g === 'tool' ? "Claude's tool calls" : g)).join(', ')}`} hint={w.gates.some(g => g !== 'tool') ? 'Its gate runs before Laki does that to a workspace; a no holds it, and you can do it anyway' : 'It sees each tool call before Claude makes it: a no refuses it, a changed input asks you first; 3 s at most, then it goes'} />
       )}
       {!!w.tools?.length && (
         <WcSec title="Tools for agents" hint="Agents run these through laki widget tool and MCP">

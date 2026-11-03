@@ -155,26 +155,34 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
 export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' | 'builtin'; where: string; blocks: FlowBlock[] }; waitKey?: (id: string) => string | undefined; answer?: (o: { id: string; n: number }) => Promise<unknown> } = {} // what a client sets: the daemon works out the rest
 
+// a task's group (the page's collapsible heads): a name, 60 characters at most; '' or none: no group
+const groupSet = (s: Schedule, g: unknown) => {
+  const name = typeof g === 'string' ? g.trim().slice(0, 60) : ''
+  if (name) s.group = name
+  else delete s.group
+}
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
   const given = Object.fromEntries(SCHEDULE_IN.filter(k => o[k] !== undefined).map(k => [k, o[k]]))
-  if (old && given.on === false && Object.keys(given).length === 1) {
-    // off takes no checks: a task whose workspace or preset is gone can still be stopped
-    Object.assign(old, { on: false, next: undefined })
+  if (old && Object.keys(given).every(k => k === 'group' || (k === 'on' && given.on === false))) {
+    // off and a group take no checks: a task whose workspace or preset is gone can still be stopped or moved
+    if (given.on === false) Object.assign(old, { on: false, next: undefined })
+    if (given.group !== undefined) groupSet(old, given.group)
     save()
     changed()
     return old
   }
   const s: Schedule = { ...(old ?? { id: randomUUID().slice(0, 8), on: true, project: '', preset: '', ws: 'new', prompt: '', when: '', rule: { days: [], times: [] } }), ...given }
   s.on = s.on !== false
+  groupSet(s, s.group)
   const proj = findProject(s.project)
   s.project = proj.id
   if (!old) {

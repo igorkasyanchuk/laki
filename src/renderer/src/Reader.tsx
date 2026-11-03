@@ -72,7 +72,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
               </details>
             ) : (
               <div key={i} className="rd-agent">
-                <Markdown src={x.text} />
+                <Markdown src={x.text} chat />
               </div>
             ),
           )}

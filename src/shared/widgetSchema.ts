@@ -154,7 +154,7 @@ export const MANIFEST: Record<string, J> = {
           properties: {
             run: str('The command'),
             ...MENU,
-            gate: { type: 'array', items: { enum: [...GATES] }, description: 'Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { "ok": false, "why", "fix" } holds it (the user may do it anyway). Command actions only' },
+            gate: { type: 'array', items: { enum: [...GATES] }, description: 'Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { "ok": false, "why", "fix" } holds it (the user may do it anyway). tool: each tool call Claude makes ({ gate, ws, tab, tool, input }): { "ok": false, "why" } refuses it, { "input": {…} } changes it (Claude asks the user); 3 s for all. Command actions only' },
             tool: {
               type: 'object',
               additionalProperties: false,

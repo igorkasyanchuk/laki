@@ -5,7 +5,7 @@ import { rpc as conn } from './conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, DEVICE_OPS, SECRET_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
+import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -35,7 +35,7 @@ export async function state(rpc: Rpc = conn) {
   return {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined, groupTemplates: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.template).map(s => [s.name || 'Unnamed group', s.template!]))), groupAgents: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.preset && v.presets.some(x => x.name === s.preset && !x.off)).map(s => [s.name || 'Unnamed group', s.preset!]))) })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group; groupTemplates and groupAgents: a group's prompt template and agent, which a new workspace in it starts with
     workspaces: live
-      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review, updated: w.pr.updated }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; tabs: its tabs with splits, as the app shows them
+      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review, updated: w.pr.updated }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, createdBy: live.some(x => x.id === w.from) ? creatorOf(w, v.tabs) : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; createdBy: its agent's tab ({ id, label: @name or its name }); tabs: its tabs with splits, as the app shows them
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, alias: t.alias && `@${t.alias}`, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
@@ -207,6 +207,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "Link a GitHub PR to a workspace (its status, checks and review then show on it), when the workspace's branch has none found: e.g. a PR its agent named.",
     inputSchema: obj({ ws: str('a workspace id'), pr: str('the PR: its URL or number') }, ['ws', 'pr']),
     run: a => rpc('prAttach', { ws: a.ws, pr: a.pr }),
+  },
+  {
+    name: 'laki_pr_draft',
+    description: "A workspace's PR back to a draft (draft: true: it went ready too early) or ready for review (draft: false). An agent may for its own workspace's PR only.",
+    inputSchema: obj({ ws: str('a workspace id'), draft: { type: 'boolean', description: 'true: a draft; false: ready for review' } }, ['ws', 'draft']),
+    run: async a => ((await rpc('prDraft', { ws: a.ws, draft: a.draft === true }, 60000)).draft ? 'a draft now' : 'ready for review now'),
   },
   {
     name: 'laki_progress',

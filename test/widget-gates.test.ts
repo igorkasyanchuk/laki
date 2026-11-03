@@ -136,7 +136,7 @@ test('gates: an error or no answer goes ahead for a step you start (logged, a to
   const ps = (await rig.rpc('widgetCheck', { id: 'ai', run: false })).problems.filter((x: any) => x.level === 'error')
   assert.deepEqual(ps.map((x: any) => [x.where, x.text]), [
     ['widget.json actions.look.gate', "an agent's action can't be a gate: each run costs, and it's slow (a command action)"],
-    ['widget.json actions.go.gate', '"shp": one of ship, merge, archive (did you mean ship?)'],
+    ['widget.json actions.go.gate', '"shp": one of ship, merge, archive, tool (did you mean ship?)'],
   ])
 })
 

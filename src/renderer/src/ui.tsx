@@ -520,7 +520,7 @@ export async function copyImage(img: HTMLImageElement) {
   const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
 }
-type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
+type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string; font?: string } // font: its label drawn in it (a CSS font-family: the font pickers')
 export type MenuItem =
   | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -697,7 +697,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         <span className="menu-icon">{it.mark ?? (it.icon && <Icon name={it.icon} />)}</span>
         <span className="menu-text">
           <span className={`menu-label ${it.mono ? 'mono' : ''}`}>
-            <span>{it.label}</span>
+            <span style={it.font ? { fontFamily: it.font } : undefined}>{it.label}</span>
             {on && <Icon name="check" size={12} />}
           </span>
           {it.sub && <span className="menu-sub">{it.sub}</span>}

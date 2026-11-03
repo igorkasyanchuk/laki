@@ -24,8 +24,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--at <when>]           the workspace now, its agent later: tomorrow 9am, in 2h, 2026-10-20 14:30
             [--after-limit]         its agent once the plan limit resets (claude, codex)
   laki rm <ws> | archive <ws> [--force] | restore <ws> | fork <ws>
-  laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
+  laki rename <ws|.> <name> [--asked]         name a workspace (in a tab, . is its own); one you named: an agent only with --asked
   laki pr <ws|.> <url|number> | --detach      attach a GitHub PR to a workspace | detach its PR (only related, kept off)
+  laki pr <ws|.> --draft | --ready            its PR back to a draft (it went ready too early) | ready for review
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
   laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours, not in an agent's tab)
   laki memory rm <project>|. <id>             forget one agents learned
@@ -212,13 +213,17 @@ and rm ask the user in the app first (its args and env run in every tab of it), 
   laki preset set claude-ask --model opus --effort high
   laki preset set claude-ask --args ''           drop its args
   laki preset off codex                          out of the pickers, its tabs still start`,
-  rename: `Names a workspace (the sidebar's row). . is this tab's.
+  rename: `Names a workspace (the sidebar's row). . is this tab's. A name the user gave it (a rename, or typed as it was
+  made) stays: an agent's rename is refused, unless the user asked for it (--asked).
 
-  laki rename . csv-export`,
+  laki rename . csv-export
+  laki rename . "login redirect" --asked     the user asked for this name`,
   pr: `Attaches a GitHub PR to a workspace, so its status and checks show on it: one opened on another branch or in
 another repo (a PR of the workspace's own branch shows by itself once pushed). Run it right after gh pr create.
 
-  laki pr . https://github.com/acme/shop/pull/118`,
+  laki pr . https://github.com/acme/shop/pull/118
+  laki pr . --draft                       back to a draft: it went ready too early
+  laki pr . --ready                       ready for review`,
   browser: `A hidden browser on the workspace's localhost (the app must be open): open loads a path on its $PORT (laki run
 starts the dev server) or a localhost URL; screenshot prints a PNG's path; click and fill take a CSS selector; text
 prints the page's text. Open, click and fill print what they caused: → <url> when the page moved, blocked: (a popup

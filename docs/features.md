@@ -37,6 +37,8 @@ time and AI money per run (`budget: 60 min, $5`).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
+- **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
+  beside each plan's limits.
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Recording mode**: mark workspaces or projects *Private*; Recording mode (⌘K, the menu bar) hides them everywhere,
   notifications and phone pushes too, while they keep running.
@@ -49,7 +51,7 @@ time and AI money per run (`budget: 60 min, $5`).
   in its worktree, then a second agent (Claude Code or Codex) reviews the diff; a failure goes back to the agent (3
   times, then over to you), and you're told *done and checked*.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
-- **Orchestrate**: the orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
+- **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and its questions show in the tab that started it, answered there. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
   makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; their dev servers' ports in the status bar (not
@@ -68,11 +70,11 @@ time and AI money per run (`budget: 60 min, $5`).
   (<img src="icons/pr-open.svg" width="13" alt="GitHub's mark"> its state,
   <img src="icons/approved.svg" width="13" alt="✓"> approved, <img src="icons/approved-you.svg" width="13" alt="✓✓"> by you
   too, 👀 you commented), sent to the agent if you like; a failing check's log a click away; ship (commit, push, PR) in one step; merge
-  (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
+  (squash, merge or rebase), approve, close or turn back into a draft from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
-  a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
+  a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
   this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
@@ -85,7 +87,7 @@ time and AI money per run (`budget: 60 min, $5`).
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
-- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English,
+- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (in groups, like workflows: drag, fold, turn several on or off at once),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.

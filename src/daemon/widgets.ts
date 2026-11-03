@@ -22,7 +22,7 @@ import { aiOnce } from './ai.ts'
 import { dir } from './dir.ts'
 import { agentCaller, broadcast, diff, git, headOf, imageSave, inside, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, execGroup, killGroup, own, plainEnv, prOf, presets, procs, q, rt, state, stats, tabStatus, wsVars } from './core.ts'
 import { errAt, flushLogs, LOG_RUN, logOn, masker, masks, xlog } from './widgetLogs.ts'
-import { gatesOf, stopStream, streaming, streams, streamSync } from './widgetEvents.ts'
+import { gatesOf, stopStream, streaming, streams, streamSync, toolGateFlag } from './widgetEvents.ts'
 import { fixtureNames, fixturesOf } from './widgetDev.ts'
 import { aiKey, allowedOf, allowOf, approve, cmdsOf, grantsOf, steering, TOOL_NAME, toolsOf, ungrant, widgetToolCall } from './widgetTools.ts'
 import { dirHash, eachHash, filesHash, repoBad, repoFiles } from './widgetTrust.ts'
@@ -537,6 +537,7 @@ export function scanWidgets() {
   for (const id of [...streams.keys()]) if (runOf(before.get(id)) !== runOf(widgets.get(id))) stopStream(id) // its command changed, or it went: started again as it reads now (the others run on)
   for (const id of [...agents.keys()]) if (!widgets.has(id)) stopAgents(id) // its folder went
   streamSync()
+  toolGateFlag() // claude's hook waits on tool gates only while one is on
   changed()
 }
 
@@ -975,6 +976,7 @@ export function widgetSet(o: { id: string; seen?: string; log?: boolean; source?
   const asked = o.source !== undefined && sourceOf(w).kind === 'ai'
   if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, asked ? 'manual' : 'settings', asked ? 'its prompt changed' : undefined, () => true)
   streamSync() // off: a stream ends
+  toolGateFlag()
   if (o.name !== undefined && rename(w, o.name)) scanWidgets() // its new name everywhere, nothing fetched
   return widgetsView().find(x => x.id === w.id)
 }

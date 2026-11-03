@@ -163,6 +163,7 @@ export type AppSettings = Paint & {
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
+  hideEmpty?: boolean // Appearance › Sidebar rows › Empty projects off: a project with no row to show is left out
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan', boolean>> // the sidebar rows' other marks (ROW_MARKS)
   timers?: boolean // a turn's time on its tab and row (unset: off)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
@@ -868,7 +869,7 @@ export function SettingsPage(p: {
   }, [s])
   useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.settings-page .overlay') && !cardOpen() && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first; a dialog in it (a widget's) or a setting's ? card takes it
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.settings-page .overlay, .menu[role=menu]') && !cardOpen() && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first; a dialog in it (a widget's), an open menu (a font's) or a setting's ? card takes it
     window.addEventListener('keydown', f, true) // before the preview terminal takes it
     return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
@@ -1544,6 +1545,9 @@ export function SettingsPage(p: {
               </Group>
               <Group title="Sidebar rows" hint="What a workspace's row shows after its name; a right click on a row or a project › Show turns them on and off too">
               <div className="setting-box">
+                <Switch className="switch-row" on={s.hideEmpty !== true} onChange={v => set({ hideEmpty: !v })}>
+                  <Says title="Empty projects" hint="Projects with no workspace to show: none, all archived, or all in Pinned. Off keeps the list short; the selected workspace's project and a filter's hits still show, and the new-workspace page still lists them all" />
+                </Switch>
                 {ROW_MARKS.map(([m, title, hint]) => (!rowMarkUsed(s, m) ? null : (
                   <Fragment key={m}>
                     <Switch className={`switch-row ${m === 'author' ? 'sub' : ''}`} on={rowMarkOn(s, m)} onChange={v => set(rowMarkSet(s, m, v))}>
@@ -1929,22 +1933,7 @@ export function SettingsPage(p: {
               <Group title="Text" hint="Ligatures (=> as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.">
                 <div className="setting-box">
                   <label className="switch-row">
-                    <select
-                      value={otherFont ? 'other' : font}
-                      onChange={e => {
-                        setOtherFont(e.target.value === 'other')
-                        if (e.target.value !== 'other') set({ fontFamily: e.target.value }) // '': the default (undefined wouldn't be saved)
-                      }}
-                    >
-                      <option value="">JetBrains Mono (default)</option>
-                      {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
-                      {fonts.map(f => (
-                        <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
-                          {f}
-                        </option>
-                      ))}
-                      <option value="other">Other…</option>
-                    </select>
+                    <FontPick value={font} label="Terminal font" first={[['', 'JetBrains Mono (default)', "'JetBrains Mono', monospace"]]} dev={fonts} mac={false} shown={font && !fonts.includes(font) ? `${font}${otherFont ? '' : ' (not found)'}` : undefined} other={() => setOtherFont(true)} onChange={f => (setOtherFont(false), set({ fontFamily: f }))} />
                     <Says title="Font" hint="The monospace fonts on this Mac; Other… takes any by its name" />
                   </label>
                   {otherFont && (

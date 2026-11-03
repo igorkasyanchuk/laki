@@ -1,17 +1,75 @@
 // Markdown as React nodes (markdown.ts' tree: nothing in it is HTML), for a file's preview, a PR's description and
 // review comments; links open in the browser. A ```mermaid block is a diagram: mermaid's SVG (securityLevel strict:
 // its labels are text, no scripts or links), the library loaded the first time one shows
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
+import { proposalOf } from './text'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
 // open in the browser, images show as links (a preview fetches nothing)
 // html: GitHub's text or a repo's file, its HTML (<details>, <a>, <ul>…) read as GitHub shows it (markdown.ts)
-export function Markdown({ src, html }: { src: string; html?: boolean }) {
+// chat: an agent's or Laki AI's answer (Reader, the AI page, Side chat): a ```diff block there is a change it proposes,
+// drawn as a diff (Proposal); in a file or a PR's text it stays code
+export function Markdown({ src, html, chat }: { src: string; html?: boolean; chat?: boolean }) {
   const tree = useMemo(() => markdown(src, html), [src, html])
-  return <div className="md">{tree.map(mdBlock)}</div>
+  const md = <div className="md">{tree.map(mdBlock)}</div>
+  return chat ? <InChat.Provider value>{md}</InChat.Provider> : md
+}
+const InChat = createContext(false)
+
+const Code = ({ text, lang }: { text: string; lang?: string }) => (
+  <pre>
+    <code>
+      {highlight(`x.${lang || 'txt'}`, text).map((l, i) => (
+        <Fragment key={i}>
+          {i > 0 && '\n'}
+          {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
+        </Fragment>
+      ))}
+    </code>
+  </pre>
+)
+// a ```diff block in a chat: red and green lines, each file's name, the numbers its @@ heads give (text.ts' proposalOf);
+// nothing is applied: it's what the agent proposes. Elsewhere, or not a diff, plain code
+function DiffBlock({ text, lang }: { text: string; lang: string }) {
+  const chat = useContext(InChat)
+  const lines = useMemo(() => (chat ? proposalOf(text) : null), [chat, text])
+  if (!lines) return <Code text={text} lang={lang} />
+  const w = `${String(lines.reduce((m, l) => Math.max(m, l.old ?? 0, l.new ?? 0), 0)).length}ch`
+  const nums = lines.some(l => l.old !== undefined || l.new !== undefined)
+  const files = lines.filter(l => l.kind === 'file')
+  return (
+    <div className="md-diff">
+      <div className="md-diff-head">
+        <span className="md-diff-tag">Proposal</span>
+        {files.length === 1 && <span className="md-diff-file">{files[0].text}</span>}
+        <span className="md-diff-says">not applied</span>
+      </div>
+      <div className="sp-diff">
+        {lines.map((l, i) =>
+          l.kind === 'file' ? (
+            files.length > 1 && (
+              <div key={i} className="dl md-diff-name">
+                {l.text}
+              </div>
+            )
+          ) : (
+            <div key={i} className={`dl${l.kind === 'add' ? ' dl-add' : l.kind === 'del' ? ' dl-del' : l.kind === 'hunk' ? ' dl-hunk' : ''}`}>
+              {nums && l.kind !== 'hunk' && (
+                <>
+                  <span className="dl-n" style={{ width: w }}>{l.old ?? ''}</span>
+                  <span className="dl-n" style={{ width: w }}>{l.new ?? ''}</span>
+                </>
+              )}
+              {l.kind === 'hunk' ? l.text : `${l.kind === 'add' ? '+' : l.kind === 'del' ? '-' : ' '}${l.text}`}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  )
 }
 
 // plain text with its web addresses as links that open in the browser (Reader's messages and steps); an address ends
@@ -108,18 +166,8 @@ function mdBlock(b: Block, k: number): React.ReactNode {
       )
     case 'code':
       if (b.lang === 'mermaid') return <Mermaid key={k} text={b.text} />
-      return (
-        <pre key={k}>
-          <code>
-            {highlight(`x.${b.lang || 'txt'}`, b.text).map((l, i) => (
-              <Fragment key={i}>
-                {i > 0 && '\n'}
-                {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
-              </Fragment>
-            ))}
-          </code>
-        </pre>
-      )
+      if (b.lang === 'diff' || b.lang === 'patch') return <DiffBlock key={k} text={b.text} lang={b.lang} />
+      return <Code key={k} text={b.text} lang={b.lang} />
     case 'list': {
       const items = b.items.map((it, i) => {
         const box = it.task !== undefined && <input key="box" type="checkbox" checked={it.task} readOnly />

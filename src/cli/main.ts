@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { AGENTS, SECRET_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, creatorOf, SECRET_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -36,6 +36,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event') flags.event = eventOk(argv[i + 1] ?? '') ? argv[++i] : true // flow run's: its name, optional (its on:)
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
   else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
+  else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
+  else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
@@ -233,7 +235,8 @@ async function main() {
         console.log(`${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`)
         for (const w of v.workspaces.filter(w => w.project === p.id)) {
           const tabs = v.tabs.filter(t => t.workspace === w.id)
-          const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '']
+          const by = !w.archived && v.workspaces.some(x => x.id === w.from && !x.archived) && (creatorOf(w, v.tabs)?.label ?? w.from)
+          const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '', by ? `created by ${by}` : '']
           console.log(`  ${w.id}  ${w.branch || 'folder'}  ${extra.filter(Boolean).join('  ')}`)
           for (const t of tabs) console.log(`    ${t.status === 'exited' && t.code === 0 ? '✓' : (glyph[t.status] ?? ' ')}${t.done ? '●' : ' '} ${t.name} (${t.id})${t.queue?.length ? ` +${t.queue.length} queued` : ''}`)
         }
@@ -267,6 +270,7 @@ async function main() {
         cmd: flags.cmd,
         prompt: k.prompt,
         name: flags.name,
+        named: flags.name ? true : undefined, // yours (an agent's laki new isn't): no agent renames it
         local: !!flags.local,
         model: flags.model,
         effort: flags.effort,
@@ -443,8 +447,9 @@ async function main() {
       const ws = ref === '.' ? process.env.LAKI_WORKSPACE : ref
       if (ref === '.' && !ws) throw new Error(`laki ${cmd} .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace`)
       if (cmd === 'pr' && flags.detach && ws) return out(await rpc('prDetach', { ws }), `detached ${ws}'s PR: only related now`)
-      if (!ws || !words.length) throw new Error(cmd === 'rename' ? 'usage: laki rename <ws|.> <name>' : 'usage: laki pr <ws|.> <url|number> | --detach')
-      if (cmd === 'rename') await rpc('wsSet', { id: ws, name: words.join(' ') })
+      if (cmd === 'pr' && (flags.draft || flags.ready) && ws) return out(await rpc('prDraft', { ws, draft: !!flags.draft, from: caller() }, 60000), `${ws}'s PR is ${flags.draft ? 'a draft' : 'ready for review'}`)
+      if (!ws || !words.length) throw new Error(cmd === 'rename' ? 'usage: laki rename <ws|.> <name>' : 'usage: laki pr <ws|.> <url|number> | --detach | --draft | --ready')
+      if (cmd === 'rename') await rpc('wsSet', { id: ws, name: words.join(' '), from: caller(), ...(flags.asked && { asked: true }) }) // an agent's: refused when you named it, unless you asked (--asked)
       else await rpc('prAttach', { ws, pr: words[0] }, 60000)
       return out({ ok: true }, cmd === 'rename' ? `renamed ${ws}` : `attached ${words[0]} to ${ws}`)
     }

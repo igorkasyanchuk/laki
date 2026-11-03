@@ -8,13 +8,15 @@ import { PanelHandle } from './Panes'
 import { Markdown } from './MarkdownView'
 import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
-import { type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
+import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
-export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
+export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
+export type Commit = { sha: string; short: string; author: string; at: number; subject: string; pushed: boolean }
+export type Commits = { base?: string; commits: Commit[]; more?: boolean } // base: a worktree's (none: a folder's own, what no remote has); more: past 200
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
 export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
@@ -31,6 +33,8 @@ export type PanelApi = {
   changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   turnChanges: () => Promise<Changes> // an agent's last turn's (turns.ts turnDiff)
+  commits: () => Promise<Commits> // what the branch adds over its base, each pushed or not (Commits)
+  commitDiff: (sha: string) => Promise<Changes> // one commit's changes
   prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
   setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
   read: (path: string, base?: boolean, uncommitted?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image; uncommitted: HEAD's)
@@ -69,6 +73,7 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'info', label: 'Info', icon: 'info' },
   { id: 'files', label: 'Files', icon: 'file' },
   { id: 'changes', label: 'Changes', icon: 'changes' },
+  { id: 'commits', label: 'Commits', icon: 'gitCommit' },
   { id: 'review', label: 'Review', icon: 'review' },
   { id: 'preview', label: 'Preview', icon: 'globe' },
   { id: 'device', label: 'Simulator', icon: 'phone' },
@@ -389,6 +394,83 @@ function ChangesTab({ api: wsApi, ws, pr, linked, worktree, turn, onOpen }: { ap
   )
 }
 
+// Commits: what this workspace's branch adds over its base (a folder's own: what no remote has), newest first, each
+// pushed (on a remote) or not; a click shows that commit's changes, read only, ← back to the list
+function CommitsTab({ api }: { api: PanelApi }) {
+  const [d, err, reload] = useLoad(api.commits, 'commits', 10000)
+  const [at, setAt] = useState<Commit | null>(null)
+  if (at) return <CommitView api={api} c={at} onBack={() => setAt(null)} />
+  const list = d?.commits ?? []
+  const out = list.filter(c => !c.pushed).length
+  return (
+    <>
+      <div className="sp-tools">
+        <span className="sp-sum muted small grow">{d ? `${list.length}${d.more ? '+' : ''} commit${list.length === 1 ? '' : 's'} ${d.base ? `over ${d.base}` : 'no remote has'}${out ? ` · ${out} not pushed` : list.length ? ' · all pushed' : ''}` : err ? '' : 'Loading…'}</span>
+        <IconButton icon="refresh" title="Refresh" onClick={reload} />
+      </div>
+      <div className="sp-body">
+        {err && <div className="warn small pad">{err}</div>}
+        {d && !list.length && <div className="muted small pad">{d.base ? `No commits over ${d.base} yet: Changes shows what isn't committed.` : 'Every commit here is on a remote.'}</div>}
+        {list.map(c => (
+          <div key={c.sha} className="sp-row sp-commit" onClick={() => setAt(c)} data-tip={`${c.subject} · ${c.author}, ${new Date(c.at).toLocaleString()} · ${c.pushed ? 'pushed' : 'not pushed yet'}`}>
+            <span className={`sp-pushed ${c.pushed ? 'on' : ''}`} aria-label={c.pushed ? 'pushed' : 'not pushed'}>
+              <Icon name={c.pushed ? 'cloud' : 'upload'} size={12} />
+            </span>
+            <span className="sp-name">{c.subject}</span>
+            <span className="mono small muted">{c.short}</span>
+            <span className="muted small sp-ago">{ago(c.at)}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+function CommitView({ api, c, onBack }: { api: PanelApi; c: Commit; onBack: () => void }) {
+  const [d, err] = useLoad(() => api.commitDiff(c.sha), c.sha, 3600e3) // a commit doesn't change
+  const byFile = useMemo(() => diffByFile(d?.diff ?? ''), [d])
+  const files = d?.files ?? []
+  const [shut, setShut] = useState<Set<string>>(new Set())
+  const split = localStore('laki.diffSplit') === 'split'
+  const toggle = (p: string) => setShut(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
+  return (
+    <>
+      <div className="sp-tools">
+        <IconButton icon="arrowLeft" title="Back to the commits" onClick={onBack} />
+        <span className="sp-sum small grow" data-tip={`${c.subject} · ${c.author}`}>
+          <span className="mono muted">{c.short}</span> {c.subject}
+        </span>
+        <span className={`tag ${c.pushed ? '' : 'warn'}`}>{c.pushed ? 'pushed' : 'not pushed'}</span>
+      </div>
+      <div className="sp-body">
+        {err && <div className="warn small pad">{err}</div>}
+        {!d && !err && <div className="muted small pad">Loading…</div>}
+        {d && !files.length && <div className="muted small pad">This commit changes no file's text.</div>}
+        {files.map(f => (
+          <div key={f.path} className="sp-change">
+            <div className="sp-row" onClick={() => toggle(f.path)} data-tip={f.path}>
+              <span className="sp-chev">
+                <Icon name={shut.has(f.path) ? 'chevronRight' : 'chevron'} />
+              </span>
+              <span className={`st st-${f.status[0]}`}>{f.status[0]}</span>
+              <span className="sp-name">
+                {f.path.slice(f.path.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f.path)}</span>
+              </span>
+              <span className="mono small">
+                <span className="add">+{f.add ?? 0}</span> <span className="del">−{f.del ?? 0}</span>
+              </span>
+            </div>
+            {!shut.has(f.path) && (
+              <div className={`sp-diff ${split ? 'split' : ''}`}>
+                <DiffRows fd={byFile.get(f.path) ?? NO_DIFF} split={split} cls={l => lineClass(l)} row={() => ({})} head={l => l.text} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onLog?: (c: Check) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onLabel?: LabelApi }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
@@ -474,6 +556,7 @@ export function SidePanel(p: {
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} worktree={p.w.kind === 'worktree'} turn={p.turn} onOpen={p.onOpen} />}
+      {tab === 'commits' && <CommitsTab key={p.w.id} api={p.api} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
       {tab === 'device' && <DeviceTab api={p.api} ws={p.w.id} />}

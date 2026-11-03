@@ -10,6 +10,7 @@ import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
 import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
+import { diffFiles } from './pr.ts'
 
 // ---------- the diff against the base
 
@@ -61,6 +62,44 @@ export async function diff(ref: string, uncommitted?: boolean) {
   return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
 }
 const CUT = '\n… (cut)'
+
+// ---------- the branch's commits: the side panel's Commits
+
+// what the branch adds over its base (a worktree's; a folder's own: what no remote has), newest first, 200 at most, each
+// pushed (some remote has it) or not
+export async function commits(ref: string) {
+  const ws = findWs(ref)
+  if (state.projects.find(p => p.id === ws.project)?.git === false) throw new Error(`${ws.name ?? ws.id}: not a git repo`)
+  const base = ws.kind === 'worktree' ? [ws.base] : []
+  const [log, unpushed] = await Promise.all([
+    exec(ws, 'git', ['log', '--no-color', '-n', '201', '--format=%H%x1f%h%x1f%an%x1f%at%x1f%s', 'HEAD', '--not', ...(base.length ? base : ['--remotes']), '--'], { timeout: 30000 }).then(r => r.stdout),
+    git(ws, 'rev-list', 'HEAD', '--not', ...base, '--remotes'), // a failure is the tab's error, never "all pushed"
+  ]).catch(e => {
+    throw new Error(`git log: ${firstLine(String(e.stderr || e.message))}`)
+  })
+  const out = new Set(unpushed.split('\n').filter(Boolean))
+  const list = log
+    .split('\n')
+    .filter(Boolean)
+    .map(l => {
+      const [sha, short, author, at, ...said] = l.split('\x1f')
+      return { sha, short, author, at: Number(at) * 1000, subject: said.join(' '), pushed: !out.has(sha) }
+    })
+  return { base: ws.kind === 'worktree' ? ws.base : undefined, commits: list.slice(0, 200), more: list.length > 200 }
+}
+// one commit's changes, in diff's shape (a merge's: against its first parent)
+export async function commitDiff(ref: string, sha: string) {
+  const ws = findWs(ref)
+  if (!/^[0-9a-f]{7,40}$/.test(String(sha))) throw new Error('a commit: its hash')
+  const text = await exec(ws, 'git', ['show', '--no-color', '--no-ext-diff', ...AB, '-M', '--diff-merges=first-parent', '--format=', sha, '--'], { timeout: 30000 }).then(
+    r => r.stdout.replace(/^\n+/, '').replace(/\n$/, ''),
+    e => {
+      throw new Error(`git show: ${firstLine(String(e.stderr || e.message))}`)
+    },
+  )
+  const MAX = 4 << 20
+  return { base: sha.slice(0, 7), from: `${sha.slice(0, 7)}^`, files: diffFiles(text), diff: text.length > MAX ? text.slice(0, MAX) + CUT : text }
+}
 
 // ---------- blame and the file on the repo's site: the full review's
 

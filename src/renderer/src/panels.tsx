@@ -507,7 +507,7 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -758,7 +758,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -2237,6 +2237,39 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 // The agent's plan, live (shared/todos.ts): its to-do list under its tab, the step under way in its head, folded by a
 // click; stale: an earlier turn's. And plan mode's plan while it waits for your yes, editable: a change answers its
 // last option (keep planning) and sends the plan as you wrote it
+// the asks of workers this tab's agent started (their workspaces' fromTab): each waiting tab's question and options,
+// answered here (answer, its label checked), or Open to go there; a wait with no menu read: Open only
+export function WorkerAsks({ asks, onAnswer, onOpen }: { asks: { ws: string; name: string; tab: TabView }[]; onAnswer: (tab: string, n: number, label: string) => Promise<unknown>; onOpen: (ws: string, tab: string) => void }) {
+  const [busy, setBusy] = useState('')
+  if (!asks.length) return null
+  return (
+    <div className="queue-strip worker-asks" role="region" aria-label="Your workers ask">
+      {asks.map(({ ws, name, tab: t }) => (
+        <div key={t.id} className="plan-ask">
+          <div className="queue-head">
+            <Icon name="help" size={13} />
+            <span className="queue-what" data-tip={t.ask?.question}>
+              <b>{name}</b> · {t.name} asks{t.ask?.question ? `: ${t.ask.question}` : ' you something'}
+            </span>
+            <button type="button" onClick={() => onOpen(ws, t.id)}>
+              Open
+            </button>
+          </div>
+          {t.ask && (
+            <div className="plan-acts">
+              {t.ask.options.map(o => (
+                <button key={o.n} type="button" className={o.n === t.ask!.at ? 'primary' : ''} disabled={busy === t.id} data-tip={o.label} onClick={() => (setBusy(t.id), void onAnswer(t.id, o.n, o.label).catch(() => {}).finally(() => setBusy('')) /* call() said why */)}>
+                  {o.n}. {o.label.length > 60 ? `${o.label.slice(0, 58)}…` : o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function PlanStrip({ tab, onAnswer, onSend }: { tab: TabView; onAnswer: (n: number) => Promise<unknown>; onSend: (text: string) => void }) {
   const [open, setOpen] = useState(true)
   const [draft, setDraft] = useState<string>()

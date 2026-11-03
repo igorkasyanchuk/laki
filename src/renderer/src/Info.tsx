@@ -58,12 +58,12 @@ export type WsInfo = {
   checking?: boolean // its Merge's gates run: Checking… on the button
   tunnels?: Tunnel[] // ports exposed to the world
   related?: string[] // other GitHub PRs and issues it's about (not its PR): its prompt's, a PR its own replaced
-  from?: { id: string; name: string } // the workspace whose agent started it
+  from?: { id: string; name: string; tab?: { id: string; label: string } } // the workspace whose agent started it; tab: that agent's (creatorOf), while open
   started?: { id: string; name: string }[] // the ones its agents started
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
-export type PRAct = 'approve' | 'close' | 'merge' // prAct: gh as you, after a confirm
+export type PRAct = 'approve' | 'close' | 'merge' | 'draft' // prAct: gh as you, after a confirm (draft: Mark as draft / Ready for review, none)
 // the PR's labels: the repo's (prLabels), and one put on or taken off (prLabel)
 export type LabelApi = { list: () => Promise<PRLabel[]>; set: (name: string, on: boolean) => void }
 export const MERGE_WORDS: Record<MergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' }
@@ -351,6 +351,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
     : [
         { label: 'Open its checks', icon: 'link', run: () => onOpen(`${pr.url}/checks`) },
         { label: 'Open its files', icon: 'diff', run: () => onOpen(`${pr.url}/files`) },
+        ...(open ? [{ label: pr.draft ? 'Ready for review' : 'Mark as draft', icon: pr.draft ? 'eye' : 'pencil', sub: pr.draft ? 'Out of draft: reviewers are asked' : 'Back to a draft: it went ready too early', run: () => onAct('draft') } as MenuItem] : []),
         ...(onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: w.prLinked ? 'Only related: its own PR, once opened, shows here' : 'Only related, kept off: its branch’s PR until you attach it again', run: onDetach } as MenuItem] : []),
         ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
       ]
@@ -497,6 +498,7 @@ export function InfoTab(p: {
   onCopy: (text: string) => void
   onStorage?: () => void // its storage folder in Finder (the app's only)
   onWs?: (id: string) => void // another workspace (from, started)
+  onTab?: (ws: string, tab: string) => void // the tab that started it (from's)
   onPrimary?: (url: string) => void // a related PR as its PR
   onUnrelate?: (url: string) => void // off the related list
   onDetach?: () => void // its PR, only linked, to related
@@ -561,9 +563,9 @@ export function InfoTab(p: {
           ))}
           {w.created ? <Row k="created" tip={new Date(w.created).toLocaleString()}>{ago(w.created)}</Row> : null}
           {w.from && (
-            <Row k="from" tip={`Its agent started this one: ${w.from.name}`}>
-              <a href="#" onClick={e => (e.preventDefault(), p.onWs?.(w.from!.id))}>
-                {w.from.name}
+            <Row k="created by" tip={`Its agent started this one: ${w.from.tab ? `${w.from.tab.label} in ` : ''}${w.from.name}`}>
+              <a href="#" onClick={e => (e.preventDefault(), w.from!.tab && p.onTab ? p.onTab(w.from!.id, w.from!.tab.id) : p.onWs?.(w.from!.id))}>
+                {w.from.tab ? `${w.from.tab.label} · ${w.from.name}` : w.from.name}
               </a>
             </Row>
           )}

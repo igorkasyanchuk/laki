@@ -54,7 +54,7 @@ export function SideChat({ tab, onSent }: { tab: TabView; onSent: (text: string)
             </div>
           ) : (
             <div key={i} className="sc-agent">
-              <Markdown src={m.text} />
+              <Markdown src={m.text} chat />
               <button type="button" className="ghost small" onClick={() => toMain(i)}>
                 Send to main chat
               </button>

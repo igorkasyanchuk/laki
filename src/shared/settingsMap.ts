@@ -53,6 +53,7 @@ export const FIND: [string, string, string?][] = [
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Design', 'layout frame window cards sections tiles inset soft rounded corners padding gaps style variation'],
+  ['appearance', 'Empty projects', 'hide projects without workspaces empty archived pinned sidebar short list'],
   ['appearance', 'Sidebar rows', 'marks row sidebar show hide next step chip merge archive pr github icon author avatar approved approval check double eyes commented review conflicts failing checks ci overlaps radar plan diff size lines'],
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
   ['appearance', 'Project names', 'sidebar project heads font case spacing size weight color accent easier to see'],
