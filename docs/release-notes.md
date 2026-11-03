@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.43.0 · Nov 3, 2026
 
 - *Usage* (the plan ring's popup › *By day and model*, ⌘K): tokens and ≈ cost a day for the last 7, 30 or 90 days,
   by agent and model, from Laki's Claude Code and Codex tabs.
