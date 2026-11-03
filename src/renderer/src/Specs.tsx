@@ -589,7 +589,7 @@ function OutFileNow({ at, dir, f, api, pageKey }: { at: Ref; dir: string; f: Pla
   return (
     <div className="out-file">
       {head}
-      {page && src && <iframe className="out-page" title={f.path} src={src} sandbox="allow-scripts" />}
+      {page && src && <iframe className="out-page" title={f.path} src={src} sandbox="allow-scripts" loading="lazy" /* a prototype runs once scrolled to */ />}
       {page && big && src && <BigPage title={f.path} src={src} onClose={() => setBig(false)} />}
       {ext === '.md' && body?.text !== undefined && (
         <div className="out-md">

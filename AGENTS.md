@@ -2479,7 +2479,10 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   Raw, `laki.csv`); editing a cell rewrites the file through `toCsv` (`parseCsv`'s `quoted`, cell by cell: a quoted cell stays quoted, a
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
   text edit. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
-  (`securityLevel: strict`).
+  (`securityLevel: strict`), each chart an `<img>` of its SVG (inline, a brainstorm's 50 were 18k nodes that every
+  next chart laid out again), in `FONT` (an image has no web fonts), drawn once ui.tsx' `useNear` says it nears the
+  screen, one at a time with a yield between (`turn`), kept by theme and text (`pics`, 200). `useNear` also holds back
+  diagram.tsx' `DiagramView` (a React Flow each) until scrolled to; a prototype's frame is `loading="lazy"`.
 - **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset; `html`: GitHub's text and a repo's files, `fromHtml` reads its tags into the same tree, `<details>` a `details` block, unknown tags and code left as text; never for what people and agents say), which
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a

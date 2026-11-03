@@ -7,7 +7,7 @@ import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/mantine/style.css'
 import { en } from '@blocknote/core/locales'
 import { createReactBlockSpec, getDefaultReactSlashMenuItems, SuggestionMenuController, useCreateBlockNote } from '@blocknote/react'
-import { type DragEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type DragEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { type Diagram, DiagramEditor, DiagramView, DiagramViewer, KINDS } from './diagram'
 import './plans.css'
@@ -34,13 +34,14 @@ const DiagramBlock = createReactBlockSpec(
   { type: 'diagram', propSchema: { kind: { default: 'flowchart' }, data: { default: '' }, png: { default: '' } }, content: 'none' },
   {
     render: ({ block, editor }) => {
-      const value = ((): Diagram => {
+      // parsed again only as it changes: a new value each time would lay its diagram out and redraw it again
+      const value = useMemo((): Diagram => {
         try {
           return JSON.parse(block.props.data) as Diagram
         } catch {
           return { kind: block.props.kind, nodes: [], edges: [] }
         }
-      })()
+      }, [block.props.data, block.props.kind])
       const [open, setOpen] = useState(() => openOnMount.has(block.id))
       const [reading, setReading] = useState(false)
       const close = () => (openOnMount.delete(block.id), setOpen(false))

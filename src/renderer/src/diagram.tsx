@@ -11,7 +11,7 @@ import type { Node, Edge, NodeProps, EdgeProps, Connection, XYPosition, NodeChan
 import '@xyflow/react/dist/style.css'
 import { toBlob } from 'html-to-image'
 import type { Diagram, DiagramEdge } from './specmd'
-import { ask } from './ui'
+import { ask, useNear } from './ui'
 
 export type { Diagram }
 
@@ -976,14 +976,17 @@ export function DiagramViewer({ value, onClose, onNodeClick, title }: ViewProps 
   )
 }
 
+// a React Flow of its own only once it nears the screen (a spec's 15 diagrams: 3.5 s to open with all of them), its
+// height kept meanwhile
 export function DiagramView({ value, onNodeClick }: ViewProps) {
   const { nodes, edges } = useMemo(() => toFlow(layout(value)), [value])
   const b = getNodesBounds(nodes)
   const height = Math.max(160, Math.min(520, b.height + 80))
+  const [at, near] = useNear()
   return (
     <ReadOnly.Provider value={true}>
-      <div className="sd-view" style={{ height }}>
-        <ReactFlowProvider>
+      <div ref={at} className="sd-view" style={{ height }}>
+        {near && <ReactFlowProvider>
           <ReactFlow
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} connectionMode={ConnectionMode.Loose}
             fitView fitViewOptions={{ maxZoom: 1 }} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
@@ -992,7 +995,7 @@ export function DiagramView({ value, onNodeClick }: ViewProps) {
           >
             <Background variant={BackgroundVariant.Dots} gap={22} size={1} />
           </ReactFlow>
-        </ReactFlowProvider>
+        </ReactFlowProvider>}
       </div>
     </ReadOnly.Provider>
   )

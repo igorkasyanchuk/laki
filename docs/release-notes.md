@@ -2,6 +2,12 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Big specs and brainstorms open at once: charts, mind maps, diagrams and prototypes are drawn as you scroll to them,
+  and the app stays responsive meanwhile (a brainstorm of 56 charts froze it for about 40 seconds). Laki AI's chat and
+  the Reader no longer draw every message again as you type or as an agent writes.
+
 ## 0.43.0 · Nov 3, 2026
 
 - *Usage* (the plan ring's popup › *By day and model*, ⌘K): tokens and ≈ cost a day for the last 7, 30 or 90 days,

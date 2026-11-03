@@ -2450,7 +2450,7 @@ button.board-name:hover { background: none; }
 .csv-del:hover { color: var(--error); }
 /* a Markdown file's ```mermaid diagram (MarkdownView.tsx) */
 .md .mermaid { margin: 0 0 12px; overflow-x: auto; text-align: center; }
-.md .mermaid svg { max-width: 100%; height: auto; }
+.md .mermaid img { max-width: 100%; height: auto; }
 /* an agent's estimate of its task (laki progress) on its tab: the number over a bar that fills */
 .tab:has(> .tab-ctx) { position: relative; }
 .tab > .usage-ring { flex: none; } /* contextMeter 'ring': the status bar's ring on its tab */

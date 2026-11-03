@@ -310,6 +310,20 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
     </div>
   )
 }
+// true once the element comes within a screen or so of sight, and then for good: what's costly to draw (a mermaid
+// chart, a diagram) waits until it's scrolled to. Hidden (display: none, a closed <details>): never, until shown.
+// scrollMargin: the page's own scroller would clip the margin away otherwise
+export function useNear(): [(el: Element | null) => void, boolean] {
+  const [el, setEl] = useState<Element | null>(null)
+  const [near, setNear] = useState(false)
+  useEffect(() => {
+    if (!el || near) return
+    const o = new IntersectionObserver(es => es.some(e => e.isIntersecting) && setNear(true), { rootMargin: '800px', scrollMargin: '800px' } as IntersectionObserverInit)
+    o.observe(el)
+    return () => o.disconnect()
+  }, [el, near])
+  return [setEl, near]
+}
 // a page scrolled well down (its body, or a list of its own): ↑ back to the top. Its frame takes onScroll (capture: a
 // scroll doesn't bubble) and draws the button (Page, Settings, Help)
 export function useToTop(): [(e: { target: EventTarget }) => void, ReactNode] {

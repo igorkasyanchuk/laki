@@ -1,10 +1,11 @@
 // Markdown as React nodes (markdown.ts' tree: nothing in it is HTML), for a file's preview, a PR's description and
 // review comments; links open in the browser. A ```mermaid block is a diagram: mermaid's SVG (securityLevel strict:
 // its labels are text, no scripts or links), the library loaded the first time one shows
-import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
 import { proposalOf } from './text'
+import { useNear } from './ui'
 import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
@@ -12,11 +13,13 @@ import { type Block, type Inline, markdown } from '../../shared/markdown'
 // html: GitHub's text or a repo's file, its HTML (<details>, <a>, <ul>…) read as GitHub shows it (markdown.ts)
 // chat: an agent's or Laki AI's answer (Reader, the AI page, Side chat): a ```diff block there is a change it proposes,
 // drawn as a diff (Proposal); in a file or a PR's text it stays code
-export function Markdown({ src, html, chat }: { src: string; html?: boolean; chat?: boolean }) {
+// memo: drawn again only as its text changes, not with the page around it (Laki AI's thread at each key typed in its
+// box, the Reader's 400 messages at each read: every code block highlighted again)
+export const Markdown = memo(function Markdown({ src, html, chat }: { src: string; html?: boolean; chat?: boolean }) {
   const tree = useMemo(() => markdown(src, html), [src, html])
   const md = <div className="md">{tree.map(mdBlock)}</div>
   return chat ? <InChat.Provider value>{md}</InChat.Provider> : md
-}
+})
 const InChat = createContext(false)
 
 const Code = ({ text, lang }: { text: string; lang?: string }) => (
@@ -118,30 +121,64 @@ export function Folded({ text, lines, html }: { text: string; lines: number; htm
     </div>
   )
 }
+// A chart is an <img> of mermaid's SVG, not the SVG in the page: a brainstorm's 50 charts inline were 18,000 elements,
+// laid out again as each next chart measured its text (a mind map: 0.45 s on an empty page, 1.6 s with them; the app
+// stuck for a minute). Drawn as it nears the screen, one at a time with the app's keys and clicks between (a page left
+// meanwhile: its turn skipped), kept by its text and theme (the files' poll, the page opened again: no drawing)
 let mermaid: Promise<typeof import('mermaid').default> | undefined
 let drawn = 0
+let theme = ''
+let turn: Promise<unknown> = Promise.resolve()
+type Pic = { k: string; src: string; w?: number }
+const pics = new Map<string, Pic>() // ponytail: the newest 200, a few MB at most
+const GONE = new Error('gone')
+// an <img> has no web fonts or CSS variables: mermaid measures its labels in the font the picture then draws them in
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+function draw(k: string, text: string, dark: boolean, live: () => boolean): Promise<Pic> {
+  const next = turn
+    .then(() => new Promise(r => setTimeout(r)))
+    .then(async () => {
+      const had = pics.get(k)
+      if (had) return had
+      if (!live()) throw GONE
+      const m = await (mermaid ??= import('mermaid').then(m => m.default))
+      if (theme !== k[0]) m.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true /* else its error drawing stays in <body> */, theme: dark ? 'dark' : 'default', fontFamily: FONT }), (theme = k[0])
+      const { svg } = await m.render(`mermaid-${++drawn}`, text)
+      // its width: max-width (it scales down to fit, never up), else its viewBox's
+      const w = Number(svg.match(/max-width:\s*([\d.]+)px/)?.[1] ?? svg.match(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+)/)?.[1]) || undefined
+      const pic = { k, src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, w }
+      pics.set(k, pic)
+      if (pics.size > 200) pics.delete(pics.keys().next().value!)
+      return pic
+    })
+  turn = next.catch(() => {})
+  return next
+}
 function Mermaid({ text }: { text: string }) {
-  const [svg, setSvg] = useState('')
-  const [err, setErr] = useState('')
   const dark = getComputedStyle(document.documentElement).colorScheme !== 'light' // the theme's, as it is now
+  const k = `${dark ? 'd' : 'l'}${text}`
+  const [pic, setPic] = useState<Pic>()
+  const [err, setErr] = useState('')
+  const [at, near] = useNear()
+  const shown = pics.get(k) ?? (pic?.k === k ? pic : undefined)
   useEffect(() => {
+    if (shown || !near) return
     let live = true
-    ;(mermaid ??= import('mermaid').then(m => m.default))
-      .then(m => {
-        m.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true /* else its error drawing stays in <body> */, theme: dark ? 'dark' : 'default', fontFamily: 'var(--ui-font)' })
-        return m.render(`mermaid-${++drawn}`, text)
-      })
-      .then(r => live && (setSvg(r.svg), setErr('')), e => live && (setSvg(''), setErr(String(e?.message ?? e).split('\n')[0])))
+    draw(k, text, dark, () => live).then(p => live && (setPic(p), setErr('')), e => live && e !== GONE && setErr(String(e?.message ?? e).split('\n')[0]))
     return () => void (live = false)
-  }, [text, dark])
-  if (svg) return <div className="mermaid" dangerouslySetInnerHTML={{ __html: svg }} />
+  }, [k, near])
+  if (shown) return (
+    <div className="mermaid">
+      <img src={shown.src} width={shown.w} alt={`A ${text.trim().split(/\s/)[0]} diagram`} />
+    </div>
+  )
   return (
-    <>
+    <div ref={at}>
       <pre>
         <code>{text}</code>
       </pre>
       {err && <div className="warn small">Mermaid can't draw it: {err}</div>}
-    </>
+    </div>
   )
 }
 
