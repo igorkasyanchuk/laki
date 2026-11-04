@@ -421,7 +421,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_plan_write',
-    description: `Write a file into a spec's or brainstorm's folder: a brainstorm's output (ideas.md, prototype-<option>.html, <name>.diagram.json) or notes beside a spec. Text files only (.md .html .txt .json .csv .svg .mmd), never README.md or spec.json (the user's). ${BRAINSTORM_OUTPUT}`,
+    description: `Write a file into a spec's or brainstorm's folder: a brainstorm's output (ideas.md, prototype-<option>.html, <name>.diagram.json) or notes beside a spec. Text files only (.md .html .txt .json .csv .svg), never README.md or spec.json (the user's). ${BRAINSTORM_OUTPUT}`,
     inputSchema: obj({ project: str('its project id'), kind: { type: 'string', enum: ['spec', 'brainstorm'] }, slug: str('its slug'), path: str('the file, relative to its folder: ideas.md, prototype-cards.html…'), text: str('the whole file') }, ['project', 'kind', 'slug', 'path', 'text']),
     run: a => rpc('planWrite', { project: a.project, kind: a.kind, slug: a.slug, path: a.path, text: a.text }),
   },

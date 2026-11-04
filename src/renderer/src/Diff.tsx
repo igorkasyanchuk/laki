@@ -31,14 +31,17 @@ export function useLoad<T>(load: () => Promise<T>, key: string, every: number) {
 
 // which changes a diff shows (Changes', the full review's): the branch's (against its base, with what isn't committed
 // yet), only what isn't committed (against HEAD: a worktree's; a folder's own Branch is that already), or the PR's
-// (gh pr diff; a linked PR's first). Branch or Uncommitted is kept per view (store), the PR's for this look only
+// (gh pr diff; a linked PR's first, or one that came to a workspace changing nothing of its own: `empty` as it was when
+// the PR first showed, so a file saved meanwhile doesn't flip it, nor does its own PR, opened after its commits). Branch or Uncommitted is kept per view (store), the PR's for this look only
 export type Scope = 'branch' | 'uncommitted' | 'pr' | 'turn' // turn: an agent's last turn's changes (turns.ts turnDiff)
 export const turnNext = { on: false } // the Reader's card's Review: Changes opens on This turn
-export function useScope(store: string, pr: boolean, linked: boolean, worktree: boolean, turn = false) {
+export function useScope(store: string, pr: boolean, linked: boolean, worktree: boolean, turn = false, empty?: boolean) {
+  const was = useRef<boolean | undefined>(undefined)
+  if (was.current === undefined && pr && empty !== undefined) was.current = empty // its stat and its PR may come after the view opens
   const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the view opens)
   const [head, setHead] = useState(() => localStore(store) === 'uncommitted')
   const [inTurn, setInTurn] = useState(() => turn && ((t => ((turnNext.on = false), t))(turnNext.on))) // never kept: the Reader's card's Review picks it (turnNext as it opens, else the laki-scope event)
-  const scope: Scope = turn && inTurn ? 'turn' : pr && (whole ?? linked) ? 'pr' : worktree && head ? 'uncommitted' : 'branch'
+  const scope: Scope = turn && inTurn ? 'turn' : pr && (whole ?? (linked || !!was.current)) ? 'pr' : worktree && head ? 'uncommitted' : 'branch'
   const set = (s: Scope) => (setInTurn(s === 'turn'), s !== 'turn' && (setWhole(s === 'pr'), s !== 'pr' && (setHead(s === 'uncommitted'), localStore(store, s))))
   return [scope, set] as const
 }

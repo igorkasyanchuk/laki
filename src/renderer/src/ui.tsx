@@ -743,8 +743,18 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
 // [the open menu (render it somewhere), open(event, items, align)]: under the clicked element, or at the
 // pointer for a right click (contextmenu)
 // a click opens it at its button; a rect: there (a menu whose items came after an await, the click's target gone)
+// The open menu is the slot's state, not the caller's: opening or closing one draws the menu alone, not App (10 ms a
+// time with 40 workspaces). The slot is one element for good, so the caller's renders pass it by.
+type Opened = { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean }
+function MenuSlot({ to }: { to: { current: (m: Opened | null) => void } }) {
+  const [m, setM] = useState<Opened | null>(null)
+  to.current = setM
+  return m && <Menu {...m} onClose={() => setM(null)} />
+}
 export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem[], align?: 'left' | 'right') => void] {
-  const [m, setM] = useState<{ anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean } | null>(null)
+  const to = useRef<(m: Opened | null) => void>(() => {})
+  const [slot] = useState(() => <MenuSlot to={to} />)
+  const setM = (m: Opened) => to.current(m)
   const open = (e: MouseEvent | DOMRect, items: MenuItem[], align: 'left' | 'right' = 'left') => {
     if (e instanceof DOMRect) return setM({ anchor: e, items, align })
     e.stopPropagation()
@@ -752,7 +762,7 @@ export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem
     const anchor = e.type === 'contextmenu' ? new DOMRect(e.clientX, e.clientY - 4, 0, 0) : (e.currentTarget as HTMLElement).getBoundingClientRect()
     setM({ anchor, items, align: e.type === 'contextmenu' ? 'left' : align, first: e.detail === 0 && e.type === 'click' }) // a key's click (⌘⇧N, Space): the first is picked
   }
-  return [m && <Menu {...m} onClose={() => setM(null)} />, open]
+  return [slot, open]
 }
 
 // tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably)

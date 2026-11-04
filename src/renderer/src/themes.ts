@@ -1141,6 +1141,49 @@ export function userCss(css?: unknown) {
   if (el.textContent !== css) el.textContent = css
 }
 
+// A rule for another look or motion than <html>'s gets a selector nothing has (OFF), and its own back as that one's
+// picked: Chrome can't file `[data-look="x"] :is(.a, .b)` under a class, so it tried every look's on every element (84%
+// of all style work: a menu's 150 new elements took 4 ms). The rule stays where it was, its declarations untouched
+// (cssText can't be put back: Chrome writes `background: var(--x)` as empty longhands). Only <html> has data-look and
+// data-motion (applyTheme).
+const GATE = /^(?:html)?\[data-(look|motion)="([\w-]+)"\]/
+const OFF = '#laki-off'
+const seen = new WeakSet<CSSStyleSheet>() // sheets looked at
+const gates: { rule: CSSStyleRule; text: string; attr: string; values: string[] }[] = []
+// a selector list's top-level parts (commas inside :is(), [] or quotes aren't)
+export function selectorsOf(list: string) {
+  const out: string[] = []
+  let depth = 0, from = 0, q = ''
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i]
+    if (q) { if (c === '\\') i++; else if (c === q) q = ''; continue }
+    if (c === '"' || c === "'") q = c
+    else if (c === '(' || c === '[') depth++
+    else if (c === ')' || c === ']') depth--
+    else if (c === ',' && !depth) (out.push(list.slice(from, i).trim()), (from = i + 1))
+  }
+  return [...out, list.slice(from).trim()]
+}
+// the look or motion a selector list is only for: every selector starts with it
+export function gateOf(selector: string) {
+  const ms = selectorsOf(selector).map(x => x.match(GATE))
+  return ms.every(m => m && m[1] === ms[0]![1]) ? { attr: ms[0]![1], values: [...new Set(ms.map(m => m![2]))] } : undefined
+}
+const styleRules = (rules: CSSRuleList): CSSStyleRule[] => Array.from(rules).flatMap(r => (r instanceof CSSStyleRule ? [r] : 'cssRules' in r && !(r instanceof CSSKeyframesRule) ? styleRules((r as CSSGroupingRule).cssRules) : []))
+export function gateRules(now: Record<string, string | undefined>) {
+  for (const sheet of Array.from(document.styleSheets)) {
+    if (seen.has(sheet)) continue
+    seen.add(sheet)
+    let rules: CSSStyleRule[]
+    try { rules = styleRules(sheet.cssRules) } catch { continue } // another origin's
+    for (const rule of rules) (g => g && gates.push({ rule, text: rule.selectorText, ...g }))(gateOf(rule.selectorText))
+  }
+  for (const g of gates) {
+    const want = g.values.includes(now[g.attr] ?? '') ? g.text : OFF
+    if (g.rule.selectorText !== want) g.rule.selectorText = want
+  }
+}
+
 // paints <html> with a theme (an unknown id is the default), or a whole Paint
 export function applyTheme(p: string | Paint = '') {
   const o: Paint = { ...(typeof p === 'string' ? { theme: p } : p), ...(asked(LESS_CLEAR) && { glass: false, sideClear: 0 }) }
@@ -1151,6 +1194,7 @@ export function applyTheme(p: string | Paint = '') {
   st.colorScheme = ''
   root.dataset.look = t.look ?? ''
   root.dataset.motion = o.motion ?? 'low'
+  gateRules({ look: root.dataset.look, motion: root.dataset.motion })
   const icons = lookOf(o)
   setIconLook(icons)
   if (icons.size !== 14) st.setProperty('--icon-k', String(icons.size / 14)) // the icons CSS sizes (a row's marks): as Icon's size scales (unset: 1)

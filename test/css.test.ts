@@ -25,3 +25,15 @@ test('no * or :not() under a :has() in our stylesheets', () => {
   assert.ok(under.test(".app[data-dz~='chrome'] .main:has(> .settings-page) > :not(.settings-page"))
   assert.ok(under.test('.page-body:has(.bn-container) :is(.notes-side > *'))
 })
+
+// themes.ts gateRules: a rule only for another look or motion than <html>'s gets a selector nothing has
+test("a look's or motion's rules are told apart by their selectors", async () => {
+  const { selectorsOf, gateOf } = await import('../src/renderer/src/themes.ts')
+  assert.deepEqual(selectorsOf('a, :is(.b, .c) d, [x="1,2"] e'), ['a', ':is(.b, .c) d', '[x="1,2"] e'])
+  assert.deepEqual(gateOf('[data-look="aqua"] :is(.menu, .modal)'), { attr: 'look', values: ['aqua'] })
+  assert.deepEqual(gateOf('html[data-look="aqua"] .tab, [data-look="neon"] .tab'), { attr: 'look', values: ['aqua', 'neon'] })
+  assert.deepEqual(gateOf('html[data-motion="high"] .menu'), { attr: 'motion', values: ['high'] })
+  assert.equal(gateOf('[data-look="aqua"] .tab, .tab'), undefined) // one of them for every look
+  assert.equal(gateOf('html:not(.theme-font)[data-look] .tab'), undefined)
+  assert.equal(gateOf('[data-look="aqua"] .tab, html[data-motion="high"] .tab'), undefined)
+})

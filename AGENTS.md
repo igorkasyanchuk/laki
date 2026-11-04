@@ -72,6 +72,9 @@ npm run dev                       # Electron + renderer dev server on :5199
   stays off: Chromium's cookie store then waits on the Keychain's *Laki Safe Storage*, the window never reaches the daemon
   until it's answered (pack-smoke's temp home: never), and an ad-hoc signature asks again after each update.
   `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
+- package.json's `overrides`: minimatch 7–11.0.0 (electron-builder's own and `@electron/universal`'s, build tools only)
+  to 11 (GHSA-g3hv-75wg-m249); the older 3.x and 5.x copies stay (their API went in 11). Drop it once electron-builder
+  takes minimatch 11 itself; a pack's file list was the same with it.
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
   browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
 - Licenses: each build writes `out/renderer/THIRD_PARTY_NOTICES.txt` (electron.vite.config.ts' `notices`: every npm
@@ -166,7 +169,7 @@ the worktree's, `git blame --incremental`; shared/types.ts `Blame`), `fileWeb` (
 `line`: the file's page on origin's site, files.ts `webOf`: GitHub's, GitLab's `-/blob`, Bitbucket's `src`; a branch
 not on origin refused), `prThreads` `all` (everyone's comments, not only `trusted`'s: for you to read, never sent to an
 agent; an agent's call refused, main.ts' `agentNo`), `prTalk` (the PR's conversation comments and each sent review's summary, oldest first). 116: the Review tab on unless
-`settings.fullReview` is false, its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). 117:
+`settings.fullReview` is false (shown once a workspace has a `stat`, with files or an open PR; useScope's `empty`, its first known: no changes of its own, it and Changes open on *PR #n*; its key the stat and the PR's head), its `stat` scanned for the workspaces a shown window has (files.ts `viewWs`, core's `setView` scans again). 117:
 workspace facts (widget.json's `facts`, widgetSchema.ts `FACTS`: a per-workspace one's `{{facts.…}}`, `$LAKI_FACTS`, a script's
 `facts`; `factsTick`, an instance's `fx`), `widgetSet` `hours` (an extension's own working hours, `always`; the view's `hours`) and
 `hide.tip` (widget.json's `tip: false` too: the view's `tipOff`), an action's JSON `send` (App's `widgetDo` send), `aiQuestion`
@@ -203,7 +206,7 @@ base chip, `SchedulesApi.branches`, a new task's the repo's `main`). 131: `proje
 hover card; none off git, archived, a codespace away), a `Stat`'s `made` and `gone` (`--summary`'s create and delete
 lines, untracked files made too), a reminder's `every` (`reminderAdd`/`reminderSet` `every`, or `at` in words that
 repeat: when.ts `REPEATS`, `whenOf`; `reminderTick` moves it to `nextRun` instead of `fired`; `every: null` once). 133: `fileRead` `media` (audio or video: its kind, `src` its data URL only with `media: true`, files.ts `MEDIA`, `MEDIA_MAX` 25 MB; ui.tsx `FileCard`: the file preview's and the Artifacts big view's player, else Open, Open in editor, Show in Finder), `openIn` `storage` (a storage folder's file), `agentCommands` (`agent`, `project`: skill.ts, the prompt boxes' / menu after the templates: claude's commands and skills (yours, the project's `.claude`, Laki's plugin's `/laki:…`), codex's prompts as `/prompts:<name>` and skills as `$<name>`; PromptInput's `Complete.commands`, `completeOf` `agent`), `send` `steer` (the app's own follow-ups: Send later, the Reader's box, a reply, a review comment; with the profile's `steer`, claude's and codex's, on unless false: typed into a running turn instead of queued, not while it asks, at a limit, waking or behind a queue; Laki's own sends never), a project's `config.workflows` (*Applicable for Workflows*, off unless true: App's `flowMenu`), kept by `projectSet`. 134: `overlapCheck` (`ws`: files.ts' one worktree against the project's others and its base now, the radar on or off: Workspace › *Check overlaps…*, App's `overlapsAt` dialog), settings' `radar` off unless true, an agent's `tabNew` `cmd` asked in the app (main.ts `cmdAsk`, `toolAsk` `cross: 'cmd'`, once only; `laki new --tab`; refused with a
-character you wouldn't see, `HIDDEN`; the notification's *Run it* only for one line of App's `CMD_NOTIFY`, no run of spaces), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
+character you wouldn't see, `HIDDEN` (other spaces than the plain one, Hangul fillers, the braille blank too), or padded past what the ask shows (`BLANK` lines, `rowsOf` over `CMD_ROWS`); the notification's *Run it* only for one line of App's `CMD_NOTIFY`, no run of spaces), opencode's model checked against `opencode models` (core's `modelKnown`). 135: a schedule's `noSetup` (`scheduleSet` keeps it
 for `ws` new only, refused for another, false or null clears it; `runSchedule`: `wsNew` `noSetup`; the CLI's `laki schedule add
 --no-setup`, MCP's `no_setup`; Schedules.tsx' where menu's *A new workspace each run, no setup*, shown for the project's
 `hasSetup`, a row's *no setup* tag). 136: `worktreeList`/`worktreeImport` (a project's ⋯ › *Import worktrees…*), the view's
@@ -2289,6 +2292,9 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     ahead dropped (Workflows' index, a workflow and a run are places too: its dialog's `nav`, `WorkflowsPage` `onNav`); `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
+    A page's own levels: Workflows' and Specs' (`onNav`: the list, each spec or brainstorm open, its templates; the
+    dialog's `of`, `kind`, `slug`, `templates`) are places; Settings' section and an extension page's tab only rewrite
+    the place they're at (App's `keepHere`, a microtask after the effects), so Back comes to where you left it.
   - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
     menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab
     (after `<emoji> <project>` when its project's icon is an emoji),
@@ -2464,8 +2470,9 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   *Reload* (and *Close* for a page) instead of a blank window. Main's `render-process-gone` reloads the window, at most
   once a minute.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
-  Go used; `default` leaves the
-  stylesheet's), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
+  Go used; `default` leaves the stylesheet's; then `gateRules`: a rule whose every selector starts with another look's
+  or motion's `[data-look="x"]` gets the selector `#laki-off` until that one's picked, its own text kept: Chrome tried
+  all 500 on every element, `[data-look] :is(…)` can't be filed under a class), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
   transparent `--term-bg` (xterm runs with `allowTransparency`). A theme after a game or film has an evocative name
   and its `aka` (the game's or film's words), which Settings' theme finder also matches. `--accent-ink` is the accent as text (every `color:`
   of it; fills and borders keep `--accent`): `readable` darkens it (lightens, on a dark theme) to 4.5:1 on the theme's
@@ -2558,7 +2565,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   switch per row and *Send now* (`send`) only when there's something to send (failing checks, `threads` open, an
   older daemon's or Info's unknown, or conflicts).
 - **`ui.tsx`**: line icons (`Icon`, `IconButton`), `Switch` (every on/off: the auto toggles, Settings' rows as
-  `switch-row`), popup and right-click menus (`useMenu`, color swatches;
+  `switch-row`), popup and right-click menus (`useMenu`: the open one is `MenuSlot`'s state, one element for good, so opening or closing
+  draws the menu alone, never its caller (App); color swatches;
   each item has a key: its own `key` or a free initial, `menuKeys`; `sub`: a line under the label, `pill`/`tone`: a tag at
   its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `tip`: its tooltip (Run ▾'s actions: their text); `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc

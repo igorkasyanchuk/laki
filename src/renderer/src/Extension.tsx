@@ -41,9 +41,10 @@ type Pick = 'live' | 'sample' | undefined // the preview's data: unset, made-up 
 
 // spots, here: the workspaces a per-workspace one has an instance in (live, no terminal, browser or SSH host), the one on
 // screen (the picker's first); onNamed: a new one's first ask named it, so Back and a reopen come back to it
-export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, ai, spots, here, back, onNamed, onAiSettings, onClose }: { id: string; tab?: ExtTab; edit?: string; start?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; spots: { id: string; name: string }[]; here: string | null; back: string; onNamed?: (id: string) => void; onAiSettings: () => void; onClose: () => void }) {
+export function ExtensionPage({ id, tab: first, edit, start, widgets, cfg, api, ai, spots, here, back, onNamed, onAiSettings, onTab, onClose }: { id: string; tab?: ExtTab; onTab?: (t: ExtTab) => void; edit?: string; start?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; spots: { id: string; name: string }[]; here: string | null; back: string; onNamed?: (id: string) => void; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
+  useEffect(() => onTab?.(tab), [tab]) // App's history: Back to this page opens this tab
   const [draft, setDraft] = useState<Draft | null>(null) // a file being edited in Files: kept across its tabs
   const [spot, setSpot] = useState(0) // Edit: the settings' card scrolled to and lit, once per click
   // edit: a setting it needs (turned on with it empty, its cell's Set …): Overview, that field

@@ -219,7 +219,7 @@ function toolShow() {
 }
 // the events that notify or toast about a workspace: none for one Recording mode hides
 const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
-type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
+type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -558,7 +558,11 @@ export function App() {
   const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
   // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
   // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
-  const [peek, setPeek] = useState<{ id: string; top: number; left: number } | null>(null)
+  const [peek, setPeekNow] = useState<{ id: string; top: number; left: number } | null>(null)
+  // none to hide: no update at all. setPeekNow(null) on none still runs App (React bails out after the render), and a
+  // menu's open, a row's press and leaving a row ask for it: 10 ms each with 40 workspaces
+  const peekOn = useRef(false)
+  const setPeek = (p: typeof peek) => void ((p || peekOn.current) && ((peekOn.current = !!p), setPeekNow(p)))
   // its diff's size, asked for as the card opens (the scan keeps only the shown workspaces')
   const [peekStat, setPeekStat] = useState<{ id: string; stat: Stat } | null>(null)
   useEffect(() => {
@@ -710,6 +714,14 @@ export function App() {
     setDialog(to.d)
     histDrawn(n => n + 1)
   }
+  // a page's own move that isn't a place of its own (a Settings section, an extension page's tab): the place it's at
+  // says it, so Back or Forward to it opens there, not where it was opened
+  // (after App's own effect: a page's first report comes from its effects, which run before App's records its place)
+  const keepHere = (mine: (d: Dialog) => boolean, d: Dialog) =>
+    queueMicrotask(() => {
+      const h = hist.current
+      if (h.at[h.i] && mine(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
+    })
   const projOf = (w?: { project: string } | null) => (w ? view?.projects.find(p => p.id === w.project) : undefined)
   const tint = (w: WorkspaceView) => (w.color && w.color !== 'none' ? w.color : projOf(w)?.color) // its own color, else its project's
   const placeName = (p: Place) => {
@@ -723,7 +735,7 @@ export function App() {
     if ('project' in d) return view?.projects.find(x => x.id === d.project)?.name ?? 'a project'
     if ('schedules' in d) return 'Schedule'
     if ('compare' in d) return 'Compare'
-    if ('specs' in d) return 'Specs'
+    if ('specs' in d) return d.slug ? (d.kind === 'brainstorm' ? 'A brainstorm' : 'A spec') : d.templates ? 'Spec templates' : 'Specs'
     if ('workflows' in d) return (n => (n.startsWith('run:') ? 'A workflow run' : n ? 'A workflow' : 'Workflows'))(d.nav ?? (d.run ? 'run:' : d.wf ? 'wf:' : ''))
     if ('note' in d) return 'Notes'
     return 'a page'
@@ -2152,12 +2164,13 @@ export function App() {
   const isTerm = (w: WorkspaceView) => !!w.term || rawKind(w) === 'shells' // a terminal: closed, not deleted
   useEffect(() => void (railOf(railKind) !== railKind && setRailKind('projects')), [railKind, settings.railShells, settings.railBrowsers])
   // the full review (settings.fullReview, FullReview.tsx): the tab bar's first tab while a git workspace has changes
-  // (its stat); shown or not per workspace (a session's tab picked leaves it), and the stat it last showed: its dot,
-  // files changed since
+  // (its stat) or an open PR (someone else's under review: no changes of its own, it opens on the PR's; only once its
+  // stat is in, so a stopped codespace, never scanned, isn't woken); shown or not per workspace (a session's tab picked
+  // leaves it), and the stat and PR head it last showed: its dot, files changed or the PR pushed since
   const [reviewing, setReviewing] = useState<Record<string, boolean>>({})
   const [reviewSeen, setReviewSeen] = useState<Record<string, string>>({})
-  const statKey = ws?.stat ? JSON.stringify(ws.stat) : ''
-  const reviewTab = !!ws && settings.fullReview !== false && git && !!ws.stat?.files && ws.browser === undefined && !isTerm(ws) && !ws.archived
+  const statKey = ws?.stat ? JSON.stringify([ws.stat, (ws.prLinked || !ws.stat.files) && ws.pr?.head]) : '' // FullReview reads again as it moves; the PR's head only where it opens on the PR's diff
+  const reviewTab = !!ws && settings.fullReview !== false && git && !!ws.stat && (!!ws.stat.files || ws.pr?.state === 'OPEN') && ws.browser === undefined && !isTerm(ws) && !ws.archived
   const reviewOn = reviewTab && !!reviewing[ws!.id]
   const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
@@ -3773,7 +3786,7 @@ export function App() {
   const tabList = (
     <>
       {reviewTab && (
-        <div className={`tab nodrag review-tab ${reviewOn ? 'sel' : ''}`} role="tab" aria-label="Review" onClick={openReview} data-keys="⌘1" data-tip={`Review: ${ws!.stat!.files} file${ws!.stat!.files === 1 ? '' : 's'}, +${ws!.stat!.add} −${ws!.stat!.del}${reviewDot ? ' · changed since you looked' : ''} · ⌘1`}>
+        <div className={`tab nodrag review-tab ${reviewOn ? 'sel' : ''}`} role="tab" aria-label="Review" onClick={openReview} data-keys="⌘1" data-tip={`Review: ${ws!.stat?.files ? `${ws!.stat.files} file${ws!.stat.files === 1 ? '' : 's'}, +${ws!.stat.add} −${ws!.stat.del}` : `PR #${ws!.pr!.number}`}${reviewDot ? ' · changed since you looked' : ''} · ⌘1`}>
           <Icon name="review" size={13} />
           {reviewDot && <i className="review-dot" />}
         </div>
@@ -4586,7 +4599,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
-            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
+            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
           {tabsAt === 'right' && tabStrip}
           {previewed && ws && (
@@ -4709,6 +4722,7 @@ export function App() {
             apps={apps}
             onClose={() => setDialog(null)}
             onSection={id => {
+              keepHere(d => d === 'settings' || (!!d && typeof d === 'object' && ('section' in d || 'settings' in d)), { section: id })
               setSeenSecs(l => (l.includes(id) ? l : [...l, id]))
               if (id === 'resources' || id === 'simulator') earn(id === 'resources' ? 'resources' : 'simTab')
             }}
@@ -4821,6 +4835,7 @@ export function App() {
             back={backWord(e.back)}
             onNamed={id => nameExt(e, id)}
             onAiSettings={() => setDialog({ section: 'ai' })}
+            onTab={tab => keepHere(d => (x => !!x && extKey(x) === extKey(e))(extOf(d)), { ...e, tab })}
             onClose={() => setDialog(e.back ?? null)}
           />
         ))(extOf(dialog))}
@@ -4913,9 +4928,10 @@ export function App() {
           specsOn && (
             <Lazy title="Specs & Brainstorms" onClose={() => setDialog(null)}>
               <SpecsPage
-                key={`${o.specs}/${o.kind}/${o.slug}`}
+                key={o.specs}
                 projects={view.projects.filter(p => !p.kind)}
-                at={{ project: o.specs || undefined, kind: o.kind, slug: o.slug }}
+                at={{ project: o.specs || undefined, of: o.of, kind: o.kind, slug: o.slug, templates: o.templates }}
+                onNav={to => setDialog(d => (specsOf(d) ? { specs: specsOf(d)!.specs, ...to } : d))}
                 onClose={() => setDialog(null)}
                 api={{
                   call,

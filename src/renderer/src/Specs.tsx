@@ -47,15 +47,36 @@ const kindIcon = (k: PlanKind) => (k === 'spec' ? 'spec' : 'bulb')
 // two levels, as breadcrumbs in the page's header: the list (both kinds in one, newest first: a filter, a kind, a
 // project, New ▾) and one spec or brainstorm alone, the page's whole width (and the window's, with the app's full
 // screen); Templates is the New menu's
-export function SpecsPage({ projects, at, api, onClose }: { projects: Project[]; at?: { project?: string; kind?: PlanKind; slug?: string }; api: SpecsApi; onClose: () => void }) {
+// at: where it opens and where Back or Forward goes (project: the list's; of: an open one's, else project's); onNav:
+// each move here, so App's history has the list, each spec or brainstorm opened and the templates as places
+export type SpecsAt = { project?: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean }
+const placeOf = (sel: Ref | null, templates: boolean) => (sel ? JSON.stringify([sel.project, sel.kind, sel.slug]) : templates ? 'templates' : '')
+export function SpecsPage({ projects, at, api, onNav, onClose }: { projects: Project[]; at?: SpecsAt; api: SpecsApi; onNav?: (to: Omit<SpecsAt, 'project'>) => void; onClose: () => void }) {
   const [list, setList] = useState<Plan[] | null>(null)
-  const [level, setLevel] = useState<'templates' | null>(null) // null: the list
+  const [level, setLevel] = useState<'templates' | null>(at?.templates ? 'templates' : null) // null: the list
   const [only, setOnly] = useState<PlanKind | ''>(at?.kind && !at.slug ? at.kind : '') // the list's kind, '' both
   const [menu, openMenu] = useMenu()
   const [project, setProject] = useState(at?.project && projects.some(p => p.id === at.project) ? at.project : '')
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState<Ref | null>(at?.project && at.kind && at.slug ? { project: at.project, kind: at.kind, slug: at.slug } : null)
+  const asked = (a?: SpecsAt): Ref | null => ((of => (of && a?.kind && a.slug ? { project: of, kind: a.kind, slug: a.slug } : null))(a?.of ?? a?.project))
+  const [sel, setSel] = useState<Ref | null>(() => asked(at))
   const [selTitle, setSelTitle] = useState('')
+  const here = placeOf(sel, level === 'templates')
+  const there = placeOf(asked(at), !!at?.templates)
+  const told = useRef(there)
+  useEffect(() => {
+    if (told.current === here) return
+    told.current = here
+    onNav?.(sel ? { of: sel.project, kind: sel.kind, slug: sel.slug } : level === 'templates' ? { templates: true } : {})
+  }, [here])
+  useEffect(() => {
+    if (told.current === there) return // its own move, come back as at
+    told.current = there
+    setSelTitle('')
+    setSel(asked(at))
+    setLevel(at?.templates ? 'templates' : null)
+    if (at?.kind && !at.slug) setOnly(at.kind) // the list as it was opened: its kind
+  }, [there])
   const [width, setWidth] = useState<PlanWidth>(() => (w => (WIDTHS.includes(w) ? w : 'normal'))(stored<PlanWidth>('laki.planWidth', 'normal'))) // an open one's: normal, wide, full
   const refresh = () => api.call<Plan[]>('planList', {}).then(setList, () => setList([]))
   useEffect(() => void (sel && selTitle && api.pinned?.(sel) && api.pin!({ ...sel, title: selTitle }, true)), [selTitle]) // a pin's tip follows a rename

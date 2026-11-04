@@ -71,8 +71,8 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
-export function FullReview({ ws, base, branch, pr, linked, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
-  const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree) // Diff.tsx: Branch, Uncommitted, PR #n
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
+  const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
   const api = atHead(wsApi, unc) // its reads and reverts against HEAD

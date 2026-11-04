@@ -439,7 +439,9 @@ selected workspace's PR is in the status bar.
   agent (the workspace's name says its task); any other agent tab gets its prompt's first words, `claude: fix the cart
   total`, or the first prompt you type in it.
 - *Review* (on unless you turn it off: Settings › Pull requests › *Review tab*): a tab first in the tab bar (⌘1, the sessions' tabs from ⌘2)
-  while a workspace has changes; its tooltip says how many files and lines, a dot that they changed since you looked.
+  while a workspace has changes or an open PR; its tooltip says how many files and lines (or the PR's number), a dot that
+  they changed, or the PR got new commits, since you looked. A workspace with no changes of its own (someone else's PR
+  you review) opens it and Changes on *PR #n*.
   Three columns, each edge dragged wider or narrower (double-click: back to its width): the files, each with a *Viewed*
   box (a PR's file: GitHub's, as in Changes; any other: kept on this Mac until its diff changes) and *n of m viewed*,
   under a filter (words, or a glob: `spec/**`, `*.rb`, `**/*_test.go`) whose *Mark n viewed* ticks every file it shows;
@@ -1260,8 +1262,8 @@ A **spec** is what you want built, written like a Notion page: headings, checkli
 drop them in) and diagrams (type `/` for the menu: flowchart, architecture, state, ER, swimlane, screen flow and
 wireframes, drawn in a full-screen editor). A **brainstorm** is an idea to explore: write the idea, who it's for and
 the constraints, then *Brainstorm with Laki AI* (Laki AI must be on, Settings › AI): it reads the brief and the
-project's code and writes its options beside it (`ideas.md` with a mermaid mind map and diagrams, a clickable
-`prototype-<option>.html` per option, `<name>.diagram.json`), which show under the brief as they come.
+project's code and writes its options beside it (`ideas.md`, a clickable `prototype-<option>.html` per option, and its
+mind map and diagrams as `<name>.diagram.json`: drawn and edited like a spec's), which show under the brief as they come.
 
 Each brainstorm has its own chat with Laki AI, in a panel on its right (the ✦ beside *Brainstorm with Laki AI* hides
 it): ask for another option, a darker prototype, a diagram of the flow; it knows which brainstorm it's in: every ask carries
@@ -1683,7 +1685,8 @@ Appearance › Rail sets the order).
 ‹ › at the rail's top (without the rail: after the sidebar head's
 hide button), or ⌘[ and ⌘], go back and forward through the pages (My Desk, Board, Settings, an extension's page,
 Specs…) and workspaces you were on, the last 25, as in a browser: open an extension's settings from My Desk, and ‹
-brings My Desk back. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
+brings My Desk back. A spec or brainstorm you opened, a workflow or a run is a step of its own; Settings and an
+extension's page come back at the section and tab you left. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
 removed since is skipped. Settings › Appearance › Rail › *Back and forward* turns it off.
 
 The window's title says where you are too: the page (*Settings — Laki*), else the workspace and tab (*fix-login ·

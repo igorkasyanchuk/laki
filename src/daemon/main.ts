@@ -661,13 +661,20 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
 // you allow it in the app each time (no Always); no window, no answer or a no: refused
 const CMD_ASK = 2000
 // what a dialog or a notification wouldn't show you: controls but tab and newline, direction and zero-width characters
-// (Unicode's format ones), line and paragraph separators
-const HIDDEN = /[\p{Cf}\u2028\u2029]|[^\P{Cc}\t\n]/u
+// (Unicode's format ones), line and paragraph separators, spaces but the plain one (no-break, wide, ideographic…) and
+// letters that draw as nothing (Hangul fillers, the braille blank)
+const HIDDEN = /[\p{Cf}\u2028\u2029\u115F\u1160\u3164\uFFA0\u2800]|[^\P{Cc}\t\n]|[^\P{Zs} ]/u
+// and padding that would push its end out of the dialog's sight (macOS hides its scrollbar): a blank line, or more rows
+// than it shows (each line's, wrapped at about 50 characters: spaces between words count)
+const BLANK = /\n[ \t]*\n/
+const CMD_ROWS = 20
+const rowsOf = (cmd: string) => cmd.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 50)), 0)
 async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
   const to = ws
   if (HIDDEN.test(cmd)) throw new Error("the command has characters the user couldn't see (a control, direction or zero-width one): ask them to run it, or put it in a script") // you allow what you read
   if (cmd.length > CMD_ASK) throw new Error(`the command is longer than ${CMD_ASK} characters, too long to show the user whole: ask them to run it, or put it in a script`) // you allow what you read, all of it
+  if (BLANK.test(cmd) || rowsOf(cmd) > CMD_ROWS) throw new Error(`the command has blank lines, or more than the ${CMD_ROWS} rows the ask shows, too much to show the user whole: ask them to run it, or put it in a script`)
   if (!core.clients.size) throw new Error("an agent's command runs once the user allows it in Laki's window, and it isn't open: ask the user to run it")
   const agent = core.state.tabs.find(t => t.id === from?.tab)?.name ?? 'An agent'
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'cmd', agent, from: name(by), to: name(to), target: 'a command', text: cmd, ws: by, tab: from?.tab })

@@ -4,6 +4,14 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's command for a new terminal tab is refused when it hides its end: blank-looking characters (no-break
+  spaces, Hangul fillers, the braille blank), blank lines, or more lines than the approval shows.
+- Menus open and close at once: a right click no longer redraws the whole window, and a theme's look no longer slows
+  every change on screen (only the look you use is matched).
+- Brainstorms draw their mind map and diagrams as Laki's own diagrams (edit them as in a spec) instead of mermaid
+  blocks.
+- The Review tab shows for a workspace with an open PR and no changes of its own (someone else's PR you review); it and
+  Changes open on the PR's diff, and the Review tab reads it again as the PR gets new commits.
 - A brainstorm with long files no longer slows Laki down: once a spec or note had been open, every change on screen
   restyled the whole window (90 ms each, the app nearly stuck); now under a millisecond.
 - Plan limits are checked less often (Claude's every 7.5 minutes), and when a server asks Laki to wait, the popup keeps

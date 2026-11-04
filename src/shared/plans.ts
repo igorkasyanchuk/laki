@@ -3,13 +3,14 @@
 import { type Plan, PLAN_KINDS, type PlanTemplate } from './types.ts'
 
 // a diagram file (<name>.diagram.json) the app draws (specdrop's format, renderer's diagram.tsx)
-export const DIAGRAM_FORMAT = `A diagram file (<name>.diagram.json) is {"kind", "nodes": [{"id", "shape", "label", "sub"?, "tag"?, "accent"?, "x"?, "y"?, "w"?, "h"?}], "edges": [{"from", "to", "label"?, "dashed"?}]}. kind and its shapes: flowchart (terminal, process, decision, io, note), architecture (service, database, queue, external, zone), state (initial, state, final), er (entity, fields in sub one per line), swimlane (lane, process, decision, terminal), screenflow (screen, phone, action, note; what's on a screen in sub, one line each). Leave out x and y for an automatic layout; accent on 1-2 nodes at most.`
+export const DIAGRAM_FORMAT = `A diagram file (<name>.diagram.json) is {"kind", "nodes": [{"id", "shape", "label", "sub"?, "tag"?, "accent"?, "x"?, "y"?, "w"?, "h"?}], "edges": [{"from", "to", "label"?, "dashed"?}]}. kind and its shapes: flowchart (terminal, process, decision, io, note), architecture (service, database, queue, external, zone), state (initial, state, final), er (entity, fields in sub one per line), swimlane (lane, process, decision, terminal), screenflow (screen, phone, action, note; what's on a screen in sub, one line each), wireframe (a UI mockup: every node with x, y, w, h; frames window, mobile, dialog, card, box; navbar, sidebar, tabs, breadcrumbs, footer; button, input, textarea, select, checkbox, radio, toggle, search; heading, text, image, avatar, list, table (sub: its rows, cells split by |, the first row the header), chart; alert, badge, progressbar, tooltip; note; label is its own text, sub its lines, a leading * the current one, accent a primary button or a checked box). Leave out x and y for an automatic layout (not a wireframe); accent on 1-2 nodes at most.`
 
 // what a brainstorm session leaves in its folder (Laki AI's laki_plan_write, or any agent writing files there)
 export const BRAINSTORM_OUTPUT = `Explore the idea, don't build it. Write what you find as files in the brainstorm's folder, never README.md (the brief) or spec.json:
-- ideas.md: the options, each with what changes for the user, pros, cons and what it takes; a mind map of the idea as a \`\`\`mermaid mindmap block, and other diagrams as \`\`\`mermaid blocks (flowchart, sequence, state, er) where they help;
+- ideas.md: the options, each with what changes for the user, pros, cons and what it takes; no diagrams in it (no \`\`\`mermaid blocks): those are files of their own;
+- mind-map.diagram.json: the idea as a flowchart from its own node, a process node for each option and its main points under them;
+- <name>.diagram.json for each diagram that helps (a flow, an architecture, states, a data model, screens, a wireframe): Laki draws and edits them, as in a spec. ${DIAGRAM_FORMAT}
 - prototype-<option>.html: one self-contained page per option (inline <style> and <script>, fonts from Google Fonts at most, no other requests), clickable where the interaction is the idea, with a short note on top: which option, what changes, what it takes; in the product's look (its colors, fonts and real names, not lorem ipsum);
-- <name>.diagram.json for an architecture or a flow worth editing by hand. ${DIAGRAM_FORMAT}
 Ask the user when the direction depends on them.`
 
 // how to brainstorm with the user (the laki-specs skill's, Laki AI's brainstorm chats'): the method of obra/superpowers'

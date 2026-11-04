@@ -51,6 +51,7 @@ export type WsInfo = {
   allow?: Record<PRPerm, boolean> // what its project lets the app do to the PR (prAllows)
   method?: MergeMethod // its project's last merge
   prLinked?: boolean // the PR a prompt named, not checked out: no auto switches
+  stat?: { files: number } // its changes (the view's stat): none, Changes opens on the PR
   fixTries?: number // failing CI sent this many times in a row for the current PR
   mergeTries?: number // and its merge conflicts
   prScan: number // minutes between PR checks (Settings › Pull requests)

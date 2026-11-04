@@ -236,8 +236,8 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
-function ChangesTab({ api: wsApi, ws, pr, linked, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
-  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree, turn)
+function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; empty?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
+  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree, turn, empty)
   useEffect(() => {
     const f = (e: Event) => ((turnNext.on = false), setScope((e as CustomEvent<Scope>).detail)) // the Reader's card's Review: This turn
     window.addEventListener('laki-scope', f)
@@ -555,7 +555,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
-      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} worktree={p.w.kind === 'worktree'} turn={p.turn} onOpen={p.onOpen} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} empty={p.w.stat && !p.w.stat.files} worktree={p.w.kind === 'worktree'} turn={p.turn} onOpen={p.onOpen} />}
       {tab === 'commits' && <CommitsTab key={p.w.id} api={p.api} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
