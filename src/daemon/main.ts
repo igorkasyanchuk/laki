@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as remoteMod from './remote.ts'
 import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
@@ -101,16 +102,16 @@ const token = randomBytes(32).toString('hex')
 // LAKI_DEV_ORIGIN: a dev renderer's, on this Mac only (launchctl setenv reaches a daemon the CLI starts too)
 const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN?.split(',').filter(o => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)) ?? [])])
 // remote access (core.ts) adds its page's origin and its own token while it runs
-const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
-const { same } = core
+const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === remoteMod.remoteOrigin())
+const { same } = remoteMod
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
 // ponytail: any program of the same user can read daemon.json's token: a Keychain item or a peer check if that matters
 // M5: remote access's Origin takes its token only: ours with it would skip the caller check (whoCalls) as a phone's page
-const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (!!o && o === core.remoteOrigin() ? same(t, core.remoteToken()) : same(t, token))
+const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (!!o && o === remoteMod.remoteOrigin() ? same(t, remoteMod.remoteToken()) : same(t, token))
 // the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
 let port = 0
-const hostOk = (h: string | undefined) => h === `127.0.0.1:${port}` || h === `localhost:${port}` || (!!h && h === (o => o && new URL(o).host)(core.remoteOrigin()))
+const hostOk = (h: string | undefined) => h === `127.0.0.1:${port}` || h === `localhost:${port}` || (!!h && h === (o => o && new URL(o).host)(remoteMod.remoteOrigin()))
 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
 // build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the link.
@@ -377,7 +378,7 @@ const api: Record<string, Handler> = {
   run: p => core.runDev(p.ws, p.script, core.callerAgent(p.caller)), // an agent's: its tab.new the agent's
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
-  cloudflared: (o: { ws?: string }) => core.cloudflared(o),
+  cloudflared: (o: { ws?: string }) => remoteMod.cloudflared(o),
   usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, metersMod.statusLimits), // claude's status line's, while fresh
   accounts: () => accountViews(),
   accountAdd: p => accountAdd(p),
@@ -386,27 +387,27 @@ const api: Record<string, Handler> = {
   accountLogin: p => core.accountLogin(p),
   tabAccount: p => core.tabAccount(p),
   resources: () => resourcesMod.resources(),
-  shareStart: p => core.shareStart(p), // a tab's read-only page, for anyone with its link
-  shareStop: p => core.stopShares({ tab: core.resolveTarget(String(p.tab ?? '')).id }),
+  shareStart: p => remoteMod.shareStart(p), // a tab's read-only page, for anyone with its link
+  shareStop: p => remoteMod.stopShares({ tab: core.resolveTarget(String(p.tab ?? '')).id }),
   // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access, an extension's stream or agent
   resourceStop: p => {
     const k = String(p.key ?? '')
     const t = k.match(/^tunnel:(.+):(\d+)$/)
     if (k === 'ai') return aiStop()
-    if (k === 'remote') return core.remoteStop()
-    if (k === 'share') return core.stopShares()
-    if (k === 'tunnel:named') return core.stopTunnels(undefined, true) // the permanent tunnels' one cloudflared: all of them
+    if (k === 'remote') return remoteMod.remoteStop()
+    if (k === 'share') return remoteMod.stopShares()
+    if (k === 'tunnel:named') return remoteMod.stopTunnels(undefined, true) // the permanent tunnels' one cloudflared: all of them
     if (k.startsWith('stream:')) return widgetStreamStop(k.slice(7))
     if (k.startsWith('agent:')) return stopAgents(k.slice(6)) // an extension's agent runs
-    if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
+    if (t) return remoteMod.tunnelStop({ ws: t[1], port: Number(t[2]) })
     throw new Error(`nothing to stop called ${k}`)
   },
   sleepTick: p => resourcesMod.sleepTick(p?.now), // tests move the clock
   tabSleep: p => resourcesMod.sleepNow(p.tab),
   tabWake: p => resourcesMod.wake(p.tab), // a pane already on it: a look doesn't attach again
-  tunnelStart: p => core.tunnelStart(p),
-  tunnelStop: p => core.tunnelStop(p),
-  tunnelCheck: p => core.tunnelCheck(p), // Settings › Tunnels: is the named tunnel ready
+  tunnelStart: p => remoteMod.tunnelStart(p),
+  tunnelStop: p => remoteMod.tunnelStop(p),
+  tunnelCheck: p => remoteMod.tunnelCheck(p), // Settings › Tunnels: is the named tunnel ready
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
@@ -419,12 +420,12 @@ const api: Record<string, Handler> = {
   scheduleRun: p => (notAgent(p, 'run a scheduled task now'), core.scheduleRun(p.id)),
   scheduleTick: p => core.scheduleTick(p.now), // tests move the clock
   pendingTick: p => core.pendingTick(p.now),
-  remoteStart: p => core.remoteStart(p),
-  remoteStop: () => core.remoteStop(),
-  remoteTick: p => core.remoteTick(p.now), // tests move the clock
+  remoteStart: p => remoteMod.remoteStart(p),
+  remoteStop: () => remoteMod.remoteStop(),
+  remoteTick: p => remoteMod.remoteTick(p.now), // tests move the clock
   archivedTidy: p => core.archivedTidy(p.now), // tests move the clock
-  shareTick: p => core.shareTick(p.now),
-  tunnelTick: p => core.tunnelTick(p.now), // tests move the clock
+  shareTick: p => remoteMod.shareTick(p.now),
+  tunnelTick: p => remoteMod.tunnelTick(p.now), // tests move the clock
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetLogs: p => widgetLogs(p), // the Logs tab (every 2 s, from its cursor), laki widget logs, MCP's laki_extension_logs
@@ -745,16 +746,16 @@ const server = createServer(async (req, res) => {
     return res.end(r.body)
   }
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
-  // remote access's PIN (core.remotePin): from its page only, with the link's key in the body
+  // remote access's PIN (remoteMod.remotePin): from its page only, with the link's key in the body
   if (req.method === 'POST' && req.url === '/pin') {
-    if (!req.headers.origin || req.headers.origin !== core.remoteOrigin()) return reply(403, { error: 'origin not allowed' })
+    if (!req.headers.origin || req.headers.origin !== remoteMod.remoteOrigin()) return reply(403, { error: 'origin not allowed' })
     let body = ''
     for await (const chunk of req) {
       body += chunk
       if (body.length > 4096) return reply(413, { error: 'too big' })
     }
     try {
-      return reply(200, core.remotePin(JSON.parse(body) ?? {}))
+      return reply(200, remoteMod.remotePin(JSON.parse(body) ?? {}))
     } catch (e) {
       return reply(200, { error: (e as Error).message })
     }
@@ -769,7 +770,7 @@ const server = createServer(async (req, res) => {
   try {
     const { method, params } = JSON.parse(body)
     const o = req.headers.origin
-    const remote = !!o && o === core.remoteOrigin()
+    const remote = !!o && o === remoteMod.remoteOrigin()
     reply(200, { result: (await call(method, params, undefined, remote, remote ? undefined : req.socket)) ?? null })
   } catch (e) {
     reply(200, { error: (e as Error).message })
@@ -802,7 +803,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   wss.handleUpgrade(req, socket, head, ws => {
     const c: core.Conn = {
       id: ++clientSeq,
-      remote: !!req.headers.origin && req.headers.origin === core.remoteOrigin(),
+      remote: !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin(),
       send: msg => {
         if (ws.readyState !== ws.OPEN) return
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
@@ -858,11 +859,11 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 
 const timers: NodeJS.Timeout[] = []
 const listening = new Promise<void>(r => server.once('listening', () => r()))
-void core
+void remoteMod
   .reapChildren()
   .catch(e => log('reapChildren', e)) // L14: tunnels a crashed daemon left running
   .then(() => listening) // tunnelsBack skips the daemon's own port: known once it listens
-  .then(() => core.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
+  .then(() => remoteMod.tunnelsBack()) // then the ones state.json kept: after them, so none of theirs is stopped
   .catch(e => log('tunnelsBack', e))
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
@@ -871,7 +872,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   writeFileSync(info, JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 })
   chmodSync(info, 0o600)
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
-  core.setDaemonPort(port)
+  remoteMod.setDaemonPort(port)
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
   every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
@@ -887,7 +888,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_OVERLAP_MS || 15000), core.scanOverlaps) // Collision radar
   every(Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
-  every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))
+  every(15000, () => (remoteMod.remoteTick(), remoteMod.shareTick(), remoteMod.tunnelTick()))
   every(30000, () => core.scheduleTick())
   every(30000, () => core.pendingTick())
   every(30000, () => core.reminderTick())
@@ -914,9 +915,9 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
 function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
-  core.tunnelsDown() // kept in state.json: they come back with the next daemon
-  core.stopShares()
-  core.remoteStop()
+  remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
+  remoteMod.stopShares()
+  remoteMod.remoteStop()
   flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   core.stopHosts()
