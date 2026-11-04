@@ -226,6 +226,13 @@ test('a model and effort go into the agent\'s flags (a wrong one makes nothing);
   await rig.rpc('tabNew', { ws: ws.id, preset: 'fast', model: 'haiku' })
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length > n, 'the preset\'s claude')
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[n].args.slice(-4), ['--model', 'sonnet', '--model', 'haiku'])
+  // the models each agent says it has (its handshake, hooks off; a gateway's custom one too), and an effort only codex
+  // names (ultra) taken once it said so
+  assert.deepEqual(await rig.rpc('agentModels', { agent: 'claude' }), [{ id: 'opus', name: 'Opus', sub: 'everyday', efforts: ['low', 'high'] }, { id: 'gw/custom-1', name: 'Custom 1' }])
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'u', preset: 'codex', effort: 'ultra' }), /effort ultra\?/)
+  assert.deepEqual(await rig.rpc('agentModels', { agent: 'codex' }), [{ id: 'gpt-x', name: 'GPT-X', efforts: ['medium', 'ultra'], def: true }])
+  assert.equal((await rig.rpc('wsNew', { project: p.id, name: 'u', preset: 'codex', effort: 'ultra' })).id, 'u')
+  assert.deepEqual(await rig.rpc('agentModels', { agent: 'gemini' }), [])
 })
 
 test("a permission mode and fast mode go into the agent's flags, kept for restarts and forks", async t => {

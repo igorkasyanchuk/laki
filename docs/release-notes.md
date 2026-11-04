@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The new-workspace page's model menu lists the models Claude Code and Codex say they have (a gateway's or custom
+  ones too), each with its own efforts, instead of a fixed list.
 - *Update when idle* (Settings › Updates): Laki waits until no agent works or asks you, then updates and restarts,
   and restarts its daemon once all are idle. Agents can ask for it too: `laki update --when-idle`.
 - Archive a project you're done with (its ⋯ › *Archive project…*): it leaves the sidebar, the pickers and ⌘K, its

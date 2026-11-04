@@ -16,7 +16,7 @@ import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
-import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
+import { accountAdd, accountRm, accountSet, accountViews, agentModels, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
@@ -211,6 +211,7 @@ const api: Record<string, Handler> = {
   projectRm: p => core.projectRm(p.id),
   projectArchive: p => core.projectArchive({ project: p.project, on: p.on !== false }),
   updateIdle: p => core.updateWhenIdle({ on: p.on, caller: p.caller }),
+  agentModels: p => agentModels({ agent: p.agent, preset: p.preset }),
   projectSet: p => core.projectSet(p.id, p),
   memoryAdd: p => core.memoryAdd({ ...p, tab: p.from?.tab ?? p.tab }), // an agent's (auto-memory), or --mine (yours: agentNo); by: the tab found by its process
   memoryRm: p => core.memoryRm(p), // an agent's only

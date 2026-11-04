@@ -8,6 +8,10 @@ fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'cl
 // -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block,
 // "slow…" waits (a Stop ends it); "slackread…": a tool it may not use unasked, asked through --permission-prompt-tool
 // (an extension's laki_ask server), what the user said in its data
+// -p --input-format stream-json (agentModels): its initialize answer's models, a gateway's custom one among them
+if (args[0] === '-p' && args[args.indexOf('--input-format') + 1] === 'stream-json' && !args.includes('--mcp-config')) {
+  return process.stdin.once('data', () => process.stdout.write(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: 'laki', response: { models: [{ value: 'default', displayName: 'Default' }, { value: 'opus', displayName: 'Opus', description: 'everyday', supportedEffortLevels: ['low', 'high'] }, { value: 'gw/custom-1', displayName: 'Custom 1' }], hooksOff: args.includes('{"disableAllHooks":true}') } } }) + '\n'))
+}
 if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
   const prompt = args[args.length - 1]
   const tools = args.includes('--allowedTools') ? args[args.indexOf('--allowedTools') + 1] : ''

@@ -3,14 +3,14 @@
 // sign-in links to its own folder (SHARED: settings, skills, plugins, chats), so a chat resumes on any account. The
 // agent's own sign-in is HOME_ACCOUNT: no env at all (CLAUDE_CONFIG_DIR set to ~/.claude would read another Keychain
 // item).
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { readJson } from '../shared/conn.ts'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { type Account, ACCOUNT_AGENTS, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Tab } from '../shared/types.ts'
-import { changed, dir, isLive, q, save, state } from './core.ts'
+import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Tab } from '../shared/types.ts'
+import { changed, dir, isLive, presetNamed, q, save, state } from './core.ts'
 import { claudeCred, keychainService, type Who } from './usage.ts'
 
 export const ENV: Record<AccountAgent, string> = { claude: 'CLAUDE_CONFIG_DIR', codex: 'CODEX_HOME' }
@@ -153,4 +153,69 @@ export function loginCmd(id: string, agent: AccountAgent) {
   const a = accountNamed(id)
   const login = agent === 'claude' ? 'claude auth login' : 'codex login'
   return a ? `${ENV[a.agent]}=${q(a.dir)} ${login}` : login
+}
+
+// The models an agent says it has, for the model menus (the new-workspace page's, Settings' profiles): claude's
+// initialize handshake (stream-json, no prompt: nothing goes to a model, its hooks off, no session kept) and codex's
+// app-server model/list, each with its efforts; a gateway's or custom models come with them. Per account (the
+// profile's, else the one in use), kept a day; a failure (not installed, an older version) isn't kept: the renderer
+// falls back to its fixed list. ponytail: codex's first page only
+const MODELS_KEPT = 24 * 3600_000
+const modelsSeen = new Map<string, { at: number; list: Promise<AgentModel[]> }>()
+export const effortsSaid = new Map<string, Set<string>>() // by agent: every effort its models named (core's modelCheck takes them too: codex's max, ultra)
+export function agentModels(o: { agent?: string; preset?: string }): Promise<AgentModel[]> {
+  const agent = o.agent
+  if (agent !== 'claude' && agent !== 'codex') return Promise.resolve([])
+  const pre = presetNamed(o.preset)
+  const acct = pre?.account ?? accountUsed(agent)
+  const key = `${agent}:${acct}`
+  const had = modelsSeen.get(key)
+  if (had && Date.now() - had.at < MODELS_KEPT) return had.list
+  const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(acct) } as NodeJS.ProcessEnv
+  const list = (
+    agent === 'claude'
+      ? asked('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--settings', '{"disableAllHooks":true}'], env, [{ type: 'control_request', request_id: 'laki', request: { subtype: 'initialize' } }], m =>
+          m?.type === 'control_response' && Array.isArray(m.response?.response?.models)
+            ? (m.response.response.models as { value: string; displayName?: string; description?: string; supportedEffortLevels?: string[] }[]).filter(x => x.value && x.value !== 'default').map(x => ({ id: x.value, name: x.displayName ?? x.value, ...(x.description && { sub: x.description }), ...(x.supportedEffortLevels?.length && { efforts: x.supportedEffortLevels }) }))
+            : undefined,
+        )
+      : asked('codex', ['app-server'], env, [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { clientInfo: { name: 'laki', version: '1' } } }, { jsonrpc: '2.0', method: 'initialized' }, { jsonrpc: '2.0', id: 2, method: 'model/list', params: {} }], m =>
+          m?.id === 2 && Array.isArray(m.result?.data)
+            ? (m.result.data as { model: string; displayName?: string; description?: string; hidden?: boolean; isDefault?: boolean; supportedReasoningEfforts?: { reasoningEffort: string }[] }[]).filter(x => x.model && !x.hidden).map(x => ({ id: x.model, name: x.displayName ?? x.model, ...(x.description && { sub: x.description }), ...(x.supportedReasoningEfforts?.length && { efforts: x.supportedReasoningEfforts.map(e => e.reasoningEffort) }), ...(x.isDefault && { def: true }) }))
+            : undefined,
+        )
+  )
+    .then(l => (l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
+    .catch(e => (modelsSeen.delete(key), Promise.reject(e)))
+  modelsSeen.set(key, { at: Date.now(), list })
+  return list
+}
+// a JSON-lines exchange: the lines sent (stdin kept open: claude ends with it), each line read through `take` until
+// it gives something; 20 s at most, then the process goes
+function asked<T>(cmd: string, args: string[], env: NodeJS.ProcessEnv, send: object[], take: (m: any) => T | undefined): Promise<T> {
+  return new Promise((ok, no) => {
+    const c = spawn(cmd, args, { env, cwd: homedir(), stdio: ['pipe', 'pipe', 'ignore'] })
+    const end = (f: () => void) => (clearTimeout(t), c.kill(), f())
+    const t = setTimeout(() => end(() => no(new Error(`${cmd} didn't say its models`))), 20_000)
+    let buf = ''
+    c.on('error', e => end(() => no(new Error(`${cmd}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed' : e.message}`))))
+    c.on('exit', () => end(() => no(new Error(`${cmd} ended without its models`))))
+    c.stdin.on('error', () => {}) // it went first: exit says so
+    c.stdout.setEncoding('utf8').on('data', (d: string) => {
+      buf += d
+      for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+        const line = buf.slice(0, i)
+        buf = buf.slice(i + 1)
+        let m: unknown
+        try {
+          m = JSON.parse(line)
+        } catch {
+          continue
+        }
+        const r = take(m)
+        if (r !== undefined) return end(() => ok(r))
+      }
+    })
+    for (const m of send) c.stdin.write(`${JSON.stringify(m)}\n`)
+  })
 }

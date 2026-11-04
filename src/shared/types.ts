@@ -13,6 +13,8 @@ export const isAgent = (s?: string): s is Agent => (AGENTS as readonly string[])
 // how hard an agent thinks, for those that take it (claude --effort, codex model_reasoning_effort); models: names to
 // suggest (any other goes too: a full name, provider/model for opencode)
 export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'] }
+// a model an agent says it has (accounts.ts agentModels): its id for --model, its name and words, its efforts
+export type AgentModel = { id: string; name: string; sub?: string; efforts?: string[]; def?: boolean }
 export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opus', 'sonnet', 'haiku'] }
 // how freely an agent acts (unset: its own default, which asks): claude's --permission-mode; codex's sandbox and
 // approvals in the same spirit. Each with what the new-workspace page says of it
@@ -935,7 +937,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 140
+export const API = 141
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -935,7 +935,9 @@ never the last prompt.
   *Custom command…* or *No agent*); the agent menu marks your default and, for another agent, offers *Make … the
   default for new workspaces*.
 - The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
-  name…*; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort (the one you last
+  name…*; Claude Code and Codex list the models they say they have, a gateway's or custom ones too, asked once a day
+  per account; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort (each model's
+  own when the agent says them; the one you last
   picked for a model comes back when you pick that model again) and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
   permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast

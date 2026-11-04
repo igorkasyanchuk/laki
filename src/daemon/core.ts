@@ -18,7 +18,7 @@ import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../s
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
-import { accountEnv, accountFor, accountIds, accounts, loginCmd } from './accounts.ts'
+import { accountEnv, accountFor, accountIds, accounts, effortsSaid, loginCmd } from './accounts.ts'
 import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
@@ -1446,7 +1446,7 @@ export function modelCheck(agent: string, model?: string, effort?: string, perm?
   if (perm && !perms?.some(p => p[0] === perm)) throw new Error(perms ? `permission mode ${perm}? ${perms.map(p => p[0]).join(', ')}` : `${agent} has no permission modes here`)
   if (fast && !FAST[agent as Agent]) throw new Error(`${agent} has no fast mode`)
   if (model && !/^(?!-)[\w.:/@[\]-]{1,120}$/.test(model)) throw new Error(`model ${model}? a name like opus, or provider/model`) // not a flag either
-  if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
+  if (effort && !EFFORTS[agent as Agent]?.includes(effort) && !effortsSaid.get(agent)?.has(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
 // opencode starts on its last used model, saying nothing, when it doesn't know the one asked for (an orchestrator's

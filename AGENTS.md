@@ -243,7 +243,9 @@ project, its workspaces and their tabs out; its agents sleep, the rest end; rest
 no PR scans): the project's ⋯ › *Archive project…*, Settings › *Archived projects*; 140: `updateIdle` (`on`; `CALLER`: an agent's tab is `by`), the view's `updateIdle`
 (core's `updateWhenIdle`, memory: it ends with the daemon it restarts): App downloads, installs once no agent but `by`
 works or asks, then the new app's `shutdown` of the older daemon once none does; `laki update --when-idle [--off]`,
-MCP's `laki_update_when_idle`. A setting the renderer adds
+MCP's `laki_update_when_idle`; 141: `agentModels` (`agent` claude or codex, `preset`: its account; accounts.ts: claude's
+stream-json initialize handshake, its hooks off and no session kept, or `codex app-server`'s model/list; a day per account,
+a failure not kept): the new-workspace page's model menu and its efforts, the fixed `MODELS` the fallback. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &

@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -864,9 +864,18 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       'right',
     )
   const ag = isAgent(starts) ? starts : undefined // an agent's model and effort flags
-  const models = (ag && MODELS[ag]) ?? []
-  const efforts = ag && EFFORTS[ag]
+  // the models claude and codex say they have (agentModels: a gateway's and custom ones too, each its efforts), by
+  // agent and profile (its account); not said yet or can't: the fixed list
+  const [told, setTold] = useState<Record<string, AgentModel[]>>({})
+  const toldKey = `${ag}:${p.preset}`
+  useEffect(() => {
+    if ((ag !== 'claude' && ag !== 'codex') || told[toldKey]) return
+    void api.call<AgentModel[]>('agentModels', { agent: ag, preset: p.preset }).then(l => setTold(x => ({ ...x, [toldKey]: l })), () => setTold(x => ({ ...x, [toldKey]: [] })))
+  }, [toldKey])
+  const said = told[toldKey]?.length ? told[toldKey] : undefined
+  const models = said?.map(m => m.id) ?? (ag && MODELS[ag]) ?? []
   const typed = p.model?.trim()
+  const efforts = said?.find(m => m.id === typed)?.efforts ?? (ag && EFFORTS[ag])
   // the effort last picked for a model comes back with it (settings.modelEfforts, by agent:model; '' its default model)
   const effortKey = (m?: string) => `${ag}:${m?.trim() ?? ''}`
   const pickModel = (m?: string) => {
@@ -882,7 +891,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         { filter: 'Type to filter…' },
         { head: 'Model' },
         { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : 'the agent'} picks`, hint: !typed ? ON : undefined, run: () => pickModel(undefined) },
-        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, mono: true, sub: MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1], tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => pickModel(m) }) as MenuItem),
+        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => (x => ({ label: m, mono: true, sub: x ? [x.name, x.sub].filter(Boolean).join(' · ') : MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1] ?? (x?.def ? 'default' : undefined), tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => pickModel(m) }) as MenuItem)(said?.find(y => y.id === m))),
         { label: 'Another model by name…', icon: 'pencil', foot: true, run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
       ],
     )
