@@ -1,0 +1,26 @@
+{
+  "session_id": "4468311f-7855-4c25-8507-a7581f766597",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-projects-demo/4468311f-7855-4c25-8507-a7581f766597.jsonl",
+  "cwd": "/Users/me/projects/demo",
+  "scratchpad_dir": "/Users/me/.claude/scratchpad",
+  "prompt_id": "26f6b93e-c2a4-4913-866d-9957b0d8e648",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/Users/me/projects/demo/notes.txt",
+    "old_string": "hello",
+    "new_string": "hello world",
+    "replace_all": false
+  },
+  "permission_suggestions": [
+    {
+      "type": "setMode",
+      "mode": "acceptEdits",
+      "destination": "session"
+    }
+  ]
+}

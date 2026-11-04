@@ -1,0 +1,31 @@
+{
+  "session_id": "6c8a952d-e198-4eba-97a2-e08b63cd5038",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-projects-demo/6c8a952d-e198-4eba-97a2-e08b63cd5038.jsonl",
+  "cwd": "/Users/me/projects/demo",
+  "scratchpad_dir": "/Users/me/.claude/scratchpad",
+  "prompt_id": "ec646275-5739-47aa-a016-49a5cadc59bb",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "touch probe.txt",
+    "description": "Create empty probe.txt file"
+  },
+  "permission_suggestions": [
+    {
+      "type": "addDirectories",
+      "directories": [
+        "/Users/me/projects/demo"
+      ],
+      "destination": "session"
+    },
+    {
+      "type": "setMode",
+      "mode": "acceptEdits",
+      "destination": "session"
+    }
+  ]
+}

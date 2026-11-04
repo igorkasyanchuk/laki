@@ -1,0 +1,32 @@
+{
+  "session_id": "4468311f-7855-4c25-8507-a7581f766597",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-projects-demo/4468311f-7855-4c25-8507-a7581f766597.jsonl",
+  "cwd": "/Users/me/projects/demo",
+  "scratchpad_dir": "/Users/me/.claude/scratchpad",
+  "prompt_id": "20fb8b9c-9a05-41b0-9825-8a4428cea0da",
+  "permission_mode": "default",
+  "agent_id": "abed20de6c99e8a57",
+  "agent_type": "web-fetch",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "WebFetch",
+  "tool_input": {
+    "url": "https://example.com",
+    "prompt": "What is the exact text inside the <title> tag of this page? Reply with just the title text."
+  },
+  "permission_suggestions": [
+    {
+      "type": "addRules",
+      "destination": "localSettings",
+      "rules": [
+        {
+          "toolName": "WebFetch",
+          "ruleContent": "domain:example.com"
+        }
+      ],
+      "behavior": "allow"
+    }
+  ]
+}

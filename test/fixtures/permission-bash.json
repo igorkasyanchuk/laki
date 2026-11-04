@@ -1,0 +1,30 @@
+{
+  "session_id": "4468311f-7855-4c25-8507-a7581f766597",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-projects-demo/4468311f-7855-4c25-8507-a7581f766597.jsonl",
+  "cwd": "/Users/me/projects/demo",
+  "scratchpad_dir": "/Users/me/.claude/scratchpad",
+  "prompt_id": "5af90a59-e955-4f7d-b637-3e9b1f46dd8d",
+  "permission_mode": "default",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm init -y",
+    "description": "Initialize a package.json with defaults"
+  },
+  "permission_suggestions": [
+    {
+      "type": "addRules",
+      "rules": [
+        {
+          "toolName": "Bash",
+          "ruleContent": "npm init *"
+        }
+      ],
+      "behavior": "allow",
+      "destination": "localSettings"
+    }
+  ]
+}
