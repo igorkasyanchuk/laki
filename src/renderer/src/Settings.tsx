@@ -1076,7 +1076,7 @@ export function SettingsPage(p: {
             <div className="setting-box managed-box" role="note">
               <Says
                 title="Some settings are managed by your organization"
-                hint={[p.managed.keys.length ? `Locked: ${p.managed.keys.join(', ')}` : '', p.managed.remote === false ? 'remote access off' : '', p.managed.bypass === false ? 'agents always ask before they act' : '', p.managed.agents ? `agents: ${p.managed.agents.join(', ')} only` : ''].filter(Boolean).join(' · ') + ` (${p.managed.from})`}
+                hint={[p.managed.keys.length ? `Locked: ${p.managed.keys.map((k) => k.replace(/[A-Z]/g, (c) => ' ' + c.toLowerCase())).join(', ')}` : '', p.managed.remote === false ? 'remote access off' : '', p.managed.bypass === false ? 'agents always ask before they act' : '', p.managed.agents ? `agents: ${p.managed.agents.join(', ')} only` : ''].filter(Boolean).join(' · ') + ` (${p.managed.from})`}
               />
             </div>
           )}
