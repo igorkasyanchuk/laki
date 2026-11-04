@@ -8,7 +8,8 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { aiOn, COMPACT_DAYS, type CompactLogLine, type CompactRun, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX } from '../shared/types.ts'
 import { aiOnce, hasKey } from './ai.ts'
-import { changed, dir, findProject, save, state } from './core.ts'
+import { changed, findProject, save, state } from './core.ts'
+import { dir } from './dir.ts'
 
 const logPath = join(dir, 'memory-compact.jsonl')
 const DAY = 86400000

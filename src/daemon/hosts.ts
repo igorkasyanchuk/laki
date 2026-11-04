@@ -1,5 +1,5 @@
 // SSH hosts and cloud workspaces: a project on another machine (host:path) through one ssh connection per host, and a
-// workspace in a GitHub codespace (codespace.ts runs gh). core.ts re-exports it.
+// workspace in a GitHub codespace (codespace.ts runs gh). core.ts imports it, and its users import it directly.
 
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
@@ -8,7 +8,8 @@ import { hostname } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { type Project, type ProjectConfig, type Tab, type Workspace } from '../shared/types.ts'
 import * as cs from './codespace.ts'
-import { agentCmd, allocPort, type At, branchPrefix, cfgHash, changed, dir, ENV_KEY, exec, fileCfg, findProject, firstLine, git, hookFiles, type Hooks, lakiEnv, log, type NewWs, q, run, runDir, save, slug, type SpawnOpts, state, uniqueWsId, wsLog } from './core.ts'
+import { agentCmd, allocPort, type At, branchPrefix, cfgHash, changed, ENV_KEY, exec, fileCfg, findProject, firstLine, git, hookFiles, type Hooks, lakiEnv, log, type NewWs, q, run, runDir, save, slug, type SpawnOpts, state, uniqueWsId, wsLog } from './core.ts'
+import { dir } from './dir.ts'
 import { own } from './resources.ts'
 
 // ---------- SSH hosts: a project on another machine (host:path, as scp writes it). One ssh connection per host (a

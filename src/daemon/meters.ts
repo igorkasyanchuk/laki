@@ -1,5 +1,5 @@
 // claude's and codex's transcripts, read as they grow: a tab's context and usage meters, and today's spend. core.ts
-// re-exports it.
+// imports it, and its users import it directly.
 
 import { closeSync, existsSync, openSync, readdirSync, readSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -7,7 +7,8 @@ import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
 import { HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
-import { changed, dir, presetOf, state } from './core.ts'
+import { changed, presetOf, state } from './core.ts'
+import { dir } from './dir.ts'
 import { type ByModel, chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
 import { claudeWindows } from './usage.ts'
 

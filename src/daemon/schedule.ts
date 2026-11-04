@@ -1,4 +1,4 @@
-// prompts for later: the board's to-dos, the calendar's reminders and scheduled tasks. core.ts re-exports it.
+// prompts for later: the board's to-dos, the calendar's reminders and scheduled tasks. core.ts imports it, and its users import it directly.
 
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -7,7 +7,8 @@ import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Re
 import { nextRun, parseAt, parseWhen, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, projectArchived, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { addTab, broadcast, byTab, changed, clients, findProject, findWs, presetNamed, projectArchived, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { dir } from './dir.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'

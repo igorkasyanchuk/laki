@@ -9,7 +9,8 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { basename, extname, join } from 'node:path'
-import { dir, state } from './core.ts'
+import { state } from './core.ts'
+import { dir } from './dir.ts'
 
 const home = join(dir, 'notes')
 const ID = /^[a-z0-9]{6,12}-[0-9a-f]{6}$/

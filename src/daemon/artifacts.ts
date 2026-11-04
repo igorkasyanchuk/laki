@@ -1,5 +1,5 @@
 // a workspace's storage folder: its artifacts, and the links agents publish, kept there in one hidden file, LINKS
-// (.url files an agent or an older Laki left are moved into it). core.ts re-exports it.
+// (.url files an agent or an older Laki left are moved into it). core.ts imports it, and its users import it directly.
 
 import { existsSync } from 'node:fs'
 import { readdir, readFile, rm, stat } from 'node:fs/promises'

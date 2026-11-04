@@ -1,7 +1,7 @@
 // The daemon's model: projects, workspaces (git worktrees), tabs (PTY sessions), agent status from hooks and
 // the follow-up queue. One process owns it all; clients get `View`s pushed on every change. Its other parts are
-// modules that import it and that it re-exports: hosts, pr, files, remote, resources, artifacts, meters, phone,
-// schedule. None of the modules in this cycle reads another's const or let as it loads (test/load-order.test.ts);
+// modules that import it and that it imports: hosts, pr, files, remote, resources, artifacts, meters, phone,
+// schedule (main.ts and the others import each directly, not through core.ts). None of the modules in this cycle reads another's const or let as it loads (test/load-order.test.ts);
 // the data folder is dir.ts', out of it.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
@@ -34,7 +34,6 @@ import { collisions, inside, scanOverlaps, scanStats, stats, viewWs } from './fi
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
-export { dir }
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { hookCause, type HookWhy } from './hookHealth.ts'

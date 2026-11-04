@@ -1,5 +1,5 @@
 // processes: each workspace's listening ports, memory and CPU by tab (Settings › Resources), process groups, and idle
-// agents put to sleep. core.ts re-exports it.
+// agents put to sleep. core.ts imports it, and its users import it directly.
 
 import { type ChildProcess, spawn } from 'node:child_process'
 import { basename } from 'node:path'

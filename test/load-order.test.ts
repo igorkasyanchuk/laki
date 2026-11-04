@@ -1,4 +1,4 @@
-// core.ts and the modules it re-exports (hosts, pr, files…) import each other: none may read another's const or let
+// core.ts and its modules (hosts, pr, files…) import each other: none may read another's const or let
 // as it loads, or whichever is imported first throws "Cannot access … before initialization". Each daemon module
 // imported first, in a process of its own, finds such a read in at least one order.
 import assert from 'node:assert/strict'

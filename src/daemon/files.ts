@@ -1,5 +1,5 @@
 // a worktree's files: the diff against its base and its size, Changes' revert and redo, and the side panel's tree,
-// reads and writes. core.ts re-exports it.
+// reads and writes. core.ts imports it, and its users import it directly.
 
 import { randomBytes } from 'node:crypto'
 import { closeSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'

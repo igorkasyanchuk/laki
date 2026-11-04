@@ -1,11 +1,12 @@
 // phone pushes (push.ts builds them): a turn that waits or is done, a workflow's questions, and the taps that answer
-// from the phone. core.ts re-exports it.
+// from the phone. core.ts imports it, and its users import it directly.
 
 import { randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerOk, type Tab, type Webhook, type Workspace } from '../shared/types.ts'
-import { answer, dir, log, rtOf, sessions, state } from './core.ts'
+import { answer, log, rtOf, sessions, state } from './core.ts'
+import { dir } from './dir.ts'
 import { pushTo, replies } from './push.ts'
 import { flowHooks } from './schedule.ts'
 import { redact } from './share.ts'

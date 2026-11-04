@@ -1,5 +1,5 @@
 // pull requests: branches followed, PR scans (gh), the PR switches' feedback to the agent (failing CI, review comments,
-// conflicts), merge when green, and the side panel's PR calls. core.ts re-exports it.
+// conflicts), merge when green, and the side panel's PR calls. core.ts imports it, and its users import it directly.
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'

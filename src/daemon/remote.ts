@@ -1,5 +1,5 @@
 // what goes out through a tunnel: a port exposed to the world, a tab shared as a page, and remote access to the whole
-// app (cloudflared or tailscale). core.ts re-exports it.
+// app (cloudflared or tailscale). core.ts imports it, and its users import it directly.
 
 import { spawn } from 'node:child_process'
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
@@ -9,7 +9,8 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
 import { type Agent, AGENT_NAMES, type Remote, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
-import { broadcast, changed, dir, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
+import { broadcast, changed, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
+import { dir } from './dir.ts'
 import { policyRemote } from './policy.ts'
 import { type Tail, tailOf } from './meters.ts'
 import { own } from './resources.ts'
