@@ -4,6 +4,7 @@ import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExterna
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { menuKeys } from './text'
+import { keyShow, type KeyId } from '../../shared/keys'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -795,5 +796,19 @@ export function Tips() {
     </div>
   )
 }
-// a diff's +added −deleted in a tooltip, in their colors (Review's tab, the status bar's changes, a row's stat…)
-const tipText = (text: string) => text.split(/(\+\d[\d.,k]* −\d[\d.,k]*)/).map((part, i) => (i % 2 ? (([add, del]) => <span key={i} className="ws-stat"><span className="add">{add}</span> <span className="del">{del}</span></span>)(part.split(' ')) : part))
+// Settings › Keys' keys in use (App sets it as it draws), for keyTip outside App: a tooltip's keys are never hard-coded
+export const tipKeys: { map: Partial<Record<KeyId, string>> } = { map: {} }
+export const keyTip = (title: string, id: KeyId) => (tipKeys.map[id] ? `${title} (${keyShow(tipKeys.map[id]!)})` : title)
+// a tooltip's keys, "Settings (⌘,)", as keycaps (a modifier each, then the key), and a diff's +added −deleted in their
+// colors (Review's tab, the status bar's changes, a row's stat…)
+const KEYS_IN = /\(([⌃⌥⇧⌘]+[^\s()]{1,6})\)/
+const tipText = (text: string) =>
+  text.split(KEYS_IN).map((part, j) =>
+    j % 2 ? (
+      <span key={`k${j}`} className="tip-keys">
+        {[...(part.match(/^[⌃⌥⇧⌘]+/)![0])].concat(part.replace(/^[⌃⌥⇧⌘]+/, '')).map((k, i) => <kbd key={i}>{k}</kbd>)}
+      </span>
+    ) : (
+      part.split(/(\+\d[\d.,k]* −\d[\d.,k]*)/).map((s, i) => (i % 2 ? (([add, del]) => <span key={`${j}-${i}`} className="ws-stat"><span className="add">{add}</span> <span className="del">{del}</span></span>)(s.split(' ')) : s))
+    ),
+  )

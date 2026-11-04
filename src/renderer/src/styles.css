@@ -3255,3 +3255,5 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .sc-agent { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .sc-box { display: flex; gap: 6px; align-items: flex-end; padding: 8px 10px; border-top: 1px solid var(--line); }
 .sc-box textarea { flex: 1; resize: none; min-height: 38px; }
+.tip-keys { display: inline-flex; gap: 2px; margin-left: 2px; vertical-align: 1px; } /* a tooltip's keys (ui.tsx tipText) */
+.tip-keys kbd { min-width: 16px; padding: 0 4px; font: 10.5px/15px var(--mono); text-align: center; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--rs, 4px); }

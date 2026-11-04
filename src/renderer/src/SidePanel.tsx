@@ -10,7 +10,7 @@ import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, Dif
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
+import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -551,7 +551,7 @@ export function SidePanel(p: {
           </button>
         ))}
         <span className="grow" />
-        <IconButton icon="x" title="Close (⌥⌘B)" onClick={p.onClose} />
+        <IconButton icon="x" title={keyTip('Close', 'panel')} onClick={p.onClose} />
       </div>
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
@@ -1431,7 +1431,7 @@ export function FilePreview(p: {
         </button>
           </>
         )}
-        <IconButton icon="x" title="Close (⌘W)" onClick={p.onClose} />
+        <IconButton icon="x" title={keyTip('Close', 'closeTab')} onClick={p.onClose} />
       </div>
       {err && p.edit && <div className="warn small pad">{err}</div>}
       {p.edit && table ? (

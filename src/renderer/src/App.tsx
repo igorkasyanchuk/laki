@@ -53,7 +53,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
-import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, iconItems, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { AGENT_COLORS, ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, iconItems, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
@@ -2099,7 +2099,8 @@ export function App() {
   const pickKey = settings.pickerKey ?? PICKER_KEY // the element picker's hotkey ('' none)
   const kb = keyMap(settings.keys) // Settings › Keys': the keys of App's own actions in use ('' none)
   const kh = (id: KeyId) => keyShow(kb[id]) || undefined // as a menu's hint
-  const kt = (title: string, id: KeyId) => (kb[id] ? `${title} (${keyShow(kb[id])})` : title) // a tooltip with its keys
+  tipKeys.map = kb // keyTip's, for tooltips outside App
+  const kt = keyTip // a tooltip with its keys, drawn as keycaps (ui.tsx tipText)
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
   const [held, setHeld] = useState({ open: false, shot: false }) // main took the keys (Help shows only those)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey).then(open => setHeld(h => ({ ...h, open })))), [hotkey])
@@ -4581,7 +4582,7 @@ export function App() {
                       {w?.name ?? previewed.ext} <span className="muted">{previewed.path}</span>
                     </span>
                     {w && <span className="muted small pv-wide">{extStatus(w)}</span>}
-                    <IconButton icon="x" title="Close (⌘W)" onClick={closePreview} />
+                    <IconButton icon="x" title={kt('Close', 'closeTab')} onClick={closePreview} />
                   </div>
                   <div className="pv-body pv-ext">{w ? <WidgetBody w={w} full api={widgetApi} /> : <div className="muted small pad">That extension is gone (or off).</div>}</div>
                 </div>
