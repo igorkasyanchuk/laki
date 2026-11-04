@@ -1833,6 +1833,8 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
             row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : `optional: ${mac ? 'brew ' : ''}install cloudflared`, CLOUDFLARED_WHY)}
           {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
           {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
+          {d.hooks && row(d.hooks.ok, 'hooks', d.hooks.ok ? "Laki's hook command runs: agents tell it when they ask and finish" : d.hooks.why!)}
+          {d.hookFiles && row(d.hookFiles.ok, 'hook files', d.hookFiles.ok ? 'written: the agents find the hooks' : d.hookFiles.why!)}
         </div>
       )}
     </div>
@@ -2287,6 +2289,39 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
         )}
       </ol>
       {note && <div className="check-note">{note}</div>}
+    </div>
+  )
+}
+
+// Hooks not heard (the daemon's hookTick): this agent sends Laki none, so asks and ends are read off its screen; the
+// likely why (hookHealth.ts), Details (a file:line, the args, the command) to copy; Dismiss: this tab, until a reload
+export function HookStrip({ tab, onCopy, onHide }: { tab: TabView; onCopy: (text: string) => void; onHide: () => void }) {
+  const [open, setOpen] = useState(false)
+  const h = tab.hookless
+  if (!h) return null
+  return (
+    <div className="queue-strip show-strip hook-strip" role="region" aria-label={`${tab.name}: hooks not heard`}>
+      <div className="queue-head">
+        <Icon name="alertCircle" size={13} />
+        <span className="queue-what">Laki isn't hearing from this agent. Asks, finishes and notifications come from the screen only.</span>
+        {h.detail && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+            Details
+          </button>
+        )}
+        <button type="button" onClick={onHide}>
+          Dismiss
+        </button>
+      </div>
+      <div className="show-text">Likely: {h.why}</div>
+      {open && h.detail && (
+        <div className="hook-detail">
+          <pre>{h.detail}</pre>
+          <button type="button" onClick={() => onCopy(h.detail!)}>
+            Copy
+          </button>
+        </div>
+      )}
     </div>
   )
 }

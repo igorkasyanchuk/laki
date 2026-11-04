@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- When an agent's hooks don't reach Laki (Claude Code, Gemini, OpenCode), its tab says so a couple of minutes after a
+  prompt, with the likely cause (`"disableAllHooks": true` in a settings file, a profile's own `--settings`,
+  `CLAUDE_CONFIG_DIR`, a moved app) to look at. Settings › Agents & profiles says when each agent's hooks were last heard,
+  and the first-run checks try Laki's hook command.
 - An agent's command for a new terminal tab is refused when it hides its end: blank-looking characters (no-break
   spaces, Hangul fillers, the braille blank), blank lines, or more lines than the approval shows.
 - Menus open and close at once: a right click no longer redraws the whole window, and a theme's look no longer slows

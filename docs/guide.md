@@ -2466,6 +2466,14 @@ A policy that doesn't read locks nothing (`daemon.log` says why). What's already
   after*.
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute.
+- **A tab says "Laki isn't hearing from this agent"**: its hooks (how Claude Code, Gemini and OpenCode tell Laki they
+  ask or finish) haven't come since its prompt, so Laki reads its screen instead: no reliable done or waiting, no
+  notifications or phone pushes, no Done check. Its *Likely* line names the cause, and *Details* the file and line (or
+  the command) to look at: `"disableAllHooks": true` in `.claude/settings.local.json`, `.claude/settings.json` or
+  `~/.claude/settings.json`; a profile whose flags have their own `--settings` (Claude Code takes one); `CLAUDE_CONFIG_DIR`
+  in an env of yours (use an account instead, Settings › Agents & profiles); Laki's hook command gone after the app
+  moved (restart Laki); an agent too old for hooks. Fix it, then restart the tab. Settings › Agents & profiles says
+  when each agent's hooks were last heard, and the first-run checks try the hook command.
 - **A host won't connect**: run `ssh <host>` in a terminal; it must sign in without asking anything (keys or agent, a
   known host key). Laki's error is in `~/.laki/daemon.log` and in the tab.
 

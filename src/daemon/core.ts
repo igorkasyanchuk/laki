@@ -46,6 +46,7 @@ export * from './tickets.ts'
 import { ticketOf } from './tickets.ts'
 export * from './policy.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
+import { hookCause, type HookWhy } from './hookHealth.ts'
 export * from './schedule.ts'
 
 export const run = promisify(execFile)
@@ -588,6 +589,7 @@ export function view(): View {
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
+  for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
   const shelved = new Set(state.projects.filter(p => p.archived).map(p => p.id))
   const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
@@ -1407,6 +1409,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     }, 300)
   }
   r.status = o.prompt && !o.resume ? 'running' : 'idle'
+  if (o.prompt && !o.resume) prompted.set(s, born) // hookTick: a prompt it was given
   r.since = undefined // a turn started by a prompt, not by Enter (input): it always notifies
   r.done = false
   s.onExit = code => {
@@ -2705,6 +2708,7 @@ export function hookOk(tab: string, key: unknown) {
 export function hook(p: { tab: string; state: string; payload?: any }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true
+  if (tab) (heard.set(tab.preset ?? '', Date.now()), deafOf(tab.id) && deaf.delete(sessions.get(tab.id)!)) // heard after all: its strip goes (turn's view)
   const gate = tab && preTool(tab, p.payload)
   if (gate) return turn(p), gate
   // codex's notify comes as any of its threads ends a turn: a sub-agent's (multi-agent) or its auto-review's while the
@@ -2907,6 +2911,7 @@ export function typeInto(s: Session, text: string | Promise<string>, enter = tru
       if (!enter) return done()
       setTimeout(() => {
         s.write('\r') // as a separate key, so it isn't part of the paste
+        if (!prompted.has(s)) prompted.set(s, Date.now())
         setTimeout(done, 50)
       }, 150)
     })
@@ -3056,6 +3061,7 @@ export function input(id: string, data: string, c?: Client) {
     return
   }
   s.write(data)
+  if (tab && tracked(tab) && data.includes('\r') && !prompted.has(s)) prompted.set(s, Date.now())
   if (tab && tracked(tab) && tab.preset !== 'claude' && data.includes('\r') && rtOf(id).status === 'idle') {
     // ponytail: Enter in an idle agent starts a turn (claude's hook says so itself); codex's notify ends it, the
     // others' quiet screen (sweepRunning)
@@ -3157,6 +3163,42 @@ export function sweepRunning(now = Date.now()) {
     if (t.queue?.length) setTimeout(() => deliver(t.id), 800) // what waited for this turn's end (autoPR's too)
   }
 }
+
+// Hooks not heard: an agent whose hooks say as a turn starts (HEARS; codex's notify comes only as one ends), on this Mac,
+// started DEAF_AFTER ago, given a prompt (a send, Enter, its start's) its screen answered, and not one hook since: the
+// tab's view has hookless, the likely why (hookHealth.ts), until a hook comes (hook). Every 30 s (main.ts)
+const HEARS = new Set(['claude', 'gemini', 'opencode'])
+const DEAF_AFTER = 2 * 60_000
+const prompted = new WeakMap<Session, number>() // a session's first prompt: a new start asks again
+const deaf = new WeakMap<Session, HookWhy>()
+const heard = new Map<string, number>() // each agent's last hook (Settings › Agents & profiles), this daemon's
+const deafOf = (id: string) => (s => s && deaf.get(s))(sessions.get(id))
+export function hookTick(now = Date.now()) {
+  for (const t of state.tabs) {
+    const s = sessions.get(t.id)
+    if (!s) continue
+    const ws = state.workspaces.find(w => w.id === t.workspace)
+    const at = prompted.get(s)
+    const is = !!ws && !ws.host && !rt.get(t.id)?.hooked && !s.exited && tracked(t) && HEARS.has(t.preset!) && at !== undefined && s.lastOutput > at && now - s.born > DEAF_AFTER
+    if (is === deaf.has(s)) continue
+    if (is) deaf.set(s, hookWhy(t, ws!))
+    else deaf.delete(s)
+    changed()
+  }
+}
+function hookWhy(t: Tab, ws: Workspace) {
+  const pr = presetOf(t)
+  const claude = t.preset === 'claude'
+  // its config folder: its account's (Laki's CLAUDE_CONFIG_DIR), else one an env of yours sets
+  const acct = claude ? state.settings?.accounts?.find(a => a.id === t.account)?.dir : undefined
+  const own = claude && !acct ? ([["its profile's env", pr?.env], ["the project's env", projectConfig(ws).env], ["Settings' env", state.settings?.env], ["Laki's own environment (where it was started)", process.env]] as const).find(([, e]) => e?.CLAUDE_CONFIG_DIR) : undefined
+  const cfg = acct ?? own?.[1]?.CLAUDE_CONFIG_DIR
+  const files = claude ? [join(ws.path, '.claude/settings.local.json'), join(ws.path, '.claude/settings.json'), ...(cfg ? [join(cfg, 'settings.json')] : []), join(homedir(), '.claude/settings.json'), '/Library/Application Support/ClaudeCode/managed-settings.json', '/etc/claude-code/managed-settings.json'] : []
+  return hookCause({ agent: t.preset!, cwd: ws.path, files, args: pr?.args, env: own && { where: own[0], dir: own[1]!.CLAUDE_CONFIG_DIR! }, argv: hookArgv })
+}
+// Settings › Agents & profiles: each agent's last hook, its live tabs and how many of them aren't heard
+export const hooksSeen = () =>
+  Object.fromEntries(AGENTS.map(a => [a, { ...(heard.has(a) && { at: heard.get(a) }), tabs: state.tabs.filter(t => t.preset === a && tracked(t) && isLive(t)).length, deaf: state.tabs.filter(t => t.preset === a && deafOf(t.id)).length }]))
 
 // a command line that runs an agent: its program (or a node/bun/deno/python script's) named as one, a path or not
 // ponytail: by name; an agent under another name (an alias to a wrapper script) still spins
@@ -3486,7 +3528,23 @@ export async function timer(p: { act: string; minutes?: number; note?: string; w
 // the first-run screen's checks
 export async function doctor(): Promise<Doctor> {
   const gh = !onPath('gh') ? 'missing' : await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const)
-  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
+  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })), hooks: await hooksRun(), hookFiles: hookFilesOk() }
+}
+// doctor's hooks: Laki's hook command runs, as agents run it (hook ping: no RPC, exits at once)
+const hooksRun = () =>
+  new Promise<{ ok: boolean; why?: string }>(done =>
+    execFile(hookArgv[0], [...hookArgv.slice(1), 'hook', 'ping'], { env: { ...plainEnv(), ...Object.fromEntries(cliEnv.map(e => e.split('='))) }, timeout: 2000 }, e => done(e ? { ok: false, why: `Laki's hook command fails (${firstLine(e)}): restart Laki; if it stays, install the app again. ${hookCmd('ping')}` } : { ok: true })),
+  )
+// and the files that point agents at it (writeHooks, at the daemon's start) are there and read
+function hookFilesOk(): { ok: boolean; why?: string } {
+  for (const f of Object.keys(hookFiles(localHooks)))
+    try {
+      const text = readFileSync(join(dir, f), 'utf8')
+      if (f.endsWith('.json')) JSON.parse(text)
+    } catch {
+      return { ok: false, why: `${join(dir, f)} is missing or broken: Laki writes it as its daemon starts (restart Laki)` }
+    }
+  return { ok: true }
 }
 
 // the tab of that kind (a script's: of that script) goes, renamed or not, and a new one starts

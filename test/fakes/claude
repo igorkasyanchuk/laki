@@ -65,7 +65,10 @@ if (args[0] === '-p') {
   })
 }
 const settings = JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8'))
+// "disableAllHooks": true in your settings (~/.claude/settings.json): no hook runs, as the real one
+const hooksOff = (() => { try { return JSON.parse(fs.readFileSync(require('path').join(process.env.HOME, '.claude/settings.json'), 'utf8')).disableAllHooks === true } catch { return false } })()
 const hook = (ev, payload) => {
+  if (hooksOff) return
   const h = settings.hooks[ev][0].hooks[0]
   // as long as its settings say, as the real one waits (a hook 3-5 s on a busy machine: killed, its state lost)
   try { execSync(h.command, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: (h.timeout ?? 60) * 1000 }) } catch {}

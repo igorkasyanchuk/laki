@@ -227,6 +227,8 @@ const api: Record<string, Handler> = {
   wsStat: p => core.wsStat(p), // a row's hover card: its diff's size now
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
+  hookTick: p => core.hookTick(p?.now), // tests move the clock
+  hooksSeen: () => core.hooksSeen(), // Settings › Agents & profiles: each agent's last hook
   wsFan: p => core.wsFan(yours(core.byCaller(p))),
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
@@ -869,6 +871,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? core.scanPRs() : core.prTick()))
   every(2000, core.sweepRunning)
+  every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   every(2000, core.shellTick)
   every(60000, () => core.sleepTick())
   core.policyTick() // a managed policy: now, then every 5 minutes

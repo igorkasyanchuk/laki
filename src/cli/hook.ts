@@ -1,4 +1,4 @@
-// `laki hook <state> [json]`: what agents' hooks run (core.ts hookArgv), on its own so a hook loads conn.ts only, not
+// `laki hook <state> [json]` (`ping`: exits 0, doctor's check): what agents' hooks run (core.ts hookArgv), on its own so a hook loads conn.ts only, not
 // the whole CLI (a node start per tool call). It runs as it's loaded: as the entry, or imported by main.ts' `hook`,
 // the same argv either way. It never fails or blocks the agent for more than a second, but for claude's PreToolUse
 // while an extension's tool gate is on (the daemon's tool-gates file, widgetEvents.ts toolGate): up to TOOL_WAIT,
@@ -9,6 +9,7 @@ import { dataDir, rpc } from '../shared/conn.ts'
 
 const TOOL_WAIT = 3500 // the daemon's TOOL_GATE_MS and its own time
 const [, , , state, extra] = process.argv
+if (state === 'ping') process.exit(0) // doctor's: the command runs, nothing sent
 let quit = setTimeout(() => process.exit(0), 1000) // never hold the agent up
 const tab = process.env.LAKI_TAB
 if (!tab) process.exit(0)

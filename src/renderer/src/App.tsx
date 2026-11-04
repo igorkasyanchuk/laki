@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, In
 import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi, NeedsList, needsSorted } from './Needs'
 import { SideChat } from './SideChat'
-import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, WorkerAsks, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, HookStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, WorkerAsks, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
@@ -542,6 +542,7 @@ export function App() {
   const [overlapsAt, setOverlapsAt] = useState<{ w: string; list?: Collision[]; err?: string } | null>(null) // Check overlaps' dialog: one workspace's, as asked (list: none yet)
   const [readMode, setReadMode] = useState<Record<string, 'reader' | 'term'>>(() => load('laki.reader', {})) // Reader view: each agent tab's, as you left it
   const [checkHid, setCheckHid] = useState<string[]>([]) // Done means checked: strips hidden (workspace:at)
+  const [hookHid, setHookHid] = useState<string[]>([]) // hooks not heard: strips dismissed (tab ids)
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
   const [full, setFull] = useState(false)
@@ -4566,6 +4567,7 @@ export function App() {
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}
+                        {!hookHid.includes(t.id) && <HookStrip tab={t} onCopy={copy} onHide={() => setHookHid(h => [...h, t.id])} />}
                         {/* Send later's for this tab: its timers, also over the sidebar's foot */}
                         <LaterStrip tab={t} later={timers.filter(x => x.then === 'send' && x.tab === t.id)} onNow={ring} onEdit={x => setDialog({ sendLater: t.workspace, edit: x })} onCancel={x => setTimer(x, () => null)} />
                       </>
@@ -4745,6 +4747,7 @@ export function App() {
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
             accounts={layoutsOn ? accountsApi : undefined}
+            hooks={(view.api ?? 0) >= 146 ? () => api.call('hooksSeen') : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             bg={{
               url: bgUrl,
