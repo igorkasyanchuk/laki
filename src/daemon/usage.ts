@@ -12,12 +12,12 @@ import { promisify } from 'node:util'
 import type { AgentUsage, UsageWindow } from '../shared/types.ts'
 
 const run = promisify(execFile)
-// Anthropic turns away clients that ask more often (CodexBar and ccusage hit it): Claude's every 10 minutes, Codex's
+// Anthropic turns away clients that ask more often (CodexBar and ccusage hit it): Claude's every 7.5 minutes, Codex's
 // every 5. AGAIN: an answer that asked no server (signed out, expired) or failed on the way (offline) is asked again
 // sooner. BACK_OFF: told to slow down (429), its Retry-After, else 10, 20, 40, then every 60 minutes, the last numbers
 // kept meanwhile.
 const USAGE_TTL = 5 * 60_000
-const TTL: Record<string, number> = { claude: 10 * 60_000 }
+const TTL: Record<string, number> = { claude: 7.5 * 60_000 }
 const AGAIN = 60_000
 const BACK_OFF = [10, 20, 40, 60].map(m => m * 60_000)
 // tests point both endpoints at a fake server: only a local one (a session's env, from a repo's .laki.json, can

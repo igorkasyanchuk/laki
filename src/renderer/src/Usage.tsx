@@ -179,7 +179,7 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
           </section>
         )}
         <p className="muted small">
-          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in: Claude's every 10 minutes, Codex's every 5. Settings › Agents & profiles has the accounts; Appearance picks the agents.
+          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in: Claude's every 7.5 minutes, Codex's every 5. Settings › Agents & profiles has the accounts; Appearance picks the agents.
         </p>
       </div>
     </div>

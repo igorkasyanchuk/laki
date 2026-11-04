@@ -736,7 +736,7 @@ the 5-hour session of the agents' plans (the busier agent's). Click it for each 
 the week per model and extra usage; Codex's 5-hour and weekly windows. Each shows when it resets. The daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
-asks: Claude's every 10 minutes, Codex's every 5. When a server asks Laki to check less often, the popup keeps the
+asks: Claude's every 7.5 minutes, Codex's every 5. When a server asks Laki to check less often, the popup keeps the
 last numbers, says when they're from and when it checks again (the server's wait, else 10, 20, 40, then every 60
 minutes). It never refreshes a token: an expired one says so
 until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). As a

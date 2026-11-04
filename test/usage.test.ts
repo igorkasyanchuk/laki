@@ -132,7 +132,7 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   assert.equal(hits.at(-1)?.auth, 'Bearer revoked')
 })
 
-test('usage: Claude asked every 10 minutes; told to wait, its Retry-After or longer each time, the last numbers kept', async t => {
+test('usage: Claude asked every 7.5 minutes; told to wait, its Retry-After or longer each time, the last numbers kept', async t => {
   assert.deepEqual([waitOf('120'), waitOf(null), waitOf('soon'), waitOf(new Date(Date.now() + 60_000).toUTCString()) > 50_000], [120_000, 0, 0, true])
   let code = 200
   let retry: string | undefined
@@ -152,24 +152,25 @@ test('usage: Claude asked every 10 minutes; told to wait, its Retry-After or lon
   const t0 = Date.now()
   const at = async (m: number) => (await rig.rpc('usage', { now: t0 + m * min }))[0]
   assert.equal((await at(0)).windows[0].used, 41)
-  assert.equal((await at(9)).windows[0].used, 41)
-  assert.equal(hits, 1) // 9 minutes on: kept
+  assert.equal((await at(7)).windows[0].used, 41)
+  assert.equal(hits, 1) // 7 minutes on: kept
 
   code = 429
   retry = '1800'
-  let u = await at(11)
-  assert.deepEqual([hits, u.windows[0].used, u.error, u.next], [2, 41, 'Anthropic asked Laki to check less often', t0 + 41 * min]) // its Retry-After
-  await at(40)
+  let u = await at(8)
+  assert.deepEqual([hits, u.windows[0].used, u.error, u.next], [2, 41, 'Anthropic asked Laki to check less often', t0 + 38 * min]) // its Retry-After
+  await at(37)
   assert.equal(hits, 2)
   retry = undefined
-  u = await at(42)
-  assert.deepEqual([hits, u.windows[0].used, u.next], [3, 41, t0 + 62 * min]) // the second time in a row: 20 minutes
-  await at(61)
+  u = await at(39)
+  assert.deepEqual([hits, u.windows[0].used, u.next], [3, 41, t0 + 59 * min]) // the second time in a row: 20 minutes
+  await at(58)
   assert.equal(hits, 3)
 
   code = 200
-  u = await at(63)
+  u = await at(60)
   assert.deepEqual([hits, u.error, u.next], [4, undefined, undefined])
   code = 429
-  assert.equal((await at(74)).next, t0 + 84 * min) // back to 10 after an answer
+  assert.equal((await at(67)).next, undefined) // 7 minutes on: kept
+  assert.equal((await at(68)).next, t0 + 78 * min) // back to 10 after an answer
 })

@@ -4,7 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
-- Plan limits are checked less often (Claude's every 10 minutes), and when a server asks Laki to wait, the popup keeps
+- Plan limits are checked less often (Claude's every 7.5 minutes), and when a server asks Laki to wait, the popup keeps
   the last numbers and says when it checks again instead of going blank.
 - Linked tickets: a project's *Ticket* script (Linear, Jira or any CLI) prints each workspace's ticket; its key and
   status show on the workspace's row, its title on the Board and the hover card.
