@@ -196,6 +196,8 @@ for the part you change, and keep it up to date with the change.
 | `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
+| `src/renderer/src/appCtx.ts` | what App's parts read of App: `AppBase` (a field per App local they use; App builds `appBase` each render after `if (!view)`), the `Dialog` type, small helpers they share. No state, no hooks: those stay in App |
+| `src/renderer/src/menus.ts` | `menusOf`: the ⋯ and right-click menus of a workspace (`wsMenu`), a tab (`tabMenu`), a file (`fileMenu`) and a project (`projectActions`), and the sidebar's *Show ›* (`showItems`) |
 | `src/renderer/src/Extension.tsx` | an extension's page, the one place to make, change and set one up: its preview (live or its sample), settings, the inspector, Laki AI's chat (starters, Undo to here), Undo, Try it live, Turn on; New extension |
 | `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab and floated simulator windows (`?window=new`, `ai`, `tab`, `sim`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
