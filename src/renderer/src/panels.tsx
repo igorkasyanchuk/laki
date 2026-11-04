@@ -7,7 +7,7 @@ import { Glyph } from './Glyph'
 import { planCount, planNow } from '../../shared/todos'
 import { ago } from '../../shared/widget'
 import { Markdown } from './MarkdownView'
-import { THEMES } from './themes'
+import { preview, THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, fuzzy, groupNew, laterText, nameOf, type PalKind, PAL_RECENT, paletteGroups, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
 import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
@@ -289,7 +289,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'project', title: 'Add a project', hint: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", go: 'Add one' },
   { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
   { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
-  { id: 'widgets', title: 'Turn on an extension', hint: 'Small live pages in the sidebar or on the Desk: your PRs, your links, or one you make', go: 'Extensions' },
+  { id: 'widgets', title: 'Make an extension', hint: 'Small live pages in the sidebar or on the Desk: from a starter, or Laki AI makes one for you', go: 'Extensions' },
   { id: 'actions', title: 'Set up actions', hint: 'The Run menu: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
@@ -308,20 +308,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme }
       <div className="onboard">
         <div className="ob-bar" style={{ '--p': `${(n / STEPS.length) * 100}%` } as CSSProperties} />
         <p className="muted small">{n === STEPS.length ? 'All done. Enjoy Laki!' : `${n} of ${STEPS.length} done. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
-        <label className="ob-step ob-theme">
-          <Icon name="palette" />
-          <div className="ob-what">
-            <b>Pick a theme</b>
-            <span className="muted small">Painted as you pick; Settings › Appearance has them all with a preview</span>
-          </div>
-          <select value={theme} onChange={e => onTheme(e.target.value)} aria-label="Theme">
-            {([['Dark', false], ['Light', true]] as const).map(([g, light]) => (
-              <optgroup key={g} label={g}>
-                {THEMES.filter(t => !!t.light === light).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+        <ThemeRow theme={theme} onTheme={onTheme} />
         <div className="ob-steps">
         {STEPS.map(x => (
           <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
@@ -347,6 +334,64 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme }
         </div>
       </div>
     </Modal>
+  )
+}
+
+// Get started's theme step: the real themes as cards in a row, dark or light; a click (or ← → in the row) paints Laki
+// with it at once, ‹ › scroll a page
+function ThemeRow({ theme, onTheme }: { theme: string; onTheme: (id: string) => void }) {
+  const cur = THEMES.find(t => t.id === theme) ?? THEMES[0]
+  const [light, setLight] = useState(!!cur.light)
+  const list = THEMES.filter(t => !!t.light === light)
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    row.current?.querySelector<HTMLElement>('.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [theme, light])
+  const page = (d: number) => row.current?.scrollBy({ left: d * row.current.clientWidth * 0.8, behavior: 'smooth' })
+  const step = (d: number) => (i => onTheme(list[Math.max(0, Math.min(list.length - 1, (i < 0 ? 0 : i + d)))].id))(list.findIndex(t => t.id === theme))
+  return (
+    <div className="ob-step ob-theme">
+      <div className="row ob-theme-head">
+        <Icon name="palette" />
+        <div className="ob-what">
+          <b>Make it feel like home</b>
+          <span className="muted small">A click paints Laki at once; Settings › Appearance has them all, with fonts and glass</span>
+        </div>
+        <span className="seg">
+          {([['Dark', false], ['Light', true]] as const).map(([w, l]) => (
+            <button key={w} className={light === l ? 'on' : ''} aria-pressed={light === l} onClick={() => setLight(l)}>
+              {w}
+            </button>
+          ))}
+        </span>
+        <IconButton icon="chevronLeft" title="Earlier themes" onClick={() => page(-1)} />
+        <IconButton icon="chevronRight" title="More themes" onClick={() => page(1)} />
+      </div>
+      <div className="ob-themes" ref={row} role="listbox" aria-label="Themes" tabIndex={0} onKeyDown={e => (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && (e.preventDefault(), step(e.key === 'ArrowRight' ? 1 : -1))}>
+        {list.map(t => {
+          const [bg, panel, fg, accent, ...ansi] = preview(t)
+          const on = t.id === theme
+          return (
+            <button key={t.id} role="option" aria-selected={on} tabIndex={-1} className={`theme ${on ? 'on' : ''}`} style={{ background: bg, color: fg }} onClick={() => onTheme(t.id)}>
+              <span className="theme-bar" style={{ background: panel }}>
+                <span style={{ background: accent }} />
+                {on && (
+                  <b className="theme-check" style={{ background: fg, color: bg }}>
+                    <Icon name="check" size={10} />
+                  </b>
+                )}
+              </span>
+              <span className="theme-dots">
+                {ansi.slice(0, 6).map((c, i) => (
+                  <span key={i} style={{ background: c }} />
+                ))}
+              </span>
+              <span className="theme-name">{t.name}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
