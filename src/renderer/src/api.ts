@@ -45,7 +45,7 @@ type Bridge = {
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void
-  onFolders?(cb: (paths: string[]) => void): void // folders dropped on the Dock icon: projects, as a drop on the window
+  onFolders?(cb: (paths: string[]) => void): () => void // folders dropped on the Dock icon: projects, as a drop on the window
   capture?(webContentsId: number): Promise<string>
   pageShot?(webContentsId: number, whole: boolean, save: boolean): Promise<string> // a Browsers page's screenshot: copied (''), or saved (its path)
   captureRect?(r: { x: number; y: number; width: number; height: number }): Promise<string> // the app window's pixels there, a PNG in base64 (the element picker's)

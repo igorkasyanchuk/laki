@@ -1508,7 +1508,7 @@ export function App() {
         setDialog('new')
       }
     }
-    bridge?.onFolders?.(paths => void addFolders(paths))
+    const unFolders = bridge?.onFolders?.(paths => void addFolders(paths))
     window.addEventListener('dragover', over)
     window.addEventListener('dragleave', leave)
     window.addEventListener('drop', drop)
@@ -1516,6 +1516,7 @@ export function App() {
       window.removeEventListener('dragover', over)
       window.removeEventListener('dragleave', leave)
       window.removeEventListener('drop', drop)
+      unFolders?.()
     }
   }, [call])
 

@@ -803,7 +803,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -875,12 +875,15 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const said = told[toldKey]?.length ? told[toldKey] : undefined
   const models = said?.map(m => m.id) ?? (ag && MODELS[ag]) ?? []
   const typed = p.model?.trim()
-  const efforts = said?.find(m => m.id === typed)?.efforts ?? (ag && EFFORTS[ag])
+  // a model's efforts: the ones it said ([]: none), else the agent's fixed list
+  const effortsOf = (m?: string) => (x => (x?.efforts ?? (ag && EFFORTS[ag])) || undefined)(said?.find(y => y.id === m?.trim()))
+  const efforts = effortsOf(typed)
   // the effort last picked for a model comes back with it (settings.modelEfforts, by agent:model; '' its default model)
   const effortKey = (m?: string) => `${ag}:${m?.trim() ?? ''}`
   const pickModel = (m?: string) => {
     const e = ag ? view.settings.modelEfforts?.[effortKey(m)] : undefined
-    set({ model: m, ...(e !== undefined && (e === '' || efforts?.includes(e)) && { effort: e }) })
+    const ok = effortsOf(m) // one the new model doesn't take goes
+    set({ model: m, effort: e !== undefined && (e === '' || ok?.includes(e)) ? e : p.effort && ok?.includes(p.effort) ? p.effort : undefined })
   }
   const pickEffort = (x: string) => (set({ effort: x }), ag && void api.call('settingsSet', { modelEfforts: { ...view.settings.modelEfforts, [effortKey(p.model)]: x } }).catch(() => {}))
   const modelRow = canModel && (ownModel || (!!typed && !models.includes(typed))) // the menu has the rest: one picker, not two
@@ -952,7 +955,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
         <span>{typed ? (models.includes(typed) ? cap(typed) : typed) : 'Default model'}</span>
         <Icon name="chevron" size={11} />
       </button>
-      {efforts && (
+      {!!efforts?.length && (
         <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="How hard it thinks" onClick={effortMenu}>
           <span>{p.effort ? cap(p.effort) : 'Default effort'}</span>
           <Icon name="chevron" size={11} />

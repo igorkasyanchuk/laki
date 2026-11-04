@@ -159,7 +159,7 @@ export function loginCmd(id: string, agent: AccountAgent) {
 // initialize handshake (stream-json, no prompt: nothing goes to a model, its hooks off, no session kept) and codex's
 // app-server model/list, each with its efforts; a gateway's or custom models come with them. Per account (the
 // profile's, else the one in use), kept a day; a failure (not installed, an older version) isn't kept: the renderer
-// falls back to its fixed list. ponytail: codex's first page only
+// falls back to its fixed list. A model's efforts [] : it takes none. ponytail: codex's first page only
 const MODELS_KEPT = 24 * 3600_000
 const modelsSeen = new Map<string, { at: number; list: Promise<AgentModel[]> }>()
 export const effortsSaid = new Map<string, Set<string>>() // by agent: every effort its models named (core's modelCheck takes them too: codex's max, ultra)
@@ -176,12 +176,12 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
     agent === 'claude'
       ? asked('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--settings', '{"disableAllHooks":true}'], env, [{ type: 'control_request', request_id: 'laki', request: { subtype: 'initialize' } }], m =>
           m?.type === 'control_response' && Array.isArray(m.response?.response?.models)
-            ? (m.response.response.models as { value: string; displayName?: string; description?: string; supportedEffortLevels?: string[] }[]).filter(x => x.value && x.value !== 'default').map(x => ({ id: x.value, name: x.displayName ?? x.value, ...(x.description && { sub: x.description }), ...(x.supportedEffortLevels?.length && { efforts: x.supportedEffortLevels }) }))
+            ? (m.response.response.models as { value: string; displayName?: string; description?: string; supportedEffortLevels?: string[] }[]).filter(x => x.value && x.value !== 'default').map(x => ({ id: x.value, name: x.displayName ?? x.value, ...(x.description && { sub: x.description }), ...(Array.isArray(x.supportedEffortLevels) && { efforts: x.supportedEffortLevels }) }))
             : undefined,
         )
       : asked('codex', ['app-server'], env, [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { clientInfo: { name: 'laki', version: '1' } } }, { jsonrpc: '2.0', method: 'initialized' }, { jsonrpc: '2.0', id: 2, method: 'model/list', params: {} }], m =>
           m?.id === 2 && Array.isArray(m.result?.data)
-            ? (m.result.data as { model: string; displayName?: string; description?: string; hidden?: boolean; isDefault?: boolean; supportedReasoningEfforts?: { reasoningEffort: string }[] }[]).filter(x => x.model && !x.hidden).map(x => ({ id: x.model, name: x.displayName ?? x.model, ...(x.description && { sub: x.description }), ...(x.supportedReasoningEfforts?.length && { efforts: x.supportedReasoningEfforts.map(e => e.reasoningEffort) }), ...(x.isDefault && { def: true }) }))
+            ? (m.result.data as { model: string; displayName?: string; description?: string; hidden?: boolean; isDefault?: boolean; supportedReasoningEfforts?: { reasoningEffort: string }[] }[]).filter(x => x.model && !x.hidden).map(x => ({ id: x.model, name: x.displayName ?? x.model, ...(x.description && { sub: x.description }), ...(Array.isArray(x.supportedReasoningEfforts) && { efforts: x.supportedReasoningEfforts.map(e => e.reasoningEffort) }), ...(x.isDefault && { def: true }) }))
             : undefined,
         )
   )

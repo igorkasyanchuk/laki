@@ -52,8 +52,10 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('deep-link-ready') // then main sends one that came first
   },
   onFolders: (cb: (paths: string[]) => void) => {
-    ipcRenderer.on('open-folders', (_e, paths: string[]) => cb(paths)) // dropped on the Dock icon
+    const f = (_e: unknown, paths: string[]) => cb(paths) // dropped on the Dock icon
+    ipcRenderer.on('open-folders', f)
     ipcRenderer.send('folders-ready') // then main sends the ones that came first
+    return () => void ipcRenderer.removeListener('open-folders', f)
   },
   onNewPrompt: (cb: (prompt: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string) => cb(p)), // the new-workspace window's
   fitNew: (height: number) => ipcRenderer.send('new-fit', height), // its height: what the page needs

@@ -1119,15 +1119,16 @@ export function storageOf(ws: Workspace) {
 // ---------- projects
 
 // a git repository (its top level), or any other folder (git: false)
-export async function projectAdd(path: string): Promise<Project> {
+// back: an archived project's folder added again brings it back (yours; an agent's is refused: the user does)
+export async function projectAdd(path: string, back = true): Promise<Project> {
   const remote = REMOTE.exec(path.trim())
-  if (remote && !existsSync(path)) return hostProjectAdd(remote[1], remote[2])
+  if (remote && !existsSync(path)) return hostProjectAdd(remote[1], remote[2], back)
   const abs = resolve(path)
   if (!statSync(abs, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${path} is not a folder`)
   const top = await git({ path: abs }, 'rev-parse', '--show-toplevel').catch(() => '')
   const root = top || realpathSync(abs)
   const existing = state.projects.find(p => !p.host && !p.kind && p.path === root)
-  if (existing) return unshelve(existing)
+  if (existing) return unshelve(existing, back)
   return projectPush({ id: '', name: basename(root), path: root, git: !!top })
 }
 
@@ -1162,7 +1163,7 @@ async function quickMake(o: Quick) {
 }
 
 // a folder on an SSH host (host:path; a relative path or ~ is from its home): a repository's top level, or the folder
-async function hostProjectAdd(host: string, path: string): Promise<Project> {
+async function hostProjectAdd(host: string, path: string, back: boolean): Promise<Project> {
   const h = await hostUp(host)
   const want = path.startsWith('/') ? path : `${h.home}/${path.replace(/^~(\/|$)/, '')}`
   const where = 'cd "$1" 2>/dev/null || { echo "no folder $1" >&2; exit 1; }; echo "$(git rev-parse --show-toplevel 2>/dev/null)"; pwd -P'
@@ -1173,7 +1174,7 @@ async function hostProjectAdd(host: string, path: string): Promise<Project> {
   const root = top || real
   if (!root?.startsWith('/')) throw new Error(`${host}:${path} is not a folder`)
   const existing = state.projects.find(p => p.host === host && p.path === root)
-  if (existing) return unshelve(existing)
+  if (existing) return unshelve(existing, back)
   const p = projectPush({ id: '', name: `${basename(root)} (${host})`, path: root, git: !!top, host }) // told apart from one here in every list
   void readHostCfg(p).then(changed)
   return p
@@ -1222,7 +1223,8 @@ export function projectArchive(o: { project: string; on: boolean }) {
 }
 export const projectArchived = (id: string) => !!state.projects.find(p => p.id === id)?.archived
 // back from the archive (its menu's Undo, Settings' Bring back, its folder added again)
-function unshelve(p: Project) {
+function unshelve(p: Project, back = true) {
+  if (p.archived && !back) throw new Error(`${p.name} is archived: the user brings it back (Settings › Archived projects)`)
   if (p.archived) delete p.archived, log(`project ${p.id} back from the archive`), save(), changed()
   return p
 }

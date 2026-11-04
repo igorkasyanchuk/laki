@@ -207,7 +207,7 @@ type Handler = (p: any, c?: core.Conn) => unknown
 const api: Record<string, Handler> = {
   ping: () => 'pong',
   state: () => core.view(),
-  projectAdd: p => core.projectAdd(p.path),
+  projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
   projectRm: p => core.projectRm(p.id),
   projectArchive: p => core.projectArchive({ project: p.project, on: p.on !== false }),
   updateIdle: p => core.updateWhenIdle({ on: p.on, caller: p.caller }),
@@ -522,7 +522,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive'])
+const FROM = new Set(['wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
