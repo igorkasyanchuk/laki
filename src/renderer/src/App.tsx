@@ -3503,7 +3503,6 @@ export function App() {
         {w.ticket && mark('ticket') && (
           <span className="ws-ticket" data-tip={[w.ticket.key, w.ticket.title, w.ticket.status && `(${w.ticket.status})`].filter(Boolean).join(' ') + (w.ticket.url ? '\nClick: open it' : '')} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), w.ticket?.url && openExternal(w.ticket.url))}>
             {w.ticket.key}
-            {w.ticket.status && <span className="ws-ticket-st">{w.ticket.status}</span>}
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
