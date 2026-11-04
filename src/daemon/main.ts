@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
 import { policyTick } from './policy.ts'
 import { ticketTick } from './tickets.ts'
@@ -355,7 +356,7 @@ const api: Record<string, Handler> = {
   prReview: p => core.prReview(p),
   issueList: p => core.issueList(p),
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
-  usageDays: () => core.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
+  usageDays: () => metersMod.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
   commits: p => core.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => core.commitDiff(p.ws, p.sha),
   prDraft: p => core.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Mark as draft / Ready for review
@@ -375,7 +376,7 @@ const api: Record<string, Handler> = {
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
-  usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, core.statusLimits), // claude's status line's, while fresh
+  usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, metersMod.statusLimits), // claude's status line's, while fresh
   accounts: () => accountViews(),
   accountAdd: p => accountAdd(p),
   accountSet: p => accountSet(p),
@@ -478,7 +479,7 @@ const api: Record<string, Handler> = {
     planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
     aiForget(chat)
   },
-  chatRead: p => core.chatRead(p), // Reader view: meters.ts
+  chatRead: p => metersMod.chatRead(p), // Reader view: meters.ts
   checkAgain: p => checkAgain(p), // Done means checked: verify.ts
   checkStop: p => checkStop(p),
   flowList: p => flowList(p), // workflows: workflow.ts
@@ -882,7 +883,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(300000, policyTick)
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(Number(process.env.LAKI_OVERLAP_MS || 15000), core.scanOverlaps) // Collision radar
-  every(Number(process.env.LAKI_METER_MS || 10000), core.meterTick) // claude's and codex's transcripts: the tabs' context and usage
+  every(Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))
   every(30000, () => core.scheduleTick())
@@ -893,7 +894,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), core.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
