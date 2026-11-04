@@ -2426,6 +2426,29 @@ prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught half
 running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
 a log out). After a crash, shells start fresh, and nothing comes back over SSH.
 
+## Managed policy (teams)
+
+An admin can lock some of Laki for everyone on a Mac: a JSON object, deployed with MDM as managed preferences for
+`dev.laki.app` (a configuration profile), or as a file: `/Library/Application Support/Laki/policy.json` on a Mac,
+`/etc/laki/policy.json` on Linux. Laki reads it as its daemon starts and every 5 minutes.
+
+```json
+{
+  "settings": { "updateCheck": true, "updateDelay": 7, "webhook": null },
+  "remote": false,
+  "bypass": false,
+  "agents": ["claude", "codex"]
+}
+```
+
+- `settings`: any of Laki's settings (their keys in `laki-settings.json`, Settings › General › Export), each locked to
+  that value; `null` keeps it unset (`webhook: null`: no phone pushes). Settings says which are managed.
+- `remote: false`: no remote access.
+- `bypass: false`: approvals required: no agent starts in a mode, or with flags, that never asks before it acts.
+- `agents`: only these agents start.
+
+A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped.
+
 ## Troubleshooting
 
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.

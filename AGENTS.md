@@ -245,7 +245,11 @@ no PR scans): the project's ⋯ › *Archive project…*, Settings › *Archived
 works or asks, then the new app's `shutdown` of the older daemon once none does; `laki update --when-idle [--off]`,
 MCP's `laki_update_when_idle`; 141: `agentModels` (`agent` claude or codex, `preset`: its account; accounts.ts: claude's
 stream-json initialize handshake, its hooks off and no session kept, or `codex app-server`'s model/list; a day per account,
-a failure not kept): the new-workspace page's model menu and its efforts, the fixed `MODELS` the fallback. A setting the renderer adds
+a failure not kept): the new-workspace page's model menu and its efforts, the fixed `MODELS` the fallback; 142: the view's `managed` (`daemon/policy.ts`: a managed policy from LAKI_POLICY, MDM's
+`/Library/Managed Preferences/dev.laki.app.plist` through plutil, `/Library/Application Support/Laki/policy.json` or
+`/etc/laki/policy.json`, at start and every 5 minutes, `policyTick`: `settings` locked (`settingsSet` refuses another,
+`policySettings`), `remote: false` (`remoteStart`), `bypass: false` and `agents` (core's `tabSpec`, `policyAgent`);
+Settings' banner. ponytail: a tab made before a lock restarts as it was). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -2790,6 +2794,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/secrets.ts` | `laki secret`: an agent asks you for a token on a masked card, gets a 0600 file's path |
 | `src/daemon/verify.ts` | Done check: a project's scripts and a second agent's review as an agent's turn ends, failures sent back |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
+| `src/daemon/policy.ts` | a managed policy for teams: locked settings, remote access off, approvals required, which agents |
 | `src/daemon/notes.ts` | notes and To-dos: one JSON file each, their pasted files, the list with search |
 | `src/renderer/src/FullReview.tsx` | the full review (`settings.fullReview`, on unless false: Settings › Pull requests' *Review tab*; `scanStats` runs for it): the tab bar's Review tab over the panes, files with Viewed boxes under a filter (words or `globMatch`'s glob; Mark viewed takes its matches, `useGhViewed`'s `mark` one file after another), every file's diff (Collapse/Expand all, blame per file: `blame` old and new, DiffRows' `gutter`), the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`), and everyone's on GitHub (`prThreads` `all`, `prTalk`); its columns' widths `laki.reviewFilesW`, `laki.reviewNotesW`, the comments hidden `laki.reviewNotesOff`, their tab `laki.reviewSide` (yours, `pr`: the PR's description, `gh`); pinned files first in both lists `laki.reviewPins` (p); a hunk's arrows (`expander`) show `MORE` lines of the worktree's file around it (`text.ts` `gapsOf` from the @@ heads, `DiffLine.ctx`; not for `PR #n`, an image, A, D or untracked); a file's right click: blame, `fileWeb` (Diff.tsx `webItems`, Changes' too), Mark viewed by folder, PanelApi's `fileItems` (App's `fileMenu`), Revert |
 | `src/renderer/src/Diff.tsx` | a diff's shared pieces (Changes, Review, the full review): `diffByFile`, `DiffRows`, `CommentBox`, `ImageDiff`, `useRevert`, `useGhViewed`, `ThreadCard`, `useSuggestions`, `useLoad` |

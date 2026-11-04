@@ -42,6 +42,8 @@ export * from './remote.ts'
 export * from './meters.ts'
 export * from './phone.ts'
 export * from './files.ts'
+export * from './policy.ts'
+import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 export * from './schedule.ts'
 
 export const run = promisify(execFile)
@@ -614,6 +616,7 @@ export function view(): View {
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
     ...(updateIdle && { updateIdle }),
+    ...((m => m && { managed: m })(managedView())),
   }
 }
 
@@ -1499,6 +1502,7 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
   const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
   const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
   modelCheck(preset, model, effort, perm, fast)
+  if (kind === 'agent') policyAgent(preset, perm === undefined ? pr?.perm : perm || undefined, pr?.args) // a managed policy's agents and approvals
   return { pr, cmd, preset, kind, model, effort, perm, fast }
 }
 
@@ -1788,6 +1792,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 
 // own: Laki's own call (widgetDev), the only one that writes widgetDevAgent
 export function settingsSet(o: Settings, own = false) {
+  policySettings(o as Record<string, unknown>) // a managed one only as the policy has it
   if (o.webhook?.answer && !answerOk(o.webhook)) throw new Error(`Answer from the phone: ${ANSWER_WHY}`)
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
@@ -1848,6 +1853,7 @@ export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
   widgetsOff() // every extension off
+  policyTick() // a managed policy's settings again
   setIconLook(lookOf(state.settings))
   save()
   changed()

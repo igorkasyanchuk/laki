@@ -1,7 +1,7 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
@@ -1255,4 +1255,21 @@ test('update when idle: asked, in the view (the agent that asked as by), cancell
   assert.ok((await rig.rpc('state')).updateIdle)
   assert.match((await rig.cli('update', '--when-idle', '--off')).out, /off/)
   assert.equal((await rig.rpc('state')).updateIdle, undefined)
+})
+
+test('a managed policy: its settings locked, remote access off, approvals required, only some agents', async t => {
+  const file = join(mkdtempSync('/tmp/laki-policy-'), 'policy.json')
+  writeFileSync(file, JSON.stringify({ settings: { updateCheck: true, keepAwake: false, webhook: null }, remote: false, bypass: false, agents: ['claude'] }))
+  const rig = await fresh(t, { env: { LAKI_POLICY: file } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const v = await rig.rpc('state')
+  assert.deepEqual(v.managed, { from: file, keys: ['updateCheck', 'keepAwake', 'webhook'], remote: false, bypass: false, agents: ['claude'] })
+  assert.equal(v.settings.updateCheck, true)
+  await assert.rejects(rig.rpc('settingsSet', { keepAwake: true }), /keepAwake is managed by your organization/)
+  await assert.rejects(rig.rpc('settingsSet', { webhook: { url: 'https://ntfy.sh/x', format: 'ntfy' } }), /webhook is managed/) // null: kept unset
+  await rig.rpc('settingsSet', { keepAwake: false, fontSize: 14 }) // the same value back: fine
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: 'a@b.co' }), /remote access is turned off by your organization/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'c', preset: 'codex' }), /codex is turned off by your organization/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b', preset: 'claude', perm: 'bypassPermissions' }), /requires approvals/)
+  assert.equal((await rig.rpc('wsNew', { project: p.id, name: 'a', preset: 'claude' })).id, 'a')
 })

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A managed policy for teams: an admin can lock settings, turn off remote access, require approvals and pick the
+  agents, through MDM or a policy file (the guide's *Managed policy*). Settings says what's managed.
 - The new-workspace page's model menu lists the models Claude Code and Codex say they have (a gateway's or custom
   ones too), each with its own efforts, instead of a fixed list.
 - *Update when idle* (Settings › Updates): Laki waits until no agent works or asks you, then updates and restarts,

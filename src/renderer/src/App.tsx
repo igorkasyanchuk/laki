@@ -4713,6 +4713,7 @@ export function App() {
             projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
             archived={view.archivedProjects}
             updateIdle={!!view.updateIdle}
+            managed={view.managed}
             onUpdateIdle={on => void call('updateIdle', { on })}
             onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}

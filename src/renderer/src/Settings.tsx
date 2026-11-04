@@ -746,6 +746,7 @@ export function SettingsPage(p: {
   archived?: { id: string; name: string; path: string; archived: number; workspaces: number }[] // archived projects (view.archivedProjects)
   onUnarchive?: (id: string) => void
   updateIdle?: boolean // Update when idle asked (view.updateIdle)
+  managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } // a managed policy's locks (view.managed)
   onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
@@ -1070,6 +1071,14 @@ export function SettingsPage(p: {
           )}
         </nav>
         <div className="settings-main form">
+          {p.managed && (
+            <div className="setting-box managed-box" role="note">
+              <Says
+                title="Some settings are managed by your organization"
+                hint={[p.managed.keys.length ? `Locked: ${p.managed.keys.join(', ')}` : '', p.managed.remote === false ? 'remote access off' : '', p.managed.bypass === false ? 'agents always ask before they act' : '', p.managed.agents ? `agents: ${p.managed.agents.join(', ')} only` : ''].filter(Boolean).join(' · ') + ` (${p.managed.from})`}
+              />
+            </div>
+          )}
           {sec === 'archived' && (
             <Group title="Archived projects">
               <div className="setting-box">

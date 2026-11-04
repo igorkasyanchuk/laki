@@ -9,7 +9,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
 import { type Agent, AGENT_NAMES, type Remote, REMOTE_TRIES, type Tunnel } from '../shared/types.ts'
-import { broadcast, changed, dir, findWs, firstLine, log, onPath, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
+import { broadcast, changed, dir, findWs, firstLine, log, onPath, policyRemote, projectConfig, resolveTarget, run, save, screen, settingsSet, state } from './core.ts'
 import { type Tail, tailOf } from './meters.ts'
 import { own } from './resources.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage } from './share.ts'
@@ -562,6 +562,7 @@ const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMO
 // via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
 // funnel: tailscale funnel, on the internet, so with a PIN only
 export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean }): Promise<Remote | undefined> {
+  policyRemote() // a managed policy may turn it off
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   if (o.via !== undefined && o.via !== 'cloudflare' && o.via !== 'tailscale') throw new Error(`through cloudflare or tailscale, not ${o.via}`)
