@@ -652,9 +652,7 @@ function UpdatesField({ on, onOn, delay, onDelay }: { on: boolean; onOn: (on: bo
       <Switch className="switch-row" on={on} onChange={onOn}>
         <Says title="Check for updates" hint="At launch and every 4 hours Laki asks GitHub for its newest release: the status bar says so until you update, a toast once per version. Nothing downloads until you click Update." />
       </Switch>
-      <div className="row">
-        <Says title="Update delay" hint="Offer a release only once it's this old: others find its problems first. Skip the delay once lets one in now." />
-        <span className="grow" />
+      <label className="switch-row">
         <select value={delay} onChange={e => onDelay(Number(e.target.value))} aria-label="Update delay">
           {UPDATE_DELAYS.map(d => (
             <option key={d} value={d}>
@@ -662,7 +660,8 @@ function UpdatesField({ on, onOn, delay, onDelay }: { on: boolean; onOn: (on: bo
             </option>
           ))}
         </select>
-      </div>
+        <Says title="Update delay" hint="Offer a release only once it's this old: others find its problems first. Skip the delay once lets one in now." />
+      </label>
       <p className="muted small">
         After an update the yellow bar offers to restart Laki's daemon when you're ready. <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>All releases ↗</a>
       </p>

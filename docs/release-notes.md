@@ -2,6 +2,10 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Settings › General › Updates: *Update delay*'s menu is its usual size again, not as tall as the words beside it.
+
 ## 0.44.0 · Nov 4, 2026
 
 - No extensions come with Laki any more: *Links* and *My PRs* are gone (one you turned on goes too). Make your own

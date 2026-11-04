@@ -3026,6 +3026,7 @@ export function App() {
   const keys = useRef<(e: KeyboardEvent, force?: KeyId, fixed?: boolean) => void>(() => {})
   keys.current = (e, force, fixed) => {
     if (keyRec.on) return // a hotkey being recorded in Settings
+    if (!view) return // the splash: nothing to act on, and what the keys read is declared after `if (!view)` below
     // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
     if (!force && settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
     const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
