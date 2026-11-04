@@ -2117,6 +2117,25 @@ export function App() {
   // main's update.ts: a newer release stays in the status bar until you update (every check says so, a restart too);
   // a version a scheduled check found also toasts, once each (main's update.json). Its notes and Download: Settings
   const [upd, setUpd] = useState<UpdateState | null>(null)
+  // Update when idle (the daemon's view.updateIdle, so it outlives this window: Settings › Updates, an agent's laki
+  // update --when-idle): the release looked for and downloaded, installed once no agent works or asks (the agent that
+  // asked aside: its turn goes on, the daemon outlives the app), then, in the new app, the older daemon restarted once
+  // none does at all (tabs resume). Nothing to update: it's turned off, saying why
+  const idleAsk = view?.updateIdle
+  const idleGo = useRef('') // what was done for this ask already (a step each, not again on every view)
+  useEffect(() => {
+    if (!idleAsk || !upd || !bridge?.update) return
+    const busy = (but?: string) => view!.tabs.some(t => t.id !== but && (t.status === 'running' || t.status === 'waiting') && (t.kind === 'agent' || !!t.runs))
+    const once = (step: string, go: () => unknown) => idleGo.current !== `${idleAsk.at}:${step}` && ((idleGo.current = `${idleAsk.at}:${step}`), void go())
+    const off = (why: string) => once('off', () => (toast(why), api.call('updateIdle', { on: false })))
+    if (upd.status === 'checking' || upd.status === 'downloading') return
+    if (upd.status === 'ready') return void (!busy(idleAsk.by) && once('install', () => bridge!.update!('install')))
+    if (upd.latest && upd.status === 'available') return void (upd.install && upd.latest.feed ? once('download', () => bridge!.update!('download')) : off("Laki can't update itself here: Settings › Updates opens the release's page"))
+    if (upd.status === 'error') return void off(`Update when idle stopped: ${upd.error}`)
+    if ((upd.checked ?? 0) < idleAsk.at && !upd.latest) return void once('check', () => bridge!.update!('check')) // looked for since it was asked
+    if (staleDaemon(view!)) return void (!busy() && once('daemon', () => api.call('shutdown'))) // the new app: main starts the new daemon
+    off(upd.held ? `Laki ${upd.held.version} waits for your update delay` : 'Laki is up to date')
+  }, [idleAsk, upd, view])
   useEffect(() => {
     void bridge?.update?.('state').then(x => setUpd(s => s ?? x)) // an event that came first is newer
     return bridge?.onUpdate?.(s => (setUpd(s), void (s.found && s.latest && toast(`Laki ${s.latest.version} is out`, () => setDialog({ section: 'general', spot: 'Updates' }), "See what's new"))))
@@ -4210,7 +4229,7 @@ export function App() {
           {upd?.latest && ( // a newer release: here until you update (Settings › General › Updates: its notes, Update)
             <button className={`sb-update ${upd.status === 'ready' ? 'sb-ready' : ''}`} data-tip={`Laki ${upd.version} → ${upd.latest.version}: what's new and Update in Settings › Updates`} onClick={() => setDialog({ section: 'general', spot: 'Updates' })}>
               <Icon name="download" size={11} />
-              {upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
+              {view?.updateIdle ? 'Updates when idle' : upd.status === 'ready' ? 'Restart to update' : upd.status === 'downloading' ? `Downloading ${upd.latest.version}…` : `Update to ${upd.latest.version}`}
             </button>
           )}
           <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
@@ -4693,6 +4712,8 @@ export function App() {
             }}
             projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
             archived={view.archivedProjects}
+            updateIdle={!!view.updateIdle}
+            onUpdateIdle={on => void call('updateIdle', { on })}
             onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}

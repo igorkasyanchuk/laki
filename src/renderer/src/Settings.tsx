@@ -595,7 +595,7 @@ function HotkeyField(p: { on: boolean; keys: string; def: string; title: string;
 
 // main's update.ts: this version, the newest release (its notes), and the one next step: Download (a signed Mac:
 // here, then Restart to update; elsewhere the release's page), or Check now
-function UpdatesField({ on, onOn, delay, onDelay }: { on: boolean; onOn: (on: boolean) => void; delay: number; onDelay: (days: number) => void }) {
+function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean; onOn: (on: boolean) => void; delay: number; onDelay: (days: number) => void; idle?: boolean; onIdle?: (on: boolean) => void }) {
   const [u, setU] = useState<UpdateState | null>(null)
   const [, tick] = useState(0) // "checked … ago" moves on while the page stays open
   useEffect(() => {
@@ -624,6 +624,15 @@ function UpdatesField({ on, onOn, delay, onDelay }: { on: boolean; onOn: (on: bo
       <div className="row cli-row">
         <Says title={`Laki ${u.version}`} hint={says} />
         <span className="grow" />
+        {idle && onIdle ? (
+          <button type="button" onClick={() => onIdle(false)} data-tip="Laki updates once no agent works or asks you: the app, then its daemon (tabs resume)">
+            Updates when idle · Cancel
+          </button>
+        ) : (here || u.status === 'ready') && onIdle && u.status !== 'downloading' && u.status !== 'checking' ? (
+          <button type="button" onClick={() => onIdle(true)} data-tip="Waits until no agent works or asks you, then restarts Laki on the new version, and its daemon once all are idle (tabs resume)">
+            Update when idle
+          </button>
+        ) : null}
         {u.status === 'ready' ? (
           <button type="button" className="primary" onClick={() => run('install')}>
             Restart to update
@@ -736,6 +745,8 @@ export function SettingsPage(p: {
   projects?: ProjectInfo[]
   archived?: { id: string; name: string; path: string; archived: number; workspaces: number }[] // archived projects (view.archivedProjects)
   onUnarchive?: (id: string) => void
+  updateIdle?: boolean // Update when idle asked (view.updateIdle)
+  onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
   renameProjects?: boolean
@@ -1197,7 +1208,7 @@ export function SettingsPage(p: {
               </Group>
               {bridge?.update && (
                 <Group title="Updates">
-                  <UpdatesField on={s.updateCheck !== false} onOn={updateCheck => set({ updateCheck })} delay={s.updateDelay ?? 0} onDelay={updateDelay => set({ updateDelay })} />
+                  <UpdatesField on={s.updateCheck !== false} onOn={updateCheck => set({ updateCheck })} delay={s.updateDelay ?? 0} onDelay={updateDelay => set({ updateDelay })} idle={p.updateIdle} onIdle={p.onUpdateIdle} />
                 </Group>
               )}
               {bridge?.badge && (

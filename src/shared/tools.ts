@@ -221,6 +221,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     run: a => rpc('progress', { tab: process.env.LAKI_TAB, pct: a.pct, note: a.note }),
   },
   {
+    name: 'laki_update_when_idle',
+    description: "Update Laki once no agent works or asks the user anything: the app installs its newest release (your own turn goes on: Laki's daemon keeps running), then restarts its daemon when every agent is idle (yours too; tabs resume). on: false cancels it.",
+    inputSchema: obj({ on: { type: 'boolean', description: 'false: cancel it' } }),
+    run: a => rpc('updateIdle', { on: a.on !== false, caller: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB } }),
+  },
+  {
     name: 'laki_secret',
     description: "Ask the user for a secret (an API key, a token, a password) without it going into this chat: they type it on a masked card under your tab in Laki, and you get only the path of a 0600 file that holds it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat \"$path\"). Waits up to 15 minutes; an error if they refuse.",
     inputSchema: obj({ label: str('what it is, a few words: Stripe test key') }, ['label']),

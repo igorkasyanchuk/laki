@@ -1242,3 +1242,17 @@ test("a workspace's rail icon (wsSet icon): an icon's name or an emoji, '' none,
   await rig.rpc('wsSet', { id: w.id, icon: '' })
   assert.equal(await icon(), undefined)
 })
+
+test('update when idle: asked, in the view (the agent that asked as by), cancelled; the CLI says it', async t => {
+  const rig = await fresh(t)
+  assert.equal((await rig.rpc('state')).updateIdle, undefined)
+  const r = await rig.rpc('updateIdle', { on: true })
+  assert.ok(r.at > 0 && !r.by) // not from an agent's tab: no one's turn to spare
+  assert.deepEqual((await rig.rpc('state')).updateIdle, r)
+  assert.equal(await rig.rpc('updateIdle', { on: false }), null)
+  assert.equal((await rig.rpc('state')).updateIdle, undefined)
+  assert.match((await rig.cli('update', '--when-idle')).out, /once no agent works or asks/)
+  assert.ok((await rig.rpc('state')).updateIdle)
+  assert.match((await rig.cli('update', '--when-idle', '--off')).out, /off/)
+  assert.equal((await rig.rpc('state')).updateIdle, undefined)
+})

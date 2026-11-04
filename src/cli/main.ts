@@ -37,6 +37,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--event-json') flags['event-json'] = argv[++i] ?? '-'
   else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
+  else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
@@ -486,6 +487,12 @@ async function main() {
       if (!target || !words.length) throw new Error('usage: laki ask <@name|ws[/tab]> <question> [--wait minutes]')
       const said = await askAgent(rpc, target, words.join(' '), process.env.LAKI_TAB, Number(flags.wait))
       return out({ answer: said }, said || '(it answered with no text)')
+    }
+    case 'update': {
+      // laki update --when-idle [--off]: Laki updates itself once no agent works or asks (the app first, then its daemon)
+      if (!flags['when-idle']) throw new Error('usage: laki update --when-idle [--off]')
+      const r = await rpc('updateIdle', { on: !flags.off, caller: caller() })
+      return out(r, r ? 'Laki updates once no agent works or asks: the app first, then its daemon (tabs resume)' : 'Update when idle: off')
     }
     case 'progress': {
       // laki progress <0-100> [what you're on]: an agent's estimate, on its tab (LAKI_TAB) until its turn ends

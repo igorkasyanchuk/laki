@@ -47,6 +47,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki agents                                 the named agents, wherever they run
   laki ask <@name|ws[/tab]> <question> [--wait min]   ask another agent; prints its reply (15 minutes at most)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
+  laki update --when-idle [--off]             update Laki once no agent works or asks: the app, then its daemon
   laki secret <what it is>                    in an agent's tab: the user types a token on a masked card; prints only
                                               the path of a 0600 file that holds it (gone after 24 hours)
   laki show <text> [--open <folder|file|url>…] [--title t]   in a tab: a card under it in Laki, a button per --open

@@ -554,6 +554,18 @@ const QUIET = 4000
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time (none run from source)
 const BUILT = typeof __BUILT__ === 'string' ? __BUILT__ : undefined
 
+// Update when idle (Settings › Updates, laki update --when-idle, MCP's laki_update_when_idle): kept here, so it outlives
+// the app's restart. The app downloads the release, installs it once no agent works or asks (`by`, the agent that
+// asked, aside: its turn goes on, this daemon outlives the app), then restarts this daemon, if it's older, once none
+// works or asks at all. In memory: it ends with this daemon (the restart it asked for)
+let updateIdle: { at: number; by?: string } | undefined
+export function updateWhenIdle(o: { on?: boolean; caller?: { ws?: unknown; tab?: unknown } }) {
+  updateIdle = o.on === false ? undefined : { at: Date.now(), ...(agentCaller(o.caller) && typeof o.caller?.tab === 'string' && { by: o.caller.tab }) }
+  log(updateIdle ? `update when idle${updateIdle.by ? ` (asked by ${updateIdle.by})` : ''}` : 'update when idle: off')
+  changed()
+  return updateIdle ?? null
+}
+
 export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
@@ -601,6 +613,7 @@ export function view(): View {
     built: BUILT,
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
+    ...(updateIdle && { updateIdle }),
   }
 }
 

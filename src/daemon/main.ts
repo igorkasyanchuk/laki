@@ -210,6 +210,7 @@ const api: Record<string, Handler> = {
   projectAdd: p => core.projectAdd(p.path),
   projectRm: p => core.projectRm(p.id),
   projectArchive: p => core.projectArchive({ project: p.project, on: p.on !== false }),
+  updateIdle: p => core.updateWhenIdle({ on: p.on, caller: p.caller }),
   projectSet: p => core.projectSet(p.id, p),
   memoryAdd: p => core.memoryAdd({ ...p, tab: p.from?.tab ?? p.tab }), // an agent's (auto-memory), or --mine (yours: agentNo); by: the tab found by its process
   memoryRm: p => core.memoryRm(p), // an agent's only
@@ -521,7 +522,7 @@ const remoteNo = (method: string, p: any) =>
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive'])
-const CALLER = new Set(['tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
+const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket

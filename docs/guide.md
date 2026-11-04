@@ -2401,6 +2401,10 @@ a click opens Settings › Updates) until you update, and says so once in a toas
 signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
 your own: the release's page). Pre-releases are never offered. *Update delay* (none, 1, 3, 7, 14 or 30 days) offers a
 release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now.
+*Update when idle* (beside *Update to x.y* and *Restart to update*) waits until no agent works or asks you, then
+downloads if it must, restarts Laki on the new version, and, once every agent is idle, restarts its daemon too (tabs
+resume); *Cancel* stops it. An agent can ask for it (`laki update --when-idle`, MCP's `laki_update_when_idle`): its own
+turn isn't waited for, and the daemon waits for it.
 
 By hand: quit it (⌘Q: the daemon and your agents keep running), then either `brew upgrade --cask laki` or download
 the new dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and replace
