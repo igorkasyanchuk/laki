@@ -9,7 +9,8 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SECRET_WAIT } from '../shared/types.ts'
-import { broadcast, changed, log, phone, rtOf, slug, state, storageOf, tracked } from './core.ts'
+import { broadcast, changed, log, rtOf, slug, state, storageOf, tracked } from './core.ts'
+import { phone } from './phone.ts'
 
 const SECRET_HOURS = 24
 const SECRET_MAX = 64 << 10

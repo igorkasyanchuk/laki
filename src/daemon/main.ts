@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as phoneMod from './phone.ts'
 import { policyTick } from './policy.ts'
 import { ticketTick } from './tickets.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
@@ -304,10 +305,10 @@ const api: Record<string, Handler> = {
   secretsTidy: p => secretsTidy(p.now), // tests move the clock
   prAttach: p => core.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
   prDetach: p => core.prDetach(p), // { ws }: its linked PR to related (not its own)
-  phoneTick: () => core.phoneTick(), // answers from the phone now (tests: not every 5 s)
+  phoneTick: () => phoneMod.phoneTick(), // answers from the phone now (tests: not every 5 s)
   prList: p => core.prList(p), // Laki AI's laki_prs: a project's open PRs
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
-  webhookTest: p => core.webhookTest(p),
+  webhookTest: p => phoneMod.webhookTest(p),
   uiReset: () => core.uiReset(),
   portKill: p => core.portKill(p),
   meme: () => meme(),
