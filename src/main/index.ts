@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -757,7 +757,7 @@ function placeFloater() {
   const d = notch ? islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay()) : undefined
   // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange); the island also while
   // nothing runs or waits and over a full-screen app
-  if ((!floats.items.length && (!floats.add || notch)) || front || parked || shooting || (d && fullScreen(d))) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
+  if ((!floats.items.length && (!floats.add || notch)) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
@@ -807,6 +807,10 @@ const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, x.status])
 let pill: Rect | null = null
 let isl: { tab: string; life: CardLife; list?: boolean; i: number } | null = null // the card that shows
 let islTick: NodeJS.Timeout | undefined
+let islSent = '' // what the shown card was last sent: the same again isn't (its reply box keeps what you type)
+// the menu bar set to hide on its own: every screen's work area is all of it, so a full-screen app can't be told.
+// ponytail: then the island shows over full-screen apps too
+const menuBarHides = () => process.platform === 'darwin' && systemPreferences.getUserDefault('_HIHideMenuBar', 'boolean') === true
 const islSeen = new Map<string, string>() // each float's status at the last list: a turn to waiting or done opens its card
 function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay())) {
   if (!floater) return
@@ -818,6 +822,7 @@ function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDi
 function fold() {
   clearInterval(islTick)
   islTick = undefined
+  islSent = ''
   if (!isl) return
   isl = null
   if (floats.at === 'notch' && card && !card.isDestroyed()) card.hide(), card.setFocusable(false)
@@ -831,9 +836,12 @@ function island(tab: string, list = false) {
   const kind = f?.status === 'waiting' ? 'ask' : 'done'
   const same = isl && isl.tab === tab && !!isl.list === list
   isl = { tab, list, i: Math.max(0, q.findIndex(x => x.tab === tab)), life: same ? isl!.life : { kind, shownAt: Date.now(), over: false, touched: false } }
+  const msg = list ? { list: floats.items } : { f, i: isl.i, n: q.length }
+  if (same && JSON.stringify(msg) === islSent) return
+  islSent = JSON.stringify(msg)
   clearInterval(islTick)
   islTick = setInterval(() => islandEv('tick'), 500)
-  card.webContents.send('island', list ? { list: floats.items } : { f, i: isl.i, n: q.length }, floats.colors)
+  card.webContents.send('island', msg, floats.colors)
 }
 function islandEv(ev: CardEvent | 'next' | 'prev') {
   if (!isl) return
@@ -853,14 +861,14 @@ const overCard = () => {
   const b = card.getBounds()
   return p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height
 }
-// a new list: a float that turned waiting or done opens its card (an ask over a finished one); the shown one gone or
-// no longer asking or done: the next ask, else folded
+// a new list: a float that turned waiting, or done within the last minute (not one Laki's start finds done an hour ago),
+// opens its card (an ask over a finished one); the shown one gone or no longer asking or done: the next ask, else folded
 function islandFloats() {
   if (floats.at !== 'notch') return void islSeen.clear()
   let open: Float | undefined
   for (const f of floats.items) {
     const was = islSeen.get(f.tab)
-    if (f.status !== was && (f.status === 'waiting' || (f.status === 'done' && floats.doneAlert)) && (!open || f.status === 'waiting')) open = f
+    if (f.status !== was && (f.status === 'waiting' || (f.status === 'done' && floats.doneAlert && Date.now() - (f.at ?? 0) < 60e3)) && (!open || f.status === 'waiting')) open = f
   }
   islSeen.clear()
   for (const f of floats.items) islSeen.set(f.tab, f.status ?? '')
@@ -892,6 +900,7 @@ ipcMain.on('island-ev', (e, ev: unknown) => {
 ipcMain.handle('floater-answer', async (e, tab: unknown, n: unknown, label: unknown) => {
   if (!(card && e.sender === card.webContents) && !(voice && e.sender === voice.webContents)) return { error: 'not a bubble' }
   if (typeof tab !== 'string' || typeof n !== 'number' || typeof label !== 'string') return { error: 'no such choice' }
+  if (!floats.items.some(x => x.tab === tab)) return { error: 'that tab is gone' } // only one the bubbles show
   return rpc('answer', { tab, n, label }).then(
     () => ({}),
     (err: Error) => ({ error: err.message }),
@@ -1119,8 +1128,7 @@ ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
     if (fromCard ? !floats.items.some(x => x.tab === tab) : !voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
     const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
     if ('error' in r) return r
-    if (fromCard) fold()
-    else if (!r?.queued) voice?.close() // (it may have shut meanwhile)
+    if (!r?.queued) fromCard ? fold() : voice?.close() // (it may have shut meanwhile); queued: the page says so first
     return { queued: !!r?.queued }
   }
   if (!voice || fromCard) return { error: 'nothing to send' }

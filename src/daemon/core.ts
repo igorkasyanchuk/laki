@@ -2744,7 +2744,7 @@ export function hookOk(tab: string, key: unknown) {
 export function hook(p: { tab: string; state: string; payload?: any }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true
-  if (tab) (heard.set(tab.preset ?? '', Date.now()), deafOf(tab.id) && deaf.delete(sessions.get(tab.id)!)) // heard after all: its strip goes (turn's view)
+  if (tab) (s => (heard.set(tab.preset ?? '', Date.now()), s && (heardIn.add(s), deaf.delete(s))))(sessions.get(tab.id)) // heard after all: its strip goes (turn's view)
   const gate = tab && preTool(tab, p.payload)
   if (gate) return turn(p), gate
   // codex's notify comes as any of its threads ends a turn: a sub-agent's (multi-agent) or its auto-review's while the
@@ -3215,6 +3215,7 @@ const HEARS = new Set(['claude', 'gemini', 'opencode'])
 const DEAF_AFTER = 2 * 60_000
 const prompted = new WeakMap<Session, number>() // a session's first prompt: a new start asks again
 const deaf = new WeakMap<Session, HookWhy>()
+const heardIn = new WeakSet<Session>() // sessions a hook came from: per start, not per tab (a restart under a moved app hears none)
 const heard = new Map<string, number>() // each agent's last hook (Settings › Agents & profiles), this daemon's
 const deafOf = (id: string) => (s => s && deaf.get(s))(sessions.get(id))
 export function hookTick(now = Date.now()) {
@@ -3223,7 +3224,7 @@ export function hookTick(now = Date.now()) {
     if (!s) continue
     const ws = state.workspaces.find(w => w.id === t.workspace)
     const at = prompted.get(s)
-    const is = !!ws && !ws.host && !rt.get(t.id)?.hooked && !s.exited && tracked(t) && HEARS.has(t.preset!) && at !== undefined && s.lastOutput > at && now - s.born > DEAF_AFTER
+    const is = !!ws && !ws.host && !heardIn.has(s) && !s.exited && tracked(t) && HEARS.has(t.preset!) && at !== undefined && s.lastOutput > at && now - s.born > DEAF_AFTER
     if (is === deaf.has(s)) continue
     if (is) deaf.set(s, hookWhy(t, ws!))
     else deaf.delete(s)

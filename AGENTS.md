@@ -749,7 +749,7 @@ Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the 
 Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
 say as a turn starts (`HEARS`: claude, gemini, opencode; codex's notify comes only as one ends), its session started
 `DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its
-start's) that its screen answered (`Session.lastOutput` since), and no hook yet (`Runtime.hooked`): its view's `hookless`
+start's) that its screen answered (`Session.lastOutput` since), and no hook from this start (`heardIn`, per Session: a restart under a moved app is checked anew): its view's `hookless`
 is `hookCause`'s first that holds: `disableAllHooks` or `allowManagedHooksOnly` true in the worktree's
 `.claude/settings.local.json`, `.claude/settings.json`, its config folder's (an account's, or `CLAUDE_CONFIG_DIR` from
 an env), `~/.claude/settings.json` or the managed one (read only; the file and line as `detail`); the profile's args with
@@ -2494,10 +2494,10 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   `hasNotch` by a built-in screen's menu bar over 24 points, `pillRect` (`NOTCH` 200, ponytail: Electron doesn't say the
   notch's width), `cardRect`, `cardQueue` (asks first, then finished ones, newest first by the float's `at`, its
   `needAt`), `lifeStep` (an ask folds only on Esc; a finished one `DONE_FOLD` 6 s after it showed unless the pointer is
-  on it, and as it leaves after being on it), `fullScreen` (ponytail: a screen with no menu bar), `plainLines`,
+  on it, and as it leaves after being on it), `fullScreen` (ponytail: a screen with no menu bar; main's `menuBarHides`, `_HIHideMenuBar`: never then), `plainLines`,
   `tookText`, `replyOf`); main's `islandAt` puts the bar at the pill (no drag, no snap; `home` and floater.json stay
-  the edge's), `islandFloats` opens a card as a float turns waiting, or done with `floaterDone` (an ask over a finished
-  one), `island(tab, list)` sends it to the #card window (`island` IPC; its height back as `island-size`, then
+  the edge's), `islandFloats` opens a card as a float turns waiting, or done within the last minute with `floaterDone` (an ask over a finished
+  one; the same card again isn't redrawn, `islSent`: its reply box keeps what's typed), `island(tab, list)` sends it to the #card window (`island` IPC; its height back as `island-size`, then
   clickable and focusable: `island-ev` `focus` as the pointer comes on it, its keys 1-9, ←→, Esc), `islandEv` the
   pointer's `enter`/`leave`/`esc`/`next`/`prev` and the 500 ms tick; a hover on the pill (`pill`) the session list,
   folded once the pointer is on neither. floater.ts' `pillRender` (bars, `.isl-*`) and `islandPage` (`#island`: an

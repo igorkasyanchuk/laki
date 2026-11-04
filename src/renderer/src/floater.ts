@@ -298,7 +298,8 @@ function pillRender(items: Float[]) {
 function islandPage() {
   const box = document.getElementById('island')!
   let shown: IslandCard | null = null
-  const fit = () => requestAnimationFrame(() => bridge?.islandSize(box.offsetHeight))
+  // measured at once: the window is hidden until main has its size, and a hidden page gets no animation frames
+  const fit = () => bridge?.islandSize(box.offsetHeight)
   box.onpointerenter = () => (bridge?.islandEv('enter'), bridge?.islandEv('focus'))
   box.onpointerleave = () => bridge?.islandEv('leave')
   document.addEventListener('keydown', e => {
@@ -319,6 +320,8 @@ function islandPage() {
   const say = (to: HTMLElement, text: string) => ((to.textContent = text), to.classList.add('bad'), fit())
   bridge?.onIsland((c, colors) => {
     paint(colors)
+    card.replaceChildren() // the edge's hover card, from before a switch to the island: never above it
+    const draft = c.f && shown?.f?.tab === c.f.tab ? (box.querySelector('textarea')?.value ?? '') : '' // the same one again: what you typed stays
     shown = c
     if (c.list) {
       // the sessions: a row's body opens its tab, its chevron (its end, the same pixel always) shows its last answer
@@ -364,7 +367,7 @@ function islandPage() {
     } else {
       parts.push(head(f, f.took ? `done in ${tookText(f.took)}` : 'done'))
       parts.push(el('div', plainLines(f.answer, 2).join('\n') || 'Finished', 'i-answer'))
-      parts.push(replyBox(f, note, fit))
+      parts.push(replyBox(f, note, fit, draft))
     }
     const foot = el('div', '', 'i-foot')
     foot.append(...(f.status === 'done' ? [btn('Review changes', '', () => bridge?.open(f.tab, 'changes'))] : []), btn('Open tab', '', () => bridge?.open(f.tab)), dots)
@@ -373,9 +376,9 @@ function islandPage() {
   })
 }
 // a reply box: ⏎ sends to the agent (send, queued while it works), ⇧⏎ a new line; a menu it shows: its options only
-function replyBox(f: Float, note: HTMLElement, fit: () => void) {
+function replyBox(f: Float, note: HTMLElement, fit: () => void, draft = '') {
   const wrap = el('div', '', 'i-reply')
-  const text = Object.assign(document.createElement('textarea'), { rows: 1, placeholder: `Reply to ${f.agent ?? 'it'}…`, spellcheck: false })
+  const text = Object.assign(document.createElement('textarea'), { rows: 1, placeholder: `Reply to ${f.agent ?? 'it'}…`, spellcheck: false, value: draft })
   const go = async () => {
     if (!text.value.trim()) return
     if (replyOf(f) === 'options') return void ((note.textContent = 'Pick an option, or Open the tab'), note.classList.add('bad'), fit())

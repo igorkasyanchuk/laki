@@ -47,6 +47,14 @@ test('a claude tab with hooks off says so once prompted, with why; a hook clears
   await rig.rpc('hookTick', { now: Date.now() + LATER })
   assert.equal((await rig.tab(ws.id)).hookless, undefined)
 
+  // heard before, then started again with its hooks off (a moved app under a daemon that outlived it): checked anew
+  const was = await rig.tab(ok.id)
+  await rig.rpc('tabSleep', { tab: was.id })
+  await rig.rpc('send', { target: was.id, text: 'again' }) // wakes it: a new start
+  await until(async () => (await rig.screen(was.id)).includes('answer: again'), 'its answer after the restart')
+  await rig.rpc('hookTick', { now: Date.now() + LATER })
+  await until(async () => (await rig.tab(ok.id)).hookless, 'hookless after its restart')
+
   // doctor: Laki's hook command runs (hook ping), its files are there
   const d = await rig.rpc('doctor')
   assert.deepEqual([d.hooks, d.hookFiles], [{ ok: true }, { ok: true }])
