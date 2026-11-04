@@ -1,31 +1,46 @@
 // What App's parts read of App: menus.ts, keydown.ts, Palette.tsx, TabBar.tsx, Sidebar.tsx and Dialogs.tsx. App builds
 // it each render, after `if (!view)` (so `view` is there), from its own state and helpers: all state and every hook
 // stay in App, and a part destructures what it uses. A new field: its type here, then its name in App's `appBase`.
-import type { Dispatch, SetStateAction } from 'react'
-import { AGENT_COLORS } from './ui'
-import { wsShown } from './text'
+import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { ExtTab } from './Extension'
 import type { DeskAsk } from './Desk'
 import type { ProjectTab } from './Project'
-import type { Account, PlanKind, Project, Settings, TabView, View, WidgetCtx, WorkspaceView, WsSort } from '../../shared/types'
+import type { Account, PlanKind, Project, Settings, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
+import type { Edit, PanelTab } from './SidePanel'
 import type { AppInfo, RowMark } from './Settings'
+import type { Step } from '../../shared/nextStep'
 import type { MenuItem } from './ui'
+import type { Inserted } from './PromptInput'
 import type { Layout } from '../../shared/layout'
-import type { KeyId } from '../../shared/keys'
+import type { KeyId, KeyMap } from '../../shared/keys'
+import type { NewWsParams } from './panels'
 import type { Collision } from '../../shared/overlap'
-import type { PanelTab } from './SidePanel'
+import { AGENT_COLORS } from './ui'
+import { wsShown } from './text'
 
 // the page or dialog over the workspace, App's `dialog`
 export type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 // the rail layout's kinds (Settings › Appearance › Layout)
 export type RailKind = 'projects' | 'shells' | 'browsers'
+// a place back and forward go to (settings.history): a page (or none: the workspace view) and the workspace selected
+export type Place = { d: Dialog; ws: string | null }
+// a file open in the app (the preview's tabs): its workspace, path and line; an artifact's is read-only; ext: a file
+// opener's full view (an extension's action with view, on this file) in its place
+export type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean; ext?: string }
 export type Where = { ws?: string; project?: string; widget?: string; file?: string; storage?: boolean } // what Open in opens: a folder (a widget's too), or a file in a workspace
 
 // a tab's color: its own, else its agent's ('none' turns that off)
 export const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 export const WEB = /\.(x?html?|svg|pdf|xml|json|png|jpe?g|gif|webp)$/i // what browsers show
 export const wsName = wsShown
+// the sidebar's filter (its funnel): words in a workspace's name, branch or PR, and at most one of these
+export const ONLY = [
+  ['needs', 'Needs you'],
+  ['busy', 'Working'],
+  ['pr', 'With a PR'],
+] as const
+export type Find = { q: string; only?: (typeof ONLY)[number][0] }
 
 // App's state and helpers its parts read: a field each, sorted
 export type AppBase = {
@@ -35,47 +50,79 @@ export type AppBase = {
   attachable: (w: WorkspaceView) => boolean
   byId: (id: string) => TabView | undefined
   call: <T>(method: string, params?: object) => Promise<T>
+  canLater: boolean
+  closePage: (w: WorkspaceView) => Promise<void>
+  closePreview: () => Promise<undefined>
   closeTabs: (ts: TabView[]) => Promise<void>
   copy: (text: string) => Promise<void>
   copyTab: (t: TabView) => undefined
+  dialog: Dialog
   done: (text: string, undo?: () => void) => void
+  doStep: (w: WorkspaceView, s: Step, e?: React.MouseEvent) => void | Window | null
+  editor: string
   extItems: (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string) => MenuItem[]
+  extOn: (x?: WorkspaceView | null) => WidgetView[]
+  extRun: (w: WidgetView, m: WidgetMenu, ctx: WidgetCtx, into?: (t: Inserted) => void) => Promise<void>
   fail: (e: unknown) => void
+  findIn: () => boolean
   floated: string[]
   floatTab: (id: string, on?: boolean) => void | undefined
   flowMenu: (w: WorkspaceView) => MenuItem[]
   fold: (id: string) => void
   folded: string[]
   forkWs: (w: WorkspaceView) => Promise<void>
+  git: boolean
   groupMoves: (ws_: WorkspaceView[]) => MenuItem[]
   groups: Layout[]
+  hereCtx: () => WidgetCtx
+  hist: RefObject<{ at: Place[]; i: number; going?: string | undefined }>
+  historyOn: boolean
   inReader: (id: string) => boolean
   isTerm: (w: WorkspaceView) => boolean
+  kb: KeyMap
   kh: (id: KeyId) => string | undefined
   laterCancel: (w: WorkspaceView) => Promise<void>
   laterChange: (w: WorkspaceView) => Promise<void>
   laterNow: (w: WorkspaceView) => undefined
+  layoutMenu: () => MenuItem[]
   mark: (m: RowMark) => boolean
   markUnread: (id: string) => Promise<unknown>
+  moveWs: (d: number) => void | undefined
   newIn: (p: Project) => void | Promise<void>
+  newTab: (preset: string, cmd?: string | undefined, w?: WorkspaceView | null, own?: boolean) => Promise<void | null>
   newWord: (p: Project) => "New browser" | "New terminal" | "New workspace"
+  newWs: (projectId?: string, init?: Partial<NewWsParams>) => void
+  nextNeed: () => void
   openIn: (app: string, where?: Where) => void
   openInItems: (where?: Where) => MenuItem[]
+  openMenu: (e: DOMRect | React.MouseEvent<Element, MouseEvent>, items: MenuItem[], align?: "left" | "right" | undefined) => void
+  openProject: () => Promise<void>
+  openReview: () => void | null
+  pickKey: string
+  previewed: Opened | null
   prMenu: (w: WorkspaceView) => MenuItem[]
   projOf: (w?: { project: string } | null) => Project | undefined
+  quickNew: (kind: "browsers" | "shells", url?: string | undefined, front?: boolean, at?: { project: string; place?: string | undefined } | undefined) => Promise<void>
   rail: boolean
   rawKind: (w: WorkspaceView) => RailKind
   readerOn: boolean
   refreshPR: () => Promise<void>
   restore: (id: string) => Promise<void>
+  reviewTab: boolean
   rmItem: (w: WorkspaceView) => MenuItem
   runMenu: (w?: WorkspaceView | null) => MenuItem[]
+  selectGroup: (g: Layout) => void
   selectTab: (ref: string | { id: string; workspace: string }) => void
+  sendLater: (to?: string, text?: string) => void
   setDialog: Dispatch<SetStateAction<Dialog>>
+  setFind: Dispatch<SetStateAction<Find | null>>
+  setFinds: Dispatch<SetStateAction<Record<string, number>>>
   setGroups: (next: Layout[]) => void | false | null
   setOverlapsAt: Dispatch<SetStateAction<{ w: string; list?: Collision[] | undefined; err?: string | undefined } | null>>
+  setPicking: Dispatch<SetStateAction<boolean>>
   setRead: (id: string, m: 'reader' | 'term') => void
   setSharing: Dispatch<SetStateAction<string | null>>
+  setSideOpen: (v: boolean | ((o: boolean) => boolean)) => void
   settings: Settings
   setWsId: Dispatch<SetStateAction<string | null>>
   showInfo: (on?: boolean) => void
@@ -83,10 +130,20 @@ export type AppBase = {
   sortItems: (cur: WsSort | undefined, pick: (s: WsSort | undefined) => void, inherit?: WsSort) => MenuItem[]
   split: (edge: "bottom" | "right", next?: string) => Promise<void>
   stepItem: (w: WorkspaceView) => MenuItem[]
+  stepOf: (w: WorkspaceView) => Step | undefined
+  stepsOn: boolean
+  tab: TabView
   tabByWs: Record<string, string>
   termIn: (p: Project, place?: string) => Promise<void>
   termsOk: boolean
   termWhere: (p: Project) => string
   toast: (text: string, undo?: () => void, label?: string, ok?: boolean) => void
+  toggleArtifacts: () => void
+  toggleFull: (on?: boolean) => void | undefined
+  togglePanel: (t?: PanelTab) => void
+  toSettings: () => void
+  travel: (j: number) => void
   view: View
+  ws: WorkspaceView | null
+  zoom: (d: number) => void
 }

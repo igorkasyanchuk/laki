@@ -17,7 +17,7 @@ import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, 
 import { AiPage } from './Ai'
 import { phVars, sideAttrs, sideVars } from './SettingsLook'
 import { Picker, PICKER_KEY } from './Picker'
-import { isKeyId, type KeyId, keyFor, keyMap, keyShow } from '../../shared/keys'
+import { isKeyId, type KeyId, keyMap, keyShow } from '../../shared/keys'
 import { CalendarPage } from './Calendar'
 import { type DeskAsk, DeskPage, onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar, withImages } from './PromptInput'
@@ -30,7 +30,7 @@ import { StarterPicker, UiKitPage } from './UiKit'
 import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, RowMarks, rowMarks, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
-import { globMatch, pressOf } from '../../shared/widgetSchema'
+import { globMatch } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
@@ -54,10 +54,11 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
-import { ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY, SHOT_KEY } from './ui'
+import { ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
-import { type AppBase, colorOf, type Dialog, type RailKind, type Where, wsName } from './appCtx'
+import { type AppBase, colorOf, type Dialog, type Find, ONLY, type Opened, type Place, type RailKind, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
+import { onKey } from './keydown'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -241,7 +242,6 @@ const extKeys = new WeakMap<object, string>()
 const extKey = (e: { extension: string; key?: string }) => e.key ?? (e.extension || extKeys.get(e) || (k => (extKeys.set(e, k), k))(`new-${Math.random().toString(36).slice(2)}`))
 // back and forward (settings.history, on unless false): a place is a page (or none: the workspace view) and the workspace
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
-type Place = { d: Dialog; ws: string | null }
 const HISTORY_MAX = 25
 const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules', 'usage'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
@@ -273,13 +273,6 @@ type Then = (typeof TIMER_THEN)[number][0]
 type Watch = { id: string; ms: number; from?: number } // a stopwatch
 type Timer = { id: string; end: number; ms: number; then: Then | 'remind' | 'send'; cmd?: string; ws?: string; tab?: string; text?: string; left?: number; note?: string } // cmd: then's command, run in ws; remind: a notification about ws; send: text to the agent tab (Send later); left: paused, the ms it has left (end means nothing then); note: what it's for (Go out), on its bar and as it ends
 const MINUTES = [1, 5, 10, 15, 25, 30, 45, 60]
-// the sidebar's filter (its funnel): words in a workspace's name, branch or PR, and at most one of these
-const ONLY = [
-  ['needs', 'Needs you'],
-  ['busy', 'Working'],
-  ['pr', 'With a PR'],
-] as const
-type Find = { q: string; only?: (typeof ONLY)[number][0] }
 const span = (ms = 0) => (ms % 3600000 === 0 ? `${ms / 3600000} h` : ms % 60000 === 0 ? `${ms / 60000} min` : [Math.floor(ms / 60000) && `${Math.floor(ms / 60000)} min`, `${Math.round((ms % 60000) / 1000)} s`].filter(Boolean).join(' '))
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : shownStatus(t))
@@ -290,9 +283,6 @@ const RAIL: [RailKind, string, IconName][] = [['projects', 'Projects', 'fork'], 
 const RAIL_FIT = 7
 const RAIL_MORE = ['todos', 'calendar', 'workflows', 'specs', 'board']
 let requests = 0
-// a file open in the app (the preview's tabs): its workspace, path and line; an artifact's is read-only; ext: a file
-// opener's full view (an extension's action with view, on this file) in its place
-type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean; ext?: string }
 const fileKey = (f: { path: string; storage?: boolean; ext?: string }) => `${f.ext ? `ext:${f.ext}:` : ''}${f.storage ? 'artifact:' : ''}${f.path}`
 // remote access's page, with Laki's PIN: the code shown in Settings › Remote access on the Mac (api.pin); a wrong one
 // counts down, the last stops remote access. One solid card (styles.css' .pin-*): Laki's mark, a lock in a ring that
@@ -2940,73 +2930,8 @@ export function App() {
   const termWhere = (p: Project) => `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
-  // keys: capture phase, before xterm.js sees them. force: an action of Settings › Keys by its id (a menu bar item's,
-  // a Browsers page's ⌘T/⌘W), whatever its keys; fixed: a menu bar item's fixed key (⌘O, ⌘E…), never one of Settings ›
-  // Keys' that was given the same keys
+  // keys: capture phase, before xterm.js sees them (keydown.ts' onKey, set at the end once there's a view)
   const keys = useRef<(e: KeyboardEvent, force?: KeyId, fixed?: boolean) => void>(() => {})
-  keys.current = (e, force, fixed) => {
-    if (keyRec.on) return // a hotkey being recorded in Settings
-    if (!view) return // the splash: nothing to act on, and what the keys read is declared after `if (!view)` below
-    // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
-    if (!force && settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
-    const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
-    // Settings › Keys' (kb): false where one doesn't apply now, so its keys go on (⌘[ in a text field: an indent)
-    const bound: Record<KeyId, false | (() => unknown)> = {
-      newWs: () => newWs(ws?.project),
-      newTab: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
-      closeTab: () => (ws?.browser !== undefined ? dialog || closePage(ws) : previewed ? closePreview() : tab && closeTabs([tab])), // a Browsers page: it closes (not under a page or dialog: it isn't in sight); else the file preview first
-      sidebar: () => setSideOpen(o => !o),
-      panel: () => ws && togglePanel(),
-      info: () => showInfo(),
-      palette: () => setDialog(d => (d === 'palette' ? null : 'palette')),
-      files: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
-      find: () => dialog || findIn() || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog; a diff's own (findIn) first
-      // the sidebar's filter: open, its box focused; pressed again in the box: closed
-      filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),
-      next: nextNeed,
-      step: stepsOn && !!ws && !dialog && (() => (st => st && doStep(ws, st))(stepOf(ws))),
-      later: canLater && !dialog && (() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)),
-      history: (box => !!box && (() => box.dispatchEvent(new CustomEvent('laki-history'))))(document.activeElement?.closest('textarea[data-history]')), // a prompt box's search of your prompts (usePromptHistory)
-      artifacts: () => dialog || toggleArtifacts(), // not under a page: out of sight
-      full: () => toggleFull(), // full screen, or back
-      back: historyOn && !field && (() => travel(hist.current.i - 1)),
-      forward: historyOn && !field && (() => travel(hist.current.i + 1)),
-      settings: () => toSettings(),
-      help: () => setDialog(d => (d === 'help' ? null : 'help')),
-      layout: !dialog && (() => (b => (b ? b.click() : (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())))(document.querySelector<HTMLElement>('.layout-btn'))), // a phone (no button): its menu at ⋯
-    }
-    const id = force ?? (fixed ? undefined : keyFor(e, kb))
-    const run = id && bound[id]
-    if (run) return void (e.preventDefault(), e.stopPropagation(), run())
-    if (force) return
-    // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in;
-    // not under a yes/no (its run's own question would replace it: a Deny, a Cancel)
-    const hit = (e.altKey || e.ctrlKey) && !e.repeat && !document.querySelector('.ask-overlay') ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined
-    if (hit) return void (e.preventDefault(), e.stopPropagation(), void extRun(hit.w, hit.m, hereCtx()))
-    if (!e.metaKey || e.altKey || e.ctrlKey) return
-    const k = e.key.toLowerCase()
-    // ⌘⇧N: the tab bar's +, its menu (shell, each agent, command) to pick from with the keys
-    if (e.shiftKey && k === 'n') return void (e.preventDefault(), e.stopPropagation(), dialog || document.querySelector<HTMLElement>('.newtab-btn')?.click())
-    // the fixed ones (shared/keys.ts FIXED)
-    const act: Record<string, () => void> = {
-      e: () => ws && openIn(editor),
-      '=': () => zoom(1),
-      '+': () => zoom(1),
-      '-': () => zoom(-1),
-      '0': () => zoom(0),
-      o: openProject,
-      d: () => git && togglePanel('changes'),
-      arrowup: () => moveWs(-1),
-      arrowdown: () => moveWs(1),
-    }
-    if (/^[1-9]$/.test(k)) act[k] = () => (n => (n < 0 ? openReview() : groups[n] && selectGroup(groups[n])))(Number(k) - 1 - (reviewTab ? 1 : 0)) // the review's tab first: ⌘1
-    if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
-    const t = e.target as HTMLElement | null // ⌘↑/⌘↓ in a text field move its cursor (xterm's own textarea isn't one)
-    if (k.startsWith('arrow') && t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t instanceof HTMLInputElement && !/^(checkbox|radio|button|submit)$/.test(t.type))) && !t.classList.contains('xterm-helper-textarea')) return
-    e.preventDefault()
-    e.stopPropagation()
-    act[k]()
-  }
   useEffect(() => {
     const f = (e: KeyboardEvent) => keys.current(e)
     bridge?.onBrowserKey?.(key => keys.current(new KeyboardEvent('keydown', { key, metaKey: true }), isKeyId(key) ? key : undefined, !isKeyId(key))) // a menu bar item's (an id, or a fixed key) or a Browsers page's, as if here
@@ -4120,14 +4045,18 @@ export function App() {
 
   // what App's parts read (appCtx.ts), built after everything in it is
   const appBase: AppBase = {
-    accountsOf, apps, archive, attachable, byId, call, closeTabs, copy, copyTab, done, extItems, fail, floated,
-    floatTab, flowMenu, fold, folded, forkWs, groupMoves, groups, inReader, isTerm, kh, laterCancel, laterChange,
-    laterNow, mark, markUnread, newIn, newWord, openIn, openInItems, prMenu, projOf, rail, rawKind, readerOn,
-    refreshPR, restore, rmItem, runMenu, selectTab, setDialog, setGroups, setOverlapsAt, setRead, setSharing,
-    settings, setWsId, showInfo, showPanel, sortItems, split, stepItem, tabByWs, termIn, termsOk, termWhere, toast,
-    view,
+    accountsOf, apps, archive, attachable, byId, call, canLater, closePage, closePreview, closeTabs, copy, copyTab,
+    dialog, done, doStep, editor, extItems, extOn, extRun, fail, findIn, floated, floatTab, flowMenu, fold, folded,
+    forkWs, git, groupMoves, groups, hereCtx, hist, historyOn, inReader, isTerm, kb, kh, laterCancel, laterChange,
+    laterNow, layoutMenu, mark, markUnread, moveWs, newIn, newTab, newWord, newWs, nextNeed, openIn, openInItems,
+    openMenu, openProject, openReview, pickKey, previewed, prMenu, projOf, quickNew, rail, rawKind, readerOn,
+    refreshPR, restore, reviewTab, rmItem, runMenu, selectGroup, selectTab, sendLater, setDialog, setFind, setFinds,
+    setGroups, setOverlapsAt, setPicking, setRead, setSharing, setSideOpen, settings, setWsId, showInfo, showPanel,
+    sortItems, split, stepItem, stepOf, stepsOn, tab, tabByWs, termIn, termsOk, termWhere, toast, toggleArtifacts,
+    toggleFull, togglePanel, toSettings, travel, view, ws, zoom,
   }
   const { wsMenu, tabMenu, fileMenu, projectActions, showItems } = menusOf(appBase)
+  keys.current = (e, force, fixed) => onKey(appBase, e, force, fixed)
 
   return (
     <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
