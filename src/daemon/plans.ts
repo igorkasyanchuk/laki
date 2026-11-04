@@ -10,7 +10,8 @@ import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync,
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { PLAN_KINDS, type Plan, type PlanFile, type PlanKind, specsOn } from '../shared/types.ts'
-import { dir, findProject, IMAGES, save, slug, state } from './core.ts'
+import { dir, findProject, save, slug, state } from './core.ts'
+import { IMAGES } from './files.ts'
 import { urlKey, urlKeyOk } from './widgets.ts'
 
 type Ref = { project: string; kind: PlanKind; slug: string }

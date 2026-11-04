@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as filesMod from './files.ts'
 import * as remoteMod from './remote.ts'
 import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
@@ -189,7 +190,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
   let body: Buffer
   let file: string
   try {
-    file = core.artifactFile(m[2], decodeURIComponent(m[3]))
+    file = filesMod.artifactFile(m[2], decodeURIComponent(m[3]))
     if (statSync(file).size > 50 << 20) return no(413, 'over 50 MB')
     body = readFileSync(file)
   } catch {
@@ -230,8 +231,8 @@ const api: Record<string, Handler> = {
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
-  overlapCheck: p => core.overlapCheck(String(p.ws ?? '')), // the workspace menu's Check overlaps: one worktree's now, the radar on or off
-  wsStat: p => core.wsStat(p), // a row's hover card: its diff's size now
+  overlapCheck: p => filesMod.overlapCheck(String(p.ws ?? '')), // the workspace menu's Check overlaps: one worktree's now, the radar on or off
+  wsStat: p => filesMod.wsStat(p), // a row's hover card: its diff's size now
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
   hookTick: p => core.hookTick(p?.now), // tests move the clock
@@ -342,16 +343,16 @@ const api: Record<string, Handler> = {
   hook: ({ key: _, ...p }) => core.hook(p), // hookWho's first
   worktreeList: p => core.worktreeList(p.project),
   worktreeImport: p => core.worktreeImport(p),
-  diff: p => core.diff(p.ws, p.uncommitted === true), // uncommitted: against HEAD (Changes' and Review's Uncommitted)
-  files: p => core.files(p.ws, p.project),
-  fileNew: p => core.fileNew(p),
-  fileRead: p => core.fileRead(p),
+  diff: p => filesMod.diff(p.ws, p.uncommitted === true), // uncommitted: against HEAD (Changes' and Review's Uncommitted)
+  files: p => filesMod.files(p.ws, p.project),
+  fileNew: p => filesMod.fileNew(p),
+  fileRead: p => filesMod.fileRead(p),
   artifactList: p => artifactsMod.artifactList(p.ws),
   linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), artifactsMod.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
-  fileWrite: p => core.fileWrite(p),
-  hunkUndo: p => core.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
-  fileUndo: p => core.fileUndo(p),
-  hunkRedo: p => core.hunkRedo(p),
+  fileWrite: p => filesMod.fileWrite(p),
+  hunkUndo: p => filesMod.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
+  fileUndo: p => filesMod.fileUndo(p),
+  hunkRedo: p => filesMod.hunkRedo(p),
   skills: () => skills(),
   agentCommands: p => agentCommands(p), // the prompt boxes' / menu
   skillSet: p => skillSet(p),
@@ -360,8 +361,8 @@ const api: Record<string, Handler> = {
   issueList: p => core.issueList(p),
   prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   usageDays: () => metersMod.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
-  commits: p => core.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
-  commitDiff: p => core.commitDiff(p.ws, p.sha),
+  commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
+  commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
   prDraft: p => core.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Mark as draft / Ready for review
   prLabels: p => core.prLabels(p.ws),
   ghCard: p => core.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
@@ -369,8 +370,8 @@ const api: Record<string, Handler> = {
   prThreads: p => core.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
   prTalk: p => core.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
   prSay: p => core.prSay(p), // a comment on the PR's conversation, as you (the full review's GitHub tab)
-  blame: p => core.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
-  fileWeb: p => core.fileWeb(p), // a file's page on origin's site, at the base or the branch
+  blame: p => filesMod.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
+  fileWeb: p => filesMod.fileWeb(p), // a file's page on origin's site, at the base or the branch
   prDiff: p => core.prDiff(p.ws),
   prFile: p => core.prFile(p.ws, p.path), // a file at the PR's head: the full review's expand arrows on PR #n
   prFiles: p => core.prFiles(p.ws),
@@ -884,8 +885,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   policyTick() // a managed policy: now, then every 5 minutes
   every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
   every(300000, policyTick)
-  every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
-  every(Number(process.env.LAKI_OVERLAP_MS || 15000), core.scanOverlaps) // Collision radar
+  every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)
+  every(Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps) // Collision radar
   every(Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (remoteMod.remoteTick(), remoteMod.shareTick(), remoteMod.tunnelTick()))
