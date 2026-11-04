@@ -611,7 +611,7 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // the voice window are the bar's window.open: the four share one renderer process. Dragged anywhere (floater-drag: the
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
-type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] } }
+type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] }; unseen?: boolean } // unseen: done, not looked at (a stale one shows as idle)
 type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch' }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
@@ -905,7 +905,7 @@ ipcMain.on('floater-menu-tab', (e, tab: unknown) => {
   Menu.buildFromTemplate([
     { label: 'Reply…', toolTip: '⌥-click', click: () => replyTo(tab) },
     { label: 'Open tab', click: () => (app.focus({ steal: true }), show(tab)) },
-    ...(f.status === 'done' ? [{ label: 'Seen', click: () => void rpc('seen', { tab }).catch(() => {}) }] : []),
+    ...(f.status === 'done' || f.unseen ? [{ label: 'Seen', click: () => void rpc('seen', { tab }).catch(() => {}) }] : []),
   ]).popup({ window: floater })
 })
 let replyFor = '' // the tab the voice window answers (a circle's Reply…), until it closes

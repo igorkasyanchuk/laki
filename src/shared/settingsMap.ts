@@ -63,6 +63,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Timer button', 'timer countdown stopwatch hide'],
   ['appearance', 'Turn timers', 'elapsed time'],
   ['needs', 'Needs you list', 'inbox waiting done answer seen review attention sidebar top'],
+  ['needs', 'Older finishes go under Earlier', 'stale old done finished earlier fold dim minutes seen all bubbles'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],

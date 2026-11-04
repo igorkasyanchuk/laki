@@ -149,7 +149,7 @@ Auto; a JS page's preview says its content's width, `pageOf`'s `{ laki: 'size' }
 refused as "changed since you opened it" otherwise), `queueNow` (Esc, then the first delivered), both and `queueClear` in `FROM`
 (`crossAsk` as a send: panels.tsx' `QueueStrip`, Panes' `foot`); 109: an `Ask`'s `question` (`askOf`'s `questionAt`: the
 line or two above the menu), a tab's `needAt` (waiting since, `Runtime.waitAt`; done since, `idleAt`), `seen` (the inverse of
-`unread`): the sidebar's Needs you list (Needs.tsx, `needsSorted`, ⌘J's order too); 110: a project's `config.layout` (a saved
+`unread`): the sidebar's Needs you list (Needs.tsx, text.ts `needsSorted`, ⌘J's order too; stale finishes, below); 110: a project's `config.layout` (a saved
 layout's name, `settings.layouts`, `SETTINGS_KEPT`), kept by `projectSet`: the tab bar's Layout menu (shared/layout.ts
 `LAYOUT_PRESETS`, `fillRoles`, `toRoles`; App's `applyLayout`, `layoutNew`); 111: `prReview` (`ws`, `comments`: `path`, `line`,
 `startLine`, `side`, `body`; each line checked against `gh pr diff` (`diffLines`) before anything goes, then one review,
@@ -2201,6 +2201,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.active`: when each agent tab last worked or waited (ms), for the bubbles' recent ones; closed tabs drop out.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
+    - `laki.needsEarlier`: `1` while Needs you's Earlier row (stale finishes) is unfolded.
     - `laki.limitsTold`: each plan limit window's reset it was told for (`limitsCrossed`: once per reset).
     - `laki.recent`: the palette's last 30 picks, by label: first in it, and ahead of a close match.
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
@@ -2287,7 +2288,12 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's one `img-src` host) before
     the row's PR mark and in the PR section, unless it's `mine`; `settings.avatars === false` (Settings › Appearance's
     *GitHub pictures*, `showAvatars`): none loaded.
-  - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
+  - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule) in text.ts `needsSorted`'s order, as Needs you
+    lists them: waiting ones, the oldest first; then done ones, the newest first, fresh before stale (`isStale`: done
+    `settings.staleAfter` minutes ago by its `needAt`; unset `STALE_AFTER` 30, 0 never; waiting never). Needs.tsx folds
+    the stale ones under *Earlier · n* (`laki.needsEarlier`: unfolded; *Seen all*: `seen` each, Undo `unread`), dimmed,
+    one line; each card's chevron shows or hides its detail (open but for a stale one), the rest of it opens the tab.
+    App's `minute` tick moves one across while nothing else changes. The Dock's count is all of them.
   - Picked rows (`picked`, ⌘-click and ⇧-click, `pickRow`, `anchor`; `pickable`: a project's live workspaces, not
     terminals' or browsers'; not on a phone): `.ws.ws-picked`, `.pick-bar` over the list (Archive: `wsArchive` `ifClean`
     each, the dirty ones asked once, Undo restores all; Mute; Move to group, `pickedGroups`, when they share a project
@@ -2409,7 +2415,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   server) a stand-in picture.
 - **`floater.ts`** (`floater.html`, the third renderer entry): the floating bubbles (Settings › Appearance;
   `settings.floater`, unset: on). App's `floats` (each workspace whose agent tab works or waits, waiting first, then
-  `floaterRecent` (0-5, 3 unset) workspaces whose agent worked last, by `laki.active`, as `idle` or `done` (done first; idle
+  `floaterRecent` (0-5, 3 unset) workspaces whose agent worked last, by `laki.active`, as `idle` or `done` (a fresh done first:
+  a stale one, `isStale`, is drawn and kept as idle, no fill; idle
   longer than `floaterRecentHours`, 4 unset, 0 never: out, a minute's tick ages them); at most `floaterMax`:
   `tab`, name, project (`projWords`: its emoji first; ponytail: an icon by name isn't drawn there), status, its color
   (`tint`), what it asked or last said, and `floatMore`'s branch, agents, PR and

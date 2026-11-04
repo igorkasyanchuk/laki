@@ -200,7 +200,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', updateDelay: 'number', modelEfforts: 'object', background: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', rowMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object', editors: 'object', customCss: 'string' }
+const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', updateDelay: 'number', modelEfforts: 'object', background: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', rowMarks: 'object', planTemplates: 'array', railPlans: 'array', railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number', floaterRecent: 'number', floaterRecentHours: 'number', staleAfter: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array', keys: 'object', layouts: 'array', tunnel: 'object', editors: 'object', customCss: 'string' }
 // what Export leaves out and Import never takes (this Mac's stay): secrets (env and presets' env: API keys; the phone
 // webhook's URL: its token) and what's private (remote access's and tunnels' emails, workflows' variables)
 const PRIVATE = ['env', 'webhook', 'remoteMail', 'tunnelMails', 'flowVars']
@@ -487,6 +487,18 @@ export const spins = (t: TabView, now = Date.now()) => shownStatus(t, now) === '
 export function spinsUntil(tabs: TabView[], now = Date.now()) {
   const left = tabs.filter(t => t.status === 'running' && shellish(t) && t.runAt && !quiet(t, now)).map(t => t.runAt! + SHELL_SPIN - now)
   return left.length ? Math.max(0, Math.min(...left)) : undefined
+}
+
+// Needs you (Needs.tsx), ⌘J and the bubbles: a done tab is stale once it's been done (needAt) staleAfter minutes
+// (settings.staleAfter; unset STALE_AFTER; 0 never); a waiting one never is
+export const STALE_AFTER = 30
+export const isStale = (t: TabView, after = STALE_AFTER, now = Date.now()) => t.status !== 'waiting' && after > 0 && !!t.needAt && now - t.needAt >= after * 60e3
+// waiting first, the oldest first (one with no time yet last); then done, the newest first: fresh ones, then stale ones
+export function needsSorted(tabs: TabView[], after = STALE_AFTER, now = Date.now()) {
+  const oldest = (a: TabView, b: TabView) => (a.needAt ?? Infinity) - (b.needAt ?? Infinity)
+  const newest = (a: TabView, b: TabView) => (b.needAt ?? 0) - (a.needAt ?? 0)
+  const done = tabs.filter(t => t.status !== 'waiting').sort(newest)
+  return [...tabs.filter(t => t.status === 'waiting').sort(oldest), ...done.filter(t => !isStale(t, after, now)), ...done.filter(t => isStale(t, after, now))]
 }
 
 // dialogs one at a time (extension tools' asks): the first is on screen; drop: answered or gone, true when it was the

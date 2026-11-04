@@ -12,8 +12,8 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -327,4 +327,21 @@ test('urlIs: --expect-url matches its page or one under it, localhost as 127.0.0
   assert.equal(urlIs('http://localhost:3000/settings', 'http://localhost:3000/login'), false)
   assert.equal(urlIs('http://localhost:3000/login', 'http://localhost:3000/'), false, 'the home page is itself only')
   assert.equal(urlIs('http://localhost:3000/?tab=2', 'http://localhost:3000'), true)
+})
+
+test('Needs you and ⌘J: waiting oldest first, fresh finishes newest first, stale ones last; staleAfter 0 never', () => {
+  const now = Date.UTC(2026, 10, 4, 12)
+  const min = 60e3
+  const tab = (id: string, status: TabView['status'], ago?: number) => ({ id, status, ...(ago !== undefined && { needAt: now - ago * min }) }) as TabView
+  const tabs = [tab('d-5', 'idle', 5), tab('w-2', 'waiting', 2), tab('d-90', 'idle', 90), tab('d-1', 'idle', 1), tab('w-10', 'waiting', 10), tab('d-40', 'idle', 40), tab('w-none', 'waiting'), tab('d-none', 'idle'), tab('w-120', 'waiting', 120)]
+  const ids = (after?: number) => needsSorted(tabs, after, now).map(t => t.id)
+  // unset: 30 minutes; a waiting one is never stale, however old
+  assert.deepEqual(ids(), ['w-120', 'w-10', 'w-2', 'w-none', 'd-1', 'd-5', 'd-none', 'd-40', 'd-90'])
+  assert.deepEqual(ids(5), ['w-120', 'w-10', 'w-2', 'w-none', 'd-1', 'd-none', 'd-5', 'd-40', 'd-90'], 'at 5 minutes it is stale')
+  assert.deepEqual(ids(0), ['w-120', 'w-10', 'w-2', 'w-none', 'd-1', 'd-5', 'd-40', 'd-90', 'd-none'], 'never: done ones newest first, none stale')
+  assert.deepEqual(tabs.filter(t => isStale(t, undefined, now)).map(t => t.id), ['d-90', 'd-40'])
+  assert.deepEqual(tabs.filter(t => isStale(t, 0, now)), [])
+  assert.equal(isStale(tab('w', 'waiting', 999), 30, now), false)
+  assert.equal(isStale(tab('d', 'idle', 30), 30, now), true, 'exactly staleAfter old')
+  assert.equal(isStale(tab('d', 'idle', 29), 30, now), false)
 })

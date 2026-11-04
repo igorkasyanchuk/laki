@@ -10,7 +10,7 @@ import { BrowserPane } from './Browser'
 import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, PrCard, prState, PRStatus, REVIEW, reviewersText, short, showAvatars, type WsInfo } from './Info'
 import { KeyOverlay } from './KeyOverlay'
-import { type NeedsApi, NeedsList, needsSorted } from './Needs'
+import { type NeedsApi, NeedsList } from './Needs'
 import { SideChat } from './SideChat'
 import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, CheckStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, WorkerAsks, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, ROW_MARKS, type RowMark, rowMarkOn, rowMarkSet, rowMarkUsed, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
@@ -49,7 +49,7 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, limitsCrossed, limitText, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, mergeActions, nameOf, needsSorted, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, STALE_AFTER, templatesFor, USAGE_AT, withPaths, wsShown, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
@@ -1030,23 +1030,27 @@ export function App() {
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
   const recentN = Math.min(5, Math.max(0, Math.floor(fs?.floaterRecent ?? 3)))
   const recentFor = (fs?.floaterRecentHours ?? 4) * 3600e3
+  const staleMin = fs?.staleAfter ?? STALE_AFTER // a finish this many minutes old is stale (isStale): Needs you's Earlier, ⌘J and the bubbles last
   const [, minute] = useState(0)
   useEffect(() => {
-    if (!recentN || !recentFor) return
-    const t = setInterval(() => minute(n => n + 1), 60e3) // recent ones age out without a state change
+    if ((!recentN || !recentFor) && !(staleMin > 0)) return
+    const t = setInterval(() => minute(n => n + 1), 60e3) // recent ones age out, and finishes go stale, without a state change
     return () => clearInterval(t)
-  }, [recentN, recentFor])
-  // Finished ones stand out (floaterDone, unset: on): one you haven't seen stays a bubble, green, past recentN and the hours
+  }, [recentN, recentFor, staleMin])
+  // Finished ones stand out (floaterDone, unset: on): one you haven't seen stays a bubble, green, past recentN and the hours;
+  // a stale one (isStale) is an idle one again: no fill, after the fresh ones, recentN and the hours decide
+  // drawn as idle; its right click's Seen stays (unseen: main's menu)
   const doneAlert = fs?.floaterDone !== false
+  const freshDone = (t: TabView) => t.done && !isStale(t, staleMin)
   const recent = (!recentN && !doneAlert) || fs?.floater === false ? [] : live
     .filter(w => !atWork.some(f => view!.tabs.find(t => t.id === f.tab)?.workspace === w.id))
     .flatMap(w => {
       const t = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited' && active.current[t.id]).sort((a, b) => active.current[b.id] - active.current[a.id])[0]
-      return t && (!recentFor || (doneAlert && t.done) || Date.now() - active.current[t.id] < recentFor) ? [{ t, w, at: active.current[t.id] }] : []
+      return t && (!recentFor || (doneAlert && freshDone(t)) || Date.now() - active.current[t.id] < recentFor) ? [{ t, w, at: active.current[t.id] }] : []
     })
-    .sort((a, b) => Number(b.t.done) - Number(a.t.done) || b.at - a.at)
-    .filter((x, i) => i < recentN || (doneAlert && x.t.done))
-    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...islandOf(t), ...floatMore(w) }))
+    .sort((a, b) => Number(freshDone(b.t)) - Number(freshDone(a.t)) || b.at - a.at)
+    .filter((x, i) => i < recentN || (doneAlert && freshDone(x.t)))
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (freshDone(t) ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...(t.done && { unseen: true }), ...islandOf(t), ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
   const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge' }
@@ -3161,11 +3165,12 @@ export function App() {
     permission: t => /permission/i.test(waits.current.get(t.id) ?? ''),
     review: t => (setDialog(null), setWsId(t.workspace), showPanel('changes'), narrow && setSideOpen(false)),
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
+    seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
   }
-  // ⌘J and the Needs you list walk the same list: waiting first, then done, the oldest first in each; the one after
-  // the tab in front (needNext: the card and row it's marked on)
-  const needAfter = () => (need => need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])(needsSorted(needing.filter(t => order.some(w => w.id === t.workspace))))
+  // ⌘J and the Needs you list walk the same list (needsSorted): waiting first, the oldest first; then done, the newest
+  // first, the stale ones last; the one after the tab in front (needNext: the card and row it's marked on)
+  const needAfter = () => (need => need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])(needsSorted(needing.filter(t => order.some(w => w.id === t.workspace)), staleMin))
   const nextNeed = () => {
     earn('jump')
     const t = needAfter()
@@ -3244,7 +3249,7 @@ export function App() {
       if (git && wt.some(t => t.kind === 'agent' && t.done && t.status === 'idle')) f({ label: 'Review changes: the agent is done', icon: 'changes', run: () => showPanel('changes') })
     }
     // Needs you: every other tab of needsYou, in its order
-    for (const t of needsSorted(needing)) {
+    for (const t of needsSorted(needing, staleMin)) {
       const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
       if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
     }
@@ -4335,7 +4340,7 @@ export function App() {
         <div className="side-scroll">
           {find && !found && <div className="empty-side muted">No workspace matches.</div>}
           {!find && (!rail || railKind === 'projects') && settings.needsList !== false && (
-            <NeedsList items={needsSorted(needing).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} next={needNext?.id} />
+            <NeedsList items={needsSorted(needing, staleMin).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} next={needNext?.id} staleAfter={staleMin} />
           )}
           {pins.length > 0 && (
             <div className="project pinned">
