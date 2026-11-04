@@ -189,7 +189,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   const fork = await rig.rpc('wsFork', { id: ws.id })
   assert.equal(fork.base, 'laki/keep')
   await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.includes('--fork-session')), 'forked claude')
-  assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(4, 7), ['--resume', id, '--fork-session'])
+  assert.deepEqual(rig.fakeLog().find(l => l.bin === 'claude' && l.args.includes('--fork-session')).args.slice(4, 7), ['--resume', id, '--fork-session'])
 })
 
 test('an unreadable state.json is kept aside and the last good one loads: nothing is written over', async t => {
