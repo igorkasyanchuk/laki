@@ -7,7 +7,7 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
 
 1. Start from a clean `main`: `git status` shows nothing to commit.
 2. Bump `version` in `package.json` (About shows it). Bump `API` in `src/shared/types.ts` if the renderer now relies
-   on a new daemon method or behavior (AGENTS.md, API).
+   on a new daemon method or behavior, and say what it added at the end of [docs/api-history.md](api-history.md).
 3. Check:
    ```bash
    npm ci

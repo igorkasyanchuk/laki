@@ -1,0 +1,266 @@
+# Agents, sessions and projects: how they work
+
+### Profiles and accounts
+
+Settings › *Agents & profiles* (the code's word stays *preset*): each preset can carry `model` and `effort` (`agentCmd`:
+the tab's own, from the new-workspace page, wins), for claude and codex `perm` and `fast` (likewise; below), and
+`account`. `daemon/accounts.ts`: an
+`Account` (`settings.accounts`, only through `accountAdd`/`accountSet`/`accountRm`: `settingsSet` drops `accounts`, so an
+import never brings folders) is a folder `<data>/accounts/<agent>-<id>` given as `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
+(`accountEnv`, in `lakiEnv`, not on a host); `HOME_ACCOUNT` (`home`) is the agent's own sign-in, no env at all (that
+variable set to `~/.claude` would read another Keychain item). `linkShared` links `SHARED` (claude: projects, file-history,
+todos, plans, skills, plugins, commands, agents, hooks, output-styles, settings.json, CLAUDE.md, keybindings.json; codex: sessions, archived_sessions,
+skills, prompts, config.toml, AGENTS.md) from the agent's own folder, at its making and each start, so a chat resumes on
+any account (claude's missing folders made in `~/.claude` first; `~/.codex` is never written: only what's there). `spawnTab` keeps `tab.account` (`accountFor`: its own, else its profile's, else `settings.accountUse`, else
+home; a removed one: home); `tabAccount` (a tab's right click › *Restart on another account*) sets it and resumes.
+`accountLogin` opens a Terminals workspace `sign in: <name>` and types the agent's login there once its prompt is up
+(`whenPrompt`, `loginCmd`). `accountView`: claude's email from the folder's `.claude.json` (home: `~/.claude.json`),
+signed in when `usage.ts` `claudeCred(dir)` finds a token: the Keychain item `Claude Code-credentials-<sha256(dir)[:8]>`
+(`keychainService`, the folder as given) or the folder's `.credentials.json`; codex's from `auth.json`'s id_token.
+`usage` takes `usageWho()` (each agent's accounts, `default` marked), cached per folder; the ring shows the defaults,
+the popup each (Usage.tsx `mostRoom`: 20 points ahead). `accountRm` (refused while a live tab is on it) removes the folder (one under `<data>/accounts`; the
+links, not their targets) and claude's Keychain item. Laki AI's claude/codex backends take the preset's account, else
+the default. Tested in `test/accounts.test.ts` (the fake `security` keeps an account's item in `$HOME/keychain-<name>`).
+
+### Layouts
+
+A workspace's tabs, each a split tree of sessions (`shared/layout.ts`), are the daemon's: `state.layouts` (by workspace,
+dropped with it), the view's `layouts`, `layoutOf` (`groupsOf`: ended sessions out, a tab per session in none).
+`layoutSet` (`layoutCheck`: shapes, this workspace's sessions, splits 10-90%) from the app: App keeps `laki.groups` for
+the first paint and an older daemon, pushes a change 250 ms later (`pushes`: a change on its way wins over a view),
+and takes the view's otherwise; the first view with API 60 sends what this window had. `tabNew` `beside`/`edge`
+(`layoutPlace`: a split there; `beside: null`, a tab of its own; none with `settings.splitNew`, beside `paneOn`: the
+pane the newest focused window is on). `layoutMove` (beside another pane, or none: a tab of its own) and `tabFocus` (a
+`focus` event: App's `selectTab`) are Laki AI's `laki_panes`; MCP's state gives each workspace's `tabs` in words
+(`describe`: `a | b` side by side, `a / b` stacked). Tested in `test/layout.test.ts`.
+
+### Agent variables
+
+`shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
+`{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
+(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: fish's way under fish, else `q`) where the caller says `vars`: `send` (before a queue), `addTab`'s
+prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MCP's `laki_run_action` and
+`laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
+their own (`varsOf`). Settings' chips under an action or a template list them.
+
+### Turns
+
+`daemon/turns.ts` (main.ts imports it; core's `turnStarts`, claude's UserPromptSubmit, and `turnEnds`), core keeping
+what the view shows on the tab's runtime:
+- each turn's changes (`settings.turnChanges`, on unless false): the worktree as a tree through an index of its own,
+  `<data>/turns/<ws>.index` (`treeOf`: first a copy of the worktree's own index, for git's stat cache; `git add -A`,
+  `write-tree`, one at a time per workspace; the worktree's own index never touched; Done check's tree too; `turnsTidy`,
+  hourly: gone workspaces' indexes, closed tabs' turns), as a claude turn starts (the last turn's card and Undo go then) and as any claude or codex turn ends (codex: the
+  last end, or Undo's tree, is its start); a tab's
+  `changes` (`TurnChanges`: `n`, `add`, `del`, the first `TURN_FILES` files, git's A/M/D, no renames). The Reader's
+  `TurnCard` (Review: Changes' *This turn*, `Scope` `turn`, the `laki-scope` event, `turnDiff`, read only; Undo:
+  `turnUndo`, after `ask`: refused while it runs or once one of its files changed since, then `git restore
+  --source=<before> --worktree` and its added files removed, `inside`). ponytail: the last turn per tab, in memory;
+  this Mac's git workspaces only;
+- the next prompt (`settings.nextPrompt`, off unless true; Settings › AI's *Guess my next prompt*): at a claude or codex
+  turn's end with an answer (yours: not a workflow's, nothing queued; Laki AI on, with a key for OpenRouter), `aiOnce`
+  with your last message (`Runtime.asked`: UserPromptSubmit's, codex's `input-messages`) and the answer's end; a line
+  but NONE is the tab's `suggest` while it's idle; the Reader's box shows it as its placeholder, Tab takes it, Esc hides it;
+- `tabHandover` (`tab`, `to`: the other of claude and codex; the tab menu's *Continue in Codex / Claude Code*, refused
+  from an agent): a handover in the storage folder (`handover-<from>-to-<to>-<stamp>.md`: `chatRead`'s your messages and
+  its answers, the newest `HANDOVER_MAX`, and `diff`'s files), then `addTab` of the other agent's first profile told to
+  read it (a host's: in the prompt). Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
+
+`daemon/secrets.ts`: `laki secret <what>` (MCP's `laki_secret`; `SECRET_WAIT`, the CLI's rpc waits as long):
+`secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`) on the tab (waiting while
+its command runs: Needs you, a notification, a phone push), panels.tsx `SecretStrip` at the pane's foot, a password
+field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<storage>/.laki-secrets/<slug>-<hex>`, 0600
+(hidden: no artifact) and the agent gets its path; `secretsTidy` (hourly) removes those past 24 hours. ponytail: in
+memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
+
+### Asks
+
+A waiting tab's view has `ask` (`shared/ask.ts` `askOf`, over the bottom 16 lines of its screen): numbered options
+(`1.`, `2)`…), consecutive, at least two, one of them marked (❯ › > ▶ ● →), box borders stripped; the last such menu
+wins (tested in `test/ask.test.ts`). `answer` reads it again, then sends ↑/↓ one at a time, 40 ms apart (a TUI reads
+a burst as one key; `Session.appCursor` picks `ESC O` or `ESC [`), then ⏎. The renderer's ask bar (App.tsx) shows
+them as buttons for the tab with the keyboard; a permission prompt's notification gets *Allow* / *Deny* (main's
+`Notification` `actions`; main calls `answer` itself, `pick` first / last, so a closed window doesn't matter). `answer`
+needs the tab waiting and takes one at a time (a second after its Enter too). A waiting tab's output has its menu read
+again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't the ask the last pushed view gave (`askKey`, set in `changed`).
+
+### Sessions
+
+`src/daemon/session.ts`: every PTY is mirrored into an `@xterm/headless` terminal.
+
+- **Attach** sends a snapshot, built with `@xterm/addon-serialize`, plus what serialize leaves out:
+  cursor visibility and style, mouse encoding, scroll region.
+- The live stream follows on the same socket, in order.
+- Any number of clients can attach. The PTY takes the size of the one that typed or resized last (`resizeFor`,
+  `follow`: a phone, then the Mac).
+- **Exit**: a signal reports code 128+signal. A shell's exit, or a command's with code 0, closes its tab (`core.ts`
+  `onExit`); an AI agent's (`tracked`), any code, leaves it with its screen and *press Enter to start it again* (a
+  resume; the tab bar dims it, ✓), unless the daemon ended it: closing, archiving and shutdown drop the session from `sessions`
+  first, restarting replaces it.
+
+### Sleep
+
+`resources.ts` `sleepTick`: an idle claude or codex tab (`sleepy`: `cantSleep` says nothing, no attached client, idle
+`settings.sleepAfter` minutes (unset: `SLEEP_AFTER`, 480; 0: never) by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
+listening ports (`procs`) in its tree) is put to sleep: `asleep` (in memory) and `Session.end`, which SIGHUPs the job
+(SIGKILL 5 s later if it's still there) but keeps the screen, the clients and a note instead of the exit line; `onExit`
+leaves it be. Its view is `idle`, `asleep: true` (the tab bar dims it, its tooltip says so); `onExit` ignores a session no longer in `sessions` (replaced or dropped). `wake` (an attach in `main.ts`, any `input` but xterm's own focus and mouse reports (`REPORTS`; the key is
+dropped), `send`, `tabWake`) is `spawnTab` `resume`, status running (so `send` queues; `sweepRunning` ends it once
+quiet and delivers), the ● kept. Enter's restart of an ended agent with a queue sets running too, for the same delivery. `agentOf` and scheduled
+runs count an asleep tab as live. A replaced session's `kill` sends its clients `exit` with code -1, which `Term.tsx`
+takes as "attach again" (a wake, Enter on an ended agent).
+
+### Terminal queries
+
+Queries (DA, DSR/CPR, DECRQM, DECRQSS, XTVERSION, OSC color) are answered exactly once.
+
+- The newest attached client is the *responder*.
+- Other renderers swallow those queries through xterm.js parser hooks (`Term.tsx`).
+- With no client attached, the headless terminal answers.
+
+### Agents and hooks
+
+Commands run as `$SHELL -lic '<cmd>'`. An agent's values (its prompt, Laki's note, paths, flags: `agentCmd`) are
+never quoted into that line: a plain word (`PLAIN`) goes in as it is, anything else in the tab's env as `LAKI_ARG_n`,
+named `"$LAKI_ARG_n"` (sh, bash, zsh and fish expand it whole; fish reads `\'` inside single quotes as an escape); on an
+SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as written. The environment adds:
+- `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
+- an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
+  them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
+- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`; `LAKI_HOOK` (a key per start, the Session's `hookKey`: `laki hook` sends it, and
+  main.ts' `hookWho` takes a tab's state with its key only, else from a process of that tab or of none (`peerOf`: tests'
+  direct `hook` calls), never another tab's; never from remote access, `REMOTE_NO`);
+- `LAKI_STORAGE_FOLDER` (`storageOf`; `STORAGE_NOTE`, the start note's and the laki skill's words: files, and a
+  link for each thing an agent publishes, kept in its `LINKS`, `.laki-links.json`; a `.url` file it saves is moved in, read by `urlOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
+  or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
+  for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
+
+Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
+`PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
+the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would
+replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
+`$LAKI_STORAGE_FOLDER` (`STORAGE_NOTE`: files, and a link to what it publishes). The CLI's `rename`/`pr` take `.` for `$LAKI_WORKSPACE` (`wsSet` name, `prAttach`).
+
+Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a host: no laki CLI there), `--plugin-dir
+<data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
+`/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
+`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents.
+Other modules add commands through `pluginFiles` (core can't import them): skill.ts' `commands/extension.md`,
+`/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command, only you start
+it (`disable-model-invocation`), and only `READ_ONLY`'s `laki widget` subcommands allowed unasked (N10: new, dev, set,
+on and the rest ask in Claude's own prompt). Its hooks run `laki hook <state>`, using an absolute
+node/Electron path and `hook.js` (`src/cli/hook.ts`, core's `hookArgv`: conn.ts only, so a tool call's hook doesn't load the
+whole CLI; `laki hook` through the CLI imports it), and map to states:
+
+| hook | state |
+|---|---|
+| SessionStart | records the resume id |
+| UserPromptSubmit, Pre/PostToolUse | running |
+| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule): prints nothing, so claude asks in its own menu |
+| Notification (permission prompts) | waiting |
+| Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
+| StopFailure | usage limit (`limits.ts`) |
+| PreCompact | running and `compacting` (the tab and row say *Compacting…*) until its next hook (SessionStart, source compact) |
+
+Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
+
+Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
+say as a turn starts (`HEARS`: claude, gemini, opencode; codex's notify comes only as one ends), its session started
+`DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its
+start's) that its screen answered (`Session.lastOutput` since), and no hook from this start (`heardIn`, per Session: a restart under a moved app is checked anew): its view's `hookless`
+is `hookCause`'s first that holds: `disableAllHooks` or `allowManagedHooksOnly` true in the worktree's
+`.claude/settings.local.json`, `.claude/settings.json`, its config folder's (an account's, or `CLAUDE_CONFIG_DIR` from
+an env), `~/.claude/settings.json` or the managed one (read only; the file and line as `detail`); the profile's args with
+their own `--settings`; `CLAUDE_CONFIG_DIR` in the profile's, project's, Settings' or the daemon's env (no account);
+`hookArgv`'s node or script gone or not executable (a moved app under a daemon that outlived it); gemini's trusted
+folders; else unknown. Any hook clears it (`hook`, `heard`: each agent's last, `hooksSeen`). panels.tsx `HookStrip` at
+the pane's foot (Details, Copy; Dismiss: App's `hookHid`, per tab, in memory); `doctor`'s `hooks` runs `hookArgv` `hook
+ping` (hook.ts exits 0 before any RPC) and `hookFiles` reads `hookFiles(localHooks)`' files back: Welcome's rows. Tested
+in `test/hook-health.test.ts` (the fake claude runs no hook with `disableAllHooks` in `$HOME/.claude/settings.json`).
+
+The other agents (`AGENTS` in `shared/types.ts`: the command is the id; `presets()` defaults to claude, codex and
+those on PATH):
+- **Gemini**: `gemini -i <prompt>` (0.4.1 answers a bare prompt and exits), `--resume <id>`. Hooks (versions that
+  have them, in a folder Gemini trusts) in `<data>/gemini-settings.json`, given as `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`
+  (the lowest layer; hook lists add up with the user's): SessionStart (session_id), BeforeAgent/AfterTool (running),
+  Notification (waiting), AfterAgent (idle, `prompt_response`); each prints `{}` (gemini wants JSON back). Superset
+  puts the same hooks in `~/.gemini/settings.json`; Laki may not. Laki doesn't trust folders for it.
+- **OpenCode**: `opencode --prompt <p>`, `--session <id>`; a model in `OPENCODE_CONFIG_CONTENT` (`{"model": …}` over a
+  profile's own of it), never `-m` (some versions' TUI refuses it). `OPENCODE_CONFIG_DIR=<data>/opencode` (on top of the
+  user's config) loads `plugin/laki.js` (`OPENCODE_PLUGIN`): session.created (not a subagent's: `parentID`) →
+  start, session.status busy/idle (idle with the last answer, from `client.session.messages`),
+  permission.asked/question.asked → waiting, session.error → failed (an Esc's `MessageAbortedError`: interrupted), and
+  the idle after either says nothing; reports go one at a time, in order.
+- **Grok**: `grok --session-id <uuid> <prompt>`: Laki picks the chat's id, `--resume <id>` after. Its TUI takes hooks
+  only from `~/.grok` (or `~/.claude/settings.json`), so it has none: Enter or a prompt sets running; `sweepRunning`
+  reads its window title (`Session.title`: `BUSY` while it works, `ASKS` "Action Required": waiting) and ends the
+  turn after `QUIET` with no `BUSY` text, as a hook would (a done notification; a turn started by Enter only after 8s, `Runtime.since`: likely a menu). Gemini without
+  hooks too (`Runtime.hooked`: a hook came from the tab; `turn` is `hook` without marking it).
+
+### Projects
+
+A project is a git repository (its top level) or any other folder (`git: false`: local workspaces only,
+no branches, diff, PRs or ship). New worktrees go to `worktreesOf` (the folders it makes 0700, a folder you had as it is): the project's `config.worktrees` (the app's only; relative: to the repo),
+else `settings.worktrees` (`~` is home) with a folder per project, else `<data>/worktrees/<project>`; a host's stay in
+`~/.laki-host`. Made ones keep their path. `config` (setup, run, teardown, expose), set in the app, wins field by field over
+the repo's `.laki.json` (`projectConfig`: the project's own folder only, never a worktree's, so a branch, a PR's checkout
+or a fork can't swap in its own setup, teardown, run, env, copy or ports). Its trust: a project's `trusted` (`cfgHash`,
+sha256 of its JSON); a file that isn't that gives its `ports` only (`cfgWait`, the view's project `cfgWait`: App's
+status bar *.laki.json waits for you* and `cfgSheet`, also after the new-workspace page makes one); `projectTrust` (no
+`hash`: its text and hash; with the shown one: trusted, then each `setupWait` workspace (made meanwhile) gets
+`copyIncludes` and its setup, a `noSetup` one's copy only). `ENV_BAD` (`ZDOTDIR`, `BASH_ENV`, `ENV`, `NODE_OPTIONS`, `PATH`, `DYLD_*`, `LD_*`,
+`*_BASE_URL`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`) never comes from the file, trusted or not, each said once in
+daemon.log. `load` trusts projects from before (no `state.cfgTrust`) as their file is (a host's `as-read`: at its first
+read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: true`.
+
+### Presets
+
+`settings.presets` (default: plain `claude` and `codex`) say how agents start: `agent` (claude, codex,
+command), `args` (appended raw before the prompt), `cmd`, `env`, `laki` (false: no `LAKI_NOTE`; Settings' *Tell it about Laki*, claude and codex), `off` (Settings' switch: out of the renderer's
+pickers, the new-tab menu, the new-workspace page and its races, scheduled tasks; the daemon still starts it). A tab keeps `preset` = what the agent is
+(hooks, resume, colors) and `profile` = the preset's name, looked up at every start (`presetOf`), so edits
+apply on restart. Env order: process < `settings.env` (global) < project (`.laki.json`, then the app's) <
+preset < Laki's own vars.
+
+A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` before a worktree is made: a name, an
+effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
+model_reasoning_effort="…"`, opencode its inline config (above), the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
+`--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
+`fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json`, the same with `fastMode`; codex `-c
+service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
+is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):
+the page shows the profile's as picked and sends only a change from it (`permSent`, `fastSent`). A profile whose `args`
+set a mode (`permInArgs`: claude's `--permission-mode`, `--dangerously-skip-permissions`; codex's `-s`, `-a`,
+`--full-auto`…) gets none of Laki's, the page no picker, Settings' select off. `view` gives a running or waiting tab `runAt`, its turn's start (set
+there: each change of status comes with `changed()`), for the turn timers (`settings.timers`).
+
+### Interrupts
+
+Esc or ⌃C ends a Claude/Codex turn without any hook. `input` sees the key and `interrupted` checks the
+screen for "Interrupted" a few times over 2.5s; a `running` hook in between cancels it. A turn can also end
+with no hook and no key (a resumed chat's recap): `sweepRunning` (every 2s) sets a running tab idle after 4s
+without output when its last 15 lines lack "esc to interrupt" (claude and codex show it, and redraw, while
+they work).
+
+### Resume
+
+`state.json` keeps projects, workspaces, tabs and resume ids (`save`: fsync, then rename; `load` copies one that
+reads as `state.json.bak`, and moves one that doesn't to `state.json.broken-<ms>`, then loads the `.bak`: never
+empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts. Starting the daemon brings every tab back:
+`claude --resume <id>`, `codex resume <id>`, a few at a time (`restoreAll`: each in `queued`, as `asleep` meanwhile, the
+oldest first; a tracked agent whose `usedAt` (a tab's: made, or `turn()`'s every state but start; `keepShells` saves it at
+shutdown) is older than `sleepAfter` is `dormant`: queued, never started by `nextRestore`, only by `restoreNow`, its view
+`asleep` without `queued`; `RESTORE_GAP` 2.5 s apart, a shell's a tenth; the view's `queued`, the tab's tooltip; `restoreNow` for one a look, a key or a message wakes,
+and every one of a workspace a window shows, `setView`; `LAKI_RESTORE_GAP` 0: all at once, tests'; shutdown clears it). Shells come back with what ran in them: `keepShells`, in `main.ts`'s
+`shutdown` before the sessions are killed, gives each local shell tab `again` (state.json): its front program's
+folder (`lsof -d cwd`) and `rerun`'s command. An agent resumes and runs: claude by `~/.claude/sessions/<pid>.json`'s
+`sessionId` (read only), else `--continue`; codex `resume --last` (its newest chat in that folder). Anything else is
+typed, no Enter; a node shim's line is its name again (`node /…/bin/npm run dev` is `npm run dev`). A live Run tab
+gets `again` `{ run: true }`, and `restoreAll` keeps it. `restoreAll` starts the shell in that folder, then `bringBack`
+types it once the prompt is up (it printed, then 500 ms quiet; 10 s at most) under a dim note. A crash keeps nothing,
+and neither does a host.
+
+A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the screen as it exits) drops the tab's
+`resumeId` (Enter starts a new chat) only when it exits within `RESUME_FAIL` (30 s) of starting: later, a chat's own
+words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:
+the code, the seconds it ran, its last lines.
