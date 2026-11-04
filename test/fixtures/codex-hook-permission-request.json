@@ -1,0 +1,14 @@
+{
+  "session_id": "01a1a84b-9ed9-7c03-a467-fb60b5ff8efd",
+  "turn_id": "01a1a84b-a112-7000-a069-ef614c8a79fd",
+  "transcript_path": "/Users/me/.codex/sessions/2026/11/04/rollout-2026-11-04T22-41-30-01a1a84b-9ed9-7c03-a467-fb60b5ff8efd.jsonl",
+  "cwd": "/Users/me/projects/demo",
+  "hook_event_name": "PermissionRequest",
+  "model": "gpt-5.6-terra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "touch b.txt",
+    "description": "Do you want to allow creating the requested empty file b.txt in this workspace?"
+  }
+}
