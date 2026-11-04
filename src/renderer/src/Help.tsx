@@ -6,7 +6,7 @@ import { type CSSProperties, Fragment, isValidElement, type ReactNode, useEffect
 import { openExternal } from './api'
 import { Glyph } from './Glyph'
 import { REPO } from './panels'
-import { Icon, IconButton, useToTop } from './ui'
+import { Icon, IconButton, usePageMark, useToTop } from './ui'
 import { type KeyId, type KeyMap, keyShow } from '../../shared/keys'
 
 // a row: its key or label, what it says, more words the filter knows it by; n: a numbered step
@@ -95,6 +95,7 @@ const Row = ({ id, k, children }: { id?: string; k: ReactNode; children: ReactNo
 
 export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: string; ship?: boolean; zoom?: number; keys: KeyMap; global: GlobalKeys; onClose: () => void }) {
   const [onScroll, toTop] = useToTop() // ↑ back to the top once well down
+  const pageEl = usePageMark() // its frame says a page is over it (the chrome look)
   const [q, setQ] = useState('')
   const [at, setAt] = useState<{ sec?: string; row?: string }>({}) // ids in view
   const main = useRef<HTMLDivElement>(null)
@@ -327,7 +328,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
 
   const go = (id: string) => document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
-    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties} onScrollCapture={onScroll}>
+    <div ref={pageEl} className="settings-page" role="dialog" aria-label="Help" style={{ zoom, '--zoomed': zoom } as CSSProperties} onScrollCapture={onScroll}>
       <div className="settings-head">
         <b>Help</b>
         <span className="grow" />

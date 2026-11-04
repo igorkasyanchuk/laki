@@ -1793,7 +1793,9 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .page-body:has(.bn-container) { --zoomed: 1; }
 .page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page)) { --zoomed: 1; } /* ponytail: My Desk's tiles and a workflow's canvas drag in fixed pixels (DESK_ROW, the canvas' grid): no ⌘± there (App's zoomPage says so) */
 .page-body:has(.bn-container) .bn-default-styles { font-size: calc(14.5px * var(--page-own, 1)); }
-.page-body:has(.bn-container) :is(.notes-side > *, .note-head, .note-meta, .todo-empty, .plan-head, .plan-meta, .plan-bar) { zoom: var(--page-own, 1); }
+/* never a * after a :has() on a frame (.main, .page-body…): with another :has() whose argument says :only-child,
+   :nth-child or :disabled (BlockNote's, Mantine's, ours), every change in the window restyled every element */
+.page-body:has(.bn-container) :is(.notes-find, .notes-colors, .notes-list, .note-head, .note-meta, .todo-empty, .plan-head, .plan-meta, .plan-bar) { zoom: var(--page-own, 1); }
 .page-body:has(> :is(.schedules, .plans-index, .ach, .project-page)) { --zoomed: calc(var(--page-zoom, 1) * var(--page-own, 1)); }
 :is(.overlay, .menu-backdrop) { zoom: calc(1 / var(--zoomed, 1)); } /* a dialog or menu a zoomed page opens (--zoomed: its zoom; Settings' and Help's too): the window's size, so its vh caps and px placing are the window's */
 :is(.overlay, .menu-backdrop) > * { --zoomed: 1; } /* one undone, not again for a menu inside the dialog */
@@ -3131,8 +3133,8 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .app[data-dz~='chrome'].electron.side-closed .tabbar { padding-left: calc(76px - var(--d-gap)); } /* the sidebar hidden, the rail too: its button past the traffic lights */
 /* pages over the main area: the title on the chrome, the page a card */
 .app[data-dz~='chrome'] .main > .settings-page { background: none; }
-.app[data-dz~='chrome'] .main:has(> .settings-page) > :not(.settings-page, .ai-fab-wrap, .ai-float),
-.app[data-dz~='chrome'] .main:has(> .settings-page) > .tabbar * { visibility: hidden; } /* what's under its see-through head (a tab's ✕ says visible) */
+.app[data-dz~='chrome'] .main[data-pages] > :not(.settings-page, .ai-fab-wrap, .ai-float),
+.app[data-dz~='chrome'] .main[data-pages] > .tabbar * { visibility: hidden; } /* data-pages: ui.tsx' Page, not :has(> .settings-page): a * under a :has() (.page-body's above) */ /* what's under its see-through head (a tab's ✕ says visible) */
 .app[data-dz~='chrome'] .settings-page > .settings-head { background: none; border-bottom-color: transparent; }
 .app[data-dz~='chrome'] .settings-page > :not(.settings-head) { margin-bottom: var(--d-gap); border: 1px solid var(--line); border-radius: var(--d-r); background: var(--bg); box-shadow: var(--d-lift); }
 .app[data-dz~='chrome'] .settings-page > .settings-body { overflow: hidden; } /* round corners over its nav; a .page-body scrolls, which clips them too */

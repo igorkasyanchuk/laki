@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, useToTop } from './ui'
+import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS } from './Usage'
@@ -776,6 +776,7 @@ export function SettingsPage(p: {
   achievements?: AchievementsApi // App's: the count, on or off, the page
 }) {
   const [onScroll, toTop] = useToTop() // ↑ back to the top once well down
+  const pageEl = usePageMark() // its frame says a page is over it (the chrome look)
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
@@ -1021,7 +1022,7 @@ export function SettingsPage(p: {
     </Group>
   )
   return (
-    <div className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties} onScrollCapture={onScroll}>
+    <div ref={pageEl} className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties} onScrollCapture={onScroll}>
       <div className="settings-head">
         <b>Settings</b>
         <span className="grow" />

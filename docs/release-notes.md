@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A brainstorm with long files no longer slows Laki down: once a spec or note had been open, every change on screen
+  restyled the whole window (90 ms each, the app nearly stuck); now under a millisecond.
 - Plan limits are checked less often (Claude's every 7.5 minutes), and when a server asks Laki to wait, the popup keeps
   the last numbers and says when it checks again instead of going blank.
 - Linked tickets: a project's *Ticket* script (Linear, Jira or any CLI) prints each workspace's ticket; its key and

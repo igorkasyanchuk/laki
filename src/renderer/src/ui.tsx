@@ -290,6 +290,19 @@ export function usePageSide(page: string): [boolean, ReactNode] {
   return [shown, <IconButton icon="sidebar" title={shown ? 'Hide the list' : 'Show the list'} className="page-side-btn" onClick={flip} />]
 }
 
+// a page over the main area (.settings-page: Page, Settings, Help): its frame (.main) counts them as data-pages, which
+// the chrome look hides what's under one by (styles.css; a :has(> .settings-page) there restyled the whole window)
+export function usePageMark() {
+  const el = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const m = el.current?.parentElement
+    if (!m) return
+    m.dataset.pages = String(Number(m.dataset.pages ?? 0) + 1)
+    return () => void (Number(m.dataset.pages) > 1 ? (m.dataset.pages = String(Number(m.dataset.pages) - 1)) : delete m.dataset.pages)
+  }, [])
+  return el
+}
+
 export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
   useEffect(() => {
     if (!esc) return
@@ -298,8 +311,9 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true }
     return () => window.removeEventListener('keydown', f)
   }, [onClose, esc])
   const [onScroll, toTop] = useToTop()
+  const el = usePageMark()
   return (
-    <div className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
+    <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
       <div className="settings-head">
         {head ?? <b>{title}</b>}
         <span className="grow" />

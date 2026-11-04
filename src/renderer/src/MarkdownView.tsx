@@ -155,7 +155,7 @@ function draw(k: string, text: string, dark: boolean, live: () => boolean): Prom
   return next
 }
 function Mermaid({ text }: { text: string }) {
-  const dark = getComputedStyle(document.documentElement).colorScheme !== 'light' // the theme's, as it is now
+  const dark = document.documentElement.style.colorScheme !== 'light' // the theme's (applyTheme sets it; styles.css' :root is dark), not getComputedStyle: a whole-window restyle at each chart's draw
   const k = `${dark ? 'd' : 'l'}${text}`
   const [pic, setPic] = useState<Pic>()
   const [err, setErr] = useState('')
