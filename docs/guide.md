@@ -1909,7 +1909,7 @@ and what it costs.
   *Where*: *Edge* (the drop) or *Notch*: a black pill at the top of the built-in screen, around its notch (or under the
   menu bar on a screen without one), a thin bar per agent (waiting ones pulse, finished ones are green) and how many
   need you. It opens into a card by itself when an agent asks (its question and options, or what a permission is for:
-  *1-9* or a click answers, Esc folds it) or finishes (its first lines, how long it took, a reply box, *Review
+  a click answers; after a click on the card, *1-9* do too and Esc folds it) or finishes (its first lines, how long it took, a reply box, *Review
   changes*, *Open tab*; it folds after 6 seconds unless the pointer is on it); one card at a time, *1 of 3* when more
   wait. A hover on the pill lists the sessions: a row opens its tab, its › shows its last answer. Hidden while Laki is
   in front, when nothing runs, and over a full-screen app),

@@ -751,13 +751,19 @@ function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
   floater.setBounds({ ...barAt, ...sized(len) }, animate)
   floater.webContents.send('floater-side', side)
 }
-app.whenReady().then(() => screen.on('display-removed', () => snap()))
+// a screen gone (or, for the island, come or changed: the built-in one with the lid shut, a resolution): placed again
+app.whenReady().then(() => {
+  const again = () => (floats.at === 'notch' ? floater?.isVisible() && placeFloater() : snap())
+  screen.on('display-removed', again)
+  screen.on('display-added', () => floats.at === 'notch' && again())
+  screen.on('display-metrics-changed', () => floats.at === 'notch' && again())
+})
 function placeFloater() {
   const notch = floats.at === 'notch'
   const d = notch ? islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay()) : undefined
   // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange); the island also while
-  // nothing runs or waits and over a full-screen app
-  if ((!floats.items.length && (!floats.add || notch)) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
+  // nothing runs, waits or is done (idle recent ones don't keep it up) and over a full-screen app
+  if ((notch ? !floats.items.some(f => f.status !== 'idle') : !floats.items.length && !floats.add) || front || parked || shooting || (d && fullScreen(d) && !menuBarHides())) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
@@ -818,6 +824,7 @@ function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDi
   barAt = { x: pill.x, y: pill.y }
   floater.setBounds(pill)
   floater.webContents.send('floater-side', 'notch')
+  if (card && !card.isDestroyed() && card.isVisible() && isl) card.setBounds(cardRect(pill, card.getBounds().height)) // the screen changed under it
 }
 function fold() {
   clearInterval(islTick)

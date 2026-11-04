@@ -60,6 +60,8 @@ test("a reply's words: the answer's first lines as plain text, how long the turn
   const md = '## Done\n\nAdded **14 tests** for `/auth`, all green.\n- Opened [PR #212](https://github.com/o/r/pull/212).\n```ts\ncode()\n```\nMore'
   assert.deepEqual(plainLines(md, 3), ['Done', 'Added 14 tests for /auth, all green.', 'Opened PR #212.'])
   assert.deepEqual(plainLines(undefined), [])
+  // emphasis goes; underscores inside a word stay
+  assert.deepEqual(plainLines('Fixed parse_line_end in test_utils.py, _really_ **now**'), ['Fixed parse_line_end in test_utils.py, really now'])
   assert.equal(plainLines('x'.repeat(400), 1)[0].length, 160)
   assert.equal(tookText(252e3), '4m 12s')
   assert.equal(tookText(9e3), '9s')

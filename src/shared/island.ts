@@ -62,7 +62,8 @@ export function plainLines(md: string | undefined, n = 3, max = 160) {
       l
         .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/, '')
         .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/(\*\*|__|\*|_|~~|`)(?=\S)([^\n]*?\S)\1/g, '$2')
+        .replace(/(\*\*|\*|~~|`)(?=\S)([^\n]*?\S)\1/g, '$2')
+        .replace(/(?<!\w)(__|_)(?=\S)([^\n]*?\S)\1(?!\w)/g, '$2') // _emphasis_, never parse_line_end
         .replace(/`/g, '')
         .trim(),
     )

@@ -229,7 +229,7 @@ export function ownStatusLine(ws: Workspace, t: Tab): string | undefined {
 export const statusGone = (id: string) => rmSync(join(statusDir, `${id}.json`), { force: true })
 export function statusTidy() {
   const live = new Set(state.tabs.map(t => t.id))
-  for (const f of existsSync(statusDir) ? readdirSync(statusDir) : []) if (!live.has(f.replace(/\.(json|tmp)$/, ''))) rmSync(join(statusDir, f), { force: true })
+  for (const f of existsSync(statusDir) ? readdirSync(statusDir) : []) if (!live.has(f.replace(/(\.\d+)?\.(json|tmp)$/, ''))) rmSync(join(statusDir, f), { force: true })
 }
 
 // today's, the workspaces that used most first (5)

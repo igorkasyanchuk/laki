@@ -300,7 +300,8 @@ function islandPage() {
   let shown: IslandCard | null = null
   // measured at once: the window is hidden until main has its size, and a hidden page gets no animation frames
   const fit = () => bridge?.islandSize(box.offsetHeight)
-  box.onpointerenter = () => (bridge?.islandEv('enter'), bridge?.islandEv('focus'))
+  box.onpointerenter = () => bridge?.islandEv('enter')
+  box.onpointerdown = () => bridge?.islandEv('focus') // a press, not a pass: the app in front keeps the keyboard until then
   box.onpointerleave = () => bridge?.islandEv('leave')
   document.addEventListener('keydown', e => {
     if (!shown || e.metaKey || e.ctrlKey || (e.target as HTMLElement).tagName === 'TEXTAREA') return void (e.key === 'Escape' && (e.target as HTMLElement).tagName === 'TEXTAREA' && bridge?.islandEv('esc'))

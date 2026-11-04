@@ -493,7 +493,8 @@ const STATUS_SH = `#!/bin/sh
 # Laki: keeps claude's status line JSON for its tab, then runs your own status line with the same input
 in=$(cat)
 if [ -n "$LAKI_TAB" ] && [ -n "$LAKI_STATUSLINE_DIR" ]; then
-  printf '%s' "$in" 2>/dev/null > "$LAKI_STATUSLINE_DIR/$LAKI_TAB.tmp" && mv -f "$LAKI_STATUSLINE_DIR/$LAKI_TAB.tmp" "$LAKI_STATUSLINE_DIR/$LAKI_TAB.json" 2>/dev/null
+  t="$LAKI_STATUSLINE_DIR/$LAKI_TAB.$$.tmp"
+  printf '%s' "$in" 2>/dev/null > "$t" && mv -f "$t" "$LAKI_STATUSLINE_DIR/$LAKI_TAB.json" 2>/dev/null
 fi
 c=$LAKI_STATUSLINE_CMD
 unset LAKI_STATUSLINE_CMD

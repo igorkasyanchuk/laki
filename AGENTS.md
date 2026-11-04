@@ -2498,7 +2498,7 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   `tookText`, `replyOf`); main's `islandAt` puts the bar at the pill (no drag, no snap; `home` and floater.json stay
   the edge's), `islandFloats` opens a card as a float turns waiting, or done within the last minute with `floaterDone` (an ask over a finished
   one; the same card again isn't redrawn, `islSent`: its reply box keeps what's typed), `island(tab, list)` sends it to the #card window (`island` IPC; its height back as `island-size`, then
-  clickable and focusable: `island-ev` `focus` as the pointer comes on it, its keys 1-9, ←→, Esc), `islandEv` the
+  clickable and focusable: `island-ev` `focus` as the pointer presses on it (a pass leaves the keyboard where it was), its keys 1-9, ←→, Esc), `islandEv` the
   pointer's `enter`/`leave`/`esc`/`next`/`prev` and the 500 ms tick; a hover on the pill (`pill`) the session list,
   folded once the pointer is on neither. floater.ts' `pillRender` (bars, `.isl-*`) and `islandPage` (`#island`: an
   ask's options through `floater-answer` with n and label, a permission's `permVerb` and command, a finished one's
