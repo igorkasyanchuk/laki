@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as scheduleMod from './schedule.ts'
 import * as hostsMod from './hosts.ts'
 import * as prMod from './pr.ts'
 import * as filesMod from './files.ts'
@@ -270,18 +271,18 @@ const api: Record<string, Handler> = {
   layoutSet: p => core.layoutSet(p),
   layoutMove: p => core.layoutMove(p),
   tabFocus: p => core.tabFocus(p),
-  todoAdd: p => core.todoAdd(p),
-  todoRm: p => core.todoRm(p),
+  todoAdd: p => scheduleMod.todoAdd(p),
+  todoRm: p => scheduleMod.todoRm(p),
   memoryCompact: p => memoryCompact(p),
   memoryCompactLog: p => memoryCompactLog(p),
   memoryTick: p => memoryTick(p.now), // tests move the clock
   cliState: () => core.cliState(),
   cliInstall: () => core.cliInstall(),
   cliRemove: () => core.cliRemove(),
-  reminderAdd: p => core.reminderAdd(p),
-  reminderSet: p => core.reminderSet(p),
-  reminderRm: p => core.reminderRm(p),
-  reminderTick: p => core.reminderTick(p.now), // tests move the clock
+  reminderAdd: p => scheduleMod.reminderAdd(p),
+  reminderSet: p => scheduleMod.reminderSet(p),
+  reminderRm: p => scheduleMod.reminderRm(p),
+  reminderTick: p => scheduleMod.reminderTick(p.now), // tests move the clock
   tabClose: p => core.closeTab(p.id),
   tabSet: ({ from: _, ...p }) => core.tabSet(p), // from: whoCalls' (an agent names its own tab only: agentNo)
   settingsSet: ({ from: _, ...p }) => core.settingsSet(p), // from: whoCalls', not a setting
@@ -418,11 +419,11 @@ const api: Record<string, Handler> = {
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
-  scheduleSet: ({ from, ...p }) => core.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
-  scheduleRm: p => core.scheduleRm(p.id),
-  scheduleRun: p => (notAgent(p, 'run a scheduled task now'), core.scheduleRun(p.id)),
-  scheduleTick: p => core.scheduleTick(p.now), // tests move the clock
-  pendingTick: p => core.pendingTick(p.now),
+  scheduleSet: ({ from, ...p }) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
+  scheduleRm: p => scheduleMod.scheduleRm(p.id),
+  scheduleRun: p => (notAgent(p, 'run a scheduled task now'), scheduleMod.scheduleRun(p.id)),
+  scheduleTick: p => scheduleMod.scheduleTick(p.now), // tests move the clock
+  pendingTick: p => scheduleMod.pendingTick(p.now),
   remoteStart: p => remoteMod.remoteStart(p),
   remoteStop: () => remoteMod.remoteStop(),
   remoteTick: p => remoteMod.remoteTick(p.now), // tests move the clock
@@ -819,7 +820,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     core.clients.add(c)
     core.hello(c)
     widgetAsks(c) // an extension's asks still waiting: this window shows them too
-    if (core.clients.size === 1) widgetTick(undefined, 'open'), core.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
+    if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
       try {
@@ -892,16 +893,16 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (remoteMod.remoteTick(), remoteMod.shareTick(), remoteMod.tunnelTick()))
-  every(30000, () => core.scheduleTick())
-  every(30000, () => core.pendingTick())
-  every(30000, () => core.reminderTick())
+  every(30000, () => scheduleMod.scheduleTick())
+  every(30000, () => scheduleMod.pendingTick())
+  every(30000, () => scheduleMod.reminderTick())
   every(1800000, () => memoryTick())
   every(30000, () => widgetTick())
   every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
-  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)

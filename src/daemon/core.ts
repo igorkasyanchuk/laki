@@ -38,7 +38,6 @@ export { dir }
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { hookCause, type HookWhy } from './hookHealth.ts'
-export * from './schedule.ts'
 
 export const run = promisify(execFile)
 
