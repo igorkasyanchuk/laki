@@ -473,6 +473,7 @@ export type Settings = {
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   needsList?: boolean // Settings › Appearance › Sidebar: the Needs you list above Pinned and the projects (on unless false)
+  staleAfter?: number // Settings › Needs you: minutes after which a done tab is stale (the renderer's text.ts isStale: Earlier, ⌘J and the bubbles last; unset 30, 0 never)
   keyOverlay?: boolean // Settings › Keys: hold ⌘ for a badge beside everything with a key (on unless false)
   layouts?: SavedLayout[] // the Layout menu's saved ones (shared/layout.ts): a split by role and the side panel
   ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)

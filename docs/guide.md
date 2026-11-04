@@ -245,11 +245,14 @@ selected workspace's PR is in the status bar.
   | <img src="icons/approved-you.svg" width="14" alt="double check"> | approved, and by you too |
   | 👀 | you commented on, or reviewed with comments, someone else's PR |
 - **Needs you**, at the sidebar's top (above Pinned and the projects; hidden when empty, a click on its head folds it):
-  every agent waiting for you, then the ones done while you looked away, the oldest first. A waiting one's card shows
-  what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a click answers it
-  there. A done one's shows its answer's first line and diff size, *Review* (the right panel's Changes) and *Seen*
-  (clears its ●). A click anywhere else opens the tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes
-  through the same list. Settings › *Needs you* turns it off.
+  every agent waiting for you, the oldest first, then the ones done while you looked away, the newest first. A waiting
+  one's card shows what it asks and its options as buttons (a permission prompt with no menu: *Allow* / *Deny*); a
+  click answers it there. A done one's shows its answer's first line and diff size, *Review* (the right panel's
+  Changes) and *Seen* (clears its ●). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
+  dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
+  tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
+  take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
+  (5, 15, 30 or 60 minutes, or never).
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message

@@ -9,7 +9,7 @@ short version.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
-  from its card; what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
+  from its card, the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.

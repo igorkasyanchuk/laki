@@ -8,7 +8,7 @@ import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } fr
 import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
-import { exportable, importable, type RunAction, type Template, USAGE_AT } from './text'
+import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
@@ -160,6 +160,7 @@ export type AppSettings = Paint & {
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
   needsList?: boolean // the sidebar's Needs you list (unset: on)
+  staleAfter?: number // minutes after which a finish is stale: Needs you's Earlier, ⌘J and the bubbles last (unset: STALE_AFTER; 0: never)
   keyOverlay?: boolean // Settings › Keys: hold ⌘ for the keys (unset: on)
   ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
@@ -2130,6 +2131,16 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.needsList !== false} onChange={v => set({ needsList: v })}>
                   <Says title="Needs you list" hint={`At the top of the sidebar: every agent waiting for you, its question and options to answer it there, then the ones done while you looked away (Review, Seen). ${nextKey ? `${nextKey} goes` : 'Next tab that needs you goes'} through the same list`} />
                 </Switch>
+                <label className="switch-row sub">
+                  <select value={s.staleAfter ?? STALE_AFTER} onChange={e => set({ staleAfter: Number(e.target.value) })}>
+                    {[5, 15, 30, 60, 0].map(n => (
+                      <option key={n} value={n}>
+                        {n ? `After ${n} min` : 'Never'}
+                      </option>
+                    ))}
+                  </select>
+                  <Says title="Older finishes go under Earlier" hint={`One done this long ago moves under a folded Earlier row, dimmed, newest first, with Seen all; waiting ones never do. ${nextKey || 'Next tab that needs you'} and the floating bubbles take them last too`} />
+                </label>
               </div>
               <p className="muted small set-links">
                 Also where they reach you:{' '}

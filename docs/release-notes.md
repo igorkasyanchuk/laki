@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Needs you puts what just finished first: done agents newest first, and ones done more than 30 minutes ago fold
+  under *Earlier*, dimmed, with *Seen all* (Settings › Needs you sets how long, or never). Each card has a chevron to
+  show or hide its detail; the rest of the card always opens the tab. ⌘J and the floating bubbles take older finishes
+  last too.
 - An agent's command for a new terminal tab is refused when it hides its end: blank-looking characters (no-break
   spaces, Hangul fillers, the braille blank), blank lines, or more lines than the approval shows.
 - Menus open and close at once: a right click no longer redraws the whole window, and a theme's look no longer slows
