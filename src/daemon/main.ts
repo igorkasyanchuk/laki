@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as prMod from './pr.ts'
 import * as filesMod from './files.ts'
 import * as remoteMod from './remote.ts'
 import * as resourcesMod from './resources.ts'
@@ -294,8 +295,8 @@ const api: Record<string, Handler> = {
   bgSet: p => core.bgSet(p), // Settings › Appearance › Background image
   bgGet: () => core.bgGet(),
   fileSave: p => core.fileSave(p),
-  prFix: p => core.prFix(p), // { ws, what, job? }: job: only that check's
-  prLog: p => core.prLog(p), // { ws, job }: a failing check's log, its steps named (Info's Log)
+  prFix: p => prMod.prFix(p), // { ws, what, job? }: job: only that check's
+  prLog: p => prMod.prLog(p), // { ws, job }: a failing check's log, its steps named (Info's Log)
   logs: p => core.logs(p), // development mode's: ws:<id> or widget:<id>
   scriptLogs: () => core.scriptLogs(), // development mode's setup and teardown runs, the last 30 workspaces'
   progress: p => core.progress(p),
@@ -308,11 +309,11 @@ const api: Record<string, Handler> = {
   secretAsk: p => secretAsk(p), // laki secret: resolves as you answer (secrets.ts)
   secretGive: p => secretGive(p),
   secretsTidy: p => secretsTidy(p.now), // tests move the clock
-  prAttach: p => core.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
-  prDetach: p => core.prDetach(p), // { ws }: its linked PR to related (not its own)
+  prAttach: p => prMod.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
+  prDetach: p => prMod.prDetach(p), // { ws }: its linked PR to related (not its own)
   phoneTick: () => phoneMod.phoneTick(), // answers from the phone now (tests: not every 5 s)
-  prList: p => core.prList(p), // Laki AI's laki_prs: a project's open PRs
-  prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
+  prList: p => prMod.prList(p), // Laki AI's laki_prs: a project's open PRs
+  prRefresh: () => prMod.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => phoneMod.webhookTest(p),
   uiReset: () => core.uiReset(),
   portKill: p => resourcesMod.portKill(p),
@@ -356,26 +357,26 @@ const api: Record<string, Handler> = {
   skills: () => skills(),
   agentCommands: p => agentCommands(p), // the prompt boxes' / menu
   skillSet: p => skillSet(p),
-  prComment: p => core.prComment(p),
-  prReview: p => core.prReview(p),
-  issueList: p => core.issueList(p),
-  prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
+  prComment: p => prMod.prComment(p),
+  prReview: p => prMod.prReview(p),
+  issueList: p => prMod.issueList(p),
+  prAct: p => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   usageDays: () => metersMod.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
-  prDraft: p => core.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Mark as draft / Ready for review
-  prLabels: p => core.prLabels(p.ws),
-  ghCard: p => core.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
-  prLabel: p => core.prLabel(p),
-  prThreads: p => core.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
-  prTalk: p => core.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
-  prSay: p => core.prSay(p), // a comment on the PR's conversation, as you (the full review's GitHub tab)
+  prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Mark as draft / Ready for review
+  prLabels: p => prMod.prLabels(p.ws),
+  ghCard: p => prMod.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
+  prLabel: p => prMod.prLabel(p),
+  prThreads: p => prMod.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
+  prTalk: p => prMod.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
+  prSay: p => prMod.prSay(p), // a comment on the PR's conversation, as you (the full review's GitHub tab)
   blame: p => filesMod.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
   fileWeb: p => filesMod.fileWeb(p), // a file's page on origin's site, at the base or the branch
-  prDiff: p => core.prDiff(p.ws),
-  prFile: p => core.prFile(p.ws, p.path), // a file at the PR's head: the full review's expand arrows on PR #n
-  prFiles: p => core.prFiles(p.ws),
-  prViewed: p => core.prViewed(p),
+  prDiff: p => prMod.prDiff(p.ws),
+  prFile: p => prMod.prFile(p.ws, p.path), // a file at the PR's head: the full review's expand arrows on PR #n
+  prFiles: p => prMod.prFiles(p.ws),
+  prViewed: p => prMod.prViewed(p),
   run: p => core.runDev(p.ws, p.script, core.callerAgent(p.caller)), // an agent's: its tab.new the agent's
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
@@ -877,7 +878,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
   every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
-  every(prMs || 60000, () => (prMs ? core.scanPRs() : core.prTick()))
+  every(prMs || 60000, () => (prMs ? prMod.scanPRs() : prMod.prTick()))
   every(2000, core.sweepRunning)
   every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   every(2000, core.shellTick)
@@ -899,7 +900,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
-  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)

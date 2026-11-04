@@ -36,7 +36,6 @@ import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 export { dir }
 export * from './hosts.ts'
-export * from './pr.ts'
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { hookCause, type HookWhy } from './hookHealth.ts'
