@@ -104,16 +104,17 @@ test('usage: which sign-in, plans with no limits, an API key, and each way the s
   assert.deepEqual([u.plan, u.windows, u.error], [undefined, [], 'This plan shows no limits (organization and education plans don’t)'])
   assert.equal(hits.at(-1)?.auth, 'Bearer file')
 
-  // told to slow down: not asked again for 5 minutes, not even after one
+  // told to slow down: not asked again for 10 minutes (no Retry-After), not even after one
   rmSync(join(home, '.claude', '.credentials.json'))
   claudeSays = 429
   const slowAt = (now += 3_600_000)
-  assert.equal((await claude(slowAt)).error, 'Asked too often: tries again in a few minutes')
+  assert.equal((await claude(slowAt)).error, 'Anthropic asked Laki to check less often')
   assert.equal(hits.at(-1)?.auth, 'Bearer kc', 'the Keychain item without an expiry, when it is the only one')
   const n = hits.length
   await claude(slowAt + 61_000)
-  assert.equal(hits.length, n, 'kept 5 minutes')
   await claude(slowAt + 301_000)
+  assert.equal(hits.length, n, 'kept 10 minutes')
+  await claude(slowAt + 601_000)
   assert.equal(hits.length, n + 1)
 
   // a server error: asked again after a minute

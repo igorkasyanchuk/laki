@@ -33,6 +33,11 @@ export function mostRoom(rows: AgentUsage[], agent: string, now = Date.now()) {
   return left.length > 1 && left[0][1] - left[1][1] >= 20 ? left[0][0] : undefined
 }
 
+const hm = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+// told to wait (a 429): whose numbers these are, and when it asks again
+const waitText = (r: AgentUsage, now: number) =>
+  `${r.error}${r.windows.length ? `, so these are from ${hm(r.at)}` : ''}. ${r.next! > now ? `Checks again at ${hm(r.next!)}` : 'Checks again soon'}.`
+
 export function resetsIn(t: number, now: number) {
   const m = Math.max(1, Math.round((t - now) / 60_000))
   if (m < 60) return `in ${m}m`
@@ -147,7 +152,7 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
                 </div>
               )
             })}
-            {r.error && <p className="muted small">{r.error}</p>}
+            {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
           </section>
         ))}
         {today && (
@@ -174,7 +179,7 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
           </section>
         )}
         <p className="muted small">
-          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in, at most every 5 minutes. Settings › Agents & profiles has the accounts; Appearance picks the agents.
+          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in: Claude's every 10 minutes, Codex's every 5. Settings › Agents & profiles has the accounts; Appearance picks the agents.
         </p>
       </div>
     </div>

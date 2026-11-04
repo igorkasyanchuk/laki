@@ -12,10 +12,14 @@ import { promisify } from 'node:util'
 import type { AgentUsage, UsageWindow } from '../shared/types.ts'
 
 const run = promisify(execFile)
-// Anthropic turns away clients that ask more often (CodexBar and ccusage hit it). AGAIN: an answer that asked no
-// server (signed out, expired) or failed on the way (offline) is asked again sooner.
+// Anthropic turns away clients that ask more often (CodexBar and ccusage hit it): Claude's every 10 minutes, Codex's
+// every 5. AGAIN: an answer that asked no server (signed out, expired) or failed on the way (offline) is asked again
+// sooner. BACK_OFF: told to slow down (429), its Retry-After, else 10, 20, 40, then every 60 minutes, the last numbers
+// kept meanwhile.
 const USAGE_TTL = 5 * 60_000
+const TTL: Record<string, number> = { claude: 10 * 60_000 }
 const AGAIN = 60_000
+const BACK_OFF = [10, 20, 40, 60].map(m => m * 60_000)
 // tests point both endpoints at a fake server: only a local one (a session's env, from a repo's .laki.json, can
 // reach a daemon the CLI starts; the tokens never leave the machine)
 export const base = (real: string) => {
@@ -23,7 +27,7 @@ export const base = (real: string) => {
   return t && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(t) ? t : real
 }
 
-type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean }
+type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean; busy?: number } // busy: told to slow down, its Retry-After (ms, 0: none)
 // whose limits: an agent's own sign-in (no dir) or an account's folder (accounts.ts)
 export type Who = { agent: string; account: string; name: string; dir?: string; default: boolean }
 const LOADERS: Record<string, (dir?: string) => Promise<Got>> = { claude, codex }
@@ -32,14 +36,21 @@ const pct = (n: number) => Math.max(0, Math.round(n))
 const failed = (e: any) =>
   e?.name === 'TimeoutError' ? 'No answer in 10 seconds' : e?.message === 'fetch failed' ? 'Can’t reach the server: offline?' : String(e?.message ?? e)
 // a request that failed: why, and whether to ask again sooner (not when told to slow down or the token was turned away)
-const fail = (e: any, plan?: string): Got => ({ plan, windows: [], error: failed(e), again: !e?.slow })
-const slow = (message: string) => Object.assign(new Error(message), { slow: true })
+const fail = (e: any, plan?: string): Got => ({ plan, windows: [], error: failed(e), again: !e?.slow, busy: e?.busy })
+const slow = (message: string, busy?: number) => Object.assign(new Error(message), { slow: true, busy })
 const when = (s: unknown) => (typeof s === 'string' && Date.parse(s)) || undefined
 
-async function get(url: string, headers: Record<string, string>, expired: string): Promise<any> {
+// Retry-After: seconds, or a date
+export const waitOf = (h: string | null, now = Date.now()) => {
+  const n = Number(h)
+  const ms = h && Number.isFinite(n) ? n * 1000 : h ? Date.parse(h) - now : NaN
+  return ms > 0 ? Math.min(ms, 6 * 3600_000) : 0
+}
+
+async function get(url: string, headers: Record<string, string>, expired: string, who: string): Promise<any> {
   const r = await fetch(url, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error' }) // the token goes to that host only
   if (r.status === 401 || r.status === 403) throw slow(expired)
-  if (r.status === 429) throw slow('Asked too often: tries again in a few minutes')
+  if (r.status === 429) throw slow(`${who} asked Laki to check less often`, waitOf(r.headers.get('retry-after')))
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json().catch(() => Promise.reject(new Error('Unexpected answer from the server'))) // a captive portal's page
 }
@@ -96,7 +107,7 @@ async function claude(d?: string): Promise<Got> {
   if (c.expiresAt && c.expiresAt < Date.now()) return { plan, windows: [], error: expired, again: true }
   let u
   try {
-    u = await get(`${base('https://api.anthropic.com')}/api/oauth/usage`, { Authorization: `Bearer ${c.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20' }, expired)
+    u = await get(`${base('https://api.anthropic.com')}/api/oauth/usage`, { Authorization: `Bearer ${c.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20' }, expired, 'Anthropic')
   } catch (e) {
     return fail(e, plan)
   }
@@ -142,7 +153,7 @@ async function codex(d?: string): Promise<Got> {
   if (typeof t.account_id === 'string' && t.account_id) headers['chatgpt-account-id'] = t.account_id
   let u
   try {
-    u = await get(`${base('https://chatgpt.com')}/backend-api/wham/usage`, headers, 'Sign-in expired: Codex renews it on its next run')
+    u = await get(`${base('https://chatgpt.com')}/backend-api/wham/usage`, headers, 'Sign-in expired: Codex renews it on its next run', 'OpenAI')
   } catch (e) {
     return fail(e)
   }
@@ -150,10 +161,12 @@ async function codex(d?: string): Promise<Got> {
   return { plan: typeof u?.plan_type === 'string' ? u.plan_type : undefined, windows, error: windows.length ? undefined : 'This plan shows no limits' }
 }
 
-// ---------- each agent's answer, kept for USAGE_TTL (AGAIN when it says so); callers asking meanwhile share one request
+// ---------- each agent's answer, kept for its TTL (AGAIN or BACK_OFF when it says so); callers asking meanwhile share
+// one request; last: its last answer with numbers, shown while the server says to wait
 
-type Entry = { at: number; ttl: number; p?: Promise<AgentUsage> }
+type Entry = { at: number; ttl: number; p?: Promise<AgentUsage>; slows?: number }
 const cache = new Map<string, Entry>()
+const last = new Map<string, AgentUsage>()
 
 // on: Settings' usage (an agent set to false isn't asked); who: each agent's accounts, its own first
 export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now()): Promise<AgentUsage[]> {
@@ -163,11 +176,19 @@ export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = D
       const mine = (r: Omit<AgentUsage, 'account' | 'name' | 'default'>): AgentUsage => ({ ...r, account: w.account, name: w.name, default: w.default })
       const c = cache.get(key)
       if (c?.p && now - c.at < c.ttl) return c.p.then(mine) // a rename, another default: now's
-      const entry: Entry = { at: now, ttl: USAGE_TTL }
+      const entry: Entry = { at: now, ttl: TTL[w.agent] ?? USAGE_TTL }
       entry.p = LOADERS[w.agent](w.dir).then(
-        ({ again, ...r }) => {
+        ({ again, busy, ...r }) => {
           if (again) entry.ttl = AGAIN
-          return { agent: w.agent, ...r, at: Date.now() }
+          if (busy !== undefined) {
+            entry.slows = (c?.slows ?? 0) + 1
+            entry.ttl = Math.max(busy, BACK_OFF[Math.min(entry.slows, BACK_OFF.length) - 1])
+            const had = last.get(key)
+            return { ...(had ?? { agent: w.agent, ...r, at: Date.now() }), error: r.error, next: entry.at + entry.ttl }
+          }
+          const got = { agent: w.agent, ...r, at: Date.now() }
+          if (got.windows.length) last.set(key, got)
+          return got
         },
         e => ((entry.ttl = AGAIN), { agent: w.agent, windows: [], error: failed(e), at: Date.now() }),
       )

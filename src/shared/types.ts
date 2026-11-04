@@ -754,7 +754,7 @@ export type StudioChat = { id: string; title: string; at: number; busy: boolean 
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
 // an agent's limits; error: why there are none (signed out…); at: when they were read
 // account: whose (an Account's id or HOME_ACCOUNT), name to tell them apart, default: the one new sessions use
-export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; account?: string; name?: string; default?: boolean }
+export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean } // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':

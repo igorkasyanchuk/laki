@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { base, claudeWindows, codexWindows } from '../src/daemon/usage.ts'
+import { base, claudeWindows, codexWindows, waitOf } from '../src/daemon/usage.ts'
 import { fresh } from './helpers.ts'
 
 test('usage: the windows of Claude and Codex answers', () => {
@@ -130,4 +130,46 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   u = await rig.rpc('usage')
   assert.equal(u[0].error, 'Sign-in expired: Claude Code renews it on its next run')
   assert.equal(hits.at(-1)?.auth, 'Bearer revoked')
+})
+
+test('usage: Claude asked every 10 minutes; told to wait, its Retry-After or longer each time, the last numbers kept', async t => {
+  assert.deepEqual([waitOf('120'), waitOf(null), waitOf('soon'), waitOf(new Date(Date.now() + 60_000).toUTCString()) > 50_000], [120_000, 0, 0, true])
+  let code = 200
+  let retry: string | undefined
+  let hits = 0
+  const srv = createServer((_q, r) => {
+    hits++
+    r.writeHead(code, { 'content-type': 'application/json', ...(retry && { 'retry-after': retry }) })
+    r.end(code === 200 ? JSON.stringify({ five_hour: { utilization: 41 } }) : '{}')
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  await rig.rpc('settingsSet', { usage: { codex: false } })
+  mkdirSync(join(rig.home, '.claude'))
+  writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 86_400_000 } }))
+  const min = 60_000
+  const t0 = Date.now()
+  const at = async (m: number) => (await rig.rpc('usage', { now: t0 + m * min }))[0]
+  assert.equal((await at(0)).windows[0].used, 41)
+  assert.equal((await at(9)).windows[0].used, 41)
+  assert.equal(hits, 1) // 9 minutes on: kept
+
+  code = 429
+  retry = '1800'
+  let u = await at(11)
+  assert.deepEqual([hits, u.windows[0].used, u.error, u.next], [2, 41, 'Anthropic asked Laki to check less often', t0 + 41 * min]) // its Retry-After
+  await at(40)
+  assert.equal(hits, 2)
+  retry = undefined
+  u = await at(42)
+  assert.deepEqual([hits, u.windows[0].used, u.next], [3, 41, t0 + 62 * min]) // the second time in a row: 20 minutes
+  await at(61)
+  assert.equal(hits, 3)
+
+  code = 200
+  u = await at(63)
+  assert.deepEqual([hits, u.error, u.next], [4, undefined, undefined])
+  code = 429
+  assert.equal((await at(74)).next, t0 + 84 * min) // back to 10 after an answer
 })
