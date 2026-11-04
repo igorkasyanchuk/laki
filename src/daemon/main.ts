@@ -15,7 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
-import { dir } from './dir.ts'
+import { dir, inRig } from './dir.ts'
 import * as scheduleMod from './schedule.ts'
 import * as hostsMod from './hosts.ts'
 import * as prMod from './pr.ts'
@@ -713,12 +713,9 @@ async function hookWho(sock: Socket, p: any) {
   }
 }
 
-// the ticks' now (storageTidy, archivedTidy, scheduleTick…): a test's daemon only (the rig's LAKI_TEST_PARENT); any
-// other caller's clock is the Mac's, else a date years ahead deletes every storage folder's files at once
-// and only over a data folder under /tmp (the rig's /tmp/laki-…): an env var alone could reach a real ~/.laki (not
-// TMPDIR: an env var too)
-const inTemp = (p: string, tmp = realOf('/tmp')) => p !== tmp && core.within(tmp, p)
-const TEST_CLOCK = !!process.env.LAKI_TEST_PARENT && process.env.LAKI_TEST_CLOCK !== '0' && inTemp(realOf(dir)) // 0: a test's daemon that takes none (api.test's)
+// the ticks' now (storageTidy, archivedTidy, scheduleTick…): a test's daemon only (dir.ts' inRig); any other caller's
+// clock is the Mac's, else a date years ahead deletes every storage folder's files at once
+const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's daemon that takes none (api.test's)
 
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {
   const h = Object.hasOwn(api, method) ? api[method] : undefined

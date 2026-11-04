@@ -345,3 +345,20 @@ test('Needs you and ⌘J: waiting oldest first, fresh finishes newest first, sta
   assert.equal(isStale(tab('d', 'idle', 30), 30, now), true, 'exactly staleAfter old')
   assert.equal(isStale(tab('d', 'idle', 29), 30, now), false)
 })
+
+test("the test rig only: LAKI_POLICY and the RPC's now need LAKI_TEST_PARENT and a data folder under /tmp (dir.ts inRig)", () => {
+  const dirTs = new URL('../src/daemon/dir.ts', import.meta.url).pathname
+  const inRig = (env: Record<string, string>) =>
+    execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', '--input-type=module', '-e', `const { inRig } = await import(${JSON.stringify(dirTs)}); process.stdout.write(String(inRig()))`], { env: { PATH: process.env.PATH ?? '', ...env } }).toString()
+  const rig = mkdtempSync('/tmp/laki-rig-')
+  const away = mkdtempSync('/var/tmp/laki-rig-') // not under /tmp, here or on Linux
+  try {
+    assert.equal(inRig({ LAKI_HOME: rig, LAKI_TEST_PARENT: '1' }), 'true')
+    assert.equal(inRig({ LAKI_HOME: rig }), 'false') // an env var alone: a team's policy stays
+    assert.equal(inRig({ LAKI_HOME: away, LAKI_TEST_PARENT: '1' }), 'false')
+    assert.equal(inRig({ LAKI_HOME: '/tmp', LAKI_TEST_PARENT: '1' }), 'false')
+  } finally {
+    rmSync(rig, { recursive: true, force: true })
+    rmSync(away, { recursive: true, force: true })
+  }
+})

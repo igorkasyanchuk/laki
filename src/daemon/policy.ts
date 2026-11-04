@@ -1,6 +1,6 @@
 // A managed policy for teams: what an admin deploys (MDM's managed preferences, or a file) and the user can't change
 // in Laki. Read as the daemon starts and every 5 minutes (policyTick), from the first that's there: LAKI_POLICY (a
-// file: tests'), /Library/Managed Preferences/dev.laki.app.plist (a configuration profile's; plutil reads it as JSON),
+// file: the test rig's only), /Library/Managed Preferences/dev.laki.app.plist (a configuration profile's; plutil reads it as JSON),
 // /Library/Application Support/Laki/policy.json (macOS), /etc/laki/policy.json (Linux). Its keys:
 //   settings: { <a Settings key>: value }: locked to that value (null: unset), settingsSet refuses another
 //   remote: false        no remote access (remoteStart refused)
@@ -12,9 +12,11 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { neverAsks } from '../shared/types.ts'
 import { changed, log, save, state } from './core.ts'
+import { inRig } from './dir.ts'
 
 export type Policy = { settings?: Record<string, unknown>; remote?: false; bypass?: false; agents?: string[]; from: string }
-const SOURCES = () => [process.env.LAKI_POLICY, '/Library/Managed Preferences/dev.laki.app.plist', '/Library/Application Support/Laki/policy.json', '/etc/laki/policy.json'].filter((x): x is string => !!x)
+// LAKI_POLICY in the test rig only (dir.ts' inRig): read first, a file holding {} would cancel what an admin deployed
+const SOURCES = () => [inRig() && process.env.LAKI_POLICY, '/Library/Managed Preferences/dev.laki.app.plist', '/Library/Application Support/Laki/policy.json', '/etc/laki/policy.json'].filter((x): x is string => !!x)
 let now: Policy | undefined
 let said = ''
 export const policy = () => now
