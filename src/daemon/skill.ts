@@ -208,7 +208,8 @@ more than 30 minutes late is skipped and logged as missed).
     laki schedule add <project> --when "every day at 2am except weekends" "<prompt>"
 
 - \`--when\`: \`weekdays at 9:00\`, \`mon, wed and fri at 18:30\`, \`every 2 hours from 9am to 6pm\`,
-  \`every 30 minutes\`, \`at 3 in the afternoon\`, \`tomorrow at 7am\` or \`once at 23:00\` (one run, then off).
+  \`every 30 minutes\`, \`at 3 in the afternoon\`, \`tomorrow at 7am\` or \`once at 23:00\` (one run, then off);
+  several times at once with \`;\`: \`weekdays at 9am; fri at 4pm\`.
   Every 5 minutes at most; name the days instead of "every few days". A wording it can't read is refused
   with what it needs.
 - \`--where\`: \`new\` (the default in a repo: a new worktree and workspace each run), \`folder\` (the project's

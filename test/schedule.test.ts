@@ -105,6 +105,24 @@ test('when: a line of English to days and times; the next run; in words', () => 
   assert.equal(wsTitle({ name: 'Nightly {{DD.MM}}', prompt: 'x' }, at), 'Nightly 05.10')
 })
 
+test('when: several times in one line, a part each; a time two parts share runs once', () => {
+  const wed = new Date(2026, 10, 4, 8, 0).getTime() // a Wednesday, 08:00
+  const r = parseWhen('weekdays at 9am; fri at 4pm', wed) as Rule
+  assert.deepEqual([r.days, r.times, r.also], [[1, 2, 3, 4, 5], [540], [{ days: [5], times: [960] }]])
+  assert.equal(describe(r), 'Weekdays at 09:00; Fri at 16:00')
+  assert.deepEqual(parseWhen('weekdays at 9am and fridays at 16:00', wed), r) // " and " before days splits too
+  const fri = new Date(2026, 10, 6, 10, 0).getTime()
+  assert.equal(nextRun(r, fri), new Date(2026, 10, 6, 16, 0).getTime()) // Friday: the later part's time
+  // " and " between times or days stays one rule
+  assert.deepEqual(parseWhen('weekdays at 9 and 17:30', wed), { days: [1, 2, 3, 4, 5], times: [540, 1050] })
+  assert.deepEqual(parseWhen('mon and thu at 9am', wed), { days: [1, 4], times: [540] })
+  // the same time twice: one run
+  const twice = parseWhen('every day at 9am; weekdays at 9am', wed) as Rule
+  assert.equal(nextRun(twice, new Date(2026, 10, 4, 9, 0).getTime()), new Date(2026, 10, 5, 9, 0).getTime())
+  // a part that doesn't read says which
+  assert.deepEqual(parseWhen('weekdays at 9am; sometimes', wed), { error: 'sometimes: At what time? (every day at 9am)' })
+})
+
 test('scheduled tasks: a new workspace each run, or the workspace’s agent; once, missed, the log', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

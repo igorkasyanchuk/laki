@@ -18,7 +18,7 @@ export type SchedulesApi = {
   branches(project: string): Promise<{ branches: string[]; main: string; current: string }> // a new workspace's base: the new-workspace page's list
 }
 
-const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
+const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'weekdays at 9am; fri at 4pm', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
 const RUNS = 8 // the log's rows until Show all
 // where a run goes: its words, its icon
 export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]

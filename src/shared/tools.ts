@@ -278,7 +278,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj(
       {
         project: str('a project id'),
-        when: str('e.g. "weekdays at 9am", "every day at 2am except weekends", "every 2 hours from 9am to 6pm", "tomorrow at 7am"'),
+        when: str('e.g. "weekdays at 9am", "every day at 2am except weekends", "every 2 hours from 9am to 6pm", "tomorrow at 7am"; several times with ";": "weekdays at 9am; fri at 4pm"'),
         prompt: str('what the agent should do each run; {{DD-MM-YY}}-style dates become the run’s'),
         preset: str('claude (the default), codex, gemini, grok, opencode or a preset of theirs'),
         name: str('the task’s name, also each run’s workspace name; may hold {{DD-MM}}'),

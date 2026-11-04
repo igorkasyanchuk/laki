@@ -707,7 +707,7 @@ run fails, saying so.
   that run, saying so, `laki schedule add … --base release/2.0`), whether it skips the project's setup script (Where's *A new
   workspace each run, no setup*, when the project has one; the row says *no setup*; `--no-setup`), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
   `mon, wed and fri at 18:30`, `every 2 hours from 9am to 6pm`, `every 30 minutes`, `hourly on weekends`,
-  `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). Until it reads, a few
+  `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). Several times for one task: `;` between them, or *and* before the next days: `weekdays at 9am; fri at 4pm` (the calendar and the next runs show all of them; a time two of them share runs once). Until it reads, a few
   examples sit under *When* (a click fills it in); then the form says how it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
 - Dates in the name or the prompt: `{{DD-MM-YY}}`, `{{YYYY-MM-DD}}`, `{{HH:mm}}`, `{{ddd D MMM}}` (`Nightly deps
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or

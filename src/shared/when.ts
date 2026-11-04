@@ -1,9 +1,13 @@
 // When a scheduled task runs, from a line of English (the daemon schedules with it, the form previews it):
 //   every day at 2am except weekends · weekdays at 9:00 · mon, wed and fri at 18:30 · every 2 hours from 9am to 6pm
 //   every 30 minutes · hourly on weekends · at 9am and 5pm · tomorrow at 7am · once at 23:00
+//   weekdays at 9am; fri at 4pm · weekdays at 9am and fridays at 16:00 (several times: a part each)
 // A rule is the days of the week (0 Sunday … 6) and the times on them (minutes after midnight), in the Mac's time zone;
-// once: it runs one time, at the first of them.
-export type Rule = { days: number[]; times: number[]; once?: boolean }
+// also: more such parts, each its own days and times (a time two parts share runs once); once: it runs one time, at
+// the first of them.
+export type Part = { days: number[]; times: number[] }
+export type Rule = Part & { once?: boolean; also?: Part[] }
+export const partsOf = (r: Rule): Part[] => [{ days: r.days, times: r.times }, ...(r.also ?? [])]
 
 export const MIN_EVERY = 5 // minutes: the shortest interval
 const NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -44,7 +48,32 @@ function daysIn(s: string): number[] {
 
 const tidy = (text: string) => ` ${text.toLowerCase().replace(/\b([ap])\.m\.?/g, '$1m').replace(/(\d)\.(\d\d)(?!\d)/g, '$1:$2').replace(/[,;&]/g, ' , ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ')} `
 
+// several times in one line: split at ";" (a comma would read as a list of days or times), or at " and " when what's
+// before it has a time and what's after starts with days (weekdays at 9am and fri at 4pm; never at 9 and 17:30)
+const SPLIT = new RegExp(`\\s+and\\s+(?=(?:on\\s+|every\\s+|each\\s+)?(?:${DAY_WORD}|every ?day|daily|tomorrow)\\b)`, 'i')
 export function parseWhen(text: string, now = Date.now()): Rule | { error: string } {
+  const bits = text.split(';').flatMap(b => {
+    const out: string[] = []
+    let rest = b
+    for (let m = SPLIT.exec(rest); m; m = SPLIT.exec(rest)) {
+      const head = rest.slice(0, m.index)
+      if (!new RegExp(`\\b${TIME}`).test(head.replace(new RegExp(`\\b${DAY_WORD}\\b`, 'gi'), ' ')) || !/\d|noon|midnight|hourly|every/i.test(head)) break
+      out.push(head)
+      rest = rest.slice(m.index + m[0].length)
+    }
+    return [...out, rest]
+  }).filter(b => b.trim())
+  if (bits.length < 2) return parseOne(text, now)
+  const rules: Rule[] = []
+  for (const b of bits) {
+    const r = parseOne(b, now)
+    if ('error' in r) return { error: `${b.trim()}: ${r.error}` }
+    rules.push(r)
+  }
+  const [first, ...more] = rules
+  return { days: first.days, times: first.times, ...(rules.some(r => r.once) ? { once: true } : {}), also: more.map(r => ({ days: r.days, times: r.times })) }
+}
+function parseOne(text: string, now: number): Rule | { error: string } {
   let s = tidy(text)
   s = s.replace(/\b(\d{1,2}(?::\d\d)?) (?:in the )?(morning|afternoon|evening)\b/g, (_, t: string, w: string) => `${t}${w === 'morning' ? 'am' : 'pm'}`) // at 3 in the afternoon
   if (/\bevery (\d+ |other )(days?|weeks?)\b|\bevery (\d+ )?(months?|years?)\b|\b(monthly|yearly)\b/.test(s)) return { error: 'Every few days isn’t a choice: name the days (mon and thu at 9am)' }
@@ -98,6 +127,7 @@ export function parseWhen(text: string, now = Date.now()): Rule | { error: strin
 
 // the first time the rule says after `after` (ms), or undefined (no days or times)
 export function nextRun(r: Rule, after: number): number | undefined {
+  if (r.also?.length) return partsOf(r).map(p => nextRun(p, after)).reduce<number | undefined>((a, b) => (a === undefined ? b : b === undefined ? a : Math.min(a, b)), undefined)
   const d = new Date(after)
   for (let i = 0; i <= 7; i++) {
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i)
@@ -184,6 +214,7 @@ const DAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 // "Weekdays at 02:00", "Mon, Wed, Fri every 30 min from 09:00 to 17:30", "Once: Sat at 07:00"
 export function describe(r: Rule): string {
+  if (r.also?.length) return (r.once ? 'Once, the first of: ' : '') + partsOf(r).map(p => describe(p)).join('; ')
   const k = r.days.join()
   const days = k === '0,1,2,3,4,5,6' ? 'Every day' : k === '1,2,3,4,5' ? 'Weekdays' : k === '0,6' ? 'Weekends' : r.days.map(d => DAY_LABEL[d]).join(', ')
   const t = r.times
