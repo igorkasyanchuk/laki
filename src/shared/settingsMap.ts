@@ -178,7 +178,7 @@ export const FIND: [string, string, string?][] = [
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
   ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
-  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
+  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen where edge notch island pill menu bar reply'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['general', 'Setup & teardown', 'setup teardown script logs output deleted workspaces development'],
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],

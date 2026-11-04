@@ -577,6 +577,7 @@ export type Settings = {
   floaterMax?: number // the bubbles at most (unset: 12)
   floaterCards?: boolean // a bubble's card on hover (unset: on)
   floaterDone?: boolean // a finished agent you haven't seen: a green, pulsing bubble until a click or a look (unset: on)
+  floaterAt?: 'edge' | 'notch' // where the bubbles go: the screen's edge (unset), or an island at the top, in the notch or under the menu bar, that opens into a card when an agent asks or finishes
   floaterNew?: boolean // the bubbles' +: New task, Say it, Screenshot area, Whole screen (unset: on)
   floaterMenu?: 'stack' | 'card' // the +'s actions: stacked in the drop over it, or a menu beside it (unset: stack)
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)

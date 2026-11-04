@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('laki', {
   notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
   sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
-  onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
+  onFocusTab: (cb: (tab: string, panel?: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string, panel?: string) => cb(tab, panel)), // panel: changes (the island's Review)
   onEarn: (cb: (id: string) => void) => void ipcRenderer.on('earn', (_e, id: string) => cb(id)), // an achievement main saw: the global hotkey, a bubble's click
   onFront: (cb: (on: boolean) => void) => ipcRenderer.on('front', (_e, on: boolean) => cb(on)), // Laki in front of other apps, or not
   onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
@@ -80,7 +80,7 @@ contextBridge.exposeInMainWorld('laki', {
     drag: (phase: 'start' | 'move' | 'end', dx = 0, dy = 0) => ipcRenderer.send('floater-drag', phase, dx, dy),
     size: (len: number, up?: boolean) => ipcRenderer.send('floater-size', len, up), // its length along the edge; up: the stack opened or closed, the + stays put
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
-    open: (tab: string) => ipcRenderer.send('floater-open', tab),
+    open: (tab: string, panel?: 'changes') => ipcRenderer.send('floater-open', tab, panel),
     seen: (tab: string) => ipcRenderer.send('floater-seen', tab), // a right click: its ● cleared without opening it
     act: (what: 'new' | 'mic' | 'area' | 'screen' | 'ai') => ipcRenderer.send('floater-act', what), // the +'s actions (the bar's stack or the menu)
     tip: (name: string, hint: string, top: number) => ipcRenderer.send('floater-tip', name, hint, top), // a stacked action's name beside it
@@ -91,9 +91,18 @@ contextBridge.exposeInMainWorld('laki', {
     onCard: (cb: (f: object, colors: Record<string, string>) => void) => ipcRenderer.on('card', (_e, f, colors) => cb(f, colors)),
     cardSize: (tab: string, w: number, h: number) => ipcRenderer.send('floater-card', tab, w, h),
     // the voice prompt's window: the agents it can go to, then the text out (no tab: a new session's page)
-    onVoice: (cb: (items: object[], colors: Record<string, string>, to: string) => void) => ipcRenderer.on('voice', (_e, items, colors, to) => cb(items, colors, to)),
+    onVoice: (cb: (items: object[], colors: Record<string, string>, to: string, reply?: object) => void) => ipcRenderer.on('voice', (_e, items, colors, to, reply) => cb(items, colors, to, reply)), // reply: the one agent it answers (a circle's Reply…)
     voiceSend: (tab: string, text: string): Promise<{ error?: string; queued?: boolean }> => ipcRenderer.invoke('voice-send', tab, text),
     voiceClose: () => ipcRenderer.send('voice-close'),
+    // a circle's right click (Reply…, Open tab, Seen) and ⌥-click (Reply…): main's menu and the reply window
+    menuTab: (tab: string) => ipcRenderer.send('floater-menu-tab', tab),
+    reply: (tab: string) => ipcRenderer.send('floater-reply', tab),
+    answer: (tab: string, n: number, label: string): Promise<{ error?: string }> => ipcRenderer.invoke('floater-answer', tab, n, label),
+    // the island (floaterAt notch): a card or the session list in, its height out; the pointer and keys (enter, leave,
+    // esc, next, prev; focus: its keys; pill: a hover on the pill)
+    onIsland: (cb: (c: object, colors: Record<string, string>) => void) => ipcRenderer.on('island', (_e, c, colors) => cb(c, colors)),
+    islandSize: (h: number) => ipcRenderer.send('island-size', h),
+    islandEv: (ev: string) => ipcRenderer.send('island-ev', ev),
   },
   // the screenshot's editor window (annotate.html): the picture in, the drawn one and a note out
   annotate: {

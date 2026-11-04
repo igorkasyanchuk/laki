@@ -611,6 +611,7 @@ export function App() {
   })
   // when each agent tab last worked or waited (laki.active, by tab), for the recent ones
   const active = useRef<Record<string, number>>((a => (a && typeof a === 'object' && !Array.isArray(a) ? a : {}))(load<unknown>('laki.active', {})) as Record<string, number>)
+  const turnAt = useRef<Record<string, number>>({}) // each tab's last turn start (the island's done in 4m 12s)
   for (const t of view?.tabs ?? []) if (t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting' || (t.done && !active.current[t.id]))) active.current[t.id] = Date.now() // done unseen with no stamp: it ran while the app was closed
   // a project's sidebar rows: rowsOf, each group's workspaces (and the ones above its first group) in its sort, a
   // group's own or the project's (manual: as dragged); last active: its agents' latest turn here, else when it was made
@@ -1015,11 +1016,15 @@ export function App() {
       ].filter((x): x is string => !!x),
     }
   }
+  // the island's cards (floaterAt notch) and the reply window: the agent, since when it needs you, its menu, its last
+  // answer and how long its turn took (runs: each tab's last turn start, as the view gave it while it ran)
+  for (const t of view?.tabs ?? []) if (t.runAt) turnAt.current[t.id] = t.runAt
+  const islandOf = (t: TabView) => ({ agent: t.preset ?? t.name, at: t.needAt, ...(t.status === 'waiting' && t.ask && { ask: t.ask }), ...(t.last && { answer: t.last.slice(0, 2000) }), ...(t.done && t.needAt && turnAt.current[t.id] && { took: t.needAt - turnAt.current[t.id] }) })
   const atWork = fs?.floater === false ? [] : live.flatMap(w => {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...(t.status === 'waiting' && t.ask?.tool && { perm: { tool: t.ask.tool, what: t.ask.what ?? '' } }), ...floatMore(w) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...(t.status === 'waiting' && t.ask?.tool && { perm: { tool: t.ask.tool, what: t.ask.what ?? '' } }), ...islandOf(t), ...floatMore(w) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
@@ -1041,10 +1046,10 @@ export function App() {
     })
     .sort((a, b) => Number(b.t.done) - Number(a.t.done) || b.at - a.at)
     .filter((x, i) => i < recentN || (doneAlert && x.t.done))
-    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...floatMore(w) }))
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...islandOf(t), ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs) }
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge' }
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   useEffect(() => {
     bridge?.floats?.(floats, floatColors, floatOpts)
@@ -1435,7 +1440,7 @@ export function App() {
     })
     api.connect()
     // a notification's, a bubble's or the menu bar's: over any page, as ⌘J; its row unfolded into sight (below)
-    bridge?.onFocusTab(id => (setDialog(null), selectTab(id), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace), (scrolledTo.current = null), setScrollAsk(n => n + 1)))
+    bridge?.onFocusTab((id, panel) => (setDialog(null), selectTab(id), panel === 'changes' && showPanel('changes'), (w => w && setReveal(r => [...r, w]))(viewRef.current?.tabs.find(t => t.id === id)?.workspace), (scrolledTo.current = null), setScrollAsk(n => n + 1)))
     bridge?.onDeepLink?.(setLink)
     onLakiLink(setLink) // a laki:// link in the app (the AI's to a workspace): routed here, as the Dock's
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)

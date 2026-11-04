@@ -2447,6 +2447,25 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
   which `will-navigate` would block): one renderer process, one row in Settings › Resources.
   `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer; `[data-done='on']`: a done one filled green with a slow pulse, `floaterDone` unset or true: App keeps an unseen done one a bubble past `floaterRecent` and its hours),
   also Settings › Appearance's live previews.
+- **The island** (`settings.floaterAt` `notch`; unset `edge`, the drop above): shared/island.ts (its pure parts:
+  `hasNotch` by a built-in screen's menu bar over 24 points, `pillRect` (`NOTCH` 200, ponytail: Electron doesn't say the
+  notch's width), `cardRect`, `cardQueue` (asks first, then finished ones, newest first by the float's `at`, its
+  `needAt`), `lifeStep` (an ask folds only on Esc; a finished one `DONE_FOLD` 6 s after it showed unless the pointer is
+  on it, and as it leaves after being on it), `fullScreen` (ponytail: a screen with no menu bar), `plainLines`,
+  `tookText`, `replyOf`); main's `islandAt` puts the bar at the pill (no drag, no snap; `home` and floater.json stay
+  the edge's), `islandFloats` opens a card as a float turns waiting, or done with `floaterDone` (an ask over a finished
+  one), `island(tab, list)` sends it to the #card window (`island` IPC; its height back as `island-size`, then
+  clickable and focusable: `island-ev` `focus` as the pointer comes on it, its keys 1-9, ←→, Esc), `islandEv` the
+  pointer's `enter`/`leave`/`esc`/`next`/`prev` and the 500 ms tick; a hover on the pill (`pill`) the session list,
+  folded once the pointer is on neither. floater.ts' `pillRender` (bars, `.isl-*`) and `islandPage` (`#island`: an
+  ask's options through `floater-answer` with n and label, a permission's `permVerb` and command, a finished one's
+  `plainLines`, `tookText`, `replyBox` (`voice-send` from the card window), *Review changes*: `floater-open` with
+  `changes`, main's `show(tab, panel)`, App's `onFocusTab` → `showPanel('changes')`). A float's `agent`, `at`, `ask`,
+  `answer`, `took` (App's `islandOf`; `turnAt`: each tab's last `runAt`). Replies (edge too): a circle's right click
+  is main's native menu (`floater-menu-tab`: *Reply…*, *Open tab*, a done one's *Seen*), ⌥-click and *Reply…*
+  `floater-reply` → `replyTo`: #voice with `replyFor` (`sendVoice`: no pick row, its last answer, a waiting one's
+  options as buttons; text refused while it shows a menu; queued: *Queued*, then it closes); the hover card's *Right-click or ⌥-click to reply*, once
+  a session. Tested in `test/island.test.ts`.
 - **A floated tab** (main's `tabWins`, `tab-float` IPC through App's `floatTab`: the tab's menu › *Float in its own window* (`popOut`), ⌘K, and the
   pane's *Show it* / *Bring it back*): `panelWin` `?window=tab&tab=<id>`, `NewWindow.tsx` `TabWindow` (its head the
   title bar; a `Term` of its own at the tab's ⌘± size: one more client of the session, the PTY sizes to whoever typed last;
@@ -2822,6 +2841,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |
 | `src/daemon/workflow.ts` | workflows: the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
 | `src/shared/workflow.ts` | workflows' model and Markdown file, `check`, the format in words (MCP's and Laki AI's) |
+| `src/shared/island.ts` | the bubbles' island (floaterAt notch): where the pill and its card go, which card shows next, when one folds; a reply's words |
 | `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas with its blocks and variables sidebar, inspector, file, runs |
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
 | `src/renderer/src/Ai.tsx` | the AI page: its earlier chats' sidebar, Chat (a thread, the composer, images as thumbnails), Calls and Info tabs |

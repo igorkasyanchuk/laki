@@ -7,7 +7,7 @@ short version.
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*),
-  a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
+  a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card; what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.

@@ -11,7 +11,7 @@ type Bridge = {
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[]): void
   sound?(name: string): void
   browse?(r: object): Promise<unknown>
-  onFocusTab(cb: (tab: string) => void): void
+  onFocusTab(cb: (tab: string, panel?: string) => void): void
   onEarn?(cb: (id: string) => void): void
   onBrowserTab?(cb: (url: string, front: boolean) => void): void // a Browsers page's link to a new tab: front, or in the background
   onBrowserKey?(cb: (key: string) => void): void // a Browsers page's new or close tab (the page gets keys, not the app) or a menu bar item: a shared/keys.ts id, else a ⌘ key

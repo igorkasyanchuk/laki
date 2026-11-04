@@ -231,6 +231,7 @@ export type AppSettings = Paint & {
   floaterDone?: boolean // a finished agent you haven't seen: a green, pulsing bubble until a click or a look (unset: on)
   floaterNew?: boolean // the bubbles' + (unset: on)
   floaterMenu?: 'stack' | 'card' // its actions: stacked in the drop, or a menu beside it (unset: stack)
+  floaterAt?: 'edge' | 'notch' // where: the screen's edge (unset), or the island at the top
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   videoButton?: boolean // the foot's YouTube button (unset: on)
@@ -1680,6 +1681,22 @@ export function SettingsPage(p: {
                 </Switch>
                 {s.floater !== false && (
                   <>
+                    <div className="switch-row sub fl-styles fl-at" role="radiogroup" aria-label="Where they show">
+                      <span className="muted small">Where</span>
+                      {(
+                        [
+                          ['edge', 'Edge', "A drop on the screen's left or right edge, a circle per agent; drag it where you like"],
+                          ['notch', 'Notch', 'A pill at the top of the screen, in the notch or under the menu bar; it opens into a card when an agent asks or finishes, and you answer there'],
+                        ] as const
+                      ).map(([k, name, what]) => (
+                        <button key={k} role="radio" aria-checked={(s.floaterAt ?? 'edge') === k} className={(s.floaterAt ?? 'edge') === k ? 'on' : ''} data-tip={what} onClick={() => set({ floaterAt: k })}>
+                          <span className={`fl-at-pic ${k}`} aria-hidden>
+                            <i />
+                          </span>
+                          {name}
+                        </button>
+                      ))}
+                    </div>
                     <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
                       <span className="muted small">While working</span>
                       {FLOATER_STYLES.map(([k, name, what]) => (

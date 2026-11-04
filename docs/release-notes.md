@@ -4,6 +4,11 @@ version it builds, with the date. -->
 
 ## Next
 
+- The floating bubbles can live in the notch: Settings › Appearance › Floating bubbles › *Where* › *Notch* shows a
+  pill at the top of the screen that opens into a card when an agent asks (answer there) or finishes (reply there,
+  or open its changes).
+- Reply to an agent from the floating bubbles: right-click a circle (or ⌥-click it) for a small reply window with its
+  last answer; a waiting one shows its options as buttons.
 - Claude's permission asks say what it wants to do: the tool and its command, file or address show on the ask bar,
   in the notification (with *Always: <rule>* for its don't-ask-again choice), on the floating bubbles' card and in
   phone pushes (tokens masked).

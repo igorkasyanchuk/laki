@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
+import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
 import { updater } from './update.ts'
@@ -323,7 +324,7 @@ function create() {
 // an achievement only main sees (shared/achievements.ts): App's earn, as for a call
 const earn = (id: 'hotkey' | 'bubble') => win?.webContents.send('earn', id)
 
-function show(tab?: string) {
+function show(tab?: string, panel?: 'changes') {
   if (!win) {
     pendingTab = tab ?? null
     create()
@@ -332,7 +333,7 @@ function show(tab?: string) {
   if (win.isMinimized()) win.restore()
   win.show()
   win.focus()
-  if (tab) win.webContents.send('focus-tab', tab)
+  if (tab) win.webContents.send('focus-tab', tab, panel)
 }
 
 // the global hotkey (Settings › General, ui.tsx keyLabel's text: ⌃⌥⌘L; '' none): Laki forward from any app. False:
@@ -610,14 +611,14 @@ ipcMain.on('badge', (e, n: number, items: { tab: string; label: string }[] = [],
 // the voice window are the bar's window.open: the four share one renderer process. Dragged anywhere (floater-drag: the
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
-type Float = { tab: string; status?: string }
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean }
+type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[] } }
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch' }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
 const menuH = () => MENU.height + (floats.ai ? 46 : 0) // a row more: Ask Laki AI
 const STYLES = ['glow', 'gradient', 'arc', 'bricks', 'comet', 'wave', 'still'] // a working agent's circle (Settings' previews: floater.css)
-let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true, ai: false }
+let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true, ai: false, at: 'edge' }
 let floater: BrowserWindow | null = null
 let card: BrowserWindow | null = null
 let voice: BrowserWindow | null = null
@@ -671,6 +672,15 @@ const pin = (f: BrowserWindow, to?: string) => {
   f.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   f.webContents.on('will-navigate', (e, url) => url !== to && e.preventDefault())
 }
+// the voice window's agents (none: always a new session), or the one it replies to (replyFor: a circle's Reply…), and
+// where it goes: by the bar's end, or under the island's pill
+function sendVoice(w: BrowserWindow) {
+  const to = replyFor ? floats.items.find(x => x.tab === replyFor) : undefined
+  voiceTabs = new Set(to ? [to.tab] : floats.voiceTo === 'new' ? [] : floats.items.map(x => x.tab))
+  w.webContents.send('voice', to ? [] : floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo, to)
+  if (floats.at === 'notch' && pill) w.setPosition(Math.round(pill.x + pill.width / 2 - VOICE.width / 2), pill.y + pill.height + 4)
+  else if (barAt) (p => w.setPosition(p.x, p.y))(beside(VOICE.width, VOICE.height, barLen() - (across() ? VOICE.width : VOICE.height))) // by the bar's end
+}
 // the bar; its page opens the card, the menu and the voice window (#card, #menu, #voice), only those, as one of each
 function barWin() {
   const f = new BrowserWindow(floatOpts(BAR, 60))
@@ -707,11 +717,9 @@ function barWin() {
       return
     }
     voice = w
-    w.on('closed', () => voice === w && (voice = null))
+    w.on('closed', () => voice === w && ((voice = null), (replyFor = '')))
     w.webContents.on('did-finish-load', () => {
-      voiceTabs = new Set(floats.voiceTo === 'new' ? [] : floats.items.map(x => x.tab))
-      w.webContents.send('voice', floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo) // always a new session: no agents to pick
-      if (barAt) (p => w.setPosition(p.x, p.y))(beside(VOICE.width, VOICE.height, barLen() - (across() ? VOICE.width : VOICE.height))) // by the bar's end
+      sendVoice(w)
       w.show()
       w.focus() // the key window without bringing Laki's own forward (a panel): dictation and the keys go to it
     })
@@ -745,23 +753,28 @@ function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
 }
 app.whenReady().then(() => screen.on('display-removed', () => snap()))
 function placeFloater() {
-  // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange)
-  if ((!floats.items.length && !floats.add) || front || parked || shooting) return void (floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
+  const notch = floats.at === 'notch'
+  const d = notch ? islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay()) : undefined
+  // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange); the island also while
+  // nothing runs or waits and over a full-screen app
+  if ((!floats.items.length && (!floats.add || notch)) || front || parked || shooting || (d && fullScreen(d))) return void (fold(), floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
       if (home && !['left', 'right'].includes(home.side as string)) delete home.side // an older file's, or a row's on top or bottom: left or right, by where it is
     } catch {}
     const f = (floater = barWin())
-    f.webContents.on('did-finish-load', () => (snap(), sendFloats()))
+    f.webContents.on('did-finish-load', () => (floats.at === 'notch' ? islandAt() : snap(), sendFloats()))
     f.on('closed', () => floater === f && ((floater = null), (dragFrom = null)))
   } else sendFloats()
+  if (notch) islandAt(d)
   if (!floater.isVisible()) floater.showInactive()
 }
 const sendFloats = () => floater?.webContents.send('floats', floats)
 ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   if (e.sender !== win?.webContents) return
   const o = (opts && typeof opts === 'object' ? opts : {}) as Partial<FloatOpts>
+  const was = floats.at
   floats = {
     items: Array.isArray(items) ? items.slice(0, 12) : [],
     colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {},
@@ -772,15 +785,138 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     voiceTo: o.voiceTo === 'new' ? 'new' : 'pick',
     doneAlert: o.doneAlert !== false,
     ai: o.ai === true,
+    at: o.at === 'notch' ? 'notch' : 'edge',
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
-  if (floats.menu !== 'card' || !floats.add) menu?.close()
+  if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
   if (parked && floatState() !== parked) parked = ''
+  if (floats.at !== was) (fold(), card?.hide(), card?.setIgnoreMouseEvents(floats.at !== 'notch'), floats.at === 'edge' && floater && snap()) // to the edge again: where it was
   placeFloater()
+  islandFloats()
 })
 // Stop (Settings › Resources): the bubbles' windows closed, until an agent's state changes
 let parked = ''
 const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, x.status]))
+
+// the island (floaterAt notch, shared/island.ts): the bar is a pill at the top of the built-in screen (else the main
+// one), in its notch or under its menu bar; no drag, no snap (home and floater.json stay the edge's). It opens a card
+// (the #card window, clickable and focusable while it shows) on its own as an agent turns waiting, or done
+// (floaterDone): one at a time, asks first, newest first; an ask stays until it's answered or Esc, a finished one folds
+// 6 s after unless the pointer is on it, or as the pointer leaves it after being on it. A hover on the pill with no
+// card: the session list, until the pointer is on neither
+let pill: Rect | null = null
+let isl: { tab: string; life: CardLife; list?: boolean; i: number } | null = null // the card that shows
+let islTick: NodeJS.Timeout | undefined
+const islSeen = new Map<string, string>() // each float's status at the last list: a turn to waiting or done opens its card
+function islandAt(d = islandDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay())) {
+  if (!floater) return
+  pill = pillRect(d)
+  barAt = { x: pill.x, y: pill.y }
+  floater.setBounds(pill)
+  floater.webContents.send('floater-side', 'notch')
+}
+function fold() {
+  clearInterval(islTick)
+  islTick = undefined
+  if (!isl) return
+  isl = null
+  if (floats.at === 'notch' && card && !card.isDestroyed()) card.hide(), card.setFocusable(false)
+}
+// the card for a tab (list: the sessions), sent to its window, which says its size (island-size), then shown under the pill
+function island(tab: string, list = false) {
+  if (!card || card.isDestroyed() || !pill) return
+  const q = cardQueue(floats.items)
+  const f = list ? undefined : floats.items.find(x => x.tab === tab)
+  if (!list && !f) return fold()
+  const kind = f?.status === 'waiting' ? 'ask' : 'done'
+  const same = isl && isl.tab === tab && !!isl.list === list
+  isl = { tab, list, i: Math.max(0, q.findIndex(x => x.tab === tab)), life: same ? isl!.life : { kind, shownAt: Date.now(), over: false, touched: false } }
+  clearInterval(islTick)
+  islTick = setInterval(() => islandEv('tick'), 500)
+  card.webContents.send('island', list ? { list: floats.items } : { f, i: isl.i, n: q.length }, floats.colors)
+}
+function islandEv(ev: CardEvent | 'next' | 'prev') {
+  if (!isl) return
+  if (ev === 'next' || ev === 'prev') {
+    const q = cardQueue(floats.items)
+    return q.length && void island(q[(isl.i + (ev === 'next' ? 1 : q.length - 1)) % q.length].tab)
+  }
+  // the list: until the pointer is on neither the pill nor it
+  if (isl.list) return void (ev === 'esc' || (ev !== 'enter' && !overBar() && !overCard()) ? fold() : undefined)
+  const r = lifeStep(isl.life, ev, Date.now())
+  isl.life = r.life
+  if (r.fold) fold()
+}
+const overCard = () => {
+  if (!card || card.isDestroyed() || !card.isVisible()) return false
+  const p = screen.getCursorScreenPoint()
+  const b = card.getBounds()
+  return p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height
+}
+// a new list: a float that turned waiting or done opens its card (an ask over a finished one); the shown one gone or
+// no longer asking or done: the next ask, else folded
+function islandFloats() {
+  if (floats.at !== 'notch') return void islSeen.clear()
+  let open: Float | undefined
+  for (const f of floats.items) {
+    const was = islSeen.get(f.tab)
+    if (f.status !== was && (f.status === 'waiting' || (f.status === 'done' && floats.doneAlert)) && (!open || f.status === 'waiting')) open = f
+  }
+  islSeen.clear()
+  for (const f of floats.items) islSeen.set(f.tab, f.status ?? '')
+  if (front || !floater?.isVisible()) return
+  if (open && !(isl && !isl.list && isl.life.kind === 'ask' && open.status !== 'waiting')) return island(open.tab)
+  if (!isl) return
+  if (isl.list) return island('', true)
+  const now = floats.items.find(x => x.tab === isl!.tab)
+  if (now && (now.status === 'waiting' || now.status === 'done')) return island(isl.tab) // its new text
+  const next = cardQueue(floats.items).find(x => x.status === 'waiting')
+  if (next) island(next.tab)
+  else fold()
+}
+ipcMain.on('island-size', (e, h: unknown) => {
+  if (!card || e.sender !== card.webContents || !isl || !pill || typeof h !== 'number' || !(h > 0 && h < 900)) return
+  card.setIgnoreMouseEvents(false)
+  card.setFocusable(true)
+  card.setBounds(cardRect(pill, h))
+  if (!card.isVisible()) card.showInactive()
+})
+ipcMain.on('island-ev', (e, ev: unknown) => {
+  if (!(card && e.sender === card.webContents) && !(floater && e.sender === floater.webContents)) return
+  if (ev === 'focus') return void (card && !card.isDestroyed() && card.focus()) // the pointer on it: its keys (1-9, Esc) without bringing Laki forward
+  if (ev === 'pill') return void (isl || (floats.items.length && island('', true))) // a hover on the pill: the list, unless a card shows
+  if (ev === 'enter' || ev === 'leave' || ev === 'esc' || ev === 'next' || ev === 'prev') islandEv(ev)
+  if (ev === 'leave' && isl?.list) setTimeout(() => isl?.list && islandEv('tick'), 300) // across the gap from the pill to it
+})
+// a card's or the reply window's choice of an agent's menu: its n and label (refused once the menu changed)
+ipcMain.handle('floater-answer', async (e, tab: unknown, n: unknown, label: unknown) => {
+  if (!(card && e.sender === card.webContents) && !(voice && e.sender === voice.webContents)) return { error: 'not a bubble' }
+  if (typeof tab !== 'string' || typeof n !== 'number' || typeof label !== 'string') return { error: 'no such choice' }
+  return rpc('answer', { tab, n, label }).then(
+    () => ({}),
+    (err: Error) => ({ error: err.message }),
+  )
+})
+// a circle's right click (edge): Reply…, Open tab, Seen (a finished one's); ⌥-click and Reply…: the reply window
+ipcMain.on('floater-menu-tab', (e, tab: unknown) => {
+  if (!floater || e.sender !== floater.webContents || typeof tab !== 'string') return
+  const f = floats.items.find(x => x.tab === tab)
+  if (!f) return
+  Menu.buildFromTemplate([
+    { label: 'Reply…', toolTip: '⌥-click', click: () => replyTo(tab) },
+    { label: 'Open tab', click: () => (app.focus({ steal: true }), show(tab)) },
+    ...(f.status === 'done' ? [{ label: 'Seen', click: () => void rpc('seen', { tab }).catch(() => {}) }] : []),
+  ]).popup({ window: floater })
+})
+let replyFor = '' // the tab the voice window answers (a circle's Reply…), until it closes
+function replyTo(tab: string) {
+  replyFor = tab
+  hover = null
+  card?.hide()
+  if (voice && !voice.isDestroyed()) return void (sendVoice(voice), voice.focus())
+  floater?.webContents.send('floater-voice')
+}
+ipcMain.on('floater-reply', (e, tab: unknown) => floater && e.sender === floater.webContents && typeof tab === 'string' && floats.items.some(x => x.tab === tab) && replyTo(tab))
 
 // what each of the app's processes holds, for Settings › Resources (by pid; ps has the memory): the window, the frames
 // in it of their own (a JS widget, the video), the preview's page, an agent browser's, the bubbles, the editor. stop:
@@ -833,7 +969,7 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
 // nothing, a snap's animation goes on. up: the stack opened or closed, the drop grows or shrinks upward (leftward in a
 // row), so the + stays under the mouse
 ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
-  if (!floater || e.sender !== floater.webContents || !(len > 0 && len < 2400)) return
+  if (!floater || e.sender !== floater.webContents || !(len > 0 && len < 2400) || floats.at === 'notch') return
   const [was, now] = [barLen(), Math.round(len)]
   if (now === was) return
   if (dragFrom) return (s => floater!.setSize(s.width, s.height))(sized(now))
@@ -844,7 +980,7 @@ ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
   } else if (up && stackFrom) (home = stackFrom), (stackFrom = null) // not saved: a drag saves where it is
   snap(false, now)
 })
-ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab), earn('bubble')))
+ipcMain.on('floater-open', (e, tab: string, panel?: unknown) => ((floater && e.sender === floater.webContents) || (card && e.sender === card.webContents)) && typeof tab === 'string' && (fold(), app.focus({ steal: true }), show(tab, panel === 'changes' ? 'changes' : undefined), earn('bubble')))
 ipcMain.on('floater-seen', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && void rpc('seen', { tab }).catch(() => {}))
 // the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
 // own), Ask Laki AI (the AI page, in one too), the menu bar's screenshots; Say it from the menu: the bar opens its window
@@ -972,23 +1108,29 @@ ipcMain.on('new-fit', (e, h: unknown) => {
   newWin.setContentSize(newWin.getContentSize()[0], Math.round(Math.min(Math.max(h, 200), d.y + d.height - newWin.getBounds().y - 20)))
 })
 // the voice prompt: to an agent of the list (send, as the app's, queued while it works), or a new session's page
+// the island's finished card's reply box too (the card's window); a reply queued (it works again meanwhile): the page
+// says so, then closes
 ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
-  if (!voice || e.sender !== voice.webContents || typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
+  const fromCard = !!card && e.sender === card.webContents && floats.at === 'notch'
+  if ((!voice || e.sender !== voice.webContents) && !fromCard) return { error: 'not a bubble' }
+  if (typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
   if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
   if (typeof tab === 'string' && tab) {
-    if (!voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
-    const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: err.message }))
+    if (fromCard ? !floats.items.some(x => x.tab === tab) : !voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
+    const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: /no such|not found/i.test(err.message) ? 'that tab is gone' : err.message }))
     if ('error' in r) return r
-    voice?.close() // (it may have shut meanwhile)
+    if (fromCard) fold()
+    else if (!r?.queued) voice?.close() // (it may have shut meanwhile)
     return { queued: !!r?.queued }
   }
+  if (!voice || fromCard) return { error: 'nothing to send' }
   voice.close()
   newWsWin(text.trim())
   return {}
 })
 ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.close())
 ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
-  if (!floater || e.sender !== floater.webContents) return
+  if (!floater || e.sender !== floater.webContents || floats.at === 'notch') return
   if (phase === 'start') {
     const [x, y] = floater.getPosition()
     dragFrom = { x, y }

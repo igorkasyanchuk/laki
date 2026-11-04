@@ -1872,8 +1872,10 @@ and what it costs.
   *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
-  (state, checks, review, conflicts), diff size and ports; click to open it in Laki; a right click on a done one marks
-  it seen (no longer lit); drag it from anywhere on it (a circle too)
+  (state, checks, review, conflicts), diff size and ports; click to open it in Laki; a right click shows *Reply…*,
+  *Open tab* and, for a done one, *Seen* (no longer lit); ⌥-click is *Reply…*: a small window aimed at that agent, its
+  last answer above the box, ⏎ sends (queued while it works; a closed tab says so and keeps your text), and an agent
+  that asks with a menu shows its options as buttons instead; drag it from anywhere on it (a circle too)
   anywhere, and it sticks to the screen's side nearest where you let go (left or right), where it stays; hidden while Laki is
   in front; on by default. *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft
   halo), *Gradient* (its color turning slowly inside, the default), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
@@ -1890,7 +1892,14 @@ and what it costs.
   *Say it goes to* picks either *An agent I pick each time* (the default: the bubbles'
   agents or a new session, nothing chosen until you do; queued while the agent works) or *Always a new session*
   (the new-workspace window with it). With + the drop stays even when no agent is at work. macOS shows
-  another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead),
+  another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead.
+  *Where*: *Edge* (the drop) or *Notch*: a black pill at the top of the built-in screen, around its notch (or under the
+  menu bar on a screen without one), a thin bar per agent (waiting ones pulse, finished ones are green) and how many
+  need you. It opens into a card by itself when an agent asks (its question and options, or what a permission is for:
+  *1-9* or a click answers, Esc folds it) or finishes (its first lines, how long it took, a reply box, *Review
+  changes*, *Open tab*; it folds after 6 seconds unless the pointer is on it); one card at a time, *1 of 3* when more
+  wait. A hover on the pill lists the sessions: a row opens its tab, its › shows its last answer. Hidden while Laki is
+  in front, when nothing runs, and over a full-screen app),
   *Background image* (a picture behind the sidebar and terminals in any theme, with *Dim* and *Blur*; Glass shows the
   desktop instead), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the

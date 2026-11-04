@@ -2501,6 +2501,11 @@ button.board-name:hover { background: none; }
 .fl-styles button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; border-radius: 999px; }
 .fl-styles button.on { border-color: var(--accent); color: var(--fg); }
 .fl-styles button:disabled { opacity: 1; cursor: default; border-style: dashed; color: var(--muted); }
+/* Where (floaterAt): a screen's picture each, the drop on its right edge or the pill at its top */
+.fl-at-pic { position: relative; width: 30px; height: 20px; border: 1px solid var(--line); border-radius: 4px; background: var(--side); overflow: hidden; }
+.fl-at-pic i { position: absolute; background: var(--fg); opacity: 0.8; }
+.fl-at-pic.edge i { right: 0; top: 4px; width: 5px; height: 11px; border-radius: 3px 0 0 3px; }
+.fl-at-pic.notch i { top: 0; left: 8px; width: 14px; height: 4px; border-radius: 0 0 3px 3px; background: #000; opacity: 1; box-shadow: 0 0 0 1px var(--muted); }
 .fl-styles .fl-dot { width: 22px; height: 22px; font-size: 8px; }
 /* Settings' Dock icon: a tile per icon, the picked one outlined */
 .setting-box > :is(.dock-icons, .icon-packs).switch-row { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }

@@ -8,12 +8,17 @@
 // under the mouse. #voice: Say it's prompt, dictated (macOS's), sent to an agent of the list or a new session.
 // The bar opens the other three (window.open): one renderer process for all four.
 import './floater.css'
+import { alwaysOf, permVerb } from '../../shared/ask'
+import { dotsText, plainLines, replyOf, tookText } from '../../shared/island'
+import type { Ask } from '../../shared/types'
 import { initials } from './text'
 
-// branch, agents, pr, lines: the card's more, as the sidebar's hover card has them
-export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
+// branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
+// island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
+export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[]; agent?: string; at?: number; ask?: Ask; answer?: string; took?: number }
 type Colors = Record<string, string>
-type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean }
+type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean; at?: 'edge' | 'notch' }
+type IslandCard = { f?: Float; i?: number; n?: number; list?: Float[] }
 // the +'s actions, the menu bar's too: what, its name, what it does; Ask Laki AI while it's on (Settings › AI), last:
 // the others keep their keys
 const ACTS = [
@@ -29,11 +34,11 @@ type Bridge = {
   dictate?: () => void
   floater?: {
     onFloats: (cb: (f: Floats) => void) => void
-    onSide: (cb: (side: 'left' | 'right' | 'top' | 'bottom') => void) => void
+    onSide: (cb: (side: 'left' | 'right' | 'top' | 'bottom' | 'notch') => void) => void
     drag: (phase: 'start' | 'move' | 'end', dx?: number, dy?: number) => void
     size: (len: number, up?: boolean) => void
     hover: (tab: string, top: number) => void
-    open: (tab: string) => void
+    open: (tab: string, panel?: 'changes') => void
     seen: (tab: string) => void
     act: (what: Act) => void
     tip: (name: string, hint: string, top: number) => void
@@ -43,9 +48,15 @@ type Bridge = {
     onVoiceOpen: (cb: () => void) => void
     onCard: (cb: (f: Float, colors: Colors) => void) => void
     cardSize: (tab: string, w: number, h: number) => void
-    onVoice: (cb: (items: Float[], colors: Colors, to: string) => void) => void
+    onVoice: (cb: (items: Float[], colors: Colors, to: string, reply?: Float) => void) => void
     voiceSend: (tab: string, text: string) => Promise<{ error?: string; queued?: boolean }>
     voiceClose: () => void
+    menuTab: (tab: string) => void
+    reply: (tab: string) => void
+    answer: (tab: string, n: number, label: string) => Promise<{ error?: string }>
+    onIsland: (cb: (c: IslandCard, colors: Colors) => void) => void
+    islandSize: (h: number) => void
+    islandEv: (ev: string) => void
   }
 }
 
@@ -84,7 +95,9 @@ const button = (act: Act | 'plus', name: string) => {
 }
 
 document.body.dataset.mode = mode
-if (mode === 'card')
+let hinted = false // the reply hint on a finished one's card: once per session
+if (mode === 'card') {
+  islandPage()
   bridge?.onCard((f, colors) => {
     paint(colors)
     card.classList.toggle('tip', (f.status as string) === 'tip') // a stacked action's name
@@ -102,10 +115,12 @@ if (mode === 'card')
       ...(f.last ? [el('div', f.last, 'last')] : []),
       ...(pr ? [pr] : []),
       ...(f.lines ?? []).map(x => el('div', x, 'row')),
+      ...(f.status === 'done' && !hinted ? [el('div', 'Right-click or ⌥-click to reply', 'hint')] : []),
     )
+    if (f.status === 'done') hinted = true
     bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
   })
-else if (mode === 'voice') voicePage()
+} else if (mode === 'voice') voicePage()
 else if (mode === 'menu') menuPage()
 else {
   page('card')
@@ -130,8 +145,9 @@ else {
   let away = false
   bar.onpointerenter = () => (away = false)
   bar.onpointerleave = () => hot()
+  const notch = () => document.body.dataset.at === 'notch'
   bar.onpointerdown = e => {
-    if (e.button !== 0) return
+    if (e.button !== 0 || notch()) return
     bar.setPointerCapture(e.pointerId)
     const at = e.target as HTMLElement
     drag = { x: e.screenX, y: e.screenY, moved: false, tab: at.closest<HTMLElement>('.fl-dot')?.dataset.tab, act: at.closest<HTMLElement>('.fl-btn')?.dataset.act, wasOpen: menuOpen || Date.now() - menuShut < 400 }
@@ -148,6 +164,7 @@ else {
     drag = null
     if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'ai' || d?.act === 'area' || d?.act === 'screen')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
+    else if (click && d?.tab && alt) hover(''), bridge?.reply(d.tab) // ⌥-click: a reply to it, Laki stays where it is
     else if (click && d?.tab) hover(''), bridge?.open(d.tab)
     else if (click && d?.act === 'plus') plus(!!d.wasOpen)
     else if (click && d?.act) {
@@ -173,16 +190,23 @@ else {
     bar.querySelector('[data-act="plus"]')?.classList.toggle('on', open)
   })
   bridge?.onVoiceOpen(() => page('voice'))
-  bar.onpointerup = () => done(true)
+  let alt = false // the click's ⌥ (pointerup's)
+  bar.onpointerup = e => ((alt = e.altKey), done(true))
+  // a circle's right click: main's menu (Reply…, Open tab, and Seen for a finished one: done turns idle, no longer lit)
   bar.oncontextmenu = e => {
-    const tab = (e.target as HTMLElement).closest<HTMLElement>('.fl-dot.done')?.dataset.tab // a finished one only: a waiting one still needs you
-    if (tab) e.preventDefault(), bridge?.seen(tab) // seen without opening it: done turns idle, no longer lit
+    const tab = (e.target as HTMLElement).closest<HTMLElement>('.fl-dot')?.dataset.tab
+    if (tab && !notch()) e.preventDefault(), hover(''), bridge?.menuTab(tab)
   }
+  // the island's pill: a hover (or a click) shows the sessions, unless a card does
+  bar.addEventListener('pointerenter', () => notch() && bridge?.islandEv('pill'))
+  bar.addEventListener('pointerleave', () => notch() && bridge?.islandEv('leave'))
+  bar.addEventListener('click', () => notch() && bridge?.islandEv('pill'))
   bar.onpointercancel = () => done(false)
   // hidden (Laki in front): the circle under the mouse then isn't under it as it comes back
   document.addEventListener('visibilitychange', () => document.hidden && (hovered = ''))
   const length = () => (across() ? bar.offsetWidth : bar.offsetHeight)
   bridge?.onSide(side => {
+    if (side === 'notch') return
     const turned = across() !== (side === 'top' || side === 'bottom')
     document.body.dataset.side = side
     if (turned && cur) bridge.size(length()) // a row now (or a column again): its own length
@@ -199,6 +223,9 @@ else {
     tipped = '' // its buttons are made anew: a move names one again
     const { items, colors, style, add, doneAlert } = cur
     paint(colors)
+    document.body.dataset.at = cur.at ?? 'edge'
+    if (cur.at === 'notch') return pillRender(items)
+    bar.querySelectorAll('.isl').forEach(x => x.remove())
     document.body.dataset.fstyle = style || 'glow'
     document.body.dataset.done = doneAlert === false ? '' : 'on' // a finished one you haven't seen: green, pulsing
     const was = bar.querySelector<HTMLElement>('.hot')?.dataset // lit again below, made anew
@@ -247,6 +274,121 @@ else {
     else if (hovered) hover('')
     bridge?.size(length(), up)
   }
+}
+
+// the island's pill at rest: a thin bar per agent in its color (waiting: pulsing; done: green) on the left, how many need
+// you on the right (main sizes and places it; nothing to drag)
+function pillRender(items: Float[]) {
+  bar.querySelectorAll('.fl-dot, .fl-btns, .isl').forEach(d => d.remove())
+  const bars = el('div', '', 'isl isl-bars')
+  for (const f of items.slice(0, 8)) {
+    const b = el('i', '', `isl-b ${f.status}`)
+    if (f.color && /^[a-z]+$/.test(f.color)) b.style.setProperty('--ink', `var(--tc${f.color})`)
+    bars.append(b)
+  }
+  const need = items.filter(f => f.status === 'waiting' || f.status === 'done').length
+  const count = el('div', need ? String(need) : '', `isl isl-n${items.some(f => f.status === 'waiting') ? ' waiting' : ''}`)
+  bar.append(bars, el('div', '', 'isl isl-gap'), count)
+}
+
+// the island's card window: an agent's ask (its menu as buttons, 1-9; a permission's tool and command), a finished one
+// (its first lines, its time, a reply box, Review, Open), or the session list (a row's body opens its tab, its chevron
+// shows its last answer). Its height goes to main, which places it under the pill; the pointer and Esc decide when it
+// folds (main: shared/island.ts lifeStep)
+function islandPage() {
+  const box = document.getElementById('island')!
+  let shown: IslandCard | null = null
+  const fit = () => requestAnimationFrame(() => bridge?.islandSize(box.offsetHeight))
+  box.onpointerenter = () => (bridge?.islandEv('enter'), bridge?.islandEv('focus'))
+  box.onpointerleave = () => bridge?.islandEv('leave')
+  document.addEventListener('keydown', e => {
+    if (!shown || e.metaKey || e.ctrlKey || (e.target as HTMLElement).tagName === 'TEXTAREA') return void (e.key === 'Escape' && (e.target as HTMLElement).tagName === 'TEXTAREA' && bridge?.islandEv('esc'))
+    if (e.key === 'Escape') bridge?.islandEv('esc')
+    else if (e.key === 'ArrowRight') bridge?.islandEv('next')
+    else if (e.key === 'ArrowLeft') bridge?.islandEv('prev')
+    else if (/^[1-9]$/.test(e.key) && shown.f?.ask) box.querySelector<HTMLButtonElement>(`[data-n="${e.key}"]`)?.click()
+  })
+  const head = (f: Float, right: string) => {
+    const h = el('div', '', 'i-head')
+    const dot = el('i', '', `i-dot ${f.status}`)
+    if (f.color && /^[a-z]+$/.test(f.color)) dot.style.setProperty('--ink', `var(--tc${f.color})`)
+    h.append(dot, el('b', f.agent ?? 'agent'), el('span', ` · ${f.name}`, 'i-ws'), el('span', right, 'i-right'))
+    return h
+  }
+  const btn = (text: string, cls: string, on: () => void) => Object.assign(el('button', text, cls) as HTMLButtonElement, { onclick: on })
+  const say = (to: HTMLElement, text: string) => ((to.textContent = text), to.classList.add('bad'), fit())
+  bridge?.onIsland((c, colors) => {
+    paint(colors)
+    shown = c
+    if (c.list) {
+      // the sessions: a row's body opens its tab, its chevron (its end, the same pixel always) shows its last answer
+      box.replaceChildren(
+        el('div', 'Sessions', 'i-title'),
+        ...c.list.map(f => {
+          const row = el('div', '', 'i-row')
+          const main = el('div', '', 'i-main')
+          main.append(head(f, WORDS[f.status] ?? f.status))
+          main.onclick = () => bridge?.open(f.tab)
+          const more = el('div', plainLines(f.answer, 3).join('\n'), 'i-more')
+          more.hidden = true
+          const chev = btn('›', 'i-chev', () => ((more.hidden = !more.hidden), chev.classList.toggle('on', !more.hidden), fit()))
+          chev.disabled = !f.answer
+          row.append(main, chev, more)
+          return row
+        }),
+      )
+      return fit()
+    }
+    const f = c.f!
+    const dots = el('span', dotsText(c.i ?? 0, c.n ?? 1), 'i-dots')
+    dots.onclick = () => bridge?.islandEv('next')
+    const note = el('div', '', 'i-note')
+    const parts: HTMLElement[] = []
+    if (f.status === 'waiting') {
+      parts.push(head(f, 'asks'))
+      const a = f.ask
+      if (a?.tool) parts.push(el('div', permVerb(a.tool), 'i-q'), el('pre', a.what ?? '', 'i-what'), el('div', `${a.tool} · ${f.project} / ${f.name}`, 'i-sub'))
+      else if (a?.question || f.last) parts.push(el('div', a?.question ?? f.last ?? '', 'i-q'))
+      const opts = el('div', '', 'i-opts')
+      const always = a?.rule ? alwaysOf(a) : undefined
+      for (const o of a?.options ?? []) {
+        const b = btn(`${o.n}  ${o === always ? `Always: ${a!.rule}` : o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
+          const r = await bridge?.answer(f.tab, o.n, o.label)
+          if (r?.error) say(note, r.error)
+        })
+        b.dataset.n = String(o.n)
+        opts.append(b)
+      }
+      parts.push(opts)
+      if (!a?.options.length) parts.push(el('div', 'Its question is in its tab', 'i-sub'))
+    } else {
+      parts.push(head(f, f.took ? `done in ${tookText(f.took)}` : 'done'))
+      parts.push(el('div', plainLines(f.answer, 2).join('\n') || 'Finished', 'i-answer'))
+      parts.push(replyBox(f, note, fit))
+    }
+    const foot = el('div', '', 'i-foot')
+    foot.append(...(f.status === 'done' ? [btn('Review changes', '', () => bridge?.open(f.tab, 'changes'))] : []), btn('Open tab', '', () => bridge?.open(f.tab)), dots)
+    box.replaceChildren(...parts, note, foot)
+    fit()
+  })
+}
+// a reply box: ⏎ sends to the agent (send, queued while it works), ⇧⏎ a new line; a menu it shows: its options only
+function replyBox(f: Float, note: HTMLElement, fit: () => void) {
+  const wrap = el('div', '', 'i-reply')
+  const text = Object.assign(document.createElement('textarea'), { rows: 1, placeholder: `Reply to ${f.agent ?? 'it'}…`, spellcheck: false })
+  const go = async () => {
+    if (!text.value.trim()) return
+    if (replyOf(f) === 'options') return void ((note.textContent = 'Pick an option, or Open the tab'), note.classList.add('bad'), fit())
+    const r = await bridge?.voiceSend(f.tab, text.value)
+    if (r?.error) (note.textContent = r.error), note.classList.add('bad'), fit()
+    else if (r?.queued) (note.textContent = 'Queued: it gets it when its turn ends'), note.classList.remove('bad'), (text.value = ''), fit()
+  }
+  text.onkeydown = e => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) e.preventDefault(), go()
+  }
+  text.oninput = () => ((text.style.height = 'auto'), (text.style.height = `${Math.min(text.scrollHeight, 96)}px`), fit())
+  wrap.append(text, Object.assign(el('button', '↑', 'i-send'), { onclick: go, title: 'Send (⏎)' }))
+  return wrap
 }
 
 // the +'s menu beside the drop (floaterMenu card): a row per action with its name, what it does and its key (1-5);
@@ -298,13 +440,20 @@ function voicePage() {
   box.querySelector<HTMLElement>('.v-mic')!.innerHTML = ICONS.mic
   box.querySelector<HTMLElement>('.v-mic')!.onclick = dictate
   box.querySelector<HTMLElement>('.v-x')!.onclick = () => bridge?.voiceClose()
+  const title = box.querySelector<HTMLElement>('.v-head b')!
+  const lastBox = box.querySelector<HTMLElement>('.v-last')!
+  const opts = box.querySelector<HTMLElement>('.v-opts')!
+  let reply: Float | undefined // a circle's Reply…: the one agent it goes to
   const go = async () => {
     if (!text.value.trim() || send.disabled) return
-    if (to.value === PICK) return void ((note.textContent = 'Pick who gets it first'), note.classList.add('bad'), to.focus())
+    // an agent in a menu: typed keys would pick one of its options
+    if (reply && replyOf(reply) === 'options') return void ((note.textContent = 'Pick an option, or Open the tab'), note.classList.add('bad'))
+    if (!reply && to.value === PICK) return void ((note.textContent = 'Pick who gets it first'), note.classList.add('bad'), to.focus())
     send.disabled = true
-    const r = await bridge?.voiceSend(to.value, text.value)
+    const r = await bridge?.voiceSend(reply ? reply.tab : to.value, text.value)
     send.disabled = false
-    if (r?.error) (note.textContent = r.error), note.classList.add('bad')
+    if (r?.error) (note.textContent = r.error), note.classList.add('bad') // its text kept
+    else if (r?.queued) (note.textContent = 'Queued: it gets it when its turn ends'), note.classList.remove('bad'), setTimeout(() => bridge?.voiceClose(), 1200)
   }
   send.onclick = go
   text.oninput = calm
@@ -321,8 +470,33 @@ function voicePage() {
     note.classList.remove('bad')
   }
   to.onchange = () => to.value !== PICK && calm()
-  bridge?.onVoice((items, colors, where) => {
+  bridge?.onVoice((items, colors, where, to1) => {
     paint(colors)
+    reply = to1
+    box.classList.toggle('reply', !!reply)
+    title.textContent = reply ? `Reply to ${reply.agent ?? 'it'} · ${reply.name}` : 'Say a prompt'
+    lastBox.textContent = reply ? plainLines(reply.answer, 3).join('\n') : ''
+    lastBox.hidden = !lastBox.textContent
+    // a waiting one's menu: its options as buttons (answer, by n and label)
+    opts.replaceChildren(
+      ...(reply && replyOf(reply) === 'options'
+        ? reply.ask!.options.map(o =>
+            Object.assign(el('button', `${o.n}. ${o.label}`, 'v-opt'), {
+              onclick: async () => {
+                const r = await bridge?.answer(reply!.tab, o.n, o.label)
+                if (r?.error) (note.textContent = r.error), note.classList.add('bad')
+                else bridge?.voiceClose()
+              },
+            }),
+          )
+        : []),
+    )
+    opts.hidden = !opts.childElementCount
+    if (reply) {
+      to.hidden = true
+      note.textContent = hint = replyOf(reply) === 'options' ? 'Pick an option, or Open the tab · Esc closes' : '⏎ sends · ⇧⏎ a new line · Esc closes'
+      return void text.focus()
+    }
     const opt = (value: string, textContent: string, o: Partial<HTMLOptionElement> = {}) => Object.assign(document.createElement('option'), { value, textContent, ...o })
     to.replaceChildren(
       ...(where === 'new' ? [] : [opt(PICK, 'Pick who gets it…', { disabled: true, selected: true })]),
