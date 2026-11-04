@@ -116,6 +116,7 @@ test('when: several times in one line, a part each; a time two parts share runs 
   // " and " between times or days stays one rule
   assert.deepEqual(parseWhen('weekdays at 9 and 17:30', wed), { days: [1, 2, 3, 4, 5], times: [540, 1050] })
   assert.deepEqual(parseWhen('mon and thu at 9am', wed), { days: [1, 4], times: [540] })
+  assert.deepEqual(parseWhen('at 9am on mondays and fridays', wed), { days: [1, 5], times: [540] }) // "fridays" alone has no time: read whole
   // the same time twice: one run
   const twice = parseWhen('every day at 9am; weekdays at 9am', wed) as Rule
   assert.equal(nextRun(twice, new Date(2026, 10, 4, 9, 0).getTime()), new Date(2026, 10, 5, 9, 0).getTime())

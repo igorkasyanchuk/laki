@@ -345,7 +345,7 @@ export async function pendingTick(now = Date.now()) {
   if (pendingBusy) return
   pendingBusy = true
   try {
-    for (const w of state.workspaces.filter(x => x.pending && !x.archived && !x.pending.failed)) {
+    for (const w of state.workspaces.filter(x => x.pending && !x.archived && !x.pending.failed && !projectArchived(x.project))) { // an archived project's: once it's back (late)
       const p = w.pending!
       if (p.limit && !(p.at !== undefined && p.at <= now)) {
         const agent = presetNamed(p.preset)?.agent ?? p.preset

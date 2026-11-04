@@ -145,4 +145,8 @@ test('an archived project: out of the view with its workspaces, its shells close
   assert.ok(back.workspaces.some((x: { id: string }) => x.id === w.id))
   assert.equal(back.archivedProjects, undefined)
   await until(async () => !(await rig.tab(w.id, 'shell')), 'its shell closed by the archive')
+  // its folder added again (a drop on the window or the Dock icon): back from the archive too
+  await rig.rpc('projectArchive', { project: p.id })
+  assert.equal((await rig.rpc('projectAdd', { path: rig.repo })).id, p.id)
+  assert.ok((await rig.rpc('state')).projects.some((x: { id: string }) => x.id === p.id))
 })

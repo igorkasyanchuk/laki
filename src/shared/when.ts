@@ -49,27 +49,32 @@ function daysIn(s: string): number[] {
 const tidy = (text: string) => ` ${text.toLowerCase().replace(/\b([ap])\.m\.?/g, '$1m').replace(/(\d)\.(\d\d)(?!\d)/g, '$1:$2').replace(/[,;&]/g, ' , ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ')} `
 
 // several times in one line: split at ";" (a comma would read as a list of days or times), or at " and " when what's
-// before it has a time and what's after starts with days (weekdays at 9am and fri at 4pm; never at 9 and 17:30)
+// before it has a time and what's after starts with days (weekdays at 9am and fri at 4pm; never at 9 and 17:30); a
+// part that then reads as nothing (at 9am on mondays and fridays: "fridays" has no time) reads its ";" bit whole
 const SPLIT = new RegExp(`\\s+and\\s+(?=(?:on\\s+|every\\s+|each\\s+)?(?:${DAY_WORD}|every ?day|daily|tomorrow)\\b)`, 'i')
+const andsOf = (b: string) => {
+  const out: string[] = []
+  let rest = b
+  for (let m = SPLIT.exec(rest); m; m = SPLIT.exec(rest)) {
+    const head = rest.slice(0, m.index)
+    if (!new RegExp(`\\b${TIME}`).test(head.replace(new RegExp(`\\b${DAY_WORD}\\b`, 'gi'), ' ')) || !/\d|noon|midnight|hourly|every/i.test(head)) break
+    out.push(head)
+    rest = rest.slice(m.index + m[0].length)
+  }
+  return [...out, rest]
+}
 export function parseWhen(text: string, now = Date.now()): Rule | { error: string } {
-  const bits = text.split(';').flatMap(b => {
-    const out: string[] = []
-    let rest = b
-    for (let m = SPLIT.exec(rest); m; m = SPLIT.exec(rest)) {
-      const head = rest.slice(0, m.index)
-      if (!new RegExp(`\\b${TIME}`).test(head.replace(new RegExp(`\\b${DAY_WORD}\\b`, 'gi'), ' ')) || !/\d|noon|midnight|hourly|every/i.test(head)) break
-      out.push(head)
-      rest = rest.slice(m.index + m[0].length)
-    }
-    return [...out, rest]
-  }).filter(b => b.trim())
-  if (bits.length < 2) return parseOne(text, now)
+  const bits = text.split(';').filter(b => b.trim())
   const rules: Rule[] = []
   for (const b of bits) {
-    const r = parseOne(b, now)
-    if ('error' in r) return { error: `${b.trim()}: ${r.error}` }
-    rules.push(r)
+    const ands = andsOf(b).map(x => parseOne(x, now))
+    const rs = ands.length > 1 && ands.some(r => 'error' in r) ? [parseOne(b, now)] : ands
+    for (const r of rs) {
+      if ('error' in r) return bits.length > 1 ? { error: `${b.trim()}: ${r.error}` } : r
+      rules.push(r)
+    }
   }
+  if (rules.length < 2) return rules[0] ?? parseOne(text, now)
   const [first, ...more] = rules
   return { days: first.days, times: first.times, ...(rules.some(r => r.once) ? { once: true } : {}), also: more.map(r => ({ days: r.days, times: r.times })) }
 }

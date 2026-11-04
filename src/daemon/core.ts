@@ -16,7 +16,7 @@ import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type Check
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
-import { flowView } from '../shared/workflow.ts'
+import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accounts, effortsSaid, loginCmd } from './accounts.ts'
 import * as cs from './codespace.ts'
@@ -1127,7 +1127,7 @@ export async function projectAdd(path: string): Promise<Project> {
   const top = await git({ path: abs }, 'rev-parse', '--show-toplevel').catch(() => '')
   const root = top || realpathSync(abs)
   const existing = state.projects.find(p => !p.host && !p.kind && p.path === root)
-  if (existing) return existing
+  if (existing) return unshelve(existing)
   return projectPush({ id: '', name: basename(root), path: root, git: !!top })
 }
 
@@ -1173,7 +1173,7 @@ async function hostProjectAdd(host: string, path: string): Promise<Project> {
   const root = top || real
   if (!root?.startsWith('/')) throw new Error(`${host}:${path} is not a folder`)
   const existing = state.projects.find(p => p.host === host && p.path === root)
-  if (existing) return existing
+  if (existing) return unshelve(existing)
   const p = projectPush({ id: '', name: `${basename(root)} (${host})`, path: root, git: !!top, host }) // told apart from one here in every list
   void readHostCfg(p).then(changed)
   return p
@@ -1198,12 +1198,14 @@ function projectPush(p: Project) {
 export function projectArchive(o: { project: string; on: boolean }) {
   const p = findProject(o.project)
   if (p.kind) throw new Error(`${p.name} can't be archived`)
-  if (!o.on) return void (delete p.archived, save(), changed())
+  if (!o.on) return void unshelve(p)
   const wss = new Set(state.workspaces.filter(w => w.project === p.id && !w.archived).map(w => w.id))
   const tabs = state.tabs.filter(t => wss.has(t.workspace))
   const live = (t: Tab) => !!sessions.get(t.id) && !sessions.get(t.id)!.exited && !asleep.has(t.id)
   const busy = tabs.filter(t => live(t) && (tracked(t) ? ['running', 'waiting'].includes(rtOf(t.id).status) : shellAgents.has(t.id)))
   if (busy.length) throw new Error(`${p.name}: ${busy.map(t => t.name).join(', ')} ${busy.length > 1 ? 'are' : 'is'} working or asking you; archive it once ${busy.length > 1 ? 'they finish' : 'that ends'}`)
+  if (state.flows?.some(r => r.project === p.id && !FLOW_ENDED.includes(r.status))) throw new Error(`${p.name}: a workflow runs in it; archive it once that ends (or stop it)`)
+  for (const w of wss) stopTunnels(w), stopShares({ ws: w }) // nothing of it stays public with no row to show it
   for (const t of tabs) {
     if (queued.has(t.id)) dormant.add(t.id) // a restore not started yet: it waits for the project to come back
     if (!live(t)) continue
@@ -1219,6 +1221,11 @@ export function projectArchive(o: { project: string; on: boolean }) {
   changed()
 }
 export const projectArchived = (id: string) => !!state.projects.find(p => p.id === id)?.archived
+// back from the archive (its menu's Undo, Settings' Bring back, its folder added again)
+function unshelve(p: Project) {
+  if (p.archived) delete p.archived, log(`project ${p.id} back from the archive`), save(), changed()
+  return p
+}
 
 export function projectRm(ref: string) {
   const p = findProject(ref)

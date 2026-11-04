@@ -1286,4 +1286,5 @@ test("linked tickets: a project's Ticket script, run per workspace, its JSON or 
   const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'tk' })
   const ws = await until(async () => (await rig.rpc('state')).workspaces.find((x: { id: string; ticket?: unknown }) => x.id === w.id && x.ticket), 'its ticket', 8000)
   assert.deepEqual(ws.ticket, { key: 'ENG-42', title: `On ${w.branch}`, status: 'Todo' })
+  assert.deepEqual(ticketFrom('A-1\u001b[31m red'), { key: 'A-1 [31m', title: 'red' }) // a line's control characters out
 })

@@ -28,10 +28,12 @@ export function ticketFrom(out: string): Ticket | undefined {
     return { key, ...((x => x && { title: x })(cut(o.title, 200))), ...((x => x && { status: x })(cut(typeof o.status === 'object' ? o.status?.name : o.status, 40))), ...(url && /^https?:\/\//.test(url) && { url }) }
   } catch {}
   const m = /^(\S{1,40})\s*(.*)$/.exec(s.split('\n')[0].trim())
-  return m ? { key: m[1], ...(m[2] && { title: m[2].slice(0, 200) }) } : undefined
+  const key = cut(m?.[1], 40)
+  return key ? { key, ...((x => x && { title: x })(cut(m![2], 200))) } : undefined
 }
 
-function runOne(ws: Workspace, cmd: string): Promise<string> {
+// what it printed, or undefined when it failed (an exit but 0, 20 s): the ticket shown stays (a network blip)
+function runOne(ws: Workspace, cmd: string): Promise<string | undefined> {
   return new Promise(ok => {
     const p = state.projects.find(x => x.id === ws.project)
     const env = { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, LAKI_WORKSPACE: ws.id, LAKI_WORKSPACE_NAME: ws.name ?? ws.id, LAKI_PROJECT: p?.name ?? ws.project, LAKI_BRANCH: ws.branch ?? '', LAKI_BASE: ws.base ?? '', PORT: String(ws.port ?? '') }
@@ -39,8 +41,8 @@ function runOne(ws: Workspace, cmd: string): Promise<string> {
     let out = ''
     const t = setTimeout(() => c.kill(), 20_000)
     c.stdout.setEncoding('utf8').on('data', (d: string) => (out = (out + d).slice(0, 64_000)))
-    c.on('error', () => (clearTimeout(t), ok('')))
-    c.on('close', code => (clearTimeout(t), ok(code === 0 ? out : '')))
+    c.on('error', () => (clearTimeout(t), ok(undefined)))
+    c.on('close', code => (clearTimeout(t), ok(code === 0 ? out : undefined)))
   })
 }
 
@@ -50,6 +52,7 @@ export async function ticketTick(now = Date.now()) {
   going = true
   try {
     let moved = false
+    for (const id of seen.keys()) if (!state.workspaces.some(w => w.id === id)) seen.delete(id), (moved = true) // gone
     for (const ws of state.workspaces) {
       const cmd = !ws.archived && !ws.host && !ws.codespace && !state.projects.find(p => p.id === ws.project)?.archived ? projectConfig(ws).ticket?.trim() : undefined
       const had = seen.get(ws.id)
@@ -59,7 +62,8 @@ export async function ticketTick(now = Date.now()) {
       }
       if (had && had.cmd === cmd && had.branch === ws.branch && now - had.at < TICKET_EVERY) continue
       if (!existsSync(ws.path)) continue
-      const t = ticketFrom(await runOne(ws, cmd))
+      const said = await runOne(ws, cmd)
+      const t = said === undefined && had?.cmd === cmd && had.branch === ws.branch ? had.t : ticketFrom(said ?? '')
       if (JSON.stringify(t) !== JSON.stringify(had?.t)) moved = true
       seen.set(ws.id, { at: now, branch: ws.branch, cmd, t })
     }

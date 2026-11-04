@@ -2131,7 +2131,8 @@ export function App() {
     if (upd.status === 'checking' || upd.status === 'downloading') return
     if (upd.status === 'ready') return void (!busy(idleAsk.by) && once('install', () => bridge!.update!('install')))
     if (upd.latest && upd.status === 'available') return void (upd.install && upd.latest.feed ? once('download', () => bridge!.update!('download')) : off("Laki can't update itself here: Settings › Updates opens the release's page"))
-    if (upd.status === 'error') return void off(`Update when idle stopped: ${upd.error}`)
+    // an error from before this ask (an earlier check's): looked again first; one from a step of its own stops it
+    if (upd.status === 'error') return void (idleGo.current.startsWith(`${idleAsk.at}:`) ? off(`Update when idle stopped: ${upd.error}`) : once('check', () => bridge!.update!('check')))
     if ((upd.checked ?? 0) < idleAsk.at && !upd.latest) return void once('check', () => bridge!.update!('check')) // looked for since it was asked
     if (staleDaemon(view!)) return void (!busy() && once('daemon', () => api.call('shutdown'))) // the new app: main starts the new daemon
     off(upd.held ? `Laki ${upd.held.version} waits for your update delay` : 'Laki is up to date')

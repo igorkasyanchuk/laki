@@ -199,7 +199,7 @@ function asked<T>(cmd: string, args: string[], env: NodeJS.ProcessEnv, send: obj
     const t = setTimeout(() => end(() => no(new Error(`${cmd} didn't say its models`))), 20_000)
     let buf = ''
     c.on('error', e => end(() => no(new Error(`${cmd}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed' : e.message}`))))
-    c.on('exit', () => end(() => no(new Error(`${cmd} ended without its models`))))
+    c.on('close', () => end(() => no(new Error(`${cmd} ended without its models`)))) // close: after its output was read
     c.stdin.on('error', () => {}) // it went first: exit says so
     c.stdout.setEncoding('utf8').on('data', (d: string) => {
       buf += d
