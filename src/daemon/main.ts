@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
 import { policyTick } from './policy.ts'
@@ -343,8 +344,8 @@ const api: Record<string, Handler> = {
   files: p => core.files(p.ws, p.project),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
-  artifactList: p => core.artifactList(p.ws),
-  linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), core.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
+  artifactList: p => artifactsMod.artifactList(p.ws),
+  linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), artifactsMod.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
   fileWrite: p => core.fileWrite(p),
   hunkUndo: p => core.hunkUndo(p), // Changes' Revert: a hunk or lines of it, a whole file; hunkRedo is its Undo
   fileUndo: p => core.fileUndo(p),

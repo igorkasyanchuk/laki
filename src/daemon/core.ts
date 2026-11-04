@@ -37,7 +37,6 @@ import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } 
 export { dir }
 export * from './hosts.ts'
 export * from './pr.ts'
-export * from './artifacts.ts'
 export * from './resources.ts'
 export * from './remote.ts'
 export * from './files.ts'
