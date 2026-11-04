@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as hostsMod from './hosts.ts'
 import * as prMod from './pr.ts'
 import * as filesMod from './files.ts'
 import * as remoteMod from './remote.ts'
@@ -227,7 +228,7 @@ const api: Record<string, Handler> = {
   projectFile: p => core.projectFileConfig(p.id),
   projectTrust: p => core.projectTrust(p),
   branches: p => core.branches(p.project),
-  csMachines: p => core.csMachines(p),
+  csMachines: p => hostsMod.csMachines(p),
   wsNew: p => core.wsNew(yours(core.byCaller(p))),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
@@ -922,7 +923,7 @@ function shutdown() {
   remoteMod.remoteStop()
   flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
-  core.stopHosts()
+  hostsMod.stopHosts()
   widgetsStop() // dev mode's watchers
   core.queued.clear() // a restart's tabs not started yet: none starts now (each keeps its `again` for the next start)
   try {

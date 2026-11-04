@@ -35,7 +35,6 @@ import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startP
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 export { dir }
-export * from './hosts.ts'
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { hookCause, type HookWhy } from './hookHealth.ts'
