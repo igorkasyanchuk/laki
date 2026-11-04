@@ -1016,6 +1016,9 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .check-out { flex-basis: 100%; margin-left: 20px; } .check-out summary { cursor: pointer; color: var(--muted); }
 .check-out pre, .check-note { margin: 4px 0; max-height: 160px; overflow: auto; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; }
 .check-note { margin: 0 12px 8px; font-family: inherit; font-size: 12.5px; }
+.hook-strip .queue-head > .icon-svg { color: var(--waiting); } /* hooks not heard (panels.tsx HookStrip) */
+.hook-seen.warn { color: var(--waiting); } /* Settings › Agents & profiles: an agent's tabs not heard */
+.hook-detail { display: flex; align-items: flex-start; gap: 6px; padding: 0 12px 8px; } .hook-detail pre { flex: 1; min-width: 0; margin: 0; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .plan-head { width: 100%; border: none; background: none; text-align: left; font: inherit; cursor: pointer; } /* the agent's plan, live (panels.tsx PlanStrip) */
 .plan-head .queue-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-head:hover { color: var(--fg); }

@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { FIND, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -773,6 +773,7 @@ export function SettingsPage(p: {
   scriptLogs?: () => void // development mode's setup and teardown runs
   presets: Preset[] // the daemon's: the settings', or its defaults
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
+  hooks?: () => Promise<Record<string, HookSeen>> // Agents & profiles: each agent's last hook (the daemon's hooksSeen)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
   onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
   achievements?: AchievementsApi // App's: the count, on or off, the page
@@ -916,6 +917,29 @@ export function SettingsPage(p: {
     const t = setInterval(() => !document.hidden && loadAccts(), 10000) // each read asks the Keychain: not too often
     return () => clearInterval(t)
   }, [sec, !!p.accounts])
+  // each agent's hooks as Laki last heard them, while Agents & profiles is open
+  const [hooks, setHooks] = useState<Record<string, HookSeen>>({})
+  useEffect(() => {
+    if (sec !== 'presets' || !p.hooks) return
+    const load = () => void p.hooks!().then(setHooks, () => {})
+    load()
+    const t = setInterval(() => !document.hidden && load(), 10000)
+    return () => clearInterval(t)
+  }, [sec, !!p.hooks])
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
+  // codex: its notify, only as a turn ends; the others: the last hook, or none yet (and how many tabs aren't heard)
+  const hookSays = (agent: Preset['agent']) => {
+    const h = hooks[agent]
+    if (agent === 'command' || !h) return undefined
+    const profiles = n(presets.filter(x => x.agent === agent).length, 'profile')
+    if (agent === 'codex') return <span className="muted small" data-tip="Codex tells Laki only as a turn ends (its notify); the rest comes from its screen">{profiles} · notify only</span>
+    const says = h.at ? `last hook ${ago(h.at)}` : `no hooks yet${h.tabs ? ` (${n(h.tabs, 'tab')})` : ''}`
+    return (
+      <span className={`muted small hook-seen ${h.deaf ? 'warn' : ''}`} data-tip={h.deaf ? `${n(h.deaf, 'tab')} not heard: each one's pane says the likely why` : "When Laki last heard this agent's hooks: they say when it asks and finishes"}>
+        {profiles} · {says} {h.deaf ? '⚠' : h.at ? '✓' : ''}
+      </span>
+    )
+  }
   const setPreset = (i: number, p: Partial<Preset>) => set({ presets: presets.map((x, j) => (j === i ? { ...x, ...p } : x)) })
   // a key per preset card that survives removing one above it (names change as you type)
   const keys = useRef<number[]>([])
@@ -2315,7 +2339,7 @@ export function SettingsPage(p: {
                 after the command, before the prompt, through the shell (so the variables work); env goes on top of the project's.
               </p>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
-                <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
+                <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
                   {isAccountAgent(agent) && p.accounts && (
                     <AccountsBlock agent={agent} api={p.accounts} views={accts} usage={usage} use={accts.find(v => v.agent === agent && v.default)?.id ?? HOME_ACCOUNT} onUse={id => (set({ accountUse: { ...s.accountUse, [agent]: id } }), setAccts(v => v.map(x => (x.agent === agent ? { ...x, default: x.id === id } : x))))} reload={loadAccts} />
                   )}

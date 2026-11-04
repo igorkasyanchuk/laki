@@ -259,7 +259,9 @@ and the peek card's line. 144: an `Ask`'s `tool`, `what` and `rule` (claude's Pe
 shared/ask.ts `permOf`; cleared by its next hook that isn't a wait; `alwaysOf`, `permVerb`): the ask bar's tool tag and
 command, its "don't ask again" button as *Yes, don't ask again for <rule>*, the notification's *<ws> · <tab> wants to
 run* and *Always: <rule>*, the bubbles' card (`Float.perm`), the phone's body through share.ts `redact`; a
-Notification after it while it waits isn't told again (`again`). A setting the renderer adds
+Notification after it while it waits isn't told again (`again`). 146: a tab's `hookless` (`hookTick`, every 30 s, `now`: tests'; Hooks not heard, below),
+`hooksSeen` (each agent's last hook, live tabs, `deaf`: Settings › Agents & profiles' line), `doctor`'s `hooks` (`laki
+hook ping`, 2 s) and `hookFiles`. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -742,6 +744,20 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 | PreCompact | running and `compacting` (the tab and row say *Compacting…*) until its next hook (SessionStart, source compact) |
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
+
+Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
+say as a turn starts (`HEARS`: claude, gemini, opencode; codex's notify comes only as one ends), its session started
+`DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its
+start's) that its screen answered (`Session.lastOutput` since), and no hook yet (`Runtime.hooked`): its view's `hookless`
+is `hookCause`'s first that holds: `disableAllHooks` or `allowManagedHooksOnly` true in the worktree's
+`.claude/settings.local.json`, `.claude/settings.json`, its config folder's (an account's, or `CLAUDE_CONFIG_DIR` from
+an env), `~/.claude/settings.json` or the managed one (read only; the file and line as `detail`); the profile's args with
+their own `--settings`; `CLAUDE_CONFIG_DIR` in the profile's, project's, Settings' or the daemon's env (no account);
+`hookArgv`'s node or script gone or not executable (a moved app under a daemon that outlived it); gemini's trusted
+folders; else unknown. Any hook clears it (`hook`, `heard`: each agent's last, `hooksSeen`). panels.tsx `HookStrip` at
+the pane's foot (Details, Copy; Dismiss: App's `hookHid`, per tab, in memory); `doctor`'s `hooks` runs `hookArgv` `hook
+ping` (hook.ts exits 0 before any RPC) and `hookFiles` reads `hookFiles(localHooks)`' files back: Welcome's rows. Tested
+in `test/hook-health.test.ts` (the fake claude runs no hook with `disableAllHooks` in `$HOME/.claude/settings.json`).
 
 The other agents (`AGENTS` in `shared/types.ts`: the command is the id; `presets()` defaults to claude, codex and
 those on PATH):
@@ -2839,6 +2855,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/tickets.ts` | linked tickets: a project's Ticket script per workspace, its key, title and status |
 | `src/daemon/policy.ts` | a managed policy for teams: locked settings, remote access off, approvals required, which agents |
+| `src/daemon/hookHealth.ts` | hooks not heard: `hookCause`, why an agent's hooks likely don't reach Laki (no core import: tested directly) |
 | `src/daemon/notes.ts` | notes and To-dos: one JSON file each, their pasted files, the list with search |
 | `src/renderer/src/FullReview.tsx` | the full review (`settings.fullReview`, on unless false: Settings › Pull requests' *Review tab*; `scanStats` runs for it): the tab bar's Review tab over the panes, files with Viewed boxes under a filter (words or `globMatch`'s glob; Mark viewed takes its matches, `useGhViewed`'s `mark` one file after another), every file's diff (Collapse/Expand all, blame per file: `blame` old and new, DiffRows' `gutter`), the comments gathered (`laki.reviewNotes`; Viewed off a PR: `laki.reviewed`, by the file's diff), sent to an agent or posted as one review (`prReview`), and everyone's on GitHub (`prThreads` `all`, `prTalk`); its columns' widths `laki.reviewFilesW`, `laki.reviewNotesW`, the comments hidden `laki.reviewNotesOff`, their tab `laki.reviewSide` (yours, `pr`: the PR's description, `gh`); pinned files first in both lists `laki.reviewPins` (p); a hunk's arrows (`expander`) show `MORE` lines of the worktree's file around it (`text.ts` `gapsOf` from the @@ heads, `DiffLine.ctx`; not for `PR #n`, an image, A, D or untracked); a file's right click: blame, `fileWeb` (Diff.tsx `webItems`, Changes' too), Mark viewed by folder, PanelApi's `fileItems` (App's `fileMenu`), Revert |
 | `src/renderer/src/Diff.tsx` | a diff's shared pieces (Changes, Review, the full review): `diffByFile`, `DiffRows`, `CommentBox`, `ImageDiff`, `useRevert`, `useGhViewed`, `ThreadCard`, `useSuggestions`, `useLoad` |

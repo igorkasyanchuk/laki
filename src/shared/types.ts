@@ -815,7 +815,7 @@ export type Ask = { options: { n: number; label: string }[]; at: number; questio
 // laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a
 // page in the browser); kind: what a target is (url: http(s); folder, file: an absolute path on this Mac)
 export type Card = { id: string; title?: string; text: string; open: { label: string; target: string; kind: 'url' | 'folder' | 'file' }[]; at: number }
-export type TabView = Tab & { changes?: TurnChanges; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number } } // changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -845,7 +845,9 @@ export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[] } // idb: laki screen's simulator hands
+// Settings › Agents & profiles: an agent's last hook (this daemon's), its live tabs, how many aren't heard (hooksSeen)
+export type HookSeen = { at?: number; tabs: number; deaf: number }
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 
 // a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
 // minutes (none: no fetch command or script); size: cells, 1–4 across the sidebar's grid by 1–4 down; full: it has a
@@ -941,7 +943,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 144
+export const API = 146
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
