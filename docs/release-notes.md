@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Claude's permission asks say what it wants to do: the tool and its command, file or address show on the ask bar,
+  in the notification (with *Always: <rule>* for its don't-ask-again choice), on the floating bubbles' card and in
+  phone pushes (tokens masked).
 - An agent's command for a new terminal tab is refused when it hides its end: blank-looking characters (no-break
   spaces, Hangul fillers, the braille blank), blank lines, or more lines than the approval shows.
 - Menus open and close at once: a right click no longer redraws the whole window, and a theme's look no longer slows

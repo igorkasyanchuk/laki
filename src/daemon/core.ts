@@ -8,6 +8,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
+import { type Perm, permOf } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -96,7 +97,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -220,6 +221,9 @@ export function hookFiles(h: Hooks): Record<string, string> {
       PostToolUse: c('running', '*'),
       // permission prompts and questions, not the 60s idle reminder
       Notification: c('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
+      // a permission ask as it's shown, with the tool and its input (turn: the tab's perm); laki hook prints nothing for
+      // it, so claude asks in its own menu as before. ponytail: a host's Write sends its whole file through the terminal
+      PermissionRequest: c('waiting', '*'),
       Stop: c('idle'),
       StopFailure: c('failed'),
       PreCompact: c('compacting'), // a long chat summed up (auto or /compact): the tab says so until the next hook
@@ -584,7 +588,8 @@ export function view(): View {
     else r.waitAt = undefined
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
-    const ask = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
+    const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
+    const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
@@ -2766,6 +2771,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
   }
   if (p.state !== 'start') r.bg = undefined
   r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
+  if (p.state !== 'waiting') r.perm = undefined // answered (its tool runs), refused or over
   switch (p.state) {
     case 'compacting':
       if (r.status !== 'waiting') r.status = 'running'
@@ -2807,25 +2813,32 @@ function turn(p: { tab: string; state: string; payload?: any }) {
         if (got) (r.published ??= []).push(got)
       }
       break
-    case 'waiting':
+    case 'waiting': {
+      // claude's PermissionRequest comes as its menu is shown, before its Notification (if any: that one comes later,
+      // when you haven't answered): the ask is told once, with what it wants
+      const again = r.status === 'waiting' && !!r.perm && pl.hook_event_name === 'Notification'
+      if (pl.hook_event_name === 'PermissionRequest') r.perm = permOf(pl, state.workspaces.find(w => w.id === tab.workspace)?.path, homedir())
       r.status = 'waiting'
       r.limit = undefined
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: pl.message ?? '' })
-      phone(tab, 'waiting', pl.message ?? '')
+      if (again) break
+      const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
+      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
+      phone(tab, 'waiting', text)
       setTimeout(() => {
         // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
         const s = sessions.get(tab.id)
         if (r.status !== 'waiting') return
         const options = s && !s.exited ? s.ask()?.options : undefined
-        widgetEvent('turn.waiting', { question: String(pl.message ?? '').slice(0, 2000), options }, tab.workspace, tab)
+        widgetEvent('turn.waiting', { question: text.slice(0, 2000), options, ...(r.perm && { tool: r.perm.tool, what: r.perm.what }) }, tab.workspace, tab)
         for (const f of turnWaits)
           try {
-            f(tab, { question: String(pl.message ?? '').slice(0, 2000), options: options ?? [] })
+            f(tab, { question: text.slice(0, 2000), options: options ?? [] })
           } catch (e) {
             log(`waits ${tab.id}: ${(e as Error).message}`)
           }
       }, 800)
       break
+    }
     case 'idle':
     case 'done': // codex notify: {"type":"agent-turn-complete","thread-id":…,"last-assistant-message":…}
     case 'failed': {

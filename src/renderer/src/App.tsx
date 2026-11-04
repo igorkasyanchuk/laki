@@ -1,5 +1,6 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, EFFORTS, MODELS, SEP_WHERE, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { alwaysOf, permVerb } from '../../shared/ask'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
@@ -1018,7 +1019,7 @@ export function App() {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...floatMore(w) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: projWords(w), status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: tint(w), last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...(t.status === 'waiting' && t.ask?.tool && { perm: { tool: t.ask.tool, what: t.ask.what ?? '' } }), ...floatMore(w) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
@@ -1324,11 +1325,14 @@ export function App() {
           const s = viewRef.current?.settings
           const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
           if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted || (m.kind === 'waiting' && t.status !== 'waiting')) return
-          const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
-          // a button per choice of its menu; a permission prompt whose menu wasn't read: Allow and Deny, its first and last
+          const perm = m.kind === 'waiting' && t.ask?.tool ? t.ask : undefined // claude's permission ask: what it wants to do
+          const body = perm ? perm.what ?? '' : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
+          // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
+          // wasn't read: Allow and Deny, its first and last
+          const always = perm?.rule ? alwaysOf(perm) : undefined
           const actions: NotifyAction[] | undefined =
-            m.kind !== 'waiting' ? undefined : t.ask ? t.ask.options.map(o => ({ text: `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, actions)
+            m.kind !== 'waiting' ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, actions)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
@@ -4701,12 +4705,23 @@ export function App() {
         {tab?.ask && !tab.planAsk /* its plan card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
           <div className="ask-bar">
-            <span className="muted">{tab.name} asks:</span>
-            {tab.ask.options.map(o => (
-              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => call('answer', { tab: tab.id, n: o.n }).catch(() => {})}>
-                {o.n}. {o.label.length > 40 ? `${o.label.slice(0, 38)}…` : o.label}
-              </button>
-            ))}
+            {tab.ask.tool ? (
+              // claude's permission ask (PermissionRequest): the tool and what it touches
+              <>
+                <span className="tag ask-tool">{tab.ask.tool}</span>
+                <span className="ask-what mono" data-tip={tab.ask.what}>{tab.ask.what}</span>
+              </>
+            ) : (
+              <span className="muted">{tab.name} asks:</span>
+            )}
+            {tab.ask.options.map(o => {
+              const label = tab.ask!.rule && o === alwaysOf(tab.ask) ? `Yes, don't ask again for ${tab.ask!.rule}` : o.label
+              return (
+                <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
+                  {o.n}. {label.length > 48 ? `${label.slice(0, 46)}…` : label}
+                </button>
+              )
+            })}
           </div>
         )}
         {touch && tab && !(narrow && (panelOpen || previewed)) /* not under a panel */ && (

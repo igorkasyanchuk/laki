@@ -8,6 +8,7 @@ import { answerOk, type Tab, type Webhook, type Workspace } from '../shared/type
 import { answer, dir, log, rtOf, sessions, state } from './core.ts'
 import { pushTo, replies } from './push.ts'
 import { flowHooks } from './schedule.ts'
+import { redact } from './share.ts'
 
 // a push to your phone (push.ts) for a turn that waits or is done: once per state change of a tab (pushed: what went
 // since it last ran; view() clears it), never for a muted tab or workspace, nor a private one in Recording mode
@@ -29,7 +30,11 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
     const ask = kind === 'waiting' ? s!.ask() : undefined
     const nonce = ask && nonceFor(w)
     if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
-    pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
+    // a permission ask's command or file (claude's PermissionRequest), its secrets' shapes masked: it leaves the Mac
+    // (Settings' titles only: pushRequest drops it, as any question)
+    const perm = kind === 'waiting' ? rtOf(tab.id).perm : undefined
+    const said = perm ? `${perm.tool}: ${redact(perm.what)}` : question
+    pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: said || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
   }
   if (kind === 'waiting') setTimeout(go, 800)
   else go()

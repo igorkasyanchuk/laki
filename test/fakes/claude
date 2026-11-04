@@ -83,7 +83,8 @@ let busy = false // a turn under way: Esc interrupts it (no Stop hook, like the 
 let slow = false // a slow turn: a line typed meanwhile waits in it (the real one reads it then), no turn of its own
 let ticker // a tick turn's redraws
 // "menu": a permission prompt like the real one's, ↑↓ move its ❯, Enter picks
-const MENU = ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)']
+const MENU0 = ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)']
+let MENU = MENU0
 let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
@@ -92,6 +93,19 @@ const turn = text => {
   if (text.startsWith('todo')) hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_input: { todos: text.replace(/^todo!? /, '').split(';').map((content, i) => ({ content, status: text.startsWith('todo!') ? 'completed' : i ? 'pending' : 'in_progress' })) } })
   // "planmode": plan mode's end, ExitPlanMode asking you to approve its plan, a menu as the real one's
   if (text.startsWith('planmode')) { hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'ExitPlanMode', tool_input: { plan: '1. Read cart.ts\n2. Fix the total' } }); process.stdout.write('Would you like to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your approval for the plan' }); return }
+  // "perm <fixture> [:: <command>]": a permission ask as the real one's (test/fixtures/permission-<fixture>.json, a Bash
+  // command instead of its own): PermissionRequest first, then its menu (no Notification: that comes only later)
+  if (text.startsWith('perm ')) {
+    const [name, cmd] = text.slice(5).split(' :: ')
+    const pl = JSON.parse(fs.readFileSync(`${__dirname}/../fixtures/permission-${name.trim()}.json`, 'utf8'))
+    pl.cwd = process.cwd()
+    if (pl.tool_input?.file_path) pl.tool_input.file_path = `${process.cwd()}/${pl.tool_input.file_path.split('/').pop()}`
+    if (cmd) pl.tool_input.command = cmd
+    const rule = pl.permission_suggestions?.find(x => x.type === 'addRules')?.rules?.[0]?.ruleContent
+    MENU = ['Yes', rule ? `Yes, and don’t ask again for: ${rule}` : 'Yes, and switch to accept edits', 'No']
+    hook('PermissionRequest', pl)
+    process.stdout.write(`${pl.tool_name}\r\n\r\nDo you want to proceed?\r\n`); menu = 1; drawMenu(); return
+  }
   if (text.startsWith('menu')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true
@@ -126,6 +140,7 @@ process.stdin.on('data', d => {
       if (k === '\r') {
         const pick = MENU[menu - 1]
         menu = 0
+        MENU = MENU0
         process.stdout.write(`picked: ${pick}\r\n> `)
         return hook('Stop', { last_assistant_message: `picked: ${pick}` })
       }

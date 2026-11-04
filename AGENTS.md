@@ -255,7 +255,11 @@ a failure not kept): the new-workspace page's model menu and its efforts, the fi
 Settings' banner. ponytail: a tab made before a lock restarts as it was); 143: a project's `config.ticket` (kept by `projectSet`),
 a workspace's `ticket` (`daemon/tickets.ts`: the script per live local workspace every `LAKI_TICKET_MS` 5 minutes and as
 its branch moves, `ticketTick`; JSON or `KEY title`, `ticketFrom`): the row's `.ws-ticket` (rowMarks' `ticket`), the Board's
-and the peek card's line. A setting the renderer adds
+and the peek card's line. 144: an `Ask`'s `tool`, `what` and `rule` (claude's PermissionRequest hook, core's `Runtime.perm`:
+shared/ask.ts `permOf`; cleared by its next hook that isn't a wait; `alwaysOf`, `permVerb`): the ask bar's tool tag and
+command, its "don't ask again" button as *Yes, don't ask again for <rule>*, the notification's *<ws> · <tab> wants to
+run* and *Always: <rule>*, the bubbles' card (`Float.perm`), the phone's body through share.ts `redact`; a
+Notification after it while it waits isn't told again (`again`). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -731,6 +735,7 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 |---|---|
 | SessionStart | records the resume id |
 | UserPromptSubmit, Pre/PostToolUse | running |
+| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule): prints nothing, so claude asks in its own menu |
 | Notification (permission prompts) | waiting |
 | Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
 | StopFailure | usage limit (`limits.ts`) |

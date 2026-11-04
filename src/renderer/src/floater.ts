@@ -11,7 +11,7 @@ import './floater.css'
 import { initials } from './text'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them
-export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
+export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; perm?: { tool: string; what: string }; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
 type Colors = Record<string, string>
 type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean }
 // the +'s actions, the menu bar's too: what, its name, what it does; Ask Laki AI while it's on (Settings › AI), last:
@@ -96,6 +96,7 @@ if (mode === 'card')
     if (pr && f.pr) pr.append(el('span', f.pr.state, `st ${/^[a-z]+$/.test(f.pr.state) ? f.pr.state : ''}`), el('span', f.pr.text, 'title'), ...(f.pr.meta ? [el('div', f.pr.meta, 'sub')] : []))
     card.replaceChildren(
       el('b', f.name),
+      ...(f.perm ? [((p: HTMLElement) => (p.append(el('b', f.perm!.tool), ' · ', el('span', f.perm!.what, 'mono')), p))(el('div', '', 'perm'))] : []), // claude's permission ask: the tool and what it touches
       meta,
       ...[f.branch, f.agents].flatMap(x => (x ? [el('div', x, 'row')] : [])),
       ...(f.last ? [el('div', f.last, 'last')] : []),

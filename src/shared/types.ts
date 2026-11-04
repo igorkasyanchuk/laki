@@ -807,7 +807,7 @@ export type PR = {
 // Created by: the tab whose agent started a workspace (its fromTab: laki new, /laki:orchestrate), as its @name, else
 // its name, while it's open; none: undefined (Info and laki ls then name its workspace, from)
 export const creatorOf = (w: { fromTab?: string }, tabs: { id: string; name: string; alias?: string }[]) => (t => t && { id: t.id, label: t.alias ? `@${t.alias}` : t.name })(w.fromTab ? tabs.find(t => t.id === w.fromTab) : undefined)
-export type Ask = { options: { n: number; label: string }[]; at: number; question?: string } // at: the marked option's n; question: the line or two above the menu
+export type Ask = { options: { n: number; label: string }[]; at: number; question?: string; tool?: string; what?: string; rule?: string } // at: the marked option's n; question: the line or two above the menu; tool, what, rule: claude's PermissionRequest (shared/ask.ts permOf): the tool (an MCP tool's server), what it touches in a line, the "don't ask again" rule its menu offers
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
 // laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a
@@ -939,7 +939,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 143
+export const API = 144
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

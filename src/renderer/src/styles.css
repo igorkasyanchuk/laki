@@ -1765,6 +1765,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ask-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--line); background: var(--side); font-size: 12px; }
 .ask-bar::-webkit-scrollbar { display: none; }
 .ask-bar > span { flex: none; }
+.ask-bar .ask-tool { font-weight: 600; }
+.ask-bar > .ask-what { flex: 0 1 auto; min-width: 80px; max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--fg); }
 .ask-bar button { flex: none; height: 26px; padding: 0 10px; white-space: nowrap; touch-action: manipulation; }
 .narrow .ask-bar button { height: 34px; }
 
