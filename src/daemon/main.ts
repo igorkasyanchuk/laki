@@ -15,6 +15,7 @@ import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
+import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
@@ -312,7 +313,7 @@ const api: Record<string, Handler> = {
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => phoneMod.webhookTest(p),
   uiReset: () => core.uiReset(),
-  portKill: p => core.portKill(p),
+  portKill: p => resourcesMod.portKill(p),
   meme: () => meme(),
   aiAsk: ({ from, ...p }) => (core.agentCaller(from) || core.promptKeep(p.text), aiAsk(p, (method, params) => call(method, params) as Promise<any>)), // Laki's own AI (yours: its text in your prompts' history): its tools call this API here; from: whoCalls'
   aiUnqueue: p => aiUnqueue(p), // a message sent while it answered, taken back before it goes
@@ -384,7 +385,7 @@ const api: Record<string, Handler> = {
   accountRm: p => accountRm(p),
   accountLogin: p => core.accountLogin(p),
   tabAccount: p => core.tabAccount(p),
-  resources: () => core.resources(),
+  resources: () => resourcesMod.resources(),
   shareStart: p => core.shareStart(p), // a tab's read-only page, for anyone with its link
   shareStop: p => core.stopShares({ tab: core.resolveTarget(String(p.tab ?? '')).id }),
   // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access, an extension's stream or agent
@@ -400,9 +401,9 @@ const api: Record<string, Handler> = {
     if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
     throw new Error(`nothing to stop called ${k}`)
   },
-  sleepTick: p => core.sleepTick(p?.now), // tests move the clock
-  tabSleep: p => core.sleepNow(p.tab),
-  tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
+  sleepTick: p => resourcesMod.sleepTick(p?.now), // tests move the clock
+  tabSleep: p => resourcesMod.sleepNow(p.tab),
+  tabWake: p => resourcesMod.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
   tunnelCheck: p => core.tunnelCheck(p), // Settings › Tunnels: is the named tunnel ready
@@ -830,7 +831,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
           return c.send({ id: m.id, error: (e as Error).message })
         }
         try {
-          core.wake(m.params?.tab) // a look wakes an agent put to sleep
+          resourcesMod.wake(m.params?.tab) // a look wakes an agent put to sleep
         } catch (e) {
           log('wake', e) // its folder gone: the old screen, which says so
         }
@@ -872,13 +873,13 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   core.setDaemonPort(port)
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
-  every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), core.scanPorts)
+  every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? core.scanPRs() : core.prTick()))
   every(2000, core.sweepRunning)
   every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   every(2000, core.shellTick)
-  every(60000, () => core.sleepTick())
+  every(60000, () => resourcesMod.sleepTick())
   policyTick() // a managed policy: now, then every 5 minutes
   every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
   every(300000, policyTick)

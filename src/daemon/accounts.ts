@@ -10,7 +10,8 @@ import { readJson } from '../shared/conn.ts'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Tab } from '../shared/types.ts'
-import { changed, dir, isLive, presetNamed, q, save, state } from './core.ts'
+import { changed, dir, presetNamed, q, save, state } from './core.ts'
+import { isLive } from './resources.ts'
 import { claudeCred, keychainService, type Who } from './usage.ts'
 
 export const ENV: Record<AccountAgent, string> = { claude: 'CLAUDE_CONFIG_DIR', codex: 'CODEX_HOME' }
