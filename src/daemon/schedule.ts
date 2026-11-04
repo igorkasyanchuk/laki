@@ -7,7 +7,7 @@ import { flowsOn, HOME_ACCOUNT, isAgent, type Pending, type PendingView, type Re
 import { nextRun, parseAt, parseWhen, stamp, whenOf, wsTitle } from '../shared/when.ts'
 import { type Block as FlowBlock, FLOW_ENDED, inputVals } from '../shared/workflow.ts'
 import { accountFor, usageWho } from './accounts.ts'
-import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
+import { addTab, broadcast, byTab, changed, clients, dir, findProject, findWs, presetNamed, projectArchived, save, send, slug, state, tabsOf, tail, tracked, wsLog, wsNew } from './core.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
@@ -275,6 +275,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
   const prompt = stamp(s.prompt, now)
   s.last = now
   try {
+    if (projectArchived(s.project)) throw new Error(`${s.project} is archived: bring it back to run its tasks`)
     if (s.widget) {
       // an extension: fetched, or one of its actions run (on ones only)
       const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)

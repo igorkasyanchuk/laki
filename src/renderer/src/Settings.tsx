@@ -734,6 +734,8 @@ export function SettingsPage(p: {
   onSave: (s: AppSettings) => void
   onClose: () => void
   projects?: ProjectInfo[]
+  archived?: { id: string; name: string; path: string; archived: number; workspaces: number }[] // archived projects (view.archivedProjects)
+  onUnarchive?: (id: string) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
   renameProjects?: boolean
@@ -1050,8 +1052,30 @@ export function SettingsPage(p: {
               <ProjectMark p={x} or={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} size={14} /> <span>{x.name}</span>
             </button>
           ))}
+          {!findQ.trim() && !!p.archived?.length && (
+            <button className={sec === 'archived' ? 'on' : ''} onClick={() => openSec('archived')} data-tip="Projects you archived: out of the sidebar and pickers">
+              <Icon name="archive" size={14} /> <span>Archived projects</span>
+            </button>
+          )}
         </nav>
         <div className="settings-main form">
+          {sec === 'archived' && (
+            <Group title="Archived projects">
+              <div className="setting-box">
+                <p className="muted small">Out of the sidebar, the pickers and ⌘K; their workspaces, worktrees and chats are kept. Back brings a project back as it was: its agents resume their chats as you look at them.</p>
+                {(p.archived ?? []).map(x => (
+                  <div key={x.id} className="row cli-row">
+                    <Says title={x.name} hint={`${x.path} · ${x.workspaces} workspace${x.workspaces === 1 ? '' : 's'} · archived ${ago(x.archived)}`} />
+                    <span className="grow" />
+                    <button type="button" onClick={() => p.onUnarchive?.(x.id)}>
+                      <Icon name="restore" /> Bring back
+                    </button>
+                  </div>
+                ))}
+                {!p.archived?.length && <p className="muted small">None now.</p>}
+              </div>
+            </Group>
+          )}
           {project && (
             <ProjectSection
               key={project.id}

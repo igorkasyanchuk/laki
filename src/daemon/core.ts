@@ -25,7 +25,7 @@ import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { type GateBy, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
-import { asleep, isLive, restoredAt, wake } from './resources.ts'
+import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { meterRead, meterView, todayView } from './meters.ts'
@@ -572,15 +572,19 @@ export function view(): View {
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
     return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
+  // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
+  const shelved = new Set(state.projects.filter(p => p.archived).map(p => p.id))
+  const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
   return {
-    projects: state.projects.map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
+    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
+    ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
-    workspaces: state.workspaces.map(w => {
+    workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
       return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending) }
     }),
-    tabs,
+    tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
     settings: state.settings ?? {},
     remote: remoteView(),
@@ -1166,6 +1170,36 @@ function projectPush(p: Project) {
   changed()
   return p
 }
+
+// a project archived (on false: back): out of the sidebar, the pickers, ⌘K and MCP's state (view leaves it and its
+// workspaces out, archivedProjects lists it), its worktrees, chats and history kept; refused while one of its agents
+// works or asks you. Its agents sleep (claude and codex resume their chats as they're looked at again), what can't
+// sleep ends (a shell's tab closes; an agent's tab stays, Enter starts it); its restores wait (dormant), its
+// scheduled tasks fail saying so, a new workspace in it is refused, its PRs aren't scanned
+export function projectArchive(o: { project: string; on: boolean }) {
+  const p = findProject(o.project)
+  if (p.kind) throw new Error(`${p.name} can't be archived`)
+  if (!o.on) return void (delete p.archived, save(), changed())
+  const wss = new Set(state.workspaces.filter(w => w.project === p.id && !w.archived).map(w => w.id))
+  const tabs = state.tabs.filter(t => wss.has(t.workspace))
+  const live = (t: Tab) => !!sessions.get(t.id) && !sessions.get(t.id)!.exited && !asleep.has(t.id)
+  const busy = tabs.filter(t => live(t) && (tracked(t) ? ['running', 'waiting'].includes(rtOf(t.id).status) : shellAgents.has(t.id)))
+  if (busy.length) throw new Error(`${p.name}: ${busy.map(t => t.name).join(', ')} ${busy.length > 1 ? 'are' : 'is'} working or asking you; archive it once ${busy.length > 1 ? 'they finish' : 'that ends'}`)
+  for (const t of tabs) {
+    if (queued.has(t.id)) dormant.add(t.id) // a restore not started yet: it waits for the project to come back
+    if (!live(t)) continue
+    try {
+      sleepNow(t.id)
+    } catch {
+      sessions.get(t.id)!.end('\r\n\x1b[2m[ended: its project was archived]\x1b[0m\r\n')
+    }
+  }
+  p.archived = Date.now()
+  log(`archived project ${p.id}`)
+  save()
+  changed()
+}
+export const projectArchived = (id: string) => !!state.projects.find(p => p.id === id)?.archived
 
 export function projectRm(ref: string) {
   const p = findProject(ref)
@@ -2023,6 +2057,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 }
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
+  if (proj.archived) throw new Error(`${proj.name} is archived: bring it back first (Settings › Projects › Archived projects)`)
   if (typeof o.name !== 'string') o = { ...o, name: undefined } // an RPC's number or object: no name (slug and trim take text)
   const asked = o.name?.trim() // the caller's, not one made below from the prompt (another's words, a PR's, an issue's)
   // an agent's (MCP's from alone: its preset unknown). ponytail: Laki AI's laki_shell and laki_run_action tabs and
@@ -2511,7 +2546,7 @@ export function restoreAll() {
     if (!ws.archived)
       for (const t of tabsOf(ws.id)) {
         queued.add(t.id), asleep.add(t.id)
-        if (after && tracked(t) && !t.queue?.length && Date.now() - (t.usedAt ?? 0) > after) dormant.add(t.id)
+        if (projectArchived(ws.project) || (after && tracked(t) && !t.queue?.length && Date.now() - (t.usedAt ?? 0) > after)) dormant.add(t.id) // an archived project's: until it's back
       }
   if (dormant.size) log(`asleep since the restart (unused ${after / 60_000} min): ${[...dormant].join(', ')}`)
   if (!RESTORE_GAP) for (const id of [...queued]) if (!dormant.has(id)) restoreNow(id)

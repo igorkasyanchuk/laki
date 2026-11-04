@@ -3178,6 +3178,7 @@ export function App() {
       null,
       ...(p.kind ? [] : [{ label: 'Settings', icon: 'settings', key: 's', run: () => setDialog({ project: p.id, tab: 'settings' }) } as MenuItem]), // its page's Settings tab; Terminals and Browsers have none
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), tip: 'Prompts that run in it on a schedule', run: () => setDialog({ schedules: p.id }) },
+      ...(p.kind ? [] : [{ label: 'Archive project…', icon: 'archive', key: 'a', tip: 'Out of the sidebar, pickers and ⌘K, its history kept; Settings › Archived projects brings it back', run: () => void ask(`Archive project ${p.name}?`, { text: "It leaves the sidebar, the pickers and ⌘K. Its agents sleep and resume their chats when it's back; terminals close; worktrees and history stay. Settings › Archived projects brings it back.", ok: 'Archive' }).then(y => void (y && call('projectArchive', { project: p.id }).then(() => done(`Archived project ${p.name}`, () => void call('projectArchive', { project: p.id, on: false })), () => {}))) } as MenuItem]),
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, tip: 'Takes it out of Laki; its files stay', run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: wsName(w), icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
@@ -4691,6 +4692,8 @@ export function App() {
               call('settingsSet', s).catch(() => {})
             }}
             projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
+            archived={view.archivedProjects}
+            onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             onMemory={id => setDialog({ project: id, tab: 'memory' })}

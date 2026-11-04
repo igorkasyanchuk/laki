@@ -112,6 +112,7 @@ export type Project = {
   id: string
   name: string
   path: string
+  archived?: number // archived (projectArchive): when; out of every list until it's back
   git?: boolean
   host?: string
   config?: ProjectConfig
@@ -912,7 +913,8 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+export type ArchivedProject = { id: string; name: string; path: string; host?: string; archived: number; workspaces: number }
+export type View = { projects: Project[]; archivedProjects?: ArchivedProject[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
@@ -933,7 +935,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 138
+export const API = 139
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

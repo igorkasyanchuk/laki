@@ -362,6 +362,9 @@ selected workspace's PR is in the status bar.
   - *Collapse* / *Expand*;
   - *Settings* (the project's page at its Settings tab; see Project settings below);
   - *Scheduled tasks…* (the project's tasks and runs; the count of its tasks on the right);
+  - *Archive project…*: out of the sidebar, the pickers and ⌘K, its workspaces, worktrees and chats kept (its agents
+    sleep, its terminals close; refused while one of its agents works or asks you); Settings › *Archived projects* brings
+    it back as it was;
   - *Remove project*;
   - its archived workspaces, which you click to restore.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. With the rail, each kind (Projects,

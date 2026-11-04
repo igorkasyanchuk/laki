@@ -237,7 +237,10 @@ claude's PreToolUse through core's `preTool`, each tool gate in turn within `TOO
 deny, `{input}` an `updatedInput` with `permissionDecision: 'ask'`, never allow; an error or timeout goes; an input past
 `TOOL_IN_MAX` (1 MB) shown with its long strings cut (`cutBig`), refused only, never changed; hook.ts waits
 `TOOL_WAIT` only while `<data>/tool-gates` is there, `toolGateFlag` at scan, `widgetSet` and each call) and the
-`tool.call` event (never a workflow's start). A setting the renderer adds
+`tool.call` event (never a workflow's start). 139: `projectArchive` (`project`, `on`: false brings it back; refused from an agent, `AGENT_NO`;
+refused while one of its agents works or asks), a project's `archived`, the view's `archivedProjects` (view leaves an archived
+project, its workspaces and their tabs out; its agents sleep, the rest end; restores dormant; `wsNew` and scheduled runs refused;
+no PR scans): the project's ⋯ › *Archive project…*, Settings › *Archived projects*. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &

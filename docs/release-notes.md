@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Archive a project you're done with (its ⋯ › *Archive project…*): it leaves the sidebar, the pickers and ⌘K, its
+  agents sleep and its history stays; Settings › *Archived projects* brings it back with one click.
 - Drop a folder on Laki's Dock icon to add it as a project (or open it, if it's one already), even when Laki isn't
   running.
 - The prompt box's `#` list shows who is assigned to each issue and the PRs that close it (open, draft, merged or

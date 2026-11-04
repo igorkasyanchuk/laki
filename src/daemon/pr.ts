@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
@@ -197,7 +197,7 @@ export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   if (bg && now - limitedAt < LIMITED) return Promise.resolve()
   void csRefresh()
   // workspaces in parallel: each gh call may take seconds
-  const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY))
+  const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !projectArchived(ws.project) && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY))
   prScan = Promise.all(scanned.map(scanPR)).then(() => {
     prScan = null
     const again = prAgain
