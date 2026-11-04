@@ -865,6 +865,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(2000, core.shellTick)
   every(60000, () => core.sleepTick())
   core.policyTick() // a managed policy: now, then every 5 minutes
+  every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => core.ticketTick()) // linked tickets: each due workspace's script
   every(300000, core.policyTick)
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(Number(process.env.LAKI_OVERLAP_MS || 15000), core.scanOverlaps) // Collision radar

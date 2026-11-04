@@ -42,6 +42,8 @@ export * from './remote.ts'
 export * from './meters.ts'
 export * from './phone.ts'
 export * from './files.ts'
+export * from './tickets.ts'
+import { ticketOf } from './tickets.ts'
 export * from './policy.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 export * from './schedule.ts'
@@ -596,7 +598,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending) }
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -996,6 +998,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       teardown: o.config.teardown?.trim() || undefined,
       run: o.config.run?.trim() || undefined,
       ...Object.fromEntries(RUN_SCRIPTS.map(k => [k, o.config![k]?.trim() || undefined])),
+      ticket: typeof o.config.ticket === 'string' ? o.config.ticket.trim() || undefined : undefined, // linked tickets (tickets.ts)
       expose: o.config.expose?.trim() || undefined,
       actions: actionsOk(o.config.actions),
       templates: templatesOk(o.config.templates),

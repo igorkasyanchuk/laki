@@ -100,7 +100,7 @@ const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's
 // a sidebar row's marks, each on or off: Appearance › Sidebar rows and a sidebar right click's Show › (App's showItems).
 // Older ones keep their own settings (prIcon, prMarks, diffStat), the rest are rowMarks: on unless false, but the next
 // step's chip (off unless true); conflicts and failing checks, unset: as the PR's mark
-export type RowMark = 'step' | 'pr' | 'author' | 'approved' | 'mine' | 'commented' | 'conflict' | 'ci' | 'radar' | 'plan' | 'stat'
+export type RowMark = 'step' | 'pr' | 'author' | 'approved' | 'mine' | 'commented' | 'conflict' | 'ci' | 'radar' | 'plan' | 'stat' | 'ticket'
 export const ROW_MARKS: [RowMark, string, string][] = [
   ['step', 'Next step', 'A chip with what it needs from you now: Merge, Archive, Answer… (its ⋯ menu has it first either way)'],
   ['pr', 'Pull request', "GitHub's mark: green open, purple merged, red closed, gray draft"],
@@ -112,6 +112,7 @@ export const ROW_MARKS: [RowMark, string, string][] = [
   ['ci', 'Failing checks', 'A red mark when its PR\'s checks fail'],
   ['radar', 'Overlaps', 'How many other workspaces change the same lines (Collision radar)'],
   ['plan', "The agent's plan", 'n/m of its to-do list'],
+  ['ticket', 'Linked ticket', "Its ticket's key and status, from the project's Ticket script (a click opens it)"],
   ['stat', 'Diff size', 'Lines added and removed against its base, new files too; checked every 10 seconds'],
 ]
 export function rowMarkOn(s: Pick<AppSettings, 'prIcon' | 'prMarks' | 'diffStat' | 'rowMarks'>, m: RowMark): boolean {
@@ -164,7 +165,7 @@ export type AppSettings = Paint & {
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   hideEmpty?: boolean // Appearance › Sidebar rows › Empty projects off: a project with no row to show is left out
-  rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan', boolean>> // the sidebar rows' other marks (ROW_MARKS)
+  rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // the sidebar rows' other marks (ROW_MARKS)
   timers?: boolean // a turn's time on its tab and row (unset: off)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
   costs?: boolean // what each chat used, tokens and ≈ API price, and today's (unset: on)

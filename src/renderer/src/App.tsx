@@ -3500,6 +3500,12 @@ export function App() {
             <span className="del">−{short(w.stat.del)}</span>
           </span>
         )}
+        {w.ticket && mark('ticket') && (
+          <span className="ws-ticket" data-tip={[w.ticket.key, w.ticket.title, w.ticket.status && `(${w.ticket.status})`].filter(Boolean).join(' ') + (w.ticket.url ? '\nClick: open it' : '')} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), w.ticket?.url && openExternal(w.ticket.url))}>
+            {w.ticket.key}
+            {w.ticket.status && <span className="ws-ticket-st">{w.ticket.status}</span>}
+          </span>
+        )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
         {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
         {mark('radar') && (n => n > 0 && (
@@ -3671,6 +3677,7 @@ export function App() {
         </div>
         {last && <div className="wp-last">{last}</div>}
         {pr && <PrCard pr={pr} linked={w.prLinked} face={!pr.mine || settings.ownAvatar !== false} onOpen={openExternal} />}
+        {w.ticket && <div className="wp-line">{w.ticket.key}{w.ticket.title ? ` ${w.ticket.title}` : ''}{w.ticket.status ? ` · ${w.ticket.status}` : ''}</div>}
         {(st => st && (st.add > 0 || st.del > 0 || st.dirty > 0) && <div className="wp-line wp-files">{filesText(st)} <span className="ws-stat"><span className="add">+{short(st.add)}</span> <span className="del">−{short(st.del)}</span></span>{st.dirty ? ` · ${st.dirty} not committed` : ''}</div>)(w.stat ?? (peekStat?.id === w.id ? peekStat.stat : undefined))}
         {marks.map(m => (
           <div key={String(m)} className="wp-line">

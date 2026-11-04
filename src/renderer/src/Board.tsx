@@ -174,6 +174,11 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                       {name(w.project)}
                       {w.branch && w.kind === 'worktree' ? ` · ${w.branch}` : ''}
                     </div>
+                    {w.ticket && (
+                      <div className="board-ticket small" data-tip={w.ticket.status}>
+                        <b>{w.ticket.key}</b> {w.ticket.title ?? ''}{w.ticket.status ? ` · ${w.ticket.status}` : ''}
+                      </div>
+                    )}
                     {last && <div className="board-last">{last}</div>}
                     {w.pr && (
                       <div className="board-pr">

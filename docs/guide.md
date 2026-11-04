@@ -2148,6 +2148,10 @@ tab). Saved as you type:
   - *Run*: what ▷ Run starts, e.g. `npm run dev -- --port $PORT`.
   - *Test*, *Lint*, *Format*, *Deploy*: Run ▾'s, e.g. `npm test`; `.laki.json` takes them as `test`, `lint`, `format`
     and `deploy`.
+  - *Ticket* (`.laki.json`'s `ticket`): prints a workspace's linked ticket from Linear, Jira or any CLI, as JSON
+    `{key, title, status, url}` or a line `KEY title`; it runs in each workspace every 5 minutes and as its branch
+    changes (`$LAKI_BRANCH`, `$LAKI_WORKSPACE`, `$LAKI_BASE`). The key and status show on the workspace's row (a click
+    opens it; Show › *Linked ticket*), the title on the Board and the hover card.
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 - *Expose to the world*: who can open its tunnels, as addresses and `*@domains` (e.g. `me@x.dev, *@team.com`).
   The popup starts from it every time: *Only these emails*, filled in. Empty: *Anyone with the link*.

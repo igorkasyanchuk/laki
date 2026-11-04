@@ -1273,3 +1273,17 @@ test('a managed policy: its settings locked, remote access off, approvals requir
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b', preset: 'claude', perm: 'bypassPermissions' }), /requires approvals/)
   assert.equal((await rig.rpc('wsNew', { project: p.id, name: 'a', preset: 'claude' })).id, 'a')
 })
+
+test("linked tickets: a project's Ticket script, run per workspace, its JSON or KEY title line in the view", async t => {
+  const { ticketFrom } = await import('../src/daemon/tickets.ts')
+  assert.deepEqual(ticketFrom('{"key":"ENG-12","title":"Fix cart","status":{"name":"In Progress"},"url":"https://linear.app/x/ENG-12"}'), { key: 'ENG-12', title: 'Fix cart', status: 'In Progress', url: 'https://linear.app/x/ENG-12' })
+  assert.deepEqual(ticketFrom('PROJ-7 Totals round wrong\nmore'), { key: 'PROJ-7', title: 'Totals round wrong' })
+  assert.deepEqual(ticketFrom('{"key":"A-1","url":"javascript:alert(1)"}'), { key: 'A-1' }) // a link only http(s)
+  assert.equal(ticketFrom('  '), undefined)
+  const rig = await fresh(t, { env: { LAKI_TICKET_TICK_MS: '300' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, config: { ticket: 'printf \'{"key":"ENG-%s","title":"On %s","status":"Todo"}\' 42 "$LAKI_BRANCH"' } })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'tk' })
+  const ws = await until(async () => (await rig.rpc('state')).workspaces.find((x: { id: string; ticket?: unknown }) => x.id === w.id && x.ticket), 'its ticket', 8000)
+  assert.deepEqual(ws.ticket, { key: 'ENG-42', title: `On ${w.branch}`, status: 'Todo' })
+})

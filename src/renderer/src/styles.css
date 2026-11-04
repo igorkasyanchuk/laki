@@ -3264,3 +3264,6 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .tip-keys { display: inline-flex; gap: 2px; margin-left: 2px; vertical-align: 1px; } /* a tooltip's keys (ui.tsx tipText) */
 .tip-keys kbd { min-width: 16px; padding: 0 4px; font: 10.5px/15px var(--mono); text-align: center; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--rs, 4px); }
 .managed-box { border-left: 3px solid var(--waiting); margin-bottom: 12px; } /* Settings: a managed policy's locks (policy.ts) */
+.ws-ticket { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; font: 10.5px/16px var(--mono); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 4px); cursor: pointer; } /* a linked ticket's key (daemon/tickets.ts) */
+.ws-ticket-st { color: var(--muted); font-family: var(--ui-font, inherit); }
+.board-ticket { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -21,8 +21,9 @@ const SCRIPTS = [
   { k: 'lint', label: 'Lint', hint: 'Run ▾ › Lint: in a lint tab of its own.', eg: 'npm run lint' },
   { k: 'format', label: 'Format', hint: 'Run ▾ › Format: in a format tab of its own.', eg: 'npx prettier --write .' },
   { k: 'deploy', label: 'Deploy', hint: 'Run ▾ › Deploy: in a deploy tab of its own, after you confirm.', eg: 'npm run deploy' },
+  { k: 'ticket', label: 'Ticket', hint: "Prints each workspace's ticket: JSON {key, title, status, url}, or a line KEY title. Run in each workspace every 5 minutes and as its branch changes ($LAKI_BRANCH, $LAKI_WORKSPACE); its key and status show on the workspace's row, its title on the Board and the hover card.", eg: 'linear issue view "$LAKI_BRANCH" --json  # or: jira issue view "${LAKI_BRANCH%%-*}" --plain' },
 ] as const
-export type Scripts = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string }
+export type Scripts = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; ticket?: string }
 
 // a project's lifecycle scripts: one at a time, any number of lines; Import fills one from a file
 export function ScriptsField({ value, file = {}, git = true, tab, onChange }: { value: Scripts; file?: Scripts; git?: boolean; tab?: keyof Scripts; onChange: (s: Scripts) => void }) {
