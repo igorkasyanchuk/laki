@@ -412,6 +412,9 @@ test('prompt completion: @ and # after a space, / at a line\'s start; the rows; 
   const refs = [{ n: 42, title: 'Fix cart total', url: 'u42', kind: 'PR' as const }, { n: 7, title: 'Totals round wrong', url: 'u7', kind: 'issue' as const }]
   assert.deepEqual(completions({ ch: '#', q: '4', from: 0 }, { refs }).map(r => r.label), ['#42 Fix cart total'])
   assert.deepEqual(completions({ ch: '#', q: 'tot', from: 0 }, { refs }).map(r => [r.value, r.sub]), [['u42', 'PR'], ['u7', 'issue']])
+  // an issue's row says who has it and the PRs that close it
+  const taken = [{ n: 7, title: 'Totals round wrong', url: 'u7', kind: 'issue' as const, assignees: ['ann', 'bob'], prs: [{ number: 9, state: 'draft' }, { number: 10, state: 'merged' }] }]
+  assert.equal(completions({ ch: '#', q: '7', from: 0 }, { refs: taken })[0].sub, 'issue · @ann, @bob · #9 draft, #10 merged')
   const templates = [{ name: 'Review', text: 'Review {{prompt}} carefully' }, { name: 'Tests', text: 'Write tests' }]
   assert.deepEqual(completions({ ch: '/', q: 'rev', from: 0 }, { templates }).map(r => r.label), ['/Review'])
   // a path or URL and a space; a template's text, the caret at its {{prompt}}, else at its end

@@ -318,14 +318,23 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   rmSync(join(gh, 'comment.json'))
   await assert.rejects(r([{ path: 'a.ts', line: 2, body: 'x' }]), /GitHub turned the review down: HTTP 422/)
 
-  // the prompt boxes' # completion: the repo's open issues (gh issue list), gh's failure in words and tried again, then
-  // kept a minute; @ on the new-workspace page: the project's own folder's files
+  // the prompt boxes' # completion: the repo's open issues with who has each and the PRs that close it (one GraphQL
+  // call), gh's failure in words and tried again, then kept a minute; @ on the new-workspace page: the project's own
+  // folder's files
   await assert.rejects(rig.rpc('issueList', { project: p.id }), /gh: Command failed/)
-  writeFileSync(join(gh, 'issues.json'), JSON.stringify([{ number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7', labels: [] }]))
-  assert.deepEqual(await rig.rpc('issueList', { project: p.id }), [{ number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7' }])
-  writeFileSync(join(gh, 'issues.json'), '[]')
-  assert.equal((await rig.rpc('issueList', { project: p.id })).length, 1) // a minute's
-  assert.match(log(), /gh issue list --state open --json number,title,url --limit 50/)
+  const pr = (number: number, state: string, isDraft = false) => ({ number, url: `https://github.com/o/r/pull/${number}`, state, isDraft })
+  const nodes = [
+    { number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7', assignees: { nodes: [{ login: 'ann' }] }, closedByPullRequestsReferences: { nodes: [pr(9, 'OPEN', true), pr(8, 'CLOSED'), pr(10, 'MERGED')] } },
+    { number: 6, title: 'Free shipping', url: 'https://github.com/o/r/issues/6', assignees: { nodes: [] }, closedByPullRequestsReferences: { nodes: [pr(11, 'OPEN')] } },
+  ]
+  writeFileSync(join(gh, 'issues.json'), JSON.stringify({ data: { repository: { issues: { nodes } } } }))
+  assert.deepEqual(await rig.rpc('issueList', { project: p.id }), [
+    { number: 7, title: 'Totals round wrong', url: 'https://github.com/o/r/issues/7', assignees: ['ann'], prs: [{ number: 9, url: 'https://github.com/o/r/pull/9', state: 'draft' }, { number: 8, url: 'https://github.com/o/r/pull/8', state: 'closed' }, { number: 10, url: 'https://github.com/o/r/pull/10', state: 'merged' }] },
+    { number: 6, title: 'Free shipping', url: 'https://github.com/o/r/issues/6', assignees: [], prs: [{ number: 11, url: 'https://github.com/o/r/pull/11', state: 'open' }] },
+  ])
+  writeFileSync(join(gh, 'issues.json'), '{}')
+  assert.equal((await rig.rpc('issueList', { project: p.id })).length, 2) // a minute's
+  assert.match(log(), /gh api graphql -F owner=\{owner\} -F name=\{repo\} -f query=.*closedByPullRequestsReferences/)
   assert.ok((await rig.rpc('files', { project: p.id })).files.includes('README.md'))
 })
 

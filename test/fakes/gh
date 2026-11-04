@@ -46,7 +46,7 @@ case "$1 $2" in
   "run view") # --log-failed: $FAKE_GH/run-<job>.log, else run.log, else gh's 404
     j=; p=; for a in "$@"; do [ "$p" = --job ] && j=$a; p=$a; done
     f "run-$j.log" || f run.log || { echo 'failed to get run log: HTTP 404: Not Found (https://api.github.com/repos/o/r/actions/jobs/'"$j"'/logs)' >&2; exit 1; } ;;
-  "api graphql") f graphql.json || exit 1 ;;
+  "api graphql") case "$*" in *closedByPullRequestsReferences*) f issues.json || exit 1 ;; *) f graphql.json || exit 1 ;; esac ;; # issueList's: issues.json
   "api user") f user || echo me ;;
   "label list") f labels.json || echo "[]" ;;
   "pr diff") f pr.diff || exit 1 ;;

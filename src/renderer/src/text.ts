@@ -686,7 +686,9 @@ export function triggerAt(v: string, caret: number): Trigger | null {
   const s = /(^|\n)\/([^\s/]*)$/.exec(before)
   return s ? { ch: '/', q: s[2], from: caret - s[2].length - 1 } : null
 }
-export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue' }
+export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue'; assignees?: string[]; prs?: { number: number; state: string }[] }
+// an issue's row: who has it and the PRs that close it (#12 draft), so you don't start what someone already does
+const refSub = (r: Ref) => [r.kind, r.assignees?.length ? r.assignees.map(a => `@${a}`).join(', ') : '', r.prs?.length ? r.prs.map(q => `#${q.number} ${q.state}`).join(', ') : ''].filter(Boolean).join(' · ')
 // the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
 // templates by name
 export type AgentCommand = { name: string; sub: string; skill?: boolean } // the daemon's agentCommands: /name (codex's skills $name)
@@ -702,7 +704,7 @@ export function completions(t: Trigger, o: { files?: string[]; changed?: string[
     return (o.refs ?? [])
       .filter(r => words.every(w => String(r.n).startsWith(w) || r.title.toLowerCase().includes(w)))
       .slice(0, max)
-      .map(r => ({ label: `#${r.n} ${r.title}`, sub: r.kind, value: r.url }))
+      .map(r => ({ label: `#${r.n} ${r.title}`, sub: refSub(r), value: r.url }))
   }
   // your templates first, then the agent's own commands and skills (picked: /name as typed for the agent to run)
   const tpl = (o.templates ?? []).filter(x => x.name.toLowerCase().includes(q)).map(x => ({ label: `/${x.name}`, sub: x.text.split('\n')[0].slice(0, 60), value: x.text, template: x }))

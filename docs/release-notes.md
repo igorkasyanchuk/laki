@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The prompt box's `#` list shows who is assigned to each issue and the PRs that close it (open, draft, merged or
+  closed), so you don't start work someone already has.
 - A scheduled task can run at several times: `weekdays at 9am; fri at 4pm` (or *and* before the next days). The
   calendar and *Next runs* show all of them; a time two of them share runs once.
 - Settings › General › Updates: *Update delay*'s menu is its usual size again, not as tall as the words beside it.
