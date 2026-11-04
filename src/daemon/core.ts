@@ -28,7 +28,7 @@ import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } f
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
-import { meterRead, meterView, todayView } from './meters.ts'
+import { meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { collisions, inside, scanOverlaps, scanStats, stats, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -227,6 +227,9 @@ export function hookFiles(h: Hooks): Record<string, string> {
     // Progress on tabs, and the Laki note's rename and PR of its own workspace: claude runs them without asking each time
     // (this Mac's CLI only: a host has none)
     ...(h === localHooks && { permissions: { allow: [`Bash(${LAKI_CLI} progress:*)`, `Bash(${LAKI_CLI} rename .:*)`, `Bash(${LAKI_CLI} pr .:*)`, `Bash(${LAKI_CLI} memory add .:*)`, `Bash(${LAKI_CLI} memory rm .:*)`] } }),
+    // claude's own numbers (meters.ts' status line): Laki's script keeps them, then runs yours. Over a project's own
+    // statusLine (--settings wins); this Mac's only: a host can't reach the daemon's files
+    ...(h === localHooks && statusOn() && { statusLine: { type: 'command', command: q(statusSh), padding: 0 } }),
   }
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
@@ -475,7 +478,23 @@ export function writeHooks() {
     mkdirSync(dirname(join(dir, f)), { recursive: true })
     writeFileSync(join(dir, f), text)
   }
+  writeFileSync(statusSh, STATUS_SH)
+  chmodSync(statusSh, 0o755)
 }
+
+// claude's status line command (meters.ts): runs at every redraw, so sh only, never fails. Its JSON kept for the tab
+// (a rename: never half a file), then your own command with the same input (unset first: one that runs this again ends)
+const STATUS_SH = `#!/bin/sh
+# Laki: keeps claude's status line JSON for its tab, then runs your own status line with the same input
+in=$(cat)
+if [ -n "$LAKI_TAB" ] && [ -n "$LAKI_STATUSLINE_DIR" ]; then
+  printf '%s' "$in" 2>/dev/null > "$LAKI_STATUSLINE_DIR/$LAKI_TAB.tmp" && mv -f "$LAKI_STATUSLINE_DIR/$LAKI_TAB.tmp" "$LAKI_STATUSLINE_DIR/$LAKI_TAB.json" 2>/dev/null
+fi
+c=$LAKI_STATUSLINE_CMD
+unset LAKI_STATUSLINE_CMD
+[ -n "$c" ] && printf '%s' "$in" | /bin/sh -c "$c"
+exit 0
+`
 
 // opencode's events as claude's hooks: a session (not a subagent's) made, busy, asking, idle
 const OPENCODE_PLUGIN = `// Laki's plugin (Laki writes it): tells Laki when this tab's turns start and end
@@ -1288,8 +1307,17 @@ export function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> =
     // ponytail: these replace one the user set
     ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: join(hooks, 'opencode') }), // Laki's plugin, on top of the user's config
     ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: join(hooks, 'gemini-settings.json') }), // the lowest layer; hooks add up
+    ...(tab.preset === 'claude' && !ws.host && statusLineEnv(ws, tab)), // its status line's JSON kept, yours run after (meters.ts)
     ...extra,
   }
+}
+
+// where statusline.sh keeps the tab's JSON, and your own command it runs (always given: the setting turned on while it
+// runs then works too)
+function statusLineEnv(ws: Workspace, tab: Tab): Record<string, string> {
+  mkdirSync(statusDir, { recursive: true, mode: 0o700 })
+  const own = ownStatusLine(ws, tab)
+  return { LAKI_STATUSLINE_DIR: statusDir, ...(own && { LAKI_STATUSLINE_CMD: own }) }
 }
 
 // an agent's command line, and its values: a plain word goes in as it is, anything else in the tab's env (LAKI_ARG_n)
@@ -1819,6 +1847,7 @@ export function settingsSet(o: Settings, own = false) {
   changed()
   if ('diffStat' in o || 'fullReview' in o) void scanStats() // its numbers now, not at the next scan
   if ('radar' in o) void scanOverlaps()
+  if ('statusBridge' in o) writeHooks() // claude's settings files with or without the status line
   if (dirs(state.settings) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's (an agent's) too
   return state.settings
 }
@@ -1866,6 +1895,7 @@ export function uiReset() {
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
   widgetsOff() // every extension off
   policyTick() // a managed policy's settings again
+  writeHooks() // statusBridge back on
   setIconLook(lookOf(state.settings))
   save()
   changed()
@@ -1954,6 +1984,7 @@ export function closeTab(id: string) {
   typedBy.delete(id), treeAgents.delete(id)
   state.tabs = state.tabs.filter(x => x !== t)
   stopShares({ tab: id })
+  statusGone(id)
   save()
   changed()
 }

@@ -624,6 +624,7 @@ export type Settings = {
   achievements?: AchievementsKept // Settings › Achievements, the status bar's trophy (renderer's achievements.ts)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // Settings › Appearance: how full a claude or codex tab's context is, in the status bar and on its tab as a line (unset, true) or a ring, or not there (status); false: none
   costs?: boolean // Settings › Appearance: what each claude and codex tab used, tokens and ≈ API price, and today's in the plan limits' popup (unset: on)
+  statusBridge?: boolean // Settings › Appearance: claude's status line JSON kept per tab (meters.ts), its context and plan limits over the guesses; your own status line still runs (unset: on)
 }
 
 // what you did (got: an achievement's id, when), the ones you hid, off: none shown, none earned. Settings' page never
@@ -939,7 +940,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 143
+export const API = 145
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -738,7 +738,9 @@ the 5-hour session of the agents' plans (the busier agent's). Click it for each 
 the week per model and extra usage; Codex's 5-hour and weekly windows. Each shows when it resets. The daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
-asks: Claude's every 7.5 minutes, Codex's every 5. When a server asks Laki to check less often, the popup keeps the
+asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in
+the last 10 minutes, Claude's 5-hour and weekly numbers are the ones it gave there, and the endpoint isn't asked
+(below). When a server asks Laki to check less often, the popup keeps the
 last numbers, says when they're from and when it checks again (the server's wait, else 10, 20, 40, then every 60
 minutes). It never refreshes a token: an expired one says so
 until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read). As a
@@ -756,6 +758,14 @@ tab's. Their tooltips say it in tokens: *142K of 200K tokens · 71%*. Claude's w
 *≈ $0.42 · 1.2M tokens* (input, output and cache writes and reads, at API prices; a model Laki has no price for shows
 tokens only). Settings › Appearance › *Context meter* picks how a tab shows it (a line under the tab, a ring on it, or
 the status bar only) or turns it off; *Tokens and cost* hides the rest.
+
+**Claude's status line** (Settings › Appearance › *Read Claude's status line*, on): Claude Code hands its status line
+its own numbers at each redraw. Laki's tabs on this Mac run Laki's status line command, which keeps them, then runs
+yours (your project's `.claude/settings.local.json` or `.claude/settings.json`, else the account's or your
+`~/.claude/settings.json`) with the same input, so it shows as before. Laki then knows the chat's real context window
+(no 200K-or-1M guess) and, for 10 minutes after a redraw, its context and the plan's 5-hour and weekly limits without
+asking Anthropic. Off: Laki's own estimates. A change applies to tabs started after it; a change to your own status
+line, after the tab restarts.
 
 **Side panel** (⌥⌘B, the panel icon; drag its edge to resize; ⌘I or ⓘ opens it on *Info*, below):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
@@ -1836,7 +1846,7 @@ and what it costs.
   view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
-  default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Tokens
+  default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),
   *Sidebar rows* (what a row shows after its name, each on or off, as a right click › *Show ›* does: *Next step* (off
   by default), *Pull request* (GitHub's mark), *Author's picture* with *Your picture on your PRs*, ✓, ✓✓ and 👀,

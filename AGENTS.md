@@ -255,7 +255,8 @@ a failure not kept): the new-workspace page's model menu and its efforts, the fi
 Settings' banner. ponytail: a tab made before a lock restarts as it was); 143: a project's `config.ticket` (kept by `projectSet`),
 a workspace's `ticket` (`daemon/tickets.ts`: the script per live local workspace every `LAKI_TICKET_MS` 5 minutes and as
 its branch moves, `ticketTick`; JSON or `KEY title`, `ticketFrom`): the row's `.ws-ticket` (rowMarks' `ticket`), the Board's
-and the peek card's line. A setting the renderer adds
+and the peek card's line; 145: Claude's status line (`settings.statusBridge`, on unless false; Meters, below): a tab's
+`context` and `usage`'s claude windows from it while fresh. A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
@@ -2141,9 +2142,28 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 (`AGAIN`); a 429 (`busy`) its `Retry-After` (`waitOf`), else `BACK_OFF` (10, 20, 40, then 60 minutes, `slows` in a row), the last
 answer with numbers (`last`) given meanwhile with the error and `next` (Usage.tsx' `waitText`: from when, checked again when); the RPC's `now` (tests'); `settings.usage[agent] === false` skips it. The renderer asks every minute (and notifies near a limit: Notifications). Tests set `LAKI_USAGE_API`
 (a fake server for both; only `http://127.0.0.1` or `localhost` count: a session's env can reach a daemon the CLI starts) and get a fake `security`
-(`test/fakes`) reading `$HOME/keychain`: never the real Keychain.
+(`test/fakes`) reading `$HOME/keychain`: never the real Keychain. Claude's account whose tab wrote `rate_limits` in its
+status line within `STATUS_FRESH` (meters.ts' `statusLimits`, below; main.ts passes it as `usage`'s `own`) isn't asked:
+its 5-hour and weekly windows (`claudeWindows`' labels), the endpoint's others and plan as `last` had them.
 
 ### Meters
+
+Claude's status line (`settings.statusBridge`, on unless false; Settings › Appearance's *Read Claude's status line*;
+meters.ts' statusline section): `hookFiles` gives this Mac's claude settings files (and the fast one) `statusLine`
+`<data>/statusline.sh` (`statusSh`, `padding: 0`; `--settings` wins over a project's own), `writeHooks` writes the script
+(sh, 0755, exits 0; again on `settingsSet` `statusBridge` and `uiReset`). It keeps claude's JSON as
+`$LAKI_STATUSLINE_DIR/$LAKI_TAB.json` (a `.tmp` renamed), then runs `$LAKI_STATUSLINE_CMD` (unset first: one that runs
+the script again ends) with the same stdin. `lakiEnv` gives a local claude tab both, the setting on or off (`statusLineEnv`;
+the dir 0700): `ownStatusLine`, the first `statusLine` `type: command` of the workspace's `.claude/settings.local.json`,
+`settings.json`, the account's folder's, `homeDir('claude')`'s, as the tab starts, none when it names `statusSh`.
+`statusOf` (read again only as its mtime moves; `meterRead` and `statusLimits`): `session` (`session_id`), `used`
+(`current_usage`'s input + cache writes + reads; null before an answer), `pct`, `max` (`context_window_size`), `limits`
+(`rate_limits`' five_hour, seven_day, `resets_at` in seconds, through `claudeWindows`). `meterView` takes a line of this
+chat (`session` is its `resumeId`): `max` its window (kept once it's old), `used` while `STATUS_FRESH` (10 minutes;
+`pct` × `max` when only that), else the transcript's. `statusGone` at `closeTab`, `statusTidy` hourly (gone tabs').
+Tested in `test/statusline.test.ts` (the fake claude runs `statusLine` with `test/fixtures/statusline.json`, its chat's
+id, as it starts and at each prompt; what it printed in `FAKE_LOG` as `bin: 'statusline'`). ponytail: not a host's, a
+codespace's or codex's; your status line's `padding` and managed settings aren't read.
 
 A claude or codex tab's context and what its chat used (`meters.ts` `meterTick`, every 10 s, `LAKI_METER_MS`: tests'; and
 1 s after a turn's end; both settings off: the tick reads none; an archived workspace's tabs skipped): each tab's transcript read on by `tailOf` (a `MeterRun` per tab:
@@ -2856,7 +2876,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `src/shared/tools.ts` | the tools for agents (`tools`, `skillTools`, `state`): MCP's and Laki AI's, through `rpc` |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon` (and by topic: `agents` (each agent's hooks), `presets` (how agents start), `restart`, `worktrees`), `api` (errors, edge cases, daemon start, tunnels, remote access), `shells` (shell tabs, Terminals and Browsers), `pr` (PR feedback), `cli`, `cli-agents` (the CLI from an agent's tab), `workflow`, `workflow-runs`, `workflow-agents`, `workflow-events`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `keys` (Settings › Keys' resolution, matching, clashes), `radar` (Collision radar), `check` (Done check), `plan` (the agent's plan, live), `next-step` (One next step), `reader` (Reader view), `css` (no restyle of the whole window: no `*` under a `:has()`, BlockNote's suggested edits out), `load-order` (every daemon module imported first, each in a process of its own: none reads another's const or let as it loads), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `flows.ts` (the workflows' tests' shared files); `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon` (and by topic: `agents` (each agent's hooks), `presets` (how agents start), `restart`, `worktrees`), `api` (errors, edge cases, daemon start, tunnels, remote access), `shells` (shell tabs, Terminals and Browsers), `pr` (PR feedback), `cli`, `cli-agents` (the CLI from an agent's tab), `workflow`, `workflow-runs`, `workflow-agents`, `workflow-events`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `statusline` (Claude's status line kept, yours run after, its context and limits), `keys` (Settings › Keys' resolution, matching, clashes), `radar` (Collision radar), `check` (Done check), `plan` (the agent's plan, live), `next-step` (One next step), `reader` (Reader view), `css` (no restyle of the whole window: no `*` under a `:has()`, BlockNote's suggested edits out), `load-order` (every daemon module imported first, each in a process of its own: none reads another's const or let as it loads), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `flows.ts` (the workflows' tests' shared files); `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
 
 ## Conventions

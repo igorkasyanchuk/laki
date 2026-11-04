@@ -169,6 +169,7 @@ export type AppSettings = Paint & {
   timers?: boolean // a turn's time on its tab and row (unset: off)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
   costs?: boolean // what each chat used, tokens and ≈ API price, and today's (unset: on)
+  statusBridge?: boolean // Claude Code's status line read for its context and plan limits (unset: on)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: on)
   paneInset?: boolean // Terminal › Inset panes: each pane a rounded card with room around it (off unless true; not on a phone)
@@ -1668,6 +1669,9 @@ export function SettingsPage(p: {
                   </select>
                   <Says title="Context meter" hint="How full each Claude Code and Codex chat's context is, amber past 70%, red past 90%, so you /compact or start fresh in time: a bar in the status bar, and on its tab a line along its bottom edge or a ring" />
                 </label>
+                <Switch className="switch-row" on={s.statusBridge !== false} onChange={v => set({ statusBridge: v })}>
+                  <Says title="Read Claude's status line" hint="Claude Code's own numbers for its context window and plan limits, instead of Laki's estimate and asking Anthropic every few minutes. Your own status line still shows as before. Applies to tabs started after this" />
+                </Switch>
                 <Switch className="switch-row" on={s.costs !== false} onChange={v => set({ costs: v })}>
                   <Says title="Tokens and cost" hint="What each Claude Code and Codex chat used, on its tab's tooltip, and today's in the plan limits' popup: tokens, and ≈ what they'd cost at API prices (an estimate; your plan bills its own way)" />
                 </Switch>

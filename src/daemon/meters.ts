@@ -1,14 +1,15 @@
 // claude's and codex's transcripts, read as they grow: a tab's context and usage meters, and today's spend. core.ts
 // re-exports it.
 
-import { closeSync, openSync, readSync, statSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readdirSync, readSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
-import { type Tab, type TabView, type Today } from '../shared/types.ts'
+import { HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, dir, presetOf, state } from './core.ts'
 import { type ByModel, chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
+import { claudeWindows } from './usage.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
 
@@ -79,7 +80,8 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   meters.set(tab.id, r)
   if (look) r.looked = 0
   const big = tab.preset === 'claude' && state.settings?.contextMeter !== false && claudeBig(tab) // read each time: settings change without the transcript
-  const moved = big !== r.big
+  const was = lines.get(tab.id)
+  const moved = big !== r.big || statusOf(tab) !== was // its status line written since
   r.big = big
   const text = tailOf(tab, r, () => (r.m = meterNew()))
   if (!text) return moved
@@ -139,6 +141,7 @@ export function meterTick() {
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
   for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
+  for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
@@ -155,13 +158,80 @@ function claudeBig(tab: Tab) {
 }
 export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan'> {
   const r = meters.get(t.id)
-  if (!r?.file?.endsWith(`${t.resumeId}.jsonl`)) return {} // another chat's (a /clear): until this one's is read
-  const { m } = r
+  const m = r?.file?.endsWith(`${t.resumeId}.jsonl`) ? r.m : undefined // another chat's (a /clear): until this one's is read
+  const s = (x => (x?.session === t.resumeId ? x : undefined))(statusOn() ? lines.get(t.id) : undefined) // its status line's, this chat's
   const pr = t.preset === 'claude' ? presetOf(t) : undefined
   const said = t.model || pr?.model || (/--model\b/.test(pr?.args ?? '') ? pr!.args : '') // a model the tab or its profile names wins over claude's settings
-  const max = m.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r.big) || (m.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
-  return { ...(m.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(m.used !== undefined && max && { context: { used: m.used, max } }), ...(m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  // the window claude said (the chat's, kept once the line is old), else a guess
+  const max = s?.max ?? m?.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r?.big) || (m?.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
+  const live = s && Date.now() - s.mtime < STATUS_FRESH ? (s.used ?? (s.pct !== undefined && max ? Math.round((s.pct * max) / 100) : undefined)) : undefined
+  const used = live ?? m?.used
+  return { ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
+
+// ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to
+// its status line command at each redraw; Laki's (core's statusLineSh, in its --settings file) keeps it per tab in
+// <data>/statusline/<tab>.json, then runs yours with the same input. Its context (the window it really has) and its plan
+// limits win over the transcript's guess and the usage endpoint while fresh. This Mac's claude tabs only
+export const statusDir = join(dir, 'statusline')
+export const statusSh = join(dir, 'statusline.sh')
+export const STATUS_FRESH = 10 * 60_000
+export const statusOn = () => state.settings?.statusBridge !== false
+type Line = { mtime: number; session?: string; used?: number; pct?: number; max?: number; limits: UsageWindow[] }
+const lines = new Map<string, Line>()
+const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
+// a tab's, read again only when it changed (an mtime of its own); none: not written, or the setting off
+export function statusOf(t: Tab): Line | undefined {
+  if (!statusOn() || t.preset !== 'claude') return
+  const f = join(statusDir, `${t.id}.json`)
+  const mtime = statSync(f, { throwIfNoEntry: false })?.mtimeMs
+  if (mtime === undefined) return void lines.delete(t.id)
+  const had = lines.get(t.id)
+  if (had?.mtime === mtime) return had
+  const j = readJson<any>(f)
+  const cw = j?.context_window
+  const u = cw?.current_usage // null before its first answer
+  const rl = j?.rate_limits // none before it, and with an API key
+  const w = (x: any) => num(x?.used_percentage) !== undefined && { utilization: x.used_percentage, resets_at: num(x.resets_at) && new Date(x.resets_at * 1000).toISOString() } // seconds
+  const line: Line = {
+    mtime,
+    session: typeof j?.session_id === 'string' ? j.session_id : undefined,
+    used: u && typeof u === 'object' ? (num(u.input_tokens) ?? 0) + (num(u.cache_creation_input_tokens) ?? 0) + (num(u.cache_read_input_tokens) ?? 0) : undefined,
+    pct: num(cw?.used_percentage),
+    max: num(cw?.context_window_size) || undefined,
+    limits: claudeWindows({ five_hour: w(rl?.five_hour), seven_day: w(rl?.seven_day) }), // the endpoint's labels
+  }
+  lines.set(t.id, line)
+  return line
+}
+// usage.ts' own: an account's limits from its tabs' newest fresh status line; none: ask the endpoint
+export function statusLimits(w: { agent: string; account: string }, now = Date.now()) {
+  if (w.agent !== 'claude') return
+  let best: Line | undefined
+  for (const t of state.tabs)
+    if (t.preset === 'claude' && (t.account ?? HOME_ACCOUNT) === w.account) {
+      const s = statusOf(t)
+      if (s?.limits.length && now - s.mtime < STATUS_FRESH && s.mtime > (best?.mtime ?? 0)) best = s
+    }
+  return best && { windows: best.limits, at: best.mtime }
+}
+// your own status line, as claude reads it (the workspace's local settings, its project's, the account's, yours): the
+// first command, resolved at the tab's start (a change waits for its restart). Never Laki's own: it would run itself.
+// ponytail: not managed settings, nor its padding (Laki's is 0)
+export function ownStatusLine(ws: Workspace, t: Tab): string | undefined {
+  const a = accountNamed(t.account)?.dir
+  for (const f of [join(ws.path, '.claude/settings.local.json'), join(ws.path, '.claude/settings.json'), ...(a ? [join(a, 'settings.json')] : []), join(homeDir('claude'), 'settings.json')]) {
+    const s = readJson<any>(f)?.statusLine
+    if (s?.type === 'command' && typeof s.command === 'string' && s.command.trim()) return s.command.includes(statusSh) ? undefined : s.command
+  }
+}
+// a closed tab's (core's closeTab), and hourly every gone tab's
+export const statusGone = (id: string) => rmSync(join(statusDir, `${id}.json`), { force: true })
+export function statusTidy() {
+  const live = new Set(state.tabs.map(t => t.id))
+  for (const f of existsSync(statusDir) ? readdirSync(statusDir) : []) if (!live.has(f.replace(/\.(json|tmp)$/, ''))) rmSync(join(statusDir, f), { force: true })
+}
+
 // today's, the workspaces that used most first (5)
 export function todayView(): Today | undefined {
   const chats = Object.values(spentNow().chats)
