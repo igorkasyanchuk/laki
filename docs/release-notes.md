@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Drop a folder on Laki's Dock icon to add it as a project (or open it, if it's one already), even when Laki isn't
+  running.
 - The prompt box's `#` list shows who is assigned to each issue and the PRs that close it (open, draft, merged or
   closed), so you don't start work someone already has.
 - A scheduled task can run at several times: `weekdays at 9am; fri at 4pm` (or *and* before the next days). The

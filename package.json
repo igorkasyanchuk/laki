@@ -107,7 +107,15 @@
       "minimumSystemVersion": "13.0",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice).",
-        "ElectronSquirrelPreventDowngrades": true
+        "ElectronSquirrelPreventDowngrades": true,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "Folder",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["public.folder"]
+          }
+        ]
       }
     },
     "linux": {

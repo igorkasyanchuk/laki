@@ -1497,13 +1497,18 @@ export function App() {
       if (!files(e) || e.defaultPrevented) return
       e.preventDefault()
       if (!bridge?.pathOf) return fail(new Error('Drop folders on the app window'))
+      void addFolders([...e.dataTransfer!.files].map(f => bridge!.pathOf!(f)))
+    }
+    // each a project (one already: that one), then the new-workspace page for the last; a drop on the window or the Dock icon
+    const addFolders = async (paths: string[]) => {
       let last: Project | null = null
-      for (const f of e.dataTransfer!.files) last = (await call<Project>('projectAdd', { path: bridge.pathOf(f) }).catch(() => null)) ?? last
+      for (const path of paths) last = (await call<Project>('projectAdd', { path }).catch(() => null)) ?? last // call says why
       if (last) {
         setNewFor(last.id)
         setDialog('new')
       }
     }
+    bridge?.onFolders?.(paths => void addFolders(paths))
     window.addEventListener('dragover', over)
     window.addEventListener('dragleave', leave)
     window.addEventListener('drop', drop)

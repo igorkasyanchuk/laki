@@ -1748,7 +1748,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 |---|---|
 | ⌃⌥⌘L | from any app: bring Laki forward (Settings › Keys or General › *Global hotkey*: off, or other keys; Help shows the ones in use) |
 | ⌃⌥⌘S | from any app (*Screenshot to Laki AI*, on by default with Laki AI; the menu bar has it too): a part of the screen to Laki AI's window, the mic listening |
-| ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
+| ⌘O | open a project folder (or drop one on the window or on Laki's Dock icon, even while Laki is closed; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
 | ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |
 | ⌘⇧N | the tab bar's ＋ menu: shell, an agent preset or a command, picked with ↑↓ and ⏎ (or the item's letter) |

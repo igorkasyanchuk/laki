@@ -46,7 +46,7 @@ Windows (WSL 2): [docs/install.md](docs/install.md).
 
 ## Use
 
-1. **⌘O** (or drop a folder) adds a project.
+1. **⌘O** (or drop a folder on the window or the Dock icon) adds a project.
 2. Pick an agent, write the task, **Create**: Laki makes the worktree, runs setup, starts the agent.
 3. **⌘N** for more. Review in the side panel (**⌥⌘B**), then **Ship**.
 

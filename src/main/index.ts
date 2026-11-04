@@ -38,6 +38,8 @@ let link: string | null = null // a laki:// link that came before the renderer l
 let linkReady = false // the renderer listens for links
 let shot: [string, string] | null = null // a screenshot (a PNG, base64, and its note) from the menu bar, before the renderer listened
 let shotReady = false // the renderer listens for screenshots
+let folders: string[] = [] // folders dropped on the Dock icon before the renderer listened (a cold launch: before ready)
+let foldersReady = false // the renderer listens for them
 
 // Laki.AppImage --headless … (Laki.app/Contents/MacOS/Laki too): laki serve through Electron's own node, before any
 // window or display: a server's daemon and remote access, no app (docs/headless.md)
@@ -59,6 +61,22 @@ const openLink = (url: string) => {
 app.on('open-url', (e, url) => {
   e.preventDefault()
   if (url.startsWith('laki:')) openLink(url)
+})
+// a folder dropped on the Dock icon, or opened with Laki (Info.plist's folder document type): a project, added or
+// opened by the renderer (as a drop on the window), the window in front
+const sendFolders = () => {
+  if (foldersReady && win && folders.length) win.webContents.send('open-folders', folders.splice(0))
+  if (app.isReady()) show()
+}
+app.on('open-file', (e, path) => {
+  e.preventDefault()
+  folders.push(path)
+  sendFolders()
+})
+ipcMain.on('folders-ready', e => {
+  if (!from(e)) return
+  foldersReady = true
+  sendFolders()
 })
 ipcMain.on('shot-ready', e => {
   if (!from(e)) return
@@ -285,10 +303,10 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => ((win = null), (focusFull = null), (linkReady = shotReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
+  win.on('closed', () => ((win = null), (focusFull = null), (linkReady = shotReady = foldersReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
   win.webContents.on('did-start-navigation', e => {
     if (!e.isMainFrame || e.isSameDocument) return
-    linkReady = shotReady = false // a reload: links wait for the new page
+    linkReady = shotReady = foldersReady = false // a reload: links wait for the new page
     if (focusFull !== null) win?.setFullScreen(focusFull) // and comes back out of full-screen mode, as it was before
     focusFull = null
   })
