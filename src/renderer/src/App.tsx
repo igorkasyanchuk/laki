@@ -219,6 +219,7 @@ function toolShow() {
   })
 }
 // the events that notify or toast about a workspace: none for one Recording mode hides
+const NOTE_MAX = 200 // a turn notification's body, in characters
 const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 type Dialog = null | 'scriptLogs' | 'new' | 'project' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind; slug?: string; templates?: boolean } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel; nav?: string } | { note: string }
 
@@ -1339,10 +1340,13 @@ export function App() {
           const body = perm ? perm.what ?? '' : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
           // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
           // wasn't read: Allow and Deny, its first and last
+          // one that doesn't fit is cut with … and gets none: a Yes would approve a command you can't see whole (its
+          // click shows it in the tab)
           const always = perm?.rule ? alwaysOf(perm) : undefined
+          const cut = body.length > NOTE_MAX
           const actions: NotifyAction[] | undefined =
-            m.kind !== 'waiting' ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, actions)
+            m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, cut ? `${body.slice(0, NOTE_MAX - 1)}…` : body, t.id, () => selectTab(t.id), s?.notifySound, actions)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
