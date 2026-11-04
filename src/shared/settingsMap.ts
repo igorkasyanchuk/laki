@@ -70,6 +70,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'One next step', 'next step menu what now answer merge ship archive fix ci ⌘g'],
   ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],
+  ['appearance', "Read Claude's status line", 'statusline status line context window plan limits usage rate 5-hour weekly claude code numbers'],
   ['appearance', 'Tokens and cost', 'tokens cost price dollars spend usage today api estimate money'],
   ['general', 'Environment', 'env variables'],
   ['general', 'Move to another Mac', 'export import backup file'],

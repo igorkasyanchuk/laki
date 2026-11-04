@@ -372,7 +372,7 @@ const api: Record<string, Handler> = {
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
-  usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now),
+  usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, core.statusLimits), // claude's status line's, while fresh
   accounts: () => accountViews(),
   accountAdd: p => accountAdd(p),
   accountSet: p => accountSet(p),
@@ -890,7 +890,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), core.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void core.pendingTick(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind

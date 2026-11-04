@@ -168,12 +168,19 @@ type Entry = { at: number; ttl: number; p?: Promise<AgentUsage>; slows?: number 
 const cache = new Map<string, Entry>()
 const last = new Map<string, AgentUsage>()
 
-// on: Settings' usage (an agent set to false isn't asked); who: each agent's accounts, its own first
-export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now()): Promise<AgentUsage[]> {
+// on: Settings' usage (an agent set to false isn't asked); who: each agent's accounts, its own first; own: an account's
+// windows the agent said itself (meters.ts' statusLimits, claude's status line), fresh: the endpoint isn't asked
+export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now(), own?: (w: Who, now: number) => { windows: UsageWindow[]; at: number } | undefined): Promise<AgentUsage[]> {
   return Promise.all(
     who.filter(w => on[w.agent] !== false && LOADERS[w.agent]).map(w => {
       const key = `${w.agent}:${w.dir ?? ''}`
       const mine = (r: Omit<AgentUsage, 'account' | 'name' | 'default'>): AgentUsage => ({ ...r, account: w.account, name: w.name, default: w.default })
+      const said = own?.(w, now)
+      if (said) {
+        // ponytail: the endpoint's other windows (per model, extra usage) as it last read them; its plan likewise
+        const had = last.get(key)
+        return Promise.resolve(mine({ agent: w.agent, plan: had?.plan, windows: [...said.windows, ...(had?.windows ?? []).filter(x => !said.windows.some(y => y.label === x.label))], at: said.at }))
+      }
       const c = cache.get(key)
       if (c?.p && now - c.at < c.ttl) return c.p.then(mine) // a rename, another default: now's
       const entry: Entry = { at: now, ttl: TTL[w.agent] ?? USAGE_TTL }

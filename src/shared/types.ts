@@ -626,6 +626,7 @@ export type Settings = {
   achievements?: AchievementsKept // Settings › Achievements, the status bar's trophy (renderer's achievements.ts)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // Settings › Appearance: how full a claude or codex tab's context is, in the status bar and on its tab as a line (unset, true) or a ring, or not there (status); false: none
   costs?: boolean // Settings › Appearance: what each claude and codex tab used, tokens and ≈ API price, and today's in the plan limits' popup (unset: on)
+  statusBridge?: boolean // Settings › Appearance: claude's status line JSON kept per tab (meters.ts), its context and plan limits over the guesses; your own status line still runs (unset: on)
 }
 
 // what you did (got: an achievement's id, when), the ones you hid, off: none shown, none earned. Settings' page never

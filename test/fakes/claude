@@ -2,7 +2,7 @@
 // fake claude: records its args, reports states through the hook commands in --settings, echoes input
 const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS' || k === 'CLAUDE_CONFIG_DIR')) }) + '\n')
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS' || k === 'CLAUDE_CONFIG_DIR' || k === 'LAKI_STATUSLINE_CMD')) }) + '\n')
 // -p (Laki's AI): stream-json, one laki_state call through the --mcp-config server; "fail…" fails, "slow…" waits;
 // a brainstorm writes its ideas.md
 // -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block,
@@ -82,6 +82,17 @@ if (session.startsWith('gone-')) {
 process.stdout.write('\x1b[?2004h') // bracketed paste on, like the real one
 process.stdout.write(`fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
 hook('SessionStart', { session_id: session })
+// its status line (settings' statusLine: Laki's script): the real one's JSON (fixtures/statusline.json, this chat's id)
+// on stdin as it starts and at each prompt; what it printed goes to FAKE_LOG
+const statusLine = () => {
+  const c = settings.statusLine
+  if (c?.type !== 'command') return
+  const input = JSON.stringify({ ...JSON.parse(fs.readFileSync(require('path').join(__dirname, '../fixtures/statusline.json'), 'utf8')), session_id: session })
+  let out = ''
+  try { out = execSync(c.command, { input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 5000 }) } catch {}
+  fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'statusline', tab: process.env.LAKI_TAB, out }) + '\n')
+}
+statusLine()
 let busy = false // a turn under way: Esc interrupts it (no Stop hook, like the real one)
 let slow = false // a slow turn: a line typed meanwhile waits in it (the real one reads it then), no turn of its own
 let ticker // a tick turn's redraws
@@ -92,6 +103,7 @@ let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
   hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
+  statusLine()
   // "todo a;b;c": its to-do list (TodoWrite) as its turn starts, the first under way; "todo! …": every one done
   if (text.startsWith('todo')) hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_input: { todos: text.replace(/^todo!? /, '').split(';').map((content, i) => ({ content, status: text.startsWith('todo!') ? 'completed' : i ? 'pending' : 'in_progress' })) } })
   // "planmode": plan mode's end, ExitPlanMode asking you to approve its plan, a menu as the real one's

@@ -37,6 +37,8 @@ time and AI money per run (`budget: 60 min, $5`).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
+- **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
+  window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
   beside each plan's limits.
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
