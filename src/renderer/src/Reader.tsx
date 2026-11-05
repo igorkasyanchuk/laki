@@ -90,7 +90,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
       ) : tab.ask ? (
         <div className="rd-ask">
           <span className="muted">{tab.ask.question || `${tab.name} asks:`}</span>
-          {tab.ask.diff && <AskDiff diff={tab.ask.diff} />}
+          {tab.ask.diff && <AskDiff key={tab.ask.what} diff={tab.ask.diff} />}
           <div className="rd-opts">
             {tab.ask.options.map(o => (
               <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} onClick={() => api.answer(tab.id, o.n)}>

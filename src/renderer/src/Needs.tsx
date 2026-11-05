@@ -114,7 +114,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
             // an Edit's or Write's change, before its Yes
             <div className="need-diff" onClick={stop}>
               <div className="mono small muted">{t.ask.what}</div>
-              <AskDiff diff={t.ask.diff} />
+              <AskDiff key={t.ask.what} diff={t.ask.diff} />
             </div>
           )}
           {(opts.length > 0 || allow) && (

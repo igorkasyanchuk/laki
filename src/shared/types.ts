@@ -761,7 +761,9 @@ export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[];
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
-// no worktree, one session; 'local-new': a new session, a sidebar row, each run), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
+// no worktree, one session; 'local-new': a new session, a sidebar row, each run), 'same' (the worktree its first run
+// makes, sameWs: the daemon's, every run after there), or in that workspace (its running agent of the preset, queued
+// while it works; else a new tab; fresh: always a new tab, where a workspace is shared). next:
 // when it runs (none: off, or a once that ran)
 export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; sameWs?: string; fresh?: boolean; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project'; widget?: string; action?: string; base?: string; noSetup?: boolean; group?: string } // group: the page's collapsible head it's under (none: no group); workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task; widget: an extension fetched (action: one of its actions run instead, prompt its argument), on ones only; base: a new workspace's base branch (ws new only; none: the project's checkout, as wsNew's); noSetup: its worktree without the project's setup script (ws new only, wsNew's noSetup)
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)

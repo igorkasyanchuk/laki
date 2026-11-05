@@ -468,7 +468,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                     <span className="sched-icon" data-kind={k}>
                       <Icon name={k} />
                     </span>
-                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
+                  ))(s.workflow ? 'flow' : s.widget ? 'panel' : s.ws === 'new' || s.ws === 'same' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal')}
                   <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
                     <span className="sched-name">{s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt)}</span>
                     <span className="sched-meta">

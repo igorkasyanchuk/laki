@@ -79,9 +79,10 @@ export function lineDiff(a: string, b: string): string[] {
   return out
 }
 const DIFF_LINES = 200
+const DIFF_CHARS = 12000 // it rides in every view while the tab waits
 // what an Edit, MultiEdit or Write would change, as lineDiff's lines (prior: a Write's file as it is now, '' a new
-// one; null or unset: none shown), at most 200 lines of 300 characters, then how many more; the approval cards show it
-// (Reader, the bar, the island)
+// one; null or unset: none shown), at most 200 lines of 300 characters and 12,000 in all, then how many more and their
+// counts (diffCounts reads them); the approval cards show it (Reader, the bar, Needs you, the island)
 export function permDiff(tool: string, i: Record<string, unknown>, prior?: string | null): string | undefined {
   const s = (v: unknown) => (typeof v === 'string' ? v : '')
   const lines =
@@ -90,8 +91,23 @@ export function permDiff(tool: string, i: Record<string, unknown>, prior?: strin
     : tool === 'Write' && typeof i.content === 'string' && typeof prior === 'string' ? lineDiff(prior, i.content)
     : undefined
   if (!lines?.some(l => l[0] === '-' || l[0] === '+')) return
-  const shown = lines.slice(0, DIFF_LINES).map(l => (l.length > 300 ? `${l.slice(0, 299)}…` : l))
-  return [...shown, ...(lines.length > DIFF_LINES ? [`…${lines.length - DIFF_LINES} more lines`] : [])].join('\n')
+  const shown: string[] = []
+  let size = 0
+  for (const raw of lines.slice(0, DIFF_LINES)) {
+    const l = raw.length > 300 ? `${raw.slice(0, 299)}…` : raw
+    if (size + l.length > DIFF_CHARS) break
+    shown.push(l)
+    size += l.length + 1
+  }
+  const rest = lines.slice(shown.length)
+  const n = (c: string) => rest.filter(l => l[0] === c).length
+  return [...shown, ...(rest.length ? [`…${rest.length} more lines (+${n('+')} −${n('-')})`] : [])].join('\n')
+}
+// a diff's + and − lines, the ones past its cut too (permDiff's last line)
+export function diffCounts(d: string) {
+  const ls = d.split('\n')
+  const more = /^…\d+ more lines \(\+(\d+) −(\d+)\)$/.exec(ls.at(-1) ?? '')
+  return { add: ls.filter(l => l[0] === '+').length + Number(more?.[1] ?? 0), del: ls.filter(l => l[0] === '-').length + Number(more?.[2] ?? 0) }
 }
 export function permOf(pl: { tool_name?: unknown; tool_input?: unknown; permission_suggestions?: unknown }, root?: string, home?: string, prior?: string | null): Perm | undefined {
   if (typeof pl?.tool_name !== 'string' || !pl.tool_name) return

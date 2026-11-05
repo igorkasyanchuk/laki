@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
-import { alwaysOf, permVerb } from '../../shared/ask'
+import { alwaysOf, diffCounts, permVerb } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -29,7 +29,7 @@ import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { Reader, type ReaderApi, readable } from './Reader'
-import { AskWrap, diffCounts, turnNext } from './Diff'
+import { AskWrap, turnNext } from './Diff'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
 import { Term, xterms, type SelectionUse } from './Term'
@@ -3468,7 +3468,7 @@ export function App() {
         </div>
         {tab?.ask && !tab.planAsk /* its plan card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
-          <AskWrap key={tab.id} diff={tab.ask.diff}>{chip => (
+          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff}>{chip => (
           <div className="ask-bar">
             {tab.ask!.tool ? (
               // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)

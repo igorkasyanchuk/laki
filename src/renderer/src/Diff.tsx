@@ -6,6 +6,7 @@ import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
 import { escapes, Icon, IconButton, type MenuItem, useMenu } from './ui'
+import { diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 
 // what load gives, again every few seconds while the window is in front, and on reload()
@@ -183,7 +184,6 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
 }
 
 // an approval's diff (Ask.diff, permDiff's ' ', '-', '+' lines): red and green, its first 8 lines, Expand for the rest
-export const diffCounts = (d: string) => (ls => ({ add: ls.filter(l => l[0] === '+').length, del: ls.filter(l => l[0] === '-').length }))(d.split('\n'))
 export function AskDiff({ diff }: { diff: string }) {
   const [open, setOpen] = useState(false)
   const lines = diff.split('\n')

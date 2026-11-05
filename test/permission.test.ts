@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { alwaysOf, lineDiff, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
+import { alwaysOf, diffCounts, lineDiff, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 
 const fx = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', `permission-${name}.json`), 'utf8'))
@@ -47,7 +47,11 @@ test('permDiff: an Edit, MultiEdit or Write as lines kept, gone and new; capped;
   const big = permDiff('Write', { content: Array.from({ length: 250 }, (_, i) => `l${i}${'y'.repeat(i === 0 ? 400 : 0)}`).join('\n') }, '')!.split('\n')
   assert.equal(big.length, 201)
   assert.equal(big[0].length, 300)
-  assert.equal(big.at(-1), '…50 more lines')
+  assert.equal(big.at(-1), '…50 more lines (+50 −0)')
+  assert.deepEqual(diffCounts(big.join('\n')), { add: 250, del: 0 }, 'the cut lines counted too')
+  const wide = permDiff('Write', { content: Array.from({ length: 100 }, () => 'z'.repeat(299)).join('\n') }, '')!.split('\n')
+  assert.equal(wide.length, 40, '12,000 characters at most (39 lines of 301), then the rest counted')
+  assert.equal(wide.at(-1), '…61 more lines (+61 −0)')
   assert.equal(lineDiff('a\n'.repeat(400), 'b\n'.repeat(400)).length, 802) // past the LCS cap: all out, all in
 })
 

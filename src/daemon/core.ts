@@ -491,19 +491,21 @@ exit 0
 `
 
 // a Write's file as it is now, for its ask's diff (permDiff): '' a new one; null one not shown (out of its workspace,
-// ~/.ssh's, even by a link: its lines never on a card; not a plain file, a FIFO's read never ends; over 256 KB)
-function priorOf(pl: any, root?: string): string | null | undefined {
+// ~/.ssh's, even by a link: its lines never on a card; a host's, read on this Mac it'd look new; one Laki can't read;
+// not a plain file, a FIFO's read never ends; over 256 KB)
+function priorOf(pl: any, ws?: { path: string; host?: string }): string | null | undefined {
   const f = pl?.tool_name === 'Write' ? pl.tool_input?.file_path : undefined
   if (typeof f !== 'string') return
+  if (!ws || ws.host || !f.startsWith('/')) return null
   let real: string
   try {
     real = realpathSync(f)
-  } catch {
-    return '' // not there yet
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? '' : null // not there yet: new
   }
   try {
     const st = statSync(real)
-    return root && real.startsWith(`${realpathSync(root)}/`) && st.isFile() && st.size <= 256 * 1024 ? readFileSync(real, 'utf8') : null
+    return real.startsWith(`${realpathSync(ws.path)}/`) && st.isFile() && st.size <= 256 * 1024 ? readFileSync(real, 'utf8') : null
   } catch {
     return null
   }
@@ -2860,8 +2862,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       // when you haven't answered): the ask is told once, with what it wants
       const again = r.status === 'waiting' && !!r.perm && pl.hook_event_name === 'Notification'
       if (pl.hook_event_name === 'PermissionRequest') {
-        const root = state.workspaces.find(w => w.id === tab.workspace)?.path
-        r.perm = permOf(pl, root, homedir(), priorOf(pl, root))
+        const w = state.workspaces.find(w => w.id === tab.workspace)
+        r.perm = permOf(pl, w?.path, homedir(), priorOf(pl, w))
       }
       r.status = 'waiting'
       r.limit = undefined
