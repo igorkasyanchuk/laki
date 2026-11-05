@@ -59,7 +59,9 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 
 `src/renderer/src`:
 
-- **`App.tsx`**: the sidebar, tab bar, toolbar, send bar, palette items and keys.
+- **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
+  built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
+  its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
   - Keys are handled in a capture-phase `keydown`; xterm never sees ⌘ keys. Settings › Keys' (`shared/keys.ts` `KEYS`:
     17 actions, an id, words and a default each; `settings.keys` over them, `keyMap`: '' none, one `keyOk` refuses (no
     ⌘, ⌥ or ⌃) the default) go first, after the picker's: `kb`, `keyFor` (the layout's character, `keyLabel(e, true)`,
@@ -671,7 +673,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   mode (`PERMS`) menus; `tools`: ⚡ `.nw-fast` (`FAST`); then the mic and `send`, the round `.nw-send` (a race's count
   on it)); `.nw-foot` under it (the keys, *Clear*);
   the last choices, `laki.newWs`; `images`: the menu bar's screenshots; while it's made, `.busy` fades the cards and
-  `.nw-making` says what's happening and the seconds so far), the palette,
+  `.nw-making` says what's happening and the seconds so far), the
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
   (`SITE`, the version from `package.json`, the build's time: `__BUILT__`, electron.vite.config.ts' `define`, none
   under `dev:web`; *Open-source licenses*: the build's notices through main's `open-path`, else the summary on GitHub;
