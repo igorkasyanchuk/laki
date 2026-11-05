@@ -80,6 +80,7 @@ test('share: token-shaped strings masked; a picture shown as its link (L9)', () 
   const masked = redact(more)
   for (const s of ['sk_live_abcdefghijklmnop12', 'AIzaSyA1234567890abcdefghijklmnopqrstu', 'npm_abcdefghijklmnopqrstuvwxyz0123456789', 'hf_abcdefghijklmnopqrstuvwxyz0123456789', 'b3BlbnNzaC1rZXktdjEAAAAA', 'hunter22', 'correct horse', 'abcd1234efgh']) assert.ok(!masked.includes(s), s)
   assert.match(masked, /postgres:\/\/me:••••@db\.example\.com/)
+  assert.equal(redact('MAX_TOKENS=4096 TOKEN_TTL: 3600'), 'MAX_TOKENS=4096 TOKEN_TTL: 3600') // numbers aren't secrets
   assert.equal(redact('the token: see the docs; a password field; https://example.com/a:b@c'), 'the token: see the docs; a password field; https://example.com/a:b@c') // words about secrets, a path with a colon
   const body = shareBody('Claude', [{ who: 'agent', text: 'Look: ![the chart](https://evil.example/pixel.png)' }])
   assert.doesNotMatch(body, /<img/)

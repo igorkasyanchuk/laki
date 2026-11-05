@@ -1299,6 +1299,10 @@ test('a managed policy that comes after a tab: the tab made in bypass permission
   await sleep(1000)
   const tab = await rig.tab(free.id, 'claude')
   assert.equal(tab.status, 'exited')
+  const ws = await rig.connect() // the notice waits for the window: sent as it connects
+  const n = await until(() => ws.events.find(e => e.ev === 'notice' && e.title === 'Not started'), 'a notice says why')
+  assert.match(n.text, /requires approvals/)
+  ws.ws.close()
   assert.ok(!rig.fakeLog().some((l: { args?: string[] }) => l.args?.includes('--resume') && l.args.includes('bypassPermissions')), 'not resumed in bypass permissions')
 })
 

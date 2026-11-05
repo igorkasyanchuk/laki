@@ -36,6 +36,7 @@ import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript
 import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
+import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy } from './hookHealth.ts'
 
 export const run = promisify(execFile)
@@ -1444,13 +1445,17 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
   if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`)
   // a managed policy's agents and approvals at every start (a restore, a wake, Enter), not only as the tab is made
-  // (tabSpec): a tab made before a lock doesn't come back as it was. Refused: it stays ended, its Logs say why
+  // (tabSpec): a tab made before a lock doesn't come back as it was. Refused: it stays ended, a notice in Laki's window
+  // says why (a restore's error reaches no one else: daemon.log)
   if (tab.kind === 'agent') {
     const pr = presetOf(tab)
     try {
       policyAgent(tab.preset ?? 'custom', tab.perm === undefined ? pr?.perm : tab.perm || undefined, pr?.args, tab.cmd)
     } catch (e) {
       wsLog(ws, `${tab.name}: not started: ${(e as Error).message}`)
+      try {
+        alertShow({ title: 'Not started', text: `${tab.name}: ${(e as Error).message}`, to: tab.id }, 'notice')
+      } catch {} // a minute's notices used up, or the workspace hidden: daemon.log has it
       throw e
     }
   }
