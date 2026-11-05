@@ -32,8 +32,8 @@ How it was decided:
 
 ### L329: Places: the pills, and beside them a small Laki window with each place it's in lit … (~197 B)
 
-- [ ] `.prompt-box` L377, L378
-- [ ] `.prompt-copy` L379
+- [x] `.prompt-box` L377, L378
+- [x] `.prompt-copy` L379
 
 ### L1592: Settings › Extensions' Make one with AI: the description and Laki AI's button on one line (~177 B)
 

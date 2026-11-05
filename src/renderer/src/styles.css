@@ -374,9 +374,6 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .wc-tool .tag-soft button.link { margin-left: 6px; }
 .chips-input .chip button { display: inline-flex; padding: 2px; border: none; background: none; color: var(--muted); border-radius: 50%; }
 .chips-input .chip button:hover { color: var(--fg); background: var(--hover); }
-.prompt-box { position: relative; }
-.prompt-box textarea { resize: vertical; padding-right: 36px; font-size: 11px; color: var(--muted); }
-.prompt-copy { position: absolute; top: 6px; right: 6px; }
 .widget-modal-head { flex: none; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--line); }
 .widget-full { position: relative; flex: 1; min-height: 0; padding: 12px 14px; overflow: auto; }
 .widget-full .widget-frame { height: 100%; }
