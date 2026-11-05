@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -82,6 +82,27 @@ export async function readCapped(r: Response, max: number): Promise<{ text: stri
 }
 
 // a JSON file's value, or undefined when it's missing or doesn't parse
+// a Write's file as it is now, for its ask's diff (permDiff): '' a new one; null one not shown (out of its workspace,
+// ~/.ssh's, even by a link: its lines never on a card; a host's, read on this Mac it'd look new; one Laki can't read;
+// not a plain file, a FIFO's read never ends; over 256 KB)
+export function priorOf(pl: any, ws?: { path: string; host?: string }): string | null | undefined {
+  const f = pl?.tool_name === 'Write' ? pl.tool_input?.file_path : undefined
+  if (typeof f !== 'string') return
+  if (!ws || ws.host || !f.startsWith('/')) return null
+  let real: string
+  try {
+    real = realpathSync(f)
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? '' : null // not there yet: new
+  }
+  try {
+    const st = statSync(real)
+    return real.startsWith(`${realpathSync(ws.path)}/`) && st.isFile() && st.size <= 256 * 1024 ? readFileSync(real, 'utf8') : null
+  } catch {
+    return null
+  }
+}
+
 export function readJson<T = any>(p: string): T | undefined {
   try {
     return JSON.parse(readFileSync(p, 'utf8'))

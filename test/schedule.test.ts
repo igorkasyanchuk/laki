@@ -249,9 +249,10 @@ test('scheduled tasks: the same workspace each run (its first run makes it), Con
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const s = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'same', name: 'Nightly', prompt: 'nightly', when: 'every day at 2am' })
   await assert.rejects(rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', fresh: true, prompt: 'x', when: 'every day at 2am' }), /start fresh is for runs that share a workspace/)
-  const first = await rig.rpc('scheduleRun', { id: s.id })
+  const [first, twin] = await Promise.all([rig.rpc('scheduleRun', { id: s.id }), rig.rpc('scheduleRun', { id: s.id })]) // Run now twice at once: one workspace
   assert.equal(first.ok, true, first.what)
   assert.match(first.what, /^started in a new workspace, nightly.*: its next runs go there too$/)
+  assert.deepEqual([twin.ok, twin.what], [false, 'skipped: its first run is still making its workspace'])
   assert.equal((await rig.rpc('state')).schedules[0].sameWs, first.ws)
   await until(async () => (await rig.tab(first.ws)).last === 'answer: nightly', 'its agent got the prompt')
   // Continue (unset): the next run tells the agent there

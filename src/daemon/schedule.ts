@@ -279,8 +279,10 @@ const logRun = (r: ScheduleRun) => {
   return r
 }
 
-// same's workspace: the one its first run made, while it's there and not archived
+// same's workspace: the one its first run made, while it's there and not archived; sameMaking: tasks whose run is
+// making it now (a second run meanwhile is skipped, not a second workspace)
 const sameOf = (s: Schedule) => (s.sameWs ? state.workspaces.find(w => w.id === s.sameWs && !w.archived) : undefined)
+const sameMaking = new Set<string>()
 
 // one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent
 export async function runSchedule(s: Schedule, now = Date.now()): Promise<ScheduleRun> {
@@ -308,14 +310,16 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       // run's, or one after its workspace was archived or deleted; the runs after go there)
       const title = wsTitle(s, now)
       // its base branch gone: wsNew refuses it, so the run fails and says so (never off another branch)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) })
+      if (s.ws === 'same' && sameMaking.has(s.id)) throw new Error('skipped: its first run is still making its workspace')
+      if (s.ws === 'same') sameMaking.add(s.id)
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) }).finally(() => sameMaking.delete(s.id))
+      if (s.ws === 'same') s.sameWs = ws.id
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''
       let name = taken(title) ? title + (own || `-${tail()}`) : title
       while (taken(name)) name = `${title}-${tail()}`
       Object.assign(ws, { name, schedule: s.id })
-      if (s.ws === 'same') s.sameWs = ws.id
       save()
       changed()
       r.ws = ws.id

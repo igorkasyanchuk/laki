@@ -499,7 +499,7 @@ async function begin(r: FlowRun) {
 // the oldest queued run of each workflow with a slot free begins (finish's, and flowTick's in case)
 function next() {
   if (!flowsOn(state.settings)) return
-  const held = new Set<string>() // a workflow whose oldest waiting can't go: none after it goes either (each pins its at once)
+  const held = new Set<string>() // a workflow whose first waiting (queueOrder) can't go: none after it goes either (each pins its at once)
   for (const r of runs().filter(x => x.status === 'queued').sort(queueOrder)) {
     const of = { id: r.workflow, source: r.source, project: r.project }
     const k = `${r.source}/${r.source === 'project' ? r.project : ''}/${r.workflow}`

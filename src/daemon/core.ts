@@ -12,7 +12,7 @@ import { type Perm, permOf } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { readJson } from '../shared/conn.ts'
+import { priorOf, readJson } from '../shared/conn.ts'
 import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -490,26 +490,6 @@ unset LAKI_STATUSLINE_CMD
 exit 0
 `
 
-// a Write's file as it is now, for its ask's diff (permDiff): '' a new one; null one not shown (out of its workspace,
-// ~/.ssh's, even by a link: its lines never on a card; a host's, read on this Mac it'd look new; one Laki can't read;
-// not a plain file, a FIFO's read never ends; over 256 KB)
-function priorOf(pl: any, ws?: { path: string; host?: string }): string | null | undefined {
-  const f = pl?.tool_name === 'Write' ? pl.tool_input?.file_path : undefined
-  if (typeof f !== 'string') return
-  if (!ws || ws.host || !f.startsWith('/')) return null
-  let real: string
-  try {
-    real = realpathSync(f)
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? '' : null // not there yet: new
-  }
-  try {
-    const st = statSync(real)
-    return real.startsWith(`${realpathSync(ws.path)}/`) && st.isFile() && st.size <= 256 * 1024 ? readFileSync(real, 'utf8') : null
-  } catch {
-    return null
-  }
-}
 // opencode's events as claude's hooks: a session (not a subagent's) made, busy, asking, idle
 const OPENCODE_PLUGIN = `// Laki's plugin (Laki writes it): tells Laki when this tab's turns start and end
 import { execFile } from 'node:child_process'

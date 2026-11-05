@@ -2,12 +2,14 @@
 // the hook printing nothing, the phone's push with secrets masked; permOf's words per tool
 import assert from 'node:assert/strict'
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { alwaysOf, diffCounts, lineDiff, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
+import { priorOf } from '../src/shared/conn.ts'
 
 const fx = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', `permission-${name}.json`), 'utf8'))
 
@@ -53,6 +55,24 @@ test('permDiff: an Edit, MultiEdit or Write as lines kept, gone and new; capped;
   assert.equal(wide.length, 40, '12,000 characters at most (39 lines of 301), then the rest counted')
   assert.equal(wide.at(-1), '…61 more lines (+61 −0)')
   assert.equal(lineDiff('a\n'.repeat(400), 'b\n'.repeat(400)).length, 802) // past the LCS cap: all out, all in
+})
+
+test("priorOf: a Write's file as it is, only a plain one in its workspace; a new one ''", () => {
+  const root = mkdtempSync(join(tmpdir(), 'laki-prior-'))
+  const out = mkdtempSync(join(tmpdir(), 'laki-out-'))
+  writeFileSync(join(root, 'a.ts'), 'one\n')
+  writeFileSync(join(out, 'secret'), 'token')
+  symlinkSync(join(out, 'secret'), join(root, 'link'))
+  const w = (file_path: unknown) => ({ tool_name: 'Write', tool_input: { file_path, content: 'x' } })
+  assert.equal(priorOf(w(join(root, 'a.ts')), { path: root }), 'one\n')
+  assert.equal(priorOf(w(join(root, 'new.ts')), { path: root }), '', 'not there yet: new')
+  assert.equal(priorOf(w(join(out, 'secret')), { path: root }), null, 'out of its workspace')
+  assert.equal(priorOf(w(join(root, 'link')), { path: root }), null, 'a link out of it')
+  assert.equal(priorOf(w(root), { path: root }), null, 'a folder')
+  assert.equal(priorOf(w(join(root, 'a.ts')), { path: root, host: 'devbox' }), null, "a host's: not this Mac's file")
+  assert.equal(priorOf(w('a.ts'), { path: root }), null, 'a relative path')
+  assert.equal(priorOf(w(join(root, 'a.ts'))), null, 'no workspace')
+  assert.equal(priorOf({ tool_name: 'Edit', tool_input: { file_path: join(root, 'a.ts') } }, { path: root }), undefined)
 })
 
 test('a PermissionRequest: the ask names the tool, what and rule; laki hook prints nothing; the next turn clears them', async t => {
