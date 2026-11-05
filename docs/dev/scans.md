@@ -62,7 +62,8 @@
   - MCP Apps (`settings.mcpApps`, on unless false; mcpApps.ts): `chatOf`'s `calls` (claude's `mcp__<server>__<tool>`
     calls, their said line `at`, their result: content blocks, `structuredContent`), `callsOf` (the newest 200); main.ts'
     `chatRead` is `chatWithApps`: `appsFor` finds each call's server in the tab's account's `.claude.json` (user and
-    local scope by the worktree's path; never `.mcp.json`; stdio or streamable HTTP, a name's other characters as `_`),
+    local scope by the worktree's path; never `.mcp.json` nor one in that path's `disabledMcpServers`, Claude's /mcp off;
+    stdio or streamable HTTP, a name's other characters as `_`), for a call Claude ran (its result in, not an error),
     connects (`initialize` with the `io.modelcontextprotocol/ui` extension, kept `IDLE`; one that exits is dropped at
     once), lists its tools (`_meta.ui.resourceUri`, a `ui://` one; `bumpReader` re-reads the chat; `seen`: again after
     `IDLE` only once the chat called that server since), and adds `apps` by said line (`from`: of

@@ -13,6 +13,8 @@ todos, plans, skills, plugins, commands, agents, hooks, output-styles, settings.
 skills, prompts, config.toml, AGENTS.md) from the agent's own folder, at its making and each start, so a chat resumes on
 any account (claude's missing folders made in `~/.claude` first; `~/.codex` is never written: only what's there). `spawnTab` keeps `tab.account` (`accountFor`: its own, else its profile's, else `settings.accountUse`, else
 home; a removed one: home); `tabAccount` (a tab's right click › *Restart on another account*) sets it and resumes.
+An agent can't call `tabAccount` or `accountRm`, nor set `accountUse`, `limitFallback` or `mcpApps` (main.ts
+`AGENT_NO`, `AGENT_KEYS`): they'd move work onto an account you never picked.
 Auto fallback (`settings.limitFallback`, each agent's account ids in order, SettingsAgents' `.account-fb`): core's
 `checkLimit` calls `fallback` a second after a new limit (new by tab and account, `limitSent`; the turn's end told
 first: a workflow pauses on it), which

@@ -2,6 +2,12 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Agents can no longer move a tab to another of your accounts, remove an account, or change which account new tabs
+  use, Auto fallback or MCP Apps: those stay yours.
+- MCP Apps leave alone a server you turned off in Claude for that folder, and start a server only for a call Claude ran.
+
 ## 0.45.0 · Nov 5, 2026
 
 - `laki notice "<text>" --to <session>` (MCP's `laki_notice`): a card at the bottom right of Laki's window, over

@@ -126,7 +126,7 @@ require('readline').createInterface({ input: process.stdin }).on('line', l => {
 `,
   )
   writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { 'ui srv': { command: process.execPath, args: [srv] } } }))
-  const { tab, add } = await chatTab(rig, 'chat-mcp')
+  const { tab, ws, add } = await chatTab(rig, 'chat-mcp')
   add(
     { type: 'user', message: { content: 'Chart it' } },
     { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_1', name: 'mcp__ui_srv__chart', input: { n: 3 } }, { type: 'tool_use', id: 'toolu_2', name: 'mcp__ui_srv__plain', input: {} }] } },
@@ -151,6 +151,11 @@ require('readline').createInterface({ input: process.stdin }).on('line', l => {
   assert.deepEqual(await rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart', arguments: { n: 4 } }), { content: [{ type: 'text', text: 'called chart {"n":4}' }] })
   await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart', from: { tab: tab.id } }), /run an MCP App's tool/)
   await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'nope', name: 'chart' }), /no such app/)
+  // a server you turned off in Claude for this folder (its /mcp: disabledMcpServers): no app, no page
+  writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { 'ui srv': { command: process.execPath, args: [srv] } }, projects: { [ws.path]: { disabledMcpServers: ['ui srv'] } } }))
+  assert.equal((await rig.rpc('chatRead', { tab: tab.id })).apps, undefined)
+  assert.equal((await fetch(`http://127.0.0.1:${port}${a.src}`)).status, 404)
+  writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { 'ui srv': { command: process.execPath, args: [srv] } } }))
   // off: none
   await rig.rpc('settingsSet', { mcpApps: false })
   assert.equal((await rig.rpc('chatRead', { tab: tab.id })).apps, undefined)

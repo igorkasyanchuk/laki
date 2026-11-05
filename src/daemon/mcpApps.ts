@@ -108,11 +108,12 @@ function http(s: Server): Conn {
 }
 
 // a server of the tab's: by the name its tools go by (mcp__<name>__<tool>: other characters as _), from the account's
-// .claude.json: this folder's own (local scope) over yours (user scope)
+// .claude.json: this folder's own (local scope) over yours (user scope); none you turned off in Claude for this folder
+// (its /mcp: disabledMcpServers)
 const norm = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, '_')
 // .claude.json, parsed again only as it changes: it holds every project's history (megabytes), and a chat in the
 // Reader is read again as it grows
-type Config = { mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server> }> }
+type Config = { mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server>; disabledMcpServers?: string[] }> }
 const configs = new Map<string, { mtime: number; size: number; cfg?: Config }>()
 function configOf(file: string): Config | undefined {
   const st = statSync(file, { throwIfNoEntry: false })
@@ -130,7 +131,8 @@ function serversOf(tab: Tab): (name: string) => Found {
   const dir = accountNamed(tab.account)?.dir ?? process.env.CLAUDE_CONFIG_DIR
   const file = dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
   const cfg = configOf(file)
-  const all = Object.entries({ ...cfg?.mcpServers, ...cfg?.projects?.[ws.path]?.mcpServers })
+  const off = new Set(Array.isArray(cfg?.projects?.[ws.path]?.disabledMcpServers) ? cfg!.projects![ws.path].disabledMcpServers : [])
+  const all = Object.entries({ ...cfg?.mcpServers, ...cfg?.projects?.[ws.path]?.mcpServers }).filter(([k]) => !off.has(k))
   return name => {
     const [k, server] = all.find(([k]) => norm(k) === name) ?? []
     if (!k || !server || typeof server !== 'object') return
@@ -190,7 +192,7 @@ export function appsFor(tab: Tab): AppView[] {
   const serverOf = serversOf(tab)
   const found = calls.map(c => ({ c, s: serverOf(c.server) }))
   const newest = new Map<string, { s: NonNullable<Found>; last: string }>()
-  for (const { c, s } of found) if (s) newest.set(s.key, { s, last: c.id }) // calls come oldest first
+  for (const { c, s } of found) if (s && c.result !== undefined && !c.error) newest.set(s.key, { s, last: c.id }) // calls come oldest first; only one Claude ran (its result in, not an error: a call you refused ends as one) asks its server
   for (const [key, { s, last }] of newest) {
     const was = seen.get(key)
     if (was && !(was.apps && Date.now() - was.at > IDLE && was.last !== last)) continue

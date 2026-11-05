@@ -50,6 +50,11 @@ test('accounts: shared folder, a tab keeps its account, restart on another, prof
   const chat = (await rig.tab(ws.id)).resumeId
   await assert.rejects(rig.rpc('tabAccount', { tab: tab.id, account: 'nope' }), /no claude account nope/)
   await assert.rejects(rig.rpc('tabAccount', { tab: plain.id.replace(/./g, 'z'), account: 'home' }))
+  // an agent moves no tab to another account and picks none for new tabs or Auto fallback: the user's
+  await assert.rejects(rig.rpc('tabAccount', { tab: tab.id, account: 'home', from: { tab: tab.id } }), /move a tab to another/)
+  await assert.rejects(rig.rpc('accountRm', { id: a.id, from: { tab: tab.id } }), /remove one of the user's accounts/)
+  for (const k of ['accountUse', 'limitFallback']) await assert.rejects(rig.rpc('settingsSet', { [k]: { claude: [a.id] }, from: { tab: tab.id } }), /change that setting/)
+  await assert.rejects(rig.rpc('settingsSet', { mcpApps: false, from: { tab: tab.id } }), /change that setting/)
   await rig.rpc('tabAccount', { tab: tab.id, account: 'home' })
   await until(() => runs().length === 2, 'restarted')
   assert.equal(runs()[1].env.CLAUDE_CONFIG_DIR, undefined)
