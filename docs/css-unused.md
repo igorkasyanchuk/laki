@@ -112,7 +112,7 @@ Found 145 prefixes in all (66 ending in `-` or `_`, 79 without). These also star
 
 ### L21: Diagram + sketch blocks (~120 B)
 
-- [ ] `.out-diagram` L26, L34
+- [x] `.out-diagram` L26, L34
 
 ## workflows.css
 

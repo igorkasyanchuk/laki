@@ -23,7 +23,6 @@
 .sd-block-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--sd-surface); }
 .sd-empty { padding: 32px; text-align: center; color: var(--sd-soft); font: 0.75rem var(--mono); }
 .sd-view { width: 100%; }
-.out-diagram { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .sd-view .react-flow__handle { opacity: 0; }
 .sd-view .react-flow__attribution { display: none; }
 
@@ -31,7 +30,6 @@
 dialog.sd-modal { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: none; color: var(--sd-ink); }
 dialog.sd-modal:not([open]) { display: none; }
 html:has(dialog.sd-modal[open]) { overflow: hidden; }
-.out-diagram { cursor: zoom-in; }
 .sd-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--sd-surface); }
 .sd-toolbar .eyebrow { margin-right: 8px; color: var(--sd-ink); font-weight: 600; }
 .sd-toolbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
