@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- A scheduled task can run in *A new workspace, then the same one each run*: its first run makes the worktree, the
+  rest go there. Tasks that share a workspace pick *Continue* (its agent gets the prompt) or *Start fresh* (a new agent
+  tab each run).
 - A queued workflow run has *Run First*: it takes the workflow's next free slot, ahead of the others waiting,
   without stopping any or raising *Runs at once*.
 - Before you approve an edit, see it: when Claude asks to edit or write a file, Reader view, the sidebar's Needs you

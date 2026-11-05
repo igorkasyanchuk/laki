@@ -156,8 +156,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action' | 'base' | 'noSetup' | 'group' | 'fresh'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action', 'base', 'noSetup', 'group', 'fresh'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
 // heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
 export const flowFiles = { at: 0, heard: 0 }
@@ -200,7 +200,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
   const ext = s.widget ? widgetUseCheck(s.widget, s.action) : undefined // throws: no such extension or action
   if (ext) {
     // a fetch or an action: no agent, no prompt (an action's argument, if any); a per-workspace one: one of the project's
-    if (ext.scoped && ['new', 'local', 'local-new'].includes(s.ws)) throw new Error(`${ext.name} is per workspace: pick one of ${proj.name}'s`)
+    if (ext.scoped && ['new', 'local', 'local-new', 'same'].includes(s.ws)) throw new Error(`${ext.name} is per workspace: pick one of ${proj.name}'s`)
   } else if (s.workflow) {
     if (!flowsOn(state.settings) || !flowHooks.find) throw new Error('Workflows are off: turn them on in Settings › General › Pages')
     const wf = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }) // throws: no such workflow
@@ -216,7 +216,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
   } else if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
   if (s.workflow || (ext && !ext.scoped)) {
     // its runs go where the workflow says; an extension's: nowhere
-  } else if (s.ws === 'new') {
+  } else if (s.ws === 'new' || s.ws === 'same') {
     if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
   } else if (s.ws !== 'local' && s.ws !== 'local-new') {
     const ws = findWs(s.ws)
@@ -228,15 +228,25 @@ export function scheduleSet(o: ScheduleIn): Schedule {
   if (s.base != null && typeof s.base !== 'string') throw new Error('base? a branch name') // null: cleared, as ''
   s.base = s.base?.trim() || undefined
   if (s.base?.startsWith('-')) throw new Error(`base ${s.base}? a branch, not an option`)
-  if (s.ws !== 'new' || s.workflow || s.widget) {
+  // same: the workspace its first run made (sameWs), for every run after; another where or project drops it
+  if (s.ws !== 'same' || s.workflow || s.widget || (old && old.project !== s.project)) delete s.sameWs
+  const making = (s.ws === 'new' || s.ws === 'same') && !s.workflow && !s.widget // its runs make a worktree: the first one, or each
+  if (!making) {
     if (o.base?.trim()) throw new Error('a base branch is for a new workspace each run')
     delete s.base
   }
   // no setup script: likewise (false or null clears it)
   if (s.noSetup != null && typeof s.noSetup !== 'boolean') throw new Error('noSetup? true or false')
-  if (!s.noSetup || s.ws !== 'new' || s.workflow || s.widget) {
+  if (!s.noSetup || !making) {
     if (o.noSetup) throw new Error('without the setup script is for a new workspace each run')
     delete s.noSetup
+  }
+  // fresh: a run into a workspace it shares (one you picked, its folder's, the same one) starts a new agent tab
+  // instead of telling the agent there (Continue, unset)
+  if (s.fresh != null && typeof s.fresh !== 'boolean') throw new Error('fresh? true or false')
+  if (!s.fresh || ['new', 'local-new'].includes(s.ws) || s.workflow || s.widget) {
+    if (o.fresh) throw new Error('start fresh is for runs that share a workspace (its folder, the same one, or one you pick)')
+    delete s.fresh
   }
   s.prompt = s.prompt?.trim() ?? ''
   if (!s.prompt && !ext) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
@@ -269,6 +279,9 @@ const logRun = (r: ScheduleRun) => {
   return r
 }
 
+// same's workspace: the one its first run made, while it's there and not archived
+const sameOf = (s: Schedule) => (s.sameWs ? state.workspaces.find(w => w.id === s.sameWs && !w.archived) : undefined)
+
 // one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent
 export async function runSchedule(s: Schedule, now = Date.now()): Promise<ScheduleRun> {
   s = state.schedules?.find(x => x.id === s.id) ?? s // scheduleSet replaces a task: the current one
@@ -279,7 +292,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     if (projectArchived(s.project)) throw new Error(`${s.project} is archived: bring it back to run its tasks`)
     if (s.widget) {
       // an extension: fetched, or one of its actions run (on ones only)
-      const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)
+      const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new', 'same'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)
       if (!u.ok) throw new Error(u.error ?? `${u.name} failed`)
       r.what = s.action ? `ran ${u.name}'s ${s.action}${u.out?.trim() ? `: ${u.out.trim().split('\n').pop()!.slice(0, 120)}` : ''}` : `fetched ${u.name}`
     } else if (s.workflow) {
@@ -290,28 +303,31 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
       r.ws = run.ws
       r.what = `${run.status === 'queued' ? 'queued' : 'started'} a run of ${s.workflow} (${run.id})` // past its at once: it waits its turn
-    } else if (s.ws === 'new' || s.ws === 'local-new') {
-      // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
+    } else if (s.ws === 'new' || s.ws === 'local-new' || (s.ws === 'same' && !sameOf(s))) {
+      // a new worktree, or a new session in the folder: either way a row of its own in the sidebar (same: its first
+      // run's, or one after its workspace was archived or deleted; the runs after go there)
       const title = wsTitle(s, now)
       // its base branch gone: wsNew refuses it, so the run fails and says so (never off another branch)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'new' && s.base && { base: s.base }), ...(s.ws === 'new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) })
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) })
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''
       let name = taken(title) ? title + (own || `-${tail()}`) : title
       while (taken(name)) name = `${title}-${tail()}`
       Object.assign(ws, { name, schedule: s.id })
+      if (s.ws === 'same') s.sameWs = ws.id
       save()
       changed()
       r.ws = ws.id
       r.tab = tabsOf(ws.id).find(t => t.kind === 'agent')?.id
-      r.what = `started in a new ${s.ws === 'new' ? 'workspace' : 'session in its folder'}, ${ws.id}${s.base ? `, off ${ws.base}` : ''}`
+      r.what = `started in a new ${s.ws === 'local-new' ? 'session in its folder' : 'workspace'}, ${ws.id}${s.base ? `, off ${ws.base}` : ''}${s.ws === 'same' ? ': its next runs go there too' : ''}`
     } else {
       // its folder: the project's local workspace, made the first time (no worktree, no agent of its own)
-      const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : findWs(s.ws)
+      const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : s.ws === 'same' ? sameOf(s)! : findWs(s.ws)
       if (ws.archived) throw new Error(`${ws.id} is archived`)
       r.ws = ws.id
-      const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && isLive(t))
+      // ponytail: Start fresh opens a tab each run and closes none (an earlier run's chat may be yours now): close them yourself
+      const live = s.fresh ? undefined : tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && isLive(t))
       if (live) {
         const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live), vars: true })
         r.tab = live.id
@@ -319,7 +335,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       } else {
         const t = addTab(ws.id, { preset: s.preset, prompt, vars: true })
         r.tab = t.id
-        r.what = `started in a new tab, ${t.name}`
+        r.what = `started ${s.fresh ? 'fresh ' : ''}in a new tab, ${t.name}`
       }
     }
   } catch (e) {

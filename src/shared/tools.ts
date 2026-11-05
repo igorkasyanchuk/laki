@@ -288,13 +288,14 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         prompt: str('what the agent should do each run; {{DD-MM-YY}}-style dates become the run’s'),
         preset: str('claude (the default), codex, gemini, grok, opencode or a preset of theirs'),
         name: str('the task’s name, also each run’s workspace name; may hold {{DD-MM}}'),
-        where: str('new (a new worktree each run), local (the project folder, one session), local-new (the folder, a new session each run) or a workspace id'),
+        where: str('new (a new worktree each run), same (a worktree its first run makes, every run after there), local (the project folder, one session), local-new (the folder, a new session each run) or a workspace id'),
+        fresh: { type: 'boolean', description: 'where same, local or a workspace id: each run starts a new agent tab there instead of telling the agent it has' },
         base: str('where new: the branch each worktree starts off (none: the project’s checkout); a run whose branch is gone fails'),
         no_setup: { type: 'boolean', description: 'where new: each worktree without the project’s setup script' },
       },
       ['project', 'when', 'prompt'],
     ),
-    run: a => rpc('scheduleSet', { project: a.project, when: a.when, prompt: a.prompt, preset: a.preset, name: a.name, ws: a.where, base: a.base, noSetup: a.no_setup === true || undefined }),
+    run: a => rpc('scheduleSet', { project: a.project, when: a.when, prompt: a.prompt, preset: a.preset, name: a.name, ws: a.where, base: a.base, noSetup: a.no_setup === true || undefined, fresh: a.fresh === true || undefined }),
   },
   // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
   {

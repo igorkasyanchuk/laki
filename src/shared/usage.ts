@@ -64,7 +64,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--base <branch>] [--no-setup] [--name n] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|same|folder|folder-new|<ws>] [--fresh] [--base <branch>] [--no-setup] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
@@ -250,9 +250,11 @@ or one under it); on any other page it's refused and nothing is done, so a page 
 
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
-late is skipped). --where: new (a worktree each run), folder, folder-new, or a workspace id (its agent gets it).
---base: the branch a new worktree starts off (new only; gone when it runs: that run fails and says so).
---no-setup: each new worktree without the project's setup script (new only).
+late is skipped). --where: new (a worktree each run), same (a worktree its first run makes, every run after
+there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a run into a workspace it shares
+(same, folder, an id) starts a new agent tab there instead of telling the agent it has.
+--base: the branch a new worktree starts off (new, and same's; gone when it runs: that run fails and says so).
+--no-setup: each new worktree without the project's setup script (new, and same's).
 {{DD-MM-YY}} in the name or prompt is the run's date. From an agent's tab it's saved off: on and run are the user's.
 
   laki schedule add shop --when "weekdays at 9am" "Triage the new issues"

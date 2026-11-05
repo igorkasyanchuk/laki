@@ -23,7 +23,7 @@ const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -546,7 +546,7 @@ async function main() {
       if (sub === 'add') {
         if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
         const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
-        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, name: flags.name, prompt: flags.prompt || words.join(' ') })
+        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, base: flags.base, noSetup: !!flags['no-setup'] || undefined, fresh: !!flags.fresh || undefined, name: flags.name, prompt: flags.prompt || words.join(' ') })
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)

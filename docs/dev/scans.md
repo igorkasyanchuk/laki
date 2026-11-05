@@ -147,9 +147,11 @@ on one only (off: a failed run), a fetch awaited (one already fetching: that one
 only on origin, `origin/<b>`; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
 it: the sidebar's clock),
 or a new session in the project's own folder (`local-new`: `wsNew` `local` + `another`, a local workspace beside the one
-it has, so each run is a sidebar row), or uses that folder (`local`: its local workspace, made by the first run) or a workspace
-(its id); in those last two, the prompt goes to the
-workspace's running agent of that preset (`send` whenIdle), else a new tab with it. Every run, or a missed one (more
+it has, so each run is a sidebar row), or uses that folder (`local`: its local workspace, made by the first run), the
+same workspace (`same`: the first run's is `new`'s, kept as the task's `sameWs`; `sameOf` gone or archived, the next run
+makes another; another `ws` or project drops it) or a workspace (its id); in those last three, the prompt goes to the
+workspace's running agent of that preset (`send` whenIdle), else a new tab with it; `fresh` (Start fresh: only where a
+workspace is shared) always a new tab, the earlier ones left open. Every run, or a missed one (more
 than `MISSED_AFTER`, 30 minutes, late: skipped), goes to `state.runs` (the last 200; the view has 50). A tick moves
 every due task on before it runs any, so a slow worktree isn't started twice. Removing a project removes its tasks; a
 gone or archived workspace is a failed run.

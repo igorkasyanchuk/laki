@@ -713,10 +713,13 @@ extensions instead: *Fetch it* (its data now, on top of its own schedule) or one
 is its `$WIDGET_ARG`); a per-workspace one runs in a workspace you pick. Only one that's turned on runs: an off one's
 run fails, saying so.
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
-  OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
+  OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *A new workspace, then the same one each run*: its first run
+  makes a worktree, every run after goes there (one archived or deleted: the next run makes another; `--where same`);
+  *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
   agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
-  while it works, or a new tab starts), the base branch a new workspace starts off (its chip: the repo's main on a new
+  while it works, or a new tab starts; for these three, *Continue* (the agent there gets it) or *Start fresh* (a new
+  agent tab each run; earlier ones stay until you close them; `--fresh`)), the base branch a new workspace starts off (its chip: the repo's main on a new
   task, any branch typed or picked; empty, the one the project has checked out; a branch gone by the time it runs fails
   that run, saying so, `laki schedule add … --base release/2.0`), whether it skips the project's setup script (Where's *A new
   workspace each run, no setup*, when the project has one; the row says *no setup*; `--no-setup`), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,

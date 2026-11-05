@@ -244,6 +244,37 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   await assert.rejects(rig.rpc('projectRm', { id: np.id }), new RegExp(`has workspaces: delete them first \\(${r2.ws}\\)`))
 })
 
+test('scheduled tasks: the same workspace each run (its first run makes it), Continue or Start fresh', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const s = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'same', name: 'Nightly', prompt: 'nightly', when: 'every day at 2am' })
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', fresh: true, prompt: 'x', when: 'every day at 2am' }), /start fresh is for runs that share a workspace/)
+  const first = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(first.ok, true, first.what)
+  assert.match(first.what, /^started in a new workspace, nightly.*: its next runs go there too$/)
+  assert.equal((await rig.rpc('state')).schedules[0].sameWs, first.ws)
+  await until(async () => (await rig.tab(first.ws)).last === 'answer: nightly', 'its agent got the prompt')
+  // Continue (unset): the next run tells the agent there
+  const again = await rig.rpc('scheduleRun', { id: s.id })
+  assert.deepEqual([again.ws, again.tab], [first.ws, first.tab])
+  assert.match(again.what, /^(sent to|queued for) its tab, claude/)
+  // Start fresh: a new agent tab there each run
+  await rig.rpc('scheduleSet', { id: s.id, fresh: true })
+  const fresh1 = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(fresh1.ws, first.ws)
+  assert.notEqual(fresh1.tab, first.tab)
+  assert.match(fresh1.what, /^started fresh in a new tab, claude/)
+  // its workspace gone: the next run makes another, and the runs after go there
+  await rig.rpc('wsRm', { id: first.ws })
+  const remade = await rig.rpc('scheduleRun', { id: s.id })
+  assert.equal(remade.ok, true, remade.what)
+  assert.notEqual(remade.ws, first.ws)
+  assert.equal((await rig.rpc('state')).schedules[0].sameWs, remade.ws)
+  // another where drops it, and Start fresh with it
+  const moved = await rig.rpc('scheduleSet', { id: s.id, ws: 'new', fresh: false })
+  assert.deepEqual([moved.sameWs, moved.fresh], [undefined, undefined])
+})
+
 test("scheduled tasks: a new workspace each run off the branch picked; that branch gone, the run fails and says so", async t => {
   const rig = await fresh(t)
   const git = (...a: string[]) => execFileSync('git', a, { cwd: rig.repo, env: rig.env })
