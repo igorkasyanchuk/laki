@@ -5,10 +5,10 @@ import type { Dispatch, RefObject, SetStateAction } from 'react'
 import type { ExtTab } from './Extension'
 import type { DeskAsk } from './Desk'
 import type { ProjectTab } from './Project'
-import type { Account, AchievementsKept, MergeMethod, PlanKind, Project, RunScript, Settings, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
+import type { Account, AchievementsKept, MergeMethod, PlanKind, Project, RunScript, Sep, Settings, Stat, TabView, View, WidgetCtx, WidgetMenu, WidgetView, WorkspaceView, WsSort } from '../../shared/types'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import type { Edit, PanelTab } from './SidePanel'
-import type { IconName, MenuItem } from './ui'
+import type { IconName, MenuItem, useRowDrag } from './ui'
 import type { AppInfo, RowMark } from './Settings'
 import type { Step } from '../../shared/nextStep'
 import type { Inserted } from './PromptInput'
@@ -21,6 +21,7 @@ import type { Collision } from '../../shared/overlap'
 import type { WidgetApi } from './Widgets'
 import type { menusOf } from './menus'
 import type { layoutOf } from './TabBar'
+import type { sideOf } from './Sidebar'
 import { AGENT_COLORS } from './ui'
 import { shownStatus, wsShown } from './text'
 
@@ -75,14 +76,23 @@ export const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status 
 export const prNum = (w: WorkspaceView) => (n => (n ? `#${n}` : undefined))(w.pr?.number ?? /\/pull\/(\d+)/.exec(w.prUrl ?? '')?.[1])
 
 // App's state and helpers its parts read: a field each, sorted
+// a workspace's state in words, for the sidebar's Extended and Cards rows
+export const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'working', done: 'done', idle: 'idle', exited: 'stopped', limit: 'at its usage limit' }
+export const clip = (s: string, n = 60) => (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ')) // a message on one line
+// a timer's quick lengths, minutes
+export const MINUTES = [1, 5, 10, 15, 25, 30, 45, 60]
+export const span = (ms = 0) => (ms % 3600000 === 0 ? `${ms / 3600000} h` : ms % 60000 === 0 ? `${ms / 60000} min` : [Math.floor(ms / 60000) && `${Math.floor(ms / 60000)} min`, `${Math.round((ms % 60000) / 1000)} s`].filter(Boolean).join(' '))
+
 export type AppBase = {
   accountsOf: (agent?: string) => (Account | { id: string; name: string })[]
   achKept: AchievementsKept
   aiDock: boolean
   allows: (w: WorkspaceView, k: 'approve' | 'close' | 'merge' | 'land') => boolean
+  anchor: RefObject<string | null>
   apps: AppInfo[]
   archive: (w: WorkspaceView, asked?: boolean) => Promise<void>
   attachable: (w: WorkspaceView) => boolean
+  busyWith: <T>(ids: string[], what: string, f: () => Promise<T>) => Promise<T>
   byId: (id: string) => TabView | undefined
   call: <T>(method: string, params?: object) => Promise<T>
   canLater: boolean
@@ -100,6 +110,9 @@ export type AppBase = {
   dock: (on: boolean) => void | NodeJS.Timeout
   done: (text: string, undo?: () => void) => void
   doStep: (w: WorkspaceView, s: Step, e?: React.MouseEvent) => void | Window | null
+  dropAgent: (w: WorkspaceView) => TabView
+  dropOn: string | null
+  dropProps: (w: WorkspaceView) => { onDragOver: (e: React.DragEvent) => void | false; onDragLeave: (e: React.DragEvent) => void | false; onDrop: (e: React.DragEvent) => void }
   editor: string
   editorName: string
   editScripts: () => void | undefined
@@ -110,6 +123,7 @@ export type AppBase = {
   fail: (e: unknown) => void
   find: Find | null
   findIn: () => boolean
+  fitFoot: (el: HTMLDivElement | null) => (() => void) | undefined
   floated: string[]
   floatTab: (id: string, on?: boolean) => void | undefined
   flowItems: WorkflowItem[]
@@ -118,15 +132,18 @@ export type AppBase = {
   flowsOn: boolean
   fold: (id: string) => void
   folded: string[]
+  footButtons: (words: boolean, bar?: boolean) => React.JSX.Element
   forkWs: (w: WorkspaceView) => Promise<void>
   full: boolean
   gallery: string | null
   git: boolean
+  going: Record<string, string>
   group: Layout | null
   groupMoves: (ws_: WorkspaceView[]) => MenuItem[]
   groups: Layout[]
   hereCtx: () => WidgetCtx
   hist: RefObject<{ at: Place[]; i: number; going?: string | undefined }>
+  histNav: false | React.JSX.Element
   historyOn: boolean
   info: boolean
   inReader: (id: string) => boolean
@@ -134,23 +151,31 @@ export type AppBase = {
   kb: KeyMap
   keyText: (k: string) => string
   kh: (id: KeyId) => string | undefined
+  kindOf: (w: WorkspaceView) => RailKind
   kt: (title: string, id: KeyId) => string
+  labels: boolean
   laterCancel: (w: WorkspaceView) => Promise<void>
   laterChange: (w: WorkspaceView) => Promise<void>
   laterNow: (w: WorkspaceView) => undefined
   layoutWait: RefObject<{ ws: string; tree: RoleLayout; panel?: { open: boolean; tab?: string | undefined; w?: number | undefined } | undefined; needs: Role; until: number } | null>
+  listOff: boolean
   live: WorkspaceView[]
+  making: { key: number; project: string; place?: string | undefined; name: string }[]
   mark: (m: RowMark) => boolean
   markUnread: (id: string) => Promise<unknown>
   moveWs: (d: number) => void | undefined
   narrow: boolean
+  needAfter: () => TabView
   needing: TabView[]
+  needsYou: (t: TabView) => boolean
   newIn: (p: Project) => void | Promise<void>
   newTab: (preset: string, cmd?: string | undefined, w?: WorkspaceView | null, own?: boolean) => Promise<void | null>
   newTabActions: Action[]
   newWord: (p: Project) => "New browser" | "New terminal" | "New workspace"
   newWs: (projectId?: string, init?: Partial<NewWsParams>) => void
   nextNeed: () => void
+  onboard: { done: string[]; seen?: boolean | undefined; off?: boolean | undefined }
+  onboardDone: Set<string>
   openIn: (app: string, where?: Where) => void
   openInItems: (where?: Where) => MenuItem[]
   openMenu: (e: DOMRect | React.MouseEvent<Element, MouseEvent>, items: MenuItem[], align?: "left" | "right" | undefined) => void
@@ -163,7 +188,14 @@ export type AppBase = {
   panelShown: boolean
   panelTab: PanelTab
   panelW: number
+  peek: { id: string; top: number; left: number } | null
+  peekBox: RefObject<HTMLDivElement | null>
+  peekStat: { id: string; stat: Stat } | null
+  peekTimer: RefObject<number>
+  picked: string[]
+  picking: boolean
   pickKey: string
+  pinned: WorkspaceView[]
   prAct: (w: WorkspaceView, act: PRAct, method?: MergeMethod) => Promise<void | false>
   previewed: Opened | null
   prFix: (w: WorkspaceView, what: FixWhat, job?: string) => Promise<boolean>
@@ -171,16 +203,23 @@ export type AppBase = {
   project: Project | undefined
   projOf: (w?: { project: string } | null) => Project | undefined
   quickNew: (kind: "browsers" | "shells", url?: string | undefined, front?: boolean, at?: { project: string; place?: string | undefined } | undefined) => Promise<void>
+  radarOf: (w: WorkspaceView) => Collision[]
   rail: boolean
+  railBar: false | React.JSX.Element
+  railKind: RailKind
+  railOf: (k?: RailKind) => RailKind
   rawKind: (w: WorkspaceView) => RailKind
   readerOn: boolean
   refreshPR: () => Promise<void>
+  restart: (id: string, ms: number) => void
   restore: (id: string) => Promise<void>
   reviewOn: boolean
   reviewSeen: Record<string, string>
   reviewTab: boolean
+  ring: (id: string) => void
   rmItem: (w: WorkspaceView) => MenuItem
   roleTabs: (w: WorkspaceView, gs: Layout[]) => RoleTab[]
+  rows: ReturnType<typeof useRowDrag>
   run: () => Promise<void | null>
   runFlow: (f: WorkflowItem, ws?: string) => void
   runMenu: (w?: WorkspaceView | null) => MenuItem[]
@@ -198,18 +237,25 @@ export type AppBase = {
   setPanelOpen: Dispatch<SetStateAction<boolean>>
   setPanelTab: Dispatch<SetStateAction<PanelTab>>
   setPanelW: Dispatch<SetStateAction<number>>
+  setPeek: (p: { id: string; top: number; left: number } | null) => undefined
+  setPicked: Dispatch<SetStateAction<string[]>>
   setPicking: Dispatch<SetStateAction<boolean>>
   setRead: (id: string, m: 'reader' | 'term') => void
   setReveal: Dispatch<SetStateAction<string[]>>
   setSharing: Dispatch<SetStateAction<string | null>>
   setSideOpen: (v: boolean | ((o: boolean) => boolean)) => void
+  setStrip: (k: RailKind, at?: 'left' | 'right') => void
+  setTimer: (id: string, f: (t: Timer) => Timer | null) => void
   setTimers: Dispatch<SetStateAction<Timer[]>>
   settings: Settings
   setVideo: Dispatch<SetStateAction<{ src: string; play?: boolean | undefined; at?: number | undefined; min?: boolean | undefined } | null>>
+  setWatch: (id: string, f: (w: Watch) => Watch | null) => void
   setWsId: Dispatch<SetStateAction<string | null>>
   showInfo: (on?: boolean) => void
   showPanel: (t: PanelTab) => void
   sideOpen: boolean
+  sideW: number
+  sortedRows: (p: Project, ws: WorkspaceView[]) => (Sep | WorkspaceView)[]
   sortItems: (cur: WsSort | undefined, pick: (s: WsSort | undefined) => void, inherit?: WsSort) => MenuItem[]
   specsOn: boolean
   split: (edge: "bottom" | "right", next?: string) => Promise<void>
@@ -219,6 +265,7 @@ export type AppBase = {
   stepItem: (w: WorkspaceView) => MenuItem[]
   stepOf: (w: WorkspaceView) => Step | undefined
   stepsOn: boolean
+  strip: "left" | "right" | undefined
   tab: TabView
   tabByWs: Record<string, string>
   tabsAt: "bottom" | "left" | "right" | "top"
@@ -227,6 +274,7 @@ export type AppBase = {
   termsOk: boolean
   termWhere: (p: Project) => string
   timers: Timer[]
+  tint: (w: WorkspaceView) => string | undefined
   toast: (text: string, undo?: () => void, label?: string, ok?: boolean) => void
   toggleArtifacts: () => void
   toggleFull: (on?: boolean) => void | undefined
@@ -235,12 +283,16 @@ export type AppBase = {
   travel: (j: number) => void
   video: { src: string; play?: boolean | undefined; at?: number | undefined; min?: boolean | undefined } | null
   view: View
+  waits: RefObject<Map<string, string>>
+  watches: Watch[]
+  wideBar: boolean
   widgetApi: WidgetApi
   ws: WorkspaceView | null
   wsActions: Action[]
+  wsAt: (d: number) => WorkspaceView | undefined
   wsMore: () => MenuItem[]
   zoom: (d: number) => void
 }
 
 // and what the parts App builds first give the ones after: the menus (menusOf), the Layout menu (layoutOf)
-export type AppCtx = AppBase & ReturnType<typeof menusOf> & ReturnType<typeof layoutOf>
+export type AppCtx = AppBase & ReturnType<typeof menusOf> & ReturnType<typeof layoutOf> & ReturnType<typeof sideOf>
