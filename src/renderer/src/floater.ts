@@ -78,8 +78,8 @@ let hovered = '' // the tab whose card shows
 const hover = (tab: string, top = 0) => ((hovered = tab), bridge?.hover(tab, top))
 const el = (tag: string, text: string, cls = '') => Object.assign(document.createElement(tag), { textContent: text, className: cls })
 // a permission ask's buttons only when what it runs is shown whole, as it is (noteWhole, a notification's rule): a cut
-// one (ask.ts' WHAT_MAX) or one with a bidi or invisible character gets none, its tab shows it
-const whole = (a?: Ask) => !a?.tool || noteWhole(a.what ?? '')
+// one (ask.ts' WHAT_MAX), one with a bidi or invisible character, or an empty one gets none, its tab shows it
+const whole = (a?: Ask) => !a?.tool || (!!a.what?.trim() && noteWhole(a.what))
 // the buttons' line icons (constants: safe as markup)
 const svg = (d: string, box = 24) => `<svg viewBox="0 0 ${box} ${box}" fill="none" stroke="currentColor" stroke-width="${box === 24 ? 2 : 1.5}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
 const ICONS: Record<Act | 'plus', string> = {

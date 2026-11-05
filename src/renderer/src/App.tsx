@@ -1184,10 +1184,11 @@ export function App() {
           const body = perm ? `${perm.what ?? ''}${perm.diff ? (c => ` (+${c.add} −${c.del})`)(diffCounts(perm.diff)) : ''}` : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
           // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
           // wasn't read: Allow and Deny, its first and last
-          // one that doesn't fit is cut with … and gets none, as one with a bidi or invisible character (noteWhole): a Yes
-          // would approve a command you can't see whole (its click shows it in the tab)
+          // one that doesn't fit is cut with … and gets none, as one with a bidi or invisible character (noteWhole), or a
+          // permission ask whose command says nothing: a Yes would approve a command you can't see whole (its click shows
+          // it in the tab)
           const always = perm?.rule ? alwaysOf(perm) : undefined
-          const cut = !noteWhole(body)
+          const cut = !noteWhole(body) || (!!perm && !perm.what?.trim())
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
           const card = !w?.important ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
