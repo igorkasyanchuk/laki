@@ -942,7 +942,6 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .nw-chip .toggle:not(.on) { color: var(--muted); }
 /* a field in a chip is the chip's words: no box of its own, whatever a look or glass gives fields */
 .nw-chip .nw-chip-input { field-sizing: content; width: auto; min-width: 7ch; max-width: 28ch; height: 100%; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; font-size: 12.5px; }
-.nw-chip-sep { align-self: stretch; width: 1px; margin: 7px 2px; background: var(--line); }
 /* the base branch's caret: every branch, a menu (the field keeps any ref typed) */
 .nw-chip .ib.nw-chip-more { width: 20px; height: 22px; margin-left: -4px; color: var(--muted); }
 .nw-more { gap: 10px; padding: 12px 14px; }

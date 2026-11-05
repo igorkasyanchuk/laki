@@ -62,7 +62,7 @@ How it was decided:
 
 ### L950: a field in a chip is the chip's words: no box of its own, whatever a look or glass gives … (~92 B)
 
-- [ ] `.nw-chip-sep` L952
+- [x] `.nw-chip-sep` L952
 
 ### L1143: the workspace info panel and the status bar's PR (Info.tsx) (~52 B)
 
