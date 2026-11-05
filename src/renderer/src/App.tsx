@@ -1,7 +1,6 @@
-import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, creatorOf, neverAsks, PERMS, veiled, EFFORTS, MODELS, SEP_WHERE, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, permVerb } from '../../shared/ask'
-import { planTemplates, specPrompt } from '../../shared/plans'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -9,57 +8,48 @@ import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { FullReview, type ReviewApi, type Talk } from './FullReview'
 import { ago, type AutoKey, type Check, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, short, showAvatars, type WsInfo } from './Info'
-import { KeyOverlay } from './KeyOverlay'
 import { type NeedsApi } from './Needs'
 import { SideChat } from './SideChat'
-import { About, AddProject, ImportChats, ImportWorktrees, Modal, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Loading, Logs, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Prompt, Ready, CheckStrip, HookStrip, LaterStrip, PlanStrip, QueueStrip, ReplyPop, SecretStrip, ShowStrip, WorkerAsks, ScriptLogs, RemindDialog, SendLaterDialog, type Shot, StarLaki, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
+import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWsParams, Ready, CheckStrip, HookStrip, LaterStrip, PlanStrip, QueueStrip, SecretStrip, ShowStrip, WorkerAsks, type Shot, StarLaki, Video, videoCommand, Welcome } from './panels'
+import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
 import { isKeyId, type KeyId, keyMap, keyShow } from '../../shared/keys'
-import { CalendarPage } from './Calendar'
-import { type DeskAsk, DeskPage, onDesk } from './Desk'
-import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar, withImages } from './PromptInput'
-import { ProjectPage, type ProjectTab } from './Project'
-import { BirdPage } from './Bird'
-import { BoardPage } from './Board'
-import { AchievementsPage } from './Achievements'
+import { type DeskAsk, onDesk } from './Desk'
+import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
+import { type ProjectTab } from './Project'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
-import { StarterPicker, UiKitPage } from './UiKit'
-import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetDialog, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch } from '../../shared/widgetSchema'
-import { type ExtTab, ExtensionPage } from './Extension'
-import { ComparePage } from './Compare'
+import { type ExtTab } from './Extension'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { Reader, type ReaderApi, readable } from './Reader'
 import { turnNext } from './Diff'
-import { type Collision, spanText } from '../../shared/overlap'
+import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
-import { HelpPage } from './Help'
 import { Term, xterms, type SelectionUse } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { SchedulesPage } from './Schedules'
-import { actionsFor, applySuggestions, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, mergeActions, nameOf, needsSorted, parseDuration, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, templatesFor, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
+import { actionsFor, applySuggestions, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
-import { type Cloudflared, portsOf, SharePop, TunnelButton, type TunnelApi } from './Tunnel'
-import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
-import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
-import { ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
+import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
+import { type ShownPop, type ShownWin } from './Shown'
+import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
+import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
-import { type Action, type AppBase, type AppCtx, appIcon, clip, MINUTES, span, STATE_WORDS, colorOf, type Dialog, EDITOR_IDS, type Find, type Opened, type Place, type RailKind, SCRIPT_ICONS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
+import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { onKey } from './keydown'
-import { Palette, paletteItems } from './Palette'
 import { layoutOf, TabBar, TabStrip } from './TabBar'
 import { sideOf, Sidebar } from './Sidebar'
+import { Dialogs, Pages } from './Dialogs'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -183,22 +173,6 @@ function AiFloat({ children }: { children: ReactNode }) {
 const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
 const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
-const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
-const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
-const NotesPage = lazy(() => import('./Notes')) // BlockNote with it: loaded as it opens
-const TodoListPage = lazy(() => import('./TodoList')) // experimental, and BlockNote with it: loaded as it opens
-// what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment;
-// its code failing to load, or the page throwing, its own message (Boundary), the window kept
-const Waiting = ({ title, onClose }: { title: string; onClose: () => void }) => (
-  <Page title={title} wide esc={false} onClose={onClose}>
-    {null}
-  </Page>
-)
-const Lazy = ({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) => (
-  <Boundary title={title} onClose={onClose}>
-    <Suspense fallback={<Waiting title={title} onClose={onClose} />}>{children}</Suspense>
-  </Boundary>
-)
 
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
@@ -226,28 +200,12 @@ const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunn
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
-// the Specs page: specs is a project's id, '' all; kind and slug, the one to open
-const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
-// the Notes page: note, the one open ('': the first)
-const notesOf = (d: Dialog) => (d && typeof d === 'object' && 'note' in d ? d : undefined)
-// the Workflows page: run, the run to open
-const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ? d : undefined)
-// the Settings page, in any of its forms: all of it, a project's, or a section asked for
-const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && !!d && ('settings' in d || 'section' in d))
-// an extension's page (Extension.tsx): its id ('' a new one), and the page it goes back to
-const extOf = (d: Dialog) => (d && typeof d === 'object' && 'extension' in d ? d : undefined)
-// an extension page's key: a new one's its dialog's own, kept as its first ask names it (key), so it isn't drawn again then
-const extKeys = new WeakMap<object, string>()
-const extKey = (e: { extension: string; key?: string }) => e.key ?? (e.extension || extKeys.get(e) || (k => (extKeys.set(e, k), k))(`new-${Math.random().toString(36).slice(2)}`))
 // back and forward (settings.history, on unless false): a place is a page (or none: the workspace view) and the workspace
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 const HISTORY_MAX = 25
 const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules', 'usage'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
-// the Extension page's way back, in words
-const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', todos: 'To-dos', calendar: 'Calendar', board: 'Board', achievements: 'Achievements', bird: 'Bird view', schedules: 'Schedule', help: 'Help', usage: 'Usage' }
-const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 const PICTURE = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i // what Copy puts on the clipboard as a picture (main's PICS)
 const PLAIN = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|css|svg|[cm]?[jt]sx?|py|rb|go|rs|sh|sql|diff|patch)$/i // Copy text: files that are text
@@ -670,14 +628,6 @@ export function App() {
     setDialog(to.d)
     histDrawn(n => n + 1)
   }
-  // a page's own move that isn't a place of its own (a Settings section, an extension page's tab): the place it's at
-  // says it, so Back or Forward to it opens there, not where it was opened
-  // (after App's own effect: a page's first report comes from its effects, which run before App's records its place)
-  const keepHere = (mine: (d: Dialog) => boolean, d: Dialog) =>
-    queueMicrotask(() => {
-      const h = hist.current
-      if (h.at[h.i] && mine(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
-    })
   const projOf = (w?: { project: string } | null) => (w ? view?.projects.find(p => p.id === w.project) : undefined)
   const tint = (w: WorkspaceView) => (w.color && w.color !== 'none' ? w.color : projOf(w)?.color) // its own color, else its project's
   const placeName = (p: Place) => {
@@ -706,17 +656,6 @@ export function App() {
   const here = titleAt.current === null ? [pe && `${pe} ${hereP!.name}`, ws && wsName(ws), tab?.name].filter(Boolean).join(' · ') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
   const winTitle = here ? `${here} — Laki` : 'Laki'
   useEffect(() => void (document.title = winTitle), [winTitle])
-  // a new extension's first ask names it: the dialog (and the place in the history) says which, so Back, ⌘K's way back
-  // and a reopen go to it and its chat, not a blank page; its key stays, so it isn't drawn again
-  const nameExt = (e: { extension: string; back?: Dialog; key?: string }, id: string) => {
-    const k = extKey(e)
-    const d: Dialog = { extension: id, back: e.back, key: k }
-    const it = (x: Dialog) => (e => !!e && extKey(e) === k)(extOf(x)) // that page still, not another extension's opened meanwhile
-    const h = hist.current
-    if (h.at[h.i] && it(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
-    h.going = JSON.stringify({ d, ws: ws?.id ?? null })
-    setDialog(x => (it(x) ? d : x))
-  }
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
   const layoutsOn = (view?.api ?? 0) >= 60
@@ -1610,18 +1549,6 @@ export function App() {
   const markUnread = (id: string) => call('unread', { tab: id }).catch(() => {})
   // claude's and codex's accounts by name (Settings › Agents & profiles): the agent's own sign-in first
   const accountsOf = (agent?: string) => (isAccountAgent(agent) ? [{ id: HOME_ACCOUNT, name: 'Default sign-in' }, ...(view?.settings.accounts ?? []).filter(a => a.agent === agent)] : [])
-  // Settings › Agents & profiles' accounts: Sign in opens its terminal (Settings closes: the sign-in is there)
-  const accountsApi: AccountsApi = {
-    load: () => api.call<AccountView[]>('accounts'),
-    usage: () => api.call<AgentUsage[]>('usage'),
-    add: (agent, name) => call<Account>('accountAdd', { agent, name }),
-    rename: (id, name) => call('accountSet', { id, name }),
-    remove: async a => {
-      if (!(await ask(`Remove the account ${a.name}?`, { text: `Its sign-in goes with it (${a.email ?? 'its folder'}, and Claude's Keychain item for it). Its chats stay: they're shared. Tabs on it start on the default next time.`, ok: 'Remove', danger: true }))) throw new Error('kept')
-      return call('accountRm', { id: a.id })
-    },
-    login: a => call<WorkspaceView>('accountLogin', { id: a.id, agent: a.agent }).then(w => (setDialog(null), showNew(w.id))),
-  }
   const showNew = (id: string, ...more: string[]) => (setReveal(r => [...r, ...(wsId ? [wsId] : []), id, ...more]), setWsId(id))
   const forkWs = (w: WorkspaceView) => call<WorkspaceView>('wsFork', { id: w.id }).then(x => showNew(x.id), () => {})
 
@@ -1867,8 +1794,6 @@ export function App() {
   }
   // an artifact's folder in Finder ('': the storage folder): open-path would open a document in its app
   const revealArt = (w: WorkspaceView, path: string) => void bridge?.openPath?.(`${w.storage}/${path.replace(/\/?[^/]*$/, '')}`)
-  // the Artifacts in the side panel's Files (the strip's ⋯ › Open in Files)
-  const artifactsInFiles = () => (setArtsIn(ws?.id ?? null), showPanel('files'), setGallery(null))
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => done('Copied'), fail)
   // the agent skills installed with other text than this Laki's (Settings › Agent skill: an update of Laki changed
   // it, an edit, half a folder): a bar with Update, read as it connects and on the window's focus (a minute apart);
@@ -2442,18 +2367,6 @@ export function App() {
     if (!p.seps?.some(s => s.id === d.id) && sort !== 'manual' && g === groupOf(moved)) toast(`Sorted ${SORTS.find(x => x[0] === sort)![1].toLowerCase()}: the ${g ? 'group' : 'project'}'s ⋯ › Sort workspaces › As dragged keeps the order you drag`)
     if (d.into && folded.includes(d.target)) fold(d.target) // dropped into a folded group: it opens, to show it there
   })
-  // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
-  // template: the default prompt template of a new workspace under it ('' none)
-  // a group's name and defaults (Edit group: template, agent, where, permission mode, model, effort, base; '' none)
-  const sepName = async (o: { sep: string; id?: string }, name: string, d: Partial<Sep>) => {
-    const p = view!.projects.find(p => p.id === o.sep)
-    if (!p) return
-    const own = Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v || undefined])) as Partial<Sep> // '' drops it
-    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, ...own } : x)) }))
-    const id = `sep-${Math.random().toString(36).slice(2, 10)}`
-    const ids = [id, ...rowsOf(p, view!.workspaces).map(x => x.id)]
-    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, ...own }], rows: ids })
-  }
   // Sort workspaces: a project's (unset: as dragged), or a group's (unset: the project's, its own way named)
   const SORTS: [WsSort, string][] = [['manual', 'As dragged'], ['created', 'Newest first'], ['activity', 'Last active first'], ['name', 'By name']]
   const sortItems = (cur: WsSort | undefined, pick: (s: WsSort | undefined) => void, inherit?: WsSort): MenuItem[] => [
@@ -2727,18 +2640,6 @@ export function App() {
     const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
     if (id) setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))
   }, [dialog])
-  const onboardGo = (id: string) => {
-    setDialog(null)
-    if (id === 'project') openProject()
-    else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
-    else if (id === 'settings') setDialog('settings')
-    else if (id === 'shell') quickNew('shells')
-    else if (id === 'experimental') setDialog({ section: 'general', spot: 'Experimental' })
-    else if (id === 'workflows' && !flowsOn) setDialog({ section: 'general', spot: 'Pages' }) // Workflows off: where it's turned on again
-    else if (id === 'schedules') setDialog('schedules')
-    else if (id === 'workflows') setDialog({ workflows: '' })
-    else setDialog({ section: id })
-  }
   // the sidebar's + › Terminal or Browser: a new one in the Terminals or Browsers project (the first makes it), selected
   // a page's link to a new tab (url; front: target=_blank, else a middle click, ⌘-click or its menu): one more, selected or not
   const quickNew = async (kind: 'shells' | 'browsers', url?: string, front = true, at?: { project: string; place?: string }) => {
@@ -2814,8 +2715,6 @@ export function App() {
       </div>
     )
 
-  const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
-  const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
   const schedulesFor = schedulesOf(dialog)
   const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port || !!project?.kind) : [] // $PORT has its own, always (a terminal: none, its ports as any)
   // ✕ beside a port something of the workspace listens on: stops it, once you say so
@@ -2864,30 +2763,6 @@ export function App() {
   // branched (the daemon's scanOverlaps); one you hid stays hidden while it reads the same
   const radarKey = (w: WorkspaceView, c: Collision) => [w.id, c.ws ?? c.base, c.file, c.mine, c.theirs].join('|')
   const radarOf = (w: WorkspaceView) => (w.overlaps ?? []).filter(c => !radarHid.includes(radarKey(w, c)))
-  // inDialog: Check overlaps' (no Hide: that's the radar's marks; Open closes it)
-  const radarMenu = (w: WorkspaceView, list = radarOf(w), inDialog = false): MenuItem[] =>
-    list.flatMap((c, i): MenuItem[] => {
-      const o = c.ws ? view.workspaces.find(x => x.id === c.ws) : undefined
-      const where = `${c.file} (${spanText(c.theirs)} there, ${spanText(c.mine)} here)`
-      const hide: MenuItem[] = inDialog ? [] : [{ label: 'Hide until it changes', icon: 'eye', tip: 'Shows again when either side changes those lines', run: () => setRadarHid(h => [...h, radarKey(w, c)]) }]
-      if (!o)
-        return [
-          ...(i ? [null] : []),
-          { head: `${c.base} changed ${c.file} since this branched` },
-          { label: `Ask the agent to merge ${c.base} in`, icon: 'gitMerge', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, tip: 'Sent when its turn ends', run: () => void call('send', { target: w.id, whenIdle: true, text: `${c.base} has changed ${where} since this branch started, where you change it too. Merge ${c.base} in now (git merge ${c.base}; no rebase, no force push), resolve any conflicts keeping what both sides meant, run what you can locally, then say what changed.` }).then(() => toast('Sent to the agent'), () => {}) },
-          ...hide,
-        ]
-      const tell = (to: WorkspaceView, other: WorkspaceView, mine: Collision['mine'], theirs: Collision['theirs']) =>
-        void call('send', { target: to.id, whenIdle: true, text: `Heads up: workspace ${wsName(other)} (branch ${other.branch}) also changes ${c.file}, ${spanText(theirs)}, where you change ${spanText(mine)}. Both will merge into ${to.base}. Read its change with \`laki diff ${other.id}\` and keep yours compatible with it; tell me if you can't.` }).then(() => toast(`Sent to ${wsName(to)}'s agent`), () => {})
-      return [
-        ...(i ? [null] : []),
-        { head: `${wsName(o)} changes ${c.file} too` },
-        { label: `Open ${wsName(o)}`, icon: 'arrowUpRight', sub: `${spanText(c.theirs)} there, ${spanText(c.mine)} here`, run: () => (setWsId(o.id), inDialog && setOverlapsAt(null)) },
-        { label: "Tell this one's agent", icon: 'send', tip: `Sends it where ${wsName(o)}'s change is, to build on`, run: () => tell(w, o, c.mine, c.theirs) },
-        { label: `Tell ${wsName(o)}'s agent`, icon: 'send', run: () => tell(o, w, c.theirs, c.mine) },
-        ...hide,
-      ]
-    })
   // One next step (shared/nextStep.ts): the toolbar's button (⌘G) and a row's chip; a click does it
   const stepsOn = settings.nextStep !== false
   // a row's marks (Settings › Appearance › Sidebar rows); Show ›, in the sidebar's right clicks, turns each on or off
@@ -2934,28 +2809,6 @@ export function App() {
   const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
   const BOARD_TIP = 'Board: every workspace by where it is, and to-dos'
-  // an achievement's Show me (achievements.ts' go): where it's done; a page that's off, where it's turned on
-  const achGo = (go: string) => {
-    const [k, arg, spot] = go.split(':')
-    const off: Record<string, boolean> = { workflows: !flowsOn, specs: !specsOn, notes: !notesOn, calendar: !calOn, todos: !todosOn, desk: !deskOn, ai: !aiOn(settings), device: !(view.projects.find(p => p.id === ws?.project)?.config?.simulator ?? settings.simulator === true) }
-    const at = k === 'panel' ? arg : k // the Simulator tab: off unless Settings › Simulators (or the project's own) turns it on
-    setDialog(null)
-    if (off[at]) setDialog(at === 'ai' || at === 'device' ? { section: at === 'ai' ? 'ai' : 'simulator' } : { section: 'general', spot: 'Pages' })
-    else if (k === 'project') void openProject()
-    else if (k === 'new') view.projects.some(p => !p.kind) ? newWs() : void openProject()
-    else if (k === 'shells' || k === 'browsers') void quickNew(k)
-    else if (k === 'section') setDialog({ section: arg, ...(spot && { spot }) })
-    else if (k === 'workflows') setDialog({ workflows: '' })
-    else if (k === 'specs') setDialog({ specs: '' })
-    else if (k === 'notes') setDialog({ note: '' })
-    else if (k === 'panel' || k === 'newtab' || k === 'rename' || k === 'ship') {
-      if (!ws || ws.browser !== undefined) toast('Select a workspace first, then try it there')
-      else if (k === 'panel') showPanel(arg as PanelTab)
-      else if (k === 'rename') setDialog({ renameWs: ws.id })
-      else if (k === 'ship') ws.kind === 'worktree' ? setDialog('ship') : toast('Ship needs a worktree: start a workspace first')
-      else setTimeout(() => document.querySelector<HTMLElement>('.newtab-btn')?.click(), 50) // its menu, where it is
-    } else setDialog(k as Dialog) // a page: help, palette, board, schedules, timer, ai, desk, todos
-  }
   const achHidden = achKept.hidden ?? []
   const achAll = ACHIEVEMENTS.filter(a => !achHidden.includes(a.id))
   const achN = achAll.filter(a => achKept.got?.[a.id]).length
@@ -3064,7 +2917,6 @@ export function App() {
   // the tab bar's ⋯: One next step first; on a phone, the top bar's extensions too (no room for their strip), each as
   // its button's click
   const wsMore = (): MenuItem[] => [...(ws ? stepItem(ws) : []), ...(narrow && ws?.kind === 'worktree' && !(stepsOn && stepOf(ws)?.id === 'ship') ? [{ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') } as MenuItem] : []), ...(tops => (narrow && tops.length ? [...wsActions, { head: 'Extensions' }, ...tops.map(w => ({ label: w.name, sub: w.label ?? w.badge, run: () => extClick(w, widgetApi) }))] : wsActions))(ownWidgets.filter(w => w.on && placesOf(w).includes('top')))]
-  const deskWidgets = shownWidgets.filter(w => !(w.on && w.hidden)).map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'achievements' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || (dialog === 'bird' && settings.birdView !== false) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || (todosOn && dialog === 'todos') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   // the list as a strip: a name each, written down it (no filter, a page over it or a phone: the list)
@@ -3351,24 +3203,30 @@ export function App() {
 
   // what App's parts read (appCtx.ts), built after everything in it is
   const appBase: AppBase = {
-    accountsOf, achKept, aiDock, allows, anchor, apps, archive, attachable, busyWith, byId, call, canLater,
-    closePage, closePreview, closeTabs, copy, copyTab, costsOn, ctxLook, ctxOn, devRunning, devTab, dialog, dock,
-    done, doStep, dropAgent, dropOn, dropProps, editor, editorName, editScripts, extItems, extMenus, extOn, extRun,
-    fail, find, findIn, fitFoot, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, fold, folded,
-    footButtons, forkWs, full, gallery, git, going, group, groupMoves, groups, hereCtx, hist, histNav, historyOn,
-    info, inReader, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutWait,
-    listOff, live, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newIn, newTab,
-    newTabActions, newWord, newWs, nextNeed, onboard, onboardDone, openIn, openInItems, openMenu, openPort,
-    openProject, openReview, order, ownWidgets, panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat,
-    peekTimer, picked, picking, pickKey, pinned, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarOf,
-    rail, railBar, railKind, railOf, rawKind, readerOn, refreshPR, restart, restore, reviewOn, reviewSeen, reviewTab,
-    ring, rmItem, roleTabs, rows, run, runFlow, runMenu, runScript, selectGroup, selectTab, sendLater, setDialog,
-    setFind, setFinds, setFolded, setGroups, setOnboard, setOverlapsAt, setPanelOpen, setPanelTab, setPanelW,
-    setPeek, setPicked, setPicking, setRead, setReveal, setSharing, setSideOpen, setStrip, setTimer, setTimers,
-    settings, setVideo, setWatch, setWsId, showInfo, showPanel, sideOpen, sideW, sortedRows, sortItems, specsOn,
-    split, staleMin, start, statKey, stepItem, stepOf, stepsOn, strip, tab, tabByWs, tabsAt, targets, termIn,
-    termsOk, termWhere, timers, tint, toast, toggleArtifacts, toggleFull, togglePanel, toSettings, travel, video,
-    view, waits, watches, wideBar, widgetApi, ws, wsActions, wsAt, wsMore, zoom,
+    accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
+    archive, artMenu, artPage, artView, asFile, attachable, bgUrl, busyWith, byId, call, calOn, canLater, cfgSheet,
+    checking, closePage, closePreview, closeTabs, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
+    dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
+    extInserts, extItems, extMenus, extModal, extOn, extRun, extWs, fail, find, findIn, fitFoot, floated, floatTab,
+    flowItems, flowMenu, flowsHere, flowsOn, fold, folded, fontSize, footButtons, forkWs, full, gallery, gated, git,
+    going, group, groupMoves, groups, held, hereCtx, hist, histNav, historyOn, hotkey, inBrowser, info, inReader,
+    inViewer, isTerm, kb, keyText, kh, kindOf, kt, labels, laterCancel, laterChange, laterNow, layoutsOn, layoutWait,
+    listOff, live, made, making, mark, markUnread, moveWs, narrow, needAfter, needing, needsYou, newFor, newImages,
+    newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
+    openInItems, openMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
+    panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
+    pinPlan, placeName, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarKey, radarOf, rail,
+    railBar, railKind, railOf, rawKind, readerOn, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
+    reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
+    schedulesFor, selectGroup, selectTab, sendLater, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal,
+    setFind, setFinds, setFolded, setGallery, setGroups, setMaking, setNewFor, setNewImages, setNewInit, setOnboard,
+    setOverlapsAt, setPanelOpen, setPanelTab, setPanelW, setPeek, setPicked, setPicking, setPops, setRadarHid,
+    setRead, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, setSideOpen, setStrip, setTimer,
+    setTimers, settings, settingsKey, setVideo, setWatch, setWsId, sharing, shotKey, showInfo, shown, showNew,
+    shownWidgets, showPanel, sideOpen, sideW, sortedRows, sortItems, specsOn, split, stale, staleMin, start, statKey,
+    stepItem, stepOf, stepsOn, strip, tab, tabByWs, tabsAt, targets, termIn, termsOk, termWhere, timers, tint, toast,
+    todosOn, toggleArtifacts, toggleFull, togglePanel, toSettings, touch, travel, video, view, waits, watches,
+    whereNow, wideBar, widgetApi, ws, wsActions, wsAt, wsHere, wsMore, zoom,
   }
   const parts = { ...appBase, ...menusOf(appBase), ...layoutOf(appBase) }
   const app: AppCtx = { ...parts, ...sideOf(parts) }
@@ -3631,450 +3489,7 @@ export function App() {
           <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />
         )}
         {tabsAt === 'bottom' && <TabStrip app={app} />}
-        {(dialog === 'settings' || settingsFor || section) && (
-          <SettingsPage
-            key={settingsKey}
-            own={own}
-            settings={view.settings}
-            presets={view.presets}
-            apps={apps}
-            onClose={() => setDialog(null)}
-            onSection={id => {
-              keepHere(d => d === 'settings' || (!!d && typeof d === 'object' && ('section' in d || 'settings' in d)), { section: id })
-              setSeenSecs(l => (l.includes(id) ? l : [...l, id]))
-              if (id === 'resources' || id === 'simulator') earn(id === 'resources' ? 'resources' : 'simTab')
-            }}
-            onSave={({ achievements: _, recording: __, modelEfforts: ___, ...s }) => {
-              // achievements: App's own (earn), never this page's copy from when it opened (Recording mode and the efforts per
-              // model likewise: ⌘K's, the new-workspace page's); a profile: the list longer than the one in use
-              if (s.presets && s.presets.length > (settings.presets ?? view.presets).length) earn('profile')
-              call('settingsSet', s).catch(() => {})
-            }}
-            projects={view.projects.filter(p => !p.kind).map(p => ({ ...p, git: p.git !== false })) /* Terminals and Browsers: not projects, nothing to set */}
-            archived={view.archivedProjects}
-            updateIdle={!!view.updateIdle}
-            managed={view.managed}
-            onUpdateIdle={on => void call('updateIdle', { on })}
-            onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
-            projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
-            onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
-            onMemory={id => setDialog({ project: id, tab: 'memory' })}
-            achievements={{ n: achN, of: achAll.length, hidden: achHidden.length, off: !!achKept.off, setOff: off => void achSet({ off }).catch(fail), unhide: () => void achSet({ hidden: [] }).catch(fail), open: () => setDialog('achievements') }}
-            renameProjects
-            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
-            accounts={layoutsOn ? accountsApi : undefined}
-            hooks={(view.api ?? 0) >= 146 ? () => api.call('hooksSeen') : undefined}
-            ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
-            bg={{
-              url: bgUrl,
-              set: async f => {
-                if (!f) return api.call('bgSet', {})
-                const data = await new Promise<string>((ok, no) => {
-                  const r = new FileReader()
-                  r.onload = () => ok(String(r.result).split(',')[1] ?? '')
-                  r.onerror = () => no(new Error("couldn't read that file"))
-                  r.readAsDataURL(f)
-                })
-                return api.call('bgSet', { data, ext: f.name.split('.').pop() })
-              },
-            }}
-            webhookTest={w => api.call('webhookTest', w)}
-            cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
-            storage={() => api.call('storageInfo')}
-            uiReset={() => api.call('uiReset')}
-            simulator={p => api.call('sim', p)}
-            tunnels={n => api.call('tunnelCheck', n)}
-            resources={{
-              load: () => api.call<Resources>('resources'),
-              tabs: view.tabs,
-              wsName: id => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id)),
-              sleep: tab => api.call('tabSleep', { tab }),
-              stopOther: key => api.call('resourceStop', { key }),
-              open: tab => (setDialog(null), selectTab(tab), view.tabs.find(t => t.id === tab)?.asleep && call('tabWake', { tab }).catch(() => {})),
-              procs: bridge?.procs,
-              // main's (the bubbles, an agent browser), else the page's own frames (laki-stop: the video, a widget, the preview)
-              stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
-              widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
-            }}
-            remote={{ state: view.remote, start: (hours, mail, open, pin, via, funnel) => api.call('remoteStart', { hours, mail, open, pin, via, funnel }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
-            widgets={extCfg}
-            logs={(key, title) => setDialog({ logs: key, title })}
-            scriptLogs={() => setDialog('scriptLogs')}
-            section={settingsFor ? `project:${settingsFor.id}` : section}
-            script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
-            spot={typeof dialog === 'object' && dialog && 'spot' in dialog ? dialog.spot : undefined}
-          />
-        )}
-        {shown[0] && <ShownDialog s={shown[0]} left={shown.length - 1} onOpenRun={() => (setDialog({ workflows: '', run: shown[0].run }), setShown([]))} onClose={() => setShown(q => q.slice(1))} />}
-        <ShownPops pops={pops} onShow={p => (setShown(q => [...q, p]), setPops(q => q.filter(x => x !== p)))} onOpenRun={p => (setDialog({ workflows: '', run: p.run }), setPops(q => q.filter(x => x !== p)))} onClose={k => setPops(q => q.filter(x => x.key !== k))} />
-        {(t =>
-          t && (
-            <SharePop
-              name={t.name}
-              share={t.share}
-              onClose={() => setSharing(null)}
-              api={{
-                // the link copied as it's made: what you share it for
-                start: hours => api.call<{ url: string }>('shareStart', { tab: t.id, hours }).then(r => navigator.clipboard.writeText(r.url).then(() => done('Share link copied'), () => {})),
-                stop: () => api.call('shareStop', { tab: t.id }),
-                open: openExternal,
-                copy,
-              }}
-            />
-          ))(sharing ? byId(sharing) : undefined)}
-        {(t =>
-          t &&
-          reply && (
-            <ReplyPop
-              key={`${reply.tab}:${reply.x}:${reply.y}`}
-              from={t}
-              text={reply.text}
-              at={reply}
-              to={replyTo(t.id)}
-              onAdd={(to, text) => call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: finish it there`)))}
-              onSend={(to, text) => call<{ queued?: number }>('send', { target: to.id, text, ...(to.kind === 'agent' && { whenIdle: true, steer: true }) }).then(r => done(r.queued ? `Queued for ${to.name}: it goes after its turn` : `Sent to ${to.name}`))}
-              onClose={() => setReply(null)}
-            />
-          ))(reply ? byId(reply.tab) : undefined)}
-        {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(dialog && typeof dialog === 'object' && 'widget' in dialog ? (dialog.back ?? null) : null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? shownWidgets.find(x => x.id === dialog.widget) : undefined)}
-        {(w => w && extModal && <WidgetModal key={extModal.n} w={w} ws={extModal.ws} m={extModal.m} api={widgetApi} onClose={m => setExtModal(x => (!m || x?.m === m ? null : x))} />)(extModal ? view.widgets?.find(x => x.id === extModal.wid) : undefined)}
-        {(e => e && (
-          <ExtensionPage
-            key={extKey(e)}
-            id={e.extension}
-            tab={e.tab}
-            edit={e.edit}
-            start={e.start}
-            widgets={view.widgets ?? []}
-            cfg={extCfg}
-            api={widgetApi}
-            ai={settings.ai}
-            spots={order.filter(w => !w.host && !view.projects.find(p => p.id === w.project)?.kind).map(w => ({ id: w.id, name: wsName(w) }))}
-            here={wsHere}
-            back={backWord(e.back)}
-            onNamed={id => nameExt(e, id)}
-            onAiSettings={() => setDialog({ section: 'ai' })}
-            onTab={tab => keepHere(d => (x => !!x && extKey(x) === extKey(e))(extOf(d)), { ...e, tab })}
-            onClose={() => setDialog(e.back ?? null)}
-          />
-        ))(extOf(dialog))}
-        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={extOf(dialog.back ?? null) ? placeName({ d: dialog.back!, ws: null }) : backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
-        {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom * own} onClose={() => setDialog(null)} />}
-        {dialog === 'about' && <About onClose={() => setDialog(null)} />}
-        {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
-        {dialog === 'desk' && deskOn && (
-          <DeskPage
-            widgets={deskWidgets}
-            wsName={ws && wsHere ? wsName(ws) : undefined}
-            tiles={settings.deskTiles}
-            tabs={settings.deskTabs}
-            api={{
-              ...widgetApi,
-              place: (id, place, on) => (on ? extCfg.set(id, { place, on }) : call('widgetSet', { id, place, ...(on !== undefined && { on }) })), // on: a repo's sheet first
-              build: aiOn(settings) ? start => setDialog({ extension: '', back: 'desk', start }) : undefined, // a new extension's page, its first ask Build with AI's: it writes one placed on the Desk
-              save: o => void call('settingsSet', { ...(o.tiles && { deskTiles: o.tiles }), ...(o.tabs && { deskTabs: o.tabs }) }).catch(() => {}),
-            }}
-            onClose={() => setDialog(null)}
-          />
-        )}
-        {(o =>
-          o &&
-          notesOn && (
-            <Lazy title="Notes" onClose={() => setDialog(null)}>
-              <NotesPage id={o.note} api={{ call: (m, p) => api.call(m, p) }} onOpen={note => setDialog({ note })} onClose={() => setDialog(null)} />
-            </Lazy>
-          ))(notesOf(dialog))}
-        {dialog === 'todos' && todosOn && (
-          <Lazy title="To-dos" onClose={() => setDialog(null)}>
-            <TodoListPage api={{ call: (m, p) => api.call(m, p) }} onClose={() => setDialog(null)} />
-          </Lazy>
-        )}
-        {dialog === 'calendar' && calOn && (
-          <CalendarPage
-            schedules={view.schedules ?? []}
-            runs={view.runs ?? []}
-            reminders={view.reminders ?? []}
-            workspaces={live.map(w => ({ id: w.id, name: wsName(w) }))}
-            api={{
-              add: r => call('reminderAdd', r),
-              set: r => call('reminderSet', r),
-              rm: id => call('reminderRm', { id }),
-              openWs: id => (setDialog(null), setWsId(id)),
-              openSchedules: () => setDialog('schedules'),
-            }}
-            onClose={() => setDialog(null)}
-          />
-        )}
-        {dialog === 'onboard' && (
-          <Onboarding
-            done={onboardDone}
-            onGo={onboardGo}
-            onTick={id => setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))}
-            onSkip={() => setDialog(null)}
-            onOff={() => (setOnboard(o => ({ ...o, off: true })), setDialog(null))}
-            theme={settings.theme ?? 'default'}
-            onTheme={theme => call('settingsSet', { theme }).catch(() => {})}
-          />
-        )}
-        {dialog === 'scriptLogs' && <ScriptLogs load={() => api.call<ScriptRun[]>('scriptLogs')} copy={copy} onClose={() => setDialog({ section: 'general' })} />}
-        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.back ?? (dialog.logs === 'new' ? { section: 'general' } : null))} />}
-        {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
-        {dialog === 'starters' && <StarterPicker onClose={() => setDialog(null)} onPick={k => (setDialog(null), void extCfg.make!(k))} />}
-        {dialog && typeof dialog === 'object' && 'project' in dialog && (p => p && (
-          <ProjectPage
-            key={p.id}
-            project={p}
-            schedules={view.schedules?.filter(s => s.project === p.id) ?? []}
-            tab={dialog.tab}
-            onTab={tab => setDialog({ project: p.id, tab })}
-            onClose={() => setDialog(null)}
-            api={{
-              save: o => call('projectSet', { id: p.id, ...o }),
-              saveSettings: o => call('projectSet', { id: p.id, ...o }).catch(() => {}),
-              ...(aiOn(settings) && { compact: { run: () => call('memoryCompact', { project: p.id }), log: () => api.call<CompactLogLine[]>('memoryCompactLog', { project: p.id }) } }),
-              file: id => api.call<ProjectConfig>('projectFile', { id }),
-              global: { actions: settings.actions, templates: settings.templates, simulator: settings.simulator === true, flows: flowsOn },
-              onGlobal: sec => setDialog({ section: sec }),
-              schedules: () => setDialog({ schedules: p.id }),
-              setSchedule: (id, on) => call('scheduleSet', { id, on }),
-              specs: specsOn ? { list: () => api.call('planList', { project: p.id }), open: at => setDialog({ specs: p.id, ...at }) } : undefined,
-            }}
-          />
-        ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={aiNames} onClose={() => setDialog(null)} onSettings={spot => setDialog({ section: 'ai', ...(spot && { spot }) })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} inserts={extInserts(hereCtx())} complete={completeOf(view, { project: extWs(ws)?.project })} />}
-        {(o =>
-          o &&
-          specsOn && (
-            <Lazy title="Specs & Brainstorms" onClose={() => setDialog(null)}>
-              <SpecsPage
-                key={o.specs}
-                projects={view.projects.filter(p => !p.kind)}
-                at={{ project: o.specs || undefined, of: o.of, kind: o.kind, slug: o.slug, templates: o.templates }}
-                onNav={to => setDialog(d => (specsOf(d) ? { specs: specsOf(d)!.specs, ...to } : d))}
-                onClose={() => setDialog(null)}
-                api={{
-                  call,
-                  aiOn: aiOn(settings),
-                  start: p => (setNewFor(p.project), setNewInit({ prompt: specPrompt(p) }), setDialog('new')),
-                  aiSettings: () => setDialog({ section: 'ai' }),
-                  templates: planTemplates(settings),
-                  saveTemplates: planTemplates => call('settingsSet', { planTemplates }),
-                  copy,
-                  reveal: path => void bridge?.openPath?.(path),
-                  full,
-                  toggleFull: () => toggleFull(),
-                  ...(rail && { pinned: r => (settings.railPlans ?? []).some(x => samePlan(x, r)), pin: pinPlan }),
-                }}
-              />
-            </Lazy>
-          ))(specsOf(dialog))}
-        {(o =>
-          o &&
-          flowsOn && (
-            <Lazy title="Workflows" onClose={() => setDialog(null)}>
-              <WorkflowsPage
-                key={o.run ?? (o.start ? JSON.stringify(o.start) : o.wf ? JSON.stringify(o.wf) : '')}
-                view={view}
-                projects={view.projects.filter(p => !p.kind)}
-                presets={view.presets.filter(p => !p.off)}
-                actions={settings.actions}
-                at={{ run: o.run, start: o.start, wf: o.wf }}
-                nav={o.nav}
-                onNav={nav => setDialog(d => (d && typeof d === 'object' && 'workflows' in d ? { ...d, nav } : d))}
-                onClose={() => setDialog(null)}
-                api={{
-                  call,
-                  openWs: id => (setDialog(null), setWsId(id)),
-                  openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })),
-                  toast: (text, undo) => toast(text, undo),
-                  phone: !!settings.webhook?.url?.trim(),
-                  settings: section => setDialog({ section }),
-                  // Laki AI's floating chat over the page (it knows the open workflow); an ask: sent there, as you'd type it
-                  ai: aiOn(settings) ? ask => (setAiFloat(true), ask && void whereNow().then(context => api.call('aiAsk', { text: ask, context })).catch(fail)) : undefined,
-                  globals: settings.flowVars,
-                  setGlobals: flowVars => call('settingsSet', { flowVars }),
-                }}
-              />
-            </Lazy>
-          ))(flowsOf(dialog))}
-        {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[] }>('usageDays')} onClose={() => setDialog(null)} />}
-        {dialog === 'bird' && settings.birdView !== false && (
-          <BirdPage
-            view={view}
-            onClose={() => setDialog(null)}
-            api={{ screen: tab => api.call<string>('screen', { target: tab, lines: 40 }) /* no toast: a tab closed meanwhile */, open: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })), needs: needsYou }}
-          />
-        )}
-        {dialog === 'achievements' && (
-          <AchievementsPage
-            kept={achKept}
-            onClose={() => setDialog(null)}
-            api={{
-              go: achGo,
-              hide: (id, hide) => (h => void achSet({ hidden: hide ? [...h, id] : h }).catch(fail))((achRef.current.hidden ?? []).filter(x => x !== id)),
-              off: off => void achSet({ off }).then(() => off && (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
-            }}
-          />
-        )}
-        {dialog === 'board' && (
-          <BoardPage
-            view={view}
-            timers={settings.timers}
-            going={going}
-            onClose={() => setDialog(null)}
-            api={{
-              open: id => (setWsId(id), setDialog(null)),
-              start: t => {
-                // a folder's own workspace has its session already: another one beside it, for this prompt
-                const plain = view.projects.find(p => p.id === t.project)?.git === false
-                const prompt = withImages(t.text, (t.images ?? []).map(path => ({ path })))
-                return call('wsNew', { project: t.project, prompt, place: 'top', ...(plain && { local: true, another: true, name: nameOf(t.text) }) }).then(() => call('todoRm', { id: t.id }))
-              },
-              add: (project, text, images) => call('todoAdd', { project, text, images }),
-              saveImage: (data, ext) => api.call<string>('imageSave', { data, ext }),
-              saveFile: (data, name) => api.call<string>('fileSave', { data, name }),
-              rm: id => call('todoRm', { id }),
-              menu: (e, w) =>
-                openMenu(e, [
-                  { label: 'Open', icon: 'arrowRight', key: 'o', run: () => (setWsId(w.id), setDialog(null)) },
-                  null,
-                  ...(w.kind === 'worktree' ? [{ label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(w) } as MenuItem] : []),
-                  { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
-                ]),
-              archiveAll: (e, merged) => openMenu(e, [{ label: `Archive all ${merged.length}`, icon: 'archive', key: 'a', run: async () => { if (await ask(`Archive all ${merged.length} merged?`, { text: `${merged.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay).`, ok: 'Archive' })) for (const w of merged) await archive(w, true) } }], 'right'), // asked once, then one by one: one with changes asks again
-            }}
-          />
-        )}
-        {typeof dialog === 'object' && dialog && 'compare' in dialog && (
-          <ComparePage
-            view={view}
-            race={dialog.compare}
-            timers={settings.timers}
-            onClose={() => setDialog(null)}
-            api={{
-              open: id => (setWsId(id), setDialog(null)),
-              changes: id => api.call<Changes>('diff', { ws: id }),
-              keep: async (winner, losers) => {
-                if (!(await ask(`Keep ${wsName(winner)}?`, { text: `${losers.map(wsName).join(', ')} ${losers.length === 1 ? 'is' : 'are'} archived: tabs stop and worktrees go (the branches stay).`, ok: 'Archive the others', danger: true }))) return
-                const gone: string[] = []
-                const held: string[] = []
-                await busyWith(losers.map(w => w.id), 'archiving', async () => {
-                  for (const w of losers) if (await call<{ held?: GateHeld[] } | null>('wsArchive', { id: w.id }).then(r => (r?.held && held.push(`${wsName(w)} (${r.held.map(h => h.why).join('; ')})`), !r?.held), () => false)) gone.push(w.id) // held by a gate: it stays
-                })
-                setWsId(winner.id)
-                setDialog(null)
-                toast(`Kept ${wsName(winner)}, archived ${gone.length}${held.length ? `; a gate held ${held.join(', ')}` : ''}`, () => gone.reduce((p, id) => p.then(() => call('wsRestore', { id })), Promise.resolve<unknown>(undefined)).then(() => setWsId(winner.id), () => {}))
-              },
-            }}
-          />
-        )}
-        {schedulesFor !== undefined && (
-          <SchedulesPage
-            key={schedulesFor /* another project's menu: its filter */}
-            project={schedulesFor}
-            view={view}
-            onSeen={id => (setRunsSeen(id), localStorage.setItem('laki.runsSeen', JSON.stringify(id)))}
-            onClose={() => setDialog(null)}
-            api={{
-              set: s => api.call('scheduleSet', s),
-              rm: id => api.call('scheduleRm', { id }),
-              run: id => api.call('scheduleRun', { id }),
-              flows: flowsOn ? () => api.call('flowList', {}) : undefined,
-              branches: project => api.call('branches', { project }),
-              open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),
-              pick: async () => {
-                const path = bridge ? await bridge.pickFolder() : prompt('The folder’s full path') // a browser has no folder picker
-                return path?.trim() ? api.call<Project>('projectAdd', { path: path.trim() }) : null
-              },
-            }}
-          />
-        )}
-        {dialog === 'new' && (
-          <NewWorkspace
-            key={`${newFor}${JSON.stringify(newInit ?? '')}`} // another project asked for while it's open (＋, a dropped folder, a link)
-            view={{ ...view, projects: view.projects.filter(p => !p.kind) } /* Terminals and Browsers make theirs with + */}
-            // newFor: a project just added may not be in the view yet (projectAdd answers first): the page starts there
-            // anyway, not in the selected workspace's project
-            project={newFor && !view.projects.find(p => p.id === newFor)?.kind ? newFor : [ws?.project].find(id => view.projects.some(p => p.id === id && !p.kind))}
-            agent={settings.agent}
-            initial={newInit}
-            images={newImages}
-            inserts={project => extInserts({}, project)}
-            onClose={() => {
-              setDialog(null)
-              setNewFor(undefined)
-              setNewInit(undefined)
-              setNewImages([])
-            }}
-            onCreate={async p => {
-              // a row in the sidebar meanwhile (it stays when Esc closes the page: the workspace is still coming)
-              const key = ++made.current.key
-              const page = made.current.page
-              const pr = prIn(p.prompt) // a prompt naming a PR: the workspace is named after it
-              const name = p.name?.trim() || (pr ? `PR #${pr.replace(/.*\/pull\//, '')}` : nameOf(p.prompt ?? '')) || 'new workspace'
-              setMaking(m => [...m, { key, project: p.project, place: p.place, name: p.fan ? `${name} ×${p.fan.length}` : name }])
-              const gone = () => setMaking(m => m.filter(x => x.key !== key))
-              // a race: a workspace per agent, then Compare
-              // a PR whose branch a workspace has already: that one, a click away
-              const got = await (p.fan
-                ? call<WorkspaceView[]>('wsFan', { ...p, presets: p.fan })
-                : api.call<WorkspaceView>('wsNew', p).then(
-                    w => [w],
-                    e => {
-                      const there = (e as Error).message.match(/checked out in workspace (\S+)$/)?.[1]
-                      toast((e as Error).message, there ? () => (setWsId(there), setDialog(null)) : undefined, 'Open it')
-                      throw e
-                    },
-                  )
-              ).finally(gone)
-              if (page !== made.current.page) {
-                // closed meanwhile: you went on with something else, which keeps the focus; the new one is a click away
-                setReveal(r => [...r, ...got.map(w => w.id)])
-                return toast(`${wsName(got[0])}${got.length > 1 ? ` and ${got.length - 1} more` : ''} ready`, () => showNew(got[0].id, ...got.slice(1).map(w => w.id)), 'Open', true)
-              }
-              showNew(got[0].id, ...got.slice(1).map(w => w.id))
-              ;(pj => pj?.cfgWait && void cfgSheet(pj))(view?.projects.find(x => x.id === got[0].project))
-              setDialog(d => (d !== 'new' ? d : p.fan && got[0].race ? { compare: got[0].race } : null))
-              setNewFor(undefined)
-              setNewInit(undefined)
-              setNewImages([])
-            }}
-          />
-        )}
-        {ws && gallery === ws.id && ws.storage && (
-          <ArtifactsBar
-            ws={ws.id}
-            n={ws.artifacts ?? 0}
-            links={ws.links}
-            onClose={() => setGallery(null)}
-            api={{
-              list: () => api.call<Artifact[]>('artifactList', { ws: ws.id }),
-              read: (path, media) => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true, media }),
-              open: path => openIn('default', { ws: ws.id, file: path, storage: true }),
-              editor: path => openIn('editor', { ws: ws.id, file: path, storage: true }),
-              reveal: bridge?.openPath && (path => revealArt(ws, path)),
-              files: artifactsInFiles,
-              menu: path => artMenu(ws, path),
-              copy,
-              page: path => (inViewer(path) ? artPage(ws, path) : undefined),
-              unlink: url => api.call('linkRm', { ws: ws.id, url }),
-              external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
-            }}
-          />
-        )}
-        {artView && (w => w && (
-          <ArtifactView
-            key={`${w.id}/${artView.path}`}
-            path={artView.path}
-            page={artPage(w, artView.path)}
-            read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
-            onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
-            onFile={asFile(w, artView.path)}
-            onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, storage: true }))}
-            onReveal={bridge?.openPath && (() => revealArt(w, artView.path))}
-            onClose={() => setArtView(null)}
-          />
-        ))(view.workspaces.find(x => x.id === artView.ws))}
+        <Pages app={app} />
         {!wideBar && statusBar}
         {aiFab && (
           <>
@@ -4138,287 +3553,7 @@ export function App() {
           )}
         </div>
       )}
-      {dialog === 'project' && (
-        <AddProject
-          onClose={() => setDialog(null)}
-          onAdd={async path => {
-            const p = await call<Project>('projectAdd', { path })
-            newWs(p.id) // as a picked folder goes
-          }}
-        />
-      )}
-      {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
-      {dialog === 'palette' && <Palette items={paletteItems(app)} forName={ws ? wsName(ws) : undefined} onClose={() => setDialog(null)} />}
-      <KeyOverlay on={settings.keyOverlay !== false && !narrow && !touch && !dialog} keys={settings.keys} />
-      {dialog === 'ship' && ws && (
-        <Prompt
-          title={`Ship ${ws.id}`}
-          busy={checking === `ship:${ws.id}` ? 'Checking…' : undefined}
-          // what it does, said before it does it (a git action: this is its confirmation): the changes, the push, the PR
-          hint={`${ws.stat ? `${ws.stat.files} file${ws.stat.files === 1 ? '' : 's'} changed (+${ws.stat.add} −${ws.stat.del})${ws.stat.dirty ? `, ${ws.stat.dirty} not committed yet` : ''}: ` : ''}git add -A and commit, push ${ws.branch} to origin (git push -u), then a PR into ${ws.base ?? 'its base'} (gh pr create --fill), in a ship tab`}
-          placeholder="Commit message"
-          onClose={() => setDialog(null)}
-          onSubmit={async message => {
-            const t = await gated(ws, 'ship', force => call<TabView | { held: GateHeld[] }>('ship', { ws: ws.id, message, force }))
-            setDialog(null)
-            if (t && 'id' in t) selectTab(t)
-          }}
-        />
-      )}
-      {overlapsAt &&
-        (w =>
-          w && (
-            <Modal title={`Overlaps · ${wsName(w)}`} onClose={() => setOverlapsAt(null)}>
-              {overlapsAt.err ? (
-                <p className="warn small">{overlapsAt.err}</p>
-              ) : !overlapsAt.list ? (
-                <p className="muted small">Comparing its changes with {projOf(w)?.name}'s other worktrees and with {w.base ?? 'its base'}…</p>
-              ) : !overlapsAt.list.length ? (
-                <p className="muted small">None: no other worktree of {projOf(w)?.name} changes the same lines, and {w.base ?? 'its base'} hasn't changed them since it branched.</p>
-              ) : (
-                <div className="overlaps">
-                  {radarMenu(w, overlapsAt.list, true).map((it, i) =>
-                    !it ? null : 'head' in it ? (
-                      <b key={i} className="overlaps-head">
-                        {it.head}
-                      </b>
-                    ) : 'run' in it && it.run ? (
-                      <button key={i} className="overlaps-act" data-tip={it.tip} onClick={it.run}>
-                        {it.icon && <Icon name={it.icon} />} {it.label}
-                        {it.sub && <span className="muted small">{it.sub}</span>}
-                      </button>
-                    ) : null,
-                  )}
-                </div>
-              )}
-            </Modal>
-          ))(view.workspaces.find(x => x.id === overlapsAt.w))}
-      {dialog === 'video' && (
-        <Prompt
-          title="Watch a YouTube video"
-          placeholder="https://www.youtube.com/watch?v=…"
-          hint="It plays at the bottom of the sidebar, beside your work; × closes it."
-          onClose={() => setDialog(null)}
-          onSubmit={async link => {
-            const src = youtubeEmbed(link)
-            if (!src) {
-              toast('Not a YouTube link: a video, a short or a playlist')
-              throw new Error('not YouTube') // the dialog stays open
-            }
-            setVideo({ src, play: true, at: Date.now() })
-            earn('video')
-            setSideOpen(true) // asked for from ⌘K with the sidebar hidden: shown, not just heard
-            setDialog(null)
-          }}
-        />
-      )}
-      {dialog && typeof dialog === 'object' && 'timerCmd' in dialog && ws && (
-        <Prompt
-          title="When it ends, run"
-          placeholder="say 'time is up' · npm test · open https://…"
-          hint={`Runs through your login shell in ${wsName(ws)}, in a tab of its own (it closes when the command succeeds).`}
-          initial={timers.find(t => t.id === dialog.timerCmd)?.cmd}
-          onClose={() => setDialog(null)}
-          onSubmit={async cmd => {
-            setTimer(dialog.timerCmd, x => ({ ...x, then: 'command', cmd, ws: ws.id }))
-            setDialog(null)
-          }}
-        />
-      )}
-      {dialog === 'timer' && (
-        <TimerDialog
-          where={ws ? wsName(ws) : undefined}
-          onClose={() => setDialog(null)}
-          onStart={(ms, cmd, note) => {
-            addTimer(ms, { ...(cmd && ws && { then: 'command' as const, cmd, ws: ws.id }), ...(note && { note }) })
-            setDialog(null)
-          }}
-        />
-      )}
-      {dialog && typeof dialog === 'object' && 'remind' in dialog && (
-        <RemindDialog
-          name={wsName(live.find(w => w.id === dialog.remind) ?? { id: dialog.remind })}
-          onClose={() => setDialog(null)}
-          onPick={ms => {
-            addTimer(ms, { then: 'remind', ws: dialog.remind })
-            setDialog(null)
-            done(`I'll remind you at ${new Date(Date.now() + ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
-          }}
-        />
-      )}
-      {dialog && typeof dialog === 'object' && 'sendLater' in dialog && (() => {
-        const old = timers.find(t => t.id === dialog.edit)
-        const agents = [
-          ...(view?.tabs ?? []).filter(t => t.workspace === dialog.sendLater && t.kind === 'agent' && (t.status !== 'exited' || t.id === old?.tab)).map(t => ({ id: t.id, name: t.name })),
-          ...(aiOn(settings) || old?.tab === 'ai' ? [{ id: 'ai', name: 'Laki AI' }] : []),
-        ]
-        const w = live.find(x => x.id === dialog.sendLater)
-        const picks = mergeActions(settings.actions, view?.projects.find(p => p.id === w?.project)?.config?.actions).filter(a => a.target !== 'shell') // Run ▾'s agent actions
-        return (
-          <SendLaterDialog
-            agents={agents}
-            tab={old?.tab ?? dialog.to ?? (agents.some(t => t.id === tab?.id) ? tab!.id : undefined)}
-            text={old?.text ?? dialog.text}
-            at={old?.end}
-            picks={picks}
-            inserts={to => (t => extInserts(to === 'ai' ? hereCtx() : { ws: t?.workspace, tab: t?.id }))(view.tabs.find(x => x.id === to))}
-            complete={to => (to === 'ai' ? completeOf(view, { project: w?.project }) : (t => completeOf(view, { ws: t?.workspace, agent: t?.kind === 'agent' ? t.preset : undefined }))(view.tabs.find(x => x.id === to)))}
-            onClose={() => setDialog(dialog.back ?? null)}
-            onPick={o => {
-              if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))
-              else addTimer(o.ms, { then: 'send', ws: dialog.sendLater, tab: o.tab, text: o.text })
-              setDialog(dialog.back ?? null) // from the AI page: back there
-              done(`It goes to ${agents.find(t => t.id === o.tab)?.name ?? 'the agent'} at ${new Date(Date.now() + o.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
-            }}
-          />
-        )
-      })()}
-      {typeof dialog === 'object' && dialog && 'timerNote' in dialog && (
-        <Prompt
-          title="The timer's message"
-          initial={timers.find(t => t.id === dialog.timerNote)?.note ?? ''}
-          placeholder="Go out · Stretch · Check the oven"
-          hint="On its bar, and what it says as it ends."
-          onClose={() => setDialog(null)}
-          onSubmit={async typed => {
-            setTimer(dialog.timerNote, x => ({ ...x, note: typed.trim().slice(0, 120) || undefined }))
-            setDialog(null)
-          }}
-        />
-      )}
-      {typeof dialog === 'object' && dialog && 'timer' in dialog && (
-        <Prompt
-          title="Start this timer over with"
-          placeholder="25 · 1h 30m · 90s"
-          hint="Minutes, or with units (h, m, s); up to a day. It starts at once."
-          onClose={() => setDialog(null)}
-          onSubmit={async typed => {
-            const ms = parseDuration(typed)
-            if (!ms) {
-              toast('A length like 25, 1h 30m or 90s, up to 24 hours')
-              throw new Error('no length') // the dialog stays open
-            }
-            restart(dialog.timer, ms)
-            setDialog(null)
-          }}
-        />
-      )}
-      {dialog === 'custom' && ws && (
-        <Prompt
-          title="New tab: command"
-          placeholder="aider --model sonnet"
-          hint="Runs through your login shell, in the workspace."
-          onClose={() => setDialog(null)}
-          onSubmit={async cmd => {
-            setDialog(null)
-            await newTab('custom', cmd)
-          }}
-        />
-      )}
-      {dialog && typeof dialog === 'object' && 'rename' in dialog && byId(dialog.rename) && (
-        <Prompt
-          title="Rename"
-          initial={byId(dialog.rename)!.name}
-          onClose={() => setDialog(null)}
-          onSubmit={async name => {
-            await call('tabSet', { id: dialog.rename, name })
-            setDialog(null)
-          }}
-        />
-      )}
-      {dialog && typeof dialog === 'object' && 'sep' in dialog && (() => {
-        const p = view.projects.find(p => p.id === dialog.sep)
-        const s = p?.seps?.find(x => x.id === dialog.id)
-        const tpls = templatesFor(settings.templates, p?.config?.templates)
-        const keys: string[] = [] // each pick's field, in order
-        return (
-        <Prompt
-          title={dialog.id ? 'Edit group' : 'New group'}
-          hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
-          initial={s?.name}
-          picks={([
-            ...(tpls.length || s?.template ? [{ key: 'template', label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template }] : []),
-            { key: 'preset', label: 'Default agent: a new workspace here starts it', none: 'None: the last one used', options: view.presets.filter(x => !x.off).map(x => x.name), value: s?.preset },
-            ...(p?.git === false ? [] : [{ key: 'where', label: 'Where: a new workspace here is made', none: 'As last picked', options: [...SEP_WHERE], names: { worktree: 'New worktree', bare: 'New worktree, no setup', local: "Local: the project's folder" }, value: s?.where }]),
-            { key: 'perm', label: 'Permission mode', none: "The agent profile's", options: ['ask', ...new Set(Object.values(PERMS).flatMap(m => m!.map(x => x[0])))], names: { ask: 'Ask first', ...Object.fromEntries(Object.values(PERMS).flatMap(m => m!.map(x => [x[0], x[1]]))) }, value: s?.perm },
-            { key: 'model', label: 'Model', none: "The agent profile's", options: Object.values(MODELS).flat(), value: s?.model, free: true },
-            { key: 'effort', label: 'Effort', none: "The agent profile's", options: [...new Set(Object.values(EFFORTS).flat())], value: s?.effort },
-            ...(p?.git === false ? [] : [{ key: 'base', label: 'Base branch for new worktrees', none: "The repo's main branch", options: [], value: s?.base, free: true }]),
-          ] as ({ key: string; label: string; none: string; options: string[]; value?: string; names?: Record<string, string>; free?: boolean })[]).map(({ key, ...x }) => (keys.push(key), x))}
-          onClose={() => setDialog(null)}
-          onSubmit={async (name, picked) => {
-            await sepName(dialog, name, Object.fromEntries(keys.map((k, i) => [k, picked[i]?.trim() ?? ''])))
-            setDialog(null)
-          }}
-        />
-        )
-      })()}
-      {dialog && typeof dialog === 'object' && 'notes' in dialog && (p => p && <ProjectNotes name={p.name} notes={p.notes ?? ''} onSave={notes => call('projectSet', { id: p.id, notes })} onClose={() => setDialog(null)} />)(view?.projects.find(p => p.id === dialog.notes))}
-      {dialog && typeof dialog === 'object' && 'importChats' in dialog && (p =>
-        p && (
-          <ImportChats
-            name={p.name}
-            wsName={id => (w => (w ? wsName(w) : "the project's folder"))(view.workspaces.find(w => w.id === id))}
-            load={() => call('chatList', { project: p.id })}
-            onClose={() => setDialog(null)}
-            onImport={async ids => {
-              const made = await call<{ id: string; workspace: string }[]>('chatImport', { project: p.id, ids })
-              setDialog(null)
-              if (made[0]) (showNew(made[0].workspace), selectTab(made[0])) // by ref: the view hasn't the tab yet
-              done(`${made.length} chat${made.length === 1 ? '' : 's'} imported`)
-            }}
-          />
-        ))(view.projects.find(p => p.id === dialog.importChats))}
-      {dialog && typeof dialog === 'object' && 'importWt' in dialog && (p =>
-        p && (
-          <ImportWorktrees
-            name={p.name}
-            load={() => call('worktreeList', { project: p.id })}
-            onClose={() => setDialog(null)}
-            onImport={async paths => {
-              const made = await call<{ id: string }[]>('worktreeImport', { project: p.id, paths })
-              setDialog(null)
-              done(`${made.length} worktree${made.length === 1 ? '' : 's'} imported`)
-            }}
-          />
-        ))(view.projects.find(p => p.id === dialog.importWt))}
-      {dialog && typeof dialog === 'object' && 'attachPr' in dialog && (w => w && (
-        <Prompt
-          title="Attach a pull request"
-          placeholder="https://github.com/owner/repo/pull/12, or 12"
-          hint={`Its URL, or its number in this repo. Its status and checks show here; the PR switches work when its branch is this workspace's (${w.branch}).`}
-          onClose={() => setDialog(null)}
-          onSubmit={async pr => {
-            const r = await call<{ number: number; linked: boolean }>('prAttach', { ws: w.id, pr })
-            setDialog(null)
-            done(`PR #${r.number} attached${r.linked ? ': only linked, its branch is another one' : ''}`)
-          }}
-        />
-      ))(live.find(w => w.id === dialog.attachPr))}
-      {dialog && typeof dialog === 'object' && 'ciLog' in dialog && (w => w && (
-        <CiLog
-          key={dialog.job}
-          name={dialog.name}
-          url={dialog.url}
-          load={() => api.call<string>('prLog', { ws: w.id, job: dialog.job }) /* its failure shows in it, not as a toast */}
-          onSend={() => prFix(w, 'ci', dialog.job)}
-          onOpen={openExternal}
-          copy={copy}
-          onClose={() => setDialog(null)}
-        />
-      ))(live.find(w => w.id === dialog.ciLog))}
-      {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
-        <Prompt
-          title="Rename workspace"
-          hint="Only the name shown here: the folder and branch keep the id. Enter the id to go back to it."
-          initial={(w => w.name || w.id)(live.find(w => w.id === dialog.renameWs)!)}
-          onClose={() => setDialog(null)}
-          onSubmit={async name => {
-            await call('wsSet', { id: dialog.renameWs, name })
-            setDialog(null)
-          }}
-        />
-      )}
+      <Dialogs app={app} />
     </div>
   )
 }
