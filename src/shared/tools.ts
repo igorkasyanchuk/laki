@@ -5,7 +5,7 @@ import { rpc as conn } from './conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
+import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -231,6 +231,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "Ask the user for a secret (an API key, a token, a password) without it going into this chat: they type it on a masked card under your tab in Laki, and you get only the path of a 0600 file that holds it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat \"$path\"). Waits up to 15 minutes; an error if they refuse.",
     inputSchema: obj({ label: str('what it is, a few words: Stripe test key') }, ['label']),
     run: a => rpc('secretAsk', { label: a.label, from: { ws: from, tab: process.env.LAKI_TAB } }, SECRET_WAIT + 30_000),
+  },
+  {
+    name: 'laki_alert',
+    description: "An important alert for the user: a card at the bottom right of their screen, over every app, until they close it. Only when they ask for one (\"show me an important alert\", \"ask me with a Laki alert\"). With choices (up to 6) it waits for their pick, up to 30 minutes, and returns it (choice), or closed / timedOut; without, it shows and returns.",
+    inputSchema: obj({ text: str('what it says, up to 600 characters: the question or the news'), title: str('a few words over it (default: your workspace and tab)'), choices: { type: 'array', items: { type: 'string' }, description: 'the answers to pick from, up to 6: Ship, Wait' } }, ['text']),
+    run: a => rpc('alertShow', { text: a.text, title: a.title, choices: a.choices, from: { ws: from, tab: process.env.LAKI_TAB } }, ALERT_WAIT + 30_000),
   },
   // a project's memory (agents': Laki AI keeps the user's with laki_memory_write)
   {
@@ -466,10 +472,10 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_reminder',
     description: "Laki's calendar (Calendar): follow-ups the user is reminded of at a moment, with a notification. act add (text, at: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30, or one that repeats: every weekday at 9am, mondays at 5pm; ws: a workspace it's about, default yours), list (what's coming and recent, with ids), done or rm (by id). Only when the user asks for a reminder or a follow-up.",
-    inputSchema: obj({ act: { type: 'string', enum: ['add', 'list', 'done', 'rm'] }, text: str('add: what to remind of'), at: str('add: when'), ws: str("add: a workspace's id"), id: str('done, rm: its id, from list') }, ['act']),
+    inputSchema: obj({ act: { type: 'string', enum: ['add', 'list', 'done', 'rm'] }, text: str('add: what to remind of'), at: str('add: when'), ws: str("add: a workspace's id"), important: { type: 'boolean', description: 'add: when the user says it matters (important, urgent, high importance): it rings as a card on screen, over every app, until they close it' }, id: str('done, rm: its id, from list') }, ['act']),
     run: async a => {
       if (a.act === 'add') {
-        const r = await rpc('reminderAdd', { text: a.text, at: a.at, ws: a.ws ?? from, tab: process.env.LAKI_TAB, by: who ?? (process.env.LAKI_TAB ? undefined : 'MCP') })
+        const r = await rpc('reminderAdd', { text: a.text, at: a.at, ws: a.ws ?? from, tab: process.env.LAKI_TAB, by: who ?? (process.env.LAKI_TAB ? undefined : 'MCP'), ...(a.important === true && { important: true }) })
         return { id: r.id, at: new Date(r.at).toString() }
       }
       if (a.act === 'done' || a.act === 'rm') return a.act === 'rm' ? (await rpc('reminderRm', { id: a.id }), { ok: true }) : rpc('reminderSet', { id: a.id, done: true })
@@ -703,8 +709,8 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_timer',
-    description: "Laki's timers in the sidebar (they live in its window): act timer (a countdown of minutes, a note saying what it's for), remind (minutes and a workspace id: a notification about it), send (minutes, an agent tab's id and text: typed into it then, once it's idle: Send later), stopwatch (one that counts up), list (what runs, with ids), stop (by id).",
-    inputSchema: obj({ act: { type: 'string', enum: ['timer', 'remind', 'send', 'stopwatch', 'list', 'stop'] }, minutes: { type: 'number', description: 'how long, in minutes (0.5: 30 seconds)' }, note: str('what it is for: on its bar and as it rings'), ws: str("remind: the workspace's id"), tab: str("send: the agent tab's id"), text: str('send: the message'), id: str('stop: its id, from list') }, ['act']),
+    description: "Laki's timers in the sidebar (they live in its window): act timer (a countdown of minutes, a note saying what it's for; important: as it ends, a card on screen until closed, when the user says it matters), remind (minutes and a workspace id: a notification about it), send (minutes, an agent tab's id and text: typed into it then, once it's idle: Send later), stopwatch (one that counts up), list (what runs, with ids), stop (by id).",
+    inputSchema: obj({ act: { type: 'string', enum: ['timer', 'remind', 'send', 'stopwatch', 'list', 'stop'] }, minutes: { type: 'number', description: 'how long, in minutes (0.5: 30 seconds)' }, note: str('what it is for: on its bar and as it rings'), ws: str("remind: the workspace's id"), tab: str("send: the agent tab's id"), text: str('send: the message'), important: { type: 'boolean', description: 'timer: a card on screen as it ends, over every app, until closed' }, id: str('stop: its id, from list') }, ['act']),
     run: a => rpc('timer', a),
   },
   {

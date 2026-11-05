@@ -16,7 +16,7 @@ import { redact } from './share.ts'
 // (hidden: a phone on the desk is on camera too). ponytail: a turn that starts and ends
 // within the 30 ms before a view is built looks like the same one, and its end isn't pushed
 export const pushed = new Map<string, string>()
-const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
+export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   const w = state.settings?.webhook
   const ws = state.workspaces.find(x => x.id === tab.workspace)

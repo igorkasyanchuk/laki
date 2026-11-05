@@ -704,12 +704,14 @@ export function Dialogs({ app }: { app: AppCtx }) {
           }}
         />
       )}
-      {dialog === 'timer' && (
+      {(dialog === 'timer' || dialog === 'importantTimer') && (
         <TimerDialog
+          key={dialog}
           where={ws ? wsName(ws) : undefined}
+          important={dialog === 'importantTimer'}
           onClose={() => setDialog(null)}
-          onStart={(ms, cmd, note) => {
-            addTimer(ms, { ...(cmd && ws && { then: 'command' as const, cmd, ws: ws.id }), ...(note && { note }) })
+          onStart={(ms, cmd, note, important) => {
+            addTimer(ms, { ...(cmd && ws && { then: 'command' as const, cmd, ws: ws.id }), ...(note && { note }), ...(important && { important }) })
             setDialog(null)
           }}
         />

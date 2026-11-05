@@ -37,12 +37,12 @@ import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, role
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, mentionsOf, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, mentionsOf, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
-import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
+import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
@@ -713,7 +713,7 @@ export function App() {
       const remind = t?.then === 'remind' && typeof t.ws === 'string'
       const left = !remind && typeof t?.left === 'number' && t.left > 0 ? t.left : undefined // paused: kept however long it was closed
       return typeof t?.id === 'string' && typeof t.end === 'number' && (t.end > Date.now() || remind || left) && typeof t.ms === 'number' && t.ms > 0
-        ? [{ id: t.id, end: t.end, ms: t.ms, then: remind || (TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string'))) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws, left, ...(typeof t.note === 'string' && t.note.trim() && { note: t.note.trim().slice(0, 120) }) }]
+        ? [{ id: t.id, end: t.end, ms: t.ms, then: remind || (TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string'))) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws, left, ...(typeof t.note === 'string' && t.note.trim() && { note: t.note.trim().slice(0, 120) }), ...(t.important === true && { important: true }) }]
         : []
     })
   })
@@ -726,13 +726,13 @@ export function App() {
   watchesRef.current = watches
   // Laki AI's timers (laki_timer, through the daemon): a timer, a reminder about a workspace, a message for later or a
   // stopwatch; what runs; one stopped
-  const timerAct = useRef<(m: { act: string; ms: number; note?: string; ws?: string; tab?: string; text?: string; which?: string }) => unknown>(() => {})
+  const timerAct = useRef<(m: { act: string; ms: number; note?: string; ws?: string; tab?: string; text?: string; which?: string; important?: boolean }) => unknown>(() => {})
   timerAct.current = m => {
     const id = Math.random().toString(36).slice(2, 10)
     if (m.act === 'stopwatch') return (setWatches(l => [...l, { id, ms: 0, from: Date.now() }]), { id, stopwatch: 'running' })
     if (m.act === 'list')
       return {
-        timers: timersRef.current.map(t => ({ id: t.id, kind: t.then === 'remind' ? 'reminder' : t.then === 'send' ? 'send later' : 'timer', secondsLeft: Math.round((t.left ?? t.end - Date.now()) / 1000), paused: t.left !== undefined, note: t.note, ws: t.ws, text: t.text })),
+        timers: timersRef.current.map(t => ({ id: t.id, kind: t.then === 'remind' ? 'reminder' : t.then === 'send' ? 'send later' : 'timer', secondsLeft: Math.round((t.left ?? t.end - Date.now()) / 1000), paused: t.left !== undefined, note: t.note, ws: t.ws, text: t.text, ...(t.important && { important: true }) })),
         stopwatches: watchesRef.current.map(w => ({ id: w.id, seconds: Math.round((w.ms + (w.from ? Date.now() - w.from : 0)) / 1000), running: !!w.from })),
       }
     if (m.act === 'stop') {
@@ -741,7 +741,7 @@ export function App() {
       throw new Error(`no timer or stopwatch ${m.which}`)
     }
     const then: Partial<Timer> = m.act === 'remind' ? { then: 'remind', ws: m.ws } : m.act === 'send' ? { then: 'send', ws: m.ws, tab: m.tab, text: m.text } : {}
-    setTimers(l => [...l, { id, end: Date.now() + m.ms, ms: m.ms, then: 'notify', ...then, ...(m.note && { note: m.note }) }])
+    setTimers(l => [...l, { id, end: Date.now() + m.ms, ms: m.ms, then: 'notify', ...then, ...(m.note && { note: m.note }), ...(m.important === true && m.act === 'timer' && { important: true }) }])
     return { id, rings: new Date(Date.now() + m.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
   }
   const addTimer = (ms: number, more: Partial<Timer> = {}) => {
@@ -787,9 +787,10 @@ export function App() {
     const s = viewRef.current?.settings
     const sound = s?.timerSound || 'Glass'
     const up = t.note ? `${t.note} (${span(t.ms)} is up${did})` : `${span(t.ms)} is up${did}` // its message first: what it was for
+    if (t.important && bridge) return void (notify(t.note || 'Timer', up, '', () => {}, sound, undefined, { tone: 'info' }), toast(`Timer: ${up}`)) // a card on screen until closed
     if (s?.timerAlert === 'notification') return void (notify(t.note || 'Timer', up, '', () => {}, sound), toast(`Timer: ${up}`))
     if (sound !== 'none') bridge?.sound?.(sound)
-    const again = () => addTimer(t.ms, { then: t.then, cmd: t.cmd, ws: t.ws, note: t.note })
+    const again = () => addTimer(t.ms, { then: t.then, cmd: t.cmd, ws: t.ws, note: t.note, important: t.important })
     if (document.querySelector('.ask-overlay')) return toast(`Timer: ${up}`, again, 'Again') // a dialog would answer the open one with no
     choose(t.note || `${span(t.ms)} timer is up`, [t.note && `${span(t.ms)} timer is up`, did && did.slice(2).replace(/^./, c => c.toUpperCase())].filter(Boolean).join(' · ') || undefined, [{ label: 'Again' }, { label: 'OK', primary: true }]).then(i => i === 0 && again())
   }
@@ -943,9 +944,11 @@ export function App() {
     .filter((x, i) => i < recentN || (doneAlert && freshDone(x.t)))
     .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: projWords(w), status: (freshDone(t) ? 'done' : 'idle') as 'idle' | 'done', color: tint(w), last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...(t.done && { unseen: true }), ...islandOf(t), ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
-  const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
+  const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['error', '--error'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
   const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: aiOn(fs), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge' }
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
+  const asking = view?.tabs.filter(t => t.status === 'waiting').map(t => t.id).join(' ') // none: not connected, nothing known
+  useEffect(() => void (asking !== undefined && bridge?.asking?.(asking ? asking.split(' ') : [])), [asking]) // asks on screen: an answered one's card goes
   useEffect(() => {
     bridge?.floats?.(floats, floatColors, floatOpts)
     const keep = new Set(view?.tabs.map(t => t.id))
@@ -1187,7 +1190,8 @@ export function App() {
           const cut = !noteWhole(body)
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions)
+          const card = !w?.important ? undefined : m.kind === 'waiting' ? { ask: true, ...(perm?.diff && { diff: perm.diff }) } : { tone: m.kind === 'limit' ? ('bad' as const) : ('ok' as const) } // an important workspace's: a card on screen (main's addCard)
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions, card)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
@@ -1200,7 +1204,7 @@ export function App() {
         if (!t || m.status === 'failed' || s?.notify === false || t.muted || w?.muted) return
         if (m.status !== 'over' && (s?.notifyOn?.done === false || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound)
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound, undefined, w?.important ? { tone: m.status === 'over' ? 'bad' : 'ok' } : undefined)
       } else if (m.ev === 'flow') {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
@@ -1234,7 +1238,14 @@ export function App() {
         const body = m.kind === 'waiting' ? `asks you: ${m.text}` : `${m.status}: ${m.text}`
         notify(`Workflow · ${m.name}`, noteCut(body), '', open, s?.notifySound)
         if (m.kind === 'waiting') toast(`${m.name} asks you: ${m.text}`.slice(0, 160), open, 'Open')
-      } else if (m.ev === 'reminder') {
+      } else if (m.ev === 'alert') {
+        // laki alert: what an agent or a script asked to show you as a card on screen, with its choices (each answers
+        // it: alertAnswer); notifications off or not, as you asked for it
+        const picks: string[] = m.choices ?? []
+        if (bridge) notify(String(m.title), String(m.text), m.tab ?? '', () => {}, viewRef.current?.settings.notifySound, picks.map(c => ({ text: c, alert: { id: m.id, choice: c } })), { alert: m.id })
+        else void choose(String(m.title), String(m.text), picks.length ? picks.map((c, i) => ({ label: c, primary: i === 0 })) : [{ label: 'OK', primary: true }], undefined, `alert:${m.id}`).then(i => void api.call('alertAnswer', { id: m.id, ...(picks[i] !== undefined && { choice: picks[i] }) }).catch(() => {})) // a browser (remote access): the app's own dialog
+      } else if (m.ev === 'alertDone') bridge ? bridge.cardGone?.(`alert:${m.id}`) : unchoose(`alert:${m.id}`)
+      else if (m.ev === 'reminder') {
         // the calendar's reminder, due (the daemon rings each once): a notification and a toast, Open its workspace. One
         // due while the app was closed comes right after the first state, before it's drawn: once there's a view
         const ring = (n = 0): unknown => {
@@ -1242,7 +1253,7 @@ export function App() {
           if (!v) return n < 100 && setTimeout(() => ring(n + 1), 50)
           const w = m.ws ? v.workspaces.find(x => x.id === m.ws && !x.archived) : undefined
           const open = () => (w ? (setDialog(null), setWsId(w.id)) : setDialog('calendar'))
-          if (v.settings.notify !== false) notify('Reminder', noteCut(String(m.text)), (w && v.tabs.find(x => x.workspace === w.id)?.id) ?? '', open, v.settings.notifySound) // its click: there
+          if (v.settings.notify !== false || m.important) notify('Reminder', noteCut(String(m.text)), (w && v.tabs.find(x => x.workspace === w.id)?.id) ?? '', open, v.settings.notifySound, undefined, m.important ? { tone: 'info' } : undefined) // its click: there; an important one: a card on screen, notifications off or not
           toast(`Reminder: ${m.text}`.slice(0, 160), open, w ? 'Open' : 'Calendar')
         }
         ring()
@@ -1452,36 +1463,43 @@ export function App() {
   // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
   type Peek = { dirty?: number; ahead?: number; unpushed?: number }
   const peekWs = async (w: WorkspaceView): Promise<Peek> => ((view?.api ?? 0) >= 94 ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {})
-  // archive: the same, but the storage folder stays (archive keeps it), and a codespace is stopped, its files kept
-  const rmFacts = async (w: WorkspaceView, archive = false, pk?: Peek): Promise<Fact[]> => {
+  // archive: the same, but the storage folder stays (archive keeps it), and a codespace is stopped, its files kept.
+  // Each line's icon is tinted by what it means for you (green: nothing lost, amber: mind it, red: lost), the PR's state
+  // is a pill, and the verdict over them sums it up: Safe to delete (merged, or nothing of its own), else what to check
+  const rmFacts = async (w: WorkspaceView, archive = false, pk?: Peek): Promise<{ facts: Fact[]; verdict?: Verdict }> => {
     pk ??= await peekWs(w)
     const cs = w.codespace !== undefined
     const stops = archive && cs // what's in it stays
     const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
     const tabs = view?.tabs.filter(t => t.workspace === w.id && t.status !== 'exited') ?? []
     const busy = tabs.filter(t => t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting'))
-    const facts: Fact[] = [{ label: 'Project', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
-    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
-    facts.push(cs ? { label: 'Codespace', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
-    if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept' : 'lost'}` : 'none uncommitted' })
-    if (pk.ahead) facts.push({ label: 'Commits', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
-    if (w.pr) facts.push({ label: 'PR', value: `#${w.pr.number} ${w.pr.draft ? 'draft' : w.pr.state.toLowerCase()}${w.pr.title ? ` · ${w.pr.title}` : ''} (stays on GitHub)` })
-    if (w.pr?.author) facts.push({ label: 'Author', value: `${w.pr.author}${w.pr.mine ? ' (you)' : ''}` })
-    facts.push({ label: 'Tabs', value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
-    if (w.ports.length) facts.push({ label: 'Servers', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
-    if (w.artifacts) facts.push(archive || view?.settings?.keepStorage ? { label: 'Artifacts', value: `${n(w.artifacts, 'file')} (kept)` } : { label: 'Artifacts', value: `${n(w.artifacts, 'file')}: deleted` })
-    facts.push({ label: 'Created', value: ago(w.created) })
-    return facts
+    const pr = w.pr
+    const merged = pr?.state === 'MERGED'
+    const open = !!pr && !merged && pr.state !== 'CLOSED'
+    const keptArts = archive || !!view?.settings?.keepStorage
+    const facts: Fact[] = [{ label: 'Project', icon: 'folder', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
+    if (w.kind === 'worktree') facts.push({ label: 'Branch', icon: 'gitBranch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
+    facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
+    if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty && !stops ? 'bad' : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept' : 'lost'}` : 'none uncommitted' })
+    if (pk.ahead) facts.push({ label: 'Commits', icon: 'gitCommit', tone: pk.unpushed ? 'warn' : 'ok', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
+    if (pr) facts.push({ label: 'PR', icon: merged ? 'gitMerge' : 'pr', tone: merged ? 'ok' : open ? 'warn' : undefined, chip: merged ? 'Merged' : pr.draft ? 'Draft' : open ? 'Open' : 'Closed', value: `#${pr.number}${pr.title ? ` · ${pr.title}` : ''} (stays on GitHub)` })
+    if (pr?.author) facts.push({ label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` })
+    facts.push({ label: 'Tabs', icon: 'terminal', tone: busy.length ? 'warn' : undefined, value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
+    if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
+    if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${keptArts ? ' (kept)' : ': deleted'}` })
+    facts.push({ label: 'Created', icon: 'clock', value: ago(w.created) })
+    const verdict = rmVerdict({ archive, worktree: w.kind === 'worktree', dirty: pk.dirty, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
+    return { facts, verdict }
   }
   const rmWs = async (w: WorkspaceView) => {
-    if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, facts: await rmFacts(w), ok: 'Delete', danger: true }))) return
+    if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, ...(await rmFacts(w)), ok: 'Delete', danger: true }))) return
     if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
   // a terminal closes as a tab does: asked only while something runs in it (an agent, a command, a server) or it keeps artifacts
   const closeTerm = async (w: WorkspaceView) => {
     const busy = w.ports.length > 0 || (!!w.artifacts && !view?.settings?.keepStorage) || (view?.tabs ?? []).some(t => t.workspace === w.id && t.status !== 'exited' && (t.kind === 'agent' || t.status === 'running' || !!t.runs))
-    if (busy && !(await ask(`Close ${wsName(w)}?`, { text: 'What runs in it stops.', facts: await rmFacts(w), ok: 'Close', danger: true }))) return
+    if (busy && !(await ask(`Close ${wsName(w)}?`, { text: 'What runs in it stops.', ...(await rmFacts(w)), ok: 'Close', danger: true }))) return
     if (!(await busyWith([w.id], 'closing', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return
     done(`Closed ${wsName(w)}`)
   }
@@ -1515,7 +1533,7 @@ export function App() {
     const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there
     const pk = asked ? {} : await peekWs(w)
     const cs = w.codespace !== undefined // its codespace stops, its files stay
-    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay. Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, facts: await rmFacts(w, true, pk), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
+    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay. Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
     let forced = false
     const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
     const r = old && asked ? { dirty: -1 } : await gated(w, 'archive', go(!old && !pk.dirty)) // the changes it was asked about go
@@ -2388,6 +2406,7 @@ export function App() {
     { head: 'Start a timer' },
     ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => addTimer(m * 60000) }) as MenuItem),
     { label: 'Other length, a message or a command…', icon: 'pencil', key: 'o', run: () => setDialog('timer') },
+    { label: 'Important timer…', icon: 'alertCircle', key: 'i', tip: 'As it ends, a card at the bottom right over every app, until you close it', run: () => setDialog('importantTimer') },
     null,
     { label: 'Stopwatch', icon: 'clock', key: 's', run: () => setWatches(l => [...l, { id: Math.random().toString(36).slice(2, 10), ms: 0, from: Date.now() }]) },
   ]

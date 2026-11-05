@@ -783,3 +783,25 @@ export function menuKeys(acts: { key?: string; label: string }[]) {
     return k
   })
 }
+
+// what Delete or Archive comes to, over its facts (App's rmFacts): bad when uncommitted files are lost, warn when
+// something needs minding (commits not pushed, a PR not merged, agents at work, artifacts deleted), ok when its PR is
+// merged or it has nothing of its own (a worktree with no changes or commits); unknown counts (wsPeek too slow) say nothing,
+// a merged PR's worktree included (its uncommitted files weren't counted)
+export type RmState = { archive?: boolean; worktree: boolean; dirty?: number; ahead?: number; unpushed?: number; lost?: boolean; pr?: { number: number; state: string }; busy: number; artifacts: number; keptArts: boolean }
+export function rmVerdict(s: RmState): { tone: 'ok' | 'warn' | 'bad'; text: string } | undefined {
+  const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
+  const merged = s.pr?.state === 'MERGED'
+  const open = !!s.pr && !merged && s.pr.state !== 'CLOSED'
+  const lost = s.dirty && s.lost ? [`${n(s.dirty, 'uncommitted file')} ${s.dirty === 1 ? 'is' : 'are'} lost`] : []
+  const mind = [
+    s.unpushed && `${n(s.unpushed, 'commit')} not pushed (kept on the branch here)`,
+    open && `PR #${s.pr!.number} isn't merged yet`,
+    s.busy && `${n(s.busy, 'agent')} at work ${s.busy === 1 ? 'stops' : 'stop'}`,
+    s.artifacts && !s.keptArts && `${n(s.artifacts, 'artifact')} ${s.artifacts === 1 ? 'goes' : 'go'}`,
+  ].filter(Boolean) as string[]
+  if (lost.length) return { tone: 'bad', text: `Check first: ${[...lost, ...mind].join('; ')}` }
+  if (mind.length) return { tone: 'warn', text: `Mind: ${mind.join('; ')}` }
+  const safe = merged && (s.dirty !== undefined || !s.worktree || !s.lost) ? `PR #${s.pr!.number} is merged${s.dirty === 0 ? ', nothing uncommitted' : ''}${s.ahead && !s.unpushed ? ', all pushed' : ''}` : s.worktree && s.dirty === 0 && !s.ahead ? 'nothing of its own: no changes, no commits' : ''
+  return safe ? { tone: 'ok', text: `Safe to ${s.archive ? 'archive' : 'delete'}: ${safe}` } : undefined
+}

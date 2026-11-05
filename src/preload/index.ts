@@ -3,7 +3,9 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
-  notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
+  notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[], card?: { diff?: string; ask?: boolean; alert?: string; tone?: string }) => ipcRenderer.send('notify', title, body, tab, sound, actions, card),
+  cardGone: (key: string) => ipcRenderer.send('card-gone', key), // a laki alert over: its card goes
+  asking: (tabs: string[]) => ipcRenderer.send('asking', tabs), // the tabs that wait: cards on screen for the others' asks go
   sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string, panel?: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string, panel?: string) => cb(tab, panel)), // panel: changes (the island's Review)
@@ -103,6 +105,15 @@ contextBridge.exposeInMainWorld('laki', {
     onIsland: (cb: (c: object, colors: Record<string, string>) => void) => ipcRenderer.on('island', (_e, c, colors) => cb(c, colors)),
     islandSize: (h: number) => ipcRenderer.send('island-size', h),
     islandEv: (ev: string) => ipcRenderer.send('island-ev', ev),
+  },
+  // cards on screen (ask.html): the cards in, the page's height, a choice, ×, Close all and Open out (by each card's key)
+  ask: {
+    onCards: (cb: (cards: object[], colors: Record<string, string>) => void) => ipcRenderer.on('ask-cards', (_e, cards, colors) => cb(cards, colors)),
+    size: (h: number) => ipcRenderer.send('ask-size', h),
+    act: (key: string, i: number): Promise<void> => ipcRenderer.invoke('ask-act', key, i),
+    close: (key: string) => ipcRenderer.send('ask-close', key),
+    closeAll: () => ipcRenderer.send('ask-close-all'),
+    open: (key: string) => ipcRenderer.send('ask-open', key),
   },
   // the screenshot's editor window (annotate.html): the picture in, the drawn one and a note out
   annotate: {

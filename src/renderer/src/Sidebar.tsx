@@ -106,6 +106,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     { label: 'Add 5 minutes', icon: 'plus', key: 'a', run: () => setTimer(t.id, x => ({ ...x, end: x.end + 300000, ms: x.ms + 300000, ...(x.left !== undefined && { left: x.left + 300000 }) })) },
     { label: t.note ? 'Change its message…' : 'Add a message…', icon: 'pencil', key: 'm', run: () => setDialog({ timerNote: t.id }) },
     ...(t.note ? [{ label: 'Remove its message', icon: 'x', run: () => setTimer(t.id, x => ({ ...x, note: undefined })) } as MenuItem] : []),
+    { label: 'Important: a card on screen', icon: 'alertCircle', key: 'i', hint: t.important ? '✓' : undefined, tip: 'As it ends, a card at the bottom right over every app, until you close it', run: () => setTimer(t.id, x => ({ ...x, important: !x.important || undefined })) },
     null,
     { head: 'Start over with' },
     ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => restart(t.id, m * 60000) }) as MenuItem),
@@ -216,6 +217,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />
+          </span>
+        )}
+        {w.important && !w.muted && (
+          <span className="ws-mark" data-tip="Important: its asks and finishes as cards on screen">
+            <Icon name="alertCircle" size={11} />
           </span>
         )}
         {!more && wt.some(t => t.compacting) && (
@@ -349,6 +355,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
       w.race && 'in a race: ⋯ › Compare the race',
       w.muted && 'notifications muted',
+      w.important && !w.muted && 'important: cards on screen',
       w.pending && `${w.pending.agent}: ${pendingWords(w.pending, true).replace(/^S/, 's')}`,
       ...wt.filter(t => t.queue?.length).map(t => `${t.queue!.length} queued for ${t.name}`),
       ...timers.filter(t => t.then === 'remind' && t.ws === w.id).map(t => `a reminder at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
@@ -599,7 +606,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         />
       )}
       {timers.map(t => (
-        <TimerBar key={t.id} end={t.end} tip={t.then === 'send' ? `To ${sendTo(t)}: ${t.text}` : undefined} label={t.then === 'send' ? `To ${sendTo(t)}: ${clip(t.text ?? '', 80)}` : t.then === 'remind' ? reminder(t) : `${t.note ? `${t.note} · ` : ''}${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} left={t.left} onPause={t.then === 'send' || t.then === 'remind' ? undefined : () => pause(t.id)} onStop={() => setTimer(t.id, () => null)} />
+        <TimerBar key={t.id} end={t.end} tip={t.then === 'send' ? `To ${sendTo(t)}: ${t.text}` : undefined} label={t.then === 'send' ? `To ${sendTo(t)}: ${clip(t.text ?? '', 80)}` : t.then === 'remind' ? reminder(t) : `${t.important ? 'Important · ' : ''}${t.note ? `${t.note} · ` : ''}${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} left={t.left} onPause={t.then === 'send' || t.then === 'remind' ? undefined : () => pause(t.id)} onStop={() => setTimer(t.id, () => null)} />
       ))}
       {watches.map(w => (
         <StopwatchBar

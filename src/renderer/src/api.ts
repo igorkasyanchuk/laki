@@ -5,10 +5,12 @@
 import type { UpdateState } from '../../shared/update'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
-export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' } } // tool: an extension's tool call's answer (widgetToolAnswer)
+export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
-  notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[]): void
+  notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card): void
+  asking?(tabs: string[]): void // the tabs that wait (cards on screen)
+  cardGone?(key: string): void // a laki alert over: its card goes
   sound?(name: string): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string, panel?: string) => void): void
@@ -263,8 +265,12 @@ export const openKeptLink = async (url: string) => {
   if ((await bridge.openPath(path)) === 'missing') throw new Error(`Not on this Mac any more: ${path}`)
 }
 
-export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[]) {
-  if (bridge) return bridge.notify(title, body, tab, sound, actions)
+// card: something you marked important (a workspace, a timer, a reminder) or a laki alert, as a card on screen instead
+// (main's addCard; the app only): ask, a waiting agent's (its diff with it); alert, laki alert's id; tone, the edge's
+// color (ok: a finish, bad: a limit)
+type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' | 'info' }
+export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[], card?: Card) {
+  if (bridge) return bridge.notify(title, body, tab, sound, actions, card)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()
   if (Notification.permission === 'granted') new Notification(title, { body, silent: sound === 'none' }).onclick = onClick

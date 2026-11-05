@@ -196,6 +196,7 @@ export type Workspace = {
   named?: true // you named it (renamed it, or typed its name as it was made): an agent's rename is refused unless you asked (laki rename --asked), a page's title never renames it
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
+  important?: boolean // its agents' asks and finishes as cards on screen, until answered or closed (main's addCard)
   private?: boolean // Recording mode (settings.recording) hides it (veiled); its project's private too
   pinned?: boolean // the sidebar shows it above the projects, under Pinned
   railPin?: number // on the rail, after a line, for a quick click (RAIL_PINS at most): when it was pinned, their order
@@ -455,6 +456,7 @@ export type TurnChanges = { at: number; add: number; del: number; n: number; fil
 export const WHEN_DONE = ['sleep', 'lock', 'shutdown'] as const
 export type WhenDone = (typeof WHEN_DONE)[number] | 'off'
 export const SECRET_WAIT = 15 * 60_000 // laki secret's wait for your answer, then no (daemon/secrets.ts)
+export const ALERT_WAIT = 30 * 60_000 // laki alert's wait for your pick, then timedOut (daemon/alerts.ts)
 export const WHEN_DONE_WAIT = 60_000 // the countdown before it acts, which Cancel stops
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
@@ -700,7 +702,7 @@ export type Todo = { id: string; project: string; text: string; at: number; imag
 // a follow-up on the calendar (Calendar): a note for a moment, from you, Laki AI or an agent (by), maybe about a
 // workspace or a project; it rings once as it's due (fired) while the app is open, done: ticked off
 // every: the words of a repeating one (when.ts whenOf: every weekday at 9am); at is then its next time, moved on as it rings
-export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean; every?: string }
+export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean; every?: string; important?: boolean } // important: it rings as a card on screen until closed
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // a tile on the Desk: an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
 // x, y: its cell, columns from the left and rows from the top, 0 first (none: the first spot it fits, deskLayout)
@@ -946,7 +948,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 147
+export const API = 148
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

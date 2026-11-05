@@ -1378,8 +1378,9 @@ export function Prompt({ title, hint, placeholder, initial = '', picks = [], bus
 
 // a new timer: how long, a message (what it's for: Go out; on its bar and as it ends) and, with its switch, a command it
 // runs as it ends (in the workspace in front: where, its name)
-export function TimerDialog({ where, onClose, onStart }: { where?: string; onClose: () => void; onStart: (ms: number, cmd?: string, note?: string) => void }) {
+export function TimerDialog({ where, important: first = false, onClose, onStart }: { where?: string; important?: boolean; onClose: () => void; onStart: (ms: number, cmd?: string, note?: string, important?: boolean) => void }) {
   const [len, setLen] = useState('')
+  const [important, setImportant] = useState(first) // Important timer…: on to begin with
   const [note, setNote] = useState('')
   const [run, setRun] = useState(false)
   const [cmd, setCmd] = useState('')
@@ -1387,10 +1388,13 @@ export function TimerDialog({ where, onClose, onStart }: { where?: string; onClo
   const ok = !!ms && (!run || !!cmd.trim())
   return (
     <Modal title="New timer" onClose={onClose}>
-      <form className="form" onSubmit={e => (e.preventDefault(), ok && onStart(ms!, run ? cmd.trim() : undefined, note.trim().slice(0, 120) || undefined))}>
+      <form className="form" onSubmit={e => (e.preventDefault(), ok && onStart(ms!, run ? cmd.trim() : undefined, note.trim().slice(0, 120) || undefined, important))}>
         <input value={len} autoFocus placeholder="25 · 1h 30m · 90s" onChange={e => setLen(e.target.value)} />
         <div className="muted small">{len.trim() && !ms ? 'A length like 25, 1h 30m or 90s, up to 24 hours.' : 'Minutes, or with units (h, m, s); up to a day. It starts at once.'}</div>
         <input value={note} maxLength={120} placeholder="A message, if you like: Go out · Stretch · Check the oven" onChange={e => setNote(e.target.value)} />
+        <Switch on={important} onChange={setImportant} tip="As it ends, a card at the bottom right over every app, until you close it">
+          Important: a card on screen
+        </Switch>
         {where && (
           <Switch on={run} onChange={setRun} tip="As it ends, a command runs in a tab of its own">
             Then run a command

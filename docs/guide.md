@@ -1577,6 +1577,11 @@ it, in the same worktree, told to read a handover first: a file in the workspace
 (your messages and its answers) and the files changed against the base. For a usage limit or a stuck agent; the first
 tab stays as it was.
 
+**Important alerts**: ask an agent for one ("show me an important alert in this question using Laki") and it runs
+`laki alert "Deploy to production now?" --choice Deploy --choice "Not yet"` (or MCP's `laki_alert`): a card at the
+bottom right of your screen, over every app, with a button per choice; your pick goes back to the agent, which goes
+on by it (× says no choice; after 30 minutes it stops waiting). Without choices it just tells you something.
+
 **Secrets**: an agent that needs a token runs `laki secret "Stripe test key"` (or MCP's `laki_secret`). Its tab then
 needs you: a card under it asks for that, with a masked field. What you type goes to a 0600 file in the workspace's
 storage folder (hidden, deleted after 24 hours) and the agent gets only the file's path, so the value never enters
@@ -1830,7 +1835,7 @@ setting* (the box above the sections) lists the settings that match what you typ
 lit for a moment. A setting that assumes agent know-how (Done check, Collision radar, fast and permission modes,
 Merge when green, Send into the running turn…) has a ? after its name: a card of what it does, when to turn it on
 and what it costs.
-- *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, on by default (Laki AI answers it): ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+- *General*: the agent new workspaces start with, *Menu bar icon* (Laki's mark in the menu bar with the count and its menu, on by default), *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them; *Screenshot to Laki AI*, on by default (Laki AI answers it): ⌃⌥⌘S, a part of the screen to Laki AI's window with the mic on), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K; what you mark important comes as a card at the bottom right, over every app and Space, until you answer it anywhere, open it or close its ×: a workspace's asks and finishes (⋯ › Workspace › *Important: cards on screen*), a timer (*Important* in New timer or its menu), a reminder (Calendar's *Important*, `laki remind … --important`)) with a switch for each
   kind (waiting for you, finished, usage limit, plan limit nearly used, with *Plan limit at*: 75, 90 or 95%) and the sound (macOS's, or none), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
@@ -2258,6 +2263,7 @@ laki agents                                             # the named agents: wher
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
+laki alert "Ship it?" --choice Ship --choice Wait       # an important card on your screen; prints your pick
 laki screen fix-the-login/claude
 laki diff fix-the-login [--uncommitted] | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki run fix-the-login test                             # the project's test script (lint, format, deploy, setup) in its tab

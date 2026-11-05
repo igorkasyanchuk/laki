@@ -395,13 +395,26 @@ ipcMain.handle('conn', async e => {
 // Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
 // closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
 // collected Notification's events never come
-type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string } } // tool: an extension's tool call, answered (widgetToolAnswer)
+type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
 const notes = new Set<Notification>()
-ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
+// card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
+// ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
+// its edge's color
+type CardOpts = { diff?: unknown; ask?: unknown; alert?: unknown; tone?: unknown }
+ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[], card?: CardOpts) => {
   if (!fromApp(e)) return
-  if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
+  if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string')).slice(0, 9)
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
+  if (card && typeof card === 'object') {
+    if (sound !== 'none') execFile('afplay', [`/System/Library/Sounds/${named ? sound : 'Glass'}.aiff`], () => {})
+    const t = typeof tab === 'string' ? tab : ''
+    const ask = card.ask === true && !!t
+    const alert = typeof card.alert === 'string' && /^[\w-]{1,40}$/.test(card.alert) ? card.alert : ''
+    const actions = alert ? buttons.filter(a => a.alert?.id === alert) : buttons.filter(a => !a.tool && !a.alert)
+    const tone = ask || (alert && actions.length) ? 'ask' : ['ok', 'bad'].includes(card.tone as string) ? (card.tone as Card['tone']) : 'info'
+    return addCard({ key: alert ? `alert:${alert}` : t ? `tab:${t}` : `n:${++cardN}`, tab: t, ask, tone, at: Date.now(), title: String(title), body: String(body), ...(typeof card.diff === 'string' && { diff: card.diff }), actions })
+  }
   const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })
   const done = () => notes.delete(n)
   n.on('click', () => (done(), show(tab)))
@@ -416,6 +429,76 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
   if (notes.size > 50) notes.delete(notes.values().next().value!) // ponytail: the oldest go; Notification Center keeps them for days
   n.show()
 })
+
+// cards on screen (what's marked important: a workspace's asks and finishes, a timer, a reminder): a card each at the
+// bottom right of the screen the pointer was on as the first came, over every app, Space and full-screen app (a panel:
+// no focus taken, a click lands at once), stacked, the newest on top. key: one per tab (its ask, its finish: the newer
+// replaces it), else its own. An ask stays until it's answered there or anywhere else (asking: the tabs still
+// waiting), any card until it's opened or closed (×, Close all)
+type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info'; at: number; title: string; body: string; diff?: string; actions: NoteAction[]; error?: string }
+const CARD_W = 380
+let cards: Card[] = []
+let cardN = 0
+let cardWin: BrowserWindow | null = null
+let cardAt: Electron.Rectangle | null = null // the screen's work area it's in, while it shows
+function addCard(c: Card) {
+  cards = [c, ...cards.filter(x => x.key !== c.key)].slice(0, 20) // ponytail: the oldest past 20 go
+  if (!cardWin || cardWin.isDestroyed()) {
+    const w = (cardWin = new BrowserWindow(floatOpts(CARD_W, 120)))
+    w.setAlwaysOnTop(true, 'screen-saver') // over other apps' floating windows too
+    w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
+    w.webContents.on('will-navigate', e => e.preventDefault())
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    w.webContents.on('did-finish-load', sendCards)
+    w.on('closed', () => cardWin === w && ((cardWin = null), (cardAt = null)))
+    if (dev) w.loadURL(new URL('ask.html', `${process.env.ELECTRON_RENDERER_URL}/`).href)
+    else w.loadFile(fileURLToPath(new URL('../renderer/ask.html', import.meta.url)))
+  } else sendCards()
+}
+const sendCards = () => (cards.length ? cardWin?.webContents.send('ask-cards', cards, floats.colors) : (cardWin?.hide(), (cardAt = null)))
+const dropCards = (keep: (c: Card) => boolean) => {
+  const still = cards.filter(keep)
+  if (still.length !== cards.length) (cards = still), sendCards()
+}
+const cardSender = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => !!cardWin && !cardWin.isDestroyed() && e.sender === cardWin.webContents
+const cardOf = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, key: unknown) => (cardSender(e) && typeof key === 'string' ? cards.find(x => x.key === key) : undefined)
+// its height (the page's, every card in it), kept to the screen; bottom right of the work area
+ipcMain.on('ask-size', (e, h: unknown) => {
+  if (!cardSender(e) || typeof h !== 'number' || !(h > 0) || !cards.length) return
+  cardAt ??= screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+  const height = Math.round(Math.min(h, cardAt.height - 24))
+  cardWin!.setBounds({ x: cardAt.x + cardAt.width - CARD_W - 12, y: cardAt.y + cardAt.height - height - 12, width: CARD_W, height })
+  if (!cardWin!.isVisible()) cardWin!.showInactive()
+})
+// a choice: its menu answered as the notification's would be; refused (it moved on): said on the card
+ipcMain.handle('ask-act', async (e, key: unknown, i: unknown) => {
+  const c = cardOf(e, key)
+  const a = c && typeof i === 'number' ? c.actions[i] : undefined
+  if (!c || !a) return
+  try {
+    if (a.alert) await rpc('alertAnswer', { id: a.alert.id, choice: a.alert.choice })
+    else await rpc('answer', { tab: c.tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) })
+    dropCards(x => x !== c)
+  } catch (err) {
+    c.error = `${(err as Error).message}: open ${c.tab ? 'its tab' : 'Laki'}`
+    sendCards()
+  }
+})
+// closed: a laki alert that waits hears it (no choice)
+const closed = (c: Card) => c.key.startsWith('alert:') && void rpc('alertAnswer', { id: c.key.slice(6) }).catch(() => {})
+ipcMain.on('ask-close', (e, key: unknown) => (c => c && (closed(c), dropCards(x => x !== c)))(cardOf(e, key)))
+ipcMain.on('ask-close-all', e => cardSender(e) && (cards.forEach(closed), dropCards(() => false)))
+ipcMain.on('ask-open', (e, key: unknown) => {
+  const c = cardOf(e, key)
+  if (!c) return
+  if (!c.actions.length) dropCards(x => x !== c) // one with choices stays: it's answered there
+  app.focus({ steal: true })
+  show(c.tab || undefined)
+})
+// a laki alert answered, timed out or gone (alertDone, the app window's): its card goes
+ipcMain.on('card-gone', (e, key: unknown) => e.sender === win?.webContents && typeof key === 'string' && dropCards(c => c.key !== key))
+// the app window's tabs that wait: an agent's ask whose tab no longer does goes
+ipcMain.on('asking', (e, tabs: unknown) => e.sender === win?.webContents && Array.isArray(tabs) && dropCards(c => !c.ask || tabs.includes(c.tab)))
 
 // a timer's end with its dialog (Settings › General › Timers): one of macOS's sounds, whatever notifications say
 ipcMain.on('sound', (e, name: string) => {
@@ -755,6 +838,7 @@ function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
 app.whenReady().then(() => {
   const again = () => (floats.at === 'notch' ? floater?.isVisible() && placeFloater() : snap())
   screen.on('display-removed', again)
+  screen.on('display-removed', () => cards.length && ((cardAt = null), sendCards())) // the cards: on a screen that's there (their page says its height again)
   screen.on('display-added', () => floats.at === 'notch' && again())
   screen.on('display-metrics-changed', () => floats.at === 'notch' && again())
 })
@@ -960,6 +1044,7 @@ ipcMain.handle('procs', e => {
   }
   for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
   for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
+  if (cardWin && !cardWin.isDestroyed()) add(cardWin.webContents.getOSProcessId(), 'Cards on screen')
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
   if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
   if (aiW && !aiW.isDestroyed()) add(aiW.webContents.getOSProcessId(), 'Laki AI window')

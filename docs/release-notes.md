@@ -4,6 +4,17 @@ version it builds, with the date. -->
 
 ## Next
 
+- Mark what matters as important, and it comes as a card at the bottom right, over every app and Space, until you
+  close it, instead of a notification: a workspace (⋯ › Workspace › *Important: cards on screen*: its agents' asks,
+  with the change's diff and a button per choice, and their finishes), a timer (*Important* as you start it, or its
+  menu), a reminder (Calendar's *Important*, `laki remind … --important`, or ask Laki AI). Everything else notifies as
+  before; several cards stack, with *Close all*. The Timer menu has *Important timer…*, and Laki AI sets important
+  timers and reminders when you say so.
+- Ask an agent to show you an important alert ("ask me this with a Laki alert"): `laki alert "<question>" --choice A
+  --choice B` puts the question on a card over every app, and your pick goes back to the agent.
+- Delete and Archive say plainly what it comes to: *Safe to delete* in green when its PR is merged or it has nothing of
+  its own, *Mind* in amber (commits not pushed, a PR not merged, agents at work), *Check first* in red when
+  uncommitted files would be lost; each line's icon in its color, and the PR's state as a pill (Merged, Open, Draft).
 - In Reader view's box, `@` picks one of your other workspaces or projects; the message goes with a line saying
   what it is (folder, branch, agents) and how the agent can reach it. Context only: nothing starts by itself.
 - A scheduled task can run in *A new workspace, then the same one each run*: its first run makes the worktree, the

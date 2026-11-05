@@ -6,7 +6,7 @@ short version.
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
   agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
-- **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards),
+- **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it),
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card, the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
@@ -35,7 +35,7 @@ time and AI money per run (`budget: 60 min, $5`).
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
-  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path.
+  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.

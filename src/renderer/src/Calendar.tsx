@@ -9,8 +9,8 @@ import { Modal } from './panels'
 import { Icon, IconButton, load, keep, Page } from './ui'
 
 export type CalendarApi = {
-  add(r: { at: number; every?: string; text: string; ws?: string }): Promise<unknown>
-  set(r: { id: string; done?: boolean; at?: number; text?: string }): Promise<unknown>
+  add(r: { at: number; every?: string; text: string; ws?: string; important?: boolean }): Promise<unknown>
+  set(r: { id: string; done?: boolean; at?: number; text?: string; important?: boolean }): Promise<unknown>
   rm(id: string): Promise<unknown>
   openWs(ws: string): void
   openSchedules(): void
@@ -67,7 +67,7 @@ const remindersAt = (r: Reminder, from: number, to: number): { at: number; n: nu
 export function CalendarPage({ schedules, runs, reminders, workspaces, api, onClose }: { schedules: Schedule[]; runs: ScheduleRun[]; reminders: Reminder[]; workspaces: { id: string; name: string }[]; api: CalendarApi; onClose: () => void }) {
   const [mode, setMode] = useState<'week' | 'month'>(() => load('laki.calendar', 'week'))
   const [anchor, setAnchor] = useState(() => Date.now())
-  const [form, setForm] = useState<{ at: string; text: string; ws: string } | null>(null)
+  const [form, setForm] = useState<{ at: string; text: string; ws: string; important?: boolean } | null>(null)
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<number | null>(null) // a day shown whole on the right (its start, ms)
   const pick = (m: 'week' | 'month') => (setMode(m), keep('laki.calendar', m))
@@ -100,7 +100,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
     if (!form || !when) return
     if (!form.text.trim()) return setErr('Remind you of what?')
     if ('error' in when) return setErr(when.error)
-    api.add({ at: when.at, ...(when.every && { every: when.every }), text: form.text, ...(form.ws && { ws: form.ws }) }).then(() => (setForm(null), setErr('')), e => setErr((e as Error).message))
+    api.add({ at: when.at, ...(when.every && { every: when.every }), text: form.text, ...(form.ws && { ws: form.ws }), ...(form.important && { important: true }) }).then(() => (setForm(null), setErr('')), e => setErr((e as Error).message))
   }
   const line = (i: Item) => (
     <div key={i.key} className={`cal-item ${i.kind} ${i.r?.done ? 'done' : ''} ${i.kind === 'run' && !i.ok ? 'bad' : ''}`} data-tip={i.tip}>
@@ -114,6 +114,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
       <span className="cal-time">{hm(i.at)}</span>
       {i.r?.every && <Icon name="repeat" size={10} />}
       <span className="cal-text" onClick={() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules())}>{i.text}</span>
+      {i.kind === 'reminder' && <IconButton icon="alertCircle" title={i.r!.important ? 'Important: rings as a card on screen (a click: a notification again)' : 'Make it important: it rings as a card on screen, until you close it'} className={`cal-imp ${i.r!.important ? 'on' : ''}`} onClick={() => api.set({ id: i.r!.id, important: !i.r!.important }).catch(() => {})} />}
       {i.kind === 'reminder' && <IconButton icon="x" title="Remove the reminder" className="cal-rm" onClick={() => api.rm(i.r!.id).catch(() => {})} />}
     </div>
   )
@@ -173,6 +174,10 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
                   <option value="">No workspace</option>
                   {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
+              </label>
+              <label className="cal-check" data-tip="As it rings, a card at the bottom right over every app, until you close it">
+                <input type="checkbox" checked={!!form.important} onChange={e => setForm({ ...form, important: e.target.checked })} />
+                <span>Important: a card on screen</span>
               </label>
               {err && <span className="cal-err">{err}</span>}
               <div className="row">

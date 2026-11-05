@@ -126,12 +126,16 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
 type Field = { value: string; placeholder?: string; multi?: boolean } // multi: a text box (Enter a new line, ⌘⏎ OK)
-export type Fact = { label: string; value: string; icon?: string } // a line of ask's facts, under its text; icon: a name (Icon) or an emoji
-type Asking = { n?: number; title: string; text?: string; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
+// a line of ask's facts, under its text; icon: a name (Icon) or an emoji; tone: its icon's color (ok green, warn amber,
+// bad red); chip: a pill before the value in that tone (a PR's Merged)
+export type Tone = 'ok' | 'warn' | 'bad'
+export type Fact = { label: string; value: string; icon?: string; tone?: Tone; chip?: string }
+export type Verdict = { tone: Tone; text: string } // a line over the facts: what it all comes to (Safe to delete…, Check first…)
+type Asking = { n?: number; title: string; text?: string; verdict?: Verdict; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
-export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: string; danger?: boolean } = {}) =>
+export const ask = (title: string, o: { text?: string; verdict?: Verdict; facts?: Fact[]; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
-    asker ? asker({ title, text: o.text, facts: o.facts, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
+    asker ? asker({ title, text: o.text, verdict: o.verdict, facts: o.facts, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
 // one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
 let early: Asking[] = []
@@ -216,15 +220,24 @@ export function AskHost() {
       <div key={a.n} className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
+        {a.verdict && (
+          <div className={`ask-verdict ${a.verdict.tone}`} role="status">
+            <Icon name={a.verdict.tone === 'ok' ? 'checkCircle' : a.verdict.tone === 'warn' ? 'alertCircle' : 'xCircle'} />
+            <span>{a.verdict.text}</span>
+          </div>
+        )}
         {!!a.facts?.length && (
           <dl className="ask-facts">
             {a.facts.map(f => (
               <div key={f.label}>
-                <dt>
+                <dt className={f.tone}>
                   {f.icon && (isIconName(f.icon) ? <Icon name={f.icon} /> : `${f.icon} `)}
                   {f.label}
                 </dt>
-                <dd>{f.value}</dd>
+                <dd>
+                  {f.chip && <span className={`ask-chip ${f.tone ?? ''}`}>{f.chip}</span>}
+                  {f.value}
+                </dd>
               </div>
             ))}
           </dl>

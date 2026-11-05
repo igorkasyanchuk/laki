@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { AGENTS, creatorOf, SECRET_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -22,8 +22,9 @@ const sets: string[] = [] // --set name=value, again and again: a workflow run's
 const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
+const choices: string[] = [] // laki alert's --choice, again and again
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -39,6 +40,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
   else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
+  else if (!textOnly && args[0] === 'alert' && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
@@ -401,14 +403,14 @@ async function main() {
         }
         const v: View = await rpc('state')
         if (!v.reminders) throw new Error('Calendar is off: Settings › General › Pages')
-        return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}${r.every ? `  (${r.every})` : ''}`).join('\n') || 'no reminders')
+        return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}${r.every ? `  (${r.every})` : ''}${r.important ? '  (important)' : ''}`).join('\n') || 'no reminders')
       }
       const [when, ...words] = rest
-      if (!when || !words.length) throw new Error('usage: laki remind "<when: in 2h, tomorrow at 9am, 2026-10-20 14:30, every weekday at 9am>" <text…> [--ws <id>|.]')
+      if (!when || !words.length) throw new Error('usage: laki remind "<when: in 2h, tomorrow at 9am, 2026-10-20 14:30, every weekday at 9am>" <text…> [--ws <id>|.] [--important]')
       if (flags.ws === '.' && !process.env.LAKI_WORKSPACE) throw new Error('--ws .: only in a workspace\'s tab (or give its id)')
       const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : (flags.ws as string | undefined)
-      const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }) })
-      return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}${r.every ? `, then ${r.every}` : ''}`)
+      const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }), ...(flags.important && { important: true }) })
+      return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}${r.every ? `, then ${r.every}` : ''}${r.important ? ', as a card on screen' : ''}`)
     }
     case 'show': {
       // laki show "<text>" [--open <folder|file|url>…] [--title t]: a card under this tab in Laki, its buttons opening
@@ -499,6 +501,15 @@ async function main() {
       if (!rest[0]) throw new Error('usage: laki progress <0-100> [what you are on]')
       const r = await rpc('progress', { tab: flags.tab || process.env.LAKI_TAB, pct: String(rest[0]).replace(/%$/, ''), note: rest.slice(1).join(' ') || undefined })
       return out(r, `${r.pct}%`) // as the tab shows it: 0 to 100, whole
+    }
+    case 'alert': {
+      // laki alert <text…> [--title t] [--choice A]…: an important card on the user's screen (bottom right, over every app,
+      // until closed); with choices it waits for the pick and prints it (exit 1: closed or no answer in ALERT_WAIT)
+      if (!rest.length) throw new Error('usage: laki alert <text> [--title t] [--choice A --choice B], e.g. laki alert "Tests pass: ship it?" --choice Ship --choice Wait')
+      const r = await rpc('alertShow', { text: rest.join(' '), title: flags.title, choices, from: caller() }, ALERT_WAIT + 30_000)
+      if (r.shown) return out(r, 'shown')
+      if (r.choice) return out(r, r.choice)
+      throw new Error(r.closed ? 'the user closed it without a choice' : `no answer in ${ALERT_WAIT / 60_000} minutes`)
     }
     case 'secret': {
       // laki secret <what it is>: the user types it on a masked card in the app; only its file's path comes back (secrets.ts)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, mentionsOf, withMentions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, mentionsOf, rmVerdict, withMentions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -466,4 +466,18 @@ test("a group's defaults: where, permission mode and base as set; a model or eff
   assert.deepEqual(groupNew({ ...g, effort: 'xhigh' }, 'codex'), { local: false, noSetup: true, perm: '', effort: 'xhigh', base: 'dev' }, "codex -m opus would fail: claude's model left out")
   assert.deepEqual(groupNew({ id: 'sep-b', name: 'B', model: 'gpt-5.5', effort: 'nope' }, 'codex'), { model: 'gpt-5.5' }, 'a model no list knows goes as typed; an effort the agent lacks stays out')
   assert.deepEqual(groupNew(undefined, 'claude'), {})
+})
+
+test('rmVerdict: Delete and Archive sum up what goes, worst first', () => {
+  const base = { worktree: true, busy: 0, artifacts: 0, keptArts: false, lost: true }
+  assert.deepEqual(rmVerdict({ ...base, dirty: 0, pr: { number: 7, state: 'MERGED' } }), { tone: 'ok', text: 'Safe to delete: PR #7 is merged, nothing uncommitted' })
+  assert.deepEqual(rmVerdict({ ...base, archive: true, dirty: 0, ahead: 2, pr: { number: 7, state: 'MERGED' } }), { tone: 'ok', text: 'Safe to archive: PR #7 is merged, nothing uncommitted, all pushed' })
+  assert.deepEqual(rmVerdict({ ...base, dirty: 0, ahead: 0 }), { tone: 'ok', text: 'Safe to delete: nothing of its own: no changes, no commits' })
+  assert.deepEqual(rmVerdict({ ...base, dirty: 0, ahead: 3, unpushed: 1, pr: { number: 7, state: 'OPEN' }, busy: 1 }), { tone: 'warn', text: "Mind: 1 commit not pushed (kept on the branch here); PR #7 isn't merged yet; 1 agent at work stops" })
+  assert.deepEqual(rmVerdict({ ...base, dirty: 2, artifacts: 3, pr: { number: 7, state: 'MERGED' } }), { tone: 'bad', text: 'Check first: 2 uncommitted files are lost; 3 artifacts go' })
+  assert.equal(rmVerdict({ ...base, dirty: 2, lost: false })?.tone, undefined) // a codespace archived: its files stay
+  assert.equal(rmVerdict({ ...base, artifacts: 3, keptArts: true }), undefined) // counts unknown, nothing to mind: no verdict
+  assert.equal(rmVerdict({ ...base, worktree: false, dirty: 0 }), undefined) // a folder: nothing of its own goes
+  assert.equal(rmVerdict({ ...base, pr: { number: 7, state: 'MERGED' } }), undefined) // merged, but its uncommitted files not counted: no Safe
+  assert.equal(rmVerdict({ ...base, dirty: 0, ahead: 2, pr: { number: 7, state: 'CLOSED' } }), undefined) // closed unmerged, its commits pushed: nothing to say
 })

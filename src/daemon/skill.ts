@@ -48,7 +48,7 @@ function files(at: string, k: SkillName): Record<string, string> {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
 ---
 
 # Laki
@@ -120,6 +120,13 @@ ${USAGE}
 6. Need a secret (an API key, a token, a password)? Never ask for it in the chat: \`path=$(laki secret "<what it is>")\`
    has the user type it on a masked card in Laki and prints only a file's path; use it where it's needed without
    printing it: \`KEY=$(cat "$path") <command>\`.
+7. The user asks for an important alert ("show me an important alert", "ask me this with a Laki alert")? Put it on
+   their screen: \`laki alert "<question>" --choice "<answer 1>" --choice "<answer 2>"\` shows a card at the bottom
+   right, over every app, and waits for their pick (up to 30 minutes), printing it; go on by it. It waits longer than a
+   shell tool's default allows: give the call your tool's longest timeout (Claude Code's Bash: 600000 ms), or use
+   MCP's \`laki_alert\`. Without
+   \`--choice\` it only tells them something (\`--title\` names it). Only when they ask: a question in the chat is
+   the default.
 
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.
@@ -226,7 +233,8 @@ more than 30 minutes late is skipped and logged as missed).
   and \`rm\` take an id.
 - A reminder for the user (Calendar, unless it's off: Settings › General › Pages), only when they ask for one:
   \`laki remind "<when: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30>" <text> --ws .\` (\`--ws .\`: about your
-  workspace); it notifies them then. Words that repeat (every weekday at 9:30, mondays at 10am) ring each time. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
+  workspace); it notifies them then. Words that repeat (every weekday at 9:30, mondays at 10am) ring each time. \`--important\`
+  (when they say it matters): it rings as a card on their screen until they close it. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
 
 ## Recipes
 

@@ -371,6 +371,8 @@ test('fork, muting, open in a custom editor, restore when the branch is gone', a
   assert.equal((await rig.rpc('tabSet', { id: ct.id, muted: false })).muted, undefined)
   assert.equal((await rig.rpc('wsSet', { id: cw.id, muted: true })).muted, true)
   assert.equal((await rig.rpc('wsSet', { id: cw.id, muted: false })).muted, undefined)
+  assert.equal((await rig.rpc('wsSet', { id: cw.id, important: true })).important, true) // its asks and finishes as cards on screen
+  assert.equal((await rig.rpc('wsSet', { id: cw.id, important: false })).important, undefined)
 
   // a custom editor command that fails quietly: the command that failed
   await rig.rpc('settingsSet', { editorCmd: 'false' })

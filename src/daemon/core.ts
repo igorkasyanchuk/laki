@@ -1669,7 +1669,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
 // the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
 const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (specsOn(state.settings) ? (state.settings?.railPlans?.length ?? 0) : 0)
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; important?: boolean; private?: boolean; pinned?: boolean; railPin?: boolean; icon?: string; browser?: string; unrelate?: string; pending?: { at?: number | 'limit'; prompt?: string } | null; start?: boolean; from?: { ws?: string; tab?: string }; asked?: boolean; auto?: boolean }) {
   const w = findWs(o.id)
   // a name you gave it stays: an agent's rename is refused unless you asked for it (asked: laki rename --asked), a
   // Browsers page's title (auto) passes it by
@@ -1704,6 +1704,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoLand && !w.autoLand && w.fix?.land) retry.add(`${w.id}:land`) // the head it tried may go again
   if (o.autoLand !== undefined) w.autoLand = o.autoLand || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
+  if (o.important !== undefined) w.important = o.important || undefined
   if (o.private !== undefined) w.private = o.private || undefined // Recording mode hides it
   if (o.pinned !== undefined) w.pinned = o.pinned || undefined
   if (o.railPin !== undefined) w.railPin = o.railPin ? (w.railPin ?? Date.now()) : undefined
@@ -3541,7 +3542,7 @@ export function browseDone(p: { id: string; ok: boolean; result?: any; error?: s
 // the sidebar's timers and stopwatches (Laki AI's laki_timer): they live in the app's window (its localStorage), so the
 // newest client that is the app (view.browse, as the agent browser) does it and answers with browseDone
 export const TIMER_ACTS = ['timer', 'remind', 'send', 'stopwatch', 'list', 'stop'] as const
-export async function timer(p: { act: string; minutes?: number; note?: string; ws?: string; tab?: string; text?: string; id?: string }) {
+export async function timer(p: { act: string; minutes?: number; note?: string; ws?: string; tab?: string; text?: string; id?: string; important?: boolean }) {
   if (!(TIMER_ACTS as readonly string[]).includes(p.act)) throw new Error(`timer: ${p.act}? one of ${TIMER_ACTS.join(', ')}`)
   const ms = Math.round(Number(p.minutes) * 60000)
   if (['timer', 'remind', 'send'].includes(p.act) && !(ms >= 1000 && ms <= 7 * 86400000)) throw new Error('for how long? minutes, more than 0, a week at most')
@@ -3556,7 +3557,7 @@ export async function timer(p: { act: string; minutes?: number; note?: string; w
   const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
     const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "Laki's window didn't answer" })), 10000)
     browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
-    host.send({ ev: 'timer', req: id, act: p.act, ms, note: typeof p.note === 'string' ? p.note.trim().slice(0, 120) || undefined : undefined, ws, ...(tab && { ws: tab.workspace, tab: tab.id, text }), which: p.id }) // which, not id: an event with an id is taken for a reply
+    host.send({ ev: 'timer', req: id, act: p.act, ms, note: typeof p.note === 'string' ? p.note.trim().slice(0, 120) || undefined : undefined, ws, ...(tab && { ws: tab.workspace, tab: tab.id, text }), ...(p.important === true && { important: true }), which: p.id }) // which, not id: an event with an id is taken for a reply
   })
   if (!r.ok) throw new Error(r.error || 'the timer failed')
   return r.result

@@ -92,6 +92,6 @@ export default defineConfig({
     ],
     define: { __BUILT__: BUILT }, // About's build time (the dev server's: its start), and the stale daemon's check
     server: { port: 5199, strictPort: true, host: '127.0.0.1' },
-    build: { rolldownOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles
+    build: { rolldownOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html'), ask: resolve('src/renderer/ask.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles; ask: asks on screen
   },
 })

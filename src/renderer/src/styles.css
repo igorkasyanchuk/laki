@@ -775,6 +775,23 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .ask-field input { width: 100%; }
 .ask-field textarea { width: 100%; resize: vertical; font: inherit; font-size: 12px; }
 .ask-facts dt .icon-svg { margin-right: 5px; vertical-align: -2px; }
+/* a fact's tone tints its icon; a chip is a pill before its value (a PR's Merged); the verdict sums them up over the facts */
+.ask-facts dt.ok .icon-svg, .ask-verdict.ok .icon-svg { color: var(--done); }
+.ask-facts dt.warn .icon-svg, .ask-verdict.warn .icon-svg { color: var(--waiting); }
+.ask-facts dt.bad .icon-svg, .ask-verdict.bad .icon-svg { color: var(--error); }
+.ask-chip.ok::before { background-color: var(--done); }
+.ask-chip.warn::before { background-color: var(--waiting); }
+.ask-chip.bad::before { background-color: var(--error); }
+.ask-chip { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 17px; vertical-align: 1px; }
+.ask-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background-color: var(--muted); }
+.ask-chip.ok { border-color: color-mix(in srgb, var(--done) 50%, var(--line)); background: color-mix(in srgb, var(--done) 12%, transparent); }
+.ask-chip.warn { border-color: color-mix(in srgb, var(--waiting) 50%, var(--line)); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
+.ask-chip.bad { border-color: color-mix(in srgb, var(--error) 50%, var(--line)); background: color-mix(in srgb, var(--error) 12%, transparent); }
+.ask-verdict { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--rs, 8px); font-size: 12.5px; line-height: 1.4; }
+.ask-verdict .icon-svg { flex: none; margin-top: 1px; }
+.ask-verdict.ok { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); background: color-mix(in srgb, var(--done) 10%, transparent); }
+.ask-verdict.warn { border-color: color-mix(in srgb, var(--waiting) 45%, var(--line)); background: color-mix(in srgb, var(--waiting) 10%, transparent); }
+.ask-verdict.bad { border-color: color-mix(in srgb, var(--error) 50%, var(--line)); background: color-mix(in srgb, var(--error) 10%, transparent); }
 .ask-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .ask-buttons button { min-width: 84px; padding: 5px 14px; }
 .ask-buttons button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -2762,6 +2779,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .cal-examples .chip { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
 .cal-err { color: var(--error); font-size: 12px; }
 .cal-form > .row { justify-content: flex-end; }
+.cal-form > label.cal-check { flex-direction: row; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; }
+.cal-check input { width: auto; margin: 0; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .cal-dow { padding: 4px 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--side); }
 .cal-day { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 4px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; }
@@ -2786,8 +2805,9 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .cal-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .cal-tick { flex: none; display: grid; place-items: center; width: 13px; height: 13px; padding: 0; border-radius: 50%; border: 1.5px solid var(--accent); background: none; color: var(--accent-fg, #fff); }
 .cal-tick[aria-pressed='true'] { background: var(--accent); }
-.cal-item .cal-rm { visibility: hidden; margin: -3px -2px; }
-.cal-item:hover .cal-rm { visibility: visible; }
+.cal-item .cal-rm, .cal-item .cal-imp { visibility: hidden; margin: -3px -2px; }
+.cal-item:hover .cal-rm, .cal-item:hover .cal-imp, .cal-item .cal-imp.on { visibility: visible; }
+.cal-item .cal-imp.on { color: var(--waiting); } /* important: it rings as a card on screen */
 .cal-more { align-self: flex-start; padding: 0 4px; border: none; background: none; font-size: 11px; color: var(--accent-ink); cursor: pointer; }
 .narrow .cal-grid.week { grid-template-columns: 1fr; }
 .narrow .cal-grid.week .cal-dow { display: none; }

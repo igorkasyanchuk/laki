@@ -169,6 +169,19 @@ says "permission", *Allow* / *Deny* (`pick` first / last); none when its body (a
 invisible format character (`noteWhole`: macOS draws U+202E and the like, so what you read isn't what runs): a Yes
 would approve a command you can't see as it is; an extension agent's tool ask, the same: no *Allow* then.
 
+Cards on screen: what's marked important notifies as a card instead, its `notify` carrying `card`: a workspace's
+(`important`, wsSet; ⋯ › Workspace) turns (`ask` and the ask's `diff` while waiting; `tone` ok for a finish, bad for a
+limit or a check that's over to you), a timer's end (`Timer.important`, in place of the dialog), a reminder
+(`Reminder.important`, on its `reminder` event; it rings even with notifications off). Main's `addCard` shows it
+instead of a `Notification` (its sound through `afplay`, Glass by default): `cardWin`, a panel (`floatOpts`) at the
+`screen-saver` level on every Space and over full-screen apps, at the bottom right of the work area of the screen the
+pointer was on as the first came (`cardAt`, kept while it shows), sized by its page (ask.html, ask.ts: `ask-size`). A
+card per `key` (a tab's: its newer ask or finish replaces it; else its own), the newest on top, 20 at most; `ask-act`
+answers its menu as the notification would (`answer`, its n and label: refused once the menu changed, then said on the
+card), `ask-open` shows its tab (or Laki), `ask-close` and `ask-close-all` drop them; App sends the tabs that wait
+(`asking`, once there's a view), and an ask whose tab no longer waits goes. An extension's tool ask stays a
+notification.
+
 A plan limit nearly used (`notifyOn.usage`, on unless false; Settings › General's *Plan limit at*, `settings.usageAt`:
 75, 90, 95, unset `USAGE_AT` 90): App's `limits`, the ring's `load` (Usage.tsx asks each minute), runs `text.ts`
 `limitsCrossed`: a window (agent, account, label; a `note` one isn't a limit, one past its reset is at 0) at it now and
