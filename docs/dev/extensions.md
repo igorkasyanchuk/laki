@@ -72,7 +72,7 @@ closing, its crumb or Esc with nothing typed: `back`, so Settings › Extensions
 `{ widget, back }`, and its logs do the same; `WidgetApi.settings(id)`: the page): `Preview` (its first place: a
 sidebar cell at its size, a bar, a button or a Desk tile; its full view under it; *Live* / *Sample*, the page's `pick`:
 sample by default while it's off or not fetched yet, again at each `rev`), `WidgetCard`, and Laki AI's chat beside
-them (`Chat`, `widget:<id>`; '' a new one's until its first ask: `widgetSlug` names it, `onNamed`, App's `nameExt`
+them (`Chat`, `widget:<id>`; '' a new one's until its first ask: `widgetSlug` names it, `onNamed`, Dialogs.tsx' `nameExt`
 moves the dialog and its history place to it, `extKey` kept: not drawn again; one of yours: `widgetSet` `ai` first;
 its head *New chat* is `aiNew` on that chat; empty: `STARTERS`' chips, `EXAMPLES`, `StudioSessions`' *Where you left
 off*; one not yours: *Remix it*; a turn's *Undo to here*; its box focused as it opens, not on a touch screen); the head: *off*, a failed check's chip (`cfg.check`, no run, each `rev`),
@@ -261,7 +261,7 @@ renderer: tool asks wait in a `Line` (text.ts; `toolShow`, a notification's clic
 instances (`covered` leaves it out; `DeskPage` `wsName`).
 
 Where you work (Part C; `test/widget-places.test.ts`): `WIDGET_PLACES` adds `panel` (SidePanel's `ext` tabs, `PanelTab`
-`ext:<id>`, Widgets.tsx' `WidgetPanel`) and `row` (`RowMarks` on App's `wsRow` and `peekCard`, `rowMarks`' filter, an instance's `badge` else `label`, its data's `tone` (`faceOf`: a kit `TONES` word, the face's `tone`) as `t-<tone>`; a click: `click`, else `WidgetApi.full(id, ws)`, the workspace selected and its full view; scope
+`ext:<id>`, Widgets.tsx' `WidgetPanel`) and `row` (`RowMarks` on Sidebar.tsx' `wsRow` and `peekCard`, `rowMarks`' filter, an instance's `badge` else `label`, its data's `tone` (`faceOf`: a kit `TONES` word, the face's `tone`) as `t-<tone>`; a click: `click`, else `WidgetApi.full(id, ws)`, the workspace selected and its full view; scope
 workspace only: `manifestCheck` and `widgetSet` refuse a global one; `shownIn` fetches every `instOk` workspace's while
 a window is shown, `AT_ONCE` at a time). An object action's `MENU` fields (widgetSchema.ts: `ACTION_SHOWS` palette,
 workspace, tab, file, prompt; `match` globs, `globMatch`; `key`, `normKey`/`pressOf`, Alt or Ctrl in it, a plain ⌘ one

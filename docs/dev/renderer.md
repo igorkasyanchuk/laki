@@ -192,7 +192,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     else after the side head's hide button; ⌘[ ⌘] outside a text field.
     A page's own levels: Workflows' and Specs' (`onNav`: the list, each spec or brainstorm open, its templates; the
     dialog's `of`, `kind`, `slug`, `templates`) are places; Settings' section and an extension page's tab only rewrite
-    the place they're at (App's `keepHere`, a microtask after the effects), so Back comes to where you left it.
+    the place they're at (Dialogs.tsx' `keepHere`, a microtask after the effects), so Back comes to where you left it.
   - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
     menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab
     (after `<emoji> <project>` when its project's icon is an emoji),
@@ -418,7 +418,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   workflow file's (`highlightWorkflow`, a line at a time: the Workflows editor's File view);
   tokens become React text, never HTML.
 - **Sidebar styles** (`settings.sideStyle`, `SIDE_STYLES` in Settings.tsx): `.sidebar[data-style]`; status: `wsRow`'s
-  `data-state` (its rollup) colors the row's bar, `.ws-line` fills to `--p` (its agents' highest `progress`); App's `wsRow` adds
+  `data-state` (its rollup) colors the row's bar, `.ws-line` fills to `--p` (its agents' highest `progress`); Sidebar.tsx' `wsRow` adds
   `.ws-sub` (branch, `STATE_WORDS`, progress, PR, diff) for extended and cards, `.ws-last` (the agent's last answer)
   for cards; compact is CSS only. Extended and cards keep the ⋯'s place (`visibility`) and the marks on hover: rows as tall
   as their first line's marks would jump. `sideLook.icons` is `--ws-icon`, every row mark's size (avatar and GitHub's alike).
@@ -555,7 +555,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   writes it back the same way; no commit, push or resolve. Tested in `test/suggest.test.ts`), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line; App keeps several, `openFiles`, a tab each over it, `.pv-tabs`,
   by `fileKey`, each with its own `edit`; `shownFile`: each workspace's in front; ⌘W or a middle click closes one, an
   edit asked first; its left edge is a `PanelHandle`, `previewW`), `FileFinder` (⌘P, `findFiles`: a
-  basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Shell actions, each item's `tip` its text, cut at `ACTION_TIP`; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon.
+  basename match first); a right click in Files is menus.ts' `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Shell actions, each item's `tip` its text, cut at `ACTION_TIP`; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon.
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged, a webmail domain too (`text.ts` `webmail`: anyone can get an address there, a warning line); *Anyone with the link* says localhost-trusting dev tools are reachable. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
@@ -623,7 +623,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.
 - **`Achievements.tsx`** (dialog `'achievements'`: the status bar's trophy at its end, `.sb-trophy`, ⌘K,
   Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 54 (`ACHIEVEMENTS`, in
-  `ACH_GROUPS`), each with its `how` and `go` (App's `achGo`: a page, Settings' section, the right panel's tab; an
+  `ACH_GROUPS`), each with its `how` and `go` (Dialogs.tsx' `achGo`: a page, Settings' section, the right panel's tab; an
   experimental page that's off: where it's turned on). App's `earn` unlocks one once, only for what's done from now on: a
   call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`; a `{ held }` or `{ dirty }` answer isn't), a page
   opened (`pageEarns`), a number or value of the view that moved since the last view (`upsOf`/`wentUp`; the first view,

@@ -37,7 +37,7 @@ import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, role
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, applySuggestions, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, NOTE_MAX, noteCut, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin } from './Shown'
@@ -195,7 +195,6 @@ function toolShow() {
   })
 }
 // the events that notify or toast about a workspace: none for one Recording mode hides
-const NOTE_MAX = 200 // a turn notification's body, in characters
 const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
@@ -1188,7 +1187,7 @@ export function App() {
           const cut = body.length > NOTE_MAX
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
-          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, cut ? `${body.slice(0, NOTE_MAX - 1)}…` : body, t.id, () => selectTab(t.id), s?.notifySound, actions)
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions)
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
@@ -1201,7 +1200,7 @@ export function App() {
         if (!t || m.status === 'failed' || s?.notify === false || t.muted || w?.muted) return
         if (m.status !== 'over' && (s?.notifyOn?.done === false || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, String(body).slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound)
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, noteCut(String(body)), t.id, () => selectTab(t.id), s?.notifySound)
       } else if (m.ev === 'flow') {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
@@ -1211,7 +1210,7 @@ export function App() {
           if (s?.notify === false) return
           const look = () => setDialog({ workflows: '', wf: m.wf })
           const words = `${m.name} didn't start on ${m.on === 'schedule' ? 'its schedule' : m.on}: ${m.changed ? 'it changed in the repo since you allowed it' : "it comes with the repo and isn't allowed yet"}`
-          notify(`Workflow · ${m.name}`, words.slice(0, 200), '', look, s?.notifySound)
+          notify(`Workflow · ${m.name}`, noteCut(words), '', look, s?.notifySound)
           toast(words.slice(0, 160), look, 'Look…')
           return
         }
@@ -1228,12 +1227,12 @@ export function App() {
         if (m.kind === 'show' ? m.modal !== false : m.kind === 'end' && m.modal) setShown(q => [...q, win].slice(-10))
         if ((m.kind === 'show' || m.kind === 'end') && m.popover) setPops(q => [...q, { ...win, key: Date.now() + Math.random() }].slice(-3))
         if (m.kind === 'show') {
-          if (m.notify && s?.notify !== false) notify(`Workflow · ${m.name}`, String(m.text).slice(0, 200), '', open, s?.notifySound)
+          if (m.notify && s?.notify !== false) notify(`Workflow · ${m.name}`, noteCut(String(m.text)), '', open, s?.notifySound)
           return
         }
         if (s?.notify === false || (m.kind === 'end' && !m.notify)) return
         const body = m.kind === 'waiting' ? `asks you: ${m.text}` : `${m.status}: ${m.text}`
-        notify(`Workflow · ${m.name}`, body.slice(0, 200), '', open, s?.notifySound)
+        notify(`Workflow · ${m.name}`, noteCut(body), '', open, s?.notifySound)
         if (m.kind === 'waiting') toast(`${m.name} asks you: ${m.text}`.slice(0, 160), open, 'Open')
       } else if (m.ev === 'reminder') {
         // the calendar's reminder, due (the daemon rings each once): a notification and a toast, Open its workspace. One
@@ -1243,7 +1242,7 @@ export function App() {
           if (!v) return n < 100 && setTimeout(() => ring(n + 1), 50)
           const w = m.ws ? v.workspaces.find(x => x.id === m.ws && !x.archived) : undefined
           const open = () => (w ? (setDialog(null), setWsId(w.id)) : setDialog('calendar'))
-          if (v.settings.notify !== false) notify('Reminder', String(m.text).slice(0, 200), (w && v.tabs.find(x => x.workspace === w.id)?.id) ?? '', open, v.settings.notifySound) // its click: there
+          if (v.settings.notify !== false) notify('Reminder', noteCut(String(m.text)), (w && v.tabs.find(x => x.workspace === w.id)?.id) ?? '', open, v.settings.notifySound) // its click: there
           toast(`Reminder: ${m.text}`.slice(0, 160), open, w ? 'Open' : 'Calendar')
         }
         ring()
@@ -2186,7 +2185,9 @@ export function App() {
       const lines = Object.entries((m.input ?? {}) as Record<string, unknown>).map(([k, v]) => `${k}: ${(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 300)}`)
       const title = `${m.name} wants to use ${tool}`
       const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always for ${m.name}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      notify(title, lines.join(' · ').slice(0, 200) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      // Allow from the notification only when it shows the whole input (a value past 300 is cut, so that one's over too)
+      const said = lines.join(' · ')
+      notify(title, noteCut(said) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, said.length > NOTE_MAX ? undefined : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
       toolLine.add({ req: m.req, title, text: `${lines.length ? `${lines.join('\n')}\n\n` : ''}Its agent asks while it works in the background. Always: it uses ${m.perm} unasked from now on (Revoke on its page). Deny: it goes on without it.`, picks, answer })
       return toolShow()
     }
@@ -2205,7 +2206,7 @@ export function App() {
       const picks: Pick[] = [{ label: 'Run it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
       const cmd = String(m.text ?? '')
       // Run it from the notification only when it shows the whole command (shownWhole); any other is read in the dialog
-      notify(title, cmd.length > 200 ? cmd.slice(0, 199) + '…' : cmd, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, shownWhole(cmd) ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
+      notify(title, noteCut(cmd), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, shownWhole(cmd) ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
       toolLine.add({ req: m.req, title, text: `In a new terminal tab of ${m.to}, as you: the agent's own permission prompts don't see it.\n\n$ ${m.text}`, picks, answer })
       return toolShow()
     }

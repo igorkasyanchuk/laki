@@ -18,7 +18,7 @@ import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { iconTurns } from '../shared/icons.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
-import { dir } from './dir.ts'
+import { dir, realOf } from './dir.ts'
 import { agentCaller, broadcast, git, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
 import { headOf } from './pr.ts'
 import { diff, inside, stats } from './files.ts'
@@ -149,13 +149,6 @@ export const widgetRoots = () => [...devRoots(), widgetHome(), ...(state.setting
 // branch's change to them in a worktree isn't read until it reaches the project's folder
 export const repoRoots = () => state.projects.filter(p => !p.kind && !p.host).map(p => ({ root: join(p.path, '.laki', 'extensions'), project: p.id }))
 // a folder of yours (dev's, Settings') inside a project's .laki/extensions: still that repo's (its id, its trust)
-export const realOf = (d: string) => {
-  try {
-    return realpathSync(d)
-  } catch {
-    return d
-  }
-}
 const repoOf = (root: string) => repoRoots().find(r => under(root, r.root) || under(realOf(root), realOf(r.root)))?.project
 
 export const readStore = (id: string): Store => readJson<Store>(storePath(id)) ?? {}

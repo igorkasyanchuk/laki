@@ -12,7 +12,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -361,4 +361,13 @@ test("the test rig only: LAKI_POLICY and the RPC's now need LAKI_TEST_PARENT and
     rmSync(rig, { recursive: true, force: true })
     rmSync(away, { recursive: true, force: true })
   }
+})
+
+test('a notification past NOTE_MAX characters is cut with …, never through an emoji (text.ts noteCut)', () => {
+  const fits = 'x'.repeat(NOTE_MAX)
+  assert.equal(noteCut(fits), fits, 'exactly NOTE_MAX: whole')
+  const cut = noteCut(`${fits}y`)
+  assert.equal(cut, `${'x'.repeat(NOTE_MAX - 1)}…`)
+  assert.equal(cut.length, NOTE_MAX)
+  assert.equal(noteCut(`${'x'.repeat(NOTE_MAX - 2)}😀tail`), `${'x'.repeat(NOTE_MAX - 2)}…`, "the emoji's pair isn't split")
 })

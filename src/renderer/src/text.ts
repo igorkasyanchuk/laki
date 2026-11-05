@@ -37,6 +37,10 @@ export function replyText(quote: string, words: string, from?: string) {
   return `${from ? `From ${from}:` : 'From your output:'}\n${fence}\n${q}\n${fence}${words.trim() ? `\n\n${words.trim()}` : ''}`
 }
 export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.map(pathText).join('\n')].filter(Boolean).join('\n\n')
+// a notification's body: past NOTE_MAX characters cut with … (never through an emoji's pair), so it never looks whole
+// when it isn't; one that's cut gets no Yes or Allow (App's): it would approve what you can't see
+export const NOTE_MAX = 200
+export const noteCut = (s: string) => (s.length > NOTE_MAX ? `${s.slice(0, NOTE_MAX - 1).replace(/[\uD800-\uDBFF]$/, '')}…` : s)
 
 // a workspace's name as shown: one that numbers its PR (pr-14885-sq3-…, Review PR 14810 …, #14810) shows the PR's title,
 // whatever named it (a prompt's words, a template, gh failing as it was made: pr-<n>)

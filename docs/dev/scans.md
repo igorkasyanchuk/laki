@@ -160,7 +160,8 @@ The renderer posts them (`turn` events, App.tsx): off when `settings.notify === 
 turn is posted 800 ms later (its menu is often drawn after the hook; none if it isn't waiting by then), with an action
 per choice of the tab's `ask` (`NotifyAction`: `n` and `label`, main calls `answer` with both), else, when its text
 says "permission", *Allow* / *Deny* (`pick` first / last); none when its body (a permission ask's command) is past
-`NOTE_MAX`, 200 characters: cut with …, a Yes would approve a command you can't see whole.
+`NOTE_MAX`, 200 characters (text.ts `noteCut`: cut with …, as every notification's body is), a Yes would approve a
+command you can't see whole; an extension agent's tool ask, the same: no *Allow* past it.
 
 A plan limit nearly used (`notifyOn.usage`, on unless false; Settings › General's *Plan limit at*, `settings.usageAt`:
 75, 90, 95, unset `USAGE_AT` 90): App's `limits`, the ring's `load` (Usage.tsx asks each minute), runs `text.ts`
@@ -272,7 +273,7 @@ regex on the model; `priced`: some had one, else tokens only). `meterView`: `Tab
 per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
 (`todayView`: tokens, cost, the 5 workspaces that used most). The renderer (`settings.contextMeter`, `settings.costs`,
-on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): App's `tabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line
+on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): TabBar.tsx' `TabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line
 along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and tooltip lines, the status bar's `.sb-ctx` (the focused tab's,
 `.usage-bar`), `UsageButton`'s `today` (*Today*, *≈ API price*); `Usage.tsx` `level` (amber past 70, red past 90),
 `ctxText`, `usageText`. Tested in `test/meter.test.ts`.
