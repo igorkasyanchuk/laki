@@ -11,8 +11,8 @@ version it builds, with the date. -->
   last answer; a waiting one shows its options as buttons.
 - Claude's permission asks say what it wants to do: the tool and its command, file or address show on the ask bar,
   in the notification (with *Always: <rule>* for its don't-ask-again choice), on the floating bubbles' card and in
-  phone pushes (tokens masked). One too long for the notification is cut with … there and gets no buttons: you
-  answer it in the tab.
+  phone pushes (tokens masked). One too long for the notification is cut with … there and gets no buttons (as one
+  with an invisible or right-to-left character): you answer it in the tab.
 - Needs you puts what just finished first: done agents newest first, and ones done more than 30 minutes ago fold
   under *Earlier*, dimmed, with *Seen all* (Settings › Needs you sets how long, or never). Each card has a chevron to
   show or hide its detail; the rest of the card always opens the tab. ⌘J and the floating bubbles take older finishes

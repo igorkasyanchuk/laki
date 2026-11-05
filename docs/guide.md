@@ -490,8 +490,8 @@ selected workspace's PR is in the status bar.
   on the ask bar, in the notification (*fix-login · claude wants to run* and the command), on the floating bubbles'
   card and in phone pushes (tokens in it masked; *Titles only* sends none of it). Its *don't ask again* choice reads
   *Yes, don't ask again for npm test* on the bar and *Always: npm test* in the notification. A command too long for
-  the notification (over 200 characters) is cut there with … and gets no buttons: you answer it in the tab, where it
-  shows whole.
+  the notification (over 200 characters) is cut there with … and gets no buttons, as does one with an invisible or
+  right-to-left character in it: you answer it in the tab, where it shows as it is.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex
   teal, gemini blue, grok purple and opencode green, unless you pick another color (or none).

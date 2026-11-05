@@ -37,7 +37,7 @@ import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, role
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, applySuggestions, NOTE_MAX, noteCut, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin } from './Shown'
@@ -1181,10 +1181,10 @@ export function App() {
           const body = perm ? perm.what ?? '' : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
           // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
           // wasn't read: Allow and Deny, its first and last
-          // one that doesn't fit is cut with … and gets none: a Yes would approve a command you can't see whole (its
-          // click shows it in the tab)
+          // one that doesn't fit is cut with … and gets none, as one with a bidi or invisible character (noteWhole): a Yes
+          // would approve a command you can't see whole (its click shows it in the tab)
           const always = perm?.rule ? alwaysOf(perm) : undefined
-          const cut = body.length > NOTE_MAX
+          const cut = !noteWhole(body)
           const actions: NotifyAction[] | undefined =
             m.kind !== 'waiting' || cut ? undefined : t.ask ? t.ask.options.map(o => ({ text: o === always ? `Always: ${perm!.rule}` : `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(body), t.id, () => selectTab(t.id), s?.notifySound, actions)
@@ -2185,9 +2185,10 @@ export function App() {
       const lines = Object.entries((m.input ?? {}) as Record<string, unknown>).map(([k, v]) => `${k}: ${(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 300)}`)
       const title = `${m.name} wants to use ${tool}`
       const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always for ${m.name}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
-      // Allow from the notification only when it shows the whole input (a value past 300 is cut, so that one's over too)
+      // Allow from the notification only when it shows the whole input as it is (noteWhole; a value past 300 is cut, so
+      // that one's over too)
       const said = lines.join(' · ')
-      notify(title, noteCut(said) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, said.length > NOTE_MAX ? undefined : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      notify(title, noteCut(said) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, !noteWhole(said) ? undefined : picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
       toolLine.add({ req: m.req, title, text: `${lines.length ? `${lines.join('\n')}\n\n` : ''}Its agent asks while it works in the background. Always: it uses ${m.perm} unasked from now on (Revoke on its page). Deny: it goes on without it.`, picks, answer })
       return toolShow()
     }
@@ -2220,7 +2221,7 @@ export function App() {
       const said = String(m.text ?? '')
       // Allow from the notification only when it shows all of what goes (shownWhole); any other is read in the dialog
       const whole = !(send || emit) || shownWhole(said)
-      notify(title, send || emit ? (whole ? said : said.slice(0, 199) + '…') : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, whole ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
+      notify(title, send || emit ? noteCut(said) : 'what its terminal shows now', m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, whole ? picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })) : [])
       toolLine.add({ req: m.req, title, text: `${emit ? `An event: the workflows and extensions listening in ${m.to} would run there, with this:\n\n${m.text}` : send ? `It would send this to ${m.target}:\n\n${m.text}` : `It would read what ${m.target}'s terminal shows now, which may hold what you'd keep in ${m.to}.`}\n\nAlways: until Laki restarts.`, picks, answer })
       return toolShow()
     }

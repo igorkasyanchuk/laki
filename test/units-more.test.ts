@@ -12,7 +12,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -370,4 +370,14 @@ test('a notification past NOTE_MAX characters is cut with …, never through an 
   assert.equal(cut, `${'x'.repeat(NOTE_MAX - 1)}…`)
   assert.equal(cut.length, NOTE_MAX)
   assert.equal(noteCut(`${'x'.repeat(NOTE_MAX - 2)}😀tail`), `${'x'.repeat(NOTE_MAX - 2)}…`, "the emoji's pair isn't split")
+})
+
+test("a Yes on a notification only for text shown as it is: not cut, no bidi or invisible character (text.ts noteWhole)", () => {
+  assert.equal(noteWhole('npm test'), true)
+  assert.equal(noteWhole('line one\nline two\tand a tab'), true)
+  assert.equal(noteWhole('x'.repeat(NOTE_MAX)), true)
+  assert.equal(noteWhole('x'.repeat(NOTE_MAX + 1)), false, 'cut')
+  assert.equal(noteWhole('echo safe ‮fr- mr'), false, 'a right-to-left override')
+  assert.equal(noteWhole('rm​ -rf'), false, 'a zero-width space')
+  assert.equal(noteWhole('a\u001Bb'), false, 'an escape')
 })
