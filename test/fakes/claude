@@ -72,6 +72,13 @@ const hooksOff = (() => { try { return JSON.parse(fs.readFileSync(require('path'
 const hook = (ev, payload) => {
   if (hooksOff) return
   const h = settings.hooks[ev][0].hooks[0]
+  // "async": true, as the real one: started now, in the background, not waited for (FAKE_HOOK_DELAY: ms before it gets
+  // its input, one that comes late)
+  if (h.async) {
+    const c = require('child_process').spawn('/bin/sh', ['-c', h.command], { stdio: ['pipe', 'ignore', 'inherit'] })
+    c.stdin.on('error', () => {})
+    return void setTimeout(() => c.stdin.end(JSON.stringify(payload)), Number(process.env.FAKE_HOOK_DELAY) || 0)
+  }
   // as long as its settings say, as the real one waits (a hook 3-5 s on a busy machine: killed, its state lost)
   try { execSync(h.command, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: (h.timeout ?? 60) * 1000 }) } catch {}
 }
@@ -134,6 +141,16 @@ const turn = text => {
     return
   }
   if (text.startsWith('mute')) return // a turn that ends without a hook or a word (a resumed chat's recap)
+  // "tools <n>": n tool calls (Read), PreToolUse and PostToolUse each, then its answer; how long it took in FAKE_LOG
+  if (text.startsWith('tools ')) {
+    const t0 = Date.now()
+    for (let i = 0; i < (Number(text.slice(6)) || 1); i++) {
+      const call = { tool_name: 'Read', tool_input: { file_path: `${process.cwd()}/f${i}.ts` } }
+      hook('PreToolUse', { hook_event_name: 'PreToolUse', ...call })
+      hook('PostToolUse', { hook_event_name: 'PostToolUse', ...call, tool_response: { ok: true } })
+    }
+    fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, tools: Number(text.slice(6)) || 1, ms: Date.now() - t0 }) + '\n')
+  }
   if (text.startsWith('run ')) process.stdout.write(require('child_process').spawnSync('/bin/sh', ['-c', text.slice(4)], { encoding: 'utf8' }).stdout.replace(/\n/g, '\r\n')) // its Bash tool: a child of this process
   if (text.startsWith('limit')) return void ((busy = false), process.stdout.write("You've hit your usage limit. Try again in 2 hours.\r\n> "), hook('StopFailure', { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." })) // a usage limit: StopFailure
   setTimeout(() => {

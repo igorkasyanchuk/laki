@@ -173,7 +173,20 @@ the preset's args set their own, nor for codex when its `config.toml` has `devel
 replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
 `$LAKI_STORAGE_FOLDER` (`STORAGE_NOTE`: files, and a link to what it publishes). The CLI's `rename`/`pr` take `.` for `$LAKI_WORKSPACE` (`wsSet` name, `prAttach`).
 
-Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a host: no laki CLI there), `--plugin-dir
+Hooks in the background: this Mac's claude runs its PreToolUse and PostToolUse hooks with `"async": true` (claude
+2.1.318 has it; it doesn't wait, and it enforces no timeout on them), so a tool call no longer waits for two starts of
+`laki hook` (Electron as node: ~45 ms to start, ~60 ms a hook here; 10 tool calls of the fake claude: 1.8 s of hooks a
+turn before, ~40 ms after). A tab started while a tool gate is on gets `-gated`, whose PreToolUse is waited for (it may
+answer); a gate turned on later reaches running tabs as they start again (Turn on says so). `laki hook` sends `at`, its
+process's start (`performance.timeOrigin`), and `turn` keeps the newest it took (`Runtime.hookAt`): one that started
+before it (a PostToolUse after the turn's Stop, a PreToolUse after the ask PermissionRequest made) changes no state,
+`perm`, `bg` or `compacting`, only its plan and published links. A host's hooks stay waited for (its script sends no
+`at`). Not done: a node compile cache or an http.request in place of fetch (~5 ms of the ~60), a /bin/sh + curl hook.
+Electron's Node snapshot for `ELECTRON_RUN_AS_NODE` children (electron/electron#52873) was merged on Aug 17, 2026 but
+isn't in 45.2.3's notes (the newest stable on Nov 6, 2026): no release past 45.2.2 is known to have it.
+
+Claude gets `--settings <data>/claude-settings.json` (`claudeFile`: `-fast` for `fastMode`, `-gated` when an extension's
+tool gate is on as the tab starts, `existsSync(toolFlag())`; `hookFiles` writes every mix) and, on this Mac (not a host: no laki CLI there), `--plugin-dir
 <data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
 `/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
 `$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents.
@@ -258,7 +271,7 @@ A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` 
 effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
 model_reasoning_effort="…"`, opencode its inline config (above), the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
 `--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
-`fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json`, the same with `fastMode`; codex `-c
+`fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
 is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):
 the page shows the profile's as picked and sends only a change from it (`permSent`, `fastSent`). A profile whose `args`

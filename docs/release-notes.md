@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Claude Code waits less on Laki: its hooks before and after each tool call run in the background, so a tool call no
+  longer waits for Laki's hook to start twice (about 0.1 s to 0.4 s each, more on a busy Mac). A tab started while an
+  extension's tool gate is on still waits on it, as the gate may answer.
+
 - Background tasks in the status bar: *3 running* while a Claude Code tab of the workspace has a dev server, a test run
   or a background subagent going, in a terminal or the Reader; a click lists them with *Output* and *Stop*, and the
   finished ones (*Done*, *n finished*).

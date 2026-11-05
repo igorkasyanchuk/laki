@@ -24,7 +24,7 @@ import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
-import { type GateBy, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
+import { type GateBy, toolFlag, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
@@ -86,7 +86,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -199,15 +199,24 @@ const hookCmd = (st: string) => [...cliEnv, ...hookArgv.map(q), 'hook', st].join
 export type Hooks = { dir: string; argv: string[]; cmd: (st: string) => string }
 const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv], cmd: hookCmd }
 
-// how an agent's hooks reach `laki hook`: claude's settings file, gemini's, opencode's plugin (by their path in h.dir)
+// claude's settings files, one per mix of a tab's switches (claude takes one --settings): fast (fastMode), gated (an
+// extension's tool gate was on as the tab started: its PreToolUse hook is waited for, as it may answer). Else this Mac's
+// PreToolUse and PostToolUse hooks run in the background ("async": claude doesn't wait for them, a tool call spared
+// two starts of laki hook); they say when they started (hook.ts' at), and the daemon takes no state from one older than
+// a newer hook's (turn). A gate turned on later reaches a tab as it restarts. A host's are waited for (its script sends
+// no time)
+export const claudeFile = (o: { fast?: boolean; gated?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}.json`
+
+// how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
-  const c = (st: string, matcher?: string) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5 }] }]
-  const settings = {
+  const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
+  const local = h === localHooks
+  const settings = (gated: boolean) => ({
     hooks: {
       SessionStart: c('start'),
       UserPromptSubmit: c('running'),
-      PreToolUse: c('running', '*'),
-      PostToolUse: c('running', '*'),
+      PreToolUse: c('running', '*', local && !gated),
+      PostToolUse: c('running', '*', local),
       // permission prompts and questions, not the 60s idle reminder
       Notification: c('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
       // a permission ask as it's shown, with the tool and its input (turn: the tab's perm); laki hook prints nothing for
@@ -223,13 +232,13 @@ export function hookFiles(h: Hooks): Record<string, string> {
     // claude's own numbers (meters.ts' status line): Laki's script keeps them, then runs yours. Over a project's own
     // statusLine (--settings wins); this Mac's only: a host can't reach the daemon's files
     ...(h === localHooks && statusOn() && { statusLine: { type: 'command', command: q(statusSh), padding: 0 } }),
-  }
+  })
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
+  const claude = Object.fromEntries([false, true].flatMap(fast => [false, true].map(gated => [claudeFile({ fast, gated }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }) }, null, 2)])))
   return {
-    'claude-settings.json': JSON.stringify(settings, null, 2),
-    'claude-settings-fast.json': JSON.stringify({ ...settings, fastMode: true }, null, 2), // a fast tab's (one --settings only)
+    ...claude,
     'gemini-settings.json': JSON.stringify(gemini, null, 2),
     'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
   }
@@ -1357,7 +1366,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
   const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, fast ? 'claude-settings-fast.json' : 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
+    argv = ['claude', '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()) })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -2752,7 +2761,7 @@ export function hookOk(tab: string, key: unknown) {
   const said = Buffer.from(typeof key === 'string' ? key : '')
   return own.length > 0 && own.length === said.length && timingSafeEqual(own, said)
 }
-export function hook(p: { tab: string; state: string; payload?: any }) {
+export function hook(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (tab) rtOf(p.tab).hooked = true
   if (tab) (s => (heard.set(tab.preset ?? '', Date.now()), s && (heardIn.add(s), deaf.delete(s))))(sessions.get(tab.id)) // heard after all: its strip goes (turn's view)
@@ -2798,13 +2807,18 @@ function preTool(tab: Tab, pl: any) {
   )
 }
 
-// a turn's state, from a hook or from the screen (sweepRunning)
-function turn(p: { tab: string; state: string; payload?: any }) {
+// a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
+// newest hook taken (hookAt: a PreToolUse or PostToolUse run in the background, come after the turn's Stop or the next
+// ask) changes no state, only what it says of the plan and links
+function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) return
   const r = rtOf(tab.id)
   const pl = p.payload ?? {}
   const was = r.status
+  const at = typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : undefined
+  const late = at !== undefined && at < (r.hookAt ?? 0)
+  if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
   // claude's Stop while subagents it started in the background still work: paused, not done (they report back as a new
@@ -2815,9 +2829,11 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     r.bg ??= Date.now()
     return changed()
   }
-  if (p.state !== 'start') r.bg = undefined
-  r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
-  if (p.state !== 'waiting') r.perm = undefined // answered (its tool runs), refused or over
+  if (!late) {
+    if (p.state !== 'start') r.bg = undefined
+    r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
+    if (p.state !== 'waiting') r.perm = undefined // answered (its tool runs), refused or over
+  }
   switch (p.state) {
     case 'compacting':
       if (r.status !== 'waiting') r.status = 'running'
@@ -2830,8 +2846,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       }
       return changed()
     case 'running':
-      r.status = 'running'
-      r.limit = r.escAt = r.suggest = undefined
+      if (!late) r.status = 'running'
+      if (!late) r.limit = r.escAt = r.suggest = undefined
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
         titleFrom(tab, pl.prompt) // claude's, gemini's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)

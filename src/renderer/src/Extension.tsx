@@ -460,6 +460,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
           )}
         </div>
       )}
+      {on && w.gates?.includes('tool') && <p className="muted small">Its tool gate reaches a Claude Code tab as the tab starts: new tabs get it at once, the ones running now once they start again (a new tab, or Laki's daemon restarted).</p>}
       {err && r && <div className="ai-err">{err}</div>}
       <div className="ext-ai-btns">
         <button onClick={onClose}>Cancel</button>

@@ -1,6 +1,6 @@
 // Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, gemini's hooks, opencode's plugin.
 import assert from 'node:assert/strict'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, until } from './helpers.ts'
@@ -179,4 +179,29 @@ test("opencode's model: in its inline config, not -m (some TUIs refuse it), over
   // its list is read as the tab would run it: a provider only Settings' env (a key) brings is known
   await rig.rpc('settingsSet', { env: { FAKE_OC_MORE: 'mine/own-model' } })
   assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'opencode', model: 'mine/own-model' })).model, 'mine/own-model')
+})
+
+test("claude's PreToolUse and PostToolUse run in the background (async); a late one changes no state; a tool gate's tabs wait on PreToolUse", async t => {
+  const rig = await fresh(t, { env: { FAKE_HOOK_DELAY: '400', FAKE_TURN_MS: '50' } })
+  const hooks = (f: string) => JSON.parse(readFileSync(join(rig.data, f), 'utf8')).hooks
+  const bg = (h: any) => ['PreToolUse', 'PostToolUse', 'Stop', 'UserPromptSubmit', 'PermissionRequest'].map(k => h[k][0].hooks[0].async ?? false)
+  assert.deepEqual(bg(hooks('claude-settings.json')), [true, true, false, false, false])
+  assert.deepEqual(bg(hooks('claude-settings-fast.json')), [true, true, false, false, false])
+  assert.deepEqual(bg(hooks('claude-settings-gated.json')), [false, true, false, false, false]) // its PreToolUse may answer
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'claude-settings-fast-gated.json'), 'utf8')).fastMode, true)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  // a turn whose tool hooks come after its Stop (their input 400 ms late): idle it stays
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'tools 2' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: tools 2', 'Stop')
+  assert.match(rig.fakeLog().find((l: any) => l.tab === tab.id).args.join(' '), /--settings \S+\/claude-settings\.json/) // no gate on
+  await new Promise(r => setTimeout(r, 1200)) // the late ones in by now
+  assert.equal((await rig.tab(ws.id)).status, 'idle')
+  // by when each started: an older one is late, a newer one counts
+  const at = Date.now() + 60_000
+  await rig.rpc('hook', { tab: tab.id, state: 'waiting', payload: { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'ls' } }, at })
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } }, at: at - 5 })
+  assert.equal((await rig.tab(ws.id)).status, 'waiting', 'its PreToolUse, come after the ask it started before')
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } }, at: at + 5 })
+  assert.equal((await rig.tab(ws.id)).status, 'running', 'answered: its tool ran')
 })
