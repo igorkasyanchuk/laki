@@ -57,8 +57,8 @@ How it was decided:
 
 ### L1496: GitHub's expand: an arrow at a hunk header's start (the lines above it) and under the … (~99 B)
 
-- [ ] `.span2` L1551
-- [ ] `.preview-head` L1554
+- [x] `.span2` L1551
+- [x] `.preview-head` L1554
 
 ### L950: a field in a chip is the chip's words: no box of its own, whatever a look or glass gives … (~92 B)
 

@@ -1540,10 +1540,8 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .form .scripts-import { position: absolute; right: 8px; bottom: 8px; flex-direction: row; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: var(--rs, 4px); }
 .form .scripts-import:hover { color: var(--fg); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; align-items: start; }
-.grid2 .span2 { grid-column: 1 / -1; }
 .grid2 .checks { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
 input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; cursor: pointer; }
-.preview-head { display: flex; gap: 8px; margin-top: 6px; }
 .term-preview { height: 190px; padding: 8px 10px; background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .term-preview .xterm { height: 100%; }
 /* Appearance › Interface's and Sidebar's previews (SettingsLook.tsx): the app's own classes, so its settings show as they are */
