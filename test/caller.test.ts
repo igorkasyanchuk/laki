@@ -266,7 +266,8 @@ test("M5 on Linux: the caller's process by /proc (its socket's inode among a pro
 })
 
 // 0.43's review: what would sleep, lock or shut the Mac down, the Done check, Recording mode, the next prompt and keep
-// awake are the user's settings; importing worktrees too (a delete removes their folder); a tab's state comes from its
+// awake are the user's settings; 0.45's: Run ▾'s actions, templates, PR prompts and bots, the files copied into new
+// worktrees too, and an update when idle while the user's Update delay holds it; importing worktrees too (a delete removes their folder); a tab's state comes from its
 // own agent: with its start's key (LAKI_HOOK), else from that tab's process or none (yours, this test's)
 test("an agent can't set When everything is done or its like, import worktrees, or report another tab's state", async t => {
   const rig = await fresh(t)
@@ -285,6 +286,7 @@ test("an agent can't set When everything is done or its like, import worktrees, 
   // its own tab's state with its own key, as its hooks send it (the env's, so in a script of its own)
   const own = join(rig.home, 'own-hook.sh')
   writeFileSync(own, `curl -s -H 'Authorization: Bearer ${token}' --data "{\\"method\\":\\"hook\\",\\"params\\":{\\"tab\\":\\"$LAKI_TAB\\",\\"state\\":\\"running\\",\\"key\\":\\"$LAKI_HOOK\\"}}" http://127.0.0.1:${port}/rpc >> ${out}; echo >> ${out}\n`)
+  await rig.rpc('settingsSet', { prBots: ['coderabbitai'], updateDelay: 3 })
   await rig.rpc('send', {
     target: `${ws.id}/${tab}`,
     text: `run ${[
@@ -305,6 +307,14 @@ test("an agent can't set When everything is done or its like, import worktrees, 
       curl('bgSet', { data: 'x' }),
       curl('sideNew', { tab }),
       curl('uiReset', {}),
+      curl('settingsSet', { actions: [{ name: 'x', command: 'rm -rf ~' }] }),
+      curl('settingsSet', { templates: [{ name: 'x', text: 'x' }] }),
+      curl('settingsSet', { prPrompts: { ci: 'x' } }),
+      curl('settingsSet', { prBots: ['evil-bot'] }),
+      curl('settingsSet', { copyIgnored: true }),
+      curl('settingsSet', { copyUntracked: true }),
+      curl('settingsSet', { prBots: ['coderabbitai'] }), // sent back unchanged: fine
+      curl('updateIdle', { on: true }), // an Update delay is set
     ].join('; ')}; echo done >> ${out}`,
   })
   await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
@@ -319,8 +329,15 @@ test("an agent can't set When everything is done or its like, import worktrees, 
   assert.match(said[14].error, /an agent can't set the app's background picture/)
   assert.match(said[15].error, /an agent can't start the user's side chat over/)
   assert.match(said[16].error, /an agent can't reset the user's settings/)
+  for (const i of [17, 18, 19, 20, 21, 22]) assert.equal(said[i].error, "an agent can't change that setting: it's the user's (ask them)", String(i))
+  assert.equal(said[23].error, undefined)
+  assert.match(said[24].error, /an agent can't update Laki while Check for updates is off or an Update delay is set/)
   const st = await rig.rpc('state')
-  for (const k of ['whenDone', 'doneCheck', 'recording', 'nextPrompt', 'keepAwake', 'storageDays', 'updateCheck']) assert.equal(st.settings[k], undefined, k)
+  for (const k of ['whenDone', 'doneCheck', 'recording', 'nextPrompt', 'keepAwake', 'storageDays', 'updateCheck', 'actions', 'templates', 'prPrompts', 'copyIgnored', 'copyUntracked']) assert.equal(st.settings[k], undefined, k)
+  assert.deepEqual(st.settings.prBots, ['coderabbitai'])
+  assert.equal(st.updateIdle, undefined)
+  assert.ok(await rig.rpc('updateIdle', { on: true })) // yours
+  await rig.rpc('updateIdle', { on: false })
   assert.notEqual(st.tabs.find((x: any) => x.id === other).status, 'waiting')
   await until(() => rig.out.includes(`hook refused: ${tab} reported ${other}'s state`), 'said in its log')
 

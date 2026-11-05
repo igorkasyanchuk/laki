@@ -586,10 +586,13 @@ const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt hist
 // too): when everything is done (the Mac sleeps, locks or shuts down), the Done check, Recording mode, the next prompt
 // guessed (your messages to a model), keep awake; how old the tidies let storage files, archived workspaces and pasted
 // images get (a small one deletes them all within the hour); memory's compaction (memories to a model, as
-// memoryCompact); the app's updates (Electron's security fixes come with them)
-const AGENT_KEYS = /^(whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|imageDays|memoryCompact|updateCheck|updateDelay)$/
+// memoryCompact); the app's updates (Electron's security fixes come with them); and the global ones of what a project's
+// config holds (refused in projectSet): Run ▾'s actions, prompt templates, the PR switches' prompts and trusted review
+// bots (whose comments go to agents), and the files copied into new worktrees (git's ignored ones: .env)
+const AGENT_KEYS = /^(whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked)$/
 function agentNo(method: string, p: any) {
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
+  else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")

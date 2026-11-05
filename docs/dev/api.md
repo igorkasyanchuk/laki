@@ -15,8 +15,9 @@ top of the main area, *Restart Laki's daemon* (`StaleDaemon` in `ui.tsx`, `.stal
   `pmset displaysleepnow` (the lock) or loginwindow's shut down, and the setting goes back to off. `settingsSet` refuses
   a value but those (one already saved is off); an agent can't change it (main.ts' `AGENT_KEYS`, with `doneCheck`,
   `recording`, `nextPrompt`, `keepAwake`, the tidies' `storageDays`, `archivedDays`, `imageDays`, `memoryCompact`,
-  `updateCheck`, `updateDelay`; nor a workspace's or project's `private`, `bgSet`, `sideNew`, `uiReset`; remote access
-  can: Cancel). Tested with a `pmset`
+  `updateCheck`, `updateDelay`, and the global ones of what `projectSet`'s `config` holds: `actions`, `templates`,
+  `prPrompts`, `prBots`, `copyIgnored`, `copyUntracked`; nor a workspace's or project's `private`, `bgSet`, `sideNew`,
+  `uiReset`, nor `updateIdle` while `updateCheck` is off or `updateDelay` set; remote access can: Cancel). Tested with a `pmset`
   in the rig's `$HOME/bin` (`test/resources.test.ts`);
 - keep awake (`settings.keepAwake`, off unless true; Settings › Git & worktrees' *In the background*): core.ts
   `keepAwake` at each view (`changed()`): while a tab of an agent (`tracked`, or a shell's `runs`) is running or waiting,

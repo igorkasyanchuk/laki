@@ -11,7 +11,7 @@ import './floater.css'
 import { alwaysOf, permVerb } from '../../shared/ask'
 import { dotsText, plainLines, replyOf, tookText } from '../../shared/island'
 import type { Ask } from '../../shared/types'
-import { initials } from './text'
+import { initials, noteWhole } from './text'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -77,6 +77,9 @@ const WORDS: Record<Float['status'], string> = { running: 'working', waiting: 'w
 let hovered = '' // the tab whose card shows
 const hover = (tab: string, top = 0) => ((hovered = tab), bridge?.hover(tab, top))
 const el = (tag: string, text: string, cls = '') => Object.assign(document.createElement(tag), { textContent: text, className: cls })
+// a permission ask's buttons only when what it runs is shown whole, as it is (noteWhole, a notification's rule): a cut
+// one (ask.ts' WHAT_MAX) or one with a bidi or invisible character gets none, its tab shows it
+const whole = (a?: Ask) => !a?.tool || noteWhole(a.what ?? '')
 // the buttons' line icons (constants: safe as markup)
 const svg = (d: string, box = 24) => `<svg viewBox="0 0 ${box} ${box}" fill="none" stroke="currentColor" stroke-width="${box === 24 ? 2 : 1.5}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
 const ICONS: Record<Act | 'plus', string> = {
@@ -364,7 +367,7 @@ function islandPage() {
       else if (a?.question || f.last) parts.push(el('div', a?.question ?? f.last ?? '', 'i-q'))
       const opts = el('div', '', 'i-opts')
       const always = a?.rule ? alwaysOf(a) : undefined
-      for (const o of a?.options ?? []) {
+      for (const o of whole(a) ? (a?.options ?? []) : []) {
         const b = btn(`${o.n}  ${o === always ? `Always: ${a!.rule}` : o.label}`, `i-opt${o.n === a!.options[0].n ? ' primary' : ''}`, async () => {
           const r = await bridge?.answer(f.tab, o.n, o.label)
           if (r?.error) say(note, r.error)
@@ -374,6 +377,7 @@ function islandPage() {
       }
       parts.push(opts)
       if (!a?.options.length) parts.push(el('div', 'Its question is in its tab', 'i-sub'))
+      else if (!whole(a)) parts.push(el('div', 'Too long to show whole: answer in its tab', 'i-sub'))
     } else {
       parts.push(head(f, f.took ? `done in ${tookText(f.took)}` : 'done'))
       parts.push(el('div', plainLines(f.answer, 2).join('\n') || 'Finished', 'i-answer'))
@@ -488,11 +492,12 @@ function voicePage() {
     reply = to1
     box.classList.toggle('reply', !!reply)
     title.textContent = reply ? `Reply to ${reply.agent ?? 'it'} · ${reply.name}` : 'Say a prompt'
-    lastBox.textContent = reply ? plainLines(reply.answer, 3).join('\n') : ''
+    const perm = reply && replyOf(reply) === 'options' && reply.ask?.tool ? reply.ask : undefined // what a Yes here runs
+    lastBox.textContent = perm ? `${permVerb(perm.tool!)} ${perm.what ?? ''}` : reply ? plainLines(reply.answer, 3).join('\n') : ''
     lastBox.hidden = !lastBox.textContent
     // a waiting one's menu: its options as buttons (answer, by n and label)
     opts.replaceChildren(
-      ...(reply && replyOf(reply) === 'options'
+      ...(reply && replyOf(reply) === 'options' && whole(reply.ask)
         ? reply.ask!.options.map(o =>
             Object.assign(el('button', `${o.n}. ${o.label}`, 'v-opt'), {
               onclick: async () => {
@@ -507,7 +512,7 @@ function voicePage() {
     opts.hidden = !opts.childElementCount
     if (reply) {
       to.hidden = true
-      note.textContent = hint = replyOf(reply) === 'options' ? 'Pick an option, or Open the tab · Esc closes' : '⏎ sends · ⇧⏎ a new line · Esc closes'
+      note.textContent = hint = replyOf(reply) !== 'options' ? '⏎ sends · ⇧⏎ a new line · Esc closes' : whole(reply.ask) ? 'Pick an option, or Open the tab · Esc closes' : 'Too long to show whole: Open the tab · Esc closes'
       return void text.focus()
     }
     const opt = (value: string, textContent: string, o: Partial<HTMLOptionElement> = {}) => Object.assign(document.createElement('option'), { value, textContent, ...o })

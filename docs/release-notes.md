@@ -12,6 +12,11 @@ version it builds, with the date. -->
   timers and reminders when you say so.
 - Ask an agent to show you an important alert ("ask me this with a Laki alert"): `laki alert "<question>" --choice A
   --choice B` puts the question on a card over every app, and your pick goes back to the agent.
+- An agent can no longer change Run ▾'s actions, prompt templates, the PR switches' prompts and trusted review bots,
+  or which files new worktrees copy (as with a project's own), nor update Laki when idle while *Check for updates* is
+  off or an *Update delay* is set.
+- The floating bubbles' card and reply window offer no Yes on a permission ask too long to show whole (or with an
+  invisible character), as notifications already do: you answer it in the tab.
 - Delete and Archive say plainly what it comes to: *Safe to delete* in green when its PR is merged or it has nothing of
   its own, *Mind* in amber (commits not pushed, a PR not merged, agents at work), *Check first* in red when
   uncommitted files would be lost; each line's icon in its color, and the PR's state as a pill (Merged, Open, Draft).

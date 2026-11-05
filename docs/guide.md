@@ -491,7 +491,8 @@ selected workspace's PR is in the status bar.
   card and in phone pushes (tokens in it masked; *Titles only* sends none of it). Its *don't ask again* choice reads
   *Yes, don't ask again for npm test* on the bar and *Always: npm test* in the notification. A command too long for
   the notification (over 200 characters) is cut there with … and gets no buttons, as does one with an invisible or
-  right-to-left character in it: you answer it in the tab, where it shows as it is.
+  right-to-left character in it (the floating bubbles' card and reply window too): you answer it in the tab, where it
+  shows as it is.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex
   teal, gemini blue, grok purple and opencode green, unless you pick another color (or none).
@@ -2456,7 +2457,8 @@ release only once it's that old; meanwhile Settings says when it will be, and *S
 *Update when idle* (beside *Update to x.y* and *Restart to update*) waits until no agent works or asks you, then
 downloads if it must, restarts Laki on the new version, and, once every agent is idle, restarts its daemon too (tabs
 resume); *Cancel* stops it. An agent can ask for it (`laki update --when-idle`, MCP's `laki_update_when_idle`): its own
-turn isn't waited for, and the daemon waits for it.
+turn isn't waited for, and the daemon waits for it. Not while *Check for updates* is off or an *Update delay* is set:
+those are yours.
 
 By hand: quit it (⌘Q: the daemon and your agents keep running), then either `brew upgrade --cask laki` or download
 the new dmg from [the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest) and replace

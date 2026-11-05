@@ -108,7 +108,7 @@
       /* the reply window (a circle's Reply…): its last answer dimmed, a waiting one's options; as tall as it needs (main
          sizes it from VOICE) */
       #voice.reply { height: auto; min-height: 186px; }
-      .v-last { color: var(--muted); border-left: 2px solid var(--line); padding: 1px 0 1px 8px; white-space: pre-line; max-height: 64px; overflow: hidden; }
+      .v-last { color: var(--muted); border-left: 2px solid var(--line); padding: 1px 0 1px 8px; white-space: pre-line; max-height: 64px; overflow: auto; overflow-wrap: anywhere; }
       .v-opts { display: flex; flex-direction: column; gap: 4px; }
       .v-opts .v-opt { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #card .hint { margin-top: 7px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
