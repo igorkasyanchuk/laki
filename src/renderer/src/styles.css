@@ -443,7 +443,6 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .button-row > button { flex: none; }
 .pick-btn { display: inline-flex; align-items: center; gap: 6px; } /* a value and its ⌄ picker: mark, words, chevron on one line */
 .pick-btn > :last-child { margin-left: 2px; opacity: 0.7; }
-.grid5 { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-head .ib { opacity: 0; }
 /* a project's color (its ⋯'s swatches), as a workspace's: a bar at its left and a tint fading out (--tab-c, set inline) */
@@ -2589,7 +2588,6 @@ button.board-name:hover { background: none; }
 .set-head { gap: 4px; }
 .set-head p { max-width: 64ch; }
 .set-group > .field > p.muted { margin-top: 2px; }
-.grid5 { gap: 12px 14px; }
 .settings-nav { gap: 1px; }
 .settings-nav > .settings-find + .settings-nav-head { margin-top: 4px; }
 .preset { gap: 8px; padding: 12px; }

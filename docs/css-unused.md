@@ -53,7 +53,7 @@ How it was decided:
 
 ### L440: Appearance › Interface › Text size (themes.ts' --ui-size): tabs, menus, dropdowns, the … (~99 B)
 
-- [ ] `.grid5` L449
+- [x] `.grid5` L449
 
 ### L1496: GitHub's expand: an arrow at a hunk header's start (the lines above it) and under the … (~99 B)
 
@@ -70,7 +70,7 @@ How it was decided:
 
 ### L2594: Settings, calmer: more room around and inside the cards, a page's lead text in readable … (~27 B)
 
-- [ ] `.grid5` L2603
+- [x] `.grid5` L2603
 
 ## look.css
 
