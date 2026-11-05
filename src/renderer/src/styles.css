@@ -2745,8 +2745,6 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .lp-meta .add { color: var(--add); }
 .lp-meta .del { color: var(--del); }
 .lp-err { color: var(--error); }
-.prompt-peek > summary { cursor: pointer; margin: 4px 0; }
-.prompt-peek[open] > summary { margin-bottom: 6px; }
 
 /* development mode's element picker (Picker.tsx): a box over what the pointer is on, its name, a bar saying how to stop */
 html.picking, html.picking * { cursor: crosshair !important; }

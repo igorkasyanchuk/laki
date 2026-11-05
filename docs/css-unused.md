@@ -45,7 +45,7 @@ How it was decided:
 
 ### L2739: a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, or a picture (~112 B)
 
-- [ ] `.prompt-peek` L2759, L2760
+- [x] `.prompt-peek` L2759, L2760
 
 ### L3088: an extension's Logs tab (Extension.tsx Logs) (~108 B)
 
