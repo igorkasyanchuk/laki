@@ -66,6 +66,21 @@ test('share: token-shaped strings masked; a picture shown as its link (L9)', () 
   assert.match(out, /Bearer ••••/)
   assert.match(out, /\?token=••••&page=2/)
   assert.equal(redact('git push origin main; npm test'), 'git push origin main; npm test') // plain words stay
+  // more shapes: Stripe, Google, npm, Hugging Face, a PEM private key, a URL's password, a NAME=value that says secret
+  const more = [
+    'STRIPE=sk_live_abcdefghijklmnop12',
+    'maps key AIzaSyA1234567890abcdefghijklmnopqrstu',
+    '//registry.npmjs.org/:_authToken=npm_abcdefghijklmnopqrstuvwxyz0123456789',
+    'HF hf_abcdefghijklmnopqrstuvwxyz0123456789',
+    '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----',
+    'psql postgres://me:hunter22@db.example.com:5432/app',
+    'export DB_PASSWORD="correct horse"',
+    'MY_API_KEY: abcd1234efgh',
+  ].join('\n')
+  const masked = redact(more)
+  for (const s of ['sk_live_abcdefghijklmnop12', 'AIzaSyA1234567890abcdefghijklmnopqrstu', 'npm_abcdefghijklmnopqrstuvwxyz0123456789', 'hf_abcdefghijklmnopqrstuvwxyz0123456789', 'b3BlbnNzaC1rZXktdjEAAAAA', 'hunter22', 'correct horse', 'abcd1234efgh']) assert.ok(!masked.includes(s), s)
+  assert.match(masked, /postgres:\/\/me:••••@db\.example\.com/)
+  assert.equal(redact('the token: see the docs; a password field; https://example.com/a:b@c'), 'the token: see the docs; a password field; https://example.com/a:b@c') // words about secrets, a path with a colon
   const body = shareBody('Claude', [{ who: 'agent', text: 'Look: ![the chart](https://evil.example/pixel.png)' }])
   assert.doesNotMatch(body, /<img/)
   assert.match(body, /<a href="https:\/\/evil\.example\/pixel\.png"[^>]*>the chart<\/a>/)

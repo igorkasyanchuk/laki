@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Shared tabs and phone pushes mask more secrets: Stripe, Google, npm and Hugging Face keys, private keys, a
+  password in a URL, and `NAME=value` lines whose name says secret, token, password or API key.
+
 - A `laki-ui` copy button in an agent's answer that would copy something other than what the block shows asks first,
   with the text it would copy.
 

@@ -31,7 +31,7 @@ move as fixes land, so find a note by its words.
 A recommendation: the user picks which ones get fixed. Real risks with small fixes first; the largest real one, the
 agent-vs-user boundary (per-tab tokens), is under Issues because it's L and needs a decision first.
 
-- [ ] **1. `src/daemon/share.ts:240`: shared tabs and phone pushes mask secrets by a few shapes.** Security, S.
+- [x] **1. `src/daemon/share.ts:240`: shared tabs and phone pushes mask secrets by a few shapes.** Security, S.
   A shared tab is a page on the internet; its chat is the agent's words and its tool calls, where keys turn up
   (`export STRIPE_KEY=sk_live_…`, `psql postgres://me:pw@…`, a pasted `.env`), and phone pushes run through the same
   `redact`. Fix: add Stripe (`[sr]k_(live|test)_…`), Google (`AIza…`), npm (`npm_…`), Hugging Face (`hf_…`), PEM

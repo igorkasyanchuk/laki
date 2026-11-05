@@ -236,10 +236,15 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
   return m
 }
 
-// L9: token-shaped strings masked in what a share shows (its page and Markdown): API keys (sk-…, GitHub's, Slack's, AWS's
-// key ids), a Bearer token, a JWT, a token's, key's or secret's value in a URL. ponytail: shapes, not every secret
+// L9: token-shaped strings masked in what a share shows (its page and Markdown) and a phone push says: API keys (sk-…,
+// Stripe's, GitHub's, Slack's, Google's, npm's, Hugging Face's, AWS's key ids), a private key's PEM block, a Bearer
+// token, a JWT, a token's, key's or secret's value in a URL, a URL's password, a NAME=value whose name says secret.
+// ponytail: shapes, not every secret
 const SECRETS: [RegExp, string][] = [
-  [/\b(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|(?:AKIA|ASIA)[0-9A-Z]{16})\b/g, '••••'],
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '••••'],
+  [/\b(sk-[A-Za-z0-9_-]{16,}|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AIza[A-Za-z0-9_-]{30,}|npm_[A-Za-z0-9]{30,}|hf_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16})\b/g, '••••'],
+  [/\b([a-z][a-z0-9+.-]*:\/\/[^\s:@/'"<>]+:)[^\s@/'"<>]+@/gi, '$1••••@'],
+  [/\b([A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY)[A-Z0-9_]*\s*[=:]\s*)(?:(['"])[^'"\n]{2,}\2|[^\s'"&]{4,})/g, '$1••••'], // an env var's way: in capitals
   [/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, '$1••••'],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '••••'],
   [/([?&](?:token|access_token|key|api_key|apikey|secret|password|auth|sig|signature)=)[^&\s"'#<>]+/gi, '$1••••'],
