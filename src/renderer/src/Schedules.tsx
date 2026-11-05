@@ -9,8 +9,9 @@ import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
 import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 export type SchedulesApi = {
-  set(s: Partial<Schedule>): Promise<Schedule>
-  rm(id: string): Promise<unknown>
+  set(s: Partial<Omit<Schedule, 'archived'>> & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false)
+  rm(id: string): Promise<unknown> // Delete permanently: an archived one's
+  toast?: (text: string, undo?: () => void) => void // Archive's, with Undo
   run(id: string): Promise<ScheduleRun>
   open(ws: string, tab?: string): void
   pick(): Promise<{ id: string } | null> // another folder: the folder picker, then it's a project
@@ -154,7 +155,10 @@ export function Grouped<T>({ items, keyOf, groupOf, onOf, row, store, what, onMo
 export function SchedulesPage({ view, api, project: start = '', onSeen, onClose }: { view: View; api: SchedulesApi; project?: string; onSeen?: (run: string) => void; onClose: () => void }) {
   const [picked, setPicked] = useState(start) // a project's tasks and runs; '': all
   const only = view.projects.length > 1 && view.projects.some(p => p.id === picked) ? picked : '' // a removed project, or the only one: all
-  const schedules = (view.schedules ?? []).filter(s => !only || s.project === only)
+  const all = (view.schedules ?? []).filter(s => !only || s.project === only)
+  const schedules = all.filter(s => !s.archived)
+  const archived = all.filter(s => s.archived).sort((a, b) => b.archived! - a.archived!)
+  const [showArchived, setShowArchived] = useState(false)
   const runs = (view.runs ?? []).filter(r => !only || (r.project ?? view.schedules?.find(s => s.id === r.schedule)?.project) === only)
   const agents = view.presets.filter(p => p.agent !== 'command' && !p.off).map(p => p.name)
   const newest = view.runs?.[0]?.id
@@ -235,7 +239,14 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     const ws = ['new', 'same', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
     if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, base: s.base ?? '', noSetup: s.noSetup, fresh: s.fresh, ...(s.workflow && { workflow: s.workflow, source: s.source }), ...(s.widget && { widget: s.widget, action: s.action }) })
   }
-  const rm = (s: Schedule) => ask(`Delete the scheduled task ${s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))}?`, { ok: 'Delete', danger: true }).then(y => y && api.rm(s.id).catch(fail))
+  const titleOf = (s: Schedule) => s.name || (s.widget && !s.prompt ? extName(s.widget, s.action) : s.prompt.slice(0, 40))
+  const rm = (s: Schedule) => ask(`Delete the scheduled task ${titleOf(s)} permanently?`, { text: 'It and its settings go for good; its runs stay in the log.', ok: 'Delete permanently', danger: true }).then(y => y && api.rm(s.id).catch(fail))
+  // Archive: off the list and never run, until it's restored; the toast's Undo restores it
+  const archive = (s: Schedule, on: boolean) =>
+    api.set({ id: s.id, archived: on }).then(
+      () => (on && form?.id === s.id && setForm(null), api.toast?.(on ? `Archived ${titleOf(s)}` : `Restored ${titleOf(s)}`, on ? () => void api.set({ id: s.id, archived: false }).catch(fail) : undefined)),
+      fail,
+    )
   const where = (ws: string) => (ws ? (WHERE.find(x => x[0] === ws)?.[1] ?? `in ${view.workspaces.find(w => w.id === ws)?.name || ws}`) : 'pick a workspace: it has none yet')
   const nameOf = (id: string) => view.projects.find(p => p.id === id)?.name ?? id
   const pickProject = async (id: string) => {
@@ -499,7 +510,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   </button>
                   <span className="sched-acts">
                     {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
-                    <IconButton icon="trash" title="Delete" onClick={() => rm(s)} />
+                    <IconButton icon="archive" title="Archive: off the list, never runs; Archived below brings it back" onClick={() => void archive(s, true)} />
                   </span>
                   <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
                 </div>
@@ -515,6 +526,41 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             </div>
           )}
         </section>
+        )}
+
+        {archived.length > 0 && (
+          <section>
+            <button type="button" className="sched-head sched-arch-head" aria-expanded={showArchived} onClick={() => setShowArchived(o => !o)}>
+              <Icon name={showArchived ? 'chevron' : 'chevronRight'} size={12} />
+              <h3>Archived</h3>
+              <span className="muted small">{archived.length}</span>
+            </button>
+            {showArchived && (
+              <div className="sched-list">
+                {archived.map(s => (
+                  <div key={s.id} className="sched-row off sched-archived">
+                    <span className="sched-icon" data-kind="archive">
+                      <Icon name="archive" />
+                    </span>
+                    <span className="sched-main">
+                      <span className="sched-name">{titleOf(s)}</span>
+                      <span className="sched-meta">
+                        <b>{describe(s.rule)}</b>
+                        <span data-tip={at(s.archived!)}>archived {ago(s.archived!)}</span>
+                      </span>
+                      <span className="sched-tags">
+                        <span className="tag">{nameOf(s.project)}</span>
+                      </span>
+                    </span>
+                    <span className="sched-acts">
+                      <IconButton icon="restore" title={`Restore: back on the list${s.on ? ', running at its times' : ''}`} onClick={() => void archive(s, false)} />
+                      <IconButton icon="trash" title="Delete permanently" onClick={() => rm(s)} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         <section>

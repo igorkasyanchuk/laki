@@ -377,3 +377,26 @@ test("scheduled tasks: a new workspace each run without the project's setup scri
   assert.equal(cli.code, 0, cli.err)
   assert.match(cli.out, /claude · new, no setup/)
 })
+
+test('scheduled tasks: Archive takes one off the list and its runs, Restore brings it back as it was, the CLI too', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const s = await rig.rpc('scheduleSet', { project: p.id, preset: 'claude', ws: 'new', prompt: 'nightly deps', when: 'every day at 2am' })
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, archived: true }), /archive which task/)
+  await assert.rejects(rig.rpc('scheduleSet', { id: s.id, archived: 'yes' }), /archived\? true or false/)
+  const a = await rig.rpc('scheduleSet', { id: s.id, archived: true })
+  assert.ok(a.archived > 0 && a.next === undefined && a.on, 'archived, no next run, its switch kept')
+  await rig.rpc('scheduleTick', { now: s.next })
+  assert.equal((await rig.rpc('state')).runs?.length ?? 0, 0) // never runs
+  // an edit keeps it archived; Restore: its next run again
+  assert.ok((await rig.rpc('scheduleSet', { id: s.id, prompt: 'weekly deps' })).archived)
+  const r = await rig.rpc('scheduleSet', { id: s.id, archived: false })
+  assert.equal(r.archived, undefined)
+  assert.ok(r.next > Date.now())
+  // the CLI: archive, ls says so, restore; rm deletes it for good
+  assert.equal((await rig.cli('schedule', 'archive', s.id)).out.trim(), `${s.id} archived`)
+  assert.match((await rig.cli('schedule', 'ls')).out, new RegExp(`^${s.id}  archived  `))
+  assert.equal((await rig.cli('schedule', 'restore', s.id)).out.trim(), `${s.id} restored`)
+  await rig.rpc('scheduleRm', { id: s.id })
+  assert.deepEqual((await rig.rpc('state')).schedules, [])
+})

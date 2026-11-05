@@ -1728,6 +1728,7 @@ export function App() {
     changes: uncommitted => api.call<Changes>('diff', { ws: w.id, uncommitted }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
     turnChanges: () => api.call<Changes>('turnDiff', { ws: w.id }),
+    ...(w.kind === 'worktree' && { bases: () => api.call('baseBranches', { ws: w.id }), setBase: (base: string) => api.call('wsBase', { ws: w.id, base }) }),
     commits: () => api.call<Commits>('commits', { ws: w.id }),
     commitDiff: sha => api.call<Changes>('commitDiff', { ws: w.id, sha }),
     prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
@@ -2577,6 +2578,8 @@ export function App() {
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   const readerApi: ReaderApi = {
     read: (tab, v) => api.call('chatRead', { tab, v }),
+    bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),
+    appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
     answer: (tab, n) => void call('answer', { tab, n }).catch(() => {}),

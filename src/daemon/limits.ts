@@ -74,3 +74,21 @@ export function parseReset(s: string, now: Date): Date | null {
   if (m[1] && !m[3] && t.getTime() < now.getTime() - 86400e3) t = at(y + 1, mo, d) // a date without a year: the next one
   return t
 }
+
+// ---------- a model the installed claude is too old for (accounts.ts modelRefused): the API's claude_code_version_too_old
+
+// a before b: 2.1.99 before 2.1.280
+export function older(a: string, b: string) {
+  const [x, y] = [a, b].map(v => v.split('.').map(Number))
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return (x[i] || 0) < (y[i] || 0)
+  return false
+}
+// a claude_code_version_too_old error: the version it needs (its highest: the one it has is older), the one it has
+// when it says, and the model it names
+export function tooOld(text: string): { need: string; have?: string; model?: string } | undefined {
+  if (!/claude_code_version_too_old/.test(text)) return
+  const [need, have] = [...new Set([...text.matchAll(/\b(\d+\.\d+\.\d+)\b/g)].map(m => m[1]))].sort((a, b) => (older(a, b) ? 1 : older(b, a) ? -1 : 0))
+  if (!need) return
+  const model = /\b(claude-[a-z0-9][a-z0-9.-]*[a-z0-9](?:\[1m\])?)/i.exec(text)?.[1]
+  return { need, ...(have && { have }), ...(model && { model }) }
+}

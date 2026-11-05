@@ -1,24 +1,38 @@
 // Reader view: an agent tab's chat as a conversation instead of its terminal (the daemon's chatRead: claude's or
 // codex's transcript, asked every 1.5 s while shown). Your messages on the right, its answers as Markdown, a run of
-// tool calls folded into one line, what it does now; its menu as buttons, a box that sends (send whenIdle). The
-// terminal stays attached under it: Terminal brings it back as it was
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+// tool calls folded into one line, what it does now; its menu as buttons, a box that sends (send whenIdle). Over the
+// box, chips for the subagents and background tasks a claude chat still runs; under an MCP call, its app (McpApp); in
+// an answer, a laki-ui block drawn with the UI kit (UiBlock). The terminal stays attached under it: Terminal brings
+// it back as it was
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
-import { linkify, Markdown } from './MarkdownView'
+import { ask, Icon, type MenuItem, useMenu } from './ui'
+import { linkify, Markdown, UiBlocks } from './MarkdownView'
+import { clean } from './Widgets'
+import { daemonBase, openExternal } from './api'
+import { uiBehave, WIDGET_CSS } from '../../shared/widget'
+import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { type Mention, withMentions } from './text'
 import { planNow } from '../../shared/todos'
 import type { TabView } from '../../shared/types'
 
 type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
-export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[] }>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+// what a claude chat runs in the background (the daemon's share.ts bgOf): subagents and background shells
+type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string }
+type BgOut = { text: string; size: number; cut?: boolean }
+// an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
+type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
+export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
 
 export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; active: boolean }) {
   const [said, setSaid] = useState<Said[]>()
+  const [bg, setBg] = useState<BgTask[]>([])
+  const [apps, setApps] = useState<App[]>([])
   const [none, setNone] = useState(false)
   const [text, setText] = useState('')
   const [hid, setHid] = useState<string>() // the guess Esc hid (settings.nextPrompt's tab.suggest)
@@ -34,7 +48,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
     v.current = undefined
     const go = () =>
       api.read(tab.id, v.current).then(
-        r => alive && (setNone(!!r.none), r.said && ((v.current = r.v), setSaid(r.said))),
+        r => alive && (setNone(!!r.none), r.said && ((v.current = r.v), setSaid(r.said), setBg(r.bg ?? []), setApps(r.apps ?? []))),
         () => {},
       )
     go()
@@ -56,12 +70,70 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
     void api.send(tab.id, withMentions(t, api.mentions?.(tab) ?? [])).catch(() => setText(t)) // a line for each @ it names
   }
   const now = tab.plan && !tab.plan.stale ? planNow(tab.plan) : undefined
+  // the chips over the box: Subagents · n, Background · n; a click lists them, each with Show output and Stop
+  const [menu, openMenu] = useMenu()
+  const [out, setOut] = useState<{ task: BgTask; got?: BgOut; err?: string }>()
+  useEffect(() => {
+    if (!out || !api.bgOutput) return
+    let alive = true
+    const go = () => api.bgOutput!(tab.id, out.task.id).then(got => alive && setOut(o => (o?.task.id === out.task.id ? { ...o, got, err: undefined } : o)), e => alive && setOut(o => o && { ...o, err: (e as Error).message }))
+    go()
+    const t = setInterval(() => document.visibilityState === 'visible' && go(), 2000)
+    return () => ((alive = false), clearInterval(t))
+  }, [out?.task.id, tab.id])
+  const live = tab.status !== 'exited' ? bg : []
+  // a subagent in this turn (its call's id) stops with the turn (Esc); a background one or a shell: the agent is asked
+  const stop = (t: BgTask) => void api.send(tab.id, `Stop the background ${t.kind === 'agent' ? 'subagent' : 'task'} ${t.id} (${t.name}) now, with TaskStop (or KillShell), then say it's stopped.`).catch(() => {})
+  const chipMenu = (e: React.MouseEvent, list: BgTask[]) =>
+    openMenu(
+      e,
+      list.map(t => {
+        const inTurn = t.id.startsWith('toolu_')
+        return {
+          label: t.name,
+          icon: t.kind === 'agent' ? 'agent' : 'terminal',
+          mono: t.kind === 'shell',
+          sub: inTurn ? 'in this turn: Esc stops it with the turn' : t.id,
+          items: [
+            ...(t.out && api.bgOutput ? [{ label: 'Show output', icon: 'file', run: () => setOut({ task: t }) } as MenuItem] : []),
+            ...(inTurn ? [] : [{ label: 'Stop', icon: 'stop', danger: true, tip: `Asks ${tab.name} to stop it`, run: () => stop(t) } as MenuItem]),
+          ],
+        } as MenuItem
+      }),
+    )
+  const chips = live.length > 0 && (
+    <div className="rd-chips">
+      {(['agent', 'shell'] as const).map(k =>
+        (list =>
+          list.length > 0 && (
+            <button key={k} type="button" className="rd-chip" data-tip={k === 'agent' ? 'Subagents it started that still work' : 'Commands it left running in the background'} onClick={e => chipMenu(e, list)}>
+              <Icon name={k === 'agent' ? 'agent' : 'terminal'} size={12} />
+              {k === 'agent' ? 'Subagents' : 'Background'} · {list.length}
+            </button>
+          ))(live.filter(t => t.kind === k)),
+      )}
+    </div>
+  )
+  const outBox = out && (
+    <div className="rd-out">
+      <div className="rd-out-head">
+        <span className="mono small grow">{out.task.name}</span>
+        {out.got?.cut && <span className="muted small">its last 64 KB</span>}
+        <button type="button" className="link small" aria-label="Close" onClick={() => setOut(undefined)}>
+          ×
+        </button>
+      </div>
+      {out.err ? <div className="warn small">{out.err}</div> : <pre className="rd-out-text">{out.got ? out.got.text || '(nothing yet)' : 'Loading…'}</pre>}
+    </div>
+  )
+  const uiDraw = useMemo(() => (json: string) => <UiBlock json={json} onSend={text => void api.send(tab.id, text).catch(() => {})} />, [tab.id])
   return (
+    <UiBlocks.Provider value={uiDraw}>
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <div className="reader-col">
           {none && !said?.length && <div className="reader-empty muted">{tab.name}'s chat shows here once it has said something.</div>}
-          {said?.map((x, i) =>
+          {said?.map((x, i) => [
             x.who === 'you' ? (
               <You key={i} text={x.text} />
             ) : x.who === 'tool' ? (
@@ -76,7 +148,8 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
                 <Markdown src={x.text} chat />
               </div>
             ),
-          )}
+            ...apps.filter(a => a.at === i).map(a => <McpApp key={a.id} app={a} tab={tab} api={api} />),
+          ])}
           {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
           {tab.status === 'running' && (
             <div className="rd-working muted">
@@ -85,6 +158,9 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
           )}
         </div>
       </div>
+      {outBox}
+      {chips}
+      {menu}
       {tab.planAsk && tab.ask ? (
         <div className="rd-ask muted">It asks you to approve its plan: below, where you can change it too.</div>
       ) : tab.ask ? (
@@ -127,6 +203,111 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
           {at.menu}
         </form>
       )}
+    </div>
+    </UiBlocks.Provider>
+  )
+}
+
+// A ```laki-ui block in an agent's answer: UI kit JSON (an element, or { "ui": element, "data": {…} }) drawn with the
+// kit's own controls, as an extension's are (a shadow root, the sanitizer, uiBehave): a table, choices, stats… A
+// button's do send puts its prompt to this agent (your pick); copy copies; a link opens in the browser; the rest
+// (new, terminal, ai, browse, an action) does nothing here. JSON that isn't, or an element the kit hasn't: the code
+function UiBlock({ json, onSend }: { json: string; onSend: (text: string) => void }) {
+  const host = useRef<HTMLDivElement>(null)
+  const spec = useMemo(() => {
+    try {
+      const j = JSON.parse(json)
+      const ui = isElement(j) ? j : j && typeof j === 'object' && isElement(j.ui) ? j.ui : undefined
+      return ui && !uiCheck(ui).some(x => x.level === 'error') ? { ui, data: isElement(j) ? {} : (j.data ?? {}) } : undefined
+    } catch {
+      return undefined
+    }
+  }, [json])
+  const send = useRef(onSend)
+  send.current = onSend
+  useEffect(() => {
+    if (!spec || !host.current) return
+    const root = host.current.shadowRoot ?? host.current.attachShadow({ mode: 'open' })
+    root.replaceChildren(Object.assign(document.createElement('style'), { textContent: WIDGET_CSS }), clean(uiHtml(spec.ui, { data: spec.data, config: {} }, { full: true, hide: { refresh: true, at: true } })))
+    return uiBehave(root, m => {
+      const cmd = m.cmd as { do?: string; prompt?: string } | undefined
+      if (m.laki === 'do' && cmd?.do === 'send' && typeof cmd.prompt === 'string' && cmd.prompt.trim()) return (send.current(cmd.prompt.trim()), true)
+      if (m.laki === 'copy' && typeof m.text === 'string') void navigator.clipboard.writeText(m.text).catch(() => {})
+      if (m.laki === 'open' && typeof m.url === 'string' && /^https?:\/\//i.test(m.url)) openExternal(m.url)
+    })
+  }, [spec])
+  if (!spec)
+    return (
+      <pre>
+        <code>{json}</code>
+      </pre>
+    )
+  return <div ref={host} className="widget-body rd-ui" />
+}
+
+// An MCP App: the tool's own page (the server's ui:// resource, served by the daemon with its CSP) in a sandboxed frame
+// that talks to Laki by postMessage (JSON-RPC, the MCP Apps extension): it's told the call's input and result; it may
+// open a link (http(s), in the browser), ask its server to run a tool or send a message to the agent, each only once
+// you say yes on a card; it says how tall it is
+function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [src, setSrc] = useState<string>()
+  const [h, setH] = useState(180)
+  useEffect(() => void daemonBase().then(b => setSrc(b + app.src)), [app.src])
+  const now = useRef({ app, tab })
+  now.current = { app, tab }
+  useEffect(() => {
+    const post = (m: object) => frame.current?.contentWindow?.postMessage({ jsonrpc: '2.0', ...m }, '*')
+    const told = () => {
+      const a = now.current.app
+      post({ method: 'ui/notifications/tool-input', params: { arguments: a.input } })
+      if (a.result) post({ method: 'ui/notifications/tool-result', params: { ...(a.result as object), ...(a.error && { isError: true }) } })
+    }
+    const on = async (e: MessageEvent) => {
+      if (e.source !== frame.current?.contentWindow || !e.data || typeof e.data !== 'object' || e.data.jsonrpc !== '2.0') return
+      const { id, method, params } = e.data as { id?: number | string; method?: string; params?: any }
+      const reply = (r: { result?: unknown; error?: { code: number; message: string } }) => id !== undefined && post({ id, ...r })
+      const no = (message: string, code = -32000) => reply({ error: { code, message } })
+      const { app: a, tab: t } = now.current
+      try {
+        if (method === 'ui/initialize') {
+          const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark')
+          return reply({ result: { protocolVersion: '2025-06-18', hostInfo: { name: 'Laki', version: '1' }, hostCapabilities: { openLinks: {}, serverTools: {} }, hostContext: { theme: dark ? 'dark' : 'light', displayMode: 'inline', availableDisplayModes: ['inline'] } } })
+        }
+        if (method === 'ui/notifications/initialized') return told()
+        if (method === 'ui/notifications/size-changed') return void (typeof params?.height === 'number' && setH(Math.max(60, Math.min(900, Math.ceil(params.height)))))
+        if (method === 'ui/open-link') {
+          const url = String(params?.url ?? '')
+          if (!/^https?:\/\//i.test(url)) return no('only http(s) links')
+          openExternal(url)
+          return reply({ result: {} })
+        }
+        if (method === 'tools/call') {
+          const name = String(params?.name ?? '')
+          const args = JSON.stringify(params?.arguments ?? {}, null, 1)
+          if (!api.appCall || !(await ask(`The ${a.server} app wants to run ${name}`, { text: args.length > 600 ? `${args.slice(0, 600)}…` : args, ok: 'Run it' }))) return no('you said no')
+          return reply({ result: await api.appCall(t.id, a.id, name, params?.arguments ?? {}) })
+        }
+        if (method === 'ui/message') {
+          const text = (Array.isArray(params?.content) ? params.content : []).map((c: any) => (c?.type === 'text' ? String(c.text ?? '') : '')).join('\n').trim()
+          if (!text || !(await ask(`The ${a.server} app wants to send ${t.name} a message`, { text: text.length > 600 ? `${text.slice(0, 600)}…` : text, ok: 'Send' }))) return no('you said no')
+          await api.send(t.id, text)
+          return reply({ result: {} })
+        }
+        if (method && id !== undefined) no(`${method}: not here`, -32601)
+      } catch (err) {
+        no((err as Error).message)
+      }
+    }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [])
+  return (
+    <div className="rd-app">
+      <div className="rd-app-head muted small">
+        {app.server} · {app.tool}
+      </div>
+      {src && <iframe ref={frame} className="rd-app-frame" title={`${app.server} ${app.tool}`} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" style={{ height: h }} />}
     </div>
   )
 }

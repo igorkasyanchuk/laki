@@ -21,6 +21,12 @@ export const Markdown = memo(function Markdown({ src, html, chat }: { src: strin
   return chat ? <InChat.Provider value>{md}</InChat.Provider> : md
 })
 const InChat = createContext(false)
+// a ```laki-ui block (an agent's reply in the Reader: UI kit JSON): drawn by whoever provides it (the Reader), else as code
+export const UiBlocks = createContext<((json: string) => React.ReactNode) | undefined>(undefined)
+const UiFence = ({ text }: { text: string }) => {
+  const draw = useContext(UiBlocks)
+  return draw ? draw(text) : <Code text={text} lang="json" />
+}
 
 const Code = ({ text, lang }: { text: string; lang?: string }) => (
   <pre>
@@ -203,6 +209,7 @@ function mdBlock(b: Block, k: number): React.ReactNode {
       )
     case 'code':
       if (b.lang === 'mermaid') return <Mermaid key={k} text={b.text} />
+      if (b.lang === 'laki-ui') return <UiFence key={k} text={b.text} />
       if (b.lang === 'diff' || b.lang === 'patch') return <DiffBlock key={k} text={b.text} lang={b.lang} />
       return <Code key={k} text={b.text} lang={b.lang} />
     case 'list': {

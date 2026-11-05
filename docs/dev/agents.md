@@ -13,6 +13,16 @@ todos, plans, skills, plugins, commands, agents, hooks, output-styles, settings.
 skills, prompts, config.toml, AGENTS.md) from the agent's own folder, at its making and each start, so a chat resumes on
 any account (claude's missing folders made in `~/.claude` first; `~/.codex` is never written: only what's there). `spawnTab` keeps `tab.account` (`accountFor`: its own, else its profile's, else `settings.accountUse`, else
 home; a removed one: home); `tabAccount` (a tab's right click › *Restart on another account*) sets it and resumes.
+Auto fallback (`settings.limitFallback`, each agent's account ids in order, SettingsAgents' `.account-fb`): core's
+`checkLimit` calls `fallback` a second after a new limit (the turn's end told first: a workflow pauses on it), which
+notes the account's reset (`accountAt`), picks the next in the order after this one that isn't at its own, and does
+`tabAccount`, clears `limit` and types `continue` once the prompt is up (`whenPrompt`); none left: it waits as before.
+A model the installed claude is too old for: a failed claude turn's error with `claude_code_version_too_old`
+(limits.ts `tooOld`: the highest version it names is needed, the next the one it has, the model it names, else the
+tab's) is kept in `state.modelNeeds` (`modelRefused`, the turn's `last` in words); `claudeHas` (`claude --version`,
+every 10 minutes) drops what an update can run; `agentModels` leaves those out, the view's `modelNeeds` and `claudeHas`
+warn on the new-workspace page (panels.tsx `.nw-warn`, its *Update Claude Code*: core's `agentUpdate`, a Terminals
+workspace typing `claude update`; agent-refused, not remote). Tested in `test/fallback.test.ts`.
 `accountLogin` opens a Terminals workspace `sign in: <name>` and types the agent's login there once its prompt is up
 (`whenPrompt`, `loginCmd`). `accountView`: claude's email from the folder's `.claude.json` (home: `~/.claude.json`),
 signed in when `usage.ts` `claudeCred(dir)` finds a token: the Keychain item `Claude Code-credentials-<sha256(dir)[:8]>`

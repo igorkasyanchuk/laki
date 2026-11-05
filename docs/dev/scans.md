@@ -52,6 +52,26 @@
   `diff` (App's ask bar: `AskWrap`'s chip; Needs.tsx' card; floater.ts' `diffEl` on the notch's); `@` in its box: PromptInput's `useComplete` with
   `mentions` (text.ts `mentionsOf`, App's `readerApi`), a line each at send (`withMentions`); your long messages
   (`longSaid`: over 12 lines or 1,000 characters) fold under `.rd-fold`. Tested in `test/reader.test.ts`.
+  - Its chips (claude): share.ts `bgOf` reads the transcript on with `chatOf` (`Reader.bg`): an Agent/Task call runs
+    until its result (a background one, `toolUseResult.isAsync`, on under its `agentId` with its `outputFile`), a Bash
+    `run_in_background` from its result's ID (`backgroundTaskId`, or the text's) and output file, each until a
+    `<task-notification>` with an ended `status` (a user line or a `queue-operation`'s), KillShell or TaskStop; chatRead's
+    `bg`. `bgOutput` (FROM, agent-refused): the last 64 KB of a listed task's file, never another path. Reader.tsx'
+    `.rd-chips` (Subagents, Background), a menu each (*Show output*: `.rd-out`, every 2 s; *Stop*: a `send` asking the
+    agent; none for one in the turn, a `toolu_` id). `NOISE` drops claude's task-notification and agent-message lines.
+  - MCP Apps (`settings.mcpApps`, on unless false; mcpApps.ts): `chatOf`'s `calls` (claude's `mcp__<server>__<tool>`
+    calls, their said line `at`, their result: content blocks, `structuredContent`), `callsOf` (the newest 200); main.ts'
+    `chatRead` is `chatWithApps`: `appsFor` finds each call's server in the tab's account's `.claude.json` (user and
+    local scope by the worktree's path; never `.mcp.json`; stdio or streamable HTTP, a name's other characters as `_`),
+    connects (`initialize` with the `io.modelcontextprotocol/ui` extension, kept `IDLE`), lists its tools once
+    (`_meta.ui.resourceUri`, a `ui://` one; `bumpReader` re-reads the chat), and adds `apps` by said line (`from`: of
+    the newest 400). `GET /mcp-app/<tab>/<call>?key=` (`urlKey('mcp:…')`): `resources/read`'s HTML with a CSP of
+    `_meta.ui.csp`'s https origins; `mcpAppCall` (FROM, agent-refused): `tools/call` on that server. Reader.tsx `McpApp`:
+    an `allow-scripts` frame, postMessage JSON-RPC (`ui/initialize` with the theme, then `tool-input` and `tool-result`;
+    `size-changed`; `ui/open-link` http(s); `tools/call` and `ui/message` after an `ask`). Tested in `test/reader.test.ts`.
+  - `laki-ui` blocks: MarkdownView's `UiBlocks` context (unset: the JSON as code); Reader.tsx `UiBlock`: an element or
+    `{ ui, data }` passing `uiCheck`, `uiHtml` in a shadow root through Widgets' `clean`, `uiBehave`: a `do: send`
+    button's prompt to the agent, copy, http(s) links; the laki skill's *Show it as UI in your answer*.
 - One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check` and PR
   to one `Step`, `busy` while an agent or CI works; overlaps aren't one: Check overlaps, the row's ⇄): App's
   `stepOf`/`doStep`, `stepItem` (with `STEP_ICON`) first in `wsMore` (the toolbar's ⋯) and `wsMenu` (a row's ⋯ and right

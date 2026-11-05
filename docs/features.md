@@ -5,7 +5,7 @@ short version.
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts (a repo's `.laki.json` once you trust it) and your `.env` copied in;
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
-  agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
+  agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt (a model the installed Claude Code is too old for leaves the menus, with a warning on one you typed). Plain folders work too; worktrees made outside Laki come in from a project's ⋯ › *Import worktrees…*.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make (for Claude's permission asks, the command or file it wants to touch, and *Always: <rule>*; an edit's or write's change in red and green on Reader's, Needs you's and the notch's cards; a workspace, timer or reminder marked important comes as a card at the bottom right over every app instead, until you answer or close it),
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, say a prompt to one, or right-click to reply to it), or an island in the notch that opens into a card when an agent asks or finishes, pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
@@ -30,13 +30,16 @@ on an event, the last one or a sample (`laki flow run --event`), questions answe
 time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
-  with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
+  *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*);
+  an MCP tool's app (MCP Apps) shows under its call, and a `laki-ui` block in an answer is drawn with Laki's own
+  controls (a table, stats, choices you click to answer).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
@@ -78,7 +81,7 @@ time and AI money per run (`budget: 60 min, $5`).
   (squash, merge or rebase), approve, close or turn back into a draft from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
@@ -92,7 +95,7 @@ time and AI money per run (`budget: 60 min, $5`).
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
-- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once),
+- **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.

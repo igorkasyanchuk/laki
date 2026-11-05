@@ -288,7 +288,7 @@ export function Pages({ app }: { app: AppCtx }) {
       )}
       {dialog === 'calendar' && calOn && (
         <CalendarPage
-          schedules={view.schedules ?? []}
+          schedules={view.schedules?.filter(s => !s.archived) ?? []}
           runs={view.runs ?? []}
           reminders={view.reminders ?? []}
           workspaces={live.map(w => ({ id: w.id, name: wsName(w) }))}
@@ -321,7 +321,7 @@ export function Pages({ app }: { app: AppCtx }) {
         <ProjectPage
           key={p.id}
           project={p}
-          schedules={view.schedules?.filter(s => s.project === p.id) ?? []}
+          schedules={view.schedules?.filter(s => s.project === p.id && !s.archived) ?? []}
           tab={dialog.tab}
           onTab={tab => setDialog({ project: p.id, tab })}
           onClose={() => setDialog(null)}
@@ -475,6 +475,7 @@ export function Pages({ app }: { app: AppCtx }) {
           api={{
             set: s => api.call('scheduleSet', s),
             rm: id => api.call('scheduleRm', { id }),
+            toast: (text, undo) => toast(text, undo),
             run: id => api.call('scheduleRun', { id }),
             flows: flowsOn ? () => api.call('flowList', {}) : undefined,
             branches: project => api.call('branches', { project }),

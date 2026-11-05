@@ -67,6 +67,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
+  ['appearance', 'MCP Apps in the Reader', 'mcp app apps ui resource server tool reader interactive'],
   ['appearance', 'One next step', 'next step menu what now answer merge ship archive fix ci ⌘g'],
   ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
   ['appearance', 'Context meter', 'context window full tokens compact fill bar line ring status 200k 1m'],

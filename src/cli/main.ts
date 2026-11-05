@@ -548,7 +548,7 @@ async function main() {
     case 'schedule': {
       const [sub = 'ls', id, ...words] = rest
       const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.fresh ? ' fresh' : ''}${s.base ? ` off ${s.base}` : ''}${s.noSetup ? ', no setup' : ''}`}  ${s.name || s.prompt}`
+      const line = (s: Schedule) => `${s.id}  ${s.archived ? 'archived' : s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.widget ? `extension ${s.widget}: ${s.action ?? 'fetch'}` : s.workflow ? `workflow ${s.workflow}` : `${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}${s.fresh ? ' fresh' : ''}${s.base ? ` off ${s.base}` : ''}${s.noSetup ? ', no setup' : ''}`}  ${s.name || s.prompt}`
       if (sub === 'ls' || sub === 'log') {
         const v: View = await rpc('state')
         if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
@@ -561,12 +561,13 @@ async function main() {
         return out(s, line(s))
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'archive' || sub === 'restore') return out(await rpc('scheduleSet', { id, archived: sub === 'archive' }), `${id} ${sub === 'archive' ? 'archived' : 'restored'}`)
       if (sub === 'run') {
         const r = await rpc('scheduleRun', { id }, 120000)
         return out(r, `${r.ok ? '✓' : '✗'} ${r.what}`)
       }
       if (sub === 'rm') return out((await rpc('scheduleRm', { id })) ?? { ok: true }, `removed ${id}`)
-      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|rm <id>`)
+      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|archive|restore|rm <id>`)
     }
     case 'flow':
     case 'flows':

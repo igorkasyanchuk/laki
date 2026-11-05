@@ -14,6 +14,7 @@ import { changed, presetNamed, q, save, state } from './core.ts'
 import { dir } from './dir.ts'
 import { isLive } from './resources.ts'
 import { claudeCred, keychainService, type Who } from './usage.ts'
+import { older, tooOld } from './limits.ts'
 
 export const ENV: Record<AccountAgent, string> = { claude: 'CLAUDE_CONFIG_DIR', codex: 'CODEX_HOME' }
 // the agent's own folder: what a session without an account's env uses
@@ -193,8 +194,46 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
     .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
     .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e))) // its retry from the answer (an ask takes up to 20 s)
   modelsSeen.set(key, seen)
-  return seen.list
+  return agent === 'claude' ? seen.list.then(l => (void claudeHas(), l.filter(m => !needsNewer(m.id)))) : seen.list // one the installed claude is too old for: out (modelNeeds)
 }
+
+// ---------- models the installed claude is too old for: the API refuses one (claude_code_version_too_old) and names the
+// version it needs (a failed turn's error: core's turn). Kept by model in state.modelNeeds while the installed claude is
+// older: the model menus leave it out, the new-workspace page warns on one typed or a profile's; an update drops it
+// the installed claude's version (claude --version), looked at every 10 minutes at most (tests: MODELS_RETRY's env);
+// undefined: not known yet
+const HAS_KEPT = Number(process.env.LAKI_MODELS_RETRY_MS) || 10 * 60_000
+let has: { v?: string; at: number; asking?: Promise<string | undefined> } = { at: 0 }
+export function claudeHas(): Promise<string | undefined> {
+  if (has.asking) return has.asking
+  if (Date.now() - has.at < HAS_KEPT) return Promise.resolve(has.v)
+  has.asking = new Promise<string | undefined>(ok => execFile('claude', ['--version'], { timeout: 10_000, env: { ...process.env, ...state.settings?.env } }, (e, out) => ok(e ? undefined : /\d+\.\d+\.\d+/.exec(String(out))?.[0]))).then(v => {
+    const was = has.v
+    has = { v, at: Date.now() }
+    if (v && v !== was && Object.keys(state.modelNeeds ?? {}).length) {
+      // updated: what it can run now goes from the list
+      const left = Object.fromEntries(Object.entries(state.modelNeeds!).filter(([, need]) => older(v, need)))
+      if (Object.keys(left).length !== Object.keys(state.modelNeeds!).length) ((state.modelNeeds = left), save(), changed())
+    }
+    return v
+  })
+  return has.asking
+}
+export const needsNewer = (model?: string) => !!model && !!state.modelNeeds?.[model] && (!has.v || older(has.v, state.modelNeeds[model]))
+// a failed claude turn's error: a model it's too old for, kept; its words for the turn's end (the notification)
+export function modelRefused(model: string | undefined, text: string): string | undefined {
+  const t = tooOld(text)
+  const m = t?.model ?? model
+  if (!t || !m) return
+  state.modelNeeds = { ...state.modelNeeds, [m]: t.need }
+  save()
+  changed()
+  void claudeHas()
+  return `${(v => (v ? `Claude Code ${v}` : 'This Claude Code'))(t.have ?? has.v)} can't run ${m}: it needs ${t.need} or newer. Update it (claude update), or pick another model.`
+}
+// the view's: each model a newer claude is needed for, by model
+export const modelNeedsView = () => (state.modelNeeds && Object.keys(state.modelNeeds).length ? Object.fromEntries(Object.entries(state.modelNeeds).filter(([m]) => needsNewer(m))) : undefined)
+export const claudeVersion = () => has.v
 // a JSON-lines exchange: the lines sent (stdin kept open: claude ends with it), each line read through `take` until
 // it gives something; 20 s at most, then the process goes
 function asked<T>(cmd: string, args: string[], env: NodeJS.ProcessEnv, send: object[], take: (m: any) => T | undefined): Promise<T> {

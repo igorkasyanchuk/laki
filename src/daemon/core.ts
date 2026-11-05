@@ -19,7 +19,7 @@ import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../s
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
-import { accountEnv, accountFor, accountIds, accounts, effortsSaid, loginCmd } from './accounts.ts'
+import { accountEnv, accountFor, accountIds, accounts, claudeVersion, effortsSaid, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
@@ -607,6 +607,7 @@ export function view(): View {
   const shelved = new Set(state.projects.filter(p => p.archived).map(p => p.id))
   const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
   return {
+    ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
     projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
     ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
@@ -1887,7 +1888,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins, achievements). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'storageDays', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editors', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'limitFallback', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'storageDays', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'widgetDevAgent', 'editor', 'editors', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'deskTabs', 'memoryCompact', 'flowVars', 'achievements', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'layouts', 'tunnel'] // specs, workflows, calendar, notes, todoList: on unless false, so a false stays
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
@@ -2888,6 +2889,9 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       }
       const err = pl.error_details ?? pl.error ?? '' // a message as it is: quoted, a limit notice isn't read
       if (p.state === 'failed' || tab.preset === 'codex') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}` : '')
+      // a model the installed claude is too old for (the API's claude_code_version_too_old): kept, said in words
+      const refused = p.state === 'failed' && tab.preset === 'claude' ? modelRefused(tab.model || presetOf(tab)?.model?.trim(), `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`) : undefined
+      if (refused) r.last = refused
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
       if (!r.limit) phone(tab, 'done', r.last ?? '')
@@ -3145,11 +3149,46 @@ function checkLimit(tab: Tab, text: string) {
   if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
   if (!t) return
   // limit.hit once per limit: a turn's end clears r.limit first, and "in 2 hours" read again is the same one
-  if (Math.abs((limitSent.get(tab.id) ?? 0) - t.getTime()) > 60_000) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
+  const fresh = Math.abs((limitSent.get(tab.id) ?? 0) - t.getTime()) > 60_000
+  if (fresh) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
   limitSent.set(tab.id, t.getTime())
   r.limit = t.getTime()
+  if (fresh) setTimeout(() => fallback(tab, t!.getTime()), 1000) // after the turn's end is told (a workflow pauses on it, and goes on at the next one)
 }
 const limitSent = new Map<string, number>() // ponytail: a closed tab's stays (a number each)
+
+// Auto fallback (settings.limitFallback, Settings › Agents & profiles): a claude or codex tab at its plan limit restarts
+// on the next of its agent's accounts in your order that isn't at a limit itself (its chat resumes there: accounts
+// share chats) and goes on with "continue", instead of waiting for the reset. An account a tab hit the limit on is
+// skipped until that resets. ponytail: an account's limit as Laki's tabs met it, not the plan limits' own numbers
+const accountAt = new Map<string, number>() // agent:account → when its limit resets
+export function fallback(tab: Tab, until: number, now = Date.now()): string | undefined {
+  const agent = tab.preset
+  const r = rt.get(tab.id)
+  if (!isAccountAgent(agent) || !r?.limit || !state.tabs.includes(tab)) return // gone on already, or closed
+  const here = accountFor(tab, presetOf(tab)?.account)!
+  accountAt.set(`${agent}:${here}`, until)
+  const order = state.settings?.limitFallback?.[agent] ?? []
+  if (!order.length || findWs(tab.workspace).host) return
+  const ids = accountIds(agent)
+  // the ones after this one first, then from the top: a tab on the 2nd goes on on the 3rd, the 1st after the last
+  const from = order.indexOf(here)
+  const next = [...order.slice(from + 1), ...order.slice(0, Math.max(from, 0))].find(id => id !== here && ids.includes(id) && !((accountAt.get(`${agent}:${id}`) ?? 0) > now))
+  const name = (id: string) => accounts().find(a => a.id === id)?.name ?? 'Default'
+  if (!next) return void wsLog({ id: tab.workspace }, `${tab.name}: at its plan limit on ${name(here)}; every account in its fallback is too: it goes on as the limit resets`)
+  try {
+    tabAccount({ tab: tab.id, account: next })
+  } catch (e) {
+    return void wsLog({ id: tab.workspace }, `${tab.name}: fallback to ${name(next)} failed: ${(e as Error).message}`)
+  }
+  rtOf(tab.id).limit = undefined
+  rtOf(tab.id).last = `At its plan limit on ${name(here)}: it goes on on ${name(next)}.`
+  wsLog({ id: tab.workspace }, `${tab.name}: at its plan limit on ${name(here)}; goes on on ${name(next)}`)
+  const s = sessions.get(tab.id)
+  if (s) whenPrompt(s, () => (typeInto(s, 'continue'), (rtOf(tab.id).status = 'running'), changed()))
+  changed()
+  return next
+}
 
 export const RESUME_AFTER = 60_000
 
@@ -3498,6 +3537,20 @@ export async function accountLogin(p: { id: string; agent: string }) {
   const t = tabsOf(ws.id)[0]
   const s = t && sessions.get(t.id)
   if (s) whenPrompt(s, () => typeInto(s, loginCmd(p.id, agent), true))
+  return ws
+}
+
+// Update Claude Code (the new-workspace page's warning on a model too new for it): a new terminal typing claude's own
+// update, as you'd run it; the warning goes as the version is looked at again (accounts.ts claudeHas)
+export async function agentUpdate(p: { agent: string }) {
+  if (p.agent !== 'claude') throw new Error('only Claude Code updates from here')
+  const ws = await quickNew({ kind: 'shells' })
+  ws.name = 'update Claude Code'
+  save()
+  changed()
+  const t = tabsOf(ws.id)[0]
+  const s = t && sessions.get(t.id)
+  if (s) whenPrompt(s, () => typeInto(s, 'claude update', true))
   return ws
 }
 

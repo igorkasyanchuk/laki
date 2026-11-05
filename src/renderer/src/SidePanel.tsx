@@ -10,11 +10,11 @@ import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, Dif
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, useMenu } from './ui'
+import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
-export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
+export type Changes = { base: string; from?: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string } // from: what it was diffed against (a worktree's merge base with its base, else HEAD)
 export type Commit = { sha: string; short: string; author: string; at: number; subject: string; pushed: boolean }
 export type Commits = { base?: string; commits: Commit[]; more?: boolean } // base: a worktree's (none: a folder's own, what no remote has); more: past 200
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
@@ -33,6 +33,8 @@ export type PanelApi = {
   changes: (uncommitted?: boolean) => Promise<Changes> // uncommitted: only what isn't committed (against HEAD)
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   turnChanges: () => Promise<Changes> // an agent's last turn's (turns.ts turnDiff)
+  bases?: () => Promise<{ base: string; gone: boolean; local: string[]; remote: string[] }> // a worktree's: the branches its diff could compare with (Change base)
+  setBase?: (base: string) => Promise<unknown> // its new base: the diff and later compares go against it
   commits: () => Promise<Commits> // what the branch adds over its base, each pushed or not (Commits)
   commitDiff: (sha: string) => Promise<Changes> // one commit's changes
   prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
@@ -254,6 +256,24 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
   const rv = useRevert(api, byFile, all, reload, `${ws}#${scope}`)
   const findAt = useRef<HTMLDivElement>(null) // ⌘F's bar and what it searches (Diff.tsx DiffFind)
   const [menu, openMenu] = useMenu()
+  // Change base: another branch to compare with (its own deleted, or the wrong one), local or origin's; a PR keeps its own
+  const [baseErr, setBaseErr] = useState('')
+  const pickBase = (b: string) => (setBaseErr(''), void api.setBase?.(b).then(reload, e => setBaseErr((e as Error).message)))
+  const baseMenu = (e: MouseEvent) => {
+    const at = (e.currentTarget as HTMLElement).getBoundingClientRect() // the list comes after the click
+    void api.bases?.().then(
+      b =>
+        openMenu(at, [
+          ...(b.local.length + b.remote.length > 8 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
+          { head: `Compare with${b.gone ? ` (${b.base} isn't here any more)` : ''}` },
+          ...[...b.local, ...b.remote].map(x => ({ label: x, icon: 'gitBranch', mono: true, hint: x === b.base ? ON : undefined, run: () => pickBase(x) }) as MenuItem),
+          { label: 'Another branch by name…', icon: 'pencil', foot: true, sub: pr ? `PR #${pr.number} keeps its own base on GitHub` : undefined, run: () => void askText('Compare with which branch?', { placeholder: 'release/2.0', ok: 'Change base' }).then(x => x?.trim() && pickBase(x.trim())) },
+        ]),
+      e2 => setBaseErr((e2 as Error).message),
+    )
+  }
+  const canBase = !!api.setBase && worktree && scope === 'branch'
+  const baseGone = canBase && d?.from === 'HEAD' // its merge base with the base wasn't found: deleted, or no history in common
   const fileMenu = (e: MouseEvent, path: string) => (m => m.length && openMenu(e, m))([...webItems(api, path, d?.base ?? '', undefined), ...(all ? [] : [{ label: 'Revert this file…', icon: 'undo', danger: true, run: () => rv.revertFile(path) } as MenuItem])])
   // a click (not a drag that selects text) on a line opens its comment box
   const pick = (path: string, l: DiffLine, e: MouseEvent) => {
@@ -353,7 +373,12 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
             {sum || (err ? '' : 'Loading…')}
             {sum && files.length > 0 && <span className="sp-sum-more"> · click a line to comment</span>}
           </span>
-        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${inTurn ? ` · ${d.base}` : all ? '' : scope === 'uncommitted' ? ' not committed' : ` changed vs ${d.base}`}` : '')}
+        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${inTurn ? ` · ${d.base}` : all ? '' : scope === 'uncommitted' ? ' not committed' : canBase ? ' changed vs' : ` changed vs ${d.base}`}` : '')}
+        {canBase && d && !err && (
+          <button type="button" className={`link small mono sp-base ${baseGone ? 'warn' : ''}`} data-tip="Change base: compare with another branch (the worktree and its branch stay)" onClick={baseMenu}>
+            {d.base}
+          </button>
+        )}
         {inPR.length > 0 && (
           <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
             {viewed}/{inPR.length}
@@ -369,6 +394,15 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
       <div className="sp-body" ref={findAt} data-find>
         <DiffFind at={findAt} unfold={w => setOpen(o => (n => (n.size === o.size ? o : n))(new Set([...o, ...[...byFile].filter(([, fd]) => fd.hunks.some(h => h.toLowerCase().includes(w))).map(([p]) => p)])))} />
         {err && <div className="warn small pad">{err}</div>}
+        {baseErr && <div className="warn small pad">{baseErr}</div>}
+        {baseGone && !baseErr && (
+          <div className="warn small pad">
+            Can't compare with {d?.base}: it isn't here any more, or shares no history with this branch. Showing what isn't committed.{' '}
+            <button type="button" className="link small" onClick={baseMenu}>
+              Change base…
+            </button>
+          </div>
+        )}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
         {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {tree

@@ -314,7 +314,8 @@ export type AccountsApi = { load: () => Promise<AccountView[]>; usage: () => Pro
 
 // an agent's accounts: its own sign-in, then the ones added; a click on the circle makes one the default for new
 // sessions (running tabs keep theirs), Sign in opens a terminal with the agent's login in its folder
-export function AccountsBlock({ agent, api, views, usage, use, onUse, reload }: { agent: AccountAgent; api: AccountsApi; views: AccountView[]; usage: AgentUsage[]; use: string; onUse: (id: string) => void; reload: () => void }) {
+// fallback: Auto fallback's order (settings.limitFallback): a tab at its plan limit goes on on the next of these
+export function AccountsBlock({ agent, api, views, usage, use, onUse, reload, fallback = [], onFallback }: { agent: AccountAgent; api: AccountsApi; views: AccountView[]; usage: AgentUsage[]; use: string; onUse: (id: string) => void; reload: () => void; fallback?: string[]; onFallback?: (ids: string[]) => void }) {
   const [names, setNames] = useState<Record<string, string>>({})
   const mine = views.filter(v => v.agent === agent)
   const most = mostRoom(usage, agent)
@@ -334,6 +335,17 @@ export function AccountsBlock({ agent, api, views, usage, use, onUse, reload }: 
             </span>
           </div>
           {most === v.id && <span className="tag tag-open" data-tip="The most room left in its shortest limit (the status bar's ring)">most room</span>}
+          {onFallback && mine.length > 1 && (
+            <button
+              type="button"
+              className={`account-fb${fallback.includes(v.id) ? ' on' : ''}`}
+              data-tip={fallback.includes(v.id) ? `Number ${fallback.indexOf(v.id) + 1} in the fallback order: a click takes it out` : 'Add it to the fallback order: a tab at its plan limit goes on on the next account in it'}
+              aria-pressed={fallback.includes(v.id)}
+              onClick={() => onFallback(fallback.includes(v.id) ? fallback.filter(x => x !== v.id) : [...fallback, v.id])}
+            >
+              {fallback.includes(v.id) ? fallback.indexOf(v.id) + 1 : '+'}
+            </button>
+          )}
           {!v.signedIn && <span className="tag tag-conflict">not signed in</span>}
           <button type="button" onClick={() => api.login(v)}>
             {v.signedIn ? 'Sign in again' : 'Sign in'}
@@ -341,6 +353,13 @@ export function AccountsBlock({ agent, api, views, usage, use, onUse, reload }: 
           {v.id !== HOME_ACCOUNT && <IconButton icon="trash" title="Remove account (its sign-in too)" onClick={() => api.remove(v).then(reload, () => {})} />}
         </div>
       ))}
+      {onFallback && mine.length > 1 && (
+        <p className="muted small">
+          {fallback.filter(id => mine.some(v => v.id === id)).length > 1
+            ? `Auto fallback: a ${AGENT_NAMES[agent]} tab at its plan limit restarts on the next numbered account (its chat resumes there) and goes on, instead of waiting for the reset.`
+            : `Auto fallback: number two or more accounts (the round buttons) and a ${AGENT_NAMES[agent]} tab at its plan limit goes on on the next one instead of waiting for the reset.`}
+        </p>
+      )}
       <div className="row">
         <button type="button" onClick={() => api.add(agent, '').then(a => api.login({ ...a, signedIn: false, default: false }), () => {})}>
           <Icon name="plus" /> Add {AGENT_NAMES[agent]} account

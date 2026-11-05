@@ -579,6 +579,8 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .accounts { display: flex; flex-direction: column; gap: 6px; }
 .account-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: var(--bg); }
 .account-row.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.account-fb { flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 11px; color: var(--muted); }
+.account-fb.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
 .account-pick { flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 1.5px solid var(--muted); background: none; cursor: pointer; }
 .account-row.on .account-pick { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--bg), inset 0 0 0 8px var(--accent); }
 .account-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -1739,6 +1741,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .help kbd { display: inline-block; min-width: 22px; text-align: center; font: 12px/18px var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--rs, 5px); padding: 0 6px; }
 /* prompt templates (PromptInput.tsx) */
 .template-preview { margin-top: 6px; padding: 8px 10px; max-height: 140px; overflow-y: auto; white-space: pre-wrap; border: 1px dashed var(--line); border-radius: var(--radius); font-family: var(--mono); }
+.nw-warn { margin-top: 6px; }
 .page-body { display: flex; flex-direction: column; }
 .page-body > * { margin: auto; width: 100%; } /* centered both ways while it fits; from the top when it scrolls */
 .page-body > :is(.menu-backdrop, .overlay) { max-width: none; width: auto; margin: 0; } /* a page's menu or dialog: the whole window, so a click anywhere outside closes it */
@@ -1865,6 +1868,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .sched-stats span { color: var(--muted); font-size: 12.5px; }
 .sched-stats > .bad b { color: var(--error); }
 .sched-head { display: flex; align-items: baseline; gap: 8px; }
+.sched-arch-head, .sched-arch-head:hover { background: none; border: 0; padding: 0; color: inherit; cursor: pointer; align-items: center; }
+.sched-arch-head h3 { margin: 0; }
 .sched-failed { color: var(--error); }
 .sched-form { display: flex; flex-direction: column; gap: 10px; }
 .sched-form .nw-composer textarea { min-height: 76px; }
@@ -2683,8 +2688,16 @@ button.board-name:hover { background: none; }
 .rd-tool pre { margin: 4px 0 0; padding: 6px 8px; max-height: 240px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; }
 .rd-working { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
 .rd-ask, .rd-box { flex: none; max-width: 760px; width: 100%; margin: 0 auto; padding: 10px 20px 14px; box-sizing: border-box; }
+.rd-chips, .rd-out { flex: none; max-width: 720px; width: calc(100% - 40px); margin: 0 auto; box-sizing: border-box; } /* the box's column, inside its padding */
 .rd-ask { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); } .rd-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .rd-box { position: relative; display: flex; gap: 8px; align-items: flex-end; } /* @'s menu (pi-complete) over it */
+.rd-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
+.rd-app { display: flex; flex-direction: column; gap: 4px; }
+.rd-app-frame { width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.rd-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--fg); font-size: 12px; }
+.rd-out { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; background: var(--panel); }
+.rd-out-head { display: flex; align-items: center; gap: 8px; }
+.rd-out-text { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font-family: var(--mono); font-size: 11.5px; }
 .rd-box textarea { flex: 1; resize: none; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--fg); font: inherit; }
 .rd-box textarea:focus { outline: none; border-color: var(--accent); }
 .reader-switch { position: absolute; top: 6px; right: 14px; z-index: 10; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); opacity: 0.55; overflow: hidden; transition: opacity 0.15s; }

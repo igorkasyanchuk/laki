@@ -152,7 +152,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   (`ws`, `port` (never the daemon's own), `mails`, `hours`: resolves with the URL; `host`: a permanent one, refused from an agent), `tunnelStop`,
   `tunnelCheck` (Settings › Tunnels: cloudflared, `cert.pem`, the named tunnel in `tunnel list`, its credentials file
   beside the certificate or in `~/.cloudflared`; `name`, `domain`: the form's as typed, Settings saving 300 ms later);
-- worktree actions: `diff` (git's text but its last newline: a hunk to revert must match), `run`, `ship`; Changes'
+- worktree actions: `diff` (git's text but its last newline: a hunk to revert must match; `from`: the merge base, or
+  `HEAD` when it has none with its base: deleted), `baseBranches` and `wsBase` (Changes' base: a worktree's local and
+  origin's branches, `gone`; a new `Workspace.base`, local else `origin/<b>`, its own branch refused, agent-refused),
+  `run`, `ship`; Changes'
   Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
   as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
   indexes into its body; a forward patch from the worktree to the base, `git apply --check` then `git apply`: a temp
@@ -202,6 +205,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   (`SKILLS`: laki, the default, or laki-widget: the widget creator's guide, its own folder and launcher, no MCP; it says
   extension and widget are one thing); `refreshSkills` at the daemon's start writes an installed skill that's out of date again (only one whose launcher has this data dir's `LAKI_HOME`); an outdated one whose launcher has another's is `foreign`; App's `oldSkills` (the others outdated, `skills` as it connects and on the window's focus, a minute apart; Settings' rows too) is a bar under the tab bar (`.stale-bar.soft`: *Update*, `skillSet` each; *Not now*: until the app starts again), Settings' *Update all*, a foreign row's *Use this one*;
 - scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
+  `archived`: true archives it (`archived` its time, no `next`, never due), false restores it (its `next` again if on),
+  no checks, as off and a group;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app

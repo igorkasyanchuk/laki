@@ -92,6 +92,20 @@ Something for the user to look at (a folder of screenshots, a report, a page you
 --open <folder|file|url>\` (4 at most) puts a card under your tab in Laki with a button each, instead of asking them to
 run \`open …\`. Nothing opens until they click.
 
+## Show it as UI in your answer
+
+When the user reads your chat in Laki's Reader, a fenced \`laki-ui\` block in your answer is drawn with Laki's own
+controls (the UI kit: \`laki widget kit\` lists every element): a table, stats, a checklist, choices. Its JSON is an
+element, or \`{ "ui": <element>, "data": {…} }\` for one that reads its rows from data. A button with
+\`"do": "send", "prompt": "…"\` sends that prompt back to you when clicked: offer choices that way. Keep it small;
+your words say the same, for a terminal.
+
+\`\`\`laki-ui
+{ "type": "row", "children": [
+  { "type": "button", "label": "Ship it", "style": "primary", "do": "send", "prompt": "Ship it" },
+  { "type": "button", "label": "Fix the tests first", "do": "send", "prompt": "Fix the failing tests first" } ] }
+\`\`\`
+
 ## Commands
 
 Unsure of one? \`laki help <command>\` (or \`laki <command> --help\`) prints its options, what it prints and examples.

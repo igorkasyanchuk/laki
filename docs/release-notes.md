@@ -4,6 +4,21 @@ version it builds, with the date. -->
 
 ## Next
 
+- Auto fallback: in Settings › Agents & profiles, number two or more of an agent's accounts, and a Claude Code or Codex
+  tab at its plan limit restarts on the next one (its chat resumes there) and goes on, instead of waiting for the
+  reset. A workflow step at its limit goes on with it.
+- When the API says the installed Claude Code is too old for a model, the turn says so in words (the version it
+  needs), that model leaves the model menus, and the new-workspace page warns on it, with *Update Claude Code*.
+- Archive a scheduled task instead of deleting it: it leaves the list and never runs; *Archived* at the bottom of the
+  page restores it as it was, or deletes it permanently. The toast has Undo; `laki schedule archive|restore <id>`.
+- Change a worktree's base from Changes: click the branch after *changed vs* and pick another (local or origin's), for
+  a base that was deleted or wrong. The diff, its size and later compares use it; the worktree and its PR stay.
+- Reader view shows *Subagents · n* and *Background · n* over its box while a Claude Code chat has them running; a
+  click lists them, each with *Show output* and *Stop* (it asks the agent to stop it).
+- MCP Apps in Reader view: a Claude Code tool call whose MCP server has an app for it shows the app under the call.
+  Its own tool calls and messages ask you first; Settings › Appearance turns it off.
+- An agent can answer with a small `laki-ui` block (a table, stats, a checklist, choices) that Reader view draws with
+  Laki's own controls; a choice's button sends your pick back to it.
 - Mark what matters as important, and it comes as a card at the bottom right, over every app and Space, until you
   close it, instead of a notification: a workspace (⋯ › Workspace › *Important: cards on screen*: its agents' asks,
   with the change's diff and a button per choice, and their finishes), a timer (*Important* as you start it, or its

@@ -22,7 +22,7 @@ export function transcriptOf(agent: string, dir: string, id: string): string | u
 }
 
 // what the agent adds to a prompt (context, a slash command's output), not what you typed
-const NOISE = /^\s*(<(command-|local-command|system-reminder|environment_context|user_instructions|permissions|turn_aborted|user_memory)|# AGENTS\.md instructions)/
+const NOISE = /^\s*(<(command-|local-command|system-reminder|environment_context|user_instructions|permissions|turn_aborted|user_memory|task-notification|agent-message)|# AGENTS\.md instructions)/ // task-notification, agent-message: claude's word that a background task or subagent ended
 const args = (a: unknown) => {
   if (typeof a !== 'string') return a
   try {
@@ -42,7 +42,10 @@ function toolLine(name: string, input: unknown) {
 
 // a transcript (JSON lines) as what was said, in order, onto out (what its earlier lines said); an agent's answers
 // and tool calls in a row are one each
-export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
+// calls: a claude chat's MCP tool calls (mcp__<server>__<tool>), each with the said line it's in (at) and, once it
+// came, its result: the Reader's MCP Apps (mcpApps.ts)
+export type McpCall = { id: string; server: string; tool: string; input: unknown; at: number; result?: unknown; error?: boolean }
+export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: Map<string, McpCall>): Said[] {
   const add = (who: Said['who'], t: unknown) => {
     const text = String(t ?? '').trim()
     if (!text || (who === 'you' && NOISE.test(text))) return
@@ -65,7 +68,17 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
         if (j.type === 'user' && x.type === 'text') add('you', x.text)
         else if (j.type === 'user' && x.type === 'image') add('you', '[an image]')
         else if (j.type === 'assistant' && x.type === 'text') add('agent', x.text)
-        else if (j.type === 'assistant' && x.type === 'tool_use') add('tool', toolLine(x.name, x.input))
+        else if (j.type === 'assistant' && x.type === 'tool_use') {
+          add('tool', toolLine(x.name, x.input))
+          const m = calls && typeof x.id === 'string' && /^mcp__(.+?)__(.+)$/.exec(String(x.name))
+          if (m) calls!.set(x.id, { id: x.id, server: m[1], tool: m[2], input: x.input ?? {}, at: out.length - 1 })
+        } else if (j.type === 'user' && x.type === 'tool_result' && calls?.has(x.tool_use_id)) {
+          const c = calls.get(x.tool_use_id)!
+          const r = j.toolUseResult
+          // what the app is told (ui/notifications/tool-result): its content blocks, and structuredContent when claude kept it
+          c.result = { content: typeof x.content === 'string' ? [{ type: 'text', text: x.content }] : Array.isArray(x.content) ? x.content : [], ...(r && typeof r === 'object' && !Array.isArray(r) && r.structuredContent && { structuredContent: r.structuredContent }) }
+          if (x.is_error) c.error = true
+        }
       }
     } else {
       // ponytail: codex's event messages (what its own UI shows); a codex too old to write them shows tool calls only
@@ -76,6 +89,63 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = []): Said[] {
     }
   }
   return out
+}
+
+// What a claude chat started and still runs (the Reader's chips over its box): its subagents (Agent or Task: running
+// until their result, or a background one's task-notification) and background shells (Bash run_in_background: from its
+// ID until a task-notification, KillShell or TaskStop ends it), each with the file its output goes to once it's said.
+// Read on with its transcript (meters.ts chatRead), onto bg; wait: background shells' calls, until their result says
+// their ID. ponytail: claude only; one whose end isn't in the transcript (claude quit) stays until the chat is read anew
+export type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string }
+export type BgRead = { bg: Map<string, BgTask>; wait: Map<string, string> }
+const ENDED = /^(completed?|done|failed|killed|stopped|cancell?ed|error|timed?[_ ]?out)$/i
+export function bgOf(jsonl: string, r: BgRead): BgRead {
+  const ended = (text: string) => {
+    for (const n of text.split('<task-notification>').slice(1)) {
+      const tag = (k: string) => new RegExp(`<${k}>\\s*([^<]*?)\\s*</${k}>`).exec(n)?.[1]
+      if (tag('status') && !ENDED.test(tag('status')!)) continue
+      for (const id of [tag('task-id'), tag('tool-use-id')]) if (id) r.bg.delete(id)
+    }
+  }
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('tool_use') && !line.includes('task-notification')) continue // most lines: not parsed
+    let j: any
+    try {
+      j = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (j.isSidechain) continue // a subagent's own calls
+    if (j.type === 'queue-operation' && typeof j.content === 'string') ended(j.content)
+    const c = j.message?.content
+    const parts: any[] = typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []
+    for (const x of parts) {
+      if (j.type === 'user' && x.type === 'text' && typeof x.text === 'string') ended(x.text)
+      else if (j.type === 'assistant' && x.type === 'tool_use' && typeof x.id === 'string') {
+        const i = x.input ?? {}
+        const name = String(i.description || i.subagent_type || i.command || x.name).replace(/\s+/g, ' ').trim().slice(0, 80)
+        if (x.name === 'Agent' || x.name === 'Task') r.bg.set(x.id, { id: x.id, kind: 'agent', name })
+        else if (x.name === 'Bash' && i.run_in_background === true) r.wait.set(x.id, name)
+        else if (x.name === 'KillShell' || x.name === 'KillBash' || x.name === 'TaskStop') r.bg.delete(String(i.shell_id ?? i.task_id ?? i.id ?? ''))
+      } else if (j.type === 'user' && x.type === 'tool_result' && typeof x.tool_use_id === 'string') {
+        const res = j.toolUseResult && typeof j.toolUseResult === 'object' ? j.toolUseResult : {}
+        const said = typeof x.content === 'string' ? x.content : Array.isArray(x.content) ? x.content.map((y: any) => y?.text ?? '').join('\n') : ''
+        const a = r.bg.get(x.tool_use_id)
+        if (a) {
+          r.bg.delete(x.tool_use_id) // a subagent's result: it's done, or (a background one) it runs on under its own id
+          if (res.isAsync && typeof res.agentId === 'string') r.bg.set(res.agentId, { ...a, id: res.agentId, ...(typeof res.outputFile === 'string' && { out: res.outputFile }) })
+        }
+        const shell = r.wait.get(x.tool_use_id)
+        if (shell !== undefined) {
+          r.wait.delete(x.tool_use_id)
+          const id = typeof res.backgroundTaskId === 'string' ? res.backgroundTaskId : /with ID:\s*([\w-]+)/.exec(said)?.[1]
+          const out = /written to:\s*(\S+?\.output)\b/.exec(said)?.[1]
+          if (id && !x.is_error) r.bg.set(id, { id, kind: 'shell', name: shell, ...(out && { out }) })
+        }
+      }
+    }
+  }
+  return r
 }
 
 // what a chat used, from its transcript read on (meters.ts; onto m, what its earlier lines said): used, what its

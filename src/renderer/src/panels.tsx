@@ -1107,6 +1107,17 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
           )}
         </div>
         {tpl && prompting && <div className="template-preview muted small">{filled || ' '}</div>}
+        {ag === 'claude' &&
+          (m =>
+            m &&
+            view.modelNeeds?.[m] && (
+              <div className="warn small nw-warn">
+                {view.claudeHas ? `Claude Code ${view.claudeHas}` : 'This Claude Code'} can't run {m}: it needs {view.modelNeeds[m]} or newer. Update it, or pick another model.{' '}
+                <button type="button" className="link small" data-tip="A new terminal running claude update" onClick={() => void api.call('agentUpdate', { agent: 'claude' }).catch(() => {})}>
+                  Update Claude Code
+                </button>
+              </div>
+            ))(typed || prof?.model?.trim())}
         {adv && (modelRow || canRace) && (
           <div className="nw-card nw-more">
             {modelRow && (

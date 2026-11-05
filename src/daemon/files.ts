@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
-import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, state, within } from './core.ts'
+import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, save, state, within } from './core.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
 
@@ -62,6 +62,35 @@ export async function diff(ref: string, uncommitted?: boolean) {
   return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
 }
 const CUT = '\n… (cut)'
+
+// ---------- Changes' base: another branch for a worktree's diff and later compares (its base deleted, or wrong)
+
+// the branches a worktree could compare with: local ones and origin's, its own branch left out; gone: its base isn't
+// there any more (Changes says so)
+export async function baseBranches(ref: string) {
+  const ws = findWs(ref)
+  if (ws.kind !== 'worktree') throw new Error(`${ws.id} is the repo's folder: it has no base`)
+  const refs = (await git(ws, 'for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes/origin')).split('\n').filter(b => b && b !== ws.branch && b !== 'origin/HEAD' && b !== 'origin')
+  const gone = !(await git(ws, 'rev-parse', '--verify', '-q', `${ws.base}^{commit}`).catch(() => ''))
+  return { base: ws.base, gone, local: refs.filter(b => !b.startsWith('origin/')), remote: refs.filter(b => b.startsWith('origin/')) }
+}
+
+// a new base: a local branch, else origin's of that name; the worktree, its branch and its PR stay as they are
+export async function wsBase(o: { ws: string; base: string }) {
+  const ws = findWs(o.ws)
+  if (ws.kind !== 'worktree') throw new Error(`${ws.id} is the repo's folder: it has no base`)
+  const want = String(o.base ?? '').trim()
+  if (!want || want.startsWith('-') || /\s/.test(want)) throw new Error(`base ${want || '(none)'}? a branch name`)
+  const has = (r: string) => git(ws, 'rev-parse', '--verify', '-q', `${r}^{commit}`).then(Boolean, () => false)
+  const base = (await has(want)) ? want : !want.startsWith('origin/') && (await has(`origin/${want}`)) ? `origin/${want}` : ''
+  if (!base) throw new Error(`no branch ${want} in ${ws.name ?? ws.id}`)
+  if (base === ws.branch) throw new Error(`${base} is this workspace's own branch`)
+  ws.base = base
+  save()
+  changed()
+  void scanStats() // its diff size against the new base now
+  return { base }
+}
 
 // ---------- the branch's commits: the side panel's Commits
 

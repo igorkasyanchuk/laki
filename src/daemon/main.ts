@@ -31,6 +31,7 @@ import { ticketTick } from './tickets.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, agentModels, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
+import { chatWithApps, mcpAppCall, mcpPage } from './mcpApps.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
@@ -351,6 +352,8 @@ const api: Record<string, Handler> = {
   worktreeList: p => core.worktreeList(p.project),
   worktreeImport: p => core.worktreeImport(p),
   diff: p => filesMod.diff(p.ws, p.uncommitted === true), // uncommitted: against HEAD (Changes' and Review's Uncommitted)
+  baseBranches: p => filesMod.baseBranches(p.ws), // Changes' base menu
+  wsBase: p => filesMod.wsBase(p),
   files: p => filesMod.files(p.ws, p.project),
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
@@ -393,6 +396,7 @@ const api: Record<string, Handler> = {
   accountSet: p => accountSet(p),
   accountRm: p => accountRm(p),
   accountLogin: p => core.accountLogin(p),
+  agentUpdate: p => core.agentUpdate(p), // Update Claude Code, from the new-workspace page's warning
   tabAccount: p => core.tabAccount(p),
   resources: () => resourcesMod.resources(),
   shareStart: p => remoteMod.shareStart(p), // a tab's read-only page, for anyone with its link
@@ -490,7 +494,9 @@ const api: Record<string, Handler> = {
     planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
     aiForget(chat)
   },
-  chatRead: p => metersMod.chatRead(p), // Reader view: meters.ts
+  chatRead: p => chatWithApps(p), // Reader view: meters.ts, with its MCP Apps (mcpApps.ts)
+  mcpAppCall: p => mcpAppCall(p), // an MCP App's own tool call, once you allowed it
+  bgOutput: p => metersMod.bgOutput(p), // the Reader's chips: a background task's output
   checkAgain: p => checkAgain(p), // Done means checked: verify.ts
   checkStop: p => checkStop(p),
   flowList: p => flowList(p), // workflows: workflow.ts
@@ -522,7 +528,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
+const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
 const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
@@ -540,7 +546,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['alertShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd'])
+const FROM = new Set(['alertShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -582,7 +588,7 @@ const notAgent = (p: any, what: string) => {
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
-const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)' }
+const AGENT_NO: Record<string, string> = { prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)" }
 // settings an agent can't change either (remote access can: they're the user's own on the phone, Cancel's whenDone off
 // too): when everything is done (the Mac sleeps, locks or shuts down), the Done check, Recording mode, the next prompt
 // guessed (your messages to a model), keep awake; how old the tidies let storage files, archived workspaces and pasted
@@ -744,6 +750,7 @@ const server = createServer(async (req, res) => {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
+    if (u.pathname.startsWith('/mcp-app/')) return void mcpPage(u.pathname, u.searchParams).then(r => (res.writeHead(r.code, r.headers), res.end(r.body))) // an MCP App's page (mcpApps.ts): its own key, its own CSP
     if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
     if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin

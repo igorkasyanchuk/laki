@@ -193,6 +193,7 @@ export type AppSettings = Paint & {
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
+  limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
   remoteMail?: string // the one address remote access lets in
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
   remoteAuth?: 'email' | 'pin' | 'tailscale' // remote access by Cloudflare's email code (unset too), Laki's PIN, or your tailnet
@@ -208,6 +209,7 @@ export type AppSettings = Paint & {
   whenDone?: WhenDone // sleep, lock or shut down once all that was going is done, then off again (unset: off)
   radar?: boolean // Collision radar: overlapping changes between worktrees, checked on its own (unset: off; a workspace's Check overlaps asks)
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
+  mcpApps?: boolean // MCP Apps under their calls in the Reader (unset: on)
   nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
   livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
@@ -1674,6 +1676,11 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.reader !== false} onChange={v => set({ reader: v })}>
                   <Says title="Reader view" hint="A Terminal | Reader switch on each Claude Code and Codex tab: Reader shows its chat as a conversation, your messages, its answers as text, its steps folded, a box to write in. Each tab remembers which; a phone opens them in Reader" />
                 </Switch>
+                {s.reader !== false && (
+                  <Switch className="switch-row" on={s.mcpApps !== false} onChange={v => set({ mcpApps: v })}>
+                    <Says title="MCP Apps in the Reader" hint="A Claude Code tool call whose MCP server has an app for it shows that app under the call. Laki asks the server for its page, as your Claude config says (yours and this folder's servers; never a repo's .mcp.json); the app's own tool calls and messages ask you first" />
+                  </Switch>
+                )}
                 <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>
                   <Says title="The agent's plan, live" hint="An agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row. A plan it asks you to approve shows as a card you can edit: your changes go back to it. Claude Code and Codex" />
                 </Switch>
@@ -2345,7 +2352,7 @@ export function SettingsPage(p: {
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
                   {isAccountAgent(agent) && p.accounts && (
-                    <AccountsBlock agent={agent} api={p.accounts} views={accts} usage={usage} use={accts.find(v => v.agent === agent && v.default)?.id ?? HOME_ACCOUNT} onUse={id => (set({ accountUse: { ...s.accountUse, [agent]: id } }), setAccts(v => v.map(x => (x.agent === agent ? { ...x, default: x.id === id } : x))))} reload={loadAccts} />
+                    <AccountsBlock agent={agent} api={p.accounts} views={accts} usage={usage} use={accts.find(v => v.agent === agent && v.default)?.id ?? HOME_ACCOUNT} onUse={id => (set({ accountUse: { ...s.accountUse, [agent]: id } }), setAccts(v => v.map(x => (x.agent === agent ? { ...x, default: x.id === id } : x))))} reload={loadAccts} fallback={s.limitFallback?.[agent]} onFallback={ids => set({ limitFallback: { ...s.limitFallback, [agent]: ids } })} />
                   )}
                   {presets.map((pr, i) =>
                     pr.agent !== agent ? null : (

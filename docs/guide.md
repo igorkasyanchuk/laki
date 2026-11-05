@@ -731,7 +731,10 @@ run fails, saying so.
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or
   with no name after the date and the prompt's first words (*05-10 02:00 update the deps and*), and gets a clock
   in the sidebar. A name a workspace already has gets four random characters (*Nightly deps 05-10-k3x9*).
-- A task's row: its switch turns it off, a click on it edits it, ▷ runs it now, the bin deletes it. *Runs* shows the
+- A task's row: its switch turns it off, a click on it edits it, ▷ runs it now, the box archives it: it leaves the list
+  and never runs (the toast's *Undo* brings it back). *Archived*, at the bottom when there are some, lists them: ↺
+  restores one as it was (on ones run at their next time), the bin deletes it permanently (`laki schedule
+  archive|restore|rm <id>`). *Runs* shows the
   last 8 (*Show all* for the rest of the last 50; click one to go to its workspace); the filter at the top (*All
   projects*) narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
 - The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
@@ -801,7 +804,11 @@ line, after the tab restarts.
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
   *Collapse all* closes them); the button beside it shows the diffs in two columns, old and new side by side like
   GitHub's split view, and Laki remembers it; the tree button groups the files by folder (a folder holding only one
-  folder is one row with it; a click folds it), here and in the Review tab's file list, and that's remembered too. *Branch* / *Uncommitted* (a worktree's) switch between everything
+  folder is one row with it; a click folds it), here and in the Review tab's file list, and that's remembered too.
+  The branch after *changed vs* (a worktree's) changes its base: pick another branch, local or origin's, or type
+  one, for a base that was deleted or wrong; the diff, its size and later compares (Commits, Collision radar, Ship's
+  count) use it, and the worktree, its branch and its PR stay as they are (a PR's base is GitHub's). A base that isn't
+  there any more says so in amber, with *Change base…*. *Branch* / *Uncommitted* (a worktree's) switch between everything
   against the base and only what isn't committed yet (against the last commit; its Revert puts a file or hunk back
   to that commit); Changes and the Review tab each remember theirs. With a PR, *PR #n* switches to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
@@ -964,7 +971,9 @@ never the last prompt.
   default for new workspaces*.
 - The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
   name…*; Claude Code and Codex list the models they say they have, a gateway's or custom ones too, asked once a day
-  per account; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort (each model's
+  per account; when the API refuses a model because the installed Claude Code is too old for it, the turn says so
+  (the version it needs), the model leaves the menus and the page warns on one typed or a profile's, with *Update
+  Claude Code* (a terminal running `claude update`), until it's updated; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort (each model's
   own when the agent says them; the one you last
   picked for a model comes back when you pick that model again) and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
@@ -1591,6 +1600,23 @@ its chat or the model's context. *Refuse* says no; after 15 minutes it's a no.
 
 While Claude Code compacts a long chat, its tab and row say *Compacting…*.
 
+**Subagents and background tasks**: while a Claude Code chat has subagents at work or commands left running in the
+background (a dev server), chips over the box say so: *Subagents · 2*, *Background · 1*. A click lists them; each has
+*Show output* (the end of its output file, kept up to date, over the box) and *Stop*, which asks the agent to stop it
+(a subagent in the turn at work stops with the turn: Esc). They go as each ends.
+
+**MCP Apps**: a Claude Code call of an MCP tool whose server has an app for it (an MCP App: the tool's `ui://` page)
+shows that app under the call, told what it was called with and its result. Laki asks the server for the page itself,
+as your Claude config says (your servers and this folder's in `~/.claude.json`, the account's; never a repo's
+`.mcp.json`, which Claude asks you about first), and keeps the connection 10 minutes. The app runs in a sandbox with only
+the domains it declares; when it wants to run one of its server's tools, or send the agent a message, a card asks you
+first. Servers that need a sign-in aren't reached. Settings › Appearance › *MCP Apps in the Reader* turns it off.
+
+**UI in answers**: an agent can put a small fenced `laki-ui` block in its answer (the laki skill says how): UI kit JSON
+(`laki widget kit` lists the elements) that Reader draws with Laki's own controls, a table, stats, a checklist,
+choices. A button with `"do": "send"` sends its prompt back to the agent as your pick; a link opens in the browser.
+Elsewhere (the terminal, a shared page) it's the JSON as code.
+
 ### One next step
 
 The first item of a workspace's ⋯ menus (the toolbar's, its row's, its right click) is the one thing it needs from you now: *Answer claude* or *Approve the plan*
@@ -2027,7 +2053,11 @@ and what it costs.
   (and Claude's ↑ prompt history). Each row says who it signs in as, its plan, and *most room* on the one with clearly
   more of its 5-hour window left. The circle picks the default: new sessions start on it (a profile can pick one of
   its own); a tab keeps the account it started on, and its right click › *Restart on another account* moves its chat
-  to another (a turn at work stops first). ⌘K's *Switch Claude Code to …* and the plan limits' popup (*Use*) change the
+  to another (a turn at work stops first). *Auto fallback*: the round button on each row numbers it (a click again takes
+  it out); with two or more numbered, a tab at its plan limit restarts on the next numbered account that isn't at its
+  own limit (its chat resumes there) and goes on with *continue*, instead of waiting for the reset; a workflow step
+  waiting on it goes on with it. An account a tab hit the limit on is skipped until that resets; with none left, it
+  waits as before. ⌘K's *Switch Claude Code to …* and the plan limits' popup (*Use*) change the
   default too. The ring in the status bar shows each agent's default account; its popup lists them all. Removing one
   removes its folder and Claude's Keychain item for it; its chats stay.
   The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`, `$LAKI_STORAGE_FOLDER`) put a variable in at the
@@ -2286,7 +2316,7 @@ laki preset ls | preset add claude-ask --perm auto | preset set claude-ask --mod
 laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the project's memory (Project memory)
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
-laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
+laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule archive|restore|rm <id>
 laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki flow again <run> [--from <block>] | flow trash | flow restore <trash-id>   # a run again | deleted workflows

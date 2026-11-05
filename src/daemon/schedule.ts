@@ -171,13 +171,22 @@ const groupSet = (s: Schedule, g: unknown) => {
   if (name) s.group = name
   else delete s.group
 }
-export function scheduleSet(o: ScheduleIn): Schedule {
+// Archive: out of the list and never run, kept to restore (the page's Archived; Delete permanently is there). Restored,
+// it's as it was: on ones run at their next time
+function archiveSet(s: Schedule, on: boolean) {
+  if (on) (s.archived ??= Date.now()), (s.next = undefined)
+  else if (s.archived) delete s.archived, (s.next = s.on ? nextRun(s.rule, Date.now()) : undefined)
+}
+export function scheduleSet(o: ScheduleIn & { archived?: boolean }): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
+  if (o.archived !== undefined && typeof o.archived !== 'boolean') throw new Error('archived? true or false')
+  if (o.archived && !old) throw new Error('archive which task? (its id)')
   const given = Object.fromEntries(SCHEDULE_IN.filter(k => o[k] !== undefined).map(k => [k, o[k]]))
   if (old && Object.keys(given).every(k => k === 'group' || (k === 'on' && given.on === false))) {
-    // off and a group take no checks: a task whose workspace or preset is gone can still be stopped or moved
+    // off, a group and archive take no checks: a task whose workspace or preset is gone can still be stopped or moved
     if (given.on === false) Object.assign(old, { on: false, next: undefined })
     if (given.group !== undefined) groupSet(old, given.group)
+    if (o.archived !== undefined) archiveSet(old, o.archived)
     save()
     changed()
     return old
@@ -257,7 +266,8 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     if ('error' in r) throw new Error(r.error)
     s.rule = r
   }
-  s.next = s.on ? nextRun(s.rule, Date.now()) : undefined
+  s.next = s.on && !s.archived ? nextRun(s.rule, Date.now()) : undefined
+  if (o.archived !== undefined) archiveSet(s, o.archived)
   state.schedules = old ? state.schedules!.map(x => (x === old ? s : x)) : [...state.schedules!, s]
   save()
   changed()
@@ -412,7 +422,7 @@ export function startPending(w: Workspace, now = Date.now(), asked = false) {
 // every 30 s (tests pass `now`): what's due runs, what's long overdue is logged as missed; then the next time
 export async function scheduleTick(now = Date.now()) {
   // every due one moves on first: a tick while a run is still starting (a worktree takes a while) doesn't start it again
-  const due = (state.schedules ?? []).filter(s => s.on && s.next !== undefined && s.next <= now).map(s => ({ s, at: s.next! }))
+  const due = (state.schedules ?? []).filter(s => s.on && !s.archived && s.next !== undefined && s.next <= now).map(s => ({ s, at: s.next! }))
   for (const { s } of due) {
     s.next = s.rule.once ? undefined : nextRun(s.rule, now)
     if (s.rule.once) s.on = false

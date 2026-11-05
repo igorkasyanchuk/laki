@@ -9,7 +9,8 @@ import { HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, typ
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, presetOf, state } from './core.ts'
 import { dir } from './dir.ts'
-import { type ByModel, chatOf, dayOf, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
+import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
+export type { McpCall }
 import { claudeWindows } from './usage.ts'
 
 // ---------- transcripts: a claude or codex tab's (share.ts' transcriptOf), read as it grows, by shared tabs and the meters
@@ -49,17 +50,43 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
 // Reader view: a claude or codex tab's chat as what was said (share.ts' chatOf), read on as it grows; v moves with it
 // (the renderer asks every 1.5 s with the v it has: the same, no said back); none: no transcript (another agent, a
 // host's, not written yet). ponytail: the newest 400 sent whole at each change
-type Reader = Tail & { said: Said[]; v: number }
+// bg: what a claude chat runs in the background now (share.ts bgOf: the chips over the Reader's box)
+type Reader = Tail & { said: Said[]; v: number; bg: BgRead; calls: Map<string, McpCall> }
 const readers = new Map<string, Reader>()
-export function chatRead(p: { tab: string; v?: number }) {
+const bgNew = (): BgRead => ({ bg: new Map(), wait: new Map() })
+export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; from?: number } {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) throw new Error('no such tab')
   for (const id of readers.keys()) if (!state.tabs.some(t => t.id === id)) readers.delete(id) // closed tabs'
-  const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0 }), readers.get(tab.id)!)
-  const text = tailOf(tab, r, () => ((r.said = []), r.v++))
+  const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0, bg: bgNew(), calls: new Map() }), readers.get(tab.id)!)
+  const text = tailOf(tab, r, () => ((r.said = []), (r.bg = bgNew()), (r.calls = new Map()), r.v++))
   if (text === undefined) return { none: true }
-  if (text) chatOf(tab.preset!, text, r.said), r.v++
-  return p.v === r.v ? { v: r.v } : { v: r.v, said: r.said.slice(-400) }
+  if (text) chatOf(tab.preset!, text, r.said, tab.preset === 'claude' ? r.calls : undefined), tab.preset === 'claude' && bgOf(text, r.bg), r.v++
+  if (r.calls.size > 300) for (const k of [...r.calls.keys()].slice(0, r.calls.size - 200)) r.calls.delete(k) // the newest 200 (callsOf's)
+  return p.v === r.v ? { v: r.v } : { v: r.v, said: r.said.slice(-400), ...(r.said.length > 400 && { from: r.said.length - 400 }), ...(r.bg.bg.size > 0 && { bg: [...r.bg.bg.values()] }) }
+}
+
+// the Reader's MCP calls (mcpApps.ts); the newest 200. bumpReader: something to draw came in (a server's apps)
+export const callsOf = (tab: string) => [...(readers.get(tab)?.calls.values() ?? [])].slice(-200)
+export const bumpReader = (tab: string) => void (readers.get(tab) && readers.get(tab)!.v++)
+
+// a background task's output, the Reader's chip's Show output: the end of its file (64 KB), only for a task its chat
+// started (chatRead's list, read just now), never another path
+export function bgOutput(p: { tab: string; id: string }) {
+  chatRead({ tab: p.tab })
+  const t = readers.get(p.tab)?.bg.bg.get(p.id)
+  if (!t?.out) throw new Error('no output for that task (it ended, or it says none)')
+  const size = statSync(t.out, { throwIfNoEntry: false })?.size
+  if (size === undefined) return { text: '', size: 0 }
+  const n = Math.min(size, 64 << 10)
+  const buf = Buffer.alloc(n)
+  const fd = openSync(t.out, 'r')
+  try {
+    readSync(fd, buf, 0, n, size - n)
+  } finally {
+    closeSync(fd)
+  }
+  return { text: buf.toString('utf8'), size, cut: size > n }
 }
 
 // the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on

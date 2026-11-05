@@ -54,3 +54,104 @@ test('tabHandover: a codex tab beside the claude one, told to read a handover of
   const prompt = await until(() => (f => existsSync(f) && (l => l.includes('"bin":"codex"') && l)(readFileSync(f, 'utf8')))(join(rig.home, 'fake.log')), 'codex started')
   assert.ok(String(prompt).includes(r.file), 'its prompt names the handover')
 })
+
+// a claude chat's lines: its transcript, read as the Reader does (its first turn over, so its end doesn't race)
+async function chatTab(rig: any, session: string) {
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, `${session}.jsonl`)
+  writeFileSync(file, '')
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: session } })
+  return { tab, ws, add: (...o: object[]) => appendFileSync(file, o.map(line).join('')) }
+}
+const said = (rig: any, tab: string) => until(async () => (r => r.said?.length && r)(await rig.rpc('chatRead', { tab })), 'its chat')
+
+test('Reader chips: subagents and background shells a claude chat started, until they end; a shell\'s output; its notices not yours', async t => {
+  const rig = await fresh(t)
+  const { tab, add } = await chatTab(rig, 'chat-bg')
+  const out = join(rig.home, 'bx1.output')
+  writeFileSync(out, 'listening on :3000\n')
+  add(
+    { type: 'user', message: { content: 'Review and run it' } },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_a', name: 'Agent', input: { description: 'Review the diff', subagent_type: 'reviewer' } }, { type: 'tool_use', id: 'toolu_b', name: 'Bash', input: { command: 'npm run dev', description: 'dev server', run_in_background: true } }, { type: 'tool_use', id: 'toolu_c', name: 'Agent', input: { description: 'Scan deps', run_in_background: true } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_b', content: `Command running in background with ID: bx1. Output is being written to: ${out}. You will be notified.` }] }, toolUseResult: { backgroundTaskId: 'bx1' } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_c', content: 'Async agent launched' }] }, toolUseResult: { isAsync: true, agentId: 'ag9', outputFile: join(rig.home, 'ag9.output') } },
+  )
+  let r = await said(rig, tab.id)
+  assert.deepEqual(r.bg, [
+    { id: 'toolu_a', kind: 'agent', name: 'Review the diff' },
+    { id: 'bx1', kind: 'shell', name: 'dev server', out },
+    { id: 'ag9', kind: 'agent', name: 'Scan deps', out: join(rig.home, 'ag9.output') },
+  ])
+  assert.deepEqual(await rig.rpc('bgOutput', { tab: tab.id, id: 'bx1' }), { text: 'listening on :3000\n', size: 19, cut: false })
+  await assert.rejects(rig.rpc('bgOutput', { tab: tab.id, id: 'toolu_a' }), /no output/) // none said
+  await assert.rejects(rig.rpc('bgOutput', { tab: tab.id, id: 'bx1', from: { tab: tab.id } }), /read a background task's output/)
+  // the reviewer answered; the shell stopped; the background agent's notice says it's done: none left
+  add(
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_a', content: 'Looks fine' }] } },
+    { type: 'user', message: { content: '<task-notification>\n<task-id>bx1</task-id>\n<status>killed</status>\n</task-notification>' }, origin: { kind: 'task-notification' } },
+    { type: 'queue-operation', content: '<task-notification>\n<task-id>ag9</task-id>\n<tool-use-id>toolu_c</tool-use-id>\n<status>completed</status>\n</task-notification>' },
+  )
+  r = await until(async () => (x => x.said && !x.bg && x)(await rig.rpc('chatRead', { tab: tab.id, v: r.v })), 'none left')
+  assert.ok(!r.said.some((x: any) => x.who === 'you' && x.text.includes('task-notification')), 'claude\'s notice isn\'t yours')
+})
+
+test("laki-ui: the skill's example is UI kit JSON the Reader draws (no errors)", async () => {
+  const { uiCheck } = await import('../src/shared/widgetUi.ts')
+  const src = readFileSync(new URL('../src/daemon/skill.ts', import.meta.url), 'utf8')
+  const json = /\\`\\`\\`laki-ui\n([\s\S]*?)\n\\`\\`\\`/.exec(src)?.[1]
+  assert.ok(json, 'the skill has an example')
+  assert.deepEqual(uiCheck(JSON.parse(json!)).filter(x => x.level === 'error'), [])
+})
+
+test('MCP Apps: a call whose tool has an app shows it, its page with the CSP it declares, its own tool calls; off: none', async t => {
+  const rig = await fresh(t)
+  // a stdio MCP server in your Claude config: a tool with an app, one without
+  const srv = join(rig.home, 'mcp-ui.cjs')
+  writeFileSync(
+    srv,
+    `const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+require('readline').createInterface({ input: process.stdin }).on('line', l => {
+  const m = JSON.parse(l)
+  if (m.id === undefined) return
+  if (m.method === 'initialize') out({ id: m.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'ui', version: '1' } } })
+  else if (m.method === 'tools/list') out({ id: m.id, result: { tools: [{ name: 'chart', inputSchema: { type: 'object' }, _meta: { ui: { resourceUri: 'ui://ui/chart.html' } } }, { name: 'plain', inputSchema: { type: 'object' } }] } })
+  else if (m.method === 'resources/read') out({ id: m.id, result: { contents: [{ uri: m.params.uri, mimeType: 'text/html;profile=mcp-app', text: '<p id=app>chart</p>', _meta: { ui: { csp: { connectDomains: ['https://api.example.com'], resourceDomains: ['https://cdn.example.com', 'javascript:alert(1)'] } } } }] } })
+  else if (m.method === 'tools/call') out({ id: m.id, result: { content: [{ type: 'text', text: 'called ' + m.params.name + ' ' + JSON.stringify(m.params.arguments) }] } })
+  else out({ id: m.id, error: { code: -32601, message: 'no' } })
+})
+`,
+  )
+  writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { 'ui srv': { command: process.execPath, args: [srv] } } }))
+  const { tab, add } = await chatTab(rig, 'chat-mcp')
+  add(
+    { type: 'user', message: { content: 'Chart it' } },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_1', name: 'mcp__ui_srv__chart', input: { n: 3 } }, { type: 'tool_use', id: 'toolu_2', name: 'mcp__ui_srv__plain', input: {} }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: [{ type: 'text', text: '3 bars' }] }, { type: 'tool_result', tool_use_id: 'toolu_2', content: 'plain' }] } },
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'Here it is.' }] } },
+  )
+  const r = await until(async () => (x => x.apps && x)(await rig.rpc('chatRead', { tab: tab.id })), 'its app')
+  assert.equal(r.apps.length, 1)
+  const a = r.apps[0]
+  assert.deepEqual([a.id, a.at, a.server, a.tool, a.input, a.result], ['toolu_1', 1, 'ui_srv', 'chart', { n: 3 }, { content: [{ type: 'text', text: '3 bars' }] }])
+  assert.equal(r.said[a.at].who, 'tool') // under its call's line
+  const { port } = rig.info()
+  const page = await fetch(`http://127.0.0.1:${port}${a.src}`)
+  assert.equal(page.status, 200)
+  assert.equal(await page.text(), '<p id=app>chart</p>')
+  const csp = page.headers.get('content-security-policy')!
+  assert.match(csp, /^sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https:\/\/cdn\.example\.com;/)
+  assert.match(csp, /connect-src https:\/\/api\.example\.com$/)
+  assert.ok(!csp.includes('javascript'), 'only https origins')
+  assert.equal((await fetch(`http://127.0.0.1:${port}${a.src.replace(/key=\w+/, 'key=x')}`)).status, 401)
+  // its tool call (the Reader asks you first): to its server
+  assert.deepEqual(await rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart', arguments: { n: 4 } }), { content: [{ type: 'text', text: 'called chart {"n":4}' }] })
+  await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart', from: { tab: tab.id } }), /run an MCP App's tool/)
+  await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'nope', name: 'chart' }), /no such app/)
+  // off: none
+  await rig.rpc('settingsSet', { mcpApps: false })
+  assert.equal((await rig.rpc('chatRead', { tab: tab.id })).apps, undefined)
+})
