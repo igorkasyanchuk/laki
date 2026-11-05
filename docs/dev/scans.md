@@ -63,12 +63,13 @@
     calls, their said line `at`, their result: content blocks, `structuredContent`), `callsOf` (the newest 200); main.ts'
     `chatRead` is `chatWithApps`: `appsFor` finds each call's server in the tab's account's `.claude.json` (user and
     local scope by the worktree's path; never `.mcp.json`; stdio or streamable HTTP, a name's other characters as `_`),
-    connects (`initialize` with the `io.modelcontextprotocol/ui` extension, kept `IDLE`), lists its tools once
-    (`_meta.ui.resourceUri`, a `ui://` one; `bumpReader` re-reads the chat), and adds `apps` by said line (`from`: of
+    connects (`initialize` with the `io.modelcontextprotocol/ui` extension, kept `IDLE`; one that exits is dropped at
+    once), lists its tools (`_meta.ui.resourceUri`, a `ui://` one; `bumpReader` re-reads the chat; `seen`: again after
+    `IDLE` only once the chat called that server since), and adds `apps` by said line (`from`: of
     the newest 400). `GET /mcp-app/<tab>/<call>?key=` (`urlKey('mcp:…')`): `resources/read`'s HTML with a CSP of
     `_meta.ui.csp`'s https origins; `mcpAppCall` (FROM, agent-refused): `tools/call` on that server. Reader.tsx `McpApp`:
     an `allow-scripts` frame, postMessage JSON-RPC (`ui/initialize` with the theme, then `tool-input` and `tool-result`;
-    `size-changed`; `ui/open-link` http(s); `tools/call` and `ui/message` after an `ask`). Tested in `test/reader.test.ts`.
+    `size-changed`; `ui/open-link` http(s), `tools/call` and `ui/message`, each after an `ask`). Tested in `test/reader.test.ts`.
   - `laki-ui` blocks: MarkdownView's `UiBlocks` context (unset: the JSON as code); Reader.tsx `UiBlock`: an element or
     `{ ui, data }` passing `uiCheck`, `uiHtml` in a shadow root through Widgets' `clean`, `uiBehave`: a `do: send`
     button's prompt to the agent, copy, http(s) links; the laki skill's *Show it as UI in your answer*.

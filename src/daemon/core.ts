@@ -3161,7 +3161,8 @@ const limitSent = new Map<string, number>() // ponytail: a closed tab's stays (a
 // Auto fallback (settings.limitFallback, Settings › Agents & profiles): a claude or codex tab at its plan limit restarts
 // on the next of its agent's accounts in your order that isn't at a limit itself (its chat resumes there: accounts
 // share chats) and goes on with "continue", instead of waiting for the reset. An account a tab hit the limit on is
-// skipped until that resets. ponytail: an account's limit as Laki's tabs met it, not the plan limits' own numbers
+// skipped until that resets; with every one at its limit, it tries again as the first of them resets. ponytail: an
+// account's limit as Laki's tabs met it, not the plan limits' own numbers
 const accountAt = new Map<string, number>() // agent:account → when its limit resets
 export function fallback(tab: Tab, until: number, now = Date.now()): string | undefined {
   const agent = tab.preset
@@ -3169,14 +3170,18 @@ export function fallback(tab: Tab, until: number, now = Date.now()): string | un
   if (!isAccountAgent(agent) || !r?.limit || !state.tabs.includes(tab)) return // gone on already, or closed
   const here = accountFor(tab, presetOf(tab)?.account)!
   accountAt.set(`${agent}:${here}`, until)
-  const order = state.settings?.limitFallback?.[agent] ?? []
+  const order = (x => (Array.isArray(x) ? x.filter((id): id is string => typeof id === 'string') : []))(state.settings?.limitFallback?.[agent])
   if (!order.length || findWs(tab.workspace).host) return
   const ids = accountIds(agent)
   // the ones after this one first, then from the top: a tab on the 2nd goes on on the 3rd, the 1st after the last
   const from = order.indexOf(here)
   const next = [...order.slice(from + 1), ...order.slice(0, Math.max(from, 0))].find(id => id !== here && ids.includes(id) && !((accountAt.get(`${agent}:${id}`) ?? 0) > now))
   const name = (id: string) => accounts().find(a => a.id === id)?.name ?? 'Default'
-  if (!next) return void wsLog({ id: tab.workspace }, `${tab.name}: at its plan limit on ${name(here)}; every account in its fallback is too: it goes on as the limit resets`)
+  if (!next) {
+    const soon = Math.min(...order.filter(id => id !== here && ids.includes(id)).map(id => accountAt.get(`${agent}:${id}`) ?? Infinity))
+    if (soon < until) setTimeout(() => fallback(tab, until), soon - now + 1000) // another frees first: on there then
+    return void wsLog({ id: tab.workspace }, `${tab.name}: at its plan limit on ${name(here)}; every account in its fallback is too: it goes on as the first resets`)
+  }
   try {
     tabAccount({ tab: tab.id, account: next })
   } catch (e) {

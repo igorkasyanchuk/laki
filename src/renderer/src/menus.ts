@@ -154,7 +154,7 @@ export function menusOf(app: AppBase) {
     ]
   }
 
-  const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
+  const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project && !s.archived).length ?? 0)
 
   // a project's name in Laki, any you like; empty: its folder's again (the daemon's projectSet)
   const renameProject = async (p: Project) => {

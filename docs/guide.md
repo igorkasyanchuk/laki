@@ -1609,8 +1609,8 @@ background (a dev server), chips over the box say so: *Subagents · 2*, *Backgro
 shows that app under the call, told what it was called with and its result. Laki asks the server for the page itself,
 as your Claude config says (your servers and this folder's in `~/.claude.json`, the account's; never a repo's
 `.mcp.json`, which Claude asks you about first), and keeps the connection 10 minutes. The app runs in a sandbox with only
-the domains it declares; when it wants to run one of its server's tools, or send the agent a message, a card asks you
-first. Servers that need a sign-in aren't reached. Settings › Appearance › *MCP Apps in the Reader* turns it off.
+the domains it declares; when it wants to open a link, run one of its server's tools or send the agent a message, a
+card asks you first. Servers that need a sign-in aren't reached. Settings › Appearance › *MCP Apps in the Reader* turns it off.
 
 **UI in answers**: an agent can put a small fenced `laki-ui` block in its answer (the laki skill says how): UI kit JSON
 (`laki widget kit` lists the elements) that Reader draws with Laki's own controls, a table, stats, a checklist,

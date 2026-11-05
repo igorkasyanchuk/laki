@@ -196,7 +196,7 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
     .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
     .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e))) // its retry from the answer (an ask takes up to 20 s)
   modelsSeen.set(key, seen)
-  return agent === 'claude' ? seen.list.then(l => (void claudeHas(), l.filter(m => !needsNewer(m.id)))) : seen.list // one the installed claude is too old for: out (modelNeeds)
+  return agent === 'claude' ? seen.list.then(l => claudeHas().then(() => l.filter(m => !needsNewer(m.id)))) : seen.list // one the installed claude is too old for: out (modelNeeds)
 }
 
 // ---------- models the installed claude is too old for: the API refuses one (claude_code_version_too_old) and names the
@@ -234,7 +234,8 @@ export function modelRefused(model: string | undefined, text: string): string | 
   return `${(v => (v ? `Claude Code ${v}` : 'This Claude Code'))(t.have ?? has.v)} can't run ${m}: it needs ${t.need} or newer. Update it (claude update), or pick another model.`
 }
 // the view's: each model a newer claude is needed for, by model
-export const modelNeedsView = () => (state.modelNeeds && Object.keys(state.modelNeeds).length ? Object.fromEntries(Object.entries(state.modelNeeds).filter(([m]) => needsNewer(m))) : undefined)
+// (its version not looked at yet since the daemon started: asked now, so a claude updated meanwhile drops the warning)
+export const modelNeedsView = () => (state.modelNeeds && Object.keys(state.modelNeeds).length ? (!has.at && void claudeHas(), Object.fromEntries(Object.entries(state.modelNeeds).filter(([m]) => needsNewer(m)))) : undefined)
 export const claudeVersion = () => has.v
 // a JSON-lines exchange: the lines sent (stdin kept open: claude ends with it), each line read through `take` until
 // it gives something; 20 s at most, then the process goes

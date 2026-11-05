@@ -1678,7 +1678,7 @@ export function SettingsPage(p: {
                 </Switch>
                 {s.reader !== false && (
                   <Switch className="switch-row" on={s.mcpApps !== false} onChange={v => set({ mcpApps: v })}>
-                    <Says title="MCP Apps in the Reader" hint="A Claude Code tool call whose MCP server has an app for it shows that app under the call. Laki asks the server for its page, as your Claude config says (yours and this folder's servers; never a repo's .mcp.json); the app's own tool calls and messages ask you first" />
+                    <Says title="MCP Apps in the Reader" hint="A Claude Code tool call whose MCP server has an app for it shows that app under the call. Laki asks the server for its page, as your Claude config says (yours and this folder's servers; never a repo's .mcp.json); the app's links, tool calls and messages ask you first" />
                   </Switch>
                 )}
                 <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>

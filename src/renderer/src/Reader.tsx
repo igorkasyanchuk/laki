@@ -74,13 +74,13 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const [menu, openMenu] = useMenu()
   const [out, setOut] = useState<{ task: BgTask; got?: BgOut; err?: string; ended?: boolean }>()
   useEffect(() => {
-    if (!out || !api.bgOutput) return
+    if (!out || !api.bgOutput || out.ended) return // ended: nothing more to read
     let alive = true
     const go = () => api.bgOutput!(tab.id, out.task.id).then(got => alive && setOut(o => (o?.task.id === out.task.id ? { ...o, got, err: undefined } : o)), e => alive && setOut(o => o && (o.got ? { ...o, ended: true } : { ...o, err: (e as Error).message }))) // ended: its last output stays
     go()
     const t = setInterval(() => document.visibilityState === 'visible' && go(), 2000)
     return () => ((alive = false), clearInterval(t))
-  }, [out?.task.id, tab.id])
+  }, [out?.task.id, out?.ended, tab.id])
   const live = tab.status !== 'exited' ? bg : []
   // a subagent in this turn (its call's id) stops with the turn (Esc); a background one or a shell: the agent is asked
   const stop = (t: BgTask) => void api.send(tab.id, `Stop the background ${t.kind === 'agent' ? 'subagent' : 'task'} ${t.id} (${t.name}) now, with TaskStop (or KillShell), then say it's stopped.`).catch(() => {})

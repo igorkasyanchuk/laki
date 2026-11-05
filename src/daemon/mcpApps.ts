@@ -133,7 +133,7 @@ const AGAIN = 60_000
 function connect(key: string, server: Server, cwd: string): Live {
   const had = live.get(key)
   if (had) return ((had.used = Date.now()), had)
-  const end = () => live.get(key) === l && (live.delete(key), seen.delete(key)) // it exited: the next use starts it again
+  const end = () => live.get(key) === l && live.delete(key) // it exited: the next use starts it again
   const conn = (async () => {
     const c = server.command ? stdio(server, cwd, end) : http(server)
     try {
@@ -151,7 +151,7 @@ function connect(key: string, server: Server, cwd: string): Live {
   return l
 }
 setInterval(() => {
-  for (const [k, l] of live) if (Date.now() - l.used > IDLE) (live.delete(k), seen.delete(k), void l.conn.then(c => c.close(), () => {})) // its tools asked again next time
+  for (const [k, l] of live) if (Date.now() - l.used > IDLE) (live.delete(k), void l.conn.then(c => c.close(), () => {}))
 }, 60_000).unref()
 
 const uriOf = (t: any) => (x => (typeof x === 'string' && x.startsWith('ui://') ? x : undefined))(t?._meta?.ui?.resourceUri ?? t?._meta?.['ui/resourceUri'])
@@ -159,31 +159,39 @@ function appsOf(key: string, l: Live) {
   l.apps ??= l.conn
     .then(c => c.req('tools/list'))
     .then(r => new Map<string, string>((Array.isArray(r?.tools) ? r.tools : []).flatMap((t: any) => (uriOf(t) && typeof t.name === 'string' ? [[t.name, uriOf(t)!]] : []))))
-  l.apps.catch(e => (failed.set(key, Date.now()), live.delete(key), log(`mcp app: ${key.split('|').at(-1)}: ${(e as Error).message}`)))
+  l.apps.catch(e => (failed.set(key, Date.now()), live.get(key) === l && live.delete(key), log(`mcp app: ${key.split('|').at(-1)}: ${(e as Error).message}`)))
   return l.apps
 }
 
-// what the Reader draws: the tab's MCP calls whose tool has an app (known: a server's list is asked once, and the
-// chat read again as it comes); each with its page's address, what it was called with and its result
+// what the Reader draws: the tab's MCP calls whose tool has an app (known: each server's list, asked as its calls show
+// up, and the chat read again as it comes); each with its page's address, what it was called with and its result
 export type AppView = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-const seen = new Map<string, Map<string, string> | null>() // server key → its tools with an app (null: being asked); kept while its connection is
+// server key → its tools with an app (null: being asked), when it was asked and its newest call then. Asked again after
+// IDLE only once the chat called it since (Claude runs it then anyway), never just because a chat is read
+const seen = new Map<string, { apps: Map<string, string> | null; at: number; last: string }>()
 const on = (tab?: Tab) => tab?.preset === 'claude' && state.settings?.mcpApps !== false
 export function appsFor(tab: Tab): AppView[] {
   const calls = on(tab) ? callsOf(tab.id) : []
   if (!calls.length) return []
   const serverOf = serversOf(tab)
+  const found = calls.map(c => ({ c, s: serverOf(c.server) }))
+  const newest = new Map<string, { s: NonNullable<Found>; last: string }>()
+  for (const { c, s } of found) if (s) newest.set(s.key, { s, last: c.id }) // calls come oldest first
+  for (const [key, { s, last }] of newest) {
+    const was = seen.get(key)
+    if (was && !(was.apps && Date.now() - was.at > IDLE && was.last !== last)) continue
+    if (Date.now() - (failed.get(key) ?? 0) <= AGAIN) continue
+    seen.set(key, { apps: was?.apps ?? null, at: Date.now(), last }) // the old list drawn meanwhile
+    const l = connect(key, s.server, s.cwd)
+    if (was) l.apps = undefined // asked anew
+    void appsOf(key, l).then(
+      m => (seen.set(key, { apps: m, at: Date.now(), last }), m.size && bumpReader(tab.id)),
+      () => (was ? seen.set(key, { ...was, at: Date.now() }) : seen.delete(key)),
+    )
+  }
   const out: AppView[] = []
-  for (const c of calls) {
-    const s = serverOf(c.server)
-    if (!s) continue
-    const apps = seen.get(s.key)
-    if (apps === undefined && Date.now() - (failed.get(s.key) ?? 0) > AGAIN) {
-      seen.set(s.key, null)
-      void appsOf(s.key, connect(s.key, s.server, s.cwd)).then(
-        m => (seen.set(s.key, m), m.size && bumpReader(tab.id)),
-        () => seen.delete(s.key),
-      )
-    }
+  for (const { c, s } of found) {
+    const apps = s && seen.get(s.key)?.apps
     if (!apps?.has(c.tool) || c.result === undefined) continue
     out.push({ id: c.id, at: c.at, server: c.server, tool: c.tool, src: `/mcp-app/${tab.id}/${c.id}?key=${urlKey(`mcp:${tab.id}/${c.id}`)}`, input: c.input, result: c.result, ...(c.error && { error: true }) })
   }

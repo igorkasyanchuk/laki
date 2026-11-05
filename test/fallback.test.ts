@@ -53,6 +53,27 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
   assert.deepEqual((await rig.rpc('state')).settings.limitFallback, { claude: ['home', spare.id] })
 })
 
+test('auto fallback: with every account at its limit, it goes on on the first one to reset, not the last', async t => {
+  const rig = await fresh(t)
+  mkdirSync(join(rig.home, '.claude'))
+  const work = await rig.rpc('accountAdd', { agent: 'claude', name: 'Work' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi' })
+  const tab = await until(async () => (x => x?.last === 'answer: hi' && x)(await rig.tab(ws.id)), 'its first turn')
+  const runs = () => rig.fakeLog().filter(l => l.bin === 'claude' && l.tab === tab.id)
+  await rig.rpc('settingsSet', { limitFallback: { claude: ['home', work.id] } })
+  await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: { last_assistant_message: "You've hit your limit · resets in 5 seconds" } })
+  await until(() => runs().length === 2, 'on Work')
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: continue', 'it went on')
+  // Work's resets in 2 hours, the default's in seconds: it waits for the default's, then goes on there
+  await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(2) })
+  await sleep(1500)
+  assert.equal(runs().length, 2)
+  await until(() => runs().length === 3, 'back on the default as it reset')
+  assert.equal(runs()[2].env.CLAUDE_CONFIG_DIR, runs()[0].env.CLAUDE_CONFIG_DIR)
+  assert.equal((await rig.tab(ws.id)).account, 'home')
+})
+
 test("a model too new for the installed claude: the API's error kept and said, the model out of the list until an update", async t => {
   // the words: the version it needs (the higher), the one it has, the model it names
   assert.deepEqual(tooOld('API Error: 400 {"error":{"error_code":"claude_code_version_too_old","message":"claude-opus-9-1 needs Claude Code 2.1.280 or newer; this is 2.1.99"}}'), { need: '2.1.280', have: '2.1.99', model: 'claude-opus-9-1' })
