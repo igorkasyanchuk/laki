@@ -313,6 +313,15 @@ gets `again` `{ run: true }`, and `restoreAll` keeps it. `restoreAll` starts the
 types it once the prompt is up (it printed, then 500 ms quiet; 10 s at most) under a dim note. A crash keeps nothing,
 and neither does a host.
 
+A claude chat whose background commands (Bash `run_in_background`: a dev server, a watcher) or background subagents
+were running as the daemon went (an update, Update when idle, a crash: its process ended, theirs with it) is told so
+once it's back: `restoreNow` reads its transcript before the resume (meters.ts `bgLeft`: share.ts `bgOf` over the last
+32 MB; what's still open there was killed, nothing saved at shutdown, so a crash too), then `whenPrompt` → `bgGone`:
+one `send` (when idle) naming each command (`BgTask.cmd`) and each background subagent (not one in the turn, a `toolu_`
+id: the turn ended with it), `bgGoneText`. `tab.bgTold` keeps the ids named (their ends never come): never twice. A
+dormant tab gets it as it wakes (restoreNow then). ponytail: claude only; Update when idle doesn't wait for them (a dev
+server never ends).
+
 A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the screen as it exits) drops the tab's
 `resumeId` (Enter starts a new chat) only when it exits within `RESUME_FAIL` (30 s) of starting: later, a chat's own
 words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:

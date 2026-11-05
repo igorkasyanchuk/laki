@@ -29,7 +29,7 @@ import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } f
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
-import { meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { collisions, inside, scanOverlaps, scanStats, stats, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -2701,15 +2701,42 @@ export function restoreNow(id: string) {
   if (ws.archived || sessions.has(id)) return changed(), false
   let ok = true
   try {
+    const left = tracked(t) ? bgLeft(t).filter(x => !t.bgTold?.includes(x.id)) : [] // read before it resumes: what its chat still ran as the daemon went
     const s = spawnTab(t, { resume: true, cwd: a?.cwd })
     restoredAt.set(t.id, Date.now())
     if (a?.cmd) bringBack(s, a.cmd, !!a.run)
+    if (left.length) whenPrompt(s, () => bgGone(t, left))
   } catch (e) {
     ok = false // shown as ended: Enter tries again
     console.error(`restore ${t.id}:`, (e as Error).message)
   }
   changed()
   return ok && tracked(t)
+}
+
+// a resumed claude whose chat had commands running in the background (Bash run_in_background: a dev server, a watcher)
+// or background subagents as the daemon went (an update, Update when idle, a crash: its process and theirs ended):
+// one message, so it doesn't wait for output that never comes. Sent as yours are (send, when idle). ponytail: claude
+// only (share.ts bgOf reads its transcript); a subagent in the turn at work isn't named (the turn ended with it)
+export const bgGoneText = (left: { kind: string; name: string; cmd?: string; id: string }[]) => {
+  const shells = left.filter(x => x.kind === 'shell').map(x => `\`${x.cmd ?? x.name}\``)
+  const agents = left.filter(x => x.kind === 'agent' && !x.id.startsWith('toolu_')).map(x => x.name)
+  return [
+    shells.length && `Laki restarted and stopped the background commands you had running: ${shells.join(', ')}. Start again the ones you still need.`,
+    agents.length && `${shells.length ? 'It also stopped' : 'Laki restarted and stopped'} your background subagents: ${agents.join(', ')}. Start them again if you still need them.`,
+  ].filter(Boolean).join(' ')
+}
+function bgGone(t: Tab, left: { kind: string; name: string; cmd?: string; id: string }[]) {
+  const text = bgGoneText(left)
+  if (!text || !state.tabs.includes(t)) return
+  t.bgTold = [...(t.bgTold ?? []), ...left.map(x => x.id)].slice(-50)
+  save()
+  wsLog({ id: t.workspace }, `${t.name}: told what the restart stopped (${left.length})`)
+  try {
+    send({ target: t.id, text, whenIdle: true })
+  } catch (e) {
+    log(`restart note ${t.id}: ${(e as Error).message}`)
+  }
 }
 
 // ---------- shells across restarts

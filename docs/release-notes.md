@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- After Laki's daemon restarts (an update, *Update when idle*, a crash), a Claude Code tab whose dev server, watcher or
+  background subagent it stopped is told so once it's back, by name, instead of waiting for output that never comes.
+
 - *Sandbox* for Claude Code and Codex profiles (Settings › Agents & profiles, 🔒 on the new-workspace page, `laki preset
   set <name> --sandbox`): the agent runs in its own sandbox, its commands writing only in the worktree and the repo's
   git folder, so one left alone can't touch the rest of your Mac. Codex keeps its network; Claude Code runs `laki`

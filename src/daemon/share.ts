@@ -96,10 +96,10 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: M
 // ID until a task-notification, KillShell or TaskStop ends it), each with the file its output goes to once it's said.
 // Read on with its transcript (meters.ts chatRead), onto bg; wait: background shells' calls, until their result says
 // their ID. ponytail: claude only; one whose end isn't in the transcript (claude quit) stays until the chat is read anew
-export type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string }
+export type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string; cmd?: string } // cmd: a shell's command
 // done: how many ended, the newest DONE_KEPT of them, when the last one did (its line's time: the status bar's Background
 // card)
-export type BgRead = { bg: Map<string, BgTask>; wait: Map<string, string>; done?: { n: number; last: BgTask[]; at?: number } }
+export type BgRead = { bg: Map<string, BgTask>; wait: Map<string, { name: string; cmd?: string }>; done?: { n: number; last: BgTask[]; at?: number } }
 const DONE_KEPT = 5
 const ENDED = /^(completed?|done|failed|killed|stopped|cancell?ed|error|timed?[_ ]?out)$/i
 export function bgOf(jsonl: string, r: BgRead): BgRead {
@@ -137,7 +137,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
         const i = x.input ?? {}
         const name = String(i.description || i.subagent_type || i.command || x.name).replace(/\s+/g, ' ').trim().slice(0, 80)
         if (x.name === 'Agent' || x.name === 'Task') r.bg.set(x.id, { id: x.id, kind: 'agent', name })
-        else if (x.name === 'Bash' && i.run_in_background === true) r.wait.set(x.id, name)
+        else if (x.name === 'Bash' && i.run_in_background === true) r.wait.set(x.id, { name, ...(typeof i.command === 'string' && { cmd: i.command.replace(/\s+/g, ' ').trim().slice(0, 200) }) })
         else if (x.name === 'KillShell' || x.name === 'KillBash' || x.name === 'TaskStop') end(String(i.shell_id ?? i.task_id ?? i.id ?? ''))
       } else if (j.type === 'user' && x.type === 'tool_result' && typeof x.tool_use_id === 'string') {
         const res = j.toolUseResult && typeof j.toolUseResult === 'object' ? j.toolUseResult : {}
@@ -153,7 +153,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
           r.wait.delete(x.tool_use_id)
           const id = typeof res.backgroundTaskId === 'string' ? res.backgroundTaskId : /with ID:\s*([\w-]+)/.exec(said)?.[1]
           const out = /written to:\s*(\S+?\.output)\b/.exec(said)?.[1]
-          if (id && !x.is_error) r.bg.set(id, { id, kind: 'shell', name: shell, ...(out && { out }) })
+          if (id && !x.is_error) r.bg.set(id, { id, kind: 'shell', ...shell, ...(out && { out }) })
         }
       }
     }

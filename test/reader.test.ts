@@ -84,7 +84,7 @@ test('Reader chips: subagents and background shells a claude chat started, until
   let r = await said(rig, tab.id)
   assert.deepEqual(r.bg, [
     { id: 'toolu_a', kind: 'agent', name: 'Review the diff' },
-    { id: 'bx1', kind: 'shell', name: 'dev server', out },
+    { id: 'bx1', kind: 'shell', name: 'dev server', cmd: 'npm run dev', out },
     { id: 'ag9', kind: 'agent', name: 'Scan deps', out: join(rig.home, 'ag9.output') },
   ])
   assert.deepEqual(await rig.rpc('bgOutput', { tab: tab.id, id: 'bx1' }), { text: 'listening on :3000\n', size: 19, cut: false })

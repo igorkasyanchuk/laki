@@ -224,3 +224,39 @@ test('a chat that cannot be resumed is dropped: Enter starts a new one', async t
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 3, 'a new claude')
   assert.ok(!rig.fakeLog().filter(l => l.bin === 'claude')[2].args.includes('--resume'))
 })
+
+test("a restart stopped a claude chat's background commands: the resumed tab is told once, by name; one whose task ended is told nothing", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const chat = async (name: string) => {
+    const ws = await rig.rpc('wsNew', { project: p.id, name, preset: 'claude', prompt: `hi ${name}` })
+    return until(async () => (x => x?.last && x.resumeId && x)(await rig.tab(ws.id, 'claude')), 'its first turn')
+  }
+  const live = await chat('live')
+  const ended = await chat('ended')
+  // their transcripts (as reader.test's): a dev server and a background subagent left running; a migration that ended
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const at = new Date().toISOString()
+  const lines = (...o: object[]) => o.map(x => JSON.stringify({ timestamp: at, ...x })).join('\n') + '\n'
+  const bash = (id: string, cmd: string) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command: cmd, description: 'run it', run_in_background: true } }] } })
+  const started = (id: string, task: string) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: `Command running in background with ID: ${task}.` }] }, toolUseResult: { backgroundTaskId: task } })
+  writeFileSync(join(dir, `${live.resumeId}.jsonl`), lines(
+    bash('toolu_1', 'npm run dev'), started('toolu_1', 'b1'),
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_2', name: 'Agent', input: { description: 'Scan deps', run_in_background: true } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_2', content: 'launched' }] }, toolUseResult: { isAsync: true, agentId: 'ag1' } },
+  ))
+  writeFileSync(join(dir, `${ended.resumeId}.jsonl`), lines(bash('toolu_3', './migrate.sh'), started('toolu_3', 'b3'), { type: 'user', message: { content: '<task-notification>\n<task-id>b3</task-id>\n<status>completed</status>\n</task-notification>' } }))
+  await rig.stop()
+  await rig.start()
+  const told = 'Laki restarted and stopped the background commands you had running: `npm run dev`. Start again the ones you still need. It also stopped your background subagents: Scan deps. Start them again if you still need them.'
+  await until(async () => (await rig.tab(live.workspace, 'claude')).last === `answer: ${told}`, 'told')
+  await sleep(1500)
+  assert.ok(!(await rig.screen(ended.id)).includes('Laki restarted'), 'its task ended: nothing said')
+  // again: those were named already (their ends never come), nothing new to say
+  await rig.stop()
+  await rig.start()
+  await until(async () => (await rig.screen(live.id)).includes('fake claude'), 'resumed again')
+  await sleep(1500)
+  assert.ok(!(await rig.screen(live.id)).includes('Laki restarted'), 'not named twice')
+})

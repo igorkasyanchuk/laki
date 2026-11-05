@@ -67,6 +67,25 @@ export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: 
   return p.v === r.v ? { v: r.v } : { v: r.v, said: r.said.slice(-400), ...(r.said.length > 400 && { from: r.said.length - 400 }), ...(r.bg.bg.size > 0 && { bg: [...r.bg.bg.values()] }) }
 }
 
+// what a claude tab's chat left running in the background as its process ended (its transcript read now, its last
+// SHARE_READ: bgOf; a task started before that is missed): a restart's restoreNow tells the resumed agent they're gone.
+// None: another agent, a host's, no chat or transcript
+export function bgLeft(tab: Tab): BgTask[] {
+  if (tab.preset !== 'claude' || !tab.resumeId || state.workspaces.find(w => w.id === tab.workspace)?.host) return []
+  const file = transcriptOf('claude', accountNamed(tab.account)?.dir ?? homeDir('claude'), tab.resumeId)
+  const size = file ? (statSync(file, { throwIfNoEntry: false })?.size ?? 0) : 0
+  if (!size) return []
+  const n = Math.min(size, SHARE_READ)
+  const buf = Buffer.alloc(n)
+  const fd = openSync(file!, 'r')
+  try {
+    readSync(fd, buf, 0, n, size - n)
+  } finally {
+    closeSync(fd)
+  }
+  return [...bgOf(buf.toString('utf8'), bgNew()).bg.values()]
+}
+
 // the Reader's MCP calls (mcpApps.ts); the newest 200. bumpReader: something to draw came in (a server's apps)
 export const callsOf = (tab: string) => [...(readers.get(tab)?.calls.values() ?? [])].slice(-200)
 export const bumpReader = (tab: string) => void (readers.get(tab) && readers.get(tab)!.v++)
