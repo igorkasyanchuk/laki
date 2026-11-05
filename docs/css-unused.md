@@ -41,7 +41,7 @@ How it was decided:
 
 ### L725: a menu with lines under its labels, or a filter: roomier, like a picker (~118 B)
 
-- [ ] `.diff-head` L755
+- [x] `.diff-head` L755
 
 ### L2739: a link's hover card in a terminal (LinkPeek): a GitHub PR or issue, or a picture (~112 B)
 
@@ -66,7 +66,7 @@ How it was decided:
 
 ### L1143: the workspace info panel and the status bar's PR (Info.tsx) (~52 B)
 
-- [ ] `.diff-head` L1145
+- [x] `.diff-head` L1145
 
 ### L2594: Settings, calmer: more room around and inside the cards, a page's lead text in readable … (~27 B)
 
