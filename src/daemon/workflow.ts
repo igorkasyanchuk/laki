@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, apiQuestions, budgetOf, budgetText, dollars, minutes, type Budget, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, findProject, input as coreInput, findWs, modelCheck, modelKnown, plainEnv, presets, prOf, projectConfig, runDev, save, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { dir } from './dir.ts'
 import { flowFiles, flowHooks } from './schedule.ts'
@@ -500,7 +500,7 @@ async function begin(r: FlowRun) {
 function next() {
   if (!flowsOn(state.settings)) return
   const held = new Set<string>() // a workflow whose oldest waiting can't go: none after it goes either (each pins its at once)
-  for (const r of runs().filter(x => x.status === 'queued').sort((a, b) => a.started - b.started)) {
+  for (const r of runs().filter(x => x.status === 'queued').sort(queueOrder)) {
     const of = { id: r.workflow, source: r.source, project: r.project }
     const k = `${r.source}/${r.source === 'project' ? r.project : ''}/${r.workflow}`
     if (held.has(k) || runs().filter(x => going(x) && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) {
@@ -508,6 +508,7 @@ function next() {
       continue
     }
     r.status = 'running' // going now: the next one counts it
+    delete r.promoted
     say(r, 'its turn: a slot freed')
     touch()
     begin(r).catch(() => {}) // a failure ends it, in its log
@@ -1417,6 +1418,18 @@ export function flowStop(o: { id: string }) {
   const r = flowGet(o)
   if (!live(r)) throw new Error(`that run is ${r.status} already`)
   finish(r, 'stopped', 'you stopped it')
+  return r
+}
+
+// Run First: a queued run takes its workflow's next free slot, ahead of the others waiting (the newest promotion first);
+// the queue and its at once stay as they are
+export function flowFirst(o: { id: string }) {
+  const r = flowGet(o)
+  if (r.status !== 'queued') throw new Error(`that run is ${r.status}, not queued`)
+  r.promoted = Date.now()
+  say(r, 'Run First: it takes the next free slot')
+  touch()
+  next()
   return r
 }
 

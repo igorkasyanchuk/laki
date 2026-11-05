@@ -122,8 +122,9 @@ in `r.tries` (cleared when the block is entered anew, not on a try), decides `re
 call `again` (`until` must match: an earlier timer never takes a later wait), `enter(r, b, true)` (no visit); `flowResume`
 leaves the wait to `flowTick`. Past `at once` (`going`: live and not queued) `flowStart` saves the run `queued`
 (no workspace, `QUEUE_MAX` 20 per workflow, then refused) and returns it; `begin` is the `wsNew` and the start;
-`next` (from `finish`, and `flowTick` in case) begins the oldest queued one of each workflow with a slot, its
-`at once` the run's own copy. `flowResume` leaves queued ones (one cut short before its workspace: queued again);
+`next` (from `finish`, `flowFirst` and `flowTick` in case) begins the first queued one of each workflow with a slot
+(`queueOrder`: Run First's `promoted`, the newest first, cleared as it starts; then the oldest), its `at once` the
+run's own copy. `flowResume` leaves queued ones (one cut short before its workspace: queued again);
 `flowStop`/`flowForget` end one without a workspace; a schedule's run queues (core's skip while one is live stays).
 A Start's `inputs` (`FlowInput`: `inputsOf` reads the line, `name[?][:kind][=default]`, `inputText` writes it; `kind` as
 written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default and every `{{inputs.x}}` or `of`/label

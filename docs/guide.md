@@ -1474,7 +1474,8 @@ project's folder, with a new AI session or one shared with the workflow's earlie
 merging and archiving ask you first unless the block says not to; *Dry run* says them instead of doing them. A run
 keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
 once*, 3 unless changed); one started past that waits its turn, *queued*, with no workspace yet, and starts by
-itself as one of them ends (20 can wait; the run's page says how many are ahead, and *Stop* takes it off). A run
+itself as one of them ends (20 can wait; the run's page says how many are ahead, *Run First* puts it next in line,
+the newest one so marked first, and *Stop* takes it off). A run
 asks you before more agent turns than the workflow allows (30). Start can ask for more than the task: its *Inputs*
 (`inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m` in the file: a name, `?` when it's
 optional, a kind (text unless said, a number, a branch of the project, or one of a few choices) and `=` a default) are

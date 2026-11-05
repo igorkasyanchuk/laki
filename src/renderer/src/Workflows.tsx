@@ -9,7 +9,7 @@ import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayo
 import { type Agent, FAST, findAction, mergeActions, neverAsks, PERMS, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Grouped } from './Schedules'
-import { ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
+import { queueOrder, ACTIONS, AGENT_TIMEOUT, DONES, TURNS, budgetOf, budgetText, type Budget, dollars, minutes, apiQuestions, bypassIn, flowVars, permOf, permWords, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource, whenProblem } from '../../shared/workflow'
 import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
@@ -397,7 +397,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
       ) : (
         <div className="wf-page">
           {at.kind === 'run' ? (
-            <RunView key={at.id} id={at.id} entry={run} ahead={run ? queued.filter(x => x.started < run.started && runOf(x, { id: run.workflow, source: run.source, project: run.project })).length : 0} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} onAgain={again} />
+            <RunView key={at.id} id={at.id} entry={run} ahead={run ? queued.filter(x => x.id !== run.id && queueOrder(x, run) < 0 && runOf(x, { id: run.workflow, source: run.source, project: run.project })).length : 0} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} onAgain={again} />
           ) : cur ? (
             <Editor
               key={`${cur.source}/${cur.project}/${cur.id}`}
@@ -2291,6 +2291,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
     if (t && r.ws && api.openTab) api.openTab(r.ws, t)
   }
   const answer = (n: number) => api.call('flowAnswer', { id, n, text: typed }).then(x => (setTyped(''), setR(x)), e => api.toast((e as Error).message))
+  const first = () => api.call('flowFirst', { id }).then(setR, e => api.toast((e as Error).message))
   const stop = async () => (await ask('Stop this run?', { text: 'Its agents stay as they are, in their tabs.', ok: 'Stop', danger: true })) && api.call('flowStop', { id }).then(setR, e => api.toast((e as Error).message))
   const picked = pick ? r.flow.blocks.find(b => b.id === pick) : undefined
   const vars = Object.entries(r.vars).filter(([k]) => !pick || k === 'task' || k === 'answer' || k.startsWith(`steps.${pick}.`))
@@ -2318,6 +2319,11 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           <button className={mode === 'blocks' ? 'on' : ''} onClick={() => setMode('blocks')}>Blocks</button>
           <button className={mode === 'log' ? 'on' : ''} onClick={() => setMode('log')}>Log {r.log.length}</button>
         </div>
+        {r.status === 'queued' && (
+          <button className="btn" onClick={first} disabled={!ahead} data-tip={ahead ? 'It takes the next free slot, ahead of the others waiting; the queue and its at once stay as they are' : 'Next in line already'}>
+            <Icon name="arrowUp" size={11} /> Run First
+          </button>
+        )}
         {!over && <button className="btn" onClick={stop}><Icon name="stop" size={11} /> Stop</button>}
         {over && (
           <button className="btn" onClick={() => onAgain(r.id)} data-tip="A new run: its task and inputs, the workflow as it is now. A block’s right click: Run from here">

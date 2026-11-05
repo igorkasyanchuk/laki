@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A queued workflow run has *Run First*: it takes the workflow's next free slot, ahead of the others waiting,
+  without stopping any or raising *Runs at once*.
 - Before you approve an edit, see it: when Claude asks to edit or write a file, Reader view, the sidebar's Needs you
   card and the floating bubbles' notch card show the change in red and green (the first lines, *Expand* for the rest),
   the bar under the terminal a *+N −M* chip that opens it, and the notification its counts.

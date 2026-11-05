@@ -158,5 +158,5 @@ run* and *Always: <rule>*, the bubbles' card (`Float.perm`), the phone's body th
 Notification after it while it waits isn't told again (`again`). 145: Claude's status line (`settings.statusBridge`, on unless false; Meters, below): a tab's
 `context` and `usage`'s claude windows from it while fresh. 146: a tab's `hookless` (`hookTick`, every 30 s, `now`: tests'; Hooks not heard, below),
 `hooksSeen` (each agent's last hook, live tabs, `deaf`: Settings › Agents & profiles' line), `doctor`'s `hooks` (`laki
-hook ping`, 2 s) and `hookFiles`. A setting the renderer adds
+hook ping`, 2 s) and `hookFiles`. 147: `flowFirst` (Run First: a queued run's `promoted`, `queueOrder`). A setting the renderer adds
 needs no bump: `settingsSet` keeps any field.

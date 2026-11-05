@@ -35,7 +35,7 @@ import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, tod
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
 import { sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
 import { secretAsk, secretGive, secretsTidy } from './secrets.ts'
-import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
+import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
@@ -508,6 +508,7 @@ const api: Record<string, Handler> = {
   flowStart: ({ caller, ...p }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
   flowEvent: ({ caller, ...p }) => flowEvent(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false, agent: core.callerAgent(caller) } : p), // tried as if on an event: an agent's try is an agent's event
   flowStop: p => flowStop(p),
+  flowFirst: p => flowFirst(p), // Run First: a queued run goes next
   flowAnswer: p => (notAgent(p, "answer a workflow's question"), flowAnswer(p)),
   flowTest: p => flowTest(p), // the inspector's Test: one AI call, decision or webhook, alone
   flowGet: p => flowGet(p),

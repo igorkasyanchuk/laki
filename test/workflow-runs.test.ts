@@ -347,6 +347,27 @@ test('workflow queue: past at once a run is queued, no workspace; it starts as a
   assert.equal(ws.flow, b.id)
 })
 
+test('workflow queue: Run First takes the next free slot, the newest promotion first; only a queued run', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'queue', text: QUEUE })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const a = await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'first' })
+  await until(async () => (await get(a.id)).status === 'waiting', 'a asks')
+  const [b, c, d] = [await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'b' }), await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'c' }), await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'd' })]
+  await assert.rejects(rig.rpc('flowFirst', { id: a.id }), /that run is waiting, not queued/)
+  assert.ok((await rig.rpc('flowFirst', { id: c.id })).promoted)
+  await sleep(5)
+  assert.equal((await rig.rpc('flowFirst', { id: d.id })).status, 'queued', 'no slot yet: it waits, first in line')
+  await rig.rpc('flowAnswer', { id: a.id, n: 0 })
+  const x = await until(async () => (r => r.status === 'waiting' && r)(await get(d.id)), 'd goes first', 15000)
+  assert.equal(x.promoted, undefined, 'its mark cleared as it starts')
+  assert.ok(x.log.some((l: string) => / Run First: it takes the next free slot$/.test(l)))
+  assert.equal((await get(b.id)).status, 'queued')
+  assert.equal((await get(c.id)).status, 'queued')
+})
+
 test('workflow runs in a workspace you have: none made, no mark, one run there at a time; runs in: here needs one; archived refused; the CLI’s --ws', async t => {
   const HERE = AGENT('claude', 'review {{task}}').replace('runs in: worktree', 'runs in: here')
   assert.equal(parse(HERE).workflow.where, 'here')

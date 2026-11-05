@@ -49,6 +49,8 @@ export type DecideQ = { name: string; type: (typeof QTYPES)[number]; ask: string
 export const SURE = 0.7 // yes from this probability, no below 1 - it; a choice or a score this confident: else it asks you
 export const RUNS_AT_ONCE = 3 // a workflow's runs going at the same time (its at once:)
 export const QUEUE_MAX = 20 // runs waiting their turn past at once:, per workflow
+// the queue's order: Run First's, the newest promotion first, then the oldest start
+export const queueOrder = (a: { promoted?: number; started: number }, b: { promoted?: number; started: number }) => (b.promoted ?? 0) - (a.promoted ?? 0) || a.started - b.started
 export const TURNS = 30 // agent turns in one run before it asks you (its turns:)
 export const MAX_BLOCKS = 100 // a workflow's blocks: past it, it won't run (and + Block stops)
 export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'extension'] // what retry: takes
@@ -879,6 +881,7 @@ export type FlowRun = {
   pick?: string // the workspace it was given (flowStart's ws): it runs there, made by no one (no ws.flow mark)
   of?: string // the run it came from: Run again's, Run from here's
   first?: string // Run from here's: the block it starts at, with its run's state
+  promoted?: number // Run First: when; queued, it takes its workflow's next free slot (queueOrder), cleared as it starts
   resumed?: { block: string; chat?: string } // a restart brought it back at this block, its agent tab's chat then: agent() sends RESUMED to that chat
   where: Workflow['where']
   session: Workflow['session']
