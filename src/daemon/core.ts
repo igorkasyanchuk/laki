@@ -2196,6 +2196,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast, o.sandbox) // before the worktree: a wrong one makes nothing
+  const prof = presetNamed(preset)
+  if (isAgent(agent) && (o.sandbox ?? prof?.sandbox) && sandboxOff(agent, o.perm === undefined ? prof?.perm : o.perm || undefined, prof?.args)) throw new Error(SANDBOX_NO) // tabSpec's, before the worktree too
   await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, { path: proj.path, project: proj.id, host: proj.host }, preset)
   if (o.codespace !== undefined) cloudCheck(proj, o)
   if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
@@ -2881,7 +2883,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const pl = p.payload ?? {}
   const was = r.status
   const at = typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : undefined
-  const late = at !== undefined && at < (r.hookAt ?? 0)
+  const late = at !== undefined && at < (r.hookAt ?? 0) && (r.hookAt ?? 0) - at < 30_000 // ponytail: 30 s, so a clock set back doesn't hold its hooks for longer
   if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
@@ -2910,8 +2912,10 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       }
       return changed()
     case 'running':
-      if (!late) r.status = 'running'
-      if (!late) r.limit = r.escAt = r.suggest = undefined
+      if (!late) {
+        r.status = 'running'
+        r.limit = r.escAt = r.suggest = undefined
+      }
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
         titleFrom(tab, pl.prompt) // claude's, gemini's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)

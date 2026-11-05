@@ -1118,7 +1118,7 @@ export function ran(id: string, r: Run, stderr?: string) {
   const src = r.reason.startsWith('tool:') || r.reason.startsWith('gate:') ? r.reason : r.action ? `action:${r.action}` : ['stream', 'push'].includes(r.reason) ? r.reason : 'fetch'
   if (stderr?.trim()) xlog(w, 'info', src, stderr.length > LOG_RUN ? stderr.slice(-LOG_RUN) : stderr, ws)
   xlog(w, r.ok ? 'info' : 'error', src, `${r.ok ? 'ran' : 'failed'} (${r.reason}${r.why ? `: ${r.why}` : ''}) in ${r.ms} ms, exit ${r.exit ?? 0}, ${r.bytes} B${r.gh ? `, gh ${r.gh}×` : ''}${r.error ? `: ${r.error}` : ''}`.replace(/\s+/g, ' '), ws, true)
-  if (/rate limit/i.test(`${r.error ?? ''}\n${stderr ?? ''}`)) xlog(w, 'warn', src, `GitHub's rate limit: one quota for every gh of yours. Laki's own gh calls: ${ghSaid()}`, ws, true)
+  if (r.gh && /rate limit/i.test(`${r.error ?? ''}\n${stderr ?? ''}`)) xlog(w, 'warn', src, `GitHub's rate limit: one quota for every gh of yours. Laki's own gh calls: ${ghSaid()}`, ws, true)
 }
 
 // a script's default export gets { config, last, workspace } (a scope workspace one's) and returns the data (an async

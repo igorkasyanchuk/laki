@@ -226,7 +226,7 @@ test('a chat that cannot be resumed is dropped: Enter starts a new one', async t
 })
 
 test("a restart stopped a claude chat's background commands: the resumed tab is told once, by name; one whose task ended is told nothing", async t => {
-  const rig = await fresh(t)
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '300' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const chat = async (name: string) => {
     const ws = await rig.rpc('wsNew', { project: p.id, name, preset: 'claude', prompt: `hi ${name}` })
@@ -251,6 +251,9 @@ test("a restart stopped a claude chat's background commands: the resumed tab is 
   await rig.start()
   const told = 'Laki restarted and stopped the background commands you had running: `npm run dev`. Start again the ones you still need. It also stopped your background subagents: Scan deps. Start them again if you still need them.'
   await until(async () => (await rig.tab(live.workspace, 'claude')).last === `answer: ${told}`, 'told')
+  // nor shown as running in the status bar's Background chip (their ends never come)
+  await sleep(800)
+  assert.deepEqual((await rig.rpc('state')).tabs.find((x: any) => x.id === live.id).background?.now ?? [], [])
   await sleep(1500)
   assert.ok(!(await rig.screen(ended.id)).includes('Laki restarted'), 'its task ended: nothing said')
   // again: those were named already (their ends never come), nothing new to say

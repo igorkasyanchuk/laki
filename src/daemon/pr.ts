@@ -224,6 +224,7 @@ export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   // workspaces in parallel: each gh call may take seconds
   const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !projectArchived(ws.project) && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY) && !(bg && quiet(ws, now)))
   if (!scanned.length) return Promise.resolve()
+  if (quietAt.size > 500) quietAt.clear() // ponytail: archived ones' too; a clear costs each one scan
   prScan = (bg ? quotaLow(now) : Promise.resolve(false)).then(low => (low ? undefined : Promise.all(scanned.map(scanPR)))).then(() => {
     prScan = null
     const again = prAgain
