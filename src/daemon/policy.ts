@@ -6,8 +6,8 @@
 //   remote: false        nothing on the internet through Laki: remote access, tunnels (Expose to the world), shared tabs
 //   bypass: false        approvals required: no agent starts in a mode, or with args, that never ask (neverAsks)
 //   agents: [ids]        only these agents start (claude, codex, gemini, grok, opencode); a command tab that starts one too
-// The view's `managed` says what's locked (Settings' banner). ponytail: what's running isn't stopped, a tab made
-// before a lock restarts as it was; checked as tabs are made
+// The view's `managed` says what's locked (Settings' banner). ponytail: what's running isn't stopped (until it
+// restarts: checked as tabs are made and at each start, core's spawnTab)
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename } from 'node:path'

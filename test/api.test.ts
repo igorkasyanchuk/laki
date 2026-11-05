@@ -6,7 +6,7 @@ import { request } from 'node:http'
 import { basename, dirname, extname, join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
-import { connect, fresh, until } from './helpers.ts'
+import { connect, fresh, sleep, until } from './helpers.ts'
 
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
   const rig = await fresh(t)
@@ -1282,6 +1282,24 @@ test('a managed policy: its settings locked, remote access off, approvals requir
   await assert.rejects(rig.rpc('tunnelStart', { ws: a.id, port: 3000 }), /a public address \(Expose to the world\) is turned off by your organization/)
   const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === a.id).id
   await assert.rejects(rig.rpc('shareStart', { tab }), /sharing a tab is turned off by your organization/)
+})
+
+test('a managed policy that comes after a tab: the tab made in bypass permissions doesn\'t start again in it', async t => {
+  const file = join(mkdtempSync('/tmp/laki-policy-'), 'policy.json')
+  writeFileSync(file, '{}')
+  const rig = await fresh(t, { env: { LAKI_POLICY: file } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const free = await rig.rpc('wsNew', { project: p.id, name: 'free', preset: 'claude', perm: 'bypassPermissions', prompt: 'hi' })
+  const asks = await rig.rpc('wsNew', { project: p.id, name: 'asks', preset: 'claude', prompt: 'hi' })
+  for (const w of [free, asks]) await until(async () => (await rig.tab(w.id, 'claude'))?.resumeId, 'its chat')
+  writeFileSync(file, JSON.stringify({ bypass: false })) // deployed meanwhile: read as the daemon starts
+  await rig.stop()
+  await rig.start()
+  await until(async () => (await rig.screen((await rig.tab(asks.id, 'claude')).id)).includes('fake claude'), 'the one that asks resumes')
+  await sleep(1000)
+  const tab = await rig.tab(free.id, 'claude')
+  assert.equal(tab.status, 'exited')
+  assert.ok(!rig.fakeLog().some((l: { args?: string[] }) => l.args?.includes('--resume') && l.args.includes('bypassPermissions')), 'not resumed in bypass permissions')
 })
 
 test("linked tickets: a project's Ticket script, run per workspace, its JSON or KEY title line in the view", async t => {

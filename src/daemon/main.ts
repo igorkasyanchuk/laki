@@ -94,6 +94,7 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
 if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
+policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
 core.restoreAll()
 flowResume() // workflow runs back at their blocks
@@ -900,7 +901,6 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   every(2000, core.shellTick)
   every(60000, () => resourcesMod.sleepTick())
-  policyTick() // a managed policy: now, then every 5 minutes
   every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
   every(300000, policyTick)
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)

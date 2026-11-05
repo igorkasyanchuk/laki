@@ -1443,6 +1443,17 @@ export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?:
 export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
   if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`)
+  // a managed policy's agents and approvals at every start (a restore, a wake, Enter), not only as the tab is made
+  // (tabSpec): a tab made before a lock doesn't come back as it was. Refused: it stays ended, its Logs say why
+  if (tab.kind === 'agent') {
+    const pr = presetOf(tab)
+    try {
+      policyAgent(tab.preset ?? 'custom', tab.perm === undefined ? pr?.perm : tab.perm || undefined, pr?.args, tab.cmd)
+    } catch (e) {
+      wsLog(ws, `${tab.name}: not started: ${(e as Error).message}`)
+      throw e
+    }
+  }
   const marker = setupMarker(ws)
   const wait = tab.kind === 'agent' && existsSync(marker) ? `printf '\\033[2mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ` : ''
   let file = shell

@@ -2548,7 +2548,9 @@ An admin can lock some of Laki for everyone on a Mac: a JSON object, deployed wi
 - `bypass: false`: approvals required: no agent starts in a mode, or with flags, that never asks before it acts.
 - `agents`: only these agents start, also as a command tab's command (`codex --full-auto`).
 
-A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped. It covers how
+A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped, but a tab it
+refuses doesn't start again (after a restart, a wake or Enter): one made in *Bypass permissions* before the lock stays
+ended. It covers how
 Laki starts agents and what Laki does itself, not what you type in a shell tab: an agent you run there by hand (`claude
 --dangerously-skip-permissions`) is a command like any other.
 

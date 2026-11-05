@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- A managed policy also holds for tabs made before it: one it refuses (an agent turned off, *Bypass permissions* when
+  approvals are required) doesn't start again after a restart, a wake or Enter.
+
 - Shared tabs and phone pushes mask more secrets: Stripe, Google, npm and Hugging Face keys, private keys, a
   password in a URL, and `NAME=value` lines whose name says secret, token, password or API key.
 

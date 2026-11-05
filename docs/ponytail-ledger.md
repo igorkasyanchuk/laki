@@ -37,7 +37,7 @@ agent-vs-user boundary (per-tab tokens), is under Issues because it's L and need
   `redact`. Fix: add Stripe (`[sr]k_(live|test)_…`), Google (`AIza…`), npm (`npm_…`), Hugging Face (`hf_…`), PEM
   private key blocks, `scheme://user:pass@` in a URL, and a `NAME=value` rule for names with SECRET, TOKEN, PASSWORD,
   PASSWD or API_KEY. Test: `test/share.test.ts`, one sample of each masked; the plain-words case stays as it is.
-- [ ] **2. `src/daemon/policy.ts:9`: a managed policy is checked only as a tab is made.** Security, S. An
+- [x] **2. `src/daemon/policy.ts:9`: a managed policy is checked only as a tab is made.** Security, S. An
   organization deploys "approvals required"; a tab made before it in bypass permissions (or of an agent now turned off)
   starts again as it was at every restore, wake and Enter, for good. Fix: call `policyAgent` with the tab's preset,
   perm, profile args and cmd at the top of `spawnTab` (`core.ts:1443`), which `restoreNow`, wake and Enter all go
