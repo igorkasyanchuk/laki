@@ -2,12 +2,12 @@
 // says it reads (only once there's a view; before it, nothing). force: an action of Settings › Keys by its id (a menu
 // bar item's, a Browsers page's ⌘T/⌘W), whatever its keys; fixed: a menu bar item's fixed key (⌘O, ⌘E…), never one of
 // Settings › Keys' that was given the same keys
-import type { AppBase } from './appCtx'
+import type { AppCtx } from './appCtx'
 import { keyRec, keyLabel } from './ui'
 import { keyFor, type KeyId } from '../../shared/keys'
 import { pressOf } from '../../shared/widgetSchema'
 
-export function onKey(app: AppBase, e: KeyboardEvent, force?: KeyId, fixed?: boolean) {
+export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: boolean) {
   const { canLater, closePage, closePreview, closeTabs, dialog, doStep, editor, extOn, extRun, findIn, git, groups, hereCtx, hist, historyOn, kb, layoutMenu, moveWs, newTab, newWs, nextNeed, openIn, openMenu, openProject, openReview, pickKey, previewed, quickNew, reviewTab, selectGroup, sendLater, setDialog, setFind, setFinds, setPicking, setSideOpen, settings, showInfo, stepOf, stepsOn, tab, toggleArtifacts, toggleFull, togglePanel, toSettings, travel, ws, zoom } = app
   if (keyRec.on) return // a hotkey being recorded in Settings
   // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)

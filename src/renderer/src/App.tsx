@@ -44,22 +44,23 @@ import { type Collision, spanText } from '../../shared/overlap'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms, type SelectionUse } from './Term'
-import { groupsOf, type Layout, move, resize, tabsOf, allAgents, fillRoles, LAYOUT_PRESETS, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout, toRoles } from '../../shared/layout'
+import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, rolesIn, type RoleLayout, type RoleTab, type SavedLayout } from '../../shared/layout'
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, applySuggestions, pendingWords, prPill, rowFact, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, mergeActions, nameOf, needsSorted, parseDuration, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, templatesFor, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
-import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
+import { type Cloudflared, portsOf, SharePop, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
-import { type AgentUsage, ctxPct, ctxText, level, Ring, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
+import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, UsagePage, usageText } from './Usage'
 import { ask, askText, copyImage, AskHost, Boundary, choose, unchoose, colorVar, Countdown, Elapsed, type Fact, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, colorOf, type Dialog, EDITOR_IDS, type Find, ONLY, type Opened, type Place, prNum, type RailKind, SCRIPT_ICONS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
 import { onKey } from './keydown'
 import { Palette, paletteItems } from './Palette'
+import { layoutOf, TabBar, TabStrip } from './TabBar'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -1096,54 +1097,6 @@ export function App() {
     return [...new Set([...gs.flatMap(tabsOf), ...mine.map(t => t.id)])].flatMap(id => (t => (t ? [{ id, role: roleOf(t) }] : []))(mine.find(t => t.id === id)))
   }
   const layoutWait = useRef<{ ws: string; tree: RoleLayout; panel?: SavedLayout['panel']; needs: Role; until: number } | null>(null)
-  const applyLayout = async (tree: RoleLayout, panel?: SavedLayout['panel'], needs?: Role) => {
-    if (!ws || narrow) return
-    if (needs && !roleTabs(ws, groups).some(t => t.role === needs)) {
-      layoutWait.current = { ws: ws.id, tree, panel, needs, until: Date.now() + 10000 }
-      return void (needs === 'dev' ? run() : call('tabNew', { ws: ws.id, preset: 'shell' }).catch(() => (layoutWait.current = null)))
-    }
-    const next = fillRoles(tree, roleTabs(ws, groups), tab?.kind === 'agent' ? tab.id : undefined)
-    if (!next) return toast('No agent running here to lay out')
-    setGroups(next)
-    selectTab(tabsOf(next[0])[0])
-    if (panel?.open && panel.tab) (setPanelTab(panel.tab as PanelTab), setPanelOpen(true), panel.w && setPanelW(panel.w))
-    else setPanelOpen(false)
-  }
-  const saveLayout = async () => {
-    if (!ws || !group) return
-    const tree = toRoles(group, roleTabs(ws, groups), tab?.kind === 'agent' ? tab.id : undefined)
-    if (!tree) return toast('Nothing here to save: a layout keeps agents, the Run tab and shells')
-    const name = (await askText('Save this layout', { text: 'Its splits, by what each pane is (an agent, the Run tab, a shell), and the side panel as it is now.', ok: 'Save', placeholder: 'Agent, dev server and Preview' }))?.trim()
-    if (!name) return
-    const saved: SavedLayout = { name, tree, panel: { open: panelOpen, tab: panelTab, w: panelW } }
-    call('settingsSet', { layouts: [...(settings.layouts ?? []).filter(l => l.name !== name), saved] }).then(() => done(`Saved the layout ${name}`), () => {})
-  }
-  const layoutMenu = (): MenuItem[] => {
-    if (!ws) return []
-    const rt = roleTabs(ws, groups)
-    const agents = rt.filter(t => t.role === 'agent').length
-    const saved = settings.layouts ?? []
-    const mine = project?.config?.layout
-    return [
-      ...LAYOUT_PRESETS.map((p): MenuItem => {
-        const off = p.needs === 'dev' && !rt.some(t => t.role === 'dev') && !ws.run
-        return off
-          ? { label: p.name, icon: 'splitRight', sub: 'No Run tab, and no run script to start one', run: editScripts }
-          : { label: p.name, icon: p.panel ? 'panel' : p.tree && 'dir' in p.tree ? (p.tree.dir === 'row' ? 'splitRight' : 'splitDown') : 'agent', run: () => void applyLayout(p.tree, p.panel ? { open: true, tab: p.panel, w: Math.max(panelW, 560) } : undefined, p.needs) }
-      }),
-      ...(agents > 1 ? [{ label: `All agents (${Math.min(agents, 4)})`, icon: 'layers', run: () => void applyLayout(allAgents(Math.min(agents, 4))) } as MenuItem] : []),
-      ...(saved.length ? [null as unknown as MenuItem, { head: 'Saved' } as MenuItem, ...saved.map((l): MenuItem => ({ label: l.name, icon: 'layers', hint: l.name === mine ? ON : undefined, run: () => void applyLayout(l.tree, l.panel) }))] : []),
-      null as unknown as MenuItem,
-      { label: 'Save this layout…', icon: 'save', run: () => void saveLayout() },
-      ...(saved.length && project && !project.kind
-        ? [
-            { label: `Use for new workspaces in ${project.name}`, icon: 'plus', items: [{ label: 'None', hint: mine ? undefined : ON, run: () => setProjectLayout(undefined) }, ...saved.map((l): MenuItem => ({ label: l.name, hint: l.name === mine ? ON : undefined, run: () => setProjectLayout(l.name) }))] } as MenuItem,
-            { label: 'Remove a saved layout', icon: 'trash', items: saved.map((l): MenuItem => ({ label: l.name, danger: true, run: () => call('settingsSet', { layouts: saved.filter(x => x !== l) }).catch(() => {}) })) } as MenuItem,
-          ]
-        : []),
-    ]
-  }
-  const setProjectLayout = (layout?: string) => project && call('projectSet', { id: project.id, config: { ...project.config, layout } }).then(() => done(layout ? `New workspaces in ${project.name} start as ${layout}` : `New workspaces in ${project.name} start as they come`), () => {})
   // a layout waiting for its Run tab or shell; a new workspace whose project has a layout for new ones, once its tabs show
   const layoutSeen = useRef<Set<string> | null>(null) // the workspaces there were: theirs stay as they are
   useEffect(() => {
@@ -2150,7 +2103,6 @@ export function App() {
   const statKey = ws?.stat ? JSON.stringify([ws.stat, (ws.prLinked || !ws.stat.files) && ws.pr?.head]) : '' // FullReview reads again as it moves; the PR's head only where it opens on the PR's diff
   const reviewTab = !!ws && settings.fullReview !== false && git && !!ws.stat && (!!ws.stat.files || ws.pr?.state === 'OPEN') && ws.browser === undefined && !isTerm(ws) && !ws.archived
   const reviewOn = reviewTab && !!reviewing[ws!.id]
-  const reviewDot = reviewTab && !reviewOn && reviewSeen[ws!.id] !== undefined && reviewSeen[ws!.id] !== statKey
   const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
   useEffect(() => void (reviewOn && ws && setReviewSeen(m => (m[ws.id] === statKey ? m : { ...m, [ws.id]: statKey }))), [reviewOn, ws?.id, statKey])
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
@@ -3406,60 +3358,6 @@ export function App() {
   const ctxLook = settings.contextMeter === false ? undefined : settings.contextMeter === 'ring' || settings.contextMeter === 'status' ? settings.contextMeter : 'line' // Settings › Appearance: the context meter, and how its tab shows it
   const ctxOn = !!ctxLook
   const costsOn = settings.costs !== false // and what agents used
-  const keyOff = reviewTab ? 1 : 0 // the review's tab takes ⌘1
-  const tabList = (
-    <>
-      {reviewTab && (
-        <div className={`tab nodrag review-tab ${reviewOn ? 'sel' : ''}`} role="tab" aria-label="Review" onClick={openReview} data-keys="⌘1" data-tip={`Review: ${ws!.stat?.files ? `${ws!.stat.files} file${ws!.stat.files === 1 ? '' : 's'}, +${ws!.stat.add} −${ws!.stat.del}` : `PR #${ws!.pr!.number}`}${reviewDot ? ' · changed since you looked' : ''} · ⌘1`}>
-          <Icon name="review" size={13} />
-          {reviewDot && <i className="review-dot" />}
-        </div>
-      )}
-      {groups.map(g => {
-        const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
-        const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
-        const ctx = ctxOn ? ts.flatMap(t => t.context ?? []).sort((a, b) => ctxPct(b) - ctxPct(a))[0] : undefined // a split's: the fullest
-        return (
-          <div
-            key={ts[0]?.id}
-            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
-            style={colorVar(colorOf(ts[0]))}
-            onClick={() => selectGroup(g)}
-            onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
-            onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
-            onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
-            onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-keys={groups.indexOf(g) + keyOff < 9 ? `⌘${groups.indexOf(g) + 1 + keyOff}` : undefined}
-            data-tip={[...ts.filter(t => t.compacting).map(t => `${t.name} is compacting its chat: summing up a long one takes a few seconds`), ...ts.filter(t => t.queue?.length).map(t => `${t.name}: ${t.queue!.length} queued, sent as its turn ends`), ...ts.filter(t => t.alias).map(t => `${t.name} is @${t.alias}: other agents reach it by that name (laki ask, laki send)`), ...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...(ctxOn ? ts.filter(t => t.context).map(t => `${t.name}'s context: ${ctxText(t.context!)}`) : []), ...(costsOn ? ts.filter(t => t.usage).map(t => `${t.name} used ${usageText(t.usage!)} at API prices`) : []), ...ts.filter(t => t.asleep).map(t => (t.queued ? `${t.name} waits its turn after a restart: a look starts it now` : `${t.name} is asleep to free memory: a look resumes it`)), ...ts.filter(t => t.share).map(t => `${t.name} is shared as a live view${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), ...(groups.indexOf(g) + keyOff < 9 ? [`⌘${groups.indexOf(g) + 1 + keyOff}`] : []), 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
-          >
-            <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
-            <span>{ts.map(t => t.name).join(' · ')}</span>
-            {ts.some(t => t.compacting) && <span className="tab-compact">Compacting…</span>}
-            {ts.filter(t => t.alias).map(t => <span key={t.id} className="tab-alias">@{t.alias}</span> /* laki name: what other agents call it */)}
-            {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
-            {settings.timers && <TurnTime tabs={ts} />}
-            {ts.some(t => t.muted) && (
-              <span className="ws-mark">
-                <Icon name="bellOff" size={11} />
-              </span>
-            )}
-            {ts.some(t => t.share) && (
-              <span className="ws-mark">
-                <Icon name="globe" size={11} />
-              </span>
-            )}
-            {queued > 0 && <span className="badge">+{queued}</span>}
-            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} style={{ width: `${ctxPct(ctx)}%` }} />}
-            {ctx && ctxLook === 'ring' && <Ring p={ctxPct(ctx)} />}
-            <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
-              <Icon name="x" size={10} />
-            </button>
-          </div>
-        )
-      })}
-      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab (⌘⇧N) · ⌘-click an item: a tab of its own, never a split" className="nodrag newtab-btn" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title={kt('New browser tab', 'newTab')} className="nodrag newtab-btn" onClick={() => quickNew('browsers')} />)}
-    </>
-  )
   const schedTip = nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'
   const toSchedules = () => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))
   const toBoard = () => setDialog(d => (d === 'board' ? null : 'board'))
@@ -3713,11 +3611,6 @@ export function App() {
   const listed = rail && !find ? view.projects.filter(p => railOf(p.kind) === railKind) : view.projects
   const inList = (w: WorkspaceView) => !rail || !!find || kindOf(w) === railKind
   const pins = pinned.filter(w => shows(w) && inList(w))
-  const tabStrip = tabsAt !== 'top' && (
-    <div className={`tabstrip ${tabsAt}`} data-tabbar>
-      {tabList}
-    </div>
-  )
   // the status bar, full width (Zed's way): one bar under the sidebar and the main area, over every page too, the
   // sidebar's foot buttons first (with their words) and AI and Settings at its end; a phone's under the main area.
   // Off (Settings › Appearance › Status bar): none, its foot buttons at the sidebar's foot; a lost connection still
@@ -3908,21 +3801,24 @@ export function App() {
   // what App's parts read (appCtx.ts), built after everything in it is
   const appBase: AppBase = {
     accountsOf, achKept, aiDock, allows, apps, archive, attachable, byId, call, canLater, closePage, closePreview,
-    closeTabs, copy, copyTab, devRunning, devTab, dialog, dock, done, doStep, editor, editScripts, extItems,
-    extMenus, extOn, extRun, fail, find, findIn, floated, floatTab, flowItems, flowMenu, flowsHere, flowsOn, fold,
-    folded, forkWs, full, gallery, git, group, groupMoves, groups, hereCtx, hist, historyOn, inReader, isTerm, kb,
-    keyText, kh, laterCancel, laterChange, laterNow, layoutMenu, live, mark, markUnread, moveWs, needing, newIn,
-    newTab, newTabActions, newWord, newWs, nextNeed, openIn, openInItems, openMenu, openPort, openProject,
-    openReview, order, pickKey, prAct, previewed, prFix, prMenu, project, projOf, quickNew, rail, rawKind, readerOn,
-    refreshPR, restore, reviewTab, rmItem, run, runFlow, runMenu, runScript, selectGroup, selectTab, sendLater,
-    setDialog, setFind, setFinds, setFolded, setGroups, setOnboard, setOverlapsAt, setPicking, setRead, setSharing,
-    setSideOpen, setTimers, settings, setVideo, setWsId, showInfo, showPanel, sideOpen, sortItems, specsOn, split,
-    staleMin, stepItem, stepOf, stepsOn, tab, tabByWs, targets, termIn, termsOk, termWhere, timers, toast,
-    toggleArtifacts, toggleFull, togglePanel, toSettings, travel, video, view, ws, wsActions, zoom,
+    closeTabs, copy, copyTab, costsOn, ctxLook, ctxOn, devRunning, devTab, dialog, dock, done, doStep, editor,
+    editorName, editScripts, extItems, extMenus, extOn, extRun, fail, find, findIn, floated, floatTab, flowItems,
+    flowMenu, flowsHere, flowsOn, fold, folded, forkWs, full, gallery, git, group, groupMoves, groups, hereCtx, hist,
+    historyOn, info, inReader, isTerm, kb, keyText, kh, kt, laterCancel, laterChange, laterNow, layoutWait, live,
+    mark, markUnread, moveWs, narrow, needing, newIn, newTab, newTabActions, newWord, newWs, nextNeed, openIn,
+    openInItems, openMenu, openPort, openProject, openReview, order, ownWidgets, panelOpen, panelShown, panelTab,
+    panelW, pickKey, prAct, previewed, prFix, prMenu, project, projOf, quickNew, rail, rawKind, readerOn, refreshPR,
+    restore, reviewOn, reviewSeen, reviewTab, rmItem, roleTabs, run, runFlow, runMenu, runScript, selectGroup,
+    selectTab, sendLater, setDialog, setFind, setFinds, setFolded, setGroups, setOnboard, setOverlapsAt,
+    setPanelOpen, setPanelTab, setPanelW, setPicking, setRead, setReveal, setSharing, setSideOpen, setTimers,
+    settings, setVideo, setWsId, showInfo, showPanel, sideOpen, sortItems, specsOn, split, staleMin, start, statKey,
+    stepItem, stepOf, stepsOn, tab, tabByWs, tabsAt, targets, termIn, termsOk, termWhere, timers, toast,
+    toggleArtifacts, toggleFull, togglePanel, toSettings, travel, video, view, widgetApi, ws, wsActions, wsMore,
+    zoom,
   }
-  const app: AppCtx = { ...appBase, ...menusOf(appBase) }
-  const { wsMenu, tabMenu, fileMenu, projectActions, showItems } = app
-  keys.current = (e, force, fixed) => onKey(appBase, e, force, fixed)
+  const app: AppCtx = { ...appBase, ...menusOf(appBase), ...layoutOf(appBase) }
+  const { wsMenu, tabMenu, fileMenu, projectActions, showItems, applyLayout } = app
+  keys.current = (e, force, fixed) => onKey(app, e, force, fixed)
 
   return (
     <div style={{ ...(rail && { '--rail-w': `${railW}px` }), '--page-zoom': (fontSize / FONT_SIZE) * pageZoom, '--page-own': own } as CSSProperties /* the list pages' size (styles.css), as Settings'; the open page's own */} className={`app ${sideOpen || railUp ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff || (railUp && !sideOpen) ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes !== false ? 'dim-panes' : ''} ${full ? 'full' : ''} ${wideBar ? 'wide-status' : ''} ${strip ? `strip-${strip}` : ''}`} data-pad={settings.termPad} data-inset={settings.paneInset ? '' : undefined} {...(dz => dz && !narrow && !full && { 'data-design': settings.design, 'data-dz': dz })(designTraits(settings.design)) /* Appearance › Design: none on a phone or in full screen */}>
@@ -4081,46 +3977,7 @@ export function App() {
 
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
-        <div className="tabbar drag" data-tabbar>
-          {!sideOpen && <IconButton icon="sidebar" title={kt('Show sidebar', 'sidebar')} keyId="sidebar" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
-          {tabsAt === 'top' && tabList}
-          {ws && !narrow && (f => f && (by => (
-            <button type="button" className="nodrag created-by" data-tip={`Its agent started this workspace: ${by ? `${by.label} in ` : ''}${wsName(f)} · a click goes there`} onClick={() => (setReveal(r => [...r, f.id]), by ? selectTab({ id: by.id, workspace: f.id }) : setWsId(f.id))}>
-              <Icon name="agent" size={12} /> Created by <b>{by?.label ?? wsName(f)}</b>
-            </button>
-          ))(creatorOf(ws, view.tabs)))(live.find(x => x.id === ws.from))}
-          <span className="spacer" />
-          {!(narrow && ws) && <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" /> /* a phone: in the ⋯ menu (wsMore) */}
-          {ws && ws.browser === undefined && project?.kind !== 'shells' && !narrow && <IconButton icon="layers" title={kt('Layout: the agent with Preview, Changes, the dev server or a shell; yours', 'layout')} keyId="layout" className="nodrag layout-btn" onClick={e => openMenu(e, layoutMenu(), 'right')} />}
-          {ws && <IconButton icon="maximize" title={kt('Full screen: just this tab', 'full')} keyId="full" className="nodrag" onClick={() => toggleFull(true)} />}
-          {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
-            <div className="actions nodrag">
-              <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
-            </div>
-          )}
-          {ws && ws.browser === undefined && project?.kind !== 'shells' && (
-            <div className="actions nodrag">
-              {!narrow && ( // a phone: in ⌘K's palette (the search button)
-                <>
-                  <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-                  <IconButton icon="info" title={kt('Workspace info', 'info')} keyId="info" on={info} onClick={() => showInfo()} />
-                  <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelShown && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
-                </>
-              )}
-              <IconButton icon="panel" title={kt('Info, files, changes, review, preview', 'panel')} keyId="panel" on={panelShown} onClick={() => togglePanel()} />
-              {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
-              <IconButton icon="search" title={kt('Commands', 'palette')} keyId="palette" onClick={() => setDialog('palette')} />
-              {canLater && !narrow && <IconButton icon="timer" title={`${kt('Send a message later', 'later')}: to an agent or Laki AI`} keyId="later" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
-              <IconButton icon="more" title="Workspace" className="ws-more" onClick={e => openMenu(e, wsMore(), 'right')} />
-              <RunButton
-                running={devRunning}
-                onRun={() => (ws.run ? run() : editScripts())}
-                onStop={() => devTab && api.send('input', { tab: devTab.id, data: '\x03' })}
-                onMenu={e => openMenu(e, runMenu(), 'right')}
-              />
-            </div>
-          )}
-        </div>
+        <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
         {connected && view.whenDone && (
           <div className="stale-bar soft" role="alert">
@@ -4145,7 +4002,7 @@ export function App() {
         )}
         {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
         <div className="body">
-          {tabsAt === 'left' && tabStrip}
+          {tabsAt === 'left' && <TabStrip app={app} />}
           <div className="term-wrap">
             {group ? (
               <Panes
@@ -4245,7 +4102,7 @@ export function App() {
             })}
             {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>
-          {tabsAt === 'right' && tabStrip}
+          {tabsAt === 'right' && <TabStrip app={app} />}
           {previewed && ws && (
             <div className={`pv-wrap ${previewW ? 'sized' : ''}`} style={previewW ? { width: previewW } : undefined}>
               <PanelHandle onWidth={w => setPreviewW(w || null)} init={0} />
@@ -4367,7 +4224,7 @@ export function App() {
         {touch && tab && !(narrow && (panelOpen || previewed)) /* not under a panel */ && (
           <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />
         )}
-        {tabsAt === 'bottom' && tabStrip}
+        {tabsAt === 'bottom' && <TabStrip app={app} />}
         {(dialog === 'settings' || settingsFor || section) && (
           <SettingsPage
             key={settingsKey}
