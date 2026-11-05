@@ -29,6 +29,7 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
   const tab = state.tabs.find(t => t.id === o.from?.tab)
   if (hidden(state.workspaces.find(w => w.id === tab?.workspace))) throw new Error('Recording mode hides this workspace: no alert from it while that is on') // its words would show on screen
   const now = Date.now()
+  for (const [k, at] of sent) if (now - at[at.length - 1] >= 60_000) sent.delete(k) // a minute quiet: forgotten (closed tabs')
   const recent = (sent.get(tab?.id ?? '') ?? []).filter(at => now - at < 60_000)
   if (recent.length >= RATE) throw new Error(`${RATE} alerts a minute at most: wait a minute, or say it in one`)
   sent.set(tab?.id ?? '', [...recent, now])

@@ -6,10 +6,10 @@ fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'co
 // app-server (agentModels): model/list after initialize, one hidden; FAKE_MODELS: none (empty), or it fails (fail)
 if (args[0] === 'app-server') {
   if (process.env.FAKE_MODELS === 'fail') return process.exit(1)
-  if (process.env.FAKE_MODELS === 'empty') return process.stdin.on('data', d => String(d).includes('"model/list"') && process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n'))
   let buf = ''
   return process.stdin.on('data', d => {
     buf += d
+    if (buf.includes('"model/list"') && process.env.FAKE_MODELS === 'empty') return void ((buf = ''), process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n'))
     if (buf.includes('"model/list"')) process.stdout.write(JSON.stringify({ id: 2, result: { data: [{ model: 'gpt-x', displayName: 'GPT-X', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'medium' }, { reasoningEffort: 'ultra' }] }, { model: 'hidden-1', hidden: true }] } }) + '\n')
   })
 }

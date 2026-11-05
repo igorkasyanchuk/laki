@@ -1666,23 +1666,25 @@ export function App() {
     fileLists.current.set(ws, { at: Date.now(), list })
     return list
   }
-  // a name not in the worktree: its storage folder's ($LAKI_STORAGE_FOLDER, where agents keep their screenshots), the
-  // newest of that name (artifactList's order)
-  const inStorage = async (w: WorkspaceView, rel: string) =>
-    w.storage ? (await api.call<{ path: string }[]>('artifactList', { ws: w.id }).catch(() => [])).find(f => f.path === rel || f.path.endsWith(`/${rel}`))?.path : undefined
+  // a name not where the terminal's folder says (hover's and ⌘-click's alike): the worktree's one file of that name
+  // (a list read a while ago, then again: one the agent just made), else its storage folder's newest ($LAKI_STORAGE_FOLDER,
+  // where agents keep their screenshots; artifactList's order). Two in the worktree: neither
+  const findNamed = async (w: WorkspaceView, rel: string): Promise<{ path: string; storage?: true } | undefined> => {
+    const named = (f: string) => f === rel || f.endsWith(`/${rel}`)
+    let hits = (await filesOf(w.id))?.files.filter(named) ?? []
+    if (!hits.length) hits = (await filesOf(w.id, 3000))?.files.filter(named) ?? []
+    if (hits.length) return hits.length === 1 ? { path: hits[0] } : undefined
+    const kept = w.storage ? (await api.call<{ path: string }[]>('artifactList', { ws: w.id }).catch(() => [])).find(f => named(f.path))?.path : undefined
+    return kept ? { path: kept, storage: true } : undefined
+  }
   const peekImage = (id: string) => (path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
     const read = (storage: boolean, p = path) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r.image)
     if (w && path.startsWith(`${w.path}/`))
       return read(false).catch(async e => {
         if (!/ENOENT|no such file/i.test(String(e?.message ?? e))) throw e // a real failure is said, not hidden
-        const rel = path.slice(w.path.length + 1)
-        const hit = (l: FileList | null) => l?.files.filter(f => f === rel || f.endsWith(`/${rel}`)) ?? []
-        let hits = hit(await filesOf(w.id))
-        if (!hits.length) hits = hit(await filesOf(w.id, 3000)) // none in a list read a while ago: one the agent just made, read again
-        if (hits.length === 1) return read(false, hits[0])
-        const kept = !hits.length && (await inStorage(w, rel))
-        return kept ? read(true, kept) : null
+        const f = await findNamed(w, path.slice(w.path.length + 1))
+        return f ? read(!!f.storage, f.path) : null
       })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
     return api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture')))
@@ -1694,8 +1696,8 @@ export function App() {
     const how = w.host || !bridge?.openPath ? (rel ? { rel } : 'none') : await bridge.openPath(path, w.path)
     if (typeof how === 'object') panelApi(w).preview(how.rel)
     else if (how === 'missing') {
-      const kept = rel && (await inStorage(w, rel))
-      if (kept) openFile({ ws: w.id, path: kept, storage: true })
+      const f = rel ? await findNamed(w, rel) : undefined
+      if (f) openFile({ ws: w.id, path: f.path, ...(f.storage && { storage: true }) })
       else toast(`Not there: ${path}`)
     }
   }

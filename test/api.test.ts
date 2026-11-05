@@ -1277,7 +1277,7 @@ test('a managed policy: its settings locked, remote access off, approvals requir
   await assert.rejects(rig.rpc('tabNew', { ws: a.id, cmd: '/usr/local/bin/codex --full-auto' }), /codex is turned off by your organization/)
   await assert.rejects(rig.rpc('tabNew', { ws: a.id, cmd: 'claude --dangerously-skip-permissions' }), /requires approvals/)
   assert.ok((await rig.rpc('tabNew', { ws: a.id, cmd: 'claude' })).id)
-  assert.ok((await rig.rpc('tabNew', { ws: a.id, cmd: 'npm test' })).id)
+  assert.ok((await rig.rpc('tabNew', { ws: a.id, cmd: 'echo hi' })).id)
   // remote: false is anything on the internet: a tunnel, a shared tab
   await assert.rejects(rig.rpc('tunnelStart', { ws: a.id, port: 3000 }), /a public address \(Expose to the world\) is turned off by your organization/)
   const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === a.id).id

@@ -377,7 +377,7 @@ function islandPage() {
       }
       parts.push(opts)
       if (!a?.options.length) parts.push(el('div', 'Its question is in its tab', 'i-sub'))
-      else if (!whole(a)) parts.push(el('div', 'Too long to show whole: answer in its tab', 'i-sub'))
+      else if (!whole(a)) parts.push(el('div', "Can't show it whole here: answer in its tab", 'i-sub'))
     } else {
       parts.push(head(f, f.took ? `done in ${tookText(f.took)}` : 'done'))
       parts.push(el('div', plainLines(f.answer, 2).join('\n') || 'Finished', 'i-answer'))
@@ -512,7 +512,7 @@ function voicePage() {
     opts.hidden = !opts.childElementCount
     if (reply) {
       to.hidden = true
-      note.textContent = hint = replyOf(reply) !== 'options' ? '⏎ sends · ⇧⏎ a new line · Esc closes' : whole(reply.ask) ? 'Pick an option, or Open the tab · Esc closes' : 'Too long to show whole: Open the tab · Esc closes'
+      note.textContent = hint = replyOf(reply) !== 'options' ? '⏎ sends · ⇧⏎ a new line · Esc closes' : whole(reply.ask) ? 'Pick an option, or Open the tab · Esc closes' : "Can't show it whole here: Open the tab · Esc closes"
       return void text.focus()
     }
     const opt = (value: string, textContent: string, o: Partial<HTMLOptionElement> = {}) => Object.assign(document.createElement('option'), { value, textContent, ...o })
