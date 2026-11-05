@@ -277,7 +277,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_schedules',
-    description: 'The scheduled tasks (id, when, next run) and the last runs.',
+    description: 'The scheduled tasks (id, when, next run; archived: put away, never runs) and the last runs.',
     inputSchema: obj({}),
     run: async () => {
       const v: View = await rpc('state')
@@ -570,7 +570,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
     max: 16000,
     run: async a => {
       const { v, p, templates, actions } = await kit(rpc, a.project)
-      return { id: p!.id, name: p!.name, path: p!.path, notes: p!.notes || '', memory: p!.memory ?? [], templates, actions, schedules: (v.schedules ?? []).filter(x => x.project === p!.id).map(x => ({ id: x.id, name: x.name, when: x.when, on: x.on, next: x.next, prompt: x.prompt.slice(0, 300) })), todos: (v.todos ?? []).filter(t => t.project === p!.id) }
+      return { id: p!.id, name: p!.name, path: p!.path, notes: p!.notes || '', memory: p!.memory ?? [], templates, actions, schedules: (v.schedules ?? []).filter(x => x.project === p!.id && !x.archived).map(x => ({ id: x.id, name: x.name, when: x.when, on: x.on, next: x.next, prompt: x.prompt.slice(0, 300) })), todos: (v.todos ?? []).filter(t => t.project === p!.id) }
     },
   },
   {

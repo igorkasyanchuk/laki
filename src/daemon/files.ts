@@ -81,8 +81,10 @@ export async function wsBase(o: { ws: string; base: string }) {
   if (ws.kind !== 'worktree') throw new Error(`${ws.id} is the repo's folder: it has no base`)
   const want = String(o.base ?? '').trim()
   if (!want || want.startsWith('-') || /\s/.test(want)) throw new Error(`base ${want || '(none)'}? a branch name`)
-  const has = (r: string) => git(ws, 'rev-parse', '--verify', '-q', `${r}^{commit}`).then(Boolean, () => false)
-  const base = (await has(want)) ? want : !want.startsWith('origin/') && (await has(`origin/${want}`)) ? `origin/${want}` : ''
+  // a branch only (never HEAD, a sha or HEAD~3: Commits, Ship and the radar read the base as a branch)
+  const has = (r: string) => git(ws, 'show-ref', '--verify', '-q', r).then(() => true, () => false)
+  const theirs = want.startsWith('origin/') ? want : `origin/${want}`
+  const base = (await has(`refs/heads/${want}`)) ? want : (await has(`refs/remotes/${theirs}`)) ? theirs : ''
   if (!base) throw new Error(`no branch ${want} in ${ws.name ?? ws.id}`)
   if (base === ws.branch) throw new Error(`${base} is this workspace's own branch`)
   ws.base = base

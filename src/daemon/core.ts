@@ -3149,9 +3149,10 @@ function checkLimit(tab: Tab, text: string) {
   if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
   if (!t) return
   // limit.hit once per limit: a turn's end clears r.limit first, and "in 2 hours" read again is the same one
-  const fresh = Math.abs((limitSent.get(tab.id) ?? 0) - t.getTime()) > 60_000
+  const key = `${tab.id}:${tab.account ?? ''}` // by account: the one it fell back to may reset at the same time
+  const fresh = Math.abs((limitSent.get(key) ?? 0) - t.getTime()) > 60_000
   if (fresh) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
-  limitSent.set(tab.id, t.getTime())
+  limitSent.set(key, t.getTime())
   r.limit = t.getTime()
   if (fresh) setTimeout(() => fallback(tab, t!.getTime()), 1000) // after the turn's end is told (a workflow pauses on it, and goes on at the next one)
 }

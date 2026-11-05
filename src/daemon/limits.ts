@@ -89,6 +89,6 @@ export function tooOld(text: string): { need: string; have?: string; model?: str
   if (!/claude_code_version_too_old/.test(text)) return
   const [need, have] = [...new Set([...text.matchAll(/\b(\d+\.\d+\.\d+)\b/g)].map(m => m[1]))].sort((a, b) => (older(a, b) ? 1 : older(b, a) ? -1 : 0))
   if (!need) return
-  const model = /\b(claude-[a-z0-9][a-z0-9.-]*[a-z0-9](?:\[1m\])?)/i.exec(text)?.[1]
+  const model = /\b(claude-(?!code\b)[a-z0-9][a-z0-9.-]*[a-z0-9](?:\[1m\])?)/i.exec(text)?.[1]
   return { need, ...(have && { have }), ...(model && { model }) }
 }

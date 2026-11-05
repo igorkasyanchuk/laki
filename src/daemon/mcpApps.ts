@@ -24,15 +24,16 @@ type Conn = { req: (method: string, params?: object) => Promise<any>; notify: (m
 type Server = { command?: string; args?: string[]; env?: Record<string, string>; type?: string; url?: string; headers?: Record<string, string> }
 
 // a JSON-RPC exchange over a server's stdin and stdout, a message a line
-function stdio(s: Server, cwd: string): Conn {
+function stdio(s: Server, cwd: string, end: () => void): Conn {
   const c = spawn(s.command!, Array.isArray(s.args) ? s.args.map(String) : [], { cwd, env: { ...process.env, ...state.settings?.env, ...s.env }, stdio: ['pipe', 'pipe', 'ignore'] })
   const waiting = new Map<number, { ok: (v: any) => void; no: (e: Error) => void }>()
   let n = 0
   let buf = ''
+  let gone = false
   const write = (m: object) => c.stdin.write(`${JSON.stringify(m)}\n`)
   const fail = (e: Error) => (waiting.forEach(w => w.no(e)), waiting.clear())
   c.on('error', e => fail(new Error(`${s.command}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed' : e.message}`)))
-  c.on('close', () => fail(new Error(`${s.command} ended`)))
+  c.on('close', () => ((gone = true), end(), fail(new Error(`${s.command} ended`))))
   c.stdin.on('error', () => {})
   c.stdout.setEncoding('utf8').on('data', (d: string) => {
     buf += d
@@ -46,7 +47,10 @@ function stdio(s: Server, cwd: string): Conn {
       } catch {
         continue
       }
-      if (m?.method && m.id !== undefined) write({ jsonrpc: '2.0', id: m.id, ...(m.method === 'ping' ? { result: {} } : m.method === 'roots/list' ? { result: { roots: [] } } : { error: { code: -32601, message: 'not supported' } }) }) // the server asks: nothing of yours
+      if (m?.method) {
+        if (m.id !== undefined) write({ jsonrpc: '2.0', id: m.id, ...(m.method === 'ping' ? { result: {} } : m.method === 'roots/list' ? { result: { roots: [] } } : { error: { code: -32601, message: 'not supported' } }) }) // the server asks: nothing of yours
+        continue // its ask or notice, never an answer to ours (its ids are its own)
+      }
       const w = m?.id !== undefined && waiting.get(m.id)
       if (!w) continue
       waiting.delete(m.id)
@@ -56,6 +60,7 @@ function stdio(s: Server, cwd: string): Conn {
   return {
     req: (method, params) =>
       new Promise((ok, no) => {
+        if (gone) return no(new Error(`${s.command} ended`))
         const id = ++n
         const t = setTimeout(() => (waiting.delete(id), no(new Error(`${method}: no answer`))), TIMEOUT)
         waiting.set(id, { ok: v => (clearTimeout(t), ok(v)), no: e => (clearTimeout(t), no(e)) })
@@ -104,17 +109,20 @@ function http(s: Server): Conn {
 // a server of the tab's: by the name its tools go by (mcp__<name>__<tool>: other characters as _), from the account's
 // .claude.json: this folder's own (local scope) over yours (user scope)
 const norm = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, '_')
-function serverOf(tab: Tab, name: string): { key: string; server: Server; cwd: string } | undefined {
+type Found = { key: string; server: Server; cwd: string } | undefined
+function serversOf(tab: Tab): (name: string) => Found {
   const ws = findWs(tab.workspace)
-  if (ws.host) return
+  if (ws.host) return () => undefined
   const dir = accountNamed(tab.account)?.dir ?? process.env.CLAUDE_CONFIG_DIR
   const file = dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
-  const cfg = readJson<{ mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server> }> }>(file)
-  const all = { ...cfg?.mcpServers, ...cfg?.projects?.[ws.path]?.mcpServers }
-  const [k, server] = Object.entries(all).find(([k]) => norm(k) === name) ?? []
-  if (!k || !server || typeof server !== 'object') return
-  if (!(typeof server.command === 'string' && server.command) && !(typeof server.url === 'string' && /^https?:\/\//.test(server.url) && server.type !== 'sse')) return
-  return { key: `${file}|${ws.path}|${k}`, server, cwd: ws.path }
+  const cfg = readJson<{ mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server> }> }>(file) // read once for all of a chat's calls
+  const all = Object.entries({ ...cfg?.mcpServers, ...cfg?.projects?.[ws.path]?.mcpServers })
+  return name => {
+    const [k, server] = all.find(([k]) => norm(k) === name) ?? []
+    if (!k || !server || typeof server !== 'object') return
+    if (!(typeof server.command === 'string' && server.command) && !(typeof server.url === 'string' && /^https?:\/\//.test(server.url) && server.type !== 'sse')) return
+    return { key: `${file}|${ws.path}|${k}`, server, cwd: ws.path }
+  }
 }
 
 // each server's connection, its tools that have an app (by name: its page's uri) or why not
@@ -125,8 +133,9 @@ const AGAIN = 60_000
 function connect(key: string, server: Server, cwd: string): Live {
   const had = live.get(key)
   if (had) return ((had.used = Date.now()), had)
+  const end = () => live.get(key) === l && (live.delete(key), seen.delete(key)) // it exited: the next use starts it again
   const conn = (async () => {
-    const c = server.command ? stdio(server, cwd) : http(server)
+    const c = server.command ? stdio(server, cwd, end) : http(server)
     try {
       await c.req('initialize', { protocolVersion: VERSION, capabilities: { extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [UI_MIME] } } }, clientInfo: { name: 'laki', version: '1' } })
       c.notify('notifications/initialized')
@@ -142,7 +151,7 @@ function connect(key: string, server: Server, cwd: string): Live {
   return l
 }
 setInterval(() => {
-  for (const [k, l] of live) if (Date.now() - l.used > IDLE) (live.delete(k), void l.conn.then(c => c.close(), () => {}))
+  for (const [k, l] of live) if (Date.now() - l.used > IDLE) (live.delete(k), seen.delete(k), void l.conn.then(c => c.close(), () => {})) // its tools asked again next time
 }, 60_000).unref()
 
 const uriOf = (t: any) => (x => (typeof x === 'string' && x.startsWith('ui://') ? x : undefined))(t?._meta?.ui?.resourceUri ?? t?._meta?.['ui/resourceUri'])
@@ -157,12 +166,15 @@ function appsOf(key: string, l: Live) {
 // what the Reader draws: the tab's MCP calls whose tool has an app (known: a server's list is asked once, and the
 // chat read again as it comes); each with its page's address, what it was called with and its result
 export type AppView = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-const seen = new Map<string, Map<string, string> | null>() // server key → its tools with an app (null: being asked)
+const seen = new Map<string, Map<string, string> | null>() // server key → its tools with an app (null: being asked); kept while its connection is
+const on = (tab?: Tab) => tab?.preset === 'claude' && state.settings?.mcpApps !== false
 export function appsFor(tab: Tab): AppView[] {
-  if (tab.preset !== 'claude' || state.settings?.mcpApps === false) return []
+  const calls = on(tab) ? callsOf(tab.id) : []
+  if (!calls.length) return []
+  const serverOf = serversOf(tab)
   const out: AppView[] = []
-  for (const c of callsOf(tab.id)) {
-    const s = serverOf(tab, c.server)
+  for (const c of calls) {
+    const s = serverOf(c.server)
     if (!s) continue
     const apps = seen.get(s.key)
     if (apps === undefined && Date.now() - (failed.get(s.key) ?? 0) > AGAIN) {
@@ -194,8 +206,8 @@ export async function mcpPage(path: string, q: URLSearchParams): Promise<{ code:
   const m = /^\/mcp-app\/([\w-]+)\/([\w-]+)$/.exec(path)
   if (!m || !urlKeyOk(q.get('key'), `mcp:${m[1]}/${m[2]}`)) return bad(401, 'bad key')
   const tab = state.tabs.find(t => t.id === m[1])
-  const c = tab && callsOf(tab.id).find(x => x.id === m[2])
-  const s = c && serverOf(tab, c.server)
+  const c = on(tab) ? callsOf(tab!.id).find(x => x.id === m[2]) : undefined
+  const s = c && serversOf(tab!)(c.server)
   if (!c || !s) return bad(404, 'no such app')
   try {
     const l = connect(s.key, s.server, s.cwd)
@@ -227,8 +239,8 @@ export async function mcpPage(path: string, q: URLSearchParams): Promise<{ code:
 // an app's tool call, once you allowed it (the Reader asks): to the server its own tool is on, nowhere else
 export async function mcpAppCall(p: { tab: string; id: string; name: string; arguments?: unknown }) {
   const tab = state.tabs.find(t => t.id === p.tab)
-  const c = tab && callsOf(tab.id).find(x => x.id === p.id)
-  const s = c && serverOf(tab, c.server)
+  const c = on(tab) ? callsOf(tab!.id).find(x => x.id === p.id) : undefined
+  const s = c && serversOf(tab!)(c.server)
   if (!c || !s) throw new Error('no such app')
   if (typeof p.name !== 'string' || !p.name) throw new Error('which tool?')
   return (await connect(s.key, s.server, s.cwd).conn).req('tools/call', { name: p.name, arguments: p.arguments && typeof p.arguments === 'object' ? p.arguments : {} })

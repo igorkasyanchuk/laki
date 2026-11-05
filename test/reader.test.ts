@@ -116,9 +116,9 @@ test('MCP Apps: a call whose tool has an app shows it, its page with the CSP it 
     `const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
 require('readline').createInterface({ input: process.stdin }).on('line', l => {
   const m = JSON.parse(l)
-  if (m.id === undefined) return
+  if (m.id === undefined || !m.method) return // a notice, or Laki's answer to its ask
   if (m.method === 'initialize') out({ id: m.id, result: { protocolVersion: '2025-06-18', capabilities: { tools: {}, resources: {} }, serverInfo: { name: 'ui', version: '1' } } })
-  else if (m.method === 'tools/list') out({ id: m.id, result: { tools: [{ name: 'chart', inputSchema: { type: 'object' }, _meta: { ui: { resourceUri: 'ui://ui/chart.html' } } }, { name: 'plain', inputSchema: { type: 'object' } }] } })
+  else if (m.method === 'tools/list') out({ id: m.id, method: 'roots/list' }), out({ id: m.id, result: { tools: [{ name: 'chart', inputSchema: { type: 'object' }, _meta: { ui: { resourceUri: 'ui://ui/chart.html' } } }, { name: 'plain', inputSchema: { type: 'object' } }] } })
   else if (m.method === 'resources/read') out({ id: m.id, result: { contents: [{ uri: m.params.uri, mimeType: 'text/html;profile=mcp-app', text: '<p id=app>chart</p>', _meta: { ui: { csp: { connectDomains: ['https://api.example.com'], resourceDomains: ['https://cdn.example.com', 'javascript:alert(1)'] } } } }] } })
   else if (m.method === 'tools/call') out({ id: m.id, result: { content: [{ type: 'text', text: 'called ' + m.params.name + ' ' + JSON.stringify(m.params.arguments) }] } })
   else out({ id: m.id, error: { code: -32601, message: 'no' } })
@@ -154,4 +154,6 @@ require('readline').createInterface({ input: process.stdin }).on('line', l => {
   // off: none
   await rig.rpc('settingsSet', { mcpApps: false })
   assert.equal((await rig.rpc('chatRead', { tab: tab.id })).apps, undefined)
+  assert.equal((await fetch(`http://127.0.0.1:${port}${a.src}`)).status, 404) // an address it had: no page either
+  await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart' }), /no such app/)
 })

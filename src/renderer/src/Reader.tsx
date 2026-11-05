@@ -72,11 +72,11 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const now = tab.plan && !tab.plan.stale ? planNow(tab.plan) : undefined
   // the chips over the box: Subagents · n, Background · n; a click lists them, each with Show output and Stop
   const [menu, openMenu] = useMenu()
-  const [out, setOut] = useState<{ task: BgTask; got?: BgOut; err?: string }>()
+  const [out, setOut] = useState<{ task: BgTask; got?: BgOut; err?: string; ended?: boolean }>()
   useEffect(() => {
     if (!out || !api.bgOutput) return
     let alive = true
-    const go = () => api.bgOutput!(tab.id, out.task.id).then(got => alive && setOut(o => (o?.task.id === out.task.id ? { ...o, got, err: undefined } : o)), e => alive && setOut(o => o && { ...o, err: (e as Error).message }))
+    const go = () => api.bgOutput!(tab.id, out.task.id).then(got => alive && setOut(o => (o?.task.id === out.task.id ? { ...o, got, err: undefined } : o)), e => alive && setOut(o => o && (o.got ? { ...o, ended: true } : { ...o, err: (e as Error).message }))) // ended: its last output stays
     go()
     const t = setInterval(() => document.visibilityState === 'visible' && go(), 2000)
     return () => ((alive = false), clearInterval(t))
@@ -118,7 +118,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
     <div className="rd-out">
       <div className="rd-out-head">
         <span className="mono small grow">{out.task.name}</span>
-        {out.got?.cut && <span className="muted small">its last 64 KB</span>}
+        {out.ended ? <span className="muted small">ended</span> : out.got?.cut && <span className="muted small">its last 64 KB</span>}
         <button type="button" className="link small" aria-label="Close" onClick={() => setOut(undefined)}>
           ×
         </button>
@@ -279,6 +279,7 @@ function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
         if (method === 'ui/open-link') {
           const url = String(params?.url ?? '')
           if (!/^https?:\/\//i.test(url)) return no('only http(s) links')
+          if (!(await ask(`The ${a.server} app wants to open a link`, { text: url.length > 600 ? `${url.slice(0, 600)}…` : url, ok: 'Open' }))) return no('you said no')
           openExternal(url)
           return reply({ result: {} })
         }

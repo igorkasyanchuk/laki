@@ -34,8 +34,9 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
   assert.match(runs()[1].args.join(' '), new RegExp(`--resume ${tab.resumeId}`)) // the same chat
   const on = await until(async () => (x => x.last === 'answer: continue' && x)(await rig.tab(ws.id)), 'it went on')
   assert.deepEqual([on.limit, on.account], [undefined, work.id])
-  // Work at its limit too: Spare; then Spare's: the default and Work are still at theirs, so it waits
-  await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(4) })
+  // Work at its limit too (its reset at the default's time: another account's, so fresh): Spare; then Spare's: the
+  // default and Work are still at theirs, so it waits
+  await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(3) })
   await until(() => runs().length === 3, 'restarted on Spare')
   assert.equal(runs()[2].env.CLAUDE_CONFIG_DIR, spare.dir)
   await until(async () => (await rig.tab(ws.id)).last === 'answer: continue', 'it went on again')
@@ -46,6 +47,10 @@ test('auto fallback: at its plan limit a tab goes on on the next account in the 
   // Reset the interface keeps the order (yours)
   await rig.rpc('uiReset', {})
   assert.deepEqual((await rig.rpc('state')).settings.limitFallback, { claude: ['home', work.id, spare.id] })
+  // an account removed leaves the order
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
+  await rig.rpc('accountRm', { id: work.id })
+  assert.deepEqual((await rig.rpc('state')).settings.limitFallback, { claude: ['home', spare.id] })
 })
 
 test("a model too new for the installed claude: the API's error kept and said, the model out of the list until an update", async t => {

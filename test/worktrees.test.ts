@@ -441,6 +441,7 @@ test("Change base: a worktree's diff against another branch; its own branch, an 
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).base, 'landed')
   await assert.rejects(rig.rpc('wsBase', { ws: ws.id, base: 'nope' }), /no branch nope/)
   await assert.rejects(rig.rpc('wsBase', { ws: ws.id, base: '--all' }), /a branch name/)
+  for (const rev of ['HEAD', 'landed~1', 'HEAD@{0}']) await assert.rejects(rig.rpc('wsBase', { ws: ws.id, base: rev }), /no branch/) // a branch only
   await assert.rejects(rig.rpc('wsBase', { ws: ws.id, base: ws.branch }), /this workspace's own branch/)
   await assert.rejects(rig.rpc('wsBase', { ws: ws.id, base: 'main', from: { tab: (await rig.tab(ws.id)).id } }), /change a workspace's base branch/)
   // its base deleted: said (the diff falls back to what isn't committed), and another picked

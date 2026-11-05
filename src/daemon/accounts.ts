@@ -106,6 +106,8 @@ export function accountRm(p: { id: string }) {
   s.accounts = accounts().filter(x => x !== a)
   if (s.accountUse?.[a.agent] === a.id) delete s.accountUse[a.agent]
   for (const pr of s.presets ?? []) if (pr.account === a.id) delete pr.account
+  const fb = s.limitFallback?.[a.agent]
+  if (fb?.includes(a.id)) s.limitFallback![a.agent] = fb.filter(x => x !== a.id)
   if (resolve(a.dir).startsWith(join(dir, 'accounts') + sep)) rmSync(a.dir, { recursive: true, force: true }) // only one Laki made
   if (a.agent === 'claude') execFile('security', ['delete-generic-password', '-s', keychainService(a.dir)], () => {}) // none: fine
   save()
@@ -223,7 +225,7 @@ export const needsNewer = (model?: string) => !!model && !!state.modelNeeds?.[mo
 // a failed claude turn's error: a model it's too old for, kept; its words for the turn's end (the notification)
 export function modelRefused(model: string | undefined, text: string): string | undefined {
   const t = tooOld(text)
-  const m = t?.model ?? model
+  const m = model || t?.model // the one you picked: the new-workspace page warns by it
   if (!t || !m) return
   state.modelNeeds = { ...state.modelNeeds, [m]: t.need }
   save()
