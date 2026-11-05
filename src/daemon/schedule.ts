@@ -365,7 +365,9 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
 }
 
 export function scheduleRun(id: string) {
-  return runSchedule(findSchedule(id))
+  const s = findSchedule(id)
+  if (s.archived) throw new Error('this task is archived: restore it to run it (Archived, at the bottom of Scheduled tasks)') // archived ones never run
+  return runSchedule(s)
 }
 
 // ---------- a workspace's agent started later (wsNew startAt)

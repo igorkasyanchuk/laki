@@ -69,7 +69,7 @@
     the newest 400). `GET /mcp-app/<tab>/<call>?key=` (`urlKey('mcp:…')`): `resources/read`'s HTML with a CSP of
     `_meta.ui.csp`'s https origins; `mcpAppCall` (FROM, agent-refused): `tools/call` on that server. Reader.tsx `McpApp`:
     an `allow-scripts` frame, postMessage JSON-RPC (`ui/initialize` with the theme, then `tool-input` and `tool-result`;
-    `size-changed`; `ui/open-link` http(s), `tools/call` and `ui/message`, each after an `ask`). Tested in `test/reader.test.ts`.
+    `size-changed`; `ui/open-link` http(s), `tools/call` and `ui/message`, each after an `ask` that shows it whole: past 2,000 characters or with a `HIDDEN` one it's refused, as text.ts `noteWhole`). `.claude.json` is parsed again only as its mtime or size changes (`configOf`). Tested in `test/reader.test.ts`.
   - `laki-ui` blocks: MarkdownView's `UiBlocks` context (unset: the JSON as code); Reader.tsx `UiBlock`: an element or
     `{ ui, data }` passing `uiCheck`, `uiHtml` in a shadow root through Widgets' `clean`, `uiBehave`: a `do: send`
     button's prompt to the agent, copy, http(s) links; the laki skill's *Show it as UI in your answer*.

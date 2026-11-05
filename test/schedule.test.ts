@@ -386,6 +386,7 @@ test('scheduled tasks: Archive takes one off the list and its runs, Restore brin
   await assert.rejects(rig.rpc('scheduleSet', { id: s.id, archived: 'yes' }), /archived\? true or false/)
   const a = await rig.rpc('scheduleSet', { id: s.id, archived: true })
   assert.ok(a.archived > 0 && a.next === undefined && a.on, 'archived, no next run, its switch kept')
+  await assert.rejects(rig.rpc('scheduleRun', { id: s.id }), /archived: restore it/) // not by Run now either
   await rig.rpc('scheduleTick', { now: s.next })
   assert.equal((await rig.rpc('state')).runs?.length ?? 0, 0) // never runs
   // an edit keeps it archived; Restore: its next run again

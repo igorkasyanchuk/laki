@@ -7,6 +7,7 @@
 // ponytail: stdio and streamable HTTP servers; one that needs a sign-in (OAuth), SSE-only servers, plugins' servers and
 // ${VAR}s in a config aren't reached (the call shows as a plain tool line)
 import { spawn } from 'node:child_process'
+import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readJson } from '../shared/conn.ts'
@@ -109,13 +110,26 @@ function http(s: Server): Conn {
 // a server of the tab's: by the name its tools go by (mcp__<name>__<tool>: other characters as _), from the account's
 // .claude.json: this folder's own (local scope) over yours (user scope)
 const norm = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, '_')
+// .claude.json, parsed again only as it changes: it holds every project's history (megabytes), and a chat in the
+// Reader is read again as it grows
+type Config = { mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server> }> }
+const configs = new Map<string, { mtime: number; size: number; cfg?: Config }>()
+function configOf(file: string): Config | undefined {
+  const st = statSync(file, { throwIfNoEntry: false })
+  if (!st) return void configs.delete(file)
+  const had = configs.get(file)
+  if (had && had.mtime === st.mtimeMs && had.size === st.size) return had.cfg
+  const cfg = readJson<Config>(file)
+  configs.set(file, { mtime: st.mtimeMs, size: st.size, cfg })
+  return cfg
+}
 type Found = { key: string; server: Server; cwd: string } | undefined
 function serversOf(tab: Tab): (name: string) => Found {
   const ws = findWs(tab.workspace)
   if (ws.host) return () => undefined
   const dir = accountNamed(tab.account)?.dir ?? process.env.CLAUDE_CONFIG_DIR
   const file = dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
-  const cfg = readJson<{ mcpServers?: Record<string, Server>; projects?: Record<string, { mcpServers?: Record<string, Server> }> }>(file) // read once for all of a chat's calls
+  const cfg = configOf(file)
   const all = Object.entries({ ...cfg?.mcpServers, ...cfg?.projects?.[ws.path]?.mcpServers })
   return name => {
     const [k, server] = all.find(([k]) => norm(k) === name) ?? []

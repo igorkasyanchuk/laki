@@ -16,7 +16,7 @@ import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { type Mention, withMentions } from './text'
 import { planNow } from '../../shared/todos'
-import type { TabView } from '../../shared/types'
+import { HIDDEN, type TabView } from '../../shared/types'
 
 type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
 // what a claude chat runs in the background (the daemon's share.ts bgOf): subagents and background shells
@@ -249,6 +249,10 @@ function UiBlock({ json, onSend }: { json: string; onSend: (text: string) => voi
 // that talks to Laki by postMessage (JSON-RPC, the MCP Apps extension): it's told the call's input and result; it may
 // open a link (http(s), in the browser), ask its server to run a tool or send a message to the agent, each only once
 // you say yes on a card; it says how tall it is
+// what an app's card asks you to approve: all of it on the card (it scrolls), as it is: nothing HIDDEN (U+202E and the
+// like would make it read as something else), else refused, as an agent's asks are (text.ts noteWhole)
+const whole = (s: string) => s.length <= 2000 && !HIDDEN.test(s)
+const UNSHOWN = 'too long to show you whole, or with characters you would not see'
 function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [src, setSrc] = useState<string>()
@@ -279,19 +283,22 @@ function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
         if (method === 'ui/open-link') {
           const url = String(params?.url ?? '')
           if (!/^https?:\/\//i.test(url)) return no('only http(s) links')
-          if (!(await ask(`The ${a.server} app wants to open a link`, { text: url.length > 600 ? `${url.slice(0, 600)}…` : url, ok: 'Open' }))) return no('you said no')
+          if (!whole(url)) return no(`a link ${UNSHOWN}`)
+          if (!(await ask(`The ${a.server} app wants to open a link`, { text: url, ok: 'Open' }))) return no('you said no')
           openExternal(url)
           return reply({ result: {} })
         }
         if (method === 'tools/call') {
           const name = String(params?.name ?? '')
           const args = JSON.stringify(params?.arguments ?? {}, null, 1)
-          if (!api.appCall || !(await ask(`The ${a.server} app wants to run ${name}`, { text: args.length > 600 ? `${args.slice(0, 600)}…` : args, ok: 'Run it' }))) return no('you said no')
+          if (!whole(name) || !whole(args)) return no(`a call ${UNSHOWN}`)
+          if (!api.appCall || !(await ask(`The ${a.server} app wants to run ${name}`, { text: args, ok: 'Run it' }))) return no('you said no')
           return reply({ result: await api.appCall(t.id, a.id, name, params?.arguments ?? {}) })
         }
         if (method === 'ui/message') {
           const text = (Array.isArray(params?.content) ? params.content : []).map((c: any) => (c?.type === 'text' ? String(c.text ?? '') : '')).join('\n').trim()
-          if (!text || !(await ask(`The ${a.server} app wants to send ${t.name} a message`, { text: text.length > 600 ? `${text.slice(0, 600)}…` : text, ok: 'Send' }))) return no('you said no')
+          if (text && !whole(text)) return no(`a message ${UNSHOWN}`)
+          if (!text || !(await ask(`The ${a.server} app wants to send ${t.name} a message`, { text, ok: 'Send' }))) return no('you said no')
           await api.send(t.id, text)
           return reply({ result: {} })
         }
