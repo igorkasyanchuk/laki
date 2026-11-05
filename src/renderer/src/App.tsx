@@ -1666,6 +1666,10 @@ export function App() {
     fileLists.current.set(ws, { at: Date.now(), list })
     return list
   }
+  // a name not in the worktree: its storage folder's ($LAKI_STORAGE_FOLDER, where agents keep their screenshots), the
+  // newest of that name (artifactList's order)
+  const inStorage = async (w: WorkspaceView, rel: string) =>
+    w.storage ? (await api.call<{ path: string }[]>('artifactList', { ws: w.id }).catch(() => [])).find(f => f.path === rel || f.path.endsWith(`/${rel}`))?.path : undefined
   const peekImage = (id: string) => (path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(id)?.workspace)
     const read = (storage: boolean, p = path) => api.call<{ image?: string }>('fileRead', { ws: w!.id, path: p, storage }).then(r => r.image)
@@ -1676,7 +1680,9 @@ export function App() {
         const hit = (l: FileList | null) => l?.files.filter(f => f === rel || f.endsWith(`/${rel}`)) ?? []
         let hits = hit(await filesOf(w.id))
         if (!hits.length) hits = hit(await filesOf(w.id, 3000)) // none in a list read a while ago: one the agent just made, read again
-        return hits.length === 1 ? read(false, hits[0]) : null
+        if (hits.length === 1) return read(false, hits[0])
+        const kept = !hits.length && (await inStorage(w, rel))
+        return kept ? read(true, kept) : null
       })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
     return api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture')))
@@ -1687,7 +1693,11 @@ export function App() {
     const rel = path.startsWith(`${w.path}/`) ? path.slice(w.path.length + 1).replace(/\/+$/, '') : ''
     const how = w.host || !bridge?.openPath ? (rel ? { rel } : 'none') : await bridge.openPath(path, w.path)
     if (typeof how === 'object') panelApi(w).preview(how.rel)
-    else if (how === 'missing') toast(`Not there: ${path}`)
+    else if (how === 'missing') {
+      const kept = rel && (await inStorage(w, rel))
+      if (kept) openFile({ ws: w.id, path: kept, storage: true })
+      else toast(`Not there: ${path}`)
+    }
   }
   // a file path in a terminal's text, clicked: a file of the workspace in Laki's preview at its line, or your editor
   // (Settings › Terminal's fileClick; other: ⌥ held with ⌘, the other one); any other path as a file:// link's

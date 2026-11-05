@@ -75,6 +75,8 @@ version it builds, with the date. -->
 - A scheduled task can run at several times: `weekdays at 9am; fri at 4pm` (or *and* before the next days). The
   calendar and *Next runs* show all of them; a time two of them share runs once.
 - Settings › General › Updates: *Update delay*'s menu is its usual size again, not as tall as the words beside it.
+- A picture's name in a terminal (`1-sessions-index.png`) shows it on hover, and opens on ⌘-click, when it's in the
+  workspace's storage folder too, not only its worktree: the screenshots agents keep there.
 
 ## 0.44.0 · Nov 4, 2026
 
