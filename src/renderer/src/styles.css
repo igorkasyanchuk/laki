@@ -3082,7 +3082,6 @@ button.tag.ext-problems { cursor: pointer; border: none; font: inherit; }
 .ext-log-line.lv-debug { color: var(--muted); }
 .ext-log-line.lv-warn b { color: var(--waiting); }
 .ext-log-line.lv-error { color: var(--error); }
-.tag-soft.log-err { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }
 /* Achievements (Achievements.tsx): groups of cards, a gold badge once unlocked; the status bar's trophy; the unlock toast */
 .page-body > .ach { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .ach > p { margin: 0; }

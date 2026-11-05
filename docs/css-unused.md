@@ -49,7 +49,7 @@ How it was decided:
 
 ### L3088: an extension's Logs tab (Extension.tsx Logs) (~108 B)
 
-- [ ] `.log-err` L3098
+- [x] `.log-err` L3098
 
 ### L440: Appearance › Interface › Text size (themes.ts' --ui-size): tabs, menus, dropdowns, the … (~99 B)
 
