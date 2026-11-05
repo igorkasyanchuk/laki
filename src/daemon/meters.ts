@@ -216,12 +216,14 @@ export function statusLimits(w: { agent: string; account: string }, now = Date.n
     }
   return best && { windows: best.limits, at: best.mtime }
 }
-// your own status line, as claude reads it (the workspace's local settings, its project's, the account's, yours): the
+// your own status line, as claude reads it (the project's local settings, its committed ones, the account's, yours): the
 // first command, resolved at the tab's start (a change waits for its restart). Never Laki's own: it would run itself.
-// ponytail: not managed settings, nor its padding (Laki's is 0)
+// The project's from its own folder only, as .laki.json (core's cfgRead): never a worktree's, whose branch (a PR's
+// checkout, an agent's edit) would pick the command Laki runs. ponytail: not managed settings, nor its padding (Laki's is 0)
 export function ownStatusLine(ws: Workspace, t: Tab): string | undefined {
   const a = accountNamed(t.account)?.dir
-  for (const f of [join(ws.path, '.claude/settings.local.json'), join(ws.path, '.claude/settings.json'), ...(a ? [join(a, 'settings.json')] : []), join(homeDir('claude'), 'settings.json')]) {
+  const root = state.projects.find(p => p.id === ws.project)?.path
+  for (const f of [...(root ? [join(root, '.claude/settings.local.json'), join(root, '.claude/settings.json')] : []), ...(a ? [join(a, 'settings.json')] : []), join(homeDir('claude'), 'settings.json')]) {
     const s = readJson<any>(f)?.statusLine
     if (s?.type === 'command' && typeof s.command === 'string' && s.command.trim()) return s.command.includes(statusSh) ? undefined : s.command
   }

@@ -13,6 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
+import { HIDDEN } from '../shared/types.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { dir, inRig } from './dir.ts'
@@ -595,6 +596,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
+  else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
@@ -680,10 +682,6 @@ async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string
 // an agent's command in a new terminal tab (tabNew's cmd): it runs as you, past the agent's own permission prompts, so
 // you allow it in the app each time (no Always); no window, no answer or a no: refused
 const CMD_ASK = 2000
-// what a dialog or a notification wouldn't show you: controls but tab and newline, direction and zero-width characters
-// (Unicode's format ones), line and paragraph separators, spaces but the plain one (no-break, wide, ideographic…) and
-// letters that draw as nothing (Hangul fillers, the braille blank)
-const HIDDEN = /[\p{Cf}\u2028\u2029\u115F\u1160\u3164\uFFA0\u2800]|[^\P{Cc}\t\n]|[^\P{Zs} ]/u
 // and padding that would push its end out of the dialog's sight (macOS hides its scrollbar): a blank line, or more rows
 // than it shows (each line's, wrapped at about 50 characters: spaces between words count)
 const BLANK = /\n[ \t]*\n/

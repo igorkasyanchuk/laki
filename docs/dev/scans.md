@@ -166,7 +166,8 @@ turn is posted 800 ms later (its menu is often drawn after the hook; none if it 
 per choice of the tab's `ask` (`NotifyAction`: `n` and `label`, main calls `answer` with both), else, when its text
 says "permission", *Allow* / *Deny* (`pick` first / last); none when its body (a permission ask's command) is past
 `NOTE_MAX`, 200 characters (text.ts `noteCut`: cut with …, as every notification's body is), or holds a bidi or
-invisible format character (`noteWhole`: macOS draws U+202E and the like, so what you read isn't what runs): a Yes
+character you'd not see (`noteWhole`: types.ts' `HIDDEN`, cmdAsk's rule: macOS draws U+202E and the like, so what you
+read isn't what runs; a no-break space, a line separator, a zero-width one): a Yes
 would approve a command you can't see as it is; an extension agent's tool ask, the same: no *Allow* then.
 
 Cards on screen: what's marked important notifies as a card instead, its `notify` carrying `card`: a workspace's
@@ -266,8 +267,9 @@ meters.ts' statusline section): `hookFiles` gives this Mac's claude settings fil
 (sh, 0755, exits 0; again on `settingsSet` `statusBridge` and `uiReset`). It keeps claude's JSON as
 `$LAKI_STATUSLINE_DIR/$LAKI_TAB.json` (a `.tmp` renamed), then runs `$LAKI_STATUSLINE_CMD` (unset first: one that runs
 the script again ends) with the same stdin. `lakiEnv` gives a local claude tab both, the setting on or off (`statusLineEnv`;
-the dir 0700): `ownStatusLine`, the first `statusLine` `type: command` of the workspace's `.claude/settings.local.json`,
-`settings.json`, the account's folder's, `homeDir('claude')`'s, as the tab starts, none when it names `statusSh`.
+the dir 0700): `ownStatusLine`, the first `statusLine` `type: command` of the project's own folder's (never a worktree's,
+as `.laki.json`: its branch or an agent's edit would pick what runs) `.claude/settings.local.json`, `settings.json`, the
+account's folder's, `homeDir('claude')`'s, as the tab starts, none when it names `statusSh`.
 `statusOf` (read again only as its mtime moves; `meterRead` and `statusLimits`): `session` (`session_id`), `used`
 (`current_usage`'s input + cache writes + reads; null before an answer), `pct`, `max` (`context_window_size`), `limits`
 (`rate_limits`' five_hour, seven_day, `resets_at` in seconds, through `claudeWindows`). `meterView` takes a line of this

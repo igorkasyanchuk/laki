@@ -91,6 +91,10 @@ test("statusline: the project's own wins over yours, Laki's never wraps itself, 
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
   const tb = await until(async () => await rig.tab(b.id), 'its tab')
   assert.equal((await until(() => said(rig, tb.id)[0], 'its status line')).out, 'project\n')
+  // a worktree's own (its branch's, an agent's edit) never picks it: the project's folder's only
+  writeFileSync(join(b.path, '.claude/settings.local.json'), JSON.stringify({ statusLine: { type: 'command', command: 'echo worktree' } }))
+  const tc = await rig.rpc('tabNew', { ws: b.id, preset: 'claude' })
+  assert.equal((await until(() => said(rig, tc.id)[0], 'its status line')).out, 'project\n')
 
   // off: no statusLine in Laki's settings files; on again: back
   const has = () => ['claude-settings.json', 'claude-settings-fast.json'].map(f => 'statusLine' in JSON.parse(readFileSync(join(rig.data, f), 'utf8')))

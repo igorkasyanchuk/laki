@@ -457,6 +457,12 @@ export const WHEN_DONE = ['sleep', 'lock', 'shutdown'] as const
 export type WhenDone = (typeof WHEN_DONE)[number] | 'off'
 export const SECRET_WAIT = 15 * 60_000 // laki secret's wait for your answer, then no (daemon/secrets.ts)
 export const ALERT_WAIT = 30 * 60_000 // laki alert's wait for your pick, then timedOut (daemon/alerts.ts)
+// what a dialog, a notification or a card wouldn't show you: controls but tab and newline, direction and zero-width
+// characters (Unicode's format ones), line and paragraph separators, spaces but the plain one (no-break, wide,
+// ideographic…) and letters that draw as nothing (Hangul fillers, the braille blank). An agent's command asked in the
+// app (main.ts' cmdAsk) is refused with one; a Yes on a notification or the island (text.ts' noteWhole) is left out;
+// an alert's words lose them (alerts.ts)
+export const HIDDEN = /[\p{Cf}\u2028\u2029\u115F\u1160\u3164\uFFA0\u2800]|[^\P{Cc}\t\n]|[^\P{Zs} ]/u
 export const WHEN_DONE_WAIT = 60_000 // the countdown before it acts, which Cancel stops
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)

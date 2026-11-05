@@ -1539,7 +1539,7 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
   const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
   const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
   modelCheck(preset, model, effort, perm, fast)
-  if (kind === 'agent') policyAgent(preset, perm === undefined ? pr?.perm : perm || undefined, pr?.args) // a managed policy's agents and approvals
+  if (kind === 'agent') policyAgent(preset, perm === undefined ? pr?.perm : perm || undefined, pr?.args, cmd) // a managed policy's agents and approvals
   return { pr, cmd, preset, kind, model, effort, perm, fast }
 }
 

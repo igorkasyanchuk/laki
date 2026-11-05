@@ -314,7 +314,10 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       if (s.ws === 'same' && sameMaking.has(s.id)) throw new Error('skipped: its first run is still making its workspace')
       if (s.ws === 'same') sameMaking.add(s.id)
       const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws !== 'local-new' && s.base && { base: s.base }), ...(s.ws !== 'local-new' && s.noSetup && { noSetup: true }), ...(s.ws === 'local-new' && { local: true, another: true }) }).finally(() => sameMaking.delete(s.id))
-      if (s.ws === 'same') s.sameWs = ws.id
+      // on the task as it is now: one edited while its workspace was made is another object (scheduleSet replaces it), and
+      // one moved elsewhere meanwhile takes none
+      const cur = state.schedules?.find(x => x.id === s.id)
+      if (s.ws === 'same' && cur?.ws === 'same' && cur.project === s.project && !cur.workflow && !cur.widget) cur.sameWs = ws.id
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''

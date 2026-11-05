@@ -74,7 +74,8 @@ field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<
 memory (a restart drops an ask). Tested in `test/cli-agents.test.ts`.
 
 `daemon/alerts.ts`: `laki alert <text> [--title t] [--choice A]…` (MCP's `laki_alert`; `ALERT_WAIT`, 30 minutes, the
-CLI's rpc waits as long): `alertShow` (refused with no app connected, or from a workspace Recording mode hides: phone.ts `hidden`) broadcasts `alert` (`id`, `title`: yours or the
+CLI's rpc waits as long): `alertShow` (refused with no app connected, from a workspace Recording mode hides: phone.ts
+`hidden`, or past `RATE`, 5 a minute from each tab or from outside one; its words without `HIDDEN`'s characters) broadcasts `alert` (`id`, `title`: yours or the
 caller's workspace · tab, `text`, `choices` up to 6, `tab`); App makes it a card on screen (`notify`'s `card.alert`,
 a button per choice). Without choices it returns `{ shown }`; with them it waits for `alertAnswer` (`id`, a `choice` of
 its own, or none: the card's ×, Close all; refused from an agent), else `timedOut`, then broadcasts `alertDone` (the card

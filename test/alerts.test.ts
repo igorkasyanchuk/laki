@@ -50,3 +50,20 @@ test('laki alert: none from a workspace Recording mode hides (its words would be
   await rig.rpc('settingsSet', { recording: false })
   assert.equal((await rig.rpc('alertShow', { text: 'Rotate the key?', from: { tab } })).shown, true)
 })
+
+test("laki alert: what you'd not see goes from its words; a few a minute from each tab", async t => {
+  const rig = await fresh(t)
+  const ws = await rig.connect()
+  t.after(() => ws.close())
+  // a right-to-left override and a zero-width space would make a choice read as another
+  const a = await rig.rpc('alertShow', { text: 'Ship\u202Eit\u200B now?', title: 'Re\u00A0lease' })
+  const ev = await until(() => ws.events.find(e => e.ev === 'alert' && e.id === a.id), 'the alert')
+  assert.deepEqual([ev.text, ev.title], ['Ship it now?', 'Re lease'])
+  for (let i = 0; i < 4; i++) await rig.rpc('alertShow', { text: `n${i}` })
+  await assert.rejects(rig.rpc('alertShow', { text: 'one too many' }), /5 alerts a minute/)
+  // another tab's are its own
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const tab = (await rig.rpc('tabNew', { ws: w.id })).id
+  assert.equal((await rig.rpc('alertShow', { text: 'from a tab', from: { tab } })).shown, true)
+})

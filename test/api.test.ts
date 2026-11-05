@@ -1271,7 +1271,17 @@ test('a managed policy: its settings locked, remote access off, approvals requir
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: 'a@b.co' }), /remote access is turned off by your organization/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'c', preset: 'codex' }), /codex is turned off by your organization/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b', preset: 'claude', perm: 'bypassPermissions' }), /requires approvals/)
-  assert.equal((await rig.rpc('wsNew', { project: p.id, name: 'a', preset: 'claude' })).id, 'a')
+  const a = await rig.rpc('wsNew', { project: p.id, name: 'a', preset: 'claude' })
+  assert.equal(a.id, 'a')
+  // a command tab that starts an agent is that agent; any other command, and a shell, start
+  await assert.rejects(rig.rpc('tabNew', { ws: a.id, cmd: '/usr/local/bin/codex --full-auto' }), /codex is turned off by your organization/)
+  await assert.rejects(rig.rpc('tabNew', { ws: a.id, cmd: 'claude --dangerously-skip-permissions' }), /requires approvals/)
+  assert.ok((await rig.rpc('tabNew', { ws: a.id, cmd: 'claude' })).id)
+  assert.ok((await rig.rpc('tabNew', { ws: a.id, cmd: 'npm test' })).id)
+  // remote: false is anything on the internet: a tunnel, a shared tab
+  await assert.rejects(rig.rpc('tunnelStart', { ws: a.id, port: 3000 }), /a public address \(Expose to the world\) is turned off by your organization/)
+  const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === a.id).id
+  await assert.rejects(rig.rpc('shareStart', { tab }), /sharing a tab is turned off by your organization/)
 })
 
 test("linked tickets: a project's Ticket script, run per workspace, its JSON or KEY title line in the view", async t => {

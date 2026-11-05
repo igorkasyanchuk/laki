@@ -80,6 +80,13 @@ version it builds, with the date. -->
 - A scheduled task can run at several times: `weekdays at 9am; fri at 4pm` (or *and* before the next days). The
   calendar and *Next runs* show all of them; a time two of them share runs once.
 - Settings › General › Updates: *Update delay*'s menu is its usual size again, not as tall as the words beside it.
+- Review fixes: Claude's status line runs a project's own from its folder only, never a worktree's; a notification's
+  or the bubbles' Yes is left out for a no-break space or a line separator too, as for the other invisible
+  characters; `laki alert` drops invisible characters and takes 5 a minute from each tab; an agent can't mark a
+  workspace important; a managed policy's `remote: false` also turns off public addresses and shared tabs, and its
+  `agents` covers a command tab that starts one; the model menus ask an agent that said none, or failed, again after
+  5 minutes, not a day later or at every menu; a *same workspace* scheduled task edited while its first run makes the
+  workspace keeps it.
 - A picture's name in a terminal (`1-sessions-index.png`) shows it on hover, and opens on ⌘-click, when it's in the
   workspace's storage folder too, not only its worktree: the screenshots agents keep there.
 

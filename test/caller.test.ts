@@ -315,6 +315,7 @@ test("an agent can't set When everything is done or its like, import worktrees, 
       curl('settingsSet', { copyUntracked: true }),
       curl('settingsSet', { prBots: ['coderabbitai'] }), // sent back unchanged: fine
       curl('updateIdle', { on: true }), // an Update delay is set
+      curl('wsSet', { id: ws.id, important: true }),
     ].join('; ')}; echo done >> ${out}`,
   })
   await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
@@ -332,10 +333,12 @@ test("an agent can't set When everything is done or its like, import worktrees, 
   for (const i of [17, 18, 19, 20, 21, 22]) assert.equal(said[i].error, "an agent can't change that setting: it's the user's (ask them)", String(i))
   assert.equal(said[23].error, undefined)
   assert.match(said[24].error, /an agent can't update Laki while Check for updates is off or an Update delay is set/)
+  assert.match(said[25].error, /an agent can't mark a workspace important/)
   const st = await rig.rpc('state')
   for (const k of ['whenDone', 'doneCheck', 'recording', 'nextPrompt', 'keepAwake', 'storageDays', 'updateCheck', 'actions', 'templates', 'prPrompts', 'copyIgnored', 'copyUntracked']) assert.equal(st.settings[k], undefined, k)
   assert.deepEqual(st.settings.prBots, ['coderabbitai'])
   assert.equal(st.updateIdle, undefined)
+  assert.equal(st.workspaces.find((x: any) => x.id === ws.id).important, undefined)
   assert.ok(await rig.rpc('updateIdle', { on: true })) // yours
   await rig.rpc('updateIdle', { on: false })
   assert.notEqual(st.tabs.find((x: any) => x.id === other).status, 'waiting')

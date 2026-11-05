@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type View, type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { HIDDEN, type View, type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 
 // a group's defaults for a new workspace under it (Edit group): where it's made, permission mode ('ask': Ask first),
@@ -41,9 +41,10 @@ export const withPaths = (text: string, paths: string[]) => [text.trim(), paths.
 // when it isn't; one that's cut gets no Yes or Allow (App's): it would approve what you can't see
 export const NOTE_MAX = 200
 export const noteCut = (s: string) => (s.length > NOTE_MAX ? `${s.slice(0, NOTE_MAX - 1).replace(/[\uD800-\uDBFF]$/, '')}…` : s)
-// a Yes or Allow on it: only when it shows all of it as it is: not cut, and no bidi or invisible format character (U+202E
-// and the like: macOS draws them, so what you'd read isn't what runs) nor a control one (a tab or a line break is fine)
-export const noteWhole = (s: string) => s.length <= NOTE_MAX && !/[\p{Cf}\u0000-\u0008\u000B-\u001F\u007F-\u009F]/u.test(s)
+// a Yes or Allow on it: only when it shows all of it as it is: not cut, and nothing HIDDEN (U+202E and the like: macOS
+// draws them, so what you'd read isn't what runs; a tab or a line break is fine), the rule an agent's command asked in
+// the app has
+export const noteWhole = (s: string) => s.length <= NOTE_MAX && !HIDDEN.test(s)
 
 // a workspace's name as shown: one that numbers its PR (pr-14885-sq3-…, Review PR 14810 …, #14810) shows the PR's title,
 // whatever named it (a prompt's words, a template, gh failing as it was made: pr-<n>)

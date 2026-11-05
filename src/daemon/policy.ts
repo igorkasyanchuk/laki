@@ -3,14 +3,15 @@
 // file: the test rig's only), /Library/Managed Preferences/dev.laki.app.plist (a configuration profile's; plutil reads it as JSON),
 // /Library/Application Support/Laki/policy.json (macOS), /etc/laki/policy.json (Linux). Its keys:
 //   settings: { <a Settings key>: value }: locked to that value (null: unset), settingsSet refuses another
-//   remote: false        no remote access (remoteStart refused)
+//   remote: false        nothing on the internet through Laki: remote access, tunnels (Expose to the world), shared tabs
 //   bypass: false        approvals required: no agent starts in a mode, or with args, that never ask (neverAsks)
-//   agents: [ids]        only these agents start (claude, codex, gemini, grok, opencode)
+//   agents: [ids]        only these agents start (claude, codex, gemini, grok, opencode); a command tab that starts one too
 // The view's `managed` says what's locked (Settings' banner). ponytail: what's running isn't stopped, a tab made
 // before a lock restarts as it was; checked as tabs are made
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { neverAsks } from '../shared/types.ts'
+import { basename } from 'node:path'
+import { isAgent, neverAsks } from '../shared/types.ts'
 import { changed, log, save, state } from './core.ts'
 import { inRig } from './dir.ts'
 
@@ -56,15 +57,19 @@ export function policyTick() {
 export function policySettings(o: Record<string, unknown>) {
   for (const [k, v] of Object.entries(now?.settings ?? {})) if (k in o && JSON.stringify(o[k] ?? null) !== JSON.stringify(v ?? null)) throw new Error(`${k} is managed by your organization`)
 }
-// a new agent tab's (core's tabSpec): an agent the policy allows, and approvals when it says so
-export function policyAgent(agent: string, perm?: string, args?: string) {
+// a new agent tab's (core's tabSpec): an agent the policy allows, and approvals when it says so. A command tab (a
+// command profile's, tabNew's cmd) whose first word is an agent's is that agent, its other words its args. ponytail:
+// the first word only (env X=1 claude, a script, what you type in a shell aren't caught): a policy guards Laki's own starts
+export function policyAgent(agent: string, perm?: string, args?: string, cmd?: string) {
   if (!now) return
+  const [bin = '', ...rest] = agent === 'custom' ? (cmd ?? '').trim().split(/\s+/) : []
+  if (isAgent(basename(bin))) return policyAgent(basename(bin), undefined, rest.join(' '))
   if (now.agents && !now.agents.includes(agent) && !['shell', 'custom'].includes(agent)) throw new Error(`${agent} is turned off by your organization`)
   if (now.bypass === false && neverAsks(agent, perm, args)) throw new Error(`your organization requires approvals: ${agent} can't start in a mode that never asks`)
 }
-// remoteStart's
-export function policyRemote() {
-  if (now?.remote === false) throw new Error('remote access is turned off by your organization')
+// remoteStart's, tunnelStart's, shareStart's: what goes on the internet
+export function policyRemote(what = 'remote access') {
+  if (now?.remote === false) throw new Error(`${what} is turned off by your organization`)
 }
 // the view's: what's locked, for Settings' banner
 export const managedView = () => now && { from: now.from, keys: Object.keys(now.settings ?? {}), ...(now.remote === false && { remote: false as const }), ...(now.bypass === false && { bypass: false as const }), ...(now.agents && { agents: now.agents }) }

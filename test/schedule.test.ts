@@ -265,9 +265,10 @@ test('scheduled tasks: the same workspace each run (its first run makes it), Con
   assert.equal(fresh1.ws, first.ws)
   assert.notEqual(fresh1.tab, first.tab)
   assert.match(fresh1.what, /^started fresh in a new tab, claude/)
-  // its workspace gone: the next run makes another, and the runs after go there
+  // its workspace gone: the next run makes another, and the runs after go there; the task edited while that run makes
+  // it (scheduleSet replaces it): the edited one keeps it
   await rig.rpc('wsRm', { id: first.ws })
-  const remade = await rig.rpc('scheduleRun', { id: s.id })
+  const [remade] = await Promise.all([rig.rpc('scheduleRun', { id: s.id }), rig.rpc('scheduleSet', { id: s.id, prompt: 'nightly too' })])
   assert.equal(remade.ok, true, remade.what)
   assert.notEqual(remade.ws, first.ws)
   assert.equal((await rig.rpc('state')).schedules[0].sameWs, remade.ws)

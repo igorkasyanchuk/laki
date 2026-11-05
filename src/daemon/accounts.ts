@@ -160,10 +160,12 @@ export function loginCmd(id: string, agent: AccountAgent) {
 // The models an agent says it has, for the model menus (the new-workspace page's, Settings' profiles): claude's
 // initialize handshake (stream-json, no prompt: nothing goes to a model, its hooks off, no session kept) and codex's
 // app-server model/list, each with its efforts; a gateway's or custom models come with them. Per account (the
-// profile's, else the one in use), kept a day; a failure (not installed, an older version) isn't kept: the renderer
-// falls back to its fixed list. A model's efforts [] : it takes none. ponytail: codex's first page only
+// profile's, else the one in use), kept a day; none said, or a failure (not installed, an older version, signed out):
+// asked again after MODELS_RETRY, not a day later nor at every menu (each ask starts the agent, 20 s at most). The
+// renderer falls back to its fixed list meanwhile. A model's efforts [] : it takes none. ponytail: codex's first page only
 const MODELS_KEPT = 24 * 3600_000
-const modelsSeen = new Map<string, { at: number; list: Promise<AgentModel[]> }>()
+const MODELS_RETRY = Number(process.env.LAKI_MODELS_RETRY_MS) || 5 * 60_000 // the env: tests'
+const modelsSeen = new Map<string, { at: number; list: Promise<AgentModel[]>; short?: boolean }>()
 export const effortsSaid = new Map<string, Set<string>>() // by agent: every effort its models named (core's modelCheck takes them too: codex's max, ultra)
 export function agentModels(o: { agent?: string; preset?: string }): Promise<AgentModel[]> {
   const agent = o.agent
@@ -172,9 +174,10 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
   const acct = pre?.account ?? accountUsed(agent)
   const key = `${agent}:${acct}`
   const had = modelsSeen.get(key)
-  if (had && Date.now() - had.at < MODELS_KEPT) return had.list
+  if (had && Date.now() - had.at < (had.short ? MODELS_RETRY : MODELS_KEPT)) return had.list
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(acct) } as NodeJS.ProcessEnv
-  const list = (
+  const seen: { at: number; list: Promise<AgentModel[]>; short?: boolean } = { at: Date.now(), list: Promise.resolve([]) }
+  seen.list = (
     agent === 'claude'
       ? asked('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--settings', '{"disableAllHooks":true}'], env, [{ type: 'control_request', request_id: 'laki', request: { subtype: 'initialize' } }], m =>
           m?.type === 'control_response' && Array.isArray(m.response?.response?.models)
@@ -187,10 +190,10 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
             : undefined,
         )
   )
-    .then(l => (l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
-    .catch(e => (modelsSeen.delete(key), Promise.reject(e)))
-  modelsSeen.set(key, { at: Date.now(), list })
-  return list
+    .then(l => ((seen.short = !l.length), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
+    .catch(e => ((seen.short = true), Promise.reject(e)))
+  modelsSeen.set(key, seen)
+  return seen.list
 }
 // a JSON-lines exchange: the lines sent (stdin kept open: claude ends with it), each line read through `take` until
 // it gives something; 20 s at most, then the process goes

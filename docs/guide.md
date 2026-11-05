@@ -774,7 +774,8 @@ the status bar only) or turns it off; *Tokens and cost* hides the rest.
 
 **Claude's status line** (Settings › Appearance › *Read Claude's status line*, on): Claude Code hands its status line
 its own numbers at each redraw. Laki's tabs on this Mac run Laki's status line command, which keeps them, then runs
-yours (your project's `.claude/settings.local.json` or `.claude/settings.json`, else the account's or your
+yours (your project's `.claude/settings.local.json` or `.claude/settings.json`, from the project's own folder, never a
+workspace's worktree, else the account's or your
 `~/.claude/settings.json`) with the same input, so it shows as before. Laki then knows the chat's real context window
 (no 200K-or-1M guess) and, for 10 minutes after a redraw, its context and the plan's 5-hour and weekly limits without
 asking Anthropic. Off: Laki's own estimates. A change applies to tabs started after it; a change to your own status
@@ -2495,9 +2496,10 @@ An admin can lock some of Laki for everyone on a Mac: a JSON object, deployed wi
 
 - `settings`: any of Laki's settings (their keys in `laki-settings.json`, Settings › General › Export), each locked to
   that value; `null` keeps it unset (`webhook: null`: no phone pushes). Settings says which are managed.
-- `remote: false`: no remote access.
+- `remote: false`: nothing on the internet through Laki: no remote access, no public address (Expose to the world),
+  no shared tabs.
 - `bypass: false`: approvals required: no agent starts in a mode, or with flags, that never asks before it acts.
-- `agents`: only these agents start.
+- `agents`: only these agents start, also as a command tab's command (`codex --full-auto`).
 
 A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped.
 

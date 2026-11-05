@@ -175,6 +175,7 @@ const tailscale = (bin: string, target: string, ended: (why: string) => void, wh
 // forgotten one doesn't stay open for good). host: a permanent one at that name under settings.tunnel's domain (a word,
 // or the whole hostname), until it's stopped
 export async function tunnelStart(o: { ws: string; port: number; mails?: string[]; hours?: number; host?: string }): Promise<Tunnel> {
+  policyRemote('a public address (Expose to the world)') // a managed policy's remote: false
   const ws = findWs(o.ws)
   const live = () => state.workspaces.includes(ws) && !ws.archived
   const port = Number(o.port)
@@ -444,6 +445,7 @@ export const SHARE_HOURS = [1, 8, 24, 0] // how long a link lasts: 0, until you 
 let sharedAt: string | undefined // the tunnel's URL, once it gave one
 
 export async function shareStart(o: { tab: string; hours?: number }): Promise<{ url: string; until?: number }> {
+  policyRemote('sharing a tab') // a managed policy's remote: false
   const tab = resolveTarget(o.tab)
   const hours = Number(o.hours ?? 0)
   if (!SHARE_HOURS.includes(hours)) throw new Error(`for how long: ${SHARE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)

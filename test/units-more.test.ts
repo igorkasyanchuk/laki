@@ -380,4 +380,6 @@ test("a Yes on a notification only for text shown as it is: not cut, no bidi or 
   assert.equal(noteWhole('echo safe ‮fr- mr'), false, 'a right-to-left override')
   assert.equal(noteWhole('rm​ -rf'), false, 'a zero-width space')
   assert.equal(noteWhole('a\u001Bb'), false, 'an escape')
+  assert.equal(noteWhole('rm\u00A0-rf ~'), false, 'a no-break space (HIDDEN: cmdAsk refuses it too)')
+  assert.equal(noteWhole('ok\u2028rm -rf ~'), false, 'a line separator')
 })
