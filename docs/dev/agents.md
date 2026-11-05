@@ -92,6 +92,16 @@ caller's workspace · tab, `text`, `choices` up to 6, `tab`); App makes it a car
 a button per choice). Without choices it returns `{ shown }`; with them it waits for `alertAnswer` (`id`, a `choice` of
 its own, or none: the card's ×, Close all; refused from an agent), else `timedOut`, then broadcasts `alertDone` (the card
 goes: main's `card-gone`). The CLI prints the pick, exit 1 when closed or timed out. Tested in `test/alerts.test.ts`.
+`laki notice <text> [--title t] [--choice A]… [--to <ref>]` (MCP's `laki_notice`) is `alertShow(p, 'notice')`
+(`noticeShow`): the same checks and `RATE` (shared), but no app needed and the `notice` event; the daemon keeps it in
+`notices` until it's answered or closed (past `NOTICES`, 20, the oldest without a wait go; one that waits stays, its
+caller would hear a close you never made), and `noticesTo` sends them to a window as it connects, none from or about a
+workspace Recording mode hides then. `to` (`about`: `resolveTarget`, else a workspace without an agent; Recording mode
+hiding it refuses it too) rides as `to: { ws, tab?, name }`. Each window keeps its own (Shown.tsx `useNotices`: a
+connection that opens starts over, then the daemon's replay): App's `NoticeCard`s at the top of `ShownPops`' corner
+stack, × or a choice calls `alertAnswer`, *Open* leaves any page for `to`'s tab or workspace (else the sender's tab) and
+closes one without choices; floated windows (a tab's, Laki AI's, the simulator's: main.tsx' `FloatNotices`) show the
+same cards without Open; `alertDone` drops it in every window.
 
 ### Asks
 

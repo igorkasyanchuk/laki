@@ -9,7 +9,7 @@ import { type AccountView, type Account, type WorkspaceView, aiOn, type ProjectC
 import { type AgentUsage, UsagePage, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
-import { ShownDialog, ShownPops } from './Shown'
+import { NoticeCard, ShownDialog, ShownPops } from './Shown'
 import { SharePop } from './Tunnel'
 import { ReplyPop, About, Onboarding, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
@@ -55,7 +55,7 @@ const Lazy = ({ title, onClose, children }: { title: string; onClose: () => void
 
 // the pages in the main area, over the panes
 export function Pages({ app }: { app: AppCtx }) {
-  const { achAll, achHidden, achKept, achN, achRef, achSet, aiNames, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere } = app
+  const { achAll, achHidden, achKept, achN, achRef, achSet, aiNames, apps, archive, artMenu, artPage, artView, asFile, bgUrl, busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going, held, hereCtx, hist, hotkey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn, onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply, replyTo, revealArt, rmWs, samePlan, schedulesFor, selectTab, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal, setGallery, setMaking, setNewFor, setNewImages, setNewInit, setOnboard, setPicking, setPops, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, settings, settingsKey, setWsId, sharing, shotKey, shown, showNew, shownWidgets, showPanel, specsOn, stale, toast, todosOn, toggleFull, view, whereNow, widgetApi, ws, wsHere } = app
   // a page's own move that isn't a place of its own (a Settings section, an extension page's tab): the place it's at
   // says it, so Back or Forward to it opens there, not where it was opened
   // (after App's own effect: a page's first report comes from its effects, which run before App's records its place)
@@ -203,7 +203,19 @@ export function Pages({ app }: { app: AppCtx }) {
         />
       )}
       {shown[0] && <ShownDialog s={shown[0]} left={shown.length - 1} onOpenRun={() => (setDialog({ workflows: '', run: shown[0].run }), setShown([]))} onClose={() => setShown(q => q.slice(1))} />}
-      <ShownPops pops={pops} onShow={p => (setShown(q => [...q, p]), setPops(q => q.filter(x => x !== p)))} onOpenRun={p => (setDialog({ workflows: '', run: p.run }), setPops(q => q.filter(x => x !== p)))} onClose={k => setPops(q => q.filter(x => x.key !== k))} />
+      <ShownPops
+        pops={pops}
+        notices={
+          notices.length > 0 &&
+          notices.map(n => {
+            // Open: off any page, to its session (a workspace: as you left it); one without choices goes as you do
+            const tab = [n.to ? n.to.tab : n.tab].find(id => id && view.tabs.some(t => t.id === id))
+            const w = (!tab && n.to && view.workspaces.find(x => x.id === n.to!.ws && !x.archived)) || undefined
+            const open = tab || w ? () => (setDialog(null), tab ? selectTab(tab) : setWsId(w!.id), !n.choices.length && answerNotice(n)) : undefined
+            return <NoticeCard key={n.id} n={n} onAnswer={c => answerNotice(n, c)} onOpen={open} />
+          })
+        }
+        onShow={p => (setShown(q => [...q, p]), setPops(q => q.filter(x => x !== p)))} onOpenRun={p => (setDialog({ workflows: '', run: p.run }), setPops(q => q.filter(x => x !== p)))} onClose={k => setPops(q => q.filter(x => x.key !== k))} />
       {(t =>
         t && (
           <SharePop

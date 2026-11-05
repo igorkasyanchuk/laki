@@ -927,7 +927,7 @@ Under the PR's title, who approved it and who asked for changes (each one's late
 the row's hover card says the same, and so does the card that comes up as you rest on the status bar's PR (#n).
 
 *Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
-tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Mark as draft* or *Ready for review*, *Close pull request…*), under the PR's title (the
+tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Convert to draft* or *Ready for review*, *Close pull request…*), under the PR's title (the
 side panel's *Review* and *Info*), in the status bar PR's right click and (approve) a workspace's right click,
 merge, approve or close the open PR with `gh`, as you, after you confirm (each question names the PR; Approve's its
 author and checks). Your own PR has no *Approve* (GitHub refuses it). *Merge* uses the way you
@@ -1592,6 +1592,12 @@ tab stays as it was.
 `laki alert "Deploy to production now?" --choice Deploy --choice "Not yet"` (or MCP's `laki_alert`): a card at the
 bottom right of your screen, over every app, with a button per choice; your pick goes back to the agent, which goes
 on by it (× says no choice; after 30 minutes it stops waiting). Without choices it just tells you something.
+
+**Notices**: the same card inside Laki's window instead of over every app: bottom right, over whatever page is open,
+until you close it (one sent while the app is closed shows when it opens). `laki notice "fix-login is ready for review"
+--to fix-login` (or MCP's `laki_notice`): `--to` names the session it's about (a workspace, `<workspace>/<tab>` or an
+agent's `@name`), and the card's *Open* goes there; `--choice` works as with `laki alert`. For a card under a tab with
+buttons that open a file, folder or page: `laki show`.
 
 **Secrets**: an agent that needs a token runs `laki secret "Stripe test key"` (or MCP's `laki_secret`). Its tab then
 needs you: a card under it asks for that, with a masked field. What you type goes to a 0600 file in the workspace's
@@ -2296,6 +2302,7 @@ laki ask @backend "which endpoint lists teams?"         # typed in when its turn
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
 laki alert "Ship it?" --choice Ship --choice Wait       # an important card on your screen; prints your pick
+laki notice "fix-login is ready" --to fix-login         # a card in Laki's window, on any page; Open goes to fix-login
 laki screen fix-the-login/claude
 laki diff fix-the-login [--uncommitted] | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki run fix-the-login test                             # the project's test script (lint, format, deploy, setup) in its tab

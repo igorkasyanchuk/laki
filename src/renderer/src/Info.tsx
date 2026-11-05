@@ -64,7 +64,7 @@ export type WsInfo = {
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
-export type PRAct = 'approve' | 'close' | 'merge' | 'draft' // prAct: gh as you, after a confirm (draft: Mark as draft / Ready for review, none)
+export type PRAct = 'approve' | 'close' | 'merge' | 'draft' // prAct: gh as you, after a confirm (draft: Convert to draft / Ready for review, none)
 // the PR's labels: the repo's (prLabels), and one put on or taken off (prLabel)
 export type LabelApi = { list: () => Promise<PRLabel[]>; set: (name: string, on: boolean) => void }
 export const MERGE_WORDS: Record<MergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' }
@@ -352,7 +352,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
     : [
         { label: 'Open its checks', icon: 'link', run: () => onOpen(`${pr.url}/checks`) },
         { label: 'Open its files', icon: 'diff', run: () => onOpen(`${pr.url}/files`) },
-        ...(open ? [{ label: pr.draft ? 'Ready for review' : 'Mark as draft', icon: pr.draft ? 'eye' : 'pencil', sub: pr.draft ? 'Out of draft: reviewers are asked' : 'Back to a draft: it went ready too early', run: () => onAct('draft') } as MenuItem] : []),
+        ...(open ? [{ label: pr.draft ? 'Ready for review' : 'Convert to draft', icon: pr.draft ? 'eye' : 'pencil', sub: pr.draft ? 'Out of draft: reviewers are asked' : 'Back to a draft: it went ready too early', run: () => onAct('draft') } as MenuItem] : []),
         ...(onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: w.prLinked ? 'Only related: its own PR, once opened, shows here' : 'Only related, kept off: its branch’s PR until you attach it again', run: onDetach } as MenuItem] : []),
         ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
       ]

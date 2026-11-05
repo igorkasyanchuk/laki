@@ -129,7 +129,7 @@ type Field = { value: string; placeholder?: string; multi?: boolean } // multi: 
 // a line of ask's facts, under its text; icon: a name (Icon) or an emoji; tone: its icon's color (ok green, warn amber,
 // bad red); chip: a pill before the value in that tone (a PR's Merged)
 export type Tone = 'ok' | 'warn' | 'bad'
-export type Fact = { label: string; value: string; icon?: string; tone?: Tone; chip?: string }
+export type Fact = { label: string; value: ReactNode; icon?: string; tone?: Tone; chip?: string } // value: words, or a few spans (a size's +/−)
 export type Verdict = { tone: Tone; text: string } // a line over the facts: what it all comes to (Safe to delete…, Check first…)
 type Asking = { n?: number; title: string; text?: string; verdict?: Verdict; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
@@ -140,7 +140,7 @@ export const ask = (title: string, o: { text?: string; verdict?: Verdict; facts?
 // one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
 let early: Asking[] = []
 let asked = 0
-export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string, facts?: Fact[]) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, facts, buttons, check, done, tag }))
+export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string, facts?: Fact[], verdict?: Verdict) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, verdict, facts, buttons, check, done, tag }))
 // a line typed in the app's own dialog (an extension action's ask): the text, or null for Cancel, Esc or outside
 export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string; value?: string; multi?: boolean } = {}) =>
   new Promise<string | null>(done => {
@@ -724,6 +724,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
   )
   function item(it: Act, i: number) {
     const on = it.hint === ON
+    const long = !!it.hint && !on && String(it.hint).length > 12 // a path: it gives way, the label keeps its words
     return (
       <button
         key={i}
@@ -737,14 +738,14 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
       >
         <span className="menu-icon">{it.mark ?? (it.icon && <Icon name={it.icon} />)}</span>
-        <span className="menu-text">
+        <span className={`menu-text${long ? ' keep' : ''}`}>
           <span className={`menu-label ${it.mono ? 'mono' : ''}`}>
             <span style={it.font ? { fontFamily: it.font } : undefined}>{it.label}</span>
             {on && <Icon name="check" size={12} />}
           </span>
           {it.sub && <span className="menu-sub">{it.sub}</span>}
         </span>
-        {it.hint && !on && <span className={`menu-hint${String(it.hint).length > 12 ? ' long' : ''}`}>{it.hint}</span>}
+        {it.hint && !on && <span className={`menu-hint${long ? ' long' : ''}`}>{it.hint}</span>}
         {it.pill && <span className={`menu-pill ${it.tone ?? ''}`}>{it.pill}</span>}
         {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
         {it.items && <Icon name="chevronRight" size={12} />}

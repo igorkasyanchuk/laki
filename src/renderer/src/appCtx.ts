@@ -19,7 +19,7 @@ import type { Layout, Role, RoleLayout, RoleTab } from '../../shared/layout'
 import type { KeyId, KeyMap } from '../../shared/keys'
 import type { NewWsParams, Shot } from './panels'
 import type { Collision } from '../../shared/overlap'
-import type { ShownPop, ShownWin } from './Shown'
+import type { Notice, ShownPop, ShownWin } from './Shown'
 import type { FixWhat, PRAct } from './Info'
 import type { WidgetApi } from './Widgets'
 import type { menusOf } from './menus'
@@ -256,6 +256,8 @@ export type AppBase = {
   pinned: WorkspaceView[]
   pinPlan: (r: PlanPin, on: boolean) => void
   placeName: (p: Place) => string
+  notices: Notice[]
+  answerNotice: (n: Notice, choice?: string) => void
   pops: ShownPop[]
   prAct: (w: WorkspaceView, act: PRAct, method?: MergeMethod) => Promise<void | false>
   previewed: Opened | null

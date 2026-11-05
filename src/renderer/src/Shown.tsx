@@ -1,7 +1,8 @@
 // A workflow's Show you block (daemon/workflow.ts' popup): a window over the app with what the run shows you, read and
 // closed (Esc, Close). HTML goes in a sandboxed frame: no scripts, nothing it loads but pictures, links open in the
 // browser (main's window-open handler); anything else is Markdown.
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { api } from './api'
 import { Folded, Markdown } from './MarkdownView'
 import { Icon, IconButton } from './ui'
 
@@ -59,10 +60,11 @@ export function ShownDialog({ s, left, onOpenRun, onClose }: { s: ShownWin; left
 // runs nothing); Show opens it as the window
 export type ShownPop = ShownWin & { key: number }
 const words = (html: string) => new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? ''
-export function ShownPops({ pops, onShow, onOpenRun, onClose }: { pops: ShownPop[]; onShow: (p: ShownPop) => void; onOpenRun: (p: ShownPop) => void; onClose: (key: number) => void }) {
-  if (!pops.length) return null
+export function ShownPops({ pops, notices, onShow, onOpenRun, onClose }: { pops: ShownPop[]; notices?: ReactNode; onShow: (p: ShownPop) => void; onOpenRun: (p: ShownPop) => void; onClose: (key: number) => void }) {
+  if (!pops.length && !notices) return null
   return (
     <div className="shown-pops" role="status">
+      {notices}
       {pops.map(p => (
         <div key={p.key} className="shown-pop">
           <div className="shown-pop-head">
@@ -90,6 +92,72 @@ export function ShownPops({ pops, onShow, onOpenRun, onClose }: { pops: ShownPop
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// laki notice's card (daemon/alerts.ts): its words, × closes it, a choice answers it (the caller gets it), Open goes to
+// the session it's about (--to: a tab, or a workspace without an agent; else the one that sent it)
+export type Notice = { id: string; title: string; text: string; choices: string[]; tab?: string; to?: { ws: string; tab?: string; name: string } }
+
+// a window's notices, from the daemon's events: it sends them again to a window as it connects, so a connection that
+// opens starts over (a daemon started again has none: their waits failed). answer: × (none) or a choice, gone here at
+// once, then in every window (alertDone)
+export function useNotices() {
+  const [notices, setNotices] = useState<Notice[]>([])
+  useEffect(
+    () =>
+      api.on(m => {
+        if (m.ev === 'open') setNotices([])
+        else if (m.ev === 'notice') setNotices(q => (q.some(n => n.id === m.id) ? q : [...q, m as unknown as Notice]))
+        else if (m.ev === 'alertDone') setNotices(q => q.filter(n => n.id !== m.id))
+      }),
+    [],
+  )
+  const answer = (n: Notice, choice?: string) => (setNotices(q => q.filter(x => x.id !== n.id)), void api.call('alertAnswer', { id: n.id, ...(choice !== undefined && { choice }) }).catch(() => {}))
+  return { notices, answer }
+}
+
+// a floated window's (a tab's, Laki AI's, the simulator's): the same cards, without Open (the app's window has it)
+export function FloatNotices() {
+  const { notices, answer } = useNotices()
+  if (!notices.length) return null
+  return (
+    <div className="shown-pops" role="status">
+      {notices.map(n => (
+        <NoticeCard key={n.id} n={n} onAnswer={c => answer(n, c)} />
+      ))}
+    </div>
+  )
+}
+export function NoticeCard({ n, onAnswer, onOpen }: { n: Notice; onAnswer: (choice?: string) => void; onOpen?: () => void }) {
+  return (
+    <div className="shown-pop">
+      <div className="shown-pop-head">
+        <Icon name="bell" />
+        <b className="shown-title">{n.title}</b>
+        <span className="spacer" />
+        <IconButton icon="x" title={n.choices.length ? 'Close without an answer' : 'Close'} onClick={() => onAnswer()} />
+      </div>
+      <div className="shown-pop-body">
+        <Folded text={n.text} lines={6} />
+      </div>
+      {(n.to || onOpen || n.choices.length > 0) && (
+        <div className="shown-pop-foot notice-foot">
+          {n.to && <span className="muted small">for {n.to.name}</span>}
+          <span className="spacer" />
+          {onOpen && (
+            <button className="link" onClick={onOpen}>
+              Open
+            </button>
+          )}
+          {n.choices.map((c, i) => (
+            <button key={c} className={i === 0 ? 'primary' : undefined} onClick={() => onAnswer(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

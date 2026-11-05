@@ -40,7 +40,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
   else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
-  else if (!textOnly && args[0] === 'alert' && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's only
+  else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
+  else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
@@ -507,6 +508,15 @@ async function main() {
       // until closed); with choices it waits for the pick and prints it (exit 1: closed or no answer in ALERT_WAIT)
       if (!rest.length) throw new Error('usage: laki alert <text> [--title t] [--choice A --choice B], e.g. laki alert "Tests pass: ship it?" --choice Ship --choice Wait')
       const r = await rpc('alertShow', { text: rest.join(' '), title: flags.title, choices, from: caller() }, ALERT_WAIT + 30_000)
+      if (r.shown) return out(r, 'shown')
+      if (r.choice) return out(r, r.choice)
+      throw new Error(r.closed ? 'the user closed it without a choice' : `no answer in ${ALERT_WAIT / 60_000} minutes`)
+    }
+    case 'notice': {
+      // laki notice <text…> [--title t] [--choice A]… [--to <workspace[/tab]|@name>]: a card in Laki's window (bottom
+      // right, on any page, until closed), Open going to --to's tab (else the caller's); choices: as laki alert
+      if (!rest.length) throw new Error('usage: laki notice <text> [--title t] [--choice A --choice B] [--to <workspace[/tab]|@name>], e.g. laki notice "fix-login is ready for review" --to fix-login')
+      const r = await rpc('noticeShow', { text: rest.join(' '), title: flags.title, choices, to: flags.to || undefined, from: caller() }, ALERT_WAIT + 30_000)
       if (r.shown) return out(r, 'shown')
       if (r.choice) return out(r, r.choice)
       throw new Error(r.closed ? 'the user closed it without a choice' : `no answer in ${ALERT_WAIT / 60_000} minutes`)

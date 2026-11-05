@@ -66,6 +66,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`, `images`:
   `imageSave`'s and `fileSave`'s paths only, 10 at most, after the text in the prompt as it starts; the board's `Thumbs`,
   a file's `FileChip`), `todoRm`;
+- `noticeShow` (as `alertShow`, and `to`: a tab, `@name` or `<workspace>[/<tab>]`, a workspace without an agent the
+  workspace; not refused with no app connected): `laki notice`'s card in the app's windows (the `notice` event, with
+  `to: { ws, tab?, name }`), kept until answered or closed and sent to each window as it connects; `alertAnswer` answers
+  or closes it (`{ ok }`, `alertDone` to every window).
 - `alertShow` (`text`, `title`, `choices` up to 6; `from` the caller's tab; refused with no app connected): `laki alert`'s
   card on screen (the `alert` event; App's card, a browser's dialog); with choices it resolves as `alertAnswer` (`id`,
   a `choice` of its own, or none: closed; refused from an agent) comes, else `timedOut` after `ALERT_WAIT`, then the

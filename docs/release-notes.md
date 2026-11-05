@@ -4,6 +4,16 @@ version it builds, with the date. -->
 
 ## Next
 
+- `laki notice "<text>" --to <session>` (MCP's `laki_notice`): a card at the bottom right of Laki's window, over
+  whatever page is open, until you close it; *Open* goes to the session it names, and `--choice` waits for your pick as
+  `laki alert` does. For news that belongs in Laki rather than over every app, such as one agent telling you about
+  another session.
+- Merging a PR says plainly what it comes to, as Delete does: a line on top (*Checks pass, no conflicts* in green, *No
+  checks ran on it* or *A review is required first* in amber, conflicts or failing checks in red), its checks, review
+  and conflicts in their colors, its size as green and red. A PR without checks no longer says *checks pass* on its
+  *Merge* step.
+- A PR's ⋯ says *Convert to draft*, as GitHub does. Copy path keeps its name beside a long path. The Terminal/Reader
+  switch, and Reader view itself, no longer show over the full review.
 - Auto fallback: in Settings › Agents & profiles, number two or more of an agent's accounts, and a Claude Code or Codex
   tab at its plan limit restarts on the next one (its chat resumes there) and goes on, instead of waiting for the
   reset. A workflow step at its limit goes on with it.

@@ -36,7 +36,7 @@ import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planU
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
 import { sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
-import { alertAnswer, alertShow } from './alerts.ts'
+import { alertAnswer, alertShow, noticesTo } from './alerts.ts'
 import { secretAsk, secretGive, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -312,6 +312,7 @@ const api: Record<string, Handler> = {
   sideState: p => sideState(p),
   sideNew: p => sideNew(p),
   alertShow: p => alertShow(p), // laki alert: a card on screen; with choices, resolves as you pick (alerts.ts)
+  noticeShow: p => alertShow(p, 'notice'), // laki notice: the same card inside Laki's window, kept until answered or closed
   alertAnswer: p => alertAnswer(p),
   secretAsk: p => secretAsk(p), // laki secret: resolves as you answer (secrets.ts)
   secretGive: p => secretGive(p),
@@ -373,7 +374,7 @@ const api: Record<string, Handler> = {
   usageDays: () => metersMod.usageDays(), // the Usage page: tokens and $ by day, agent and model (Laki's claude and codex tabs)
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
-  prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Mark as draft / Ready for review
+  prDraft: p => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review
   prLabels: p => prMod.prLabels(p.ws),
   ghCard: p => prMod.ghCard(p), // a GitHub PR's or issue's card: a link hovered in a terminal
   prLabel: p => prMod.prLabel(p),
@@ -546,7 +547,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['alertShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
+const FROM = new Set(['alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -829,6 +830,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     core.clients.add(c)
     core.hello(c)
     widgetAsks(c) // an extension's asks still waiting: this window shows them too
+    noticesTo(c) // and the notices up
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }

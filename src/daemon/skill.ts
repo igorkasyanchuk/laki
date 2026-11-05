@@ -141,6 +141,10 @@ ${USAGE}
    MCP's \`laki_alert\`. Without
    \`--choice\` it only tells them something (\`--title\` names it). Only when they ask: a question in the chat is
    the default.
+   Something they should see in Laki but not over every app (another session is ready, a heads-up for a session not
+   yours): \`laki notice "<text>" --to <workspace>[/<tab>]|@name\` puts a card at the bottom right of Laki's window,
+   whatever page is open; its Open goes to that session. \`--choice\` waits for a pick, as with laki alert.
+   \`laki show\` is a card under your own tab, its buttons opening a file, folder or page.
 
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.

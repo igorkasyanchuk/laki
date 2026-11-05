@@ -169,7 +169,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/codespace.ts` | cloud workspaces' gh: a codespace made, waited for, started, stopped, deleted, listed; machine types; its ssh Host entry and `<data>/ssh/config` (`sshF`) |
 | `src/daemon/turns.ts` | what agents' turns leave: each turn's changes (Undo), the next prompt guessed, a chat handed to the other agent |
 | `src/daemon/secrets.ts` | `laki secret`: an agent asks you for a token on a masked card, gets a 0600 file's path |
-| `src/daemon/alerts.ts` | `laki alert`: an important card on your screen from an agent or a script; with choices it waits for your pick |
+| `src/daemon/alerts.ts` | `laki alert`: an important card on your screen from an agent or a script; with choices it waits for your pick. `laki notice`: the same card in Laki's window, on any page, kept until closed, Open going to `--to`'s session |
 | `src/daemon/verify.ts` | Done check: a project's scripts and a second agent's review as an agent's turn ends, failures sent back |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/tickets.ts` | linked tickets: a project's Ticket script per workspace, its key, title and status |

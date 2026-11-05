@@ -35,7 +35,7 @@ time and AI money per run (`budget: 60 min, $5`).
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
-  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it.
+  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
   *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*);
   an MCP tool's app (MCP Apps) shows under its call, and a `laki-ui` block in an answer is drawn with Laki's own

@@ -40,6 +40,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki preset on|off|rm <name>                show it in the pickers or not | delete it
   laki remind <when> <text> [--ws <id>|.] [--important]  a reminder on the calendar (Calendar): in 2h, tomorrow at 9am, every weekday at 9am; --important: a card on screen until closed
   laki alert <text> [--title t] [--choice A]…  an important card on the user's screen (over every app, until closed); with choices it waits and prints the pick
+  laki notice <text> [--title t] [--choice A]… [--to <ws>[/<tab>]|@name]   a card in Laki's window (any page, until closed); Open goes to --to; choices as alert
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
@@ -269,6 +270,14 @@ timeout, as that's longer than most allow by default; MCP's laki_alert waits the
 
   laki alert "Tests pass on fix-login" --title "Ready"
   laki alert "Deploy to production now?" --choice Deploy --choice "Not yet"`,
+  notice: `A card for the user inside Laki's window (bottom right, over whatever page is open, until they close it; kept
+while the app is closed, it shows when it opens): news they should see in Laki but not worth a card over every app,
+such as a message about another session. --to names that session (<workspace>[/<tab>] or @name; default yours): the
+card's Open goes there. With --choice (up to 6) it waits for their pick and prints it, as laki alert does (exit 1:
+closed or no answer in 30 minutes; MCP's laki_notice waits the same). Without choices it shows and returns.
+
+  laki notice "fix-login is ready for review" --to fix-login
+  laki notice "The API changed under fix-login: rebase it?" --to @api --choice Rebase --choice Later`,
   remind: `A reminder for the user on Laki's calendar (Calendar), only when they ask for one. --ws . ties it to
 this workspace. Words that repeat (every, daily, weekdays, mondays) make it ring each time. --important, when the user
 says it matters: it rings as a card on screen, over every app, until they close it.

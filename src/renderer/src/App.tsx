@@ -40,7 +40,7 @@ import { actionMenu, type Changes, type Commits, type Edit, edited, type FileCon
 import { actionsFor, mentionsOf, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
-import { type ShownPop, type ShownWin } from './Shown'
+import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
@@ -450,6 +450,7 @@ export function App() {
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [shown, setShown] = useState<ShownWin[]>([]) // what workflows' Show you blocks show, in turn
   const [pops, setPops] = useState<ShownPop[]>([]) // and their popovers (an end's too), the newest 3
+  const { notices, answer: answerNotice } = useNotices() // laki notice's cards, in the same corner
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
@@ -2513,19 +2514,31 @@ export function App() {
     const said = [pr.approved?.length && `approved by ${pr.approved.join(', ')}`, pr.changes?.length && `changes asked by ${pr.changes.join(', ')}`].filter(Boolean)
     const told = (pr.review === 'APPROVED' && pr.approved?.length) || (pr.review === 'CHANGES_REQUESTED' && pr.changes?.length) // the names say the decision
     const review = [told ? '' : (pr.review && REVIEW[pr.review]) || (said.length ? '' : 'none needed'), ...said].filter(Boolean).join(', ')
+    // each in its tone (the icon's color): green what's fine, amber what to look at, red what's wrong
+    const checks: Pick<Fact, 'icon' | 'tone'> = pr.checks === 'pass' ? { icon: 'checkCircle', tone: 'ok' } : pr.checks === 'fail' ? { icon: 'ciFail', tone: 'bad' } : pr.checks === 'pending' ? { icon: 'clock', tone: 'warn' } : { icon: 'alertCircle', tone: 'warn' }
     return [
-      pr.author && { label: 'Author', value: `${pr.author}${pr.mine ? ' (you)' : ''}` },
-      { label: 'Branch', value: `${w.branch || '?'} → ${pr.base ?? 'its base'}${pr.cross ? ' (from a fork)' : ''}` },
-      pr.additions !== undefined && { label: 'Size', value: `+${pr.additions} −${pr.deletions ?? 0}` },
-      { label: 'Checks', value: ciText(pr) },
-      { label: 'Review', value: review },
-      pr.conflict && { label: 'Conflicts', value: `merge conflicts with ${pr.base ?? 'its base'}` },
-      pr.ready === false && !pr.conflict && { label: 'GitHub', value: "wouldn't merge it now: blocked, behind or unstable" },
-      pr.draft && { label: 'Draft', value: 'still a draft' },
-      pr.labels?.length && { label: 'Labels', value: pr.labels.map(l => l.name).join(', ') },
-      pr.updated && { label: 'Updated', value: ago(pr.updated) },
+      pr.author && { label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` },
+      { label: 'Branch', icon: 'gitBranch', value: `${w.branch || '?'} → ${pr.base ?? 'its base'}${pr.cross ? ' (from a fork)' : ''}` },
+      pr.additions !== undefined && { label: 'Size', icon: 'diff', value: <><span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions ?? 0}</span></> },
+      { label: 'Checks', ...checks, value: ciText(pr) },
+      { label: 'Review', icon: 'eye', tone: pr.review === 'APPROVED' ? 'ok' : pr.review === 'CHANGES_REQUESTED' ? 'bad' : pr.review === 'REVIEW_REQUIRED' ? 'warn' : undefined, value: review },
+      pr.conflict && { label: 'Conflicts', icon: 'conflict', tone: 'bad', value: `merge conflicts with ${pr.base ?? 'its base'}` },
+      pr.ready === false && !pr.conflict && { label: 'GitHub', icon: 'alertCircle', tone: 'warn', value: "wouldn't merge it now: blocked, behind or unstable" },
+      pr.draft && { label: 'Draft', icon: 'pencil', tone: 'warn', value: 'still a draft' },
+      pr.labels?.length && { label: 'Labels', icon: 'tag', value: pr.labels.map(l => l.name).join(', ') },
+      pr.updated && { label: 'Updated', icon: 'clock', value: ago(pr.updated) },
     ].filter(Boolean) as Fact[]
   }
+  // what a merge comes to, over its facts: the worst first
+  const mergeVerdict = (pr: NonNullable<WorkspaceView['pr']>): Verdict =>
+    pr.conflict ? { tone: 'bad', text: `Conflicts with ${pr.base ?? 'its base'}: GitHub won't merge it` }
+    : pr.checks === 'fail' ? { tone: 'bad', text: 'Its checks fail' }
+    : pr.review === 'CHANGES_REQUESTED' ? { tone: 'bad', text: 'Changes were asked for' }
+    : pr.checks === 'pending' ? { tone: 'warn', text: 'Its checks still run' }
+    : pr.draft || pr.ready === false ? { tone: 'warn', text: pr.draft ? 'Still a draft' : "GitHub wouldn't merge it now" }
+    : pr.review === 'REVIEW_REQUIRED' ? { tone: 'warn', text: 'A review is required first' }
+    : !pr.checks ? { tone: 'warn', text: 'No checks ran on it: nothing tested it' }
+    : { tone: 'ok', text: 'Checks pass, no conflicts' }
   const prAct = async (w: WorkspaceView, act: PRAct, method: MergeMethod = cfgOf(w)?.mergeMethod ?? 'squash') => {
     const pr = w.pr
     if (!pr) return
@@ -2533,7 +2546,7 @@ export function App() {
     if (act === 'merge') {
       const del = { label: 'Delete the branch on GitHub', on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
-      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w))) !== 1) return
+      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w), mergeVerdict(pr))) !== 1) return
       return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged PR #${pr.number}`, undefined, undefined, true))
     }
     const close = act === 'close'
@@ -2564,7 +2577,7 @@ export function App() {
           null,
           ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: 'Merges it on GitHub, after you confirm', run: () => prAct(w, 'merge') } as MenuItem] : []),
           ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
-          { label: w.pr.draft ? 'Ready for review' : 'Mark as draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? 'Out of draft on GitHub: reviewers are asked' : 'Back to a draft on GitHub: it went ready too early', run: () => prDraft(w) } as MenuItem,
+          { label: w.pr.draft ? 'Ready for review' : 'Convert to draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? 'Out of draft on GitHub: reviewers are asked' : 'Back to a draft on GitHub: it went ready too early', run: () => prDraft(w) } as MenuItem,
           ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, tip: 'Closes it on GitHub without merging, after you confirm', run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
@@ -3253,7 +3266,7 @@ export function App() {
     newIn, newInit, newTab, newTabActions, newWord, newWs, nextNeed, notesOn, onboard, onboardDone, openFile, openIn,
     openInItems, openMenu, openPort, openProject, openReview, order, overlapsAt, own, ownWidgets, pageZoom, panelApi,
     panelOpen, panelShown, panelTab, panelW, peek, peekBox, peekStat, peekTimer, picked, picking, pickKey, pinned,
-    pinPlan, placeName, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarKey, radarOf, rail,
+    pinPlan, placeName, notices, answerNotice, pops, prAct, previewed, prFix, prMenu, project, projOf, quickNew, radarKey, radarOf, rail,
     railBar, railKind, railOf, rawKind, readerOn, refreshPR, reply, replyTo, restart, restore, revealArt, reviewOn,
     reviewSeen, reviewTab, ring, rmItem, rmWs, roleTabs, rows, run, runFlow, runMenu, runScript, samePlan,
     schedulesFor, selectGroup, selectTab, sendLater, setAiFloat, setArtsIn, setArtView, setDialog, setExtModal,
@@ -3305,7 +3318,7 @@ export function App() {
         {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
         <div className="body">
           {tabsAt === 'left' && <TabStrip app={app} />}
-          <div className="term-wrap">
+          <div className="term-wrap" data-review={reviewOn && ws ? '' : undefined}>
             {group ? (
               <Panes
                 layout={group}

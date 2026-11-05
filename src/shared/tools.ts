@@ -238,6 +238,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj({ text: str('what it says, up to 600 characters: the question or the news'), title: str('a few words over it (default: your workspace and tab)'), choices: { type: 'array', items: { type: 'string' }, description: 'the answers to pick from, up to 6: Ship, Wait' } }, ['text']),
     run: a => rpc('alertShow', { text: a.text, title: a.title, choices: a.choices, from: { ws: from, tab: process.env.LAKI_TAB } }, ALERT_WAIT + 30_000),
   },
+  {
+    name: 'laki_notice',
+    description: "A notice for the user inside Laki's window: a card at the bottom right over whatever page is open, until they close it (kept while the app is closed: it shows when it opens). For news they should see in Laki but that isn't worth a card over every app, such as a message about another session: to names it, and the card's Open goes there. With choices (up to 6) it waits for their pick, up to 30 minutes, and returns it (choice), or closed / timedOut; without, it shows and returns.",
+    inputSchema: obj({ text: str('what it says, up to 600 characters'), title: str('a few words over it (default: your workspace and tab)'), to: str('the session it is about: <workspace>[/<tab>] or @name (default: yours)'), choices: { type: 'array', items: { type: 'string' }, description: 'the answers to pick from, up to 6: Review, Later' } }, ['text']),
+    run: a => rpc('noticeShow', { text: a.text, title: a.title, to: a.to, choices: a.choices, from: { ws: from, tab: process.env.LAKI_TAB } }, ALERT_WAIT + 30_000),
+  },
   // a project's memory (agents': Laki AI keeps the user's with laki_memory_write)
   {
     name: 'laki_memory',
