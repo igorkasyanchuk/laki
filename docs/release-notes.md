@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.45.0 · Nov 5, 2026
 
 - `laki notice "<text>" --to <session>` (MCP's `laki_notice`): a card at the bottom right of Laki's window, over
   whatever page is open, until you close it; *Open* goes to the session it names, and `--choice` waits for your pick as
