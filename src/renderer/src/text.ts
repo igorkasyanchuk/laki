@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
+import { type View, type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 
 // a group's defaults for a new workspace under it (Edit group): where it's made, permission mode ('ask': Ask first),
@@ -695,6 +695,35 @@ export function findFiles(q: string, files: string[], max = 60) {
   return out.sort((a, b) => b.score - a.score).slice(0, max)
 }
 
+// @ in Reader's box: one of your workspaces or projects by its id (the one it's in left out; Terminals and Browsers
+// have none). As it's sent, a line for each @id in the text tells the agent what it is and how to reach it: context,
+// nothing started
+export type Mention = { token: string; label: string; sub: string; line: string }
+export function mentionsOf(v: Pick<View, 'workspaces' | 'projects' | 'tabs'> | null | undefined, here?: string): Mention[] {
+  if (!v) return []
+  const projects = v.projects.filter(p => !p.kind && !p.archived)
+  const ws = v.workspaces.filter(w => !w.archived && !w.term && w.id !== here && projects.some(p => p.id === w.project))
+  const where = (path: string, host?: string) => `folder ${host ? `${host}:` : ''}${path}`
+  return [
+    ...ws.map(w => {
+      const p = projects.find(p => p.id === w.project)!
+      const agents = v.tabs.filter(t => t.workspace === w.id && t.kind === 'agent').map(t => t.name)
+      const name = w.name && w.name !== w.id ? `"${w.name}", ` : ''
+      return { token: w.id, label: w.name || w.id, sub: `workspace · ${p.name}`, line: `[Laki workspace @${w.id}: ${name}project ${p.name}, ${where(w.path, w.host)}${w.branch ? `, branch ${w.branch}` : ''}${agents.length ? `, agents ${agents.join(', ')}` : ''}. Context only: message its agent with laki send ${w.id} "…", see its changes with laki diff ${w.id}]` }
+    }),
+    ...projects.map(p => {
+      const its = ws.filter(w => w.project === p.id).map(w => w.id)
+      return { token: p.id, label: p.name, sub: 'project', line: `[Laki project @${p.id}: ${p.name}, ${where(p.path, p.host)}${its.length ? `, workspaces ${its.slice(0, 12).join(', ')}${its.length > 12 ? '…' : ''}` : ''}. Context only]` }
+    }),
+  ]
+}
+// the text as sent: a line for each @id it names (a workspace's and a project's when they share one), once each
+export function withMentions(text: string, ms: Mention[]) {
+  const named = new Set([...text.matchAll(/(?:^|\s)@([\w.-]+)/g)].map(m => m[1].replace(/[.-]+$/, '')))
+  const lines = [...new Set(ms.filter(m => named.has(m.token)).map(m => m.line))]
+  return lines.length ? `${text}\n\n${lines.join('\n')}` : text
+}
+
 // the prompt boxes' completion (PromptInput's complete): @ a file, # a PR or issue, after the start or a space; / a
 // prompt template at the start of a line. The trigger the caret is in, its word so far and where it starts
 export type Trigger = { ch: '@' | '#' | '/'; q: string; from: number }
@@ -711,8 +740,9 @@ const refSub = (r: Ref) => [r.kind, r.assignees?.length ? r.assignees.map(a => `
 // the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
 // templates by name
 export type AgentCommand = { name: string; sub: string; skill?: boolean } // the daemon's agentCommands: /name (codex's skills $name)
-export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[]; commands?: AgentCommand[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
+export function completions(t: Trigger, o: { files?: string[]; changed?: string[]; refs?: Ref[]; templates?: Template[]; commands?: AgentCommand[]; mentions?: Mention[] }, max = 8): { label: string; sub?: string; value: string; template?: Template }[] {
   const q = t.q.toLowerCase()
+  if (t.ch === '@' && o.mentions) return o.mentions.filter(m => m.token.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)).slice(0, max).map(m => ({ label: m.label, sub: `${m.sub} · @${m.token}`, value: `@${m.token}` })) // Reader's: workspaces and projects
   if (t.ch === '@') {
     const changed = new Set(o.changed ?? [])
     const all = [...(o.changed ?? []).filter(f => (o.files ?? []).includes(f) || !o.files), ...(o.files ?? []).filter(f => !changed.has(f))]

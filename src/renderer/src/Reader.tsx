@@ -6,12 +6,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { linkify, Markdown } from './MarkdownView'
-import { historyKey, usePromptHistory } from './PromptInput'
+import { historyKey, useComplete, usePromptHistory } from './PromptInput'
+import { type Mention, withMentions } from './text'
 import { planNow } from '../../shared/todos'
 import type { TabView } from '../../shared/types'
 
 type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
-export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[] }>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void } // review, undo: its last turn's changes (the card)
+export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[] }>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
@@ -26,6 +27,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const scroll = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLTextAreaElement>(null)
   const [histMenu, history] = usePromptHistory(box, setText) // ↑ in the empty box: your prompts
+  const at = useComplete(box, api.mentions && { key: tab.id, mentions: () => api.mentions!(tab) }, setText) // @ a workspace or project
   const pinned = useRef(true) // at the bottom: it stays there as the chat grows
   useEffect(() => {
     let alive = true
@@ -51,7 +53,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
     if (!t) return
     setText('')
     pinned.current = true
-    void api.send(tab.id, t).catch(() => setText(t))
+    void api.send(tab.id, withMentions(t, api.mentions?.(tab) ?? [])).catch(() => setText(t)) // a line for each @ it names
   }
   const now = tab.plan && !tab.plan.stale ? planNow(tab.plan) : undefined
   return (
@@ -107,8 +109,11 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
             placeholder={ghost ?? (tab.status === 'running' ? `Message ${tab.name}: it reads it when this turn ends` : `Message ${tab.name}`)}
             data-tip={ghost ? 'Laki AI\'s guess at your next message · Tab takes it, Esc hides it' : undefined}
             data-history
-            onChange={e => setText(e.target.value)}
+            onChange={e => (setText(e.target.value), at.look())}
+            onSelect={at.look}
+            onBlur={at.blur}
             onKeyDown={e => {
+              if (at.key(e)) return // @'s menu took it
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
               if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))
               if (historyKey(e, !text)) return void (e.preventDefault(), history()) // your prompts
@@ -119,6 +124,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
             Send
           </button>
           {histMenu}
+          {at.menu}
         </form>
       )}
     </div>

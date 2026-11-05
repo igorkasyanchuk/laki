@@ -7,7 +7,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState, type Clipb
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
-import { type AgentCommand, completeInto, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
+import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
 import { Icon, keep, load, type MenuItem, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceSends, voiceStart, voiceStop } from './voice'
 
@@ -98,6 +98,7 @@ export type Complete = {
   templates?: () => Template[]
   commands?: () => Promise<AgentCommand[]> // the agent's own commands and skills, under the templates
   agent?: string // whose commands: another agent's are read anew (the files and refs stay)
+  mentions?: () => Mention[] // @: your workspaces and projects instead of files (Reader's box)
 }
 
 // @ # / for a text box (PromptInput's, Send later's): the trigger the caret is in (one Esc closed stays closed: shut,
@@ -115,7 +116,7 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
   const agentNow = useRef(complete?.agent) // likewise for the commands: another agent picked meanwhile drops the answer
   agentNow.current = complete?.agent
   useEffect(() => ((read.current = {}), setGot({})), [whose]) // another project or agent picked: not the last one's
-  const source = (t: Trigger | null) => t && (t.ch === '@' ? complete?.files : t.ch === '#' ? complete?.refs : complete?.templates ?? complete?.commands)
+  const source = (t: Trigger | null) => t && (t.ch === '@' ? (complete?.mentions ?? complete?.files) : t.ch === '#' ? complete?.refs : complete?.templates ?? complete?.commands)
   const look = () => {
     const el = box.current
     if (!complete || !el) return
@@ -126,7 +127,7 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
     setTrig(next)
   }
   useEffect(() => {
-    const k = trig?.ch === '@' ? 'files' : trig?.ch === '#' ? 'refs' : trig?.ch === '/' && complete?.commands ? 'commands' : ''
+    const k = trig?.ch === '@' && complete?.files && !complete.mentions ? 'files' : trig?.ch === '#' ? 'refs' : trig?.ch === '/' && complete?.commands ? 'commands' : ''
     const rk = k === 'commands' ? `commands:${complete?.agent ?? ''}` : k // per agent
     if (!k || !complete || Date.now() - (read.current[rk] ?? 0) < 60_000) return
     read.current[rk] = Date.now()
@@ -139,7 +140,7 @@ export function useComplete(box: RefObject<HTMLTextAreaElement | null>, complete
   }, [trig?.ch, whose, complete?.agent])
   useEffect(() => setGot(g => (g.commands ? { ...g, commands: undefined } : g)), [complete?.agent]) // another agent picked: not the last one's
   const shown = trig && trig.from !== shut ? trig : null
-  const rows = shown ? completions(shown, { ...got, templates: shown.ch === '/' ? complete?.templates?.() : undefined, commands: shown.ch === '/' ? got.commands : undefined }) : []
+  const rows = shown ? completions(shown, { ...got, mentions: shown.ch === '@' ? complete?.mentions?.() : undefined, templates: shown.ch === '/' ? complete?.templates?.() : undefined, commands: shown.ch === '/' ? got.commands : undefined }) : []
   const pick = (r: (typeof rows)[number]) => {
     const el = box.current
     if (!el || !shown) return

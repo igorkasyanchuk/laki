@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- In Reader view's box, `@` picks one of your other workspaces or projects; the message goes with a line saying
+  what it is (folder, branch, agents) and how the agent can reach it. Context only: nothing starts by itself.
 - A scheduled task can run in *A new workspace, then the same one each run*: its first run makes the worktree, the
   rest go there. Tasks that share a workspace pick *Continue* (its agent gets the prompt) or *Start fresh* (a new agent
   tab each run).

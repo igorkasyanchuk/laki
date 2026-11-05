@@ -2667,7 +2667,7 @@ button.board-name:hover { background: none; }
 .rd-working { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
 .rd-ask, .rd-box { flex: none; max-width: 760px; width: 100%; margin: 0 auto; padding: 10px 20px 14px; box-sizing: border-box; }
 .rd-ask { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); } .rd-opts { display: flex; flex-wrap: wrap; gap: 6px; }
-.rd-box { display: flex; gap: 8px; align-items: flex-end; }
+.rd-box { position: relative; display: flex; gap: 8px; align-items: flex-end; } /* @'s menu (pi-complete) over it */
 .rd-box textarea { flex: 1; resize: none; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--fg); font: inherit; }
 .rd-box textarea:focus { outline: none; border-color: var(--accent); }
 .reader-switch { position: absolute; top: 6px; right: 14px; z-index: 10; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); opacity: 0.55; overflow: hidden; transition: opacity 0.15s; }

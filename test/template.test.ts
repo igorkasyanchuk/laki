@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { browserUrl, groupNew, menuKeys, clock, completeInto, completions, mentionsOf, withMentions, csvSep, fillTemplate, importable, initials, laterText, limitsCrossed, limitText, MAIL_OK, paletteGroups, nameOf, parseCsv, parseDuration, parseLater, parseMails, parseSize, previewAddr, previewUrl, prPill, prRef, replyText, rowFact, shortPath, templated, templatesFor, toCsv, triggerAt, wavOf, webmail, withPaths, wordTrim, wsShown, youtubeEmbed } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -394,6 +394,27 @@ test("the palette's groups: suggestions, needs you, recent, then workspaces, tab
   assert.deepEqual(heads(paletteGroups(ws, 'https://GitHub.com/o/r/pull/15046/files#diff-1', [])), ['Workspaces: review'])
   assert.deepEqual(paletteGroups(ws, 'https://github.com/o/r/pull/1504', []), [])
   assert.deepEqual(heads(paletteGroups([{ label: 'bb', kind: 'ws' as const, find: ['https://bitbucket.org/o/r/pull-requests/7'] }], 'https://bitbucket.org/o/r/pull-requests/7/overview', [])), ['Workspaces: bb'])
+})
+
+test('mentions: @ a workspace or project in Reader\'s box; a line each as it is sent', () => {
+  const v: any = {
+    projects: [{ id: 'shop', name: 'Shop', path: '/src/shop' }, { id: 'terms', name: 'Terminals', path: '/', kind: 'shells' }, { id: 'old', name: 'Old', path: '/old', archived: 1 }],
+    workspaces: [
+      { id: 'fix-cart', name: 'Fix cart', project: 'shop', path: '/wt/fix-cart', branch: 'laki/fix-cart' },
+      { id: 'here', project: 'shop', path: '/wt/here', branch: 'laki/here' },
+      { id: 'gone', project: 'shop', path: '/wt/gone', branch: 'b', archived: true },
+      { id: 'zsh', project: 'terms', path: '/', branch: '', term: true },
+    ],
+    tabs: [{ workspace: 'fix-cart', kind: 'agent', name: 'claude' }, { workspace: 'fix-cart', kind: 'shell', name: 'zsh' }],
+  }
+  const ms = mentionsOf(v, 'here')
+  assert.deepEqual(ms.map(m => m.token), ['fix-cart', 'shop'], 'not the one it is in, archived ones, Terminals')
+  assert.equal(ms[0].line, '[Laki workspace @fix-cart: "Fix cart", project Shop, folder /wt/fix-cart, branch laki/fix-cart, agents claude. Context only: message its agent with laki send fix-cart "…", see its changes with laki diff fix-cart]')
+  assert.equal(ms[1].line, '[Laki project @shop: Shop, folder /src/shop, workspaces fix-cart. Context only]')
+  assert.deepEqual(completions({ ch: '@', q: 'ca', from: 0 }, { mentions: ms }), [{ label: 'Fix cart', sub: 'workspace · Shop · @fix-cart', value: '@fix-cart' }])
+  assert.equal(withMentions('ask @fix-cart, then @shop. And @fix-cart again; mail me@x.com', ms), `ask @fix-cart, then @shop. And @fix-cart again; mail me@x.com\n\n${ms[0].line}\n${ms[1].line}`)
+  assert.equal(withMentions('nothing named @nope', ms), 'nothing named @nope')
+  assert.deepEqual(mentionsOf(null), [])
 })
 
 test('prompt completion: @ and # after a space, / at a line\'s start; the rows; what a pick puts in', () => {
