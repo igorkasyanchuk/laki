@@ -42,6 +42,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
+import { BgButton } from './BgTasks'
 import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
@@ -3113,6 +3114,7 @@ export function App() {
                   {ctxPct(tab.context)}%
                 </span>
               )}
+              <BgButton tabs={view.tabs.filter(t => t.workspace === ws.id && t.preset === 'claude')} api={{ bgOutput: readerApi.bgOutput!, send: readerApi.send }} />
               {git && (
                 // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
                 <button

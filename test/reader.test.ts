@@ -69,8 +69,9 @@ async function chatTab(rig: any, session: string) {
 }
 const said = (rig: any, tab: string) => until(async () => (r => r.said?.length && r)(await rig.rpc('chatRead', { tab })), 'its chat')
 
-test('Reader chips: subagents and background shells a claude chat started, until they end; a shell\'s output; its notices not yours', async t => {
-  const rig = await fresh(t)
+test('Reader chips: subagents and background shells a claude chat started, until they end; a shell\'s output; its notices not yours; the status bar\'s Background', async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '300' } })
+  const bgView = async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id).background
   const { tab, add } = await chatTab(rig, 'chat-bg')
   const out = join(rig.home, 'bx1.output')
   writeFileSync(out, 'listening on :3000\n')
@@ -89,6 +90,8 @@ test('Reader chips: subagents and background shells a claude chat started, until
   assert.deepEqual(await rig.rpc('bgOutput', { tab: tab.id, id: 'bx1' }), { text: 'listening on :3000\n', size: 19, cut: false })
   await assert.rejects(rig.rpc('bgOutput', { tab: tab.id, id: 'toolu_a' }), /no output/) // none said
   await assert.rejects(rig.rpc('bgOutput', { tab: tab.id, id: 'bx1', from: { tab: tab.id } }), /read a background task's output/)
+  // the status bar's Background: read with the meters, Reader or not
+  assert.deepEqual((await until(async () => (b => b?.now.length === 3 && b)(await bgView()), 'running in the view')).now.map((x: any) => x.id), ['toolu_a', 'bx1', 'ag9'])
   // the reviewer answered; the shell stopped; the background agent's notice says it's done: none left
   add(
     { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_a', content: 'Looks fine' }] } },
@@ -96,6 +99,8 @@ test('Reader chips: subagents and background shells a claude chat started, until
     { type: 'queue-operation', content: '<task-notification>\n<task-id>ag9</task-id>\n<tool-use-id>toolu_c</tool-use-id>\n<status>completed</status>\n</task-notification>' },
   )
   r = await until(async () => (x => x.said && !x.bg && x)(await rig.rpc('chatRead', { tab: tab.id, v: r.v })), 'none left')
+  const b = await until(async () => (x => x?.now.length === 0 && x)(await bgView()), 'ended in the view')
+  assert.deepEqual([b.done, b.last.map((x: any) => x.name)], [3, ['Scan deps', 'dev server', 'Review the diff']])
   assert.ok(!r.said.some((x: any) => x.who === 'you' && x.text.includes('task-notification')), 'claude\'s notice isn\'t yours')
 })
 

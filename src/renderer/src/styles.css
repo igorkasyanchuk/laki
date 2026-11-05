@@ -1708,6 +1708,16 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .stale-bar.soft button.ghost { background: none; color: var(--muted); }
 .tunnel-pop { position: fixed; width: 500px; max-width: calc(100vw - 16px); padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 13px/1.4 var(--ui-font); color: var(--fg); white-space: normal; user-select: text; -webkit-user-select: text; }
 .tunnel-pop p { margin: 0; }
+.sb-bg { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.sb-bg.on { color: var(--fg); }
+.sb-bg.on svg { animation: spin 2.4s linear infinite; }
+.bg-pop { width: 420px; }
+.bg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.bg-list li { display: flex; align-items: center; gap: 8px; padding: 5px 2px; min-width: 0; }
+.bg-list li.ended { color: var(--muted); }
+.bg-list .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bg-list .link.on { text-decoration: underline; }
+.bg-foot { display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .tunnel-pop a { color: var(--accent-ink); }
 .tunnel-head { display: flex; align-items: center; gap: 8px; }
 .tunnel-qr { width: 200px; height: 200px; align-self: center; border-radius: var(--rs, 6px); }

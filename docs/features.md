@@ -37,7 +37,8 @@ time and AI money per run (`budget: 60 min, $5`).
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
-  *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*);
+  *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*),
+  and the status bar's *n running* lists the workspace's, finished ones too;
   an MCP tool's app (MCP Apps) shows under its call, and a `laki-ui` block in an answer is drawn with Laki's own
   controls (a table, stats, choices you click to answer).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real

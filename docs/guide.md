@@ -1609,7 +1609,9 @@ While Claude Code compacts a long chat, its tab and row say *Compacting…*.
 **Subagents and background tasks**: while a Claude Code chat has subagents at work or commands left running in the
 background (a dev server), chips over the box say so: *Subagents · 2*, *Background · 1*. A click lists them; each has
 *Show output* (the end of its output file, kept up to date, over the box) and *Stop*, which asks the agent to stop it
-(a subagent in the turn at work stops with the turn: Esc). They go as each ends.
+(a subagent in the turn at work stops with the turn: Esc). They go as each ends. The status bar says so too, whatever
+the tab shows: *3 running* while any of the workspace's Claude Code tabs has one (*2 finished* for ten minutes after the
+last ends); a click lists them all with *Output* and *Stop*, the finished ones as *Done*.
 
 **MCP Apps**: a Claude Code call of an MCP tool whose server has an app for it (an MCP App: the tool's `ui://` page)
 shows that app under the call, told what it was called with and its result. Laki asks the server for the page itself,

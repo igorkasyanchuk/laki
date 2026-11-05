@@ -97,14 +97,25 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: M
 // Read on with its transcript (meters.ts chatRead), onto bg; wait: background shells' calls, until their result says
 // their ID. ponytail: claude only; one whose end isn't in the transcript (claude quit) stays until the chat is read anew
 export type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string }
-export type BgRead = { bg: Map<string, BgTask>; wait: Map<string, string> }
+// done: how many ended, the newest DONE_KEPT of them, when the last one did (its line's time: the status bar's Background
+// card)
+export type BgRead = { bg: Map<string, BgTask>; wait: Map<string, string>; done?: { n: number; last: BgTask[]; at?: number } }
+const DONE_KEPT = 5
 const ENDED = /^(completed?|done|failed|killed|stopped|cancell?ed|error|timed?[_ ]?out)$/i
 export function bgOf(jsonl: string, r: BgRead): BgRead {
+  let at: number | undefined // the line's time
+  const end = (id: string) => {
+    const t = r.bg.get(id)
+    if (!t || !r.bg.delete(id) || !r.done) return
+    r.done.n++
+    r.done.last = [t, ...r.done.last].slice(0, DONE_KEPT)
+    r.done.at = at
+  }
   const ended = (text: string) => {
     for (const n of text.split('<task-notification>').slice(1)) {
       const tag = (k: string) => new RegExp(`<${k}>\\s*([^<]*?)\\s*</${k}>`).exec(n)?.[1]
       if (tag('status') && !ENDED.test(tag('status')!)) continue
-      for (const id of [tag('task-id'), tag('tool-use-id')]) if (id) r.bg.delete(id)
+      for (const id of [tag('task-id'), tag('tool-use-id')]) if (id) end(id)
     }
   }
   for (const line of jsonl.split('\n')) {
@@ -116,6 +127,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
       continue
     }
     if (j.isSidechain) continue // a subagent's own calls
+    at = (t => (Number.isFinite(t) ? t : undefined))(Date.parse(j.timestamp))
     if (j.type === 'queue-operation' && typeof j.content === 'string') ended(j.content)
     const c = j.message?.content
     const parts: any[] = typeof c === 'string' ? [{ type: 'text', text: c }] : Array.isArray(c) ? c : []
@@ -126,14 +138,15 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
         const name = String(i.description || i.subagent_type || i.command || x.name).replace(/\s+/g, ' ').trim().slice(0, 80)
         if (x.name === 'Agent' || x.name === 'Task') r.bg.set(x.id, { id: x.id, kind: 'agent', name })
         else if (x.name === 'Bash' && i.run_in_background === true) r.wait.set(x.id, name)
-        else if (x.name === 'KillShell' || x.name === 'KillBash' || x.name === 'TaskStop') r.bg.delete(String(i.shell_id ?? i.task_id ?? i.id ?? ''))
+        else if (x.name === 'KillShell' || x.name === 'KillBash' || x.name === 'TaskStop') end(String(i.shell_id ?? i.task_id ?? i.id ?? ''))
       } else if (j.type === 'user' && x.type === 'tool_result' && typeof x.tool_use_id === 'string') {
         const res = j.toolUseResult && typeof j.toolUseResult === 'object' ? j.toolUseResult : {}
         const said = typeof x.content === 'string' ? x.content : Array.isArray(x.content) ? x.content.map((y: any) => y?.text ?? '').join('\n') : ''
         const a = r.bg.get(x.tool_use_id)
         if (a) {
-          r.bg.delete(x.tool_use_id) // a subagent's result: it's done, or (a background one) it runs on under its own id
-          if (res.isAsync && typeof res.agentId === 'string') r.bg.set(res.agentId, { ...a, id: res.agentId, ...(typeof res.outputFile === 'string' && { out: res.outputFile }) })
+          // a subagent's result: it's done, or (a background one) it runs on under its own id
+          if (res.isAsync && typeof res.agentId === 'string') r.bg.delete(x.tool_use_id), r.bg.set(res.agentId, { ...a, id: res.agentId, ...(typeof res.outputFile === 'string' && { out: res.outputFile }) })
+          else end(x.tool_use_id)
         }
         const shell = r.wait.get(x.tool_use_id)
         if (shell !== undefined) {

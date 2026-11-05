@@ -54,6 +54,7 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
 type Reader = Tail & { said: Said[]; v: number; bg: BgRead; calls: Map<string, McpCall> }
 const readers = new Map<string, Reader>()
 const bgNew = (): BgRead => ({ bg: new Map(), wait: new Map() })
+const bgDone = (): BgRead => ({ ...bgNew(), done: { n: 0, last: [] } })
 export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; from?: number } {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) throw new Error('no such tab')
@@ -92,7 +93,9 @@ export function bgOutput(p: { tab: string; id: string }) {
 // the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on
 // every 10 s (main.ts' meterTick) and as a turn ends. Today's by chat in <data>/usage-today.json: a closed tab's stays,
 // and a restart reading each chat anew counts it once (the more of the two)
-type MeterRun = Tail & { m: Meter; big?: boolean } // big: claude's own settings run it on a 1M window
+// bg: a claude chat's background tasks (share.ts bgOf), running and ended: the status bar's Background chip. ponytail:
+// read with the meters, so none while both the context meter and costs are off
+type MeterRun = Tail & { m: Meter; big?: boolean; bg: BgRead } // big: claude's own settings run it on a 1M window
 const meters = new Map<string, MeterRun>()
 const todayPath = join(dir, 'usage-today.json')
 let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
@@ -104,16 +107,17 @@ function spentNow() {
 }
 // true: it read something new
 export function meterRead(tab: Tab, look = false) { // look: a turn's end, its transcript looked for now
-  const r = meters.get(tab.id) ?? { m: meterNew() }
+  const r = meters.get(tab.id) ?? { m: meterNew(), bg: bgDone() }
   meters.set(tab.id, r)
   if (look) r.looked = 0
   const big = tab.preset === 'claude' && state.settings?.contextMeter !== false && claudeBig(tab) // read each time: settings change without the transcript
   const was = lines.get(tab.id)
   const moved = big !== r.big || statusOf(tab) !== was // its status line written since
   r.big = big
-  const text = tailOf(tab, r, () => (r.m = meterNew()))
+  const text = tailOf(tab, r, () => ((r.m = meterNew()), (r.bg = bgDone())))
   if (!text) return moved
   meterOf(tab.preset!, text, r.m)
+  if (tab.preset === 'claude') bgOf(text, r.bg)
   const s = spentNow()
   if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
     s.chats[tab.resumeId!] = { ws: tab.workspace, tokens: r.m.today.tokens, cost: r.m.today.cost }
@@ -184,7 +188,7 @@ function claudeBig(tab: Tab) {
   }
   return false
 }
-export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan'> {
+export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background'> {
   const r = meters.get(t.id)
   const m = r?.file?.endsWith(`${t.resumeId}.jsonl`) ? r.m : undefined // another chat's (a /clear): until this one's is read
   const s = (x => (x?.session === t.resumeId ? x : undefined))(statusOn() ? lines.get(t.id) : undefined) // its status line's, this chat's
@@ -194,7 +198,8 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan'> {
   const max = s?.max ?? m?.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r?.big) || (m?.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
   const live = s && Date.now() - s.mtime < STATUS_FRESH ? (s.used ?? (s.pct !== undefined && max ? Math.round((s.pct * max) / 100) : undefined)) : undefined
   const used = live ?? m?.used
-  return { ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  const bg = m && r!.bg
+  return { ...(bg && (bg.bg.size || bg.done?.n) && { background: { now: [...bg.bg.values()], done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to

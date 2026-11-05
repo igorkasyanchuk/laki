@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Background tasks in the status bar: *3 running* while a Claude Code tab of the workspace has a dev server, a test run
+  or a background subagent going, in a terminal or the Reader; a click lists them with *Output* and *Stop*, and the
+  finished ones (*Done*, *n finished*).
+
 - Settings › General › Updates: the update delay is a row of day buttons (None, 1d … 30d), and the section lays out
   cleanly in a narrow window.
 

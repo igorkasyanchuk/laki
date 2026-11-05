@@ -59,6 +59,10 @@
     `bg`. `bgOutput` (FROM, agent-refused): the last 64 KB of a listed task's file, never another path. Reader.tsx'
     `.rd-chips` (Subagents, Background), a menu each (*Show output*: `.rd-out`, every 2 s; *Stop*: a `send` asking the
     agent; none for one in the turn, a `toolu_` id). `NOISE` drops claude's task-notification and agent-message lines.
+    The meters read it too (`MeterRun.bg`, `bgDone`: `done`, how many ended, the newest 5, the last one's line time):
+    `meterView`'s `background` (`TabView.background`: `now`, `done`, `last`, `at`) is the status bar's Background chip
+    (BgTasks.tsx `BgButton`: the workspace's claude tabs, while one runs or 10 minutes after the last ended; its card
+    lists each with Output and Stop as the chips do, the ended ones as Done, *n finished*). None while both meters are off.
   - MCP Apps (`settings.mcpApps`, on unless false; mcpApps.ts): `chatOf`'s `calls` (claude's `mcp__<server>__<tool>`
     calls, their said line `at`, their result: content blocks, `structuredContent`), `callsOf` (the newest 200); main.ts'
     `chatRead` is `chatWithApps`: `appsFor` finds each call's server in the tab's account's `.claude.json` (user and
