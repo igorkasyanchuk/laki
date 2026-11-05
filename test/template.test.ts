@@ -475,7 +475,10 @@ test('rmVerdict: Delete and Archive sum up what goes, worst first', () => {
   assert.deepEqual(rmVerdict({ ...base, dirty: 0, ahead: 0 }), { tone: 'ok', text: 'Safe to delete: nothing of its own: no changes, no commits' })
   assert.deepEqual(rmVerdict({ ...base, dirty: 0, ahead: 3, unpushed: 1, pr: { number: 7, state: 'OPEN' }, busy: 1 }), { tone: 'warn', text: "Mind: 1 commit not pushed (kept on the branch here); PR #7 isn't merged yet; 1 agent at work stops" })
   assert.deepEqual(rmVerdict({ ...base, dirty: 2, artifacts: 3, pr: { number: 7, state: 'MERGED' } }), { tone: 'bad', text: 'Check first: 2 uncommitted files are lost; 3 artifacts go' })
-  assert.equal(rmVerdict({ ...base, dirty: 2, lost: false })?.tone, undefined) // a codespace archived: its files stay
+  assert.equal(rmVerdict({ ...base, dirty: 2, lost: false })?.tone, undefined) // a folder kept: its files stay
+  // a codespace archived: its files stay, until GitHub deletes the stopped codespace
+  assert.deepEqual(rmVerdict({ ...base, archive: true, cs: true, lost: false, dirty: 2, ahead: 3, unpushed: 1 }), { tone: 'warn', text: 'Mind: 2 uncommitted files and 1 unpushed commit stay only while the codespace does: GitHub deletes a stopped one after its retention period (30 days by default)' })
+  assert.equal(rmVerdict({ ...base, archive: true, cs: true, lost: false, dirty: 0, ahead: 0 })?.tone, 'ok')
   assert.equal(rmVerdict({ ...base, artifacts: 3, keptArts: true }), undefined) // counts unknown, nothing to mind: no verdict
   assert.equal(rmVerdict({ ...base, worktree: false, dirty: 0 }), undefined) // a folder: nothing of its own goes
   assert.equal(rmVerdict({ ...base, pr: { number: 7, state: 'MERGED' } }), undefined) // merged, but its uncommitted files not counted: no Safe

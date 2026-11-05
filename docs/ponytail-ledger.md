@@ -49,13 +49,17 @@ agent-vs-user boundary (per-tab tokens), is under Issues because it's L and need
   hunk or file is gone from the app (a loose git object at best). Fix: keep each workspace's 20 undos in
   `<data>/undos/<ws>.json` (0600; an entry's patch capped at a few MB, a bigger one in memory as now), read at the first
   undo, removed with the workspace. Test: `test/hunk.test.ts`: revert a hunk, restart the daemon, Undo brings it back.
-- [ ] **4. `src/daemon/core.ts:2613`: archiving a cloud workspace skips the uncommitted check.** Data loss, S. The
+  *Not done (H8.2, re-assessed):* the only way to that Undo is the revert's toast, 8 seconds, so a restart loses it only
+  inside those 8 seconds; keeping it on disk buys nearly nothing until Changes lists past reverts (a design call).
+- [x] **4. `src/daemon/core.ts:2613`: archiving a cloud workspace skips the uncommitted check.** Data loss, S. The
   check is skipped because a stopped codespace keeps its files, but GitHub deletes a stopped codespace after its
   retention period (30 days by default, less if you set it), with its uncommitted changes and unpushed commits. Fix:
   with `ifClean`, run `git status --porcelain` and count the commits not on the remote (`@{u}..`, else
   `origin/<branch>..`) over its ssh before `cs.stop`, and return `{ dirty }` as a worktree's archive does, so the app
   asks; the archive's toast names the retention. Test: `test/ssh.test.ts` (its ssh is this machine, gh the fake): a
   codespace workspace with a changed file, and one with an unpushed commit, both come back dirty; a clean one stops.
+  *Done (H8.2) the lighter way:* the archive ask says the codespace keeps its files only until GitHub deletes it, and
+  names its uncommitted files and unpushed commits (text.ts `rmVerdict`'s `cs`, `test/template.test.ts`); not held.
 - [ ] **5. `src/daemon/share.ts:201`: a subagent's lines make an answer's usage count twice.** Correctness, S. The
   cost meter and today's spend are money on screen; an answer is a line per block, and a sidechain line between two
   of them means the earlier one isn't taken back. Fix: remember the last usage per message id (a small map, the last

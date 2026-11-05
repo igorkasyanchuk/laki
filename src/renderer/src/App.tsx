@@ -1483,7 +1483,7 @@ export function App() {
     const facts: Fact[] = [{ label: 'Project', icon: 'folder', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
     if (w.kind === 'worktree') facts.push({ label: 'Branch', icon: 'gitBranch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
     facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
-    if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty && !stops ? 'bad' : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept' : 'lost'}` : 'none uncommitted' })
+    if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty ? (stops ? 'warn' : 'bad') : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept in the stopped codespace' : 'lost'}` : 'none uncommitted' })
     if (pk.ahead) facts.push({ label: 'Commits', icon: 'gitCommit', tone: pk.unpushed ? 'warn' : 'ok', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (pr) facts.push({ label: 'PR', icon: merged ? 'gitMerge' : 'pr', tone: merged ? 'ok' : open ? 'warn' : undefined, chip: merged ? 'Merged' : pr.draft ? 'Draft' : open ? 'Open' : 'Closed', value: `#${pr.number}${pr.title ? ` · ${pr.title}` : ''} (stays on GitHub)` })
     if (pr?.author) facts.push({ label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` })
@@ -1491,7 +1491,7 @@ export function App() {
     if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
     if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${keptArts ? ' (kept)' : ': deleted'}` })
     facts.push({ label: 'Created', icon: 'clock', value: ago(w.created) })
-    const verdict = rmVerdict({ archive, worktree: w.kind === 'worktree', dirty: pk.dirty, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
+    const verdict = rmVerdict({ archive, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
     return { facts, verdict }
   }
   const rmWs = async (w: WorkspaceView) => {
@@ -1536,7 +1536,7 @@ export function App() {
     const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there
     const pk = asked ? {} : await peekWs(w)
     const cs = w.codespace !== undefined // its codespace stops, its files stay
-    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay. Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
+    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay until GitHub deletes a stopped codespace (after 30 days by default). Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
     let forced = false
     const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
     const r = old && asked ? { dirty: -1 } : await gated(w, 'archive', go(!old && !pk.dirty)) // the changes it was asked about go

@@ -2623,7 +2623,8 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   }
   const h = await gated('archive', ws, o)
   if (h) return h
-  // stopped, its files kept for Restore. ponytail: GitHub deletes a stopped one after its retention period (30 days)
+  // stopped, its files kept for Restore. ponytail: GitHub deletes a stopped one after its retention period (30 days by
+  // default), its uncommitted and unpushed work with it: the app's archive ask says so (text.ts rmVerdict's cs), it isn't held
   if (ws.codespace) await cs.stop(ws.codespace).then(() => (ws.csState = 'Shutdown'))
   await teardown(ws)
   ws.archived = true

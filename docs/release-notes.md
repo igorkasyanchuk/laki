@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Archiving a cloud workspace says its codespace keeps your uncommitted files and unpushed commits only until GitHub
+  deletes the stopped codespace (30 days by default).
+
 - A managed policy also holds for tabs made before it: one it refuses (an agent turned off, *Bypass permissions* when
   approvals are required) doesn't start again after a restart, a wake or Enter.
 
