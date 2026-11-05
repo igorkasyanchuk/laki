@@ -152,6 +152,49 @@ test("gh failing (a rate limit, the network) keeps the PR shown; only gh's none 
   assert.equal(await prOf(), undefined)
 })
 
+test("the timer's scans spare GitHub's quota: a quiet PR waits, a low quota waits; Refresh asks at once", async t => {
+  const rig = await fresh(t, { env: { LAKI_PR_BG: '1' } })
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = (o: object) => writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 5, state: 'OPEN', url: 'https://example.invalid/pr/5', mergeable: 'MERGEABLE', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }], ...o }))
+  const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr view')).length
+  pr({ statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'IN_PROGRESS', conclusion: '' }] })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const prOf = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr
+  // checks running: asked each scan
+  await until(async () => (await prOf())?.number === 5 && views() >= 3, 'scanned while running')
+  // done and as it was: quiet, the timer's scans leave it
+  pr({})
+  await until(async () => (await prOf())?.checks === 'pass', 'its checks pass')
+  const n = views()
+  await new Promise(r => setTimeout(r, 2500))
+  assert.ok(views() <= n + 1, `quiet: ${views() - n} more`) // the one that found it as it was
+  // Refresh (yours) asks at once
+  const m = views()
+  await rig.rpc('prRefresh')
+  assert.equal(views(), m + 1)
+  // ponytail: QUIET's 10 minutes aren't waited out here; the quota under FLOOR is
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api rate_limit --jq \.resources\.graphql/)
+})
+
+test("a low GraphQL quota: the timer's scans wait for its reset, Laki's log says so with its own gh calls", async t => {
+  const rig = await fresh(t, { env: { LAKI_PR_BG: '1' } })
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'ratelimit.json'), JSON.stringify({ limit: 5000, remaining: 12, reset: Math.floor(Date.now() / 1000) + 3600 }))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await until(() => /GraphQL quota has 12 left, the timer's scans wait until \d\d:\d\d \(Laki's own gh calls \d+ since/.test(rig.out), 'said')
+  const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr view')).length
+  const n = views()
+  await new Promise(r => setTimeout(r, 2500))
+  assert.ok(views() <= n + 1, `none while low (a new branch's own scan aside): ${views() - n} more`) // the timer's: ~5 in that time
+  const m = views()
+  await rig.rpc('prRefresh') // yours: at once
+  assert.equal(views(), m + 1)
+})
+
 test('autoFix and autoReview: they wait for an agent; CI goes over to you after 3 fixes in a row; a pass starts over', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

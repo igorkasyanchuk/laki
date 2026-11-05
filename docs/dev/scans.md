@@ -110,8 +110,13 @@
   `gh api user` once per host: no avatar, no Approve), every `settings.prScan` minutes
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
   A gh failure but *no pull requests found* (a rate limit, the network, a timeout) keeps the last PR; the timer's scans
-  (`scanPRs(true)`) skip a branch gh found none for within `NONE_EVERY` (5 minutes) and all of them for `LIMITED` (5
-  minutes) after gh says rate limit; a turn's end, a branch move and `prRefresh` ask at once.
+  (`scanPRs(true)`) skip a branch gh found none for within `NONE_EVERY` (5 minutes), all of them for `LIMITED` (5
+  minutes) after gh says rate limit, a quiet PR (`quietAt`: the last scan found it as it was, with no pending check and
+  its mergeability known, or not open) within `QUIET` (10 minutes; merged or closed: `SHUT`, 30), and all of them while
+  GitHub's GraphQL quota is under `FLOOR` (1000 points: `quotaLow`, `gh api rate_limit`, free, asked at most every 5
+  minutes; until its reset, logged with Laki's own gh calls); a turn's end, a branch move and `prRefresh` ask at once.
+  Every gh of Laki's is counted by kind (core.ts `ghCount`: `exec`'s, codespace.ts', `ghCard`'s; `ghSaid`), its log
+  says the hour's each hour (`ghHour`). `LAKI_PR_BG=1` makes the tests' fast timer scan as the timer does (bg).
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. No PR on the
   branch (and no `prUrl`): `prFromSaid`, the one PR link its agent tabs' last answers name (one, of a repo of `git
   remote -v`; each tried once per workspace, `saidTried`), attached as `prAttach` does, marked `prSaid` (one in `related` never: you

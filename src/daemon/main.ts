@@ -893,7 +893,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
   every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
-  every(prMs || 60000, () => (prMs ? prMod.scanPRs() : prMod.prTick()))
+  every(prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
+  every(3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
   every(2000, core.sweepRunning)
   every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   every(2000, core.shellTick)

@@ -4,6 +4,12 @@ version it builds, with the date. -->
 
 ## Next
 
+- Fewer gh calls: a PR that hasn't changed and has nothing running is checked every 10 minutes instead of every minute
+  (merged or closed ones every 30), and the background checks pause while GitHub's quota is nearly spent, so your own
+  gh and extensions keep working. A turn's end, a push or Refresh still checks at once.
+- Extensions' logs and Runs say how many times each run called gh (`gh 3×`); a run turned away by GitHub's rate limit
+  gets a line with Laki's own gh calls this hour. Laki's log counts its own each hour.
+
 - Agents can no longer move a tab to another of your accounts, remove an account, or change which account new tabs
   use, Auto fallback or MCP Apps: those stay yours.
 - MCP Apps leave alone a server you turned off in Claude for that folder, and start a server only for a call Claude ran.

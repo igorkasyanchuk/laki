@@ -111,7 +111,10 @@ the checker's warning; a value saved before it became a secret moves to the secr
 | `$WIDGET_ARG` | an action's argument (`data-arg`), never pasted into the command |
 
 It runs in the extension's folder with your PATH (gh, jq, curl…), 2 minutes at most, as a process group of its own: at
-the time limit, or a Stop, what it started goes too (a `sleep`, `npm run`, a server). A JS `script`'s default export
+the time limit, or a Stop, what it started goes too (a `sleep`, `npm run`, a server). Its `gh` goes through a small
+counter of Laki's first on that PATH: each run's log line and Runs say how many times it ran gh (`gh 3×`), since every
+gh of yours shares GitHub's rate limit with Laki's PR checks; one turned away by that limit gets a log line with Laki's
+own gh calls this hour. A JS `script`'s default export
 gets `{ config, last }` (a per-workspace one's `workspace` too) and returns the data.
 
 ## Per workspace (`scope`)

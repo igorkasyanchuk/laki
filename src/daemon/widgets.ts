@@ -8,7 +8,7 @@ import { type ChildProcess } from 'node:child_process'
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, type FSWatcher, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { readJson, writeAtomic } from '../shared/conn.ts'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, type LogLevel, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetOption, type WidgetTool, type WidgetRun, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, type ActionFile, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, openOk, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
@@ -19,7 +19,7 @@ import { iconTurns } from '../shared/icons.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
 import { dir, realOf } from './dir.ts'
-import { agentCaller, broadcast, git, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
+import { agentCaller, broadcast, git, ghSaid, imageSave, within, changed, cliArgv, cliEnv, clients, devKeep, devLog, plainEnv, prOf, presets, procs, q, rt, state, tabStatus, wsVars } from './core.ts'
 import { headOf } from './pr.ts'
 import { diff, inside, stats } from './files.ts'
 import { execGroup, killGroup, own } from './resources.ts'
@@ -1033,8 +1033,39 @@ export function envOf(w: Entry, extra: Record<string, string>) {
   for (const [k, v] of Object.entries(configOf(w, true))) env[`WIDGET_${k.toUpperCase()}`] = v
   return env
 }
-type Ran = { out: string; err: string }
-export type Failed = Error & { stderr?: string; stdout?: string; exit?: number; changed?: boolean } // changed: a guarded one's files moved (trusted)
+type Ran = { out: string; err: string; gh?: number } // gh: how many times it ran gh (ghShim)
+export type Failed = Error & { stderr?: string; stdout?: string; exit?: number; changed?: boolean; gh?: number } // changed: a guarded one's files moved (trusted)
+// a run's gh calls, counted for its log: Laki's gh (<data>/gh-shim/gh) first on its PATH adds a byte to the run's own
+// file ($LAKI_GH_COUNT), then runs the gh its PATH has ($LAKI_GH). None when that PATH has no gh. Every gh of yours
+// shares GitHub's quota with Laki's PR scans (core.ts ghSaid)
+const GH_SHIM = `#!/bin/sh
+# Laki's: counts an extension run's gh calls (its log says how many), then runs gh
+[ -n "$LAKI_GH_COUNT" ] && printf . >> "$LAKI_GH_COUNT" 2>/dev/null
+[ -x "$LAKI_GH" ] || { echo "gh: command not found" >&2; exit 127; }
+exec "$LAKI_GH" "$@"
+`
+let shimAt = ''
+function ghShim(env: Record<string, string>) {
+  const real = (env.PATH ?? '').split(':').map(d => d && join(d, 'gh')).find(f => f && statSync(f, { throwIfNoEntry: false })?.isFile())
+  if (!real) return
+  try {
+    if (!shimAt) {
+      const d = join(dir, 'gh-shim')
+      mkdirSync(d, { recursive: true })
+      writeFileSync(join(d, 'gh'), GH_SHIM, { mode: 0o755 })
+      shimAt = d
+    }
+  } catch {
+    return // not counted
+  }
+  const file = join(tmpdir(), `laki-gh-${randomBytes(6).toString('hex')}`)
+  Object.assign(env, { PATH: `${shimAt}:${env.PATH}`, LAKI_GH: real, LAKI_GH_COUNT: file })
+  return () => {
+    const n = statSync(file, { throwIfNoEntry: false })?.size ?? 0
+    rmSync(file, { force: true })
+    return n ? { gh: n } : {}
+  }
+}
 // a widget's command, in its folder, as a process group (a timeout ends what it started too): stdout and stderr, or why
 // it failed (with its stderr and exit code). stdin: an event's JSON (a handler's); else nothing to read
 const timeout = () => Number(process.env.LAKI_WIDGET_TIMEOUT_MS) || 120_000 // tests' shorter
@@ -1055,14 +1086,17 @@ export function exec(w: Entry, cmd: string, args: string[], extra: Record<string
   }
   return new Promise<Ran>((ok, no) => {
     const t = ms ?? timeout()
-    const p = execGroup(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
+    const env = envOf(w, extra)
+    const counted = ghShim(env)
+    const p = execGroup(cmd, args, { cwd: w.dir, env, timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
       execs.delete(p)
+      const gh = counted?.() ?? {}
       // its secrets masked in what it said, before anything keeps or shows it (the view's error, Runs, dev's lines,
       // devLog); its data (a fetch's stdout) is its own, as it printed it
       const mask = masker(w)
-      if (!e) return ok({ out: stdout, err: mask(stderr) })
+      if (!e) return ok({ out: stdout, err: mask(stderr), ...gh })
       const late = e.message === 'maxBuffer exceeded' ? `printed more than ${MAX_OUT >> 20} MB` : e.killed ? `timed out after ${t >= 60_000 ? `${t / 60_000} minutes` : `${t / 1000} s`}` : undefined
-      no(Object.assign(new Error(mask(late ?? (lastLine(stderr) || lastLine(stdout) || e.message))), { stderr: mask(stderr), stdout: mask(stdout), exit: typeof e.code === 'number' ? e.code : undefined }))
+      no(Object.assign(new Error(mask(late ?? (lastLine(stderr) || lastLine(stdout) || e.message))), { stderr: mask(stderr), stdout: mask(stdout), exit: typeof e.code === 'number' ? e.code : undefined, ...gh }))
     })
     execs.add(p)
     own(p, `Extension · ${w.m.name || w.id}`)
@@ -1083,7 +1117,8 @@ export function ran(id: string, r: Run, stderr?: string) {
   if (!w || !logOn(w)) return
   const src = r.reason.startsWith('tool:') || r.reason.startsWith('gate:') ? r.reason : r.action ? `action:${r.action}` : ['stream', 'push'].includes(r.reason) ? r.reason : 'fetch'
   if (stderr?.trim()) xlog(w, 'info', src, stderr.length > LOG_RUN ? stderr.slice(-LOG_RUN) : stderr, ws)
-  xlog(w, r.ok ? 'info' : 'error', src, `${r.ok ? 'ran' : 'failed'} (${r.reason}${r.why ? `: ${r.why}` : ''}) in ${r.ms} ms, exit ${r.exit ?? 0}, ${r.bytes} B${r.error ? `: ${r.error}` : ''}`.replace(/\s+/g, ' '), ws, true)
+  xlog(w, r.ok ? 'info' : 'error', src, `${r.ok ? 'ran' : 'failed'} (${r.reason}${r.why ? `: ${r.why}` : ''}) in ${r.ms} ms, exit ${r.exit ?? 0}, ${r.bytes} B${r.gh ? `, gh ${r.gh}×` : ''}${r.error ? `: ${r.error}` : ''}`.replace(/\s+/g, ' '), ws, true)
+  if (/rate limit/i.test(`${r.error ?? ''}\n${stderr ?? ''}`)) xlog(w, 'warn', src, `GitHub's rate limit: one quota for every gh of yours. Laki's own gh calls: ${ghSaid()}`, ws, true)
 }
 
 // a script's default export gets { config, last, workspace } (a scope workspace one's) and returns the data (an async
@@ -1176,7 +1211,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   }
   running.delete(k)
   const ms = Date.now() - t0
-  ran(k, { at: t0, ms, reason, why: o.why ?? (once ? 'once while off: Try it live' : undefined), ok: !error, bytes: r ? Buffer.byteLength(r.out) : 0, error, stderr: tail(fail?.stderr ?? r?.err), exit: error ? (fail?.exit ?? 0) : 0 }, fail?.stderr ?? r?.err)
+  ran(k, { at: t0, ms, reason, why: o.why ?? (once ? 'once while off: Try it live' : undefined), ok: !error, bytes: r ? Buffer.byteLength(r.out) : 0, error, stderr: tail(fail?.stderr ?? r?.err), exit: error ? (fail?.exit ?? 0) : 0, gh: r?.gh ?? fail?.gh }, fail?.stderr ?? r?.err)
   wLog(w, () => (error ? `fetch failed after ${ms} ms: ${error}` : `fetched in ${ms} ms: ${JSON.stringify(data)?.length ?? 0} bytes of JSON`), error ? 'error' : 'info')
   const gone = !!x && !state.workspaces.includes(x) // deleted meanwhile: nothing kept
   if (!gone)
@@ -1340,8 +1375,8 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
   const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
-    const { out, err } = ai ? { out: await aiAnswer(w, o.action, ai, String(o.arg ?? ''), x, ctx?.info), err: '' } : await exec(w, '/bin/sh', ['-c', cmd!], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x, gone), ...ctx?.env, ...ev?.env }, ev?.stdin)
-    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+    const { out, err, gh }: Ran = ai ? { out: await aiAnswer(w, o.action, ai, String(o.arg ?? ''), x, ctx?.info), err: '' } : await exec(w, '/bin/sh', ['-c', cmd!], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x, gone), ...ctx?.env, ...ev?.env }, ev?.stdin)
+    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0, gh }, err)
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
     let j: Record<string, unknown> | undefined
     for (const s of ai ? [lastJson(out)] : [out, lastLine(out)]) // all of it, or its last line after some log lines; an agent's json block
@@ -1368,7 +1403,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }), ...(openOk(open) && !ev && { open }), ...(files?.length && { files }), ...(typeof j?.send === 'string' && j.send.trim() && !ev && { send: j.send.trim().slice(0, INSERT_MAX) }) } // send: to the workspace's agent, the app asks first (widgetDo's send)
   } catch (e) {
     const f = e as Failed
-    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
+    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit, gh: f.gh }, f.stderr)
     wLog(w, `action ${o.action} failed: ${f.message}`, 'error')
     return { ok: false, error: f.message, ...(ev?.full && { stdout: f.stdout ?? '' }) }
   }

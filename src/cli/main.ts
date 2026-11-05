@@ -105,7 +105,7 @@ async function dev(folder?: string) {
       if (x.devError !== s.err) console.log(x.devError ? `${hm(Date.now())} ${who}✗ last good version kept: ${x.devError}` : `${hm(Date.now())} ${who}reads again`), (s.err = x.devError)
       for (const run of x.runs.filter(u => u.at > s.at).reverse()) {
         const what = run.action ? `action ${run.action}` : 'fetch'
-        console.log(`${hm(run.at)} ${who}${what} ${run.ok ? `ok ${run.ms} ms ${size(run.bytes)}` : `failed ${run.ms} ms: ${run.error}`} (${run.reason}${run.why ? `: ${run.why}` : ''})`)
+        console.log(`${hm(run.at)} ${who}${what} ${run.ok ? `ok ${run.ms} ms ${size(run.bytes)}` : `failed ${run.ms} ms: ${run.error}`}${run.gh ? `, gh ${run.gh}×` : ''} (${run.reason}${run.why ? `: ${run.why}` : ''})`)
         s.at = run.at
       }
     }

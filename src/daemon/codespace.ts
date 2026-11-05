@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
+import { ghCount } from './core.ts'
 
 const run = promisify(execFile)
 const sshDir = join(dataDir(), 'ssh')
@@ -25,6 +26,7 @@ export const SCOPE = 'gh needs the codespace scope: run gh auth refresh -s codes
 // gh here (cwd: create's, the project's folder, which fakes/gh clones); its failure as a line you can act on: the
 // codespace scope most of all, which gh auth login doesn't ask for
 async function gh(args: string[], timeout = 30000, cwd?: string) {
+  ghCount(args)
   try {
     return (await run('gh', args, { cwd, timeout, maxBuffer: 16 << 20 })).stdout.trim()
   } catch (e: any) {

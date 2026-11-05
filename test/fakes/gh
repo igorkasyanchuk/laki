@@ -48,6 +48,7 @@ case "$1 $2" in
     f "run-$j.log" || f run.log || { echo 'failed to get run log: HTTP 404: Not Found (https://api.github.com/repos/o/r/actions/jobs/'"$j"'/logs)' >&2; exit 1; } ;;
   "api graphql") case "$*" in *closedByPullRequestsReferences*) f issues.json || exit 1 ;; *) f graphql.json || exit 1 ;; esac ;; # issueList's: issues.json
   "api user") f user || echo me ;;
+  "api rate_limit") f ratelimit.json || exit 1 ;; # the PR scan's quota check: --jq .resources.graphql's answer
   "label list") f labels.json || echo "[]" ;;
   "pr diff") f pr.diff || exit 1 ;;
   "auth status") f auth || exit 1 ;;

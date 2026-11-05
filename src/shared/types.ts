@@ -876,7 +876,7 @@ export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'ch
 // its full view, else a fetch)
 // a fetch's or an action's run (widgetRuns): reason schedule, open, settings, manual, reload, dev or action:<name>; why:
 // what changed (dev mode); stderr: its last 20 lines
-export type WidgetRun = { at: number; ms: number; reason: string; why?: string; action?: string; ok: boolean; bytes: number; error?: string; stderr?: string; exit?: number }
+export type WidgetRun = { at: number; ms: number; reason: string; why?: string; action?: string; ok: boolean; bytes: number; error?: string; stderr?: string; exit?: number; gh?: number } // gh: the times it ran gh
 export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtures: string[]; devError?: string; mock?: string; data?: string; big?: boolean; stream?: WidgetStream } // data: its last data's JSON, when asked (big: over 256 KB, not given)
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }

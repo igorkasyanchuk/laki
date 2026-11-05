@@ -837,8 +837,28 @@ function worktreeAdd(proj: Project, ...args: string[]) {
   return own.then(set => git(proj, ...(set ? [] : ['-c', 'checkout.workers=0']), 'worktree', 'add', ...args))
 }
 
+// Laki's own gh calls since the hour began, by kind (pr view, api graphql…): its log says how many each hour (ghHour),
+// and an extension's run that hits GitHub's rate limit says how many in its log (ghSaid). Every gh of yours shares
+// one quota (GraphQL: 5000 points an hour)
+const ghCalls = { since: Date.now(), by: new Map<string, number>() }
+export function ghCount(args: string[]) {
+  const k = [args[0], args[1] && !args[1].startsWith('-') ? args[1].split('/')[0] : ''].filter(Boolean).join(' ')
+  ghCalls.by.set(k, (ghCalls.by.get(k) ?? 0) + 1)
+}
+export function ghSaid() {
+  const all = [...ghCalls.by].sort((a, b) => b[1] - a[1])
+  const n = all.reduce((t, [, c]) => t + c, 0)
+  return `${n} since ${new Date(ghCalls.since).toTimeString().slice(0, 5)}${n ? ` (${all.map(([k, c]) => `${k} ${c}`).join(', ')})` : ''}`
+}
+export function ghHour() {
+  if (ghCalls.by.size) log(`gh: Laki's own calls, ${ghSaid()}`)
+  ghCalls.by.clear()
+  ghCalls.since = Date.now()
+}
+
 // a command in a folder: here, or on its SSH host (with the PATH its login shell has)
 export async function exec(at: At, cmd: string, args: string[], o: { timeout?: number; maxBuffer?: number } = {}) {
+  if (cmd === 'gh') ghCount(args)
   if (!at.host) return run(cmd, args, { cwd: at.path, maxBuffer: 64 << 20, ...o })
   const h = await hostUp(at.host)
   return slot(at.host, () => run('ssh', [...sshOpts(at.host!), at.host!, `export PATH=${q(h.path)}; cd ${q(at.path)} && exec ${[cmd, ...args].map(q).join(' ')}`], { maxBuffer: 64 << 20, ...o }))
@@ -3624,7 +3644,7 @@ export async function timer(p: { act: string; minutes?: number; note?: string; w
 
 // the first-run screen's checks
 export async function doctor(): Promise<Doctor> {
-  const gh = !onPath('gh') ? 'missing' : await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const)
+  const gh = !onPath('gh') ? 'missing' : (ghCount(['auth', 'status']), await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const))
   return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })), hooks: await hooksRun(), hookFiles: hookFilesOk() }
 }
 // doctor's hooks: Laki's hook command runs, as agents run it (hook ping: no RPC, exits at once)

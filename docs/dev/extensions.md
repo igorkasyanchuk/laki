@@ -409,8 +409,11 @@ Logs (widgetLogs.ts, `test/widget-logs.test.ts`): `logOn` (`settings.widgetLogs`
 of a run's own text takes its `debug:`… prefix: `leveled`), `src`, `text` (2 KB, `masker`: secrets' and `SECRET`-named
 settings' values of 4 characters or more as ••••), `ws`) into `pending`, `flushLogs` every 500 ms and at
 `widgetsStop`: `<data>/widget-data/<id>.log`, 0600, past `LOG_MAX` (1 MB; `LAKI_WIDGET_LOG_MAX`: tests') renamed to
-`.log.1`. Written: `wLog` (Laki's, `src: laki`; a function only when logged), `ran`'s line and the run's stderr
-(`LOG_RUN`, 64 KB, its end), a stream's other stdout lines and stderr as they come, `aiLog` (`aiOnce`'s `onCall`:
+`.log.1`. Written: `wLog` (Laki's, `src: laki`; a function only when logged), `ran`'s line (with `gh N×`: `exec`'s
+`ghShim`, `<data>/gh-shim/gh` first on the run's PATH, a byte per call into its own `$LAKI_GH_COUNT` file, then
+`$LAKI_GH`, the gh that PATH has; none without one; `WidgetRun.gh`, the inspector's Runs, `laki widget dev`), a
+warning after a run that hit GitHub's rate limit with core's `ghSaid` (Laki's own gh calls this hour, by kind), and the
+run's stderr (`LOG_RUN`, 64 KB, its end), a stream's other stdout lines and stderr as they come, `aiLog` (`aiOnce`'s `onCall`:
 seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS page's `laki.log`, `page`; `LOG_RATE`
 50 a second; off: `{ kept: false }`). `widgetLogs` (`since`: the cursor, `n`; `level` at least, `src`, `ws`, `limit`;
 `next`) for Extension.tsx' `Logs` tab (every 2 s, the filters its own, `cfg.log`), `laki widget logs [-n] [-f]`, MCP's

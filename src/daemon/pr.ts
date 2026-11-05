@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
@@ -181,13 +181,38 @@ export async function prFromSaid(ws: Workspace) {
 
 let prScan: Promise<void> | null = null
 let prAgain: Set<string> | true | undefined // asked mid-scan: those workspaces (true: all) again as it ends
-// the timer's scans (bg) spare GitHub's GraphQL quota (5000 points an hour, shared with every other gh of yours): a
-// branch gh found no PR for is asked again after NONE_EVERY, and none at all for LIMITED after gh said rate limit. A
-// turn's end, a branch move and Refresh PR ask at once
+// the timer's scans (bg) spare GitHub's GraphQL quota (5000 points an hour, shared with every other gh of yours, your
+// extensions' too): a branch gh found no PR for is asked again after NONE_EVERY, and none at all for LIMITED after gh
+// said rate limit. A quiet PR (the last scan found it as it was, nothing running: no pending check, its mergeability
+// known) is asked again after QUIET, a merged or closed one's after SHUT; and none while the quota is under FLOOR. A
+// turn's end, a branch move, a push and Refresh PR ask at once
 const NONE_EVERY = 5 * 60000
 const LIMITED = 5 * 60000
+const QUIET = 10 * 60000
+const SHUT = 30 * 60000
+const FLOOR = 1000
 const noneAt = new Map<string, number>()
+const quietAt = new Map<string, number>()
 let limitedAt = 0
+const quiet = (ws: Workspace, now: number) => (t => t !== undefined && now - t < (/^(MERGED|CLOSED)$/.test(prs.get(ws.id)?.state ?? '') ? SHUT : QUIET))(quietAt.get(ws.id))
+// GitHub's GraphQL quota left: gh api rate_limit (it costs none), asked at most every QUOTA_EVERY; under FLOOR, the
+// timer's scans wait for its reset. ponytail: this Mac's gh only, an SSH host's own sign-in isn't asked
+const QUOTA_EVERY = 5 * 60000
+const quota = { at: 0, low: 0 }
+async function quotaLow(now: number) {
+  if (now < quota.low) return true
+  if (now - quota.at < QUOTA_EVERY) return false
+  quota.at = now
+  ghCount(['api', 'rate_limit'])
+  const g = await run('gh', ['api', 'rate_limit', '--jq', '.resources.graphql'], { timeout: 10000 }).then(
+    r => JSON.parse(r.stdout) as { remaining?: number; reset?: number },
+    () => undefined,
+  ).catch(() => undefined)
+  if (!g || typeof g.remaining !== 'number' || g.remaining >= FLOOR) return false
+  quota.low = Math.max(now + 60000, (g.reset ?? 0) * 1000)
+  log(`PR scan: GitHub's GraphQL quota has ${g.remaining} left, the timer's scans wait until ${new Date(quota.low).toTimeString().slice(0, 5)} (Laki's own gh calls ${ghSaid()})`)
+  return true
+}
 export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   if (prScan) {
     if (!bg) prAgain = !only || prAgain === true ? true : new Set([...(prAgain ?? []), ...only]) // e.g. a ship just opened a PR
@@ -197,8 +222,9 @@ export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
   if (bg && now - limitedAt < LIMITED) return Promise.resolve()
   void csRefresh()
   // workspaces in parallel: each gh call may take seconds
-  const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !projectArchived(ws.project) && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY))
-  prScan = Promise.all(scanned.map(scanPR)).then(() => {
+  const scanned = state.workspaces.filter(ws => (!only || only.has(ws.id)) && !ws.archived && !projectArchived(ws.project) && !away(ws) && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)) && !(bg && !ws.prUrl && now - (noneAt.get(ws.id) ?? 0) < NONE_EVERY) && !(bg && quiet(ws, now)))
+  if (!scanned.length) return Promise.resolve()
+  prScan = (bg ? quotaLow(now) : Promise.resolve(false)).then(low => (low ? undefined : Promise.all(scanned.map(scanPR)))).then(() => {
     prScan = null
     const again = prAgain
     prAgain = undefined
@@ -342,9 +368,12 @@ async function scanPR(ws: Workspace) {
   }
   noneAt.delete(ws.id)
   if (!ws.prUrl && ws.prOff && sameRef(pr.url, ws.prOff)) return void (prs.delete(ws.id) && changed()) // detached (prDetach): not followed
+  const same = JSON.stringify(prs.get(ws.id)) === JSON.stringify(pr)
+  if (same && (pr.state !== 'OPEN' || (pr.checks !== 'pending' && pr.conflict !== undefined))) quietAt.set(ws.id, Date.now())
+  else quietAt.delete(ws.id)
   const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0
   wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)
-  if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
+  if (!same) {
     prs.set(ws.id, pr)
     changed()
   }
@@ -786,6 +815,7 @@ export function ghCard(o: { url: string }): Promise<GhCard> {
   if (ghCards.size > 200) ghCards.clear() // ponytail: a terminal's links, a minute each: none kept long
   const pr = kind === 'pull'
   const fields = pr ? 'number,title,state,isDraft,author,additions,deletions,changedFiles,updatedAt,labels,reviewDecision' : 'number,title,state,author,labels,updatedAt,comments'
+  ghCount([pr ? 'pr' : 'issue', 'view'])
   const card = run('gh', [pr ? 'pr' : 'issue', 'view', url, '--json', fields], { timeout: 20000 }).then(
     ({ stdout }): GhCard => {
       const j = JSON.parse(stdout)

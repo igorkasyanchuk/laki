@@ -131,12 +131,12 @@ export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: {
         return true
       }
       try {
-        const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: step, LAKI_EVENT_FILE: file }, input, gateWait())
-        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+        const { out, err, gh } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: step, LAKI_EVENT_FILE: file }, input, gateWait())
+        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0, gh }, err)
         if (!said(out)) problem = `printed no {"ok": …}: ${lastLine(out) ?? 'nothing'}`
       } catch (e) {
         const f = e as Failed
-        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
+        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit, gh: f.gh }, f.stderr)
         if (!said(f.stdout ?? '')) (problem = f.message), (changed = !!f.changed)
       } finally {
         rmSync(file, { force: true })
@@ -194,8 +194,8 @@ export async function toolGate(x: Workspace, tab: { id: string; name: string; pr
     const reason = 'gate:tool'
     const t0 = Date.now()
     try {
-      const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: 'tool', LAKI_EVENT_FILE: file }, body, left)
-      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+      const { out, err, gh } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: 'tool', LAKI_EVENT_FILE: file }, body, left)
+      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0, gh }, err)
       const j = [out, lastLine(out)]
         .map(t => {
           try {
@@ -214,7 +214,7 @@ export async function toolGate(x: Workspace, tab: { id: string; name: string; pr
       else if (isObj(j?.input)) (now = j.input), by.push(name), wLog(w, `gate ${a} (tool ${tool}): changed its input`)
     } catch (e) {
       const f = e as Failed
-      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
+      ran(k, { at: t0, ms: Date.now() - t0, reason, why: tool, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit, gh: f.gh }, f.stderr)
       wLog(w, `gate ${a} (tool ${tool}) failed: ${f.message}: went ahead`, 'error')
     } finally {
       rmSync(file, { force: true })

@@ -964,6 +964,11 @@ function Inspector({ w, cfg, tab, draft, setDraft }: { w: WidgetView; cfg: Widge
                 <span className={r.ok ? 'good' : 'warn'}>{r.ok ? 'ok' : `failed${r.exit ? ` (${r.exit})` : ''}`}</span>
                 <span className="muted">{r.ms} ms</span>
                 {r.ok && <span className="muted">{bytes(r.bytes)}</span>}
+                {r.gh ? (
+                  <span className="muted" data-tip="Times it ran gh: every gh of yours shares GitHub's rate limit with Laki's PR checks">
+                    gh {r.gh}×
+                  </span>
+                ) : null}
                 <span className="muted grow">
                   {r.reason}
                   {r.why ? `: ${r.why}` : ''}
