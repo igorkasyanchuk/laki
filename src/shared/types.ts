@@ -49,6 +49,13 @@ export const neverAsks = (agent?: string, perm?: string, args?: string) => {
 }
 // fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
 export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
+// the agent's own sandbox (a profile's Sandbox switch): its commands write only in the worktree and the repo's git folder.
+// claude: its settings file's sandbox (Laki's own laki CLI runs outside it); codex: -s workspace-write, its network on
+export const SANDBOX: Partial<Record<Agent, true>> = { claude: true, codex: true }
+// what turns the sandbox off: bypass permissions (claude's --dangerously-skip-permissions, codex's
+// --dangerously-bypass-approvals-and-sandbox) or codex's danger-full-access
+export const SANDBOX_NO = "Bypass permissions turns the agent's sandbox off: pick one of the two"
+export const sandboxOff = (agent?: string, perm?: string, args?: string) => bypassArgs(args) || /\bdanger-full-access\b/.test(args ?? '') || (!permInArgs(agent, args) && perm === 'bypassPermissions')
 // API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a
 // transcript's model (claude's message.model, codex's turn_context) prices a tab's tokens (meters.ts).
 // ponytail: dated 2026-10, edited by hand; a long prompt's higher rate, 1-hour cache writes, fast mode and batch left
@@ -164,7 +171,7 @@ export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 // a workspace whose first agent starts later (wsNew startAt, wsSet pending): at a time, or (limit) as its account's plan
 // limit resets (the account its tab would start on now: accounts.ts accountFor), at then that reset as last read (none:
 // not known yet); failed: why its start didn't (Start now tries again); the rest is what its agent tab gets
-export type Pending = { at?: number; limit?: boolean; failed?: string; preset: string; cmd?: string; prompt?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string }
+export type Pending = { at?: number; limit?: boolean; failed?: string; preset: string; cmd?: string; prompt?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; vars?: boolean; agent?: string }
 export type PendingView = { at?: number; limit?: boolean; failed?: string; prompt?: string; agent: string } // the view's: its prompt's first line, the preset
 export const USAGE_AT = 90 // a plan limit's % that notifies (settings.usageAt unset), and that a delayed start's limit waits for
 // a plan limit's reset, a delayed start's (schedule.ts pendingTick, the new-workspace page): the soonest among the
@@ -400,6 +407,7 @@ export type Tab = {
   effort?: string // and its effort (EFFORTS)
   perm?: string // how freely it acts (PERMS' id; '': the agent's own; unset: its profile's), kept for restarts
   fast?: boolean // fast mode (FAST; unset: its profile's), kept for restarts
+  sandbox?: boolean // the agent's own sandbox (SANDBOX; unset: its profile's), kept for restarts
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
@@ -436,7 +444,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; account?: string; steer?: boolean } // steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; steer?: boolean } // steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not

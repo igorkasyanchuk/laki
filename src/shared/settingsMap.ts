@@ -122,6 +122,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Custom CSS', 'css style styles stylesheet own rules customize anything font size spacing colors'],
   ['open', 'Per project', 'editor xcode project own each per project ⌘e'],
   ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort permission mode fast presets'],
+  ['presets', 'Sandbox', "agent's sandbox writes only worktree isolate protect mac workspace-write network"],
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
   ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
@@ -218,6 +219,11 @@ export const HELP: Record<string, SettingHelp> = {
     what: "Starts this profile's agent in its fast mode: Claude Code's fast mode, Codex's fast tier.",
     when: 'Short, interactive work where waiting hurts more than the price.',
     cost: 'A higher price per token. A workspace can turn it off for itself.',
+  },
+  Sandbox: {
+    what: "Starts this profile's agent in its own sandbox: its commands can write only in the worktree and the repo's git folder (so git commit works), not elsewhere on the Mac. Claude Code: its sandbox setting, with Laki's laki command outside it; new websites are asked about. Codex: workspace-write, its network left on (laki, npm, git push).",
+    when: 'An agent left alone for a while, or a repo you trust less: a wrong command stays inside the worktree.',
+    cost: "Some commands need a yes or fail in it (a global install, a tool that writes in your home folder). Not with Bypass permissions, which turns the sandbox off.",
   },
   'Permission mode': {
     what: "How freely the agent acts: Ask first (the agent's own prompts), Auto, Accept edits, Plan (read only) or Bypass permissions (never asks).",

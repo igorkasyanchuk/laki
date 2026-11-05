@@ -936,7 +936,7 @@ async function saveProfiles(a: AiAct, rpc: Rpc) {
   const add = profilesOf(a.text)
   const same = (x: Preset, y: Preset) => x.name.toLowerCase() === y.name.toLowerCase()
   const have = presets()
-  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast, off: undefined })
+  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast, sandbox: n.sandbox, off: undefined })
   const next = [...have.map(h => (n => (n ? changed(h, n) : h))(add.find(n => same(n, h)))), ...add.filter(n => !have.some(h => same(n, h)))]
   await rpc('settingsSet', { presets: next })
 }

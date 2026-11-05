@@ -405,7 +405,7 @@ export function startPending(w: Workspace, now = Date.now(), asked = false) {
   const p = w.pending!
   const late = p.at !== undefined && now - p.at > 90_000 ? p.at : undefined
   try {
-    const t = addTab(w.id, { preset: p.preset, cmd: p.cmd, prompt: p.prompt, model: p.model, effort: p.effort, perm: p.perm, fast: p.fast, vars: p.vars, agent: p.agent })
+    const t = addTab(w.id, { preset: p.preset, cmd: p.cmd, prompt: p.prompt, model: p.model, effort: p.effort, perm: p.perm, fast: p.fast, sandbox: p.sandbox, vars: p.vars, agent: p.agent })
     delete w.pending
     wsLog(w, asked ? `${t.name} started now (Start now)` : late ? `${t.name} started late, was due ${new Date(late).toLocaleString()}` : `${t.name} started, as it was scheduled`)
     if (!asked) broadcast({ ev: 'started', ws: w.id, tab: t.id, name: w.name || w.id, agent: t.name, late })

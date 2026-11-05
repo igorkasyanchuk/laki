@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { FIND, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -2397,8 +2397,9 @@ export function SettingsPage(p: {
                               <select value={permInArgs(pr.agent, pr.args) ? '' : (pr.perm ?? '')} aria-label="Permission mode" disabled={permInArgs(pr.agent, pr.args)} data-tip={permInArgs(pr.agent, pr.args) ? 'Its flags set it' : 'How freely it acts (a workspace may pick another)'} onChange={e => setPreset(i, { perm: e.target.value || undefined })}>
                                 <option value="">{permInArgs(pr.agent, pr.args) ? 'mode: its flags’' : 'mode: ask first'}</option>
                                 {PERMS[pr.agent]!.map(([id, label]) => (
-                                  <option key={id} value={id}>
+                                  <option key={id} value={id} disabled={id === 'bypassPermissions' && !!pr.sandbox} title={id === 'bypassPermissions' && pr.sandbox ? SANDBOX_NO : undefined}>
                                     {label}
+                                    {id === 'bypassPermissions' && pr.sandbox ? ' (the sandbox is on)' : ''}
                                   </option>
                                 ))}
                               </select>
@@ -2432,6 +2433,13 @@ export function SettingsPage(p: {
                           <Switch className="switch-row" on={!!pr.fast} onChange={on => setPreset(i, { fast: on || undefined })}>
                             <Says title="Fast mode" hint="Quicker answers, at a higher price (a workspace may turn it off)" />
                           </Switch>
+                        )}
+                        {SANDBOX[pr.agent as Agent] && (
+                          (off => (
+                            <Switch className="switch-row" on={!!pr.sandbox && !off} disabled={off && !pr.sandbox} onChange={on => setPreset(i, { sandbox: on || undefined })}>
+                              <Says title="Sandbox" hint={off ? "Not with bypass permissions (its mode or its flags): that turns the agent's sandbox off" : pr.agent === 'codex' ? 'Its commands write only in the worktree and the repo’s git folder; the network stays on (laki, npm, git push)' : 'Its commands write only in the worktree and the repo’s git folder; laki runs outside it, new websites are asked about'} />
+                            </Switch>
+                          ))(sandboxOff(pr.agent, pr.perm, pr.args))
                         )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
                           <Switch className="switch-row" on={pr.steer !== false} onChange={on => setPreset(i, { steer: on ? undefined : false })}>

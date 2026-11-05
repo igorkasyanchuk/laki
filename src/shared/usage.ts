@@ -9,6 +9,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
                                     opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused)
             [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode
+            [--sandbox|--no-sandbox]  the agent's own sandbox on or off over its profile's (claude, codex)
             [--template <name>]     the prompt through one of your prompt templates
             [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
             [--group <name>]        under that group of the project in the sidebar (its template and agent too)
@@ -35,14 +36,14 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki plan new <project>|. <kind> "<title>" [text|-]   write a new one for the user (text: its Markdown; -: stdin)
   laki plan write <project>|. <kind> <slug> <file> [text|-]   a file beside one (ideas.md, a prototype); never README.md
   laki preset [ls]                            the agent profiles (Settings › Agents & profiles), your default marked
-  laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast]
+  laki preset add|set <name> [--agent claude|codex|…|command] [--args "…"] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox]
             [--cmd c] [--env KEY=value…] [--account id] [--name new]   a new profile, or change one ('' drops a field)
   laki preset on|off|rm <name>                show it in the pickers or not | delete it
   laki remind <when> <text> [--ws <id>|.] [--important]  a reminder on the calendar (Calendar): in 2h, tomorrow at 9am, every weekday at 9am; --important: a card on screen until closed
   laki alert <text> [--title t] [--choice A]…  an important card on the user's screen (over every app, until closed); with choices it waits and prints the pick
   laki notice <text> [--title t] [--choice A]… [--to <ws>[/<tab>]|@name]   a card in Laki's window (any page, until closed); Open goes to --to; choices as alert
   laki reminders [rm|done <id>]              the calendar's reminders
-  laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast]
+  laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox]
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
@@ -208,8 +209,10 @@ prototype-<option>.html, <name>.diagram.json). Text from - (or none, for write) 
   laki plan new . spec "CSV export" - < spec.md
   laki plan write . brainstorm onboarding ideas.md - < ideas.md`,
   preset: `Agent profiles (presets): how a tab's agent starts (its agent, args, model, effort, permission mode, fast
-mode, env, account). laki new --preset <name> and laki tab --preset start one. From an agent's tab, add, set, on, off
+mode, sandbox, env, account). laki new --preset <name> and laki tab --preset start one. From an agent's tab, add, set, on, off
 and rm ask the user in the app first (its args and env run in every tab of it), and need the app open.
+--sandbox (Claude Code, Codex): the agent's own sandbox, its commands writing only in the worktree and the repo's git
+folder; Codex's network stays on, Claude Code runs laki outside it. Not with bypass permissions, which turns it off.
 
   laki preset ls
   laki preset add claude-ask --agent claude --perm auto

@@ -271,6 +271,14 @@ A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` 
 effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
 model_reasoning_effort="…"`, opencode its inline config (above), the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
 `--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
+`sandbox` (`SANDBOX`, a profile's *Sandbox*, the tab's over it, kept for restarts and forks; `sandboxOff`: none with
+bypass permissions, its mode or its flags, refused by `modelCheck`, `tabSpec` and `presetSave` as `SANDBOX_NO`, and an
+agent's `sandbox: false` by main.ts' `agentNo`): claude's `--settings` gets `-sandbox` (`sandbox.enabled`,
+`autoAllowBashIfSandboxed`, `excludedCommands`: `laki *` and `LAKI_CLI`, so the CLI reaches the daemon) and `--add-dir`
+the repo's git folder (`gitCommonDir`, from `.git` and `commondir`, realpath'd); codex `codexBox`: `-s workspace-write`
+unless its mode or flags set one (read-only stays), `sandbox_workspace_write.network_access=true` and `writable_roots`
+with that folder (a worktree's lives in the main repo's .git: `git commit` writes there). Hooks and codex's notify run
+outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git folder isn't added.
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
 is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):

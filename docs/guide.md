@@ -978,7 +978,8 @@ never the last prompt.
   picked for a model comes back when you pick that model again) and the permission
   mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
   permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast
-  tier), the mic and its ⌄, and ↑. All of them are kept for its restarts and forks. A profile with its own permission
+  tier), 🔒 the sandbox (the profile's *Sandbox*, on or off for this workspace; not with *Bypass permissions*), the mic
+  and its ⌄, and ↑. All of them are kept for its restarts and forks. A profile with its own permission
   mode or fast mode starts with them picked (its mode marked *profile* in the menu); change them for this workspace
   only. Left as the profile's, an edit of the profile applies at the next start. Their menus have a filter box
   (type, ↑↓, ⏎), a line about each choice, the picked one in the accent with a check.
@@ -2047,11 +2048,16 @@ and what it costs.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
   profile is how it starts, grouped under its agent: a model and an effort, and for Claude Code and Codex a
-  permission mode and *Fast mode* (a workspace that picks its own wins), an account (Claude Code and Codex), flags
+  permission mode, *Fast mode* and *Sandbox* (a workspace that picks its own wins), an account (Claude Code and Codex), flags
   (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
   environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
-  don't use out of them (its tabs still start and resume). The defaults are the agents on your PATH (*Reset to the
+  don't use out of them (its tabs still start and resume). *Sandbox* starts the agent in its own sandbox: its commands
+  can write only in the worktree and the repo's git folder (so `git commit` works), not elsewhere on the Mac. Claude
+  Code: its sandbox setting, Laki's `laki` command run outside it, new websites asked about. Codex: `-s
+  workspace-write` with its network on (laki, npm, git push). It can't go with *Bypass permissions* (that turns the
+  sandbox off): Settings and the new-workspace page refuse the pair and say why. `laki preset set <name> --sandbox`.
+  The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them; *Add a profile for…* adds another agent's). Edit `claude` or `codex` to change how every new one starts; a tab started from a profile uses its current settings when it restarts or resumes.
 - *Accounts* (Claude Code and Codex, at the top of each one's group in *Agents & profiles*): your other sign-ins, say a
   work and a personal plan. *Add … account* makes a folder for it in Laki's data folder (given to the agent as
@@ -2291,6 +2297,7 @@ laki new app --no-setup --prompt "…"                    # without the setup sc
 laki new app --prompt "…" --tab codex --tab "npm run dev"  # more tabs there: an agent (agent:model) or a command
 laki new app --preset opencode --model openrouter/moonshotai/kimi-k3  # opencode's model as `opencode models` lists it
 laki new app --perm acceptEdits --fast --prompt "…"     # its permission mode (auto, acceptEdits, plan, bypassPermissions) and fast mode
+laki new app --sandbox --prompt "…"                    # the agent's own sandbox (Claude Code, Codex): writes in the worktree only
 laki new app --template review --group Reviews --prompt "#57"  # through a prompt template, under a sidebar group (its template and agent too)
 laki new app --action "PR+audit" --prompt "the login page"     # an agent action's prompt, then these words
 laki new app --at "tomorrow 9am" --prompt "…"            # made now, its agent starts at 9 (Laki must be running then)

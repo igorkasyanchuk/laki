@@ -612,6 +612,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)
   else if (method === 'prDraft' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can draft or ready its own workspace's PR only")
   else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
+  else if ((method === 'wsNew' || method === 'tabNew') && p.sandbox === false) notAgent(p, "start an agent outside its profile's sandbox")
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
   else if (method === 'tabSet' && p.alias !== undefined && p.from?.tab !== p.id) notAgent(p, "name another agent's tab (laki name names your own)") // else it could take a name and its messages

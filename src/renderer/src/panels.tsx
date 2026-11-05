@@ -1,6 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -552,11 +552,11 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
-type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'perm' | 'fast' | 'place'>> & { tpl?: string; agent?: string } // not the base: the repo's main one each time, unless picked
+type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'perm' | 'fast' | 'sandbox' | 'place'>> & { tpl?: string; agent?: string } // not the base: the repo's main one each time, unless picked
 const LAST_NEW = 'laki.newWs'
 // what the page held as it closed without making it (Esc, ✕, a click in the sidebar): back as it opens again, until it's
 // made or cleared
@@ -691,8 +691,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       effort: same ? last.effort : undefined,
       perm: same ? last.perm : undefined,
       fast: same ? last.fast : undefined,
+      sandbox: same ? last.sandbox : undefined,
       base: '',
-      ...(d && { ...d, project: proj, preset, noSetup: undefined, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined }), ...(!there && { place: undefined, base: '' }) }),
+      ...(d && { ...d, project: proj, preset, noSetup: undefined, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined, sandbox: undefined }), ...(!there && { place: undefined, base: '' }) }),
       ...groupNew(sep, view.presets.find(x => x.name === preset)?.agent),
       ...(initial && (({ linked: _, ...x }) => x)(initial)),
       ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
@@ -751,6 +752,10 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const fastPick = p.fast ?? !!prof?.fast
   const permSent = !ownPerm && permPick !== (prof?.perm ?? '') && (!permPick || PERMS[starts as Agent]?.some(x => x[0] === permPick)) ? permPick : undefined
   const fastSent = FAST[starts as Agent] && fastPick !== !!prof?.fast ? fastPick : undefined
+  // its sandbox likewise; never with bypass permissions (it turns the sandbox off: the daemon refuses both)
+  const boxOff = sandboxOff(starts, permPick || undefined, prof?.args)
+  const boxPick = !boxOff && (p.sandbox ?? !!prof?.sandbox)
+  const boxSent = SANDBOX[starts as Agent] && boxPick !== !!prof?.sandbox ? boxPick : undefined
   const [rivals, setRivals] = useState<string[]>(() => draft?.rivals ?? []) // a race: the other presets on the same prompt
   // a draft's prompt a link's replaced (the bubbles' voice prompt to a new session): kept, a click swaps it back
   const [prev, setPrev] = useState<string | undefined>(() => (initial?.prompt?.trim() && draft?.p.prompt?.trim() && draft.p.prompt !== initial.prompt ? draft.p.prompt : draft?.prev))
@@ -796,14 +801,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const submit = async () => {
     if (busy || saving) return
     setBusy(true)
-    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: permSent === 'bypassPermissions' ? undefined : permSent /* never by itself: picked each time */, fast: fastSent, place: p.place, tpl: tplName, agent } satisfies LastNew)
+    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: permSent === 'bypassPermissions' ? undefined : permSent /* never by itself: picked each time */, fast: fastSent, sandbox: boxSent, place: p.place, tpl: tplName, agent } satisfies LastNew)
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, named: p.name?.trim() ? true : undefined /* typed: no agent renames it */, local: p.local || plain, codespace: inCs ? p.codespace : undefined, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own && p.effort && efforts?.includes(p.effort) ? p.effort : undefined /* one its model takes */, perm: own ? permSent : undefined, fast: own ? fastSent : undefined, sandbox: own ? boxSent : undefined, fan, noSetup: canSkip && p.noSetup ? true : undefined, ...(tpl && { vars: true }), ...(start !== undefined && isAgent(starts) && !inCs && { startAt: start }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -908,7 +913,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     openMenu(e, [
       { head: 'Permission mode' },
       { label: 'Ask first', icon: 'shield', sub: `${ag ? AGENT_NAMES[ag] : 'The agent'}’s own: it asks before it acts`, hint: !perm ? ON : undefined, run: () => set({ perm: '' }) },
-      ...perms.map(([id, label, sub]) => ({ label, sub, icon: id === 'bypassPermissions' ? 'alertCircle' : id === 'plan' ? 'eye' : 'shieldCheck', danger: id === 'bypassPermissions', pill: profPill(id), hint: perm?.[0] === id ? ON : undefined, run: () => set({ perm: id }) }) as MenuItem),
+      ...perms.map(([id, label, sub]) => (id === 'bypassPermissions' && boxPick ? { label, sub: 'Not with the sandbox on (the lock beside): it turns the sandbox off', icon: 'alertCircle', tone: 'warn', run: () => {} } : { label, sub, icon: id === 'bypassPermissions' ? 'alertCircle' : id === 'plan' ? 'eye' : 'shieldCheck', danger: id === 'bypassPermissions', pill: profPill(id), hint: perm?.[0] === id ? ON : undefined, run: () => set({ perm: id }) }) as MenuItem),
     ])
   const whereMenu = (e: MouseEvent) =>
     openMenu(e, [
@@ -972,6 +977,11 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const fast = canModel && ag && FAST[ag] && (
     <button type="button" className={`ib nw-fast ${fastPick ? 'on' : ''}`} aria-pressed={fastPick} aria-label="Fast mode" data-tip={fastPick ? 'Fast mode is on: quicker answers, at a higher price' : 'Fast mode: quicker answers, at a higher price'} onMouseDown={e => e.preventDefault()} onClick={() => set({ fast: !fastPick })}>
       <Icon name="zap" />
+    </button>
+  )
+  const box = canModel && ag && SANDBOX[ag] && (
+    <button type="button" className={`ib nw-fast ${boxPick ? 'on' : ''}`} aria-pressed={boxPick} aria-label="Sandbox" disabled={boxOff} data-tip={boxOff ? SANDBOX_NO : boxPick ? "Sandbox is on: its commands write only in the worktree and the repo's git folder" : "Sandbox: its commands write only in the worktree and the repo's git folder (Settings › Agents & profiles)"} onMouseDown={e => e.preventDefault()} onClick={() => set({ sandbox: !boxPick })}>
+      <Icon name="lock" />
     </button>
   )
   const later = start !== undefined && isAgent(starts) && !inCs
@@ -1086,6 +1096,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
               tools={
                 <>
                   {fast}
+                  {box}
                   {isAgent(starts) && <StartChip start={start} onStart={setStart} agent={starts} account={prof?.account} usageAt={view.settings.usageAt ?? USAGE_AT} off={inCs ? "A codespace's agent starts with it" : undefined} />}
                 </>
               }

@@ -24,7 +24,7 @@ const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
 const VALUED = new Set(['wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'detach'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -258,7 +258,7 @@ async function main() {
       return out(projects, projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--perm mode] [--fast] [--template t] [--action a] [--group g] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--at when | --after-limit] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox] [--template t] [--action a] [--group g] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--no-setup] [--at when | --after-limit] [--prompt text]')
       // .: the project of the workspace this tab is in (an agent's /laki:new)
       const v = process.env.LAKI_WORKSPACE ? ((await rpc('state')) as View) : undefined
       const here = rest[0] === '.' && v?.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
@@ -280,6 +280,7 @@ async function main() {
         effort: flags.effort,
         perm: flags.perm, // its permission mode (claude's, codex's); none: its profile's
         fast: flags.fast ? true : undefined,
+        sandbox: flags.sandbox ? true : flags['no-sandbox'] ? false : undefined,
         place: k.place,
         vars: k.vars,
         issue: flags.issue || undefined,
@@ -425,18 +426,20 @@ async function main() {
     case 'preset':
     case 'presets': {
       // Settings › Agents & profiles: laki preset [ls] | add|set <name> [--agent a] [--args "…"] [--model m] [--effort e]
-      // [--perm p] [--fast] [--cmd c] [--env K=V…] [--account id] [--name new] | on|off|rm <name>. '' drops a field
+      // [--perm p] [--fast] [--sandbox|--no-sandbox] [--cmd c] [--env K=V…] [--account id] [--name new] | on|off|rm <name>.
+      // '' drops a field
       const [sub = 'ls', name] = rest
       if (sub === 'ls') {
         const v: View = await rpc('state')
         const def = v.settings?.agent
-        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
+        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
         return out(v.presets, v.presets.map(line).join('\n'))
       }
-      if (!['add', 'set', 'on', 'off', 'rm'].includes(sub) || !name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] | on|off|rm <name>')
+      if (!['add', 'set', 'on', 'off', 'rm'].includes(sub) || !name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] | on|off|rm <name>')
       const set: Record<string, unknown> = {}
       for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
       if (flags.fast) set.fast = true
+      if (flags.sandbox || flags['no-sandbox']) set.sandbox = flags.sandbox ? true : null // --no-sandbox: off
       const noEq = envs.find(e => !e.includes('='))
       if (noEq !== undefined) throw new Error(`--env ${noEq}: KEY=value`)
       if (envs.length) set.env = Object.fromEntries(envs.map(e => [e.slice(0, e.indexOf('=')), e.slice(e.indexOf('=') + 1)]))
@@ -462,7 +465,7 @@ async function main() {
       // no --preset then: your default agent, as MCP's laki_new_tab
       const prompt = (flags.prompt as string | undefined) || rest.slice(1).join(' ') || undefined
       const preset = flags.preset || (prompt && !flags.cmd ? ((await rpc('state')) as View).settings?.agent || 'claude' : undefined)
-      const t = await rpc('tabNew', { ws: rest[0], preset, cmd: flags.cmd, prompt, name: flags.name, model: flags.model, effort: flags.effort, perm: flags.perm, fast: flags.fast ? true : undefined, caller: caller() }, 150000) // an agent's --cmd, or a prompt into another workspace: the user is asked first
+      const t = await rpc('tabNew', { ws: rest[0], preset, cmd: flags.cmd, prompt, name: flags.name, model: flags.model, effort: flags.effort, perm: flags.perm, fast: flags.fast ? true : undefined, sandbox: flags.sandbox ? true : flags['no-sandbox'] ? false : undefined, caller: caller() }, 150000) // an agent's --cmd, or a prompt into another workspace: the user is asked first
       return out(t, `${t.name} (${t.id})`)
     }
     case 'send': {

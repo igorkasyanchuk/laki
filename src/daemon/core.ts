@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
-import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
@@ -205,7 +205,10 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // two starts of laki hook); they say when they started (hook.ts' at), and the daemon takes no state from one older than
 // a newer hook's (turn). A gate turned on later reaches a tab as it restarts. A host's are waited for (its script sends
 // no time)
-export const claudeFile = (o: { fast?: boolean; gated?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}.json`
+// sandbox: the profile's Sandbox switch, claude's own sandbox on (its Bash commands write only in the folders it works
+// in: the worktree, and the repo's git folder through --add-dir, agentCmd), with Laki's laki CLI outside it (it talks to
+// the daemon on 127.0.0.1) and nothing asked for a sandboxed command
+export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
 // how an agent's hooks reach `laki hook`: claude's settings files, gemini's, opencode's plugin (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
@@ -236,7 +239,9 @@ export function hookFiles(h: Hooks): Record<string, string> {
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
-  const claude = Object.fromEntries([false, true].flatMap(fast => [false, true].map(gated => [claudeFile({ fast, gated }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }) }, null, 2)])))
+  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])] } }
+  const two = [false, true]
+  const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && box) }, null, 2)]))))
   return {
     ...claude,
     'gemini-settings.json': JSON.stringify(gemini, null, 2),
@@ -1365,8 +1370,12 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // its profile's; no mode when the profile's flags set one
   const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
   const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
+  // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). Its
+  // repo's git folder writable too: a worktree's lives in the main repo's .git, and git commit writes there
+  const sandbox = !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
+  const gitDir = sandbox && h === localHooks ? gitCommonDir(state.workspaces.find(w => w.id === tab.workspace)?.path) : undefined // ponytail: a host's isn't added (git commit there is refused in the sandbox)
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()) })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
+    argv = ['claude', '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : []), ...(gitDir ? ['--add-dir', gitDir] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1402,9 +1411,31 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     } catch {}
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
   }
-  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDir) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
+}
+
+// codex's sandbox: workspace-write, unless its mode or its profile's flags set one already (read-only is stricter); its
+// network on, so laki (the daemon on 127.0.0.1), npm and git push work; the repo's git folder writable (git commit)
+function codexBox(perm: string | undefined, args: string | undefined, gitDir: string | undefined) {
+  const own = permInArgs('codex', args) || perm === 'plan' || perm === 'acceptEdits'
+  return [...(own ? [] : ['-s', 'workspace-write']), '-c', 'sandbox_workspace_write.network_access=true', ...(gitDir ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([gitDir])}`] : [])] // a JSON array of strings is TOML's too
+}
+
+// a folder's git folder, the one all its worktrees share (git rev-parse --git-common-dir), read from the files: .git a
+// folder, or a file naming the worktree's own (whose commondir names the shared one). None: not a repo
+export function gitCommonDir(path?: string) {
+  if (!path) return
+  const dotGit = join(path, '.git')
+  try {
+    const st = statSync(dotGit, { throwIfNoEntry: false })
+    if (!st?.isDirectory() && !st?.isFile()) return
+    const own = st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim())
+    return realpathSync(existsSync(join(own, 'commondir')) ? resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim()) : own) // as the sandbox sees it (/tmp is /private/tmp)
+  } catch {
+    return
+  }
 }
 
 export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string }
@@ -1511,8 +1542,10 @@ function presetCheck(preset?: string, cmd?: string) {
 
 // a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes; a
 // permission mode it has (PERMS), fast mode where there is one
-export function modelCheck(agent: string, model?: string, effort?: string, perm?: string, fast?: boolean) {
+export function modelCheck(agent: string, model?: string, effort?: string, perm?: string, fast?: boolean, sandbox?: boolean) {
   const perms = PERMS[agent as Agent]
+  if (sandbox && !SANDBOX[agent as Agent]) throw new Error(`${agent} has no sandbox here`)
+  if (sandbox && perm === 'bypassPermissions') throw new Error(SANDBOX_NO)
   if (perm && !perms?.some(p => p[0] === perm)) throw new Error(perms ? `permission mode ${perm}? ${perms.map(p => p[0]).join(', ')}` : `${agent} has no permission modes here`)
   if (fast && !FAST[agent as Agent]) throw new Error(`${agent} has no fast mode`)
   if (model && !/^(?!-)[\w.:/@[\]-]{1,120}$/.test(model)) throw new Error(`model ${model}? a name like opus, or provider/model`) // not a flag either
@@ -1556,7 +1589,7 @@ export async function modelKnown(agent: string, model: string | undefined, at: {
 
 // what addTab makes of a tab's options, checked (a browser page, its preset, model, effort…): tabNew's too, before it
 // asks you anything
-export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string; cmd?: string; model?: string; effort?: string; perm?: string; fast?: boolean }) {
+export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string; cmd?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean }) {
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`) // spawnTab's, before anyone's asked
   if (!o.kind) presetCheck(o.preset, o.cmd)
@@ -1568,16 +1601,18 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
   const perm = isAgent(preset) && kind === 'agent' ? (o.perm ?? undefined) : undefined // '': the agent's own, over its profile's
   const fast = isAgent(preset) && kind === 'agent' && typeof o.fast === 'boolean' ? o.fast : undefined // false: off, over its profile's
-  modelCheck(preset, model, effort, perm, fast)
+  const sandbox = isAgent(preset) && kind === 'agent' && typeof o.sandbox === 'boolean' ? o.sandbox : undefined // likewise
+  modelCheck(preset, model, effort, perm, fast, sandbox)
+  if (kind === 'agent' && (sandbox ?? pr?.sandbox) && sandboxOff(preset, perm === undefined ? pr?.perm : perm || undefined, pr?.args)) throw new Error(SANDBOX_NO)
   if (kind === 'agent') policyAgent(preset, perm === undefined ? pr?.perm : perm || undefined, pr?.args, cmd) // a managed policy's agents and approvals
-  return { pr, cmd, preset, kind, model, effort, perm, fast }
+  return { pr, cmd, preset, kind, model, effort, perm, fast, sandbox }
 }
 
 // agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
 // cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; resume?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; resume?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
   const ws = findWs(wsRef)
-  const { pr, cmd, preset, kind, model, effort, perm, fast } = tabSpec(ws, o)
+  const { pr, cmd, preset, kind, model, effort, perm, fast, sandbox } = tabSpec(ws, o)
   if (cmd !== o.cmd) o = { ...o, cmd }
   // a name with its task: an agent's prompt's words (not the workspace's first agent's: the workspace's name says it, and
   // it's titled as it is), a command's first words (npm run dev)
@@ -1588,7 +1623,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const agentName = pr?.name || (kind === 'agent' ? (preset === 'custom' ? cmdName(o.cmd!) : preset) : kind)
   const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }), ...(kind === 'agent' && { usedAt: Date.now() }) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }), ...(sandbox !== undefined && { sandbox }), ...(kind === 'agent' && { usedAt: Date.now() }) }
   const cwd = kind === 'shell' && !o.cmd ? o.cwd : undefined
   if (o.resume && kind === 'agent') tab.resumeId = o.resume // a chat of its agent's (Import chats): resumed, not a new one
   state.tabs.push(tab)
@@ -1900,7 +1935,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   for (const [k, v] of Object.entries(set)) {
     if (v === '' || v === null) delete next[k]
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
-    else if (k === 'fast' || k === 'off' || k === 'laki' || k === 'steer') next[k] = !!v
+    else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer') next[k] = !!v
     else if (k === 'env' && typeof v === 'object') next.env = Object.fromEntries(Object.entries(v as object).filter(([e]) => ENV_KEY.test(e)).map(([e, x]) => [e, String(x)]))
     else throw new Error(`a profile has no ${k}`)
   }
@@ -1912,6 +1947,8 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.effort && !EFFORTS[pr.agent as Agent]?.includes(pr.effort)) throw new Error(`effort: ${EFFORTS[pr.agent as Agent]?.join(', ') ?? `none for ${pr.agent}`}`)
   if (pr.perm && !PERMS[pr.agent as Agent]?.some(x => x[0] === pr.perm)) throw new Error(`perm: ${PERMS[pr.agent as Agent]?.map(x => x[0]).join(', ') ?? `none for ${pr.agent}`}`)
   if (pr.fast && !FAST[pr.agent as Agent]) delete pr.fast
+  if (pr.sandbox && !SANDBOX[pr.agent as Agent]) delete pr.sandbox
+  if (pr.sandbox && sandboxOff(pr.agent, pr.perm, pr.args)) throw new Error(SANDBOX_NO)
   return settingsSet({ presets: i >= 0 ? list.map((x, j) => (j === i ? pr : x)) : [...list, pr], ...(def && pr.name !== name && { agent: pr.name }) }).presets!
 }
 
@@ -2021,7 +2058,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; fromTab?: string; named?: boolean; vars?: boolean; flow?: string; hops?: number; agent?: string; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (ws.pending), at that time or as its plan limit resets; hops: the run's (flow) events' (Cause);codespace: a cloud workspace, on that machine type ('': the repo's first); noSetup: a worktree without its setup script (its .worktreeinclude copy still), ws.noSetup; vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one; flow: the workflow run making it (workflow.ts' begin), its ws.flow before its events go (an on: workspace.new run would start itself), never an RPC's; agent: an agent made it
 // (byCaller's, a run an agent started: workflow.ts'), whose: its workspace.new and its tabs' tab.new are that agent's
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
@@ -2092,7 +2129,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   const race = randomUUID().slice(0, 8)
   const made: Workspace[] = []
   for (const p of presets) {
-    made.push(await wsNew({ ...base, preset: p, perm: undefined, fast: undefined, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
+    made.push(await wsNew({ ...base, preset: p, perm: undefined, fast: undefined, sandbox: undefined, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
     for (const w of [...made].reverse()) placeWs(w, o.place) // each first, the last one first: in place as it comes, in the race's order
     save()
     changed()
@@ -2158,7 +2195,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
-  if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
+  if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast, o.sandbox) // before the worktree: a wrong one makes nothing
   await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, { path: proj.path, project: proj.id, host: proj.host }, preset)
   if (o.codespace !== undefined) cloudCheck(proj, o)
   if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
@@ -2260,11 +2297,11 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   try {
     if (o.startAt !== undefined && preset !== 'none') {
       // its agent later (schedule.ts pendingTick): what addTab would get, kept in state.json
-      ws.pending = { ...(o.startAt === 'limit' ? { limit: true } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by }
+      ws.pending = { ...(o.startAt === 'limit' ? { limit: true } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by }
       save()
       step(`agent: ${preset} later, ${o.startAt === 'limit' ? 'as its plan limit resets' : new Date(o.startAt).toISOString()}`)
       if (o.startAt === 'limit') void pendingTick() // its reset read now, for the view
-    } else if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars, agent: by, ...cause }).name} (its command: the workspace's Logs)`)
+    } else if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by, ...cause }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
@@ -2615,7 +2652,7 @@ export async function wsRestore(ref: string) {
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, perm: agent?.perm, fast: agent?.fast, fork: src.fork })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, perm: agent?.perm, fast: agent?.fast, sandbox: agent?.sandbox, fork: src.fork })
 }
 
 // restoreAll brings back every tab of every live workspace after a daemon restart: agents resume their chat, shells come

@@ -1,7 +1,7 @@
 // How agents start: the prompt as an env var (never shell-quoted), agent variables, presets, model, effort, permission and fast mode.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { type TestContext, test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
@@ -282,6 +282,47 @@ test("a permission mode and fast mode go into the agent's flags, kept for restar
   assert.deepEqual((await start({ preset: 'mine' })).modes, ['acceptEdits'], 'its flags’ own')
   assert.deepEqual((await start({ preset: 'mine', perm: 'auto' })).modes, ['acceptEdits'])
   assert.deepEqual((await start({ preset: 'cxs' })).modes, ['read-only'])
+})
+
+test("the Sandbox switch: claude's sandbox settings with the repo's git folder added, codex's workspace-write with it writable and its network on; never with bypass permissions", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const git = realpathSync(join(rig.repo, '.git'))
+  const argsOf = async (ws: any) => {
+    const tab = await rig.tab(ws.id)
+    return { tab, args: (await until(() => rig.fakeLog().find(l => l.tab === tab.id), 'its start')).args as string[] }
+  }
+  // claude: its settings file with the sandbox on, laki outside it; the worktree's git folder (the repo's .git) added
+  const c = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'claude', sandbox: true, fast: true }))
+  assert.equal(c.tab.sandbox, true)
+  const file = c.args[c.args.indexOf('--settings') + 1]
+  assert.match(file, /claude-settings-fast-sandbox\.json$/)
+  const box = JSON.parse(readFileSync(file, 'utf8'))
+  assert.deepEqual([box.fastMode, box.sandbox.enabled, box.sandbox.autoAllowBashIfSandboxed, box.sandbox.excludedCommands[0]], [true, true, true, 'laki *'])
+  assert.match(box.sandbox.excludedCommands[1], /cli(\.js|\/main\.ts)' \*$/) // the laki command agents are told
+  assert.equal(c.args[c.args.indexOf('--add-dir') + 1], git)
+  assert.ok(!('sandbox' in JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8'))))
+  // codex: workspace-write, the git folder writable, the network on; with its own mode, only those two
+  const x = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true }))
+  const roots = `sandbox_workspace_write.writable_roots=${JSON.stringify([git])}`
+  assert.deepEqual(x.args.slice(-6), ['-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots])
+  const ro = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true, perm: 'plan' }))
+  assert.deepEqual(ro.args.slice(-6), ['-s', 'read-only', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots], 'read-only: stricter, kept')
+  // a local workspace (the repo itself): its own .git
+  const local = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true, sandbox: true }))
+  assert.equal(local.args[local.args.indexOf('--add-dir') + 1], git)
+  // never with bypass permissions: the tab's, the profile's mode or flags; gemini has none
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b1', preset: 'claude', sandbox: true, perm: 'bypassPermissions' }), /turns the agent's sandbox off/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b2', preset: 'gemini', sandbox: true }), /gemini has no sandbox/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'boxed', add: true, set: { agent: 'codex', sandbox: true, args: '--dangerously-bypass-approvals-and-sandbox' } }), /turns the agent's sandbox off/)
+  await assert.rejects(rig.rpc('presetSave', { name: 'boxed', add: true, set: { agent: 'claude', sandbox: true, perm: 'bypassPermissions' } }), /turns the agent's sandbox off/)
+  // a profile's, for its tabs; off over it for a workspace (yours), never from an agent's tab
+  await rig.rpc('presetSave', { name: 'boxed', add: true, set: { agent: 'codex', sandbox: true } })
+  assert.ok((await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'boxed' }))).args.includes('workspace-write'))
+  const off = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'boxed', sandbox: false }))
+  assert.ok(!off.args.includes('workspace-write') && !off.args.some(a => a.includes('writable_roots')))
+  await assert.rejects(rig.rpc('tabNew', { ws: off.tab.workspace, preset: 'boxed', sandbox: false, from: { tab: off.tab.id } }), /outside its profile's sandbox/)
+  await assert.rejects(rig.rpc('tabNew', { ws: off.tab.workspace, preset: 'boxed', perm: 'bypassPermissions' }), /turns the agent's sandbox off/)
 })
 
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
