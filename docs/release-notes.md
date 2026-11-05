@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › General › Updates: the update delay is a row of day buttons (None, 1d … 30d), and the section lays out
+  cleanly in a narrow window.
+
 - Fewer gh calls: a PR that hasn't changed and has nothing running is checked every 10 minutes instead of every minute
   (merged or closed ones every 30), and the background checks pause while GitHub's quota is nearly spent, so your own
   gh and extensions keep working. A turn's end, a push or Refresh still checks at once.

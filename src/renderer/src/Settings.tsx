@@ -627,7 +627,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
     : 'Not checked yet'
   return (
     <div className="setting-box">
-      <div className="row cli-row">
+      <div className="row cli-row update-top">
         <Says title={`Laki ${u.version}`} hint={says} />
         <span className="grow" />
         {idle && onIdle ? (
@@ -667,18 +667,21 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
       <Switch className="switch-row" on={on} onChange={onOn}>
         <Says title="Check for updates" hint="At launch and every 4 hours Laki asks GitHub for its newest release: the status bar says so until you update, a toast once per version. Nothing downloads until you click Update." />
       </Switch>
-      <label className="switch-row">
-        <select value={delay} onChange={e => onDelay(Number(e.target.value))} aria-label="Update delay">
+      <div className="switch-row update-delay">
+        <div className="seg" role="radiogroup" aria-label="Update delay">
           {UPDATE_DELAYS.map(d => (
-            <option key={d} value={d}>
-              {d ? `${d} day${d > 1 ? 's' : ''}` : 'None'}
-            </option>
+            <button key={d} type="button" role="radio" aria-checked={delay === d} className={delay === d ? 'on' : ''} onClick={() => onDelay(d)} data-tip={d ? `Offered once it's ${d} day${d > 1 ? 's' : ''} old` : "Offered as soon as it's out"}>
+              {d ? `${d}d` : 'None'}
+            </button>
           ))}
-        </select>
+        </div>
         <Says title="Update delay" hint="Offer a release only once it's this old: others find its problems first. Skip the delay once lets one in now." />
-      </label>
-      <p className="muted small">
-        After an update the yellow bar offers to restart Laki's daemon when you're ready. <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>All releases ↗</a>
+      </div>
+      <p className="muted small update-foot">
+        <span>After an update, the yellow bar offers to restart Laki's daemon when you're ready.</span>
+        <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>
+          All releases ↗
+        </a>
       </p>
     </div>
   )

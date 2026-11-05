@@ -2066,6 +2066,13 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 /* Settings › General › Updates: the newest release's notes, scrolled past a few lines */
 .update-notes { max-height: 220px; overflow: auto; margin: 2px 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--rs, 8px); font-size: 12.5px; }
 .update-notes > a { color: var(--accent-ink); }
+.update-top { flex-wrap: wrap; } /* a narrow column: its buttons under what it says */
+.update-top > .switch-text { flex: 1 1 240px; }
+.update-delay { flex-wrap: wrap-reverse; } /* a narrow column: the words on top, the days under them */
+.update-delay > .switch-text { flex: 1 1 220px; }
+.update-delay .seg { flex: none; flex-wrap: wrap; }
+.update-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin: 0; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.update-foot > a { color: var(--accent-ink); white-space: nowrap; }
 /* the app's pane of a floated tab: where it went, and the way back */
 .floated { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--muted); text-align: center; }
 .floated .row { gap: 8px; }
