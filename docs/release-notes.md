@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- A `laki-ui` copy button in an agent's answer that would copy something other than what the block shows asks first,
+  with the text it would copy.
+
 - After Laki's daemon restarts (an update, *Update when idle*, a crash), a Claude Code tab whose dev server, watcher or
   background subagent it stopped is told so once it's back, by name, instead of waiting for output that never comes.
 

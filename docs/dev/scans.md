@@ -77,7 +77,8 @@
     `size-changed`; `ui/open-link` http(s), `tools/call` and `ui/message`, each after an `ask` that shows it whole: past 2,000 characters or with a `HIDDEN` one it's refused, as text.ts `noteWhole`). `.claude.json` is parsed again only as its mtime or size changes (`configOf`). Tested in `test/reader.test.ts`.
   - `laki-ui` blocks: MarkdownView's `UiBlocks` context (unset: the JSON as code); Reader.tsx `UiBlock`: an element or
     `{ ui, data }` passing `uiCheck`, `uiHtml` in a shadow root through Widgets' `clean`, `uiBehave`: a `do: send`
-    button's prompt to the agent, copy, http(s) links; the laki skill's *Show it as UI in your answer*.
+    button's prompt to the agent, copy (at once only for words the block shows, none HIDDEN; else `ask` with the text,
+    over 2000 characters or HIDDEN refused), http(s) links; the laki skill's *Show it as UI in your answer*.
 - One next step (`settings.nextStep`, on unless false; shared/nextStep.ts `nextStep`: a workspace's tabs, `check` and PR
   to one `Step`, `busy` while an agent or CI works; overlaps aren't one: Check overlaps, the row's ⇄): App's
   `stepOf`/`doStep`, `stepItem` (with `STEP_ICON`) first in `wsMore` (the toolbar's ⋯) and `wsMenu` (a row's ⋯ and right

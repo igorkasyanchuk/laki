@@ -232,7 +232,14 @@ function UiBlock({ json, onSend }: { json: string; onSend: (text: string) => voi
     return uiBehave(root, m => {
       const cmd = m.cmd as { do?: string; prompt?: string } | undefined
       if (m.laki === 'do' && cmd?.do === 'send' && typeof cmd.prompt === 'string' && cmd.prompt.trim()) return (send.current(cmd.prompt.trim()), true)
-      if (m.laki === 'copy' && typeof m.text === 'string') void navigator.clipboard.writeText(m.text).catch(() => {})
+      // a copy of words the block shows: at once; else (a button whose label isn't what it copies, a hidden character)
+      // you see what it would copy first, on a card: an agent's answer can't put a command you didn't read in your clipboard
+      if (m.laki === 'copy' && typeof m.text === 'string') {
+        const text = m.text
+        const seen = !HIDDEN.test(text) && !!text.trim() && (root.textContent ?? '').includes(text.trim())
+        if (!seen && (text.length > 2000 || HIDDEN.test(text))) return
+        void (seen ? Promise.resolve(true) : ask("Copy this?", { text, ok: "Copy" })).then(ok => (ok ? navigator.clipboard.writeText(text) : undefined)).catch(() => {})
+      }
       if (m.laki === 'open' && typeof m.url === 'string' && /^https?:\/\//i.test(m.url)) openExternal(m.url)
     })
   }, [spec])

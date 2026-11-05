@@ -2547,7 +2547,9 @@ An admin can lock some of Laki for everyone on a Mac: a JSON object, deployed wi
 - `bypass: false`: approvals required: no agent starts in a mode, or with flags, that never asks before it acts.
 - `agents`: only these agents start, also as a command tab's command (`codex --full-auto`).
 
-A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped.
+A policy that doesn't read locks nothing (`daemon.log` says why). What's already running isn't stopped. It covers how
+Laki starts agents and what Laki does itself, not what you type in a shell tab: an agent you run there by hand (`claude
+--dangerously-skip-permissions`) is a command like any other.
 
 ## Troubleshooting
 
@@ -2556,7 +2558,8 @@ A policy that doesn't read locks nothing (`daemon.log` says why). What's already
   200 MB to a few GB after a long day) and what they started. *Sleep* the idle ones, or set *Sleep idle agents
   after*.
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
-- **No PR badge**: run `gh auth status`. PRs are checked once a minute.
+- **No PR badge**: run `gh auth status`. PRs are checked once a minute (one that hasn't changed and has nothing
+  running, every 10 minutes; none while GitHub's quota for your gh is nearly spent).
 - **A tab says "Laki isn't hearing from this agent"**: its hooks (how Claude Code, Gemini and OpenCode tell Laki they
   ask or finish) haven't come since its prompt, so Laki reads its screen instead: no reliable done or waiting, no
   notifications or phone pushes, no Done check. Its *Likely* line names the cause, and *Details* the file and line (or
