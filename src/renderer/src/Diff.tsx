@@ -182,6 +182,47 @@ export function DiffRows({ fd, split, cls, row, head, after, gutter, nums = true
   ))
 }
 
+// an approval's diff (Ask.diff, permDiff's ' ', '-', '+' lines): red and green, its first 8 lines, Expand for the rest
+export const diffCounts = (d: string) => (ls => ({ add: ls.filter(l => l[0] === '+').length, del: ls.filter(l => l[0] === '-').length }))(d.split('\n'))
+export function AskDiff({ diff }: { diff: string }) {
+  const [open, setOpen] = useState(false)
+  const lines = diff.split('\n')
+  return (
+    <div className="ask-diff">
+      <pre>
+        {(open ? lines : lines.slice(0, 8)).map((l, i) => (
+          <div key={i} className={l[0] === '+' ? 'dl-add' : l[0] === '-' ? 'dl-del' : l[0] === '…' ? 'muted' : undefined}>
+            {l || ' '}
+          </div>
+        ))}
+      </pre>
+      {lines.length > 8 && (
+        <button type="button" className="link small" onClick={() => setOpen(o => !o)}>
+          {open ? 'Collapse' : `Expand: ${lines.length - 8} more lines`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// the bar under the terminal (App's ask-bar): a +N −M chip in it opens AskDiff over it (its terminal shows one too)
+export function AskWrap({ diff, children }: { diff?: string; children: (chip: ReactNode) => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  if (!diff) return <>{children(null)}</>
+  const { add, del } = diffCounts(diff)
+  const chip = (
+    <button type="button" className="ask-chip mono" aria-expanded={open} data-tip={open ? 'Hide the change' : 'Show the change it asks to make'} onClick={() => setOpen(o => !o)}>
+      <span className="add">+{add}</span> <span className="del">−{del}</span>
+    </button>
+  )
+  return (
+    <div className="ask-wrap">
+      {open && <AskDiff diff={diff} />}
+      {children(chip)}
+    </div>
+  )
+}
+
 export const MORE = 20 // an expand arrow's lines
 // a file's expanded lines: key, the diff they're for; lines, the file (none yet: read on the first click); up, each
 // hunk's lines shown above it; down, those after the last hunk; err, why it couldn't be read

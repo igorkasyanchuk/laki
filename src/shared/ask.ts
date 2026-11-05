@@ -45,7 +45,7 @@ function questionAt(lines: string[], i: number) {
 
 // ---------- a claude permission ask, from its PermissionRequest hook (tool_name, tool_input, permission_suggestions):
 // what the tool touches in a line, and the "don't ask again" rule its menu offers, made readable
-export type Perm = { tool: string; what: string; rule?: string }
+export type Perm = { tool: string; what: string; rule?: string; diff?: string }
 const WHAT_MAX = 300
 const cut = (s: string) => (s.length > WHAT_MAX ? `${s.slice(0, WHAT_MAX - 1)}…` : s)
 const line = (s: string) => s.replace(/\s*\n\s*/g, ' ↵ ').trim() // a command's lines on one, its breaks still seen
@@ -63,7 +63,37 @@ export function nearPath(p: string, root?: string, home?: string) {
   const h = home?.replace(/\/+$/, '')
   return h && (p === h || p.startsWith(`${h}/`)) ? `~${p.slice(h.length)}` : p
 }
-export function permOf(pl: { tool_name?: unknown; tool_input?: unknown; permission_suggestions?: unknown }, root?: string, home?: string): Perm | undefined {
+// a line diff of before and after: ' ' kept, '-' gone, '+' new, gone before new (LCS)
+// ponytail: O(n·m); past 90,000 line pairs every old line out and every new one in
+export function lineDiff(a: string, b: string): string[] {
+  const x = a ? a.split('\n') : [], y = b ? b.split('\n') : []
+  const n = x.length, m = y.length
+  if (n * m > 90000) return [...x.map(l => `-${l}`), ...y.map(l => `+${l}`)]
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1)) // L[i][j]: the common lines of x[i…] and y[j…]
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1])
+  const out: string[] = []
+  for (let i = 0, j = 0; i < n || j < m; )
+    if (i < n && j < m && x[i] === y[j]) out.push(` ${x[i++]}`), j++
+    else if (i < n && (j === m || L[i + 1][j] >= L[i][j + 1])) out.push(`-${x[i++]}`)
+    else out.push(`+${y[j++]}`)
+  return out
+}
+const DIFF_LINES = 200
+// what an Edit, MultiEdit or Write would change, as lineDiff's lines (prior: a Write's file as it is now, '' a new
+// one; null or unset: none shown), at most 200 lines of 300 characters, then how many more; the approval cards show it
+// (Reader, the bar, the island)
+export function permDiff(tool: string, i: Record<string, unknown>, prior?: string | null): string | undefined {
+  const s = (v: unknown) => (typeof v === 'string' ? v : '')
+  const lines =
+    tool === 'Edit' ? lineDiff(s(i.old_string), s(i.new_string))
+    : tool === 'MultiEdit' && Array.isArray(i.edits) ? i.edits.flatMap((e: any, k: number) => [...(k ? ['…'] : []), ...lineDiff(s(e?.old_string), s(e?.new_string))])
+    : tool === 'Write' && typeof i.content === 'string' && typeof prior === 'string' ? lineDiff(prior, i.content)
+    : undefined
+  if (!lines?.some(l => l[0] === '-' || l[0] === '+')) return
+  const shown = lines.slice(0, DIFF_LINES).map(l => (l.length > 300 ? `${l.slice(0, 299)}…` : l))
+  return [...shown, ...(lines.length > DIFF_LINES ? [`…${lines.length - DIFF_LINES} more lines`] : [])].join('\n')
+}
+export function permOf(pl: { tool_name?: unknown; tool_input?: unknown; permission_suggestions?: unknown }, root?: string, home?: string, prior?: string | null): Perm | undefined {
   if (typeof pl?.tool_name !== 'string' || !pl.tool_name) return
   const tool = pl.tool_name
   const i = (pl.tool_input && typeof pl.tool_input === 'object' ? pl.tool_input : {}) as Record<string, unknown>
@@ -77,7 +107,7 @@ export function permOf(pl: { tool_name?: unknown; tool_input?: unknown; permissi
     : tool === 'WebSearch' ? s('query')
     : mcp ? `${mcp[1]}: ${mcp[2]} ${short(i)}`
     : s('description') || s('command') || s('file_path') || s('url') || short(i)
-  return { tool: mcp ? mcp[1] : tool, what: cut(what), ...(r => r && { rule: r })(ruleOf(pl.permission_suggestions, root, home)) }
+  return { tool: mcp ? mcp[1] : tool, what: cut(what), ...(r => r && { rule: r })(ruleOf(pl.permission_suggestions, root, home)), ...(d => d && { diff: d })(permDiff(tool, i, prior)) }
 }
 // the first suggestion that would stop the asking (a rule, a folder), not a mode switch: Bash's "npm init *" → npm init,
 // WebFetch's "domain:example.com" → example.com, a folder as nearPath has it

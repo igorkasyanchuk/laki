@@ -3,6 +3,7 @@
 // tool calls folded into one line, what it does now; its menu as buttons, a box that sends (send whenIdle). The
 // terminal stays attached under it: Terminal brings it back as it was
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { linkify, Markdown } from './MarkdownView'
 import { historyKey, usePromptHistory } from './PromptInput'
@@ -60,9 +61,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
           {none && !said?.length && <div className="reader-empty muted">{tab.name}'s chat shows here once it has said something.</div>}
           {said?.map((x, i) =>
             x.who === 'you' ? (
-              <div key={i} className="rd-you">
-                {linkify(x.text)}
-              </div>
+              <You key={i} text={x.text} />
             ) : x.who === 'tool' ? (
               <details key={i} className="rd-tool">
                 <summary>
@@ -89,6 +88,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
       ) : tab.ask ? (
         <div className="rd-ask">
           <span className="muted">{tab.ask.question || `${tab.name} asks:`}</span>
+          {tab.ask.diff && <AskDiff diff={tab.ask.diff} />}
           <div className="rd-opts">
             {tab.ask.options.map(o => (
               <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} onClick={() => api.answer(tab.id, o.n)}>
@@ -120,6 +120,24 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
           </button>
           {histMenu}
         </form>
+      )}
+    </div>
+  )
+}
+
+// your message: a long one (a pasted log) folds to 10 lines under a fade, Show more opens it
+// ponytail: long by lines or length, not by measuring the wrapped text; a 1,000-character line folds even if it fits
+const longSaid = (s: string) => s.split('\n').length > 12 || s.length > 1000
+function You({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  const long = longSaid(text)
+  return (
+    <div className="rd-you">
+      <div className={long && !open ? 'rd-fold' : undefined}>{linkify(text)}</div>
+      {long && (
+        <button type="button" className="link rd-more" onClick={() => setOpen(o => !o)}>
+          {open ? 'Show less' : 'Show more'}
+        </button>
       )}
     </div>
   )

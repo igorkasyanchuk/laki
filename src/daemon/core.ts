@@ -490,6 +490,24 @@ unset LAKI_STATUSLINE_CMD
 exit 0
 `
 
+// a Write's file as it is now, for its ask's diff (permDiff): '' a new one; null one not shown (out of its workspace,
+// ~/.ssh's, even by a link: its lines never on a card; not a plain file, a FIFO's read never ends; over 256 KB)
+function priorOf(pl: any, root?: string): string | null | undefined {
+  const f = pl?.tool_name === 'Write' ? pl.tool_input?.file_path : undefined
+  if (typeof f !== 'string') return
+  let real: string
+  try {
+    real = realpathSync(f)
+  } catch {
+    return '' // not there yet
+  }
+  try {
+    const st = statSync(real)
+    return root && real.startsWith(`${realpathSync(root)}/`) && st.isFile() && st.size <= 256 * 1024 ? readFileSync(real, 'utf8') : null
+  } catch {
+    return null
+  }
+}
 // opencode's events as claude's hooks: a session (not a subagent's) made, busy, asking, idle
 const OPENCODE_PLUGIN = `// Laki's plugin (Laki writes it): tells Laki when this tab's turns start and end
 import { execFile } from 'node:child_process'
@@ -2841,7 +2859,10 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       // claude's PermissionRequest comes as its menu is shown, before its Notification (if any: that one comes later,
       // when you haven't answered): the ask is told once, with what it wants
       const again = r.status === 'waiting' && !!r.perm && pl.hook_event_name === 'Notification'
-      if (pl.hook_event_name === 'PermissionRequest') r.perm = permOf(pl, state.workspaces.find(w => w.id === tab.workspace)?.path, homedir())
+      if (pl.hook_event_name === 'PermissionRequest') {
+        const root = state.workspaces.find(w => w.id === tab.workspace)?.path
+        r.perm = permOf(pl, root, homedir(), priorOf(pl, root))
+      }
       r.status = 'waiting'
       r.limit = undefined
       if (again) break

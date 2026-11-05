@@ -29,7 +29,7 @@ import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { Reader, type ReaderApi, readable } from './Reader'
-import { turnNext } from './Diff'
+import { AskWrap, diffCounts, turnNext } from './Diff'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
 import { Term, xterms, type SelectionUse } from './Term'
@@ -1178,7 +1178,7 @@ export function App() {
           const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
           if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted || (m.kind === 'waiting' && t.status !== 'waiting')) return
           const perm = m.kind === 'waiting' && t.ask?.tool ? t.ask : undefined // claude's permission ask: what it wants to do
-          const body = perm ? perm.what ?? '' : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
+          const body = perm ? `${perm.what ?? ''}${perm.diff ? (c => ` (+${c.add} −${c.del})`)(diffCounts(perm.diff)) : ''}` : m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
           // a button per choice of its menu (its "don't ask again" one as Always: <rule>); a permission prompt whose menu
           // wasn't read: Allow and Deny, its first and last
           // one that doesn't fit is cut with … and gets none, as one with a bidi or invisible character (noteWhole): a Yes
@@ -3467,17 +3467,19 @@ export function App() {
         </div>
         {tab?.ask && !tab.planAsk /* its plan card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
+          <AskWrap key={tab.id} diff={tab.ask.diff}>{chip => (
           <div className="ask-bar">
-            {tab.ask.tool ? (
-              // claude's permission ask (PermissionRequest): the tool and what it touches
+            {tab.ask!.tool ? (
+              // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)
               <>
-                <span className="tag ask-tool">{tab.ask.tool}</span>
-                <span className="ask-what mono" data-tip={tab.ask.what}>{tab.ask.what}</span>
+                <span className="tag ask-tool">{tab.ask!.tool}</span>
+                <span className="ask-what mono" data-tip={tab.ask!.what}>{tab.ask!.what}</span>
+                {chip}
               </>
             ) : (
               <span className="muted">{tab.name} asks:</span>
             )}
-            {tab.ask.options.map(o => {
+            {tab.ask!.options.map(o => {
               const label = tab.ask!.rule && o === alwaysOf(tab.ask) ? `Yes, don't ask again for ${tab.ask!.rule}` : o.label
               return (
                 <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
@@ -3486,6 +3488,7 @@ export function App() {
               )
             })}
           </div>
+          )}</AskWrap>
         )}
         {touch && tab && !(narrow && (panelOpen || previewed)) /* not under a panel */ && (
           <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />

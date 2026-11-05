@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { alwaysOf, permOf, permVerb } from '../src/shared/ask.ts'
+import { alwaysOf, lineDiff, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 
 const fx = (name: string) => JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', `permission-${name}.json`), 'utf8'))
@@ -15,7 +15,7 @@ test('permOf: each tool in a line, cut at 300; the first rule or folder suggesti
   assert.deepEqual(permOf(fx('bash')), { tool: 'Bash', what: 'npm init -y', rule: 'npm init' })
   assert.deepEqual(permOf(fx('webfetch')), { tool: 'WebFetch', what: 'https://example.com', rule: 'example.com' })
   const edit = fx('edit')
-  assert.deepEqual(permOf(edit, '/Users/me/projects/demo'), { tool: 'Edit', what: 'notes.txt' }) // in the worktree: from its folder; setMode isn't a rule
+  assert.deepEqual(permOf(edit, '/Users/me/projects/demo'), { tool: 'Edit', what: 'notes.txt', diff: '-hello\n+hello world' }) // in the worktree: from its folder; setMode isn't a rule; its change
   assert.equal(permOf(edit, '/elsewhere', '/Users/me')!.what, '~/projects/demo/notes.txt')
   assert.deepEqual(permOf(fx('bash-dir'), undefined, '/Users/me'), { tool: 'Bash', what: 'touch probe.txt', rule: '~/projects/demo' })
   assert.equal(permOf({ tool_name: 'Bash', tool_input: { command: 'cd x\nnpm test' } })!.what, 'cd x ↵ npm test')
@@ -32,6 +32,23 @@ test('permOf: each tool in a line, cut at 300; the first rule or folder suggesti
   const ask = { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'Yes, and don’t ask again for: npm init *' }, { n: 3, label: 'No' }], at: 1 }
   assert.equal(alwaysOf(ask)?.n, 2)
   assert.equal(alwaysOf({ options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }], at: 1 }), undefined)
+})
+
+test('permDiff: an Edit, MultiEdit or Write as lines kept, gone and new; capped; none without a change', () => {
+  assert.deepEqual(lineDiff('a\nb\nc', 'a\nB\nc\nd'), [' a', '-b', '+B', ' c', '+d'])
+  assert.deepEqual(lineDiff('', 'x'), ['+x'])
+  assert.equal(permDiff('Edit', { old_string: 'same', new_string: 'same' }), undefined)
+  assert.equal(permDiff('MultiEdit', { edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: '' }] }), '-a\n+b\n…\n-c')
+  assert.equal(permDiff('Write', { content: 'one\ntwo' }, ''), '+one\n+two') // a new file
+  assert.equal(permDiff('Write', { content: 'one\ntwo' }, 'one'), ' one\n+two')
+  assert.equal(permDiff('Write', { content: 'secret' }, null), undefined) // out of its workspace: not shown
+  assert.equal(permDiff('Write', { content: 'x' }), undefined)
+  assert.equal(permDiff('Bash', { command: 'ls' }), undefined)
+  const big = permDiff('Write', { content: Array.from({ length: 250 }, (_, i) => `l${i}${'y'.repeat(i === 0 ? 400 : 0)}`).join('\n') }, '')!.split('\n')
+  assert.equal(big.length, 201)
+  assert.equal(big[0].length, 300)
+  assert.equal(big.at(-1), '…50 more lines')
+  assert.equal(lineDiff('a\n'.repeat(400), 'b\n'.repeat(400)).length, 802) // past the LCS cap: all out, all in
 })
 
 test('a PermissionRequest: the ask names the tool, what and rule; laki hook prints nothing; the next turn clears them', async t => {

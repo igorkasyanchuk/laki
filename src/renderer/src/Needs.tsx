@@ -8,6 +8,7 @@
 // 1–9 answer and Enter opens.
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
+import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
 import { Elapsed, Icon } from './ui'
@@ -109,6 +110,13 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
       {!open ? null : waiting ? (
         <>
           <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
+          {t.ask?.diff && (
+            // an Edit's or Write's change, before its Yes
+            <div className="need-diff" onClick={stop}>
+              <div className="mono small muted">{t.ask.what}</div>
+              <AskDiff diff={t.ask.diff} />
+            </div>
+          )}
           {(opts.length > 0 || allow) && (
             <div className="need-opts" onClick={stop}>
               {opts.map(o => (

@@ -295,6 +295,13 @@ function pillRender(items: Float[]) {
 // (its first lines, its time, a reply box, Review, Open), or the session list (a row's body opens its tab, its chevron
 // shows its last answer). Its height goes to main, which places it under the pill; the pointer and Esc decide when it
 // folds (main: shared/island.ts lifeStep)
+// an Edit's or Write's change (Ask.diff, permDiff's lines) on its card: red and green, its first 10 lines
+function diffEl(diff: string) {
+  const lines = diff.split('\n')
+  const pre = el('pre', '', 'i-diff')
+  pre.append(...lines.slice(0, 10).map(l => el('div', l || ' ', l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : '')), ...(lines.length > 10 ? [el('div', `…${lines.length - 10} more lines: Open tab`, 'm')] : []))
+  return pre
+}
 function islandPage() {
   const box = document.getElementById('island')!
   let shown: IslandCard | null = null
@@ -351,7 +358,7 @@ function islandPage() {
     if (f.status === 'waiting') {
       parts.push(head(f, 'asks'))
       const a = f.ask
-      if (a?.tool) parts.push(el('div', permVerb(a.tool), 'i-q'), el('pre', a.what ?? '', 'i-what'), el('div', `${a.tool} · ${f.project} / ${f.name}`, 'i-sub'))
+      if (a?.tool) parts.push(el('div', permVerb(a.tool), 'i-q'), el('pre', a.what ?? '', 'i-what'), ...(a.diff ? [diffEl(a.diff)] : []), el('div', `${a.tool} · ${f.project} / ${f.name}`, 'i-sub'))
       else if (a?.question || f.last) parts.push(el('div', a?.question ?? f.last ?? '', 'i-q'))
       const opts = el('div', '', 'i-opts')
       const always = a?.rule ? alwaysOf(a) : undefined

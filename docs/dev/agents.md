@@ -156,7 +156,7 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 |---|---|
 | SessionStart | records the resume id |
 | UserPromptSubmit, Pre/PostToolUse | running |
-| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule): prints nothing, so claude asks in its own menu |
+| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule, an Edit's, MultiEdit's or Write's change: `permDiff`, a Write's file read first only inside its workspace, `priorOf`): prints nothing, so claude asks in its own menu |
 | Notification (permission prompts) | waiting |
 | Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
 | StopFailure | usage limit (`limits.ts`) |

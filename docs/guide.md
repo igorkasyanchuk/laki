@@ -1537,9 +1537,10 @@ laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ### Reader view
 
 Each Claude Code and Codex tab has a *Terminal | Reader* switch at its top right. Reader shows its chat as a
-conversation, read from the agent's own transcript: your messages on the right, its answers as formatted text, each run
+conversation, read from the agent's own transcript: your messages on the right (a long one folds to 10 lines: *Show more*), its answers as formatted text, each run
 of tool calls folded into one line (click for the list), and what it's doing now. When it asks something, its choices
-are buttons; otherwise a box at the bottom sends it a message (while it works, it gets it when the turn ends). The
+are buttons (asked to edit or write a file, the change shows above them, red and green: the first 8 lines, *Expand* for
+the rest; the bar under the terminal has it as a *+N −M* chip, the sidebar's Needs you card and the notch's card too); otherwise a box at the bottom sends it a message (while it works, it gets it when the turn ends). The
 terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
 open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off. A
 ```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,

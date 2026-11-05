@@ -400,6 +400,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .need-ws { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .need-tab { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .need-head .elapsed { flex: none; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.need-diff { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; min-width: 0; } .need-diff > .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .need-diff pre { max-height: 160px; } /* an Edit's ask: AskDiff */
 .need-q { color: var(--fg); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .need-last { color: var(--muted); -webkit-line-clamp: 2; }
 .need-opts { display: flex; flex-direction: column; gap: 3px; }
@@ -1779,6 +1780,11 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ask-bar > span { flex: none; }
 .ask-bar .ask-tool { font-weight: 600; }
 .ask-bar > .ask-what { flex: 0 1 auto; min-width: 80px; max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--fg); }
+.ask-diff pre { margin: 0; max-height: 50vh; overflow: auto; padding: 4px 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); } /* an approval's diff (AskDiff) */
+.ask-diff pre > div { padding: 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-diff .dl-add { color: var(--add); background: var(--add-bg); } .ask-diff .dl-del { color: var(--del); background: var(--del-bg); }
+.ask-diff > .link { margin-top: 2px; font-size: 12px; }
+.ask-wrap { flex: none; border-top: 1px solid var(--line); background: var(--side); } .ask-wrap > .ask-bar { border-top: none; } .ask-wrap > .ask-diff { padding: 6px 10px 0; }
 .ask-bar button { flex: none; height: 26px; padding: 0 10px; white-space: nowrap; touch-action: manipulation; }
 .narrow .ask-bar button { height: 34px; }
 
@@ -2653,6 +2659,8 @@ button.board-name:hover { background: none; }
 .reader-col { max-width: 760px; margin: 0 auto; padding: 44px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
 .reader-empty { text-align: center; padding: 40px 0; }
 .rd-you { align-self: flex-end; max-width: 80%; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: color-mix(in srgb, var(--accent) 16%, var(--panel)); white-space: pre-wrap; overflow-wrap: anywhere; }
+.rd-fold { max-height: 10lh; overflow: hidden; mask-image: linear-gradient(to bottom, #000 55%, transparent); } /* Reader's long message, folded */
+.rd-more { display: block; margin-top: 4px; font-size: 12px; }
 .rd-agent { overflow-wrap: anywhere; } .rd-agent .md { padding: 0; max-width: none; } .rd-agent .md > :first-child { margin-top: 0; } .rd-agent .md > :last-child { margin-bottom: 0; }
 .rd-tool { font-size: 12px; color: var(--muted); } .rd-tool summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rd-tool pre { margin: 4px 0 0; padding: 6px 8px; max-height: 240px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 6px); font: 11.5px/1.45 var(--mono); white-space: pre-wrap; }

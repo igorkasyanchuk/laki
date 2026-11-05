@@ -810,7 +810,7 @@ export type PR = {
 // Created by: the tab whose agent started a workspace (its fromTab: laki new, /laki:orchestrate), as its @name, else
 // its name, while it's open; none: undefined (Info and laki ls then name its workspace, from)
 export const creatorOf = (w: { fromTab?: string }, tabs: { id: string; name: string; alias?: string }[]) => (t => t && { id: t.id, label: t.alias ? `@${t.alias}` : t.name })(w.fromTab ? tabs.find(t => t.id === w.fromTab) : undefined)
-export type Ask = { options: { n: number; label: string }[]; at: number; question?: string; tool?: string; what?: string; rule?: string } // at: the marked option's n; question: the line or two above the menu; tool, what, rule: claude's PermissionRequest (shared/ask.ts permOf): the tool (an MCP tool's server), what it touches in a line, the "don't ask again" rule its menu offers
+export type Ask = { options: { n: number; label: string }[]; at: number; question?: string; tool?: string; what?: string; rule?: string; diff?: string } // at: the marked option's n; question: the line or two above the menu; tool, what, rule, diff: claude's PermissionRequest (shared/ask.ts permOf): the tool (an MCP tool's server), what it touches in a line, the "don't ask again" rule its menu offers, an Edit's or Write's change (permDiff: ' ', '-', '+' lines)
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
 // laki show: what an agent puts under its tab for you, with buttons you click (a folder in Finder, a file in its app, a

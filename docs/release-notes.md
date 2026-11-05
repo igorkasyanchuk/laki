@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Before you approve an edit, see it: when Claude asks to edit or write a file, Reader view, the sidebar's Needs you
+  card and the floating bubbles' notch card show the change in red and green (the first lines, *Expand* for the rest),
+  the bar under the terminal a *+N −M* chip that opens it, and the notification its counts.
+- Reader view folds a long message of yours (a pasted log) to 10 lines under a fade: *Show more* opens it.
 - The floating bubbles can live in the notch: Settings › Appearance › Floating bubbles › *Where* › *Notch* shows a
   pill at the top of the screen that opens into a card when an agent asks (answer there) or finishes (reply there,
   or open its changes).
