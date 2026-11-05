@@ -78,7 +78,7 @@ How it was decided:
 
 ### L77: the tunnel popup's who-can-open choice and its list; a tunnel's link in the info panel (~167 B)
 
-- [ ] `.info-link` L85, L86
+- [x] `.info-link` L85, L86
 
 ## Kept: built at run time
 
