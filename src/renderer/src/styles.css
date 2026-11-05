@@ -514,8 +514,6 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .main:has(> .settings-page) > .body { visibility: hidden; } /* nothing under a page shows through it (glass, a see-through theme) */
 .settings-head { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); background: var(--side); -webkit-app-region: drag; }
 .settings-head button { -webkit-app-region: no-drag; }
-/* an experimental page's tag beside its title (Workflows, Specs & Brainstorms, Bird view) */
-.wf-beta { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--waiting) 22%, transparent); color: var(--fg); font: 600 10px/1.4 var(--ui-font); flex: none; }
 .electron.side-closed .settings-head { padding-left: 76px; }
 .electron.list-off .settings-head { padding-left: max(16px, calc(76px - var(--rail-w, 68px))); } /* the rail's page: past the traffic lights */
 .settings-body { flex: 1; display: flex; min-height: 0; }

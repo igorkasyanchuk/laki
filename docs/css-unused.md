@@ -28,7 +28,7 @@ How it was decided:
 
 ### L517: an experimental page's tag beside its title (Workflows, Specs & Brainstorms, Bird view) (~201 B)
 
-- [ ] `.wf-beta` L518
+- [x] `.wf-beta` L518
 
 ### L329: Places: the pills, and beside them a small Laki window with each place it's in lit … (~197 B)
 
