@@ -285,21 +285,21 @@ test("a permission mode and fast mode go into the agent's flags, kept for restar
 })
 
 test("an agent's models: none said, or a failure, asked again after a while; a list, kept", async t => {
-  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '400' } })
+  const rig = await fresh(t, { env: { LAKI_MODELS_RETRY_MS: '1500' } })
   const asks = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] === 'app-server').length
   await rig.rpc('settingsSet', { env: { FAKE_MODELS: 'fail' } })
   await assert.rejects(rig.rpc('agentModels', { agent: 'codex' }), /ended without its models/)
   await assert.rejects(rig.rpc('agentModels', { agent: 'codex' }), /ended without its models/) // kept: not started again
   assert.equal(asks(), 1)
-  await new Promise(r => setTimeout(r, 500))
+  await new Promise(r => setTimeout(r, 1600))
   await rig.rpc('settingsSet', { env: { FAKE_MODELS: 'empty' } })
   assert.deepEqual(await rig.rpc('agentModels', { agent: 'codex' }), [])
   assert.deepEqual(await rig.rpc('agentModels', { agent: 'codex' }), [])
   assert.equal(asks(), 2)
-  await new Promise(r => setTimeout(r, 500))
+  await new Promise(r => setTimeout(r, 1600))
   await rig.rpc('settingsSet', { env: {} })
   assert.equal((await rig.rpc('agentModels', { agent: 'codex' }))[0].id, 'gpt-x')
-  await new Promise(r => setTimeout(r, 500))
+  await new Promise(r => setTimeout(r, 1600))
   assert.equal((await rig.rpc('agentModels', { agent: 'codex' }))[0].id, 'gpt-x') // a list: a day
   assert.equal(asks(), 3)
 })

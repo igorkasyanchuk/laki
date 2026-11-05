@@ -190,8 +190,8 @@ export function agentModels(o: { agent?: string; preset?: string }): Promise<Age
             : undefined,
         )
   )
-    .then(l => ((seen.short = !l.length), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
-    .catch(e => ((seen.short = true), Promise.reject(e)))
+    .then(l => ((seen.short = !l.length) && (seen.at = Date.now()), l.forEach(m => m.efforts?.forEach(e => (effortsSaid.get(agent) ?? effortsSaid.set(agent, new Set()).get(agent)!).add(e))), l))
+    .catch(e => ((seen.short = true), (seen.at = Date.now()), Promise.reject(e))) // its retry from the answer (an ask takes up to 20 s)
   modelsSeen.set(key, seen)
   return seen.list
 }
