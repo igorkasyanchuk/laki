@@ -1584,10 +1584,6 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .seg-glyph { display: inline-block; width: 1em; margin-right: 5px; font-family: var(--mono); color: var(--accent-ink); }
 .setting-box .switch-row .seg button { display: inline-flex; align-items: center; padding: 3px 10px; font-size: 12px; }
 .term-font-name { width: 220px; }
-/* Settings › Extensions' Make one with AI: the description and Laki AI's button on one line */
-.widget-make { display: flex; gap: 8px; }
-.widget-make input { flex: 1; min-width: 0; }
-.widget-make button { flex: none; display: inline-flex; align-items: center; gap: 6px; }
 .side-panel .row { display: flex; flex-wrap: wrap; gap: 6px; }
 .side-panel .toggle { font-size: 12px; }
 /* file preview and finder (SidePanel.tsx), projects in Settings: as in the other app */

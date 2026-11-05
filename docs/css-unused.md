@@ -37,7 +37,7 @@ How it was decided:
 
 ### L1592: Settings › Extensions' Make one with AI: the description and Laki AI's button on one line (~177 B)
 
-- [ ] `.widget-make` L1593, L1594, L1595
+- [x] `.widget-make` L1593, L1594, L1595
 
 ### L725: a menu with lines under its labels, or a filter: roomier, like a picker (~118 B)
 
