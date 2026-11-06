@@ -2666,7 +2666,7 @@ export function App() {
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
     ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
-    ...(settings.cloud === true ? ['experimental'] : []), // one turned on; else seen through Go (below)
+    ...(view?.workspaces.some(w => w.codespace !== undefined) ? ['experimental'] : []), // a codespace made; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -2708,7 +2708,7 @@ export function App() {
   useEffect(() => void (flowsOn && view ? api.call<WorkflowItem[]>('flowList', {}).then(l => setFlowItems(l.filter(f => f.source !== 'builtin')), () => {}) : setFlowItems([])), [flowsOn, !view, view?.flowFiles])
   // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
   useEffect(() => {
-    const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
+    const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Cloud workspaces' ? 'experimental' : undefined
     if (id) setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))
   }, [dialog])
   // the sidebar's + › Terminal or Browser: a new one in the Terminals or Browsers project (the first makes it), selected

@@ -4,6 +4,11 @@ version it builds, with the date. -->
 
 ## Next
 
+- Cloud workspaces are out of Experimental: *In a codespace* on the new-workspace page for any project on GitHub,
+  each machine type with its cores, memory, disk and about its price an hour, a missing gh scope said up front with
+  the command to copy, and your `.worktreeinclude` files (an `.env`) copied in before setup. Settings › General ›
+  *Cloud workspaces* turns it off.
+
 - Gemini CLI's quota in the plan-limit ring: each model's quota with its reset, read with Gemini CLI's own Google
   sign-in (nothing written to it), the models your Gemini tabs use first. Settings › Appearance › *Gemini CLI plan limits*.
 

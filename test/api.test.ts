@@ -806,9 +806,11 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   let d = await rig.rpc('doctor')
   assert.deepEqual([d.git, d.gh, d.agents.find((a: any) => a.id === 'claude').found], [true, 'out', true])
   mkdirSync(join(rig.home, 'gh'), { recursive: true })
-  writeFileSync(join(rig.home, 'gh', 'auth'), 'Logged in to github.com\n')
+  writeFileSync(join(rig.home, 'gh', 'auth'), "Logged in to github.com\n  - Token scopes: 'gist', 'repo'\n")
   d = await rig.rpc('doctor')
-  assert.equal(d.gh, 'in')
+  assert.deepEqual([d.gh, d.ghCodespace], ['in', false]) // cloud workspaces' scope: the optional line
+  writeFileSync(join(rig.home, 'gh', 'auth'), "Logged in to github.com\n  - Token scopes: 'codespace', 'gist', 'repo'\n")
+  assert.equal((await rig.rpc('doctor')).ghCodespace, true)
 })
 
 test('answer a menu, unread, a race, an issue, the agent browser', async t => {

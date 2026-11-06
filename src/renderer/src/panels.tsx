@@ -293,7 +293,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'actions', title: 'Set up actions', hint: 'The Run menu: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
-  { id: 'experimental', title: 'Visit Experimental', hint: 'New things to try: cloud workspaces in GitHub Codespaces', go: 'Experimental' },
+  { id: 'experimental', title: 'Visit Cloud workspaces', hint: 'A workspace in a GitHub Codespace of its own', go: 'Cloud workspaces' },
   { id: 'presets', title: 'Set up agents & profiles', hint: 'Each profile its agent, model, effort and account: a second Claude plan, a cheaper model', go: 'Agents & profiles' },
   { id: 'remote', title: 'Try remote access', hint: 'Laki on your phone: signed in by email (Cloudflare), with a PIN, or over Tailscale', go: 'Remote access' },
   { id: 'schedules', title: 'Schedule a prompt', hint: 'An agent on a prompt every weekday at 9am, or once tomorrow', go: 'Scheduled tasks' },
@@ -552,6 +552,11 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
+// a codespace's machine type (codespace.ts machines): its cores, memory and disk, about its price an hour
+type CsMachine = { name: string; display: string; cpus?: number; memory?: number; storage?: number; perHour?: number }
+const GB = (n?: number) => (n ? `${Math.round(n / 2 ** 30)} GB` : '')
+const machineText = (m: CsMachine) => (m.cpus ? [`${m.cpus} cores`, m.memory && `${GB(m.memory)} RAM`, m.storage && `${GB(m.storage)} disk`, m.perHour !== undefined && `≈ $${m.perHour.toFixed(2)}/h`].filter(Boolean).join(' · ') : m.display)
+const CS_FIX = 'gh auth refresh -s codespace' // codespace.ts SCOPE's fix: copied from the page
 export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
@@ -731,13 +736,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const tpl = ti < 0 ? '' : String(ti)
   const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base, pr: prRef('', p.prompt) })
   const plain = proj?.git === false // a folder without git: local only
-  const inCs = view.settings.cloud === true && !plain && !proj?.host && p.codespace !== undefined // In a codespace (experimental)
+  const csOk = view.settings.cloud !== false && !plain && !proj?.host && !!proj?.github // In a codespace: a GitHub project's (Settings › General › Cloud workspaces)
+  const inCs = csOk && p.codespace !== undefined
   // its repo's machine types (the first picked), or why there are none (gh's words: the codespace scope…)
-  const [machines, setMachines] = useState<{ name: string; display: string }[] | string>([])
+  const [machines, setMachines] = useState<CsMachine[] | string>([])
   useEffect(() => {
     if (!inCs || !p.project) return
     setMachines([])
-    api.call<{ machines: { name: string; display: string }[] }>('csMachines', { project: p.project }).then(
+    api.call<{ machines: CsMachine[] }>('csMachines', { project: p.project }).then(
       r => (setMachines(r.machines), setP(x => (x.codespace !== undefined && !r.machines.some(m => m.name === x.codespace) ? { ...x, codespace: r.machines[0]?.name ?? '' } : x))),
       e => setMachines((e as Error).message),
     )
@@ -920,10 +926,10 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       { label: 'New worktree', icon: 'fork', sub: 'A git worktree of its own, off the base branch', hint: !p.local && !inCs && !(canSkip && p.noSetup) ? ON : undefined, run: () => set({ local: false, codespace: undefined, noSetup: undefined }) },
       ...(!plain && proj?.hasSetup ? [{ label: 'New worktree, no setup', icon: 'fork', sub: "Without the project's setup script: a quick look or experiment (the Run menu runs it later)", hint: canSkip && p.noSetup ? ON : undefined, run: () => set({ local: false, codespace: undefined, noSetup: true }) } as MenuItem] : []),
       { label: 'Local', icon: 'folder', sub: `In the repo itself, on ${current || 'the branch it’s on'}`, hint: p.local ? ON : undefined, run: () => set({ local: true, codespace: undefined }) },
-      ...(view.settings.cloud === true && !proj?.host ? [{ label: 'In a codespace', icon: 'cloud', sub: 'A GitHub Codespace of its own, off the base branch (GitHub bills it)', hint: inCs ? ON : undefined, run: () => set({ local: false, codespace: p.codespace ?? '' }) } as MenuItem] : []),
+      ...(csOk ? [{ label: 'In a codespace', icon: 'cloud', sub: 'A GitHub Codespace of its own, off the base branch (GitHub bills it)', hint: inCs ? ON : undefined, run: () => set({ local: false, codespace: p.codespace ?? '' }) } as MenuItem] : []),
     ])
   const machineMenu = (e: MouseEvent) =>
-    openMenu(e, [{ head: 'Machine type' }, ...(typeof machines === 'string' ? [] : machines).map(m => ({ label: m.display, sub: m.name, hint: p.codespace === m.name ? ON : undefined, run: () => set({ codespace: m.name }) }) as MenuItem)])
+    openMenu(e, [{ head: 'Machine type · GitHub bills it by the hour' }, ...(typeof machines === 'string' ? [] : machines).map(m => ({ label: machineText(m), sub: m.name, hint: p.codespace === m.name ? ON : undefined, run: () => set({ codespace: m.name }) }) as MenuItem)])
   const tplMenu = (e: MouseEvent) =>
     openMenu(
       e,
@@ -1032,7 +1038,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
             </span>
           ) : (
             <>
-              <button type="button" className="nw-pick" aria-haspopup="menu" data-tip={view.settings.cloud === true ? 'A worktree of its own, the repo itself, or a codespace' : 'A worktree of its own, or the repo itself'} onClick={whereMenu}>
+              <button type="button" className="nw-pick" aria-haspopup="menu" data-tip={csOk ? 'A worktree of its own, the repo itself, or a codespace' : 'A worktree of its own, or the repo itself'} onClick={whereMenu}>
                 <span>{p.local ? 'Local' : inCs ? 'In a codespace' : canSkip && p.noSetup ? 'New worktree, no setup' : 'New worktree'}</span>
                 <Icon name="chevron" size={11} />
               </button>
@@ -1053,11 +1059,16 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                   <span className="nw-pick quiet warn" data-tip={machines}>
                     <Icon name="alertCircle" />
                     <span>{machines}</span>
+                    {machines.includes(CS_FIX) && (
+                      <button type="button" className="link small" onClick={() => void navigator.clipboard.writeText(CS_FIX)}>
+                        Copy
+                      </button>
+                    )}
                   </span>
                 ) : (
                   <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its machine type: GitHub bills by it" onClick={machineMenu}>
                     <Icon name="cloud" />
-                    <span>{machines.find(m => m.name === p.codespace)?.display ?? (p.codespace || 'Machine type')}</span>
+                    <span>{(m => (m ? machineText(m) : p.codespace || 'Machine type'))(machines.find(m => m.name === p.codespace))}</span>
                     <Icon name="chevron" size={11} />
                   </button>
                 ))}
@@ -1748,6 +1759,7 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
         <div className="welcome-checks">
           {row(d.git, 'git', d.git ? 'found' : `needed for worktrees: ${mac ? 'xcode-select --install' : 'sudo apt install git'}`)}
           {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : `not found, for PRs: ${mac ? 'brew' : 'sudo apt'} install gh`)}
+          {d.ghCodespace !== undefined && row(d.ghCodespace, 'codespace scope', d.ghCodespace ? 'there: cloud workspaces work' : 'optional, for cloud workspaces: gh auth refresh -s codespace')}
           {d.cloudflared !== undefined &&
             row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : `optional: ${mac ? 'brew ' : ''}install cloudflared`, CLOUDFLARED_WHY)}
           {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}

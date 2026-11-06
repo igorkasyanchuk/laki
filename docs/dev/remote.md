@@ -39,16 +39,20 @@ A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: 
   ssh line): `<data>/ssh/codespaces/*` first (ssh takes an option's first value: a `Host *` of yours never wins over a
   codespace's own; they name only `laki-cs-*`), then `Include ~/.ssh/config`, `/etc/ssh/ssh_config` (-F reads neither),
   so plain hosts read as before.
-- Cloud workspaces (experimental, `settings.cloud`; `hosts.ts`' cloud section, `daemon/codespace.ts`: gh on this Mac): a
+- Cloud workspaces (`settings.cloud`, on unless false; `hosts.ts`' cloud section, `daemon/codespace.ts`: gh on this Mac): a
   workspace of a local GitHub project (`origin`, `ghRepo`) with a host of its own, `codespace` its codespace's name ('' while
   made), `csState` (gh's word; `Creating`, `Failed` with `csError`). `wsNew` `codespace` (a machine type, '': the repo's
-  first; `cloudCheck`: the setting, not an agent's (`from`: GitHub bills it), not a host's or a folder's, not Local, a
+  first; `cloudCheck`: the setting (`false`: off), not an agent's (`from`: GitHub bills it), not a host's or a folder's, not Local, a
   PR or a race) asks `machines` (`gh api repos/<o/r>/codespaces/machines`: the scope, the repo and the type, at once;
-  `csMachines`, the new-workspace page's *In a codespace* picker), then answers with the workspace (`cloudNew`: host
+  each one's `cpus`, `memory`, `storage` and `perHour` at `CORE_HOUR`, GitHub's price read by hand; `csMachines`, the
+  new-workspace page's *In a codespace* picker, asked as the page opens with it picked: `SCOPE` shown with a Copy of
+  its fix; offered only for a project the view marks `github`, core.ts' `onGitHub` reading `.git/config`'s origin;
+  doctor's `ghCodespace`, the token's scopes by `gh auth status`: Get started's optional line), then answers with the workspace (`cloudNew`: host
   `laki-cs-<id>`, path `<CS_ROOT>/<repo>`, `/workspaces` unless `LAKI_CS_ROOT`, tests'; branch `laki/<id>` off the base),
   while `csMake` (`making`) runs `gh codespace create -R -b -m --default-permissions`, waits for Available (`until`),
   writes its Host entry (`gh codespace ssh --config`, its `Host` line renamed: `sshEntry`) and makes the branch there (a
-  one-off ssh), then connects. `connect` waits for it (`csUp`: made or its `csError`; a stopped one started:
+  one-off ssh, with the folders of what `.worktreeinclude` names: `includes`, each a file up to 1 MB in the repo, copied
+  by `gh codespace cp -e` before it's Available, so before setup; each one in its Logs), then connects. `connect` waits for it (`csUp`: made or its `csError`; a stopped one started:
   `gh api -X POST user/codespaces/<name>/start`, then `until`), so its tabs wait in `hostTab` and print why it failed.
   `away` (made, stopped or not connected: `live`) keeps scans off it (PRs, `stat`, `wsPeek`): none wakes it.
   `csRefresh` (`gh codespace list`, with each `scanPRs` and as its master exits) keeps `csState` current. Archive:

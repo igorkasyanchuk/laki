@@ -267,7 +267,7 @@ export type AppSettings = Paint & {
   notes?: boolean // Notes (Notes.tsx), your own notes, the rail's Notes, on unless false
   todoList?: boolean // To-dos (TodoList.tsx), one checklist of your own, the rail's To-dos, on unless false
   fullReview?: boolean // the tab bar's Review tab (FullReview.tsx), Settings › Pull requests, on unless false
-  cloud?: boolean // experimental: Cloud workspaces, a workspace in a GitHub Codespace (the new-workspace page's In a codespace), off unless true
+  cloud?: boolean // Cloud workspaces: a workspace in a GitHub Codespace (the new-workspace page's In a codespace), on unless false
   simulator?: boolean // Simulators: the side panel's Simulator tab, off unless true
   emuWindow?: boolean // Simulators: an emulator Laki starts gets its own window too (off unless true: -no-window)
   history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
@@ -1435,10 +1435,10 @@ export function SettingsPage(p: {
                 </Switch>
               </div>
               </Group>
-              <Group title="Experimental" hint="New things to try: they may change, or go">
+              <Group title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, for a project on GitHub">
               <div className="setting-box">
-                <Switch className="switch-row" on={s.cloud === true} onChange={v => set({ cloud: v })}>
-                  <Says title="Cloud workspaces" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it" />
+                <Switch className="switch-row" on={s.cloud !== false} onChange={v => set({ cloud: v })}>
+                  <Says title="Cloud workspaces (GitHub Codespaces)" hint="A workspace in a GitHub Codespace of its own, made through your gh (it needs the codespace scope: gh auth refresh -s codespace): the new-workspace page's In a codespace, with a machine type. Archive stops it, Restore starts it again, Delete deletes it. GitHub bills it by the hour (≈ $0.09 a core) and its disk by the month; it stops itself after its idle timeout (30 minutes unless you changed it on GitHub), and GitHub deletes a stopped one after its retention period (30 days), its unpushed work with it" />
                 </Switch>
               </div>
               </Group>

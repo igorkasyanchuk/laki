@@ -625,7 +625,7 @@ export function view(): View {
   const hidden = new Set(state.workspaces.filter(w => shelved.has(w.project)).map(w => w.id))
   return {
     ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
-    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }) }))(cfgWait(p)))),
+    projects: state.projects.filter(p => !p.archived).map(p => (p.kind ? p : (h => ({ ...p, ...(h && { cfgWait: h }), ...(projectConfig({ project: p.id } as Workspace).setup && { hasSetup: true }), ...(!p.host && onGitHub(p.path) && { github: true }) }))(cfgWait(p)))),
     ...(shelved.size && { archivedProjects: state.projects.filter(p => p.archived).map(p => ({ id: p.id, name: p.name, path: p.path, ...(p.host && { host: p.host }), archived: p.archived!, workspaces: state.workspaces.filter(w => w.project === p.id && !w.archived).length })) }),
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
@@ -2105,6 +2105,24 @@ export function tabReopen(p: { ws: string; index?: number }): Tab & { fresh?: bo
   save()
   changed()
   return { ...tab, ...(fresh && { fresh }) }
+}
+
+// a project whose origin is on GitHub (the new-workspace page's In a codespace): its .git/config's remote "origin",
+// read again only when that file changes. ponytail: the file as written (no insteadOf, includes or a worktree's own),
+// hosts.ts' ghRepoOf asks git itself before gh
+const ghOrigin = new Map<string, { at: number; on: boolean }>()
+export function onGitHub(path: string) {
+  const f = join(path, '.git', 'config')
+  const at = statSync(f, { throwIfNoEntry: false })?.mtimeMs ?? 0
+  const had = ghOrigin.get(path)
+  if (had?.at === at) return had.on
+  let on = false
+  try {
+    const url = /\[remote "origin"\][^[]*?^\s*url\s*=\s*(\S+)/m.exec(readFileSync(f, 'utf8'))?.[1]
+    on = !!url && !!cs.ghRepo(url)
+  } catch {}
+  ghOrigin.set(path, { at, on })
+  return on
 }
 
 // ---------- workspaces
@@ -3802,8 +3820,10 @@ export async function timer(p: { act: string; minutes?: number; note?: string; w
 
 // the first-run screen's checks
 export async function doctor(): Promise<Doctor> {
-  const gh = !onPath('gh') ? 'missing' : (ghCount(['auth', 'status']), await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const))
-  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })), hooks: await hooksRun(), hookFiles: hookFilesOk() }
+  const said = onPath('gh') ? (ghCount(['auth', 'status']), await run('gh', ['auth', 'status'], { timeout: 8000 }).then(r => `${r.stdout}${r.stderr}`, () => null)) : undefined
+  const gh = said === undefined ? 'missing' : said === null ? 'out' : 'in'
+  // its token's codespace scope (cloud workspaces'): optional, said where it's missing
+  return { git: onPath('git'), gh, ...(gh === 'in' && { ghCodespace: /Token scopes:.*\bcodespace\b/.test(String(said)) }), cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })), hooks: await hooksRun(), hookFiles: hookFilesOk() }
 }
 // doctor's hooks: Laki's hook command runs, as agents run it (hook ping: no RPC, exits at once)
 const hooksRun = () =>

@@ -135,6 +135,7 @@ export type Project = {
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
   trusted?: string // its .laki.json as you trusted it (projectTrust: sha256 of its JSON); one that isn't that gives its port names only
   cfgWait?: string // the view's: its .laki.json's hash while it has more than port names and you haven't trusted it as it is
+  github?: boolean // the view's: its origin is on GitHub (core.ts onGitHub): the new-workspace page offers In a codespace
   hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's New worktree, no setup
   color?: string // TAB_COLORS': an accent (its icon, its workspaces' bar where they have none of their own, rail pins, bubbles)
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
@@ -535,7 +536,7 @@ export type Settings = {
   desk?: boolean // Settings › General › Pages: the rail's Desk, extensions placed there as tiles, on unless false
   notes?: boolean // Settings › General › Pages: the rail's Notes, your own notes (daemon/notes.ts), on unless false
   todoList?: boolean // Settings › General › Pages: the rail's To-dos, one checklist of your own (daemon/notes.ts' todoList*), on unless false
-  cloud?: boolean // experimental (Settings › General): Cloud workspaces, a workspace in a GitHub Codespace (core.ts, daemon/codespace.ts), off unless true
+  cloud?: boolean // Settings › General › Cloud workspaces: a workspace in a GitHub Codespace (core.ts, daemon/codespace.ts), on unless false
   simulator?: boolean // Settings › Simulators: the side panel's Simulator tab, off unless true
   emuWindow?: boolean // Settings › Simulators: an Android emulator Laki starts gets its own window too (off unless true: -no-window, the side panel its only screen)
   history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
@@ -879,7 +880,7 @@ export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent'
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 // Settings › Agents & profiles: an agent's last hook (this daemon's), its live tabs, how many aren't heard (hooksSeen)
 export type HookSeen = { at?: number; tabs: number; deaf: number }
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; ghCodespace?: boolean; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[]; hooks?: { ok: boolean; why?: string }; hookFiles?: { ok: boolean; why?: string } } // idb: laki screen's simulator hands; hooks: Laki's hook command runs (hook ping); hookFiles: the files that point agents at it are there and read
 
 // a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
 // minutes (none: no fetch command or script); size: cells, 1–4 across the sidebar's grid by 1–4 down; full: it has a

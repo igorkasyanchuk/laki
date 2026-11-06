@@ -198,7 +198,7 @@ npm link
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
 2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
-   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser, Settings' Experimental,
+   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser, Cloud workspaces,
    Agents & profiles, remote access, Scheduled tasks, Workflows), each with a button that does it, and a theme to pick
    from a dropdown (painted as you pick). Workflows' button opens Settings › General › Pages while they're off.
    A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
@@ -1813,12 +1813,14 @@ settings) and shows a server icon; the toolbar's ⋯ › *Copy path* gives `devb
   `cp "$LAKI_PROJECT_PATH/.env" .`), new files' lines in the diff size, and the agent skill (agents there have no
   `laki`).
 
-### Cloud workspaces (experimental)
+### Cloud workspaces
 
-Turn it on in Settings › General › *Experimental*. A workspace can then run in a GitHub Codespace of its own: on the
-new-workspace page, *New worktree* ▾ › *In a codespace*, then a machine type (the ones your repo may use). The project
-is a repository on this Mac whose `origin` is on GitHub; Laki makes the codespace through your `gh`, which needs the
-codespace scope once: `gh auth refresh -s codespace` (the page says so when it's missing).
+A workspace can run in a GitHub Codespace of its own: on the new-workspace page, *New worktree* ▾ › *In a codespace*
+(offered for a project whose `origin` is on GitHub), then a machine type (the ones your repo may use, each with its
+cores, memory, disk and about what it costs an hour: GitHub bills $0.09 a core-hour, and storage by the month).
+Laki makes the codespace through your `gh`, which needs the codespace scope once: `gh auth refresh -s codespace` (the
+page says so when it's missing, with a Copy button; Get started's checks say so too). Settings › General › *Cloud
+workspaces* turns it off.
 
 - The workspace shows at once while GitHub makes the codespace (a minute or several): its tabs wait for it, and say
   why if it fails. The row and the status bar say ☁ *codespace* and its state (being made, on, stopped, starting,
@@ -1831,8 +1833,8 @@ codespace scope once: `gh auth refresh -s codespace` (the page says so when it's
   it on GitHub, with whatever wasn't pushed. GitHub bills it while it runs, and deletes a stopped one after its
   retention period (30 days unless you set another). A codespace its idle timeout stopped stays stopped until you use
   it (a tab's Enter, the Changes panel); restarting Laki starts the ones with tabs again.
-- Not yet: prebuilds, another machine type once it's made, files git ignores copied in (`.env`: use the repo's
-  Codespaces secrets), ports other than `$PORT`.
+- The files `.worktreeinclude` names (an `.env`) are copied in before setup, as for a worktree (each up to 1 MB).
+- Not yet: prebuilds, another machine type once it's made, ports other than `$PORT`.
 
 ### Keys
 

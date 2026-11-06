@@ -19,6 +19,7 @@ case "$1" in
       view) [ -f "$FAKE_GH/cs-$c" ] || { echo 'HTTP 404: Not Found (https://api.github.com/user/codespaces/'"$c"')' >&2; exit 1; }; printf '{"state":"%s"}\n' "$(cat "$FAKE_GH/cs-$c")" ;;
       ssh) printf 'Host cs.%s.main\n\tUser codespace\n\tProxyCommand gh cs ssh -c %s --stdio -- -i ~/.ssh/codespaces.auto\n\tUserKnownHostsFile=/dev/null\n\tStrictHostKeyChecking no\n\tLogLevel quiet\n\tControlMaster auto\n\tIdentityFile ~/.ssh/codespaces.auto\n' "$c" "$c" ;;
       stop) echo Shutdown > "$FAKE_GH/cs-$c" ;;
+      cp) s= l=; for a in "$@"; do s=$l; l=$a; done; cp "$s" "${l#remote:}" ;; # a file in: its path there is here too ($LAKI_CS_ROOT)
       delete) rm -f "$FAKE_GH/cs-$c" ;;
       list) sep=; printf '['; for f in "$FAKE_GH"/cs-fake-*; do [ -f "$f" ] || continue; printf '%s{"name":"%s","state":"%s"}' "$sep" "${f##*/cs-}" "$(cat "$f")"; sep=,; done; echo ']' ;;
       *) exit 1 ;;
@@ -30,7 +31,7 @@ case "$1 $2" in
     n=${4#user/codespaces/}; n=${n%/start}; [ -f "$FAKE_GH/cs-$n" ] || exit 1; echo Available > "$FAKE_GH/cs-$n"; echo '{}' ;;
   "api repos/"*"/codespaces/machines") # $FAKE_GH/cs-noscope: gh's words for a token without the codespace scope
     [ -f "$FAKE_GH/cs-noscope" ] && { echo 'gh: This API operation needs the "codespace" scope. To request it, run:  gh auth refresh -h github.com -s codespace' >&2; exit 1; }
-    echo '{"total_count":2,"machines":[{"name":"basicLinux32gb","display_name":"2 cores, 8 GB RAM, 32 GB storage"},{"name":"standardLinux32gb","display_name":"4 cores, 16 GB RAM, 32 GB storage"}]}' ;;
+    echo '{"total_count":2,"machines":[{"name":"basicLinux32gb","display_name":"2 cores, 8 GB RAM, 32 GB storage","cpus":2,"memory_in_bytes":8589934592,"storage_in_bytes":34359738368},{"name":"standardLinux32gb","display_name":"4 cores, 16 GB RAM, 32 GB storage","cpus":4,"memory_in_bytes":17179869184,"storage_in_bytes":34359738368}]}' ;;
   "pr list") # the widgets' (widgets/): $FAKE_GH/prlist.json, --jq applied with the real jq
     j=; au=; p=; for a in "$@"; do [ "$p" = --jq ] && j=$a; [ "$p" = --author ] && au=$a; p=$a; done
     out=$(f prlist.json || echo '[]')

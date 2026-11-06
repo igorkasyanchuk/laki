@@ -78,6 +78,9 @@ time and AI money per run (`budget: 60 min, $5`).
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
+- **Cloud workspaces**: a GitHub project's workspace in a GitHub Codespace of its own (*In a codespace* on the
+  new-workspace page), its machine type picked with what it costs an hour, your `.worktreeinclude` files copied in;
+  archive stops it, restore starts it again.
 - **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar
   (<img src="icons/pr-open.svg" width="13" alt="GitHub's mark"> its state,
   <img src="icons/approved.svg" width="13" alt="✓"> approved, <img src="icons/approved-you.svg" width="13" alt="✓✓"> by you

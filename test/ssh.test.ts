@@ -134,17 +134,42 @@ async function cloudRig(t: any) {
 test('a cloud workspace: a codespace made in the background, an SSH host of its own; stopped, started again, deleted', async t => {
   const { root, rig, p, ghSaid, cloud } = await cloudRig(t)
   const ask = { project: p.id, codespace: '', name: 'cloudy', preset: 'claude', prompt: 'hello' }
-  await assert.rejects(rig.rpc('wsNew', ask), /Cloud workspaces are off: Settings › General › Experimental/)
+  // on unless turned off; only for a project on GitHub, refused before gh
+  assert.equal((await rig.rpc('state')).projects.find((x: any) => x.id === p.id).github, true)
+  await rig.rpc('settingsSet', { cloud: false })
+  await assert.rejects(rig.rpc('wsNew', ask), /Cloud workspaces are off: Settings › General › Cloud workspaces/)
   await rig.rpc('settingsSet', { cloud: true })
+  const plain = join(root, 'plain')
+  execFileSync('git', ['clone', '-q', rig.repo, plain])
+  execFileSync('git', ['remote', 'set-url', 'origin', 'https://gitlab.com/o/plain.git'], { cwd: plain })
+  const other = await rig.rpc('projectAdd', { path: plain })
+  assert.equal((await rig.rpc('state')).projects.find((x: any) => x.id === other.id).github, undefined)
+  const said = () => (existsSync(rig.env.FAKE_LOG) ? ghSaid().length : 0)
+  const before = said()
+  await assert.rejects(rig.rpc('csMachines', { project: other.id }), /origin isn't on GitHub/)
+  await assert.rejects(rig.rpc('wsNew', { ...ask, project: other.id }), /origin isn't on GitHub/)
+  assert.equal(said(), before, 'gh not asked')
+  rmSync(plain, { recursive: true, force: true })
+  await rig.rpc('projectRm', { id: other.id }).catch(() => {})
   // a token without the codespace scope: said so, nothing made
   writeFileSync(join(rig.home, 'gh', 'cs-noscope'), '')
   await assert.rejects(rig.rpc('csMachines', { project: p.id }), /gh needs the codespace scope: run gh auth refresh -s codespace/)
   await assert.rejects(rig.rpc('wsNew', ask), /run gh auth refresh -s codespace/)
   unlinkSync(join(rig.home, 'gh', 'cs-noscope'))
-  assert.deepEqual((await rig.rpc('csMachines', { project: p.id })).machines.map((m: any) => m.name), ['basicLinux32gb', 'standardLinux32gb'])
+  assert.deepEqual((await rig.rpc('csMachines', { project: p.id })).machines.map((m: any) => [m.name, m.cpus, m.perHour]), [['basicLinux32gb', 2, 0.18], ['standardLinux32gb', 4, 0.36]])
   await assert.rejects(rig.rpc('wsNew', { ...ask, codespace: 'huge' }), /no machine type huge for o\/repo/)
   await assert.rejects(rig.rpc('wsNew', { ...ask, local: true }), /not Local/)
-  assert.equal((await rig.rpc('state')).workspaces.length, 0)
+  assert.equal((await rig.rpc('state')).workspaces.filter((w: any) => w.project === p.id).length, 0)
+
+  // what .worktreeinclude names (an .env) is copied in before setup; one over 1 MB isn't
+  writeFileSync(join(rig.repo, '.gitignore'), '.env\nbig.bin\nconf/\n')
+  writeFileSync(join(rig.repo, '.worktreeinclude'), '.env\nbig.bin\nconf/local.json\n')
+  writeFileSync(join(rig.repo, '.env'), 'KEY=1\n')
+  writeFileSync(join(rig.repo, 'big.bin'), Buffer.alloc(2 << 20))
+  mkdirSync(join(rig.repo, 'conf'))
+  writeFileSync(join(rig.repo, 'conf', 'local.json'), '{}')
+  execFileSync('git', ['add', '.gitignore', '.worktreeinclude'], { cwd: rig.repo })
+  execFileSync('git', ['commit', '-qm', 'ignore'], { cwd: rig.repo })
 
   // wsNew answers at once; its tabs wait for the codespace
   const ws = await rig.rpc('wsNew', { ...ask, codespace: 'standardLinux32gb' })
@@ -157,8 +182,9 @@ test('a cloud workspace: a codespace made in the background, an SSH host of its 
   const cfg = join(rig.data, 'ssh', 'config')
   assert.match(readFileSync(cfg, 'utf8'), /^# .*\nInclude ".*\/ssh\/codespaces\/\*"\nInclude ~\/\.ssh\/config\n/)
   assert.match(readFileSync(join(rig.data, 'ssh', 'codespaces', ws.host), 'utf8'), new RegExp(`^Host laki-cs-cloudy\n\tUser codespace\n\tProxyCommand gh cs ssh -c ${name} --stdio`))
-  // its branch, setup and agent there
+  // its branch, setup and agent there; the included files in it
   await until(() => existsSync(join(ws.path, 'from-setup')), 'setup ran there')
+  assert.deepEqual([readFileSync(join(ws.path, '.env'), 'utf8'), existsSync(join(ws.path, 'conf', 'local.json')), existsSync(join(ws.path, 'big.bin'))], ['KEY=1\n', true, false])
   assert.equal(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'laki/cloudy')
   await until(async () => (await rig.tab(ws.id))?.last === 'answer: hello' && (await rig.tab(ws.id)).status === 'idle', 'the turn, its hooks through the terminal')
   const tab = await until(async () => (await rig.tab(ws.id))?.resumeId && rig.tab(ws.id), 'its chat')
@@ -183,7 +209,6 @@ test('a cloud workspace: a codespace made in the background, an SSH host of its 
 
 test("a codespace gh can't make: the workspace and its tab say why; deleting it deletes nothing on GitHub", async t => {
   const { rig, p, ghSaid, cloud } = await cloudRig(t)
-  await rig.rpc('settingsSet', { cloud: true })
   writeFileSync(join(rig.home, 'gh', 'cs-fail'), 'error creating codespace: HTTP 402: You have reached your spending limit\n')
   const ws = await rig.rpc('wsNew', { project: p.id, codespace: '', preset: 'claude', prompt: 'hi' })
   const w = await until(async () => (x => x?.csState === 'Failed' && x)(await cloud(ws.id)), 'it failed')

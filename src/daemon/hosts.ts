@@ -3,9 +3,9 @@
 
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, sep } from 'node:path'
 import { type Project, type ProjectConfig, type Tab, type Workspace } from '../shared/types.ts'
 import * as cs from './codespace.ts'
 import { agentCmd, allocPort, type At, branchPrefix, cfgHash, changed, ENV_KEY, exec, fileCfg, findProject, firstLine, git, hookFiles, type Hooks, lakiEnv, log, type NewWs, q, run, runDir, save, slug, type SpawnOpts, state, uniqueWsId, wsLog } from './core.ts'
@@ -250,12 +250,12 @@ export const readHostCfgs = async (ws: Workspace, fresh = true) => {
   if (p?.host && (fresh || !hostCfg.has(`${p.host}:${p.path}`))) await readHostCfg(p)
 }
 
-// ---------- cloud workspaces (settings.cloud, experimental): a workspace of a GitHub project here that runs in a
+// ---------- cloud workspaces (settings.cloud, on unless false): a workspace of a GitHub project here that runs in a
 // Codespace, an SSH host of its own. host: Laki's name for it (codespace.ts' Host entry); path: the repo there
 // (/workspaces/<repo>), on a branch of its own off the base, as a worktree's. gh here makes it in the background
 // (wsNew answers at once, csState Creating); its tabs wait in hostTab, since connect waits for it (csUp), and print
 // why it failed. Archive stops it, Restore starts it again, Delete deletes it. ponytail: one machine type, picked as
-// it's made; no prebuilds; no .env copied (copyIncludes); ports only $PORT (forward); PRs and ship through gh on it
+// it's made; no prebuilds; ports only $PORT (forward); PRs and ship through gh on it
 
 export const making = new Map<string, Promise<void>>() // by workspace: gh making its codespace
 export const live = new Set<string>() // hosts with a connection up (connect)
@@ -263,9 +263,35 @@ export const live = new Set<string>() // hosts with a connection up (connect)
 export const away = (ws: Workspace) => ws.codespace !== undefined && !live.has(ws.host!)
 const csSet = (ws: Workspace, st: string, err?: string) => ((ws.csState = st), (ws.csError = err), save(), changed())
 
+// the files .worktreeinclude names (ignored or not) in the project's checkout, as copyIncludes finds them: what a
+// codespace gets copied in before setup; one over INCLUDE_MAX, or a link out of the repo, is left out (in daemon.log)
+const INCLUDE_MAX = 1 << 20
+async function includes(proj: Project): Promise<string[]> {
+  const file = join(proj.path, '.worktreeinclude')
+  if (!existsSync(file)) return []
+  try {
+    const root = realpathSync(proj.path)
+    const rels = (await git(proj, 'ls-files', '-z', '--others', '--ignored', `--exclude-from=${file}`)).split('\0').filter(Boolean)
+    return rels.filter(rel => {
+      const src = (() => {
+        try {
+          return realpathSync(join(proj.path, rel))
+        } catch {}
+      })() // a link to nothing: left out
+      const st = src ? statSync(src) : undefined
+      const ok = !!src && !!st && (src + sep).startsWith(root + sep) && st.isFile() && st.size <= INCLUDE_MAX
+      if (!ok) log(`codespace copy: skipped ${rel} (over 1 MB, a link out of the repo, or not a file)`)
+      return ok
+    })
+  } catch (e) {
+    log(`codespace copy: ${(e as Error).message}`)
+    return []
+  }
+}
+
 // what makeWs refuses before gh
 export function cloudCheck(proj: Project, o: Pick<NewWs, 'from' | 'local' | 'pr' | 'race'>) {
-  if (state.settings?.cloud !== true) throw new Error('Cloud workspaces are off: Settings › General › Experimental')
+  if (state.settings?.cloud === false) throw new Error('Cloud workspaces are off: Settings › General › Cloud workspaces')
   if (o.from) throw new Error('a codespace is yours to make, from the app: GitHub bills it') // an agent's
   if (proj.host || proj.kind || proj.git === false) throw new Error(`a codespace needs a GitHub repository on this Mac: ${proj.name} isn't one`)
   if (o.local || o.pr?.trim() || o.race) throw new Error("a codespace starts on a branch of its own: not Local, a PR's or a race")
@@ -312,9 +338,12 @@ async function csMake(ws: Workspace, proj: Project, repo: string, machine: strin
     await cs.until(ws.codespace)
     await cs.sshEntry(ws.codespace, ws.host!)
     // a connection of its own: connect waits for this
-    await run('ssh', [...cs.sshF(), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=60', ws.host!, `cd ${q(ws.path)} && git checkout -q -b ${q(ws.branch)}`], { timeout: 120000 }).catch(e => {
+    const files = await includes(proj) // a worktree's .worktreeinclude copy (the .env case): their folders made with the branch
+    const dirs = [...new Set(files.map(f => dirname(join(ws.path, f))))].filter(d => d !== ws.path)
+    await run('ssh', [...cs.sshF(), '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=60', ws.host!, `cd ${q(ws.path)} && git checkout -q -b ${q(ws.branch)}${dirs.length ? ` && mkdir -p ${dirs.map(q).join(' ')}` : ''}`], { timeout: 120000 }).catch(e => {
       throw new Error(`git checkout -b ${ws.branch} there: ${firstLine(e)}`)
     })
+    for (const f of files) await cs.cp(ws.codespace, join(proj.path, f), join(ws.path, f)).then(() => wsLog(ws, `codespace: copied ${f}`), e => wsLog(ws, `codespace: ${f} not copied: ${(e as Error).message}`))
     csSet(ws, 'Available')
     void hostUp(ws.host!).catch(() => {}) // connected: scans reach it (away), with tabs or none
   } catch (e) {

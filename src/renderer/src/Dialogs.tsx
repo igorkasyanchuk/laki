@@ -96,7 +96,7 @@ export function Pages({ app }: { app: AppCtx }) {
     else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
     else if (id === 'settings') setDialog('settings')
     else if (id === 'shell') quickNew('shells')
-    else if (id === 'experimental') setDialog({ section: 'general', spot: 'Experimental' })
+    else if (id === 'experimental') setDialog({ section: 'general', spot: 'Cloud workspaces' })
     else if (id === 'workflows' && !flowsOn) setDialog({ section: 'general', spot: 'Pages' }) // Workflows off: where it's turned on again
     else if (id === 'schedules') setDialog('schedules')
     else if (id === 'workflows') setDialog({ workflows: '' })

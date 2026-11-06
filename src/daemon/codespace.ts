@@ -38,9 +38,16 @@ async function gh(args: string[], timeout = 30000, cwd?: string) {
   }
 }
 
-// the machine types the repo may use (the new-workspace page's; wsNew asks too: the scope, the repo, the name)
+// GitHub's compute price per core-hour (2-core $0.18/h, 4-core $0.36 … 32-core $2.88; storage $0.07/GB-month apart):
+// docs.github.com/en/billing/concepts/product-billing/github-codespaces, read 2026-11-06. ponytail: a constant, read by hand
+export const CORE_HOUR = 0.09
+// the machine types the repo may use (the new-workspace page's; wsNew asks too: the scope, the repo, the name): cores,
+// memory and disk (bytes) and ≈ its price an hour
 export const machines = async (repo: string) =>
-  ((JSON.parse(await gh(['api', `repos/${repo}/codespaces/machines`])).machines ?? []) as { name: string; display_name?: string }[]).map(m => ({ name: m.name, display: m.display_name || m.name }))
+  ((JSON.parse(await gh(['api', `repos/${repo}/codespaces/machines`])).machines ?? []) as { name: string; display_name?: string; cpus?: number; memory_in_bytes?: number; storage_in_bytes?: number }[]).map(m => ({ name: m.name, display: m.display_name || m.name, ...(typeof m.cpus === 'number' && { cpus: m.cpus, perHour: +(m.cpus * CORE_HOUR).toFixed(2) }), ...(typeof m.memory_in_bytes === 'number' && { memory: m.memory_in_bytes }), ...(typeof m.storage_in_bytes === 'number' && { storage: m.storage_in_bytes }) }))
+
+// a file into the codespace (cloud workspaces' .worktreeinclude copy); its folder made first (hosts.ts)
+export const cp = (name: string, from: string, to: string) => gh(['codespace', 'cp', '-c', name, '-e', from, `remote:${to}`], 60000)
 
 // gh waits while it's made; its name is the last line it prints. --default-permissions: a devcontainer asking for more
 // would wait on a question no one sees

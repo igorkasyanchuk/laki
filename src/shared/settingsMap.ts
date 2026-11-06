@@ -182,7 +182,7 @@ export const FIND: [string, string, string?][] = [
   ['general', 'Notes', 'pages notes notebook notion editor write pages memo colors search'],
   ['general', 'To-dos', 'pages todo todos to do checklist tasks list slack notion check off rail'],
   ['pr', 'Review tab', 'full review diff changes files viewed comments pending post github pr tab code review pin expand context description'],
-  ['general', 'Cloud workspaces', 'experimental cloud codespace codespaces github remote machine vm devcontainer'],
+  ['general', 'Cloud workspaces (GitHub Codespaces)', 'cloud codespace codespaces github remote machine vm devcontainer price cost scope'],
   ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['ai', "Laki AI's glow", 'ai glow animation computer use screen reading looking peek effect gradient'],
   ['voice', 'Speech to text', 'voice dictation dictate speech to text cloud hold fn mic talk whisper engine'],
