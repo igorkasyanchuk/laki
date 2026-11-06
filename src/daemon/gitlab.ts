@@ -8,28 +8,32 @@ import type { Check, PR, Project, Workspace } from '../shared/types.ts'
 import { exec, git, type At } from './core.ts'
 
 type Forge = 'gitlab' | 'github'
-const forges = new Map<string, Promise<Forge>>() // by project (its origin read once a daemon)
-const hosts = new Map<string, Promise<Forge>>() // a self-hosted one: glab signed in to it, asked once
+// by project, and a self-hosted host's (glab signed in to it), each kept KEEP: a glab signed in later, a remote changed or
+// git failing once is seen again in a while, not only after a restart
+const KEEP = 5 * 60000
+const forges = new Map<string, { at: number; f: Promise<Forge> }>()
+const hosts = new Map<string, { at: number; f: Promise<Forge> }>()
+const kept = (m: Map<string, { at: number; f: Promise<Forge> }>, k: string, make: () => Promise<Forge>) => {
+  const had = m.get(k)
+  if (had && Date.now() - had.at < KEEP) return had.f
+  const f = make()
+  m.set(k, { at: Date.now(), f })
+  return f
+}
 // a remote's host: a URL's (https://, ssh://) or scp-like git@host:path's; a path on disk has none
 export const hostOf = (url: string) => (/^[a-z][\w+.-]*:\/\/(?:[^@/\s]+@)?([^/:\s]+)/i.exec(url.trim()) ?? /^[^@/\s]+@([^/:\s]+):/.exec(url.trim()))?.[1]?.toLowerCase()
 export function forgeOf(at: (Workspace | Project) & At): Promise<Forge> {
-  const key = 'project' in at ? at.project : at.id
-  let f = forges.get(key)
-  if (!f) {
-    f = git(at, 'remote', 'get-url', 'origin').then(
+  return kept(forges, 'project' in at ? at.project : at.id, () =>
+    git(at, 'remote', 'get-url', 'origin').then(
       url => {
         const host = hostOf(url)
         if (!host || host === 'github.com') return 'github' as const
         if (host === 'gitlab.com') return 'gitlab' as const
-        let h = hosts.get(host)
-        if (!h) hosts.set(host, (h = exec(at, 'glab', ['auth', 'status', '--hostname', host], { timeout: 10000 }).then(() => 'gitlab' as const, () => 'github' as const)))
-        return h
+        return kept(hosts, host, () => exec(at, 'glab', ['auth', 'status', '--hostname', host], { timeout: 10000 }).then(() => 'gitlab' as const, () => 'github' as const))
       },
       () => 'github' as const,
-    )
-    forges.set(key, f)
-  }
-  return f
+    ),
+  )
 }
 export const isLab = (pr?: PR) => pr?.forge === 'gitlab'
 export function githubOnly(pr: PR | undefined, what: string) {

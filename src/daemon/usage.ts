@@ -190,7 +190,7 @@ async function geminiClient(): Promise<{ client_id: string; client_secret: strin
 const geminiDir = () => join(process.env.GEMINI_CLI_HOME || homedir(), '.gemini')
 export const geminiSigned = () => existsSync(join(geminiDir(), 'oauth_creds.json'))
 const geminiToken = new Map<string, { access: string; expires: number }>() // by its refresh token's hash
-let geminiProject: string | undefined
+const geminiProject = new Map<string, string>() // by its refresh token's hash: another sign-in, another project
 
 export function geminiWindows(u: any): UsageWindow[] {
   const out: UsageWindow[] = []
@@ -232,9 +232,10 @@ async function gemini(): Promise<Got> {
     }
     const headers = { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' }
     const ca = base('https://cloudcode-pa.googleapis.com')
-    geminiProject ??= process.env.GOOGLE_CLOUD_PROJECT || ((await get(`${ca}/v1internal:loadCodeAssist`, headers, 'Sign-in expired', 'Google', JSON.stringify({ metadata: { ideType: 'IDE_UNSPECIFIED', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' } })))?.cloudaicompanionProject as string | undefined) || undefined
-    if (!geminiProject) return unknown('no Code Assist project for this sign-in')
-    const windows = geminiWindows(await get(`${ca}/v1internal:retrieveUserQuota`, headers, 'Sign-in expired', 'Google', JSON.stringify({ project: geminiProject })))
+    const project = process.env.GOOGLE_CLOUD_PROJECT || geminiProject.get(key) || ((await get(`${ca}/v1internal:loadCodeAssist`, headers, 'Sign-in expired', 'Google', JSON.stringify({ metadata: { ideType: 'IDE_UNSPECIFIED', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' } })))?.cloudaicompanionProject as string | undefined) || undefined
+    if (!project) return unknown('no Code Assist project for this sign-in')
+    geminiProject.set(key, project)
+    const windows = geminiWindows(await get(`${ca}/v1internal:retrieveUserQuota`, headers, 'Sign-in expired', 'Google', JSON.stringify({ project })))
     return windows.length ? { windows } : unknown('Google shows no quota for this sign-in')
   } catch (e: any) {
     return e?.busy !== undefined ? fail(e) : unknown(failed(e)) // told to wait: waitOf's; anything else: unknown

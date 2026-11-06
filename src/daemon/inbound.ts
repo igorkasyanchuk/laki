@@ -190,9 +190,14 @@ export async function hookExpose(o: { on: boolean; via?: string }) {
   const via = o.via === 'tailscale' ? 'tailscale' : 'cloudflared'
   const p: Pub = { via, stop: () => {} }
   pub = p
-  const { cf, url } = await hookPublish(port, via, why => pub === p && ((p.down = why), (p.url = undefined), changed()))
-  p.stop = cf.stop
-  p.url = await url
+  try {
+    const { cf, url } = await hookPublish(port, via, why => pub === p && ((p.down = why), (p.url = undefined), changed()))
+    p.stop = cf.stop
+    p.url = await url
+  } catch (e) {
+    if (pub === p) p.stop(), (pub = undefined), changed() // it never came up: nothing shown as exposed
+    throw e
+  }
   changed()
   return hookList()
 }

@@ -94,7 +94,7 @@ export async function tabHandover(o: { tab?: string; to?: string }) {
 // copy. Not one inside the worktree (the next agent reads it there), a secret's name, over 10 MB, nor past the newest 20
 const PIC_MAX = 10 << 20
 const PICS = 20
-const SECRET_NAME = /^\.env|\.pem$|^id_|key/i
+const SECRET_NAME = /^\.env|\.(pem|key|p12)$|^id_[a-z0-9]+|(^|[-_.])(api[-_]?key|secret|token|credentials?)([-_.]|$)/i
 const real = (p: string) => {
   try {
     return realpathSync(p)
@@ -150,7 +150,7 @@ export function handoverPics(tab: Tab, ws: Workspace, text: string, to: string):
     mkdirSync(to, { recursive: true, mode: 0o700 })
     const copy = join(to, 'data' in f ? `picture-${++n}.${f.ext}` : `${++n}-${basename(f.path)}`)
     if ('data' in f) writeFileSync(copy, f.data, { mode: 0o600 })
-    else (copyFileSync(f.path, copy), chmodSync(copy, 0o600), (out = out.split(f.path).join(copy)))
+    else (copyFileSync(f.path, copy), chmodSync(copy, 0o600), (out = out.replace(new RegExp(`${f.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[.,:;!?]*(?:[\\s'"\`<>()[\\]{}]|$))`, 'g'), () => copy))) // the whole path only: not /tmp/a inside /tmp/a.png
     list.push('data' in f ? `${copy} (a picture pasted in the chat)` : `${copy} (was ${f.path})`)
   }
   return { text: out, list }

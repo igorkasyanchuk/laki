@@ -76,7 +76,9 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   assert.equal(await fetch(`http://127.0.0.1:${st.port}/`).then(r => r.status), 404)
   assert.ok([413, 'reset'].includes(await post('/hook/any', Buffer.alloc((1 << 20) + 10), { 'x-laki-key': k.secret })), 'over 1 MB')
   assert.equal((await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'webhook').length, 2)
-  // Expose: a quick tunnel to its port only
+  // Expose: a quick tunnel to its port only; one that never came up isn't shown as exposed
+  await assert.rejects(rig.rpc('hookExpose', { on: true }))
+  assert.equal((await rig.rpc('hookList')).via, undefined)
   mkdirSync(join(rig.home, 'bin'), { recursive: true })
   symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
   const on = await rig.rpc('hookExpose', { on: true })
