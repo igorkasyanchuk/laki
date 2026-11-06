@@ -22,6 +22,8 @@ export function headOf(path: string): string | undefined {
     return readFileSync(join(g, 'HEAD'), 'utf8').match(/^ref: refs\/heads\/(.+)$/m)?.[1].trim()
   } catch {}
 }
+// ponytail: each worktree's HEAD read at every port scan, no fs.watch: 50 worktrees take 1.2 ms a scan (0.02% of a core
+// at 5 s; H4.6 measured), and git replaces HEAD by a rename, which a file watcher loses
 export function syncBranches() {
   const moved = new Set<string>()
   for (const w of state.workspaces) {
