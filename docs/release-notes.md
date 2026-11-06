@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows and extensions start on events from outside: `issue.labeled` (someone labels a GitHub issue) and
+  `webhook` (a POST from GitHub, Linear, a CI job…, its signature checked; Settings › Tunnels › *Webhooks*, *Expose to
+  the internet* through Cloudflare or Tailscale Funnel). A new template: *Issue labelled → a workspace with an agent*.
+
 - Cloud workspaces are out of Experimental: *In a codespace* on the new-workspace page for any project on GitHub,
   each machine type with its cores, memory, disk and about its price an hour, a missing gh scope said up front with
   the command to copy, and your `.worktreeinclude` files (an `.env`) copied in before setup. Settings › General ›

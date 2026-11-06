@@ -27,6 +27,10 @@ case "$1" in
     exit 0 ;;
 esac
 case "$1 $2" in
+  "api -i") # issue.labeled's read: $FAKE_GH/issue-events.json, its ETag $FAKE_GH/issue-etag; If-None-Match it: a 304
+    e=$(f issue-etag); case "$*" in *"If-None-Match: $e"*) [ -n "$e" ] && { printf 'HTTP/2.0 304 Not Modified\r\nEtag: %s\r\n\r\n' "$e"; exit 0; } ;; esac
+    printf 'HTTP/2.0 200 OK\r\nEtag: %s\r\n\r\n' "$e"; f issue-events.json || echo '[]'
+    exit 0 ;;
   "api -X") # a codespace started: POST user/codespaces/<name>/start
     n=${4#user/codespaces/}; n=${n%/start}; [ -f "$FAKE_GH/cs-$n" ] || exit 1; echo Available > "$FAKE_GH/cs-$n"; echo '{}' ;;
   "api repos/"*"/codespaces/machines") # $FAKE_GH/cs-noscope: gh's words for a token without the codespace scope

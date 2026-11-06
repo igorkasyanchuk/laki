@@ -192,6 +192,8 @@ export const FIND: [string, string, string?][] = [
   ['general', 'Setup & teardown', 'setup teardown script logs output deleted workspaces development'],
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
+  ['tunnels', 'Webhooks', 'webhook webhooks inbound post github linear signature secret hmac trigger workflow event issue label'],
+  ['tunnels', 'Expose to the internet', 'webhook public url tunnel cloudflare tailscale funnel'],
   ['tunnels', 'Tunnels', 'expose world cloudflare cloudflared tunnel trycloudflare permanent named domain hostname dns public link port dev server'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
   ['simulator', 'Simulators', 'simulator emulator ios android iphone ipad xcode simctl adb idb avd phone device mobile app'],

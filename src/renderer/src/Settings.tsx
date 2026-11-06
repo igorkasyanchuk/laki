@@ -26,7 +26,7 @@ import { Fresh, Group, HelpQ, Says, Scope } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
-import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection } from './SettingsConnect'
+import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
 export * from './SettingsKit'
@@ -771,6 +771,7 @@ export function SettingsPage(p: {
   bg?: { url: string; set(file: File | null): Promise<unknown> } // Appearance › Background image: the picture now (App's blob URL), and a new one or none (the daemon's bgSet)
   remote?: RemoteApi
   tunnels?: (n: NamedTunnel) => Promise<TunnelCheck> // Settings › Tunnels' check (the daemon's tunnelCheck) of the name and domain as typed
+  call?: <T>(m: string, p?: object) => Promise<T> // Settings › Tunnels › Webhooks' (inbound.ts)
   widgets?: WidgetsApi
   resources?: ResourcesApi
   simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
@@ -2204,6 +2205,7 @@ export function SettingsPage(p: {
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} onLogs={widgetLogs => set({ widgetLogs })} />}
           {sec === 'tunnels' && p.tunnels && <TunnelsSection named={s.tunnel ?? {}} onNamed={tunnel => set({ tunnel })} check={p.tunnels} other={p.remote && (() => openSec('remote'))} />}
+          {sec === 'tunnels' && p.call && <WebhooksSection call={p.call} projects={(p.projects ?? []).filter(x => !x.host)} />}
           {sec === 'remote' && p.remote && (
             <RemoteSection
               other={p.tunnels && (() => openSec('tunnels'))}

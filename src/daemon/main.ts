@@ -29,6 +29,7 @@ import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
 import { policyTick } from './policy.ts'
 import * as ticks from './ticks.ts'
+import { hookAdd, hookExpose, hookList, hookRm, hookSecret, hookStop, inboundStart } from './inbound.ts'
 import { ticketTick } from './tickets.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, agentModels, usageWho } from './accounts.ts'
@@ -291,6 +292,11 @@ const api: Record<string, Handler> = {
   reminderTick: p => scheduleMod.reminderTick(p.now), // tests move the clock
   tabClose: async p => (t => core.shellCwd(t.workspace, t.id).then(cwd => core.closeTab(t.id, { cwd })))(core.findTab(String(p.id ?? ''))), // kept for ⇧⌘T, a shell with its folder
   tabReopen: p => core.tabReopen(p),
+  hookList: () => hookList(), // Settings › Webhooks (inbound.ts)
+  hookAdd: p => hookAdd(p),
+  hookRm: p => hookRm(p),
+  hookSecret: p => hookSecret(p),
+  hookExpose: p => hookExpose(p),
   tabSet: ({ from: _, ...p }) => core.tabSet(p), // from: whoCalls' (an agent names its own tab only: agentNo)
   settingsSet: ({ from: _, ...p }) => core.settingsSet(p), // from: whoCalls', not a setting
   storageInfo: () => core.storageInfo(), // Settings › General › Storage: its folder and size
@@ -534,7 +540,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['imageRead', 'remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
+const REMOTE_NO = new Set(['hookSecret', 'hookExpose', 'imageRead', 'remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
 const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))
@@ -552,7 +558,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
+const FROM = new Set(['accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -617,7 +623,7 @@ function boxNo(method: string, p: any) {
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
-const AGENT_NO: Record<string, string> = { imageRead: "read a picture anywhere on this Mac (the hover card's; its own files: fileRead)", prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)", tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)", accountRm: "remove one of the user's accounts (its sign-in goes with it)" }
+const AGENT_NO: Record<string, string> = { imageRead: "read a picture anywhere on this Mac (the hover card's; its own files: fileRead)", prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)", tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)", accountRm: "remove one of the user's accounts (its sign-in goes with it)", hookAdd: 'add a webhook (what outsiders can start)', hookRm: 'remove a webhook', hookSecret: "read a webhook's secret", hookExpose: 'put the webhook server on the internet' }
 // every refusal by name reads a from (or caller) the daemon filled in: one missing from FROM would be the caller's to say,
 // and an agent that leaves it out gets through. Checked as the daemon loads, so every test run fails on it
 for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw new Error(`AGENT_NO's ${k} isn't in FROM: an agent could leave its from out`)
@@ -952,6 +958,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick(), { idle: 'pause' }) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())
   ticks.register('aiTick', 600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
+  inboundStart() // issue.labeled's poll, the webhook server (inbound.ts)
   ticks.register('tidy', 3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
@@ -970,6 +977,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
 function shutdown() {
   log('shutting down')
   ticks.stopAll()
+  hookStop()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
   remoteMod.remoteStop()

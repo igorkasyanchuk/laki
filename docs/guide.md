@@ -1372,6 +1372,16 @@ name and url); `pr.review` `event.approved` and `event.changes`; `turn.done` `ev
 `flow.ended` `event.run`, `event.workflow.id`, `.name`, `event.status`, `event.why`; `custom.*` `event.data`, what
 `laki widget emit` sent.
 
+Two come from outside Laki. **`issue.labeled`**: someone labels an issue of one of your GitHub projects (Laki reads its
+issue events once a minute while a workflow or an extension listens; a restart doesn't fire old ones):
+`event.project`, `event.number`, `.title`, `.url`, `.label`, `.by`, `.body`. **`webhook`**: a POST to one of Settings ›
+Tunnels › *Webhooks* (a name and a secret each: GitHub's signature, Linear's, or an `X-Laki-Key` header for anything
+else): `event.name`, `event.event` (GitHub's `X-GitHub-Event`), `event.body` (the request's JSON). They run on a small
+server of their own, never Laki's; *Expose to the internet* puts it, and only it, on a Cloudflare quick tunnel (its
+address changes when it starts again) or Tailscale Funnel. Their text is someone else's: put it in a prompt as quoted
+context, and a run they start can't run commands, webhooks, extensions or an agent in bypass permissions. The
+*Issue labelled → a workspace with an agent* template starts from one.
+
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
 picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in the file; it waits for the turn to end),
@@ -1450,12 +1460,13 @@ the same name. Laki AI works on the Workflows page too: in a workflow, ✦ (or t
 chat button) opens its chat with the workflow in every ask (the file, your unsaved changes): ask it to add or change a
 step, it writes the workflow, you read it and *Save*.
 
-Six templates come with Laki, under *Start from a template* (the page's main content until you have a workflow of your
+Seven templates come with Laki, under *Start from a template* (the page's main content until you have a workflow of your
 own; *New workflow* ▾ › *From a template…* too): *Fix CI* (on `pr.checks.failed`, not on drafts: an agent fixes, pushes
 and waits for CI, three tries, then it's yours), *Review a PR* (an agent in plan mode reviews the workspace's PR; you
 approve it or post the review as a comment), *Feature to PR* (plan, you approve, build, tests with two retries, a PR, its
 checks), *Triage an issue* (`inputs: issue:number`: what it is, how big, where to start, saved to Artifacts), *Nightly
-dependency bumps* (bump, test, a PR: schedule it) and *Release notes* (on `pr.merged`, saved to Artifacts). A template
+dependency bumps* (bump, test, a PR: schedule it), *Release notes* (on `pr.merged`, saved to Artifacts) and *Issue
+labelled → a workspace with an agent* (on `issue.labeled` with the label `laki`). A template
 opens read only on the canvas; *Use this…* copies it into yours or a project's (its id `-2` when taken), and from then
 on the copy is yours: change it, run it, and its `on:` starts it (untick *Start on events* to leave that line out). A
 template never runs, starts on an event or a schedule, or saves itself; `laki flow ls` lists them as `template`.

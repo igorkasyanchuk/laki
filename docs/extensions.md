@@ -217,6 +217,8 @@ when it has them) and its own fields, 64 KB at most:
 | `gate.held` | a [gate](#gates-an-actions-gate) held a ship, a merge or an archive | `gate`, `widget`, `why` |
 | `tool.call` | Claude Code is about to make a tool call ([tool gates](#tool-calls-gate-tool-toolcall) can refuse it) | `tool`, `input` |
 | `custom.<name>` | `laki widget emit <name>` (below) | `data`, `from: { widget, tab, agent }` |
+| `issue.labeled` | someone labels an issue of a GitHub project here (read once a minute, while something listens) | `project: { id, name }`, `number`, `title`, `url`, `label`, `by`, `body` (8,000 characters: someone else's text) |
+| `webhook` | a POST to one of Settings › Webhooks, its signature checked | `name`, `event` (X-GitHub-Event, else the body's type), `body` (its JSON), `project` when the hook names one |
 
 PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
 replays nothing; so do ports a tab brought back at start listens on in its first minute. `laki widget events` lists

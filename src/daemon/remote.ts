@@ -170,6 +170,16 @@ async function tsReady() {
 const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
   publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who, [funnel ? 'funnel' : 'serve', '--https=443', 'off'])
 
+// the webhook server's public address (inbound.ts): a quick cloudflared tunnel to its port, or tailscale funnel (on the
+// internet, so GitHub reaches it). ponytail: funnel takes port 443's root, as remote access over tailscale does
+export async function hookPublish(port: number, via: 'cloudflared' | 'tailscale', ended: (why: string) => void) {
+  policyRemote('a public address for webhooks')
+  const who: [string, string] = ['Webhooks', 'hooks:expose']
+  if (via === 'tailscale') return tailscale((await tsReady()).bin, `http://127.0.0.1:${port}`, ended, who, true)
+  await cfReady(false)
+  return cloudflare(`http://localhost:${port}`, [], ended, who)
+}
+
 // tunnelStart resolves once cloudflared prints the URL (a permanent one's: once its connector is up), or was stopped
 // meanwhile, and fails with its output. hours: how long a quick one runs, as a shared tab's (SHARE_HOURS; unset: 8, so a
 // forgotten one doesn't stay open for good). host: a permanent one at that name under settings.tunnel's domain (a word,

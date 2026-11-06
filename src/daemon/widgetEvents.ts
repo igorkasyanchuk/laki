@@ -32,7 +32,9 @@ type From = { widget?: string; tab?: { id: string; name: string }; agent?: strin
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
 const sent: EventSent[] = []
-export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined, hops: number) => { flows: string[]; refused: string[] } } = {}
+export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: string | undefined, hops: number) => { flows: string[]; refused: string[] }; listens?: (name: string) => boolean } = {}
+// some extension that's on, or a workflow (workflow.ts' listens), answers that event: inbound.ts reads GitHub for it only then
+export const listened = (name: string) => [...widgets.values()].some(w => onOf(w) && handlerOf(w, name)) || !!eventHooks.listens?.(name)
 // its handler of that event: on[name], or on["custom.*"] for a custom one
 function handlerOf(w: Entry, name: string) {
   const on = w.m.on
@@ -56,7 +58,8 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   for (const w of widgets.values()) {
     const h = handlerOf(w, name)
     if (!h || !onOf(w) || w.id === o.from?.widget) continue // never its own emits
-    if (w.project && (x ? x.project !== w.project : !(name === 'app.open' || name.startsWith('custom.')))) continue // a repo's: its project's
+    const pj = x?.project ?? (extra.project as { id?: string } | undefined)?.id // issue.labeled's, a webhook's: a project, no workspace
+    if (w.project && (pj ? pj !== w.project : !(name === 'app.open' || name.startsWith('custom.')))) continue // a repo's: its project's
     // its workspace's only; as one is archived or removed, that one's too (its action runs on what it was, keeps nothing)
     const going = (name === 'workspace.archived' || name === 'workspace.removed') && !!x && instOk({ ...x, archived: false })
     if (scoped(w) && !(x && (instOk(x) || going))) continue

@@ -190,6 +190,15 @@ the one into the working block while it runs (`.wf-e.live` flowing, an `animateM
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
 entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts` (the model, the file, the
 blocks), `workflow-runs`, `workflow-agents` and `workflow-events`.
+Events from outside (`inbound.ts`): `issue.labeled` (`issueTick`, every `LAKI_ISSUE_TICK_MS` or 60 s, slow while idle,
+only while `listened` (an extension that's on, or `eventHooks.listens`: a workflow's `on:`) and the GraphQL quota isn't
+low (pr.ts `quotaLow`): `gh api -i repos/{o}/{r}/issues/events?per_page=50` with `If-None-Match`, a 304 nothing; each
+`labeled` event on an issue past the project's `issueMark` (state.json; the first read only sets it), oldest first)
+and `webhook` (`hookServe`: its own server, below in remote.md). Both are emitted `from: { agent }` ('github',
+'webhook'), so `fromEvent` refuses them what an agent's event is; neither has a workspace: `fromEvent` takes the
+payload's `project` instead (`pj`; `here` refused), and so do a repo extension's (widgetEvents.ts) and the project's
+own workflows. Tested in `test/inbound.test.ts`.
+
 Events (`eventHooks.flows`, after the setting): `heard` keeps each project's newest payload of each event (`HEARD_MAX` 200, the oldest go), `lastEvents`
 each workflow's last `FLOW_HEARD` (5) outcomes (`FlowHeard`: at, event, ws, run or why; the item's `events`, its settings'
 *Last 5 events*), in memory (`note`, and `refused`'s skip, bump `flowFiles.heard`: the view's `flowHeard`, the page's). `fromEvent(wf, name, payload, ws, o)`, one path for a real

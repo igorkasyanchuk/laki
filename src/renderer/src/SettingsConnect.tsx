@@ -1,5 +1,5 @@
 // Settings' connect sections: phone pushes, tunnels, remote access and the simulators. Settings.tsx re-exports it.
-import { ANSWER_WHY, answerOk, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
+import { ANSWER_WHY, answerOk, type InHook, type NamedTunnel, type SimCheck, type SimDev, type Webhook, webhookUrl } from '../../shared/types'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Group, Says } from './SettingsKit'
 import { Icon, IconButton, Switch } from './ui'
@@ -604,5 +604,79 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
       </div>
       )}
     </>
+  )
+}
+
+// Settings › Tunnels › Webhooks (inbound.ts): hooks a POST from outside (GitHub, Linear, a CI job) starts workflows and
+// extensions by (on: webhook), each with its secret; Expose puts the server, and only it, on the internet
+type HookRow = InHook & { local?: string; url?: string }
+type HookState = { port: number; via?: string; url?: string; down?: string; hooks: HookRow[] }
+const HOOK_KINDS: [InHook['kind'], string][] = [['github', 'GitHub (X-Hub-Signature-256)'], ['linear', 'Linear (Linear-Signature)'], ['key', 'Anything else (X-Laki-Key)']]
+export function WebhooksSection({ call, projects }: { call: <T>(m: string, p?: object) => Promise<T>; projects: { id: string; name: string }[] }) {
+  const [st, setSt] = useState<HookState | null>(null)
+  const [add, setAdd] = useState<{ name: string; kind: InHook['kind']; project: string }>({ name: '', kind: 'github', project: '' })
+  const [secret, setSecret] = useState<{ name: string; secret: string } | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const load = () => call<HookState>('hookList').then(setSt, e => setErr(String(e?.message ?? e)))
+  useEffect(() => void load(), [])
+  const act = (f: () => Promise<unknown>) => (setBusy(true), setErr(''), f().then(load, e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  const copy = (text: string) => void navigator.clipboard.writeText(text)
+  return (
+    <Group title="Webhooks" hint="A POST from GitHub, Linear, a CI job or anything else starts the workflows and extensions on: webhook, its request as event.body. Each request is checked against its hook's secret">
+      <div className="setting-box">
+        {st?.hooks.map(h => (
+          <div key={h.name} className="switch-row">
+            <Says title={`${h.name} · ${HOOK_KINDS.find(k => k[0] === h.kind)?.[1] ?? h.kind}`} hint={h.url ?? h.local ?? 'starting…'} />
+            <span className="grow" />
+            {(h.url ?? h.local) && <IconButton icon="copy" title="Copy its URL" onClick={() => copy(h.url ?? h.local!)} />}
+            <button type="button" className="link small" onClick={() => void call<{ secret: string }>('hookSecret', { name: h.name }).then(r => copy(r.secret))}>
+              Copy secret
+            </button>
+            <IconButton icon="trash" title="Remove it" onClick={() => act(() => call('hookRm', { name: h.name }))} />
+          </div>
+        ))}
+        <div className="switch-row">
+          <input value={add.name} placeholder="a name: deploys" aria-label="Webhook name" spellCheck={false} onChange={e => setAdd({ ...add, name: e.target.value })} />
+          <select value={add.kind} aria-label="Who sends it" onChange={e => setAdd({ ...add, kind: e.target.value as InHook['kind'] })}>
+            {HOOK_KINDS.map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select value={add.project} aria-label="Its project" onChange={e => setAdd({ ...add, project: e.target.value })}>
+            <option value="">No project</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={busy || !add.name.trim()} onClick={() => act(() => call<{ name: string; secret: string }>('hookAdd', { name: add.name, kind: add.kind, ...(add.project && { project: add.project }) }).then(r => (setSecret(r), setAdd({ ...add, name: '' }))))}>
+            Add
+          </button>
+        </div>
+        {secret && (
+          <p className="muted small">
+            {secret.name}'s secret (GitHub: the webhook's Secret; Linear: its signing secret; else send it as X-Laki-Key): <code>{secret.secret}</code>{' '}
+            <button type="button" className="link small" onClick={() => copy(secret.secret)}>
+              Copy
+            </button>
+          </p>
+        )}
+        {!!st?.hooks.length && (
+          <Switch className="switch-row" on={!!st.via} onChange={on => act(() => call('hookExpose', { on, via: st.via ?? 'cloudflared' }))}>
+            <Says title="Expose to the internet" hint={st.url ? `${st.url} · a quick tunnel's address changes when it starts again (a restart): paste the new one where the hooks are sent` : st.down ? `down: ${st.down}` : 'A Cloudflare quick tunnel to the webhook server only (never Laki itself), so GitHub or Linear can reach it'} />
+          </Switch>
+        )}
+        {!!st?.hooks.length && !st.via && (
+          <button type="button" className="link small" disabled={busy} onClick={() => act(() => call('hookExpose', { on: true, via: 'tailscale' }))}>
+            Expose with Tailscale Funnel instead
+          </button>
+        )}
+        {err && <p className="warn small">{err}</p>}
+      </div>
+    </Group>
   )
 }

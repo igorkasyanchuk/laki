@@ -2,6 +2,8 @@
 
 ### Scans
 
+- issue.labeled (`inbound.ts` `issueTick`, 60 s): GitHub's issue events per GitHub project while something listens;
+  docs/dev/workflows.md says how.
 - The loops (`src/daemon/ticks.ts`, H4): every periodic one goes through `register(name, ms, fn, { idle })`, listed at
   its top with its period and idle class. Idle (main.ts' `setIdle`): no client connected, or no window shown (every
   client's `view.shown` false) and no agent `running`. Then `slow` loops (the scans, meters, PR scans, sleep, hooks,

@@ -201,7 +201,7 @@ const quiet = (ws: Workspace, now: number) => (t => t !== undefined && now - t <
 // timer's scans wait for its reset. ponytail: this Mac's gh only, an SSH host's own sign-in isn't asked
 const QUOTA_EVERY = 5 * 60000
 const quota = { at: 0, low: 0 }
-async function quotaLow(now: number) {
+export async function quotaLow(now: number) {
   if (now < quota.low) return true
   if (now - quota.at < QUOTA_EVERY) return false
   quota.at = now

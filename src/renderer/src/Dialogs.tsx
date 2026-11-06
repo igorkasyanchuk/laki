@@ -182,6 +182,7 @@ export function Pages({ app }: { app: AppCtx }) {
           uiReset={() => api.call('uiReset')}
           simulator={p => api.call('sim', p)}
           tunnels={n => api.call('tunnelCheck', n)}
+          call={(m, x) => api.call(m, x)}
           resources={{
             load: () => api.call<Resources>('resources'),
             tabs: view.tabs,

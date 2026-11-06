@@ -1016,7 +1016,7 @@ test('workflow stats: runs tallied; 5 failed runs in a row that started by thems
 test('templates (workflows/): each checks; listed last, never untrusted; save, delete, history, start and schedule refuse them; an event they name starts nothing; Use this copies one that listens', async t => {
   const dir = join(dirname(new URL(import.meta.url).pathname), '../workflows')
   const files = readdirSync(dir).filter(f => f.endsWith('.md'))
-  assert.equal(files.length, 6)
+  assert.equal(files.length, 7)
   for (const f of files) {
     const { workflow, problems } = parse(readFileSync(join(dir, f), 'utf8'), f.slice(0, -3))
     assert.deepEqual([...problems, ...check(workflow)], [], f)
@@ -1031,7 +1031,7 @@ test('templates (workflows/): each checks; listed last, never untrusted; save, d
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const list = await rig.rpc('flowList')
   const tpl = list.filter((w: any) => w.source === 'builtin')
-  assert.deepEqual(tpl.map((w: any) => w.id).sort(), ['feature-to-pr', 'fix-ci', 'nightly-deps', 'release-notes', 'review-pr', 'triage-issue'])
+  assert.deepEqual(tpl.map((w: any) => w.id).sort(), ['feature-to-pr', 'fix-ci', 'issue-labeled', 'nightly-deps', 'release-notes', 'review-pr', 'triage-issue'])
   assert.equal(list.at(-1).source, 'builtin', 'listed last')
   assert.ok(tpl.every((w: any) => !w.untrusted && !w.problems.length))
   await assert.rejects(rig.rpc('flowSave', { id: 'fix-ci', source: 'builtin', text: '# x' }), /fix-ci is a template: Use this…/)

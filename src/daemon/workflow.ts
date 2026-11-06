@@ -1551,8 +1551,9 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
     if (!o.tried && !onIt(wf.on, name)) return null
   }
   const no = (why: string, untrusted?: boolean): Heard => ({ wf, why, ...(untrusted && { untrusted }) })
-  if (!ws) return no(`the event has no workspace, so no project${o.tried ? ': pick one' : ''}`)
-  if (wf.source === 'project' && wf.project !== ws.project) return no(`${ws.name ?? ws.id} isn't in its project`)
+  const pj = ws?.project ?? (typeof (payload.project as any)?.id === 'string' ? (payload.project as any).id : undefined) // issue.labeled, webhook: a project, no workspace
+  if (!pj) return no(`the event has no workspace, so no project${o.tried ? ': pick one' : ''}`)
+  if (wf.source === 'project' && wf.project !== pj) return no(`${ws ? (ws.name ?? ws.id) : 'its project'} isn't in its project`)
   if (wf.problems.length) return no(wf.problems[0])
   if (wf.byAgent && !o.editor) return no('an agent wrote it: save it in Workflows first')
   if (wf.untrusted && !o.editor) return no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`, true)
@@ -1561,12 +1562,12 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
   // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
   if (o.agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) return no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks')
   const mine = runs().filter(r => runOf(r, wf))
-  if (mine.some(r => r.id === payload.run || (live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) return no('its own run sent it')
+  if (mine.some(r => r.id === payload.run || (!!ws && live(r) && (r.ws === ws.id || ws.flow === r.id || (!r.ws && !r.pick && r.where !== 'worktree' && r.status === 'running' && ws.kind === 'local' && ws.project === r.project))))) return no('its own run sent it')
   const fails = whenFails(wf, payload)
   if (fails) return no(fails)
-  if (mine.some(r => live(r) && r.evWs === ws.id)) return no(`a run of it is live for ${ws.name ?? ws.id}`) // a worktree run's ws is its own: evWs is where its event came from
-  if (wf.where === 'here' && ws.archived) return no(`${ws.name ?? ws.id} is archived`)
-  return { wf, start: { workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `${o.tried ? 'try' : 'event'} ${name}`, event: payload, evWs: ws.id, hops, ...(o.agent && { agent: o.agent }), ...(o.editor && { editor: true }) } }
+  if (ws && mine.some(r => live(r) && r.evWs === ws.id)) return no(`a run of it is live for ${ws.name ?? ws.id}`) // a worktree run's ws is its own: evWs is where its event came from
+  if (wf.where === 'here' && (!ws || ws.archived)) return no(ws ? `${ws.name ?? ws.id} is archived` : 'it runs here, and the event has no workspace')
+  return { wf, start: { workflow: wf.id, source: wf.source, project: pj, ...(wf.where === 'here' && ws && { ws: ws.id }), task: name, trigger: `${o.tried ? 'try' : 'event'} ${name}`, event: payload, ...(ws && { evWs: ws.id }), hops, ...(o.agent && { agent: o.agent }), ...(o.editor && { editor: true }) } }
 }
 // heard since Laki started (ponytail: in memory, a restart forgets them): the newest payload of each event per project
 // (flowEvent's "the last one"), and each workflow's last FLOW_HEARD outcomes (its settings' Last events)
@@ -1581,18 +1582,20 @@ function note(wf: WorkflowItem, e: FlowHeard, again = false) { // again: one alr
   changed()
   return e
 }
+eventHooks.listens = name => flowsOn(state.settings) && flowList().some(w => w.on && w.source !== 'builtin' && onIt(w.on, name))
 eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
   const out = { flows: [] as string[], refused: [] as string[] }
   if (!flowsOn(state.settings)) return out
   const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
-  const k = `${ws?.project ?? ''}:${name}`
+  const pj = ws?.project ?? (payload.project as { id?: string } | undefined)?.id // issue.labeled's, a webhook's: a project only
+  const k = `${pj ?? ''}:${name}`
   heard.delete(k) // the newest last
   heard.set(k, { at: Date.now(), payload })
   if (heard.size > HEARD_MAX) heard.delete(heard.keys().next().value!)
   if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on && w.source !== 'builtin') } // ponytail: the files read again every 10 s, not at each event
   for (const w of listening.list) {
     if (!onIt(w.on, name)) continue
-    if (w.source === 'project' && w.project !== ws?.project) continue // a project's own: its events only
+    if (w.source === 'project' && w.project !== pj) continue // a project's own: its events only
     const h = fromEvent(w, name, payload, ws, { agent, hops })
     if (!h) continue
     if ('why' in h) {
@@ -1633,6 +1636,8 @@ const SAMPLE_EVENTS: Record<string, Record<string, unknown>> = {
   'tab.new': { kind: 'agent' },
   'port.open': { port: 5173, command: 'node vite' },
   'gate.held': { gate: 'ship', widget: 'sample', why: 'the changelog has no line for it' },
+  'issue.labeled': { project: { id: 'web', name: 'web' }, number: 128, title: 'The cart total rounds wrong', url: 'https://github.com/acme/web/issues/128', label: 'laki', by: 'octocat', body: 'Adding two items at $0.10 shows $0.30.' },
+  webhook: { name: 'deploys', event: 'deployment_status', body: { deployment_status: { state: 'failure' } } },
 }
 const SAMPLE_TAB = ['turn.done', 'turn.failed', 'turn.waiting', 'limit.hit', 'tab.new'] // a tab's events: event.tab too
 function sampleOf(name: string): Record<string, unknown> {

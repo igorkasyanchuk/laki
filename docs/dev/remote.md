@@ -110,6 +110,20 @@ through `redact` first (L9: `SECRETS`' token shapes as ••••); the page a
 when something comes under where the reader is; a footer). Its `sub`: *Live · view-only · updates as it goes*.
 Tested in `test/share.test.ts`.
 
+### Webhooks
+
+`inbound.ts`' server (`hookServe`, once `settings.inHooks` has one; `hookStop` at shutdown): `127.0.0.1`, a random port,
+never the daemon's; only `POST /hook/<name>` (404 else, `/rpc` too), `BODY_MAX` 1 MB (413), `RATE` 60 a minute per hook
+(429 with Retry-After). Each request's check (`signed`, `timingSafeEqual`): `github` `X-Hub-Signature-256`
+(`sha256=` + HMAC-SHA256 of the raw body), `linear` `Linear-Signature` (its hex), `key` `X-Laki-Key`; a failure 401,
+logged once a minute per hook (`told`). Then `webhook` `{ name, event, body, project? }`, 202. `hookAdd` (a name,
+`NAME`; a kind; a project) writes its secret to `<data>/hooks/<name>` (0600, never state.json) and returns it once;
+`hookSecret` reads it again, `hookRm` drops both, `hookList` the hooks with their local and public URLs. `hookExpose`:
+remote.ts' `hookPublish`, a quick cloudflared tunnel to that port (`cloudflare`) or `tailscale funnel` (`tailscale`,
+funnel), its `url`, `down` when it went. All four but `hookList` refused from an agent (`AGENT_NO`), `hookSecret` and
+`hookExpose` over remote access (`REMOTE_NO`). Settings › Tunnels › Webhooks (SettingsConnect.tsx `WebhooksSection`).
+ponytail: funnel takes port 443's root, as remote access over tailscale does.
+
 ### Remote access
 
 `remote.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself

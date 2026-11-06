@@ -135,6 +135,7 @@ export type Project = {
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
   trusted?: string // its .laki.json as you trusted it (projectTrust: sha256 of its JSON); one that isn't that gives its port names only
   cfgWait?: string // the view's: its .laki.json's hash while it has more than port names and you haven't trusted it as it is
+  issueMark?: { id: number; etag?: string } // issue.labeled's (inbound.ts): the newest issue event read, its ETag
   github?: boolean // the view's: its origin is on GitHub (core.ts onGitHub): the new-workspace page offers In a codespace
   hasSetup?: boolean // the view's: it has a setup script (projectConfig's: the app's, or a trusted .laki.json's): the new-workspace page's New worktree, no setup
   color?: string // TAB_COLORS': an accent (its icon, its workspaces' bar where they have none of their own, rail pins, bubbles)
@@ -479,6 +480,9 @@ export const HIDDEN = /[\p{Cf}\u2028\u2029\u115F\u1160\u3164\uFFA0\u2800]|[^\P{C
 export const WHEN_DONE_WAIT = 60_000 // the countdown before it acts, which Cancel stops
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
+// a webhook from outside (inbound.ts): its name (/hook/<name>), how a request proves it's the sender's (GitHub's or
+// Linear's signature, else X-Laki-Key), the project its event is for
+export type InHook = { name: string; kind: 'github' | 'linear' | 'key'; project?: string }
 export type Settings = {
   editor?: string
   editors?: Record<string, string> // a project's own (by its id): Open in's last pick for its folder, ⌘E's there; none: editor
@@ -594,6 +598,7 @@ export type Settings = {
   prBots?: string[] // review bots whose threads the review switch sends (unset: PR_BOTS)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
+  inHooks?: InHook[] // Settings › Webhooks: the hooks a POST from outside starts workflows by (inbound.ts; their secrets in <data>/hooks)
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
@@ -901,7 +906,7 @@ export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtu
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgetEvents.ts widgetEvent)
-export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held', 'tool.call'] as const
+export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held', 'tool.call', 'issue.labeled', 'webhook'] as const
 // gates (an action's "gate"): the steps an extension can hold; a hold: who held it and why
 export const GATES = ['ship', 'merge', 'archive', 'tool'] as const // tool: each tool call claude makes (widgetEvents.ts toolGate), the others steps of core's gated
 export type Gate = (typeof GATES)[number]
@@ -976,7 +981,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 152
+export const API = 153
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

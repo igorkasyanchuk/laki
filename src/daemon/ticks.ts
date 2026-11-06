@@ -25,6 +25,7 @@
 //   pendingTick    30 s   keep   workspaces' later starts due
 //   reminderTick   30 s   keep   reminders due
 //   widgetTick     30 s   slow   extensions' fetches, each when due
+//   issueTick      60 s   slow   issue.labeled: GitHub's issue events, while something listens (inbound.ts)
 //   prTick         60 s   slow   PR scans (gh), each workspace every settings.prScan minutes
 //   sleepTick      60 s   slow   idle tabs put to sleep
 //   mcpAppSweep    60 s   keep   idle MCP App connections closed (mcpApps.ts)
