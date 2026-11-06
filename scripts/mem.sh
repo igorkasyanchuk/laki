@@ -33,4 +33,11 @@ for c in $(pgrep -P $DPID); do
   for p in $c $(pgrep -P $c); do echo "  $(ps -o rss=,command= -p $p | awk '{printf "%.1f MB  %s %s", $1/1024, $2, $3}')"; done
 done
 laki ls
-kill $APP_PID || true; laki stop
+# idle CPU: the window closed (no client), the daemon alone for IDLE_S seconds (60); its own CPU time, not what it
+# spawns (ps, lsof, git, gh: short-lived children)
+kill $APP_PID || true
+sleep 5
+cpu() { ps -o time= -p "$1" | awk -F: '{ s = 0; for (i = 1; i <= NF; i++) s = s * 60 + $i; print s }'; }
+c0=$(cpu $DPID); sleep "${IDLE_S:-60}"; c1=$(cpu $DPID)
+echo "daemon idle CPU, no window, ${IDLE_S:-60} s: $(echo "$c0 $c1 ${IDLE_S:-60}" | awk '{ printf "%.2f%% (%.2f s)", ($2 - $1) / $3 * 100, $2 - $1 }')"
+laki stop
