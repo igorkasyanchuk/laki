@@ -550,7 +550,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
+const FROM = new Set(['accountRm', 'tabAccount', 'imageRead', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -580,8 +580,30 @@ async function whoCalls(sock: Socket, method: string, p: any) {
   const me = { ws: tab.workspace, tab: tab.id }
   return FROM.has(method) ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
 }
+// from: FROM's (whoCalls'), caller: CALLER's; the other one an RPC says only makes it stricter
 const notAgent = (p: any, what: string) => {
-  if (core.agentCaller(p.from)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
+  if (core.agentCaller(p.from) ?? core.agentCaller(p.caller)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
+}
+// a sandboxed agent's calls: what it starts is sandboxed too, and nothing of its own runs outside the sandbox: no
+// terminal (a shell tab or workspace, keys or a send into one, a ! line that Claude Code or Codex runs as a command), no
+// Run ▾ action (its script reads the worktree the agent writes). A command it asks for runs once you allow it (tabNew's
+// cmdAsk). ponytail: the Done check's scripts, a scheduled task's agent (its profile's sandbox) and git hooks a repo keeps
+// in its tree (husky's core.hooksPath) still run outside it, as the user
+function boxNo(method: string, p: any) {
+  if (!core.boxedCaller(p.caller) && !core.boxedCaller(p.from)) return
+  const no = (what: string) => {
+    throw new Error(`a sandboxed agent can't ${what}: it would run outside its sandbox (ask the user)`)
+  }
+  if (method === 'tabNew' && (p.kind === 'shell' || (!p.kind && !p.cmd?.trim() && (!p.preset || p.preset === 'shell')))) no('open a terminal')
+  if (method === 'wsNew' && (p.preset || core.state.settings?.agent) === 'shell') no('open a terminal') // a race's: refused as no agent (wsFan)
+  if ((method === 'tabNew' || method === 'wsNew' || method === 'wsFan') && p.sandbox !== false) p.sandbox = true // false: agentNo's refusal; an agent without one (gemini…): modelCheck's
+  if (method === 'run') no('start a Run ▾ action')
+  if (method === 'send' || method === 'input') {
+    const tab = core.resolveTarget(String((method === 'send' ? p.target : p.tab) ?? ''))
+    if (!(tab.kind === 'agent' && core.tracked(tab))) no(method === 'send' ? `send into ${tab.name}, a terminal` : `type into ${tab.name}, a terminal`)
+    const text = String((method === 'send' ? p.text : p.data) ?? '')
+    if (/^\s*!/.test(text)) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
+  }
 }
 // M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's
 // menu: its own included), an extension's files, a PR review or comment (gh posts it as you), remote access, memory's compaction (N11: it goes to a model), the settings remote access can't change either, and keys
@@ -593,6 +615,9 @@ const notAgent = (p: any, what: string) => {
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
 const AGENT_NO: Record<string, string> = { imageRead: "read a picture anywhere on this Mac (the hover card's; its own files: fileRead)", prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)", tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)", accountRm: "remove one of the user's accounts (its sign-in goes with it)" }
+// every refusal by name reads a from (or caller) the daemon filled in: one missing from FROM would be the caller's to say,
+// and an agent that leaves it out gets through. Checked as the daemon loads, so every test run fails on it
+for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw new Error(`AGENT_NO's ${k} isn't in FROM: an agent could leave its from out`)
 // settings an agent can't change either (remote access can: they're the user's own on the phone, Cancel's whenDone off
 // too): when everything is done (the Mac sleeps, locks or shuts down), the Done check, Recording mode, the next prompt
 // guessed (your messages to a model), keep awake; how old the tidies let storage files, archived workspaces and pasted
@@ -604,6 +629,7 @@ const AGENT_NO: Record<string, string> = { imageRead: "read a picture anywhere o
 // yours Laki starts)
 const AGENT_KEYS = /^(accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked)$/
 function agentNo(method: string, p: any) {
+  boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)

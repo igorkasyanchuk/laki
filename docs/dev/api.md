@@ -368,10 +368,13 @@ else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: 
 and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too; `shutdown`, `laki stop`; `checkAgain`, `checkStop`), `projectTrust` with a `hash`, `projectSet` with `config` or
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too; `shutdown`, `laki stop`; `checkAgain`, `checkStop`; each one in `FROM` or `CALLER`, checked as the daemon loads, and `notAgent` reads `from` or `caller`: a `from` the RPC says alone was an agent's to leave out), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
-asks something (`core.asking`), and `send`/`screen`, `input` (as a send), `tabNew` with a `prompt` (as a send, `target` *a new agent tab*) and a WebSocket's `attach` (as a screen) into
+asks something (`core.asking`); a sandboxed agent's (`boxNo`, `core.boxedCaller`: its tab's `sandboxed`) `tabNew`, `wsNew`
+and `wsFan` start sandboxed (`sandbox: true`; `false` refused, an agent with none refused by `modelCheck`), and a shell tab
+or workspace, `run`, a `send` or `input` into anything but an agent's tab, and a `!` line (claude's and codex's command
+mode) are refused; and `send`/`screen`, `input` (as a send), `tabNew` with a `prompt` (as a send, `target` *a new agent tab*) and a WebSocket's `attach` (as a screen) into
 another workspace's tab ask, and `widgetEmit` with another workspace's `ws` (`emit`: its `target` the event, `text`
 its data) (`crossAsk`: widgetTools.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`;
 App's dialog and notification; `always`: `crossOk`, in memory; a send or screen of a workspace whose `from` is the

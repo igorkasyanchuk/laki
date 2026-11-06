@@ -1375,7 +1375,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
   // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). The
   // git folders git commit writes in writable too (gitWrites: a worktree's live in the main repo's .git)
-  const sandbox = !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
+  const sandbox = sandboxed(tab)
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path) : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   if (tab.preset === 'claude') {
     argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
@@ -2142,7 +2142,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     if (p === 'none' || p === 'shell') throw new Error(`${p} isn't an agent`)
     presetCheck(p)
     const agent = presetNamed(p)?.agent ?? p
-    if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
+    if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, undefined, undefined, o.sandbox === true || undefined) // all of them before any worktree (a race's agents keep their own permission mode and speed; a sandbox asked for, a sandboxed agent's race: each one's)
     await modelKnown(agent, o.model?.trim() || presetNamed(p)?.model, { path: proj.path, project: proj.id, host: proj.host }, p)
     if (o.from) agentNoCmd({ preset: p, cmd: o.cmd }) // an agent's race: each preset before any worktree, not a half race left
     if (o.startAt !== undefined) startCheck(o.startAt, p, agent) // a later start: each one's (the limit: claude and codex only) likewise
@@ -2152,7 +2152,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   const race = randomUUID().slice(0, 8)
   const made: Workspace[] = []
   for (const p of presets) {
-    made.push(await wsNew({ ...base, preset: p, perm: undefined, fast: undefined, sandbox: undefined, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
+    made.push(await wsNew({ ...base, preset: p, perm: undefined, fast: undefined, sandbox: o.sandbox === true || undefined, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
     for (const w of [...made].reverse()) placeWs(w, o.place) // each first, the last one first: in place as it comes, in the race's order
     save()
     changed()
@@ -3491,6 +3491,15 @@ export function promptList() {
   return [...prompts].reverse()
 }
 export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
+// a tab's agent in its sandbox (agentCmd's): the tab's switch, else its profile's; none with bypass permissions (its
+// mode or its profile's flags)
+export function sandboxed(tab: Tab) {
+  const pr = presetOf(tab)
+  const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
+  return !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
+}
+// a call from a sandboxed agent's tab (main.ts' boxNo)
+export const boxedCaller = (from?: { ws?: unknown; tab?: unknown }) => (t => !!t && sandboxed(t))(agentTab(from))
 // a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
 export const asking = (id: string) => rt.get(id)?.status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
 // that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs
