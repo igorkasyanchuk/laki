@@ -274,11 +274,15 @@ model_reasoning_effort="…"`, opencode its inline config (above), the others `-
 `sandbox` (`SANDBOX`, a profile's *Sandbox*, the tab's over it, kept for restarts and forks; `sandboxOff`: none with
 bypass permissions, its mode or its flags, refused by `modelCheck`, `tabSpec` and `presetSave` as `SANDBOX_NO`, and an
 agent's `sandbox: false` by main.ts' `agentNo`): claude's `--settings` gets `-sandbox` (`sandbox.enabled`,
-`autoAllowBashIfSandboxed`, `excludedCommands`: `laki *` and `LAKI_CLI`, so the CLI reaches the daemon) and `--add-dir`
-the repo's git folder (`gitCommonDir`, from `.git` and `commondir`, realpath'd); codex `codexBox`: `-s workspace-write`
-unless its mode or flags set one (read-only stays), `sandbox_workspace_write.network_access=true` and `writable_roots`
-with that folder (a worktree's lives in the main repo's .git: `git commit` writes there). Hooks and codex's notify run
-outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git folder isn't added.
+`autoAllowBashIfSandboxed`, `excludedCommands`: `laki *` and `LAKI_CLI`, so the CLI reaches the daemon) and `--add-dir`,
+first (it takes every word up to a flag), for each folder `git commit` writes in (`gitWrites`, from `.git` and
+`commondir`, realpath'd: a worktree's own folder, the index and HEAD, and the shared `objects`, `refs` and `logs`; never
+the shared `hooks` or `config`, which git runs outside the sandbox, Laki's own git included; the repo itself, a local
+workspace: its whole `.git`); codex `codexBox`: `-s workspace-write` unless its mode or flags pick a sandbox (read-only
+stays; an approval flag like `-a never` picks none), `sandbox_workspace_write.network_access=true` and `writable_roots`
+with those folders (codex keeps a worktree's own folder read-only otherwise: checked with `codex sandbox`, 0.162). Hooks
+and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git
+folders aren't added.
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c
 service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). A tab's unset `perm`/`fast`
 is its profile's, read at each start; `''` (*Ask first*) and `false` are none over the profile's (`addTab` keeps them):
@@ -314,12 +318,13 @@ types it once the prompt is up (it printed, then 500 ms quiet; 10 s at most) und
 and neither does a host.
 
 A claude chat whose background commands (Bash `run_in_background`: a dev server, a watcher) or background subagents
-were running as the daemon went (an update, Update when idle, a crash: its process ended, theirs with it) is told so
-once it's back: `restoreNow` reads its transcript before the resume (meters.ts `bgLeft`: share.ts `bgOf` over the last
-32 MB; what's still open there was killed, nothing saved at shutdown, so a crash too), then `whenPrompt` → `bgGone`:
-one `send` (when idle) naming each command (`BgTask.cmd`) and each background subagent (not one in the turn, a `toolu_`
-id: the turn ended with it), `bgGoneText`. `tab.bgTold` keeps the ids named (their ends never come): never twice. A
-dormant tab gets it as it wakes (restoreNow then). ponytail: claude only; Update when idle doesn't wait for them (a dev
+were running as Laki ended its process (a restart: an update, Update when idle, a crash; or sleep) is told so once
+it's back: `bgTell`, from `restoreNow` and resources.ts `wake`, reads its transcript as it resumes (meters.ts `bgLeft`:
+share.ts `bgOf` over the last 8 MB, `BG_READ`; what's still open there was killed, nothing saved at shutdown, so a
+crash too; a read that fails says nothing and never stops the resume), then `whenPrompt` → `bgGone`: one `send` (when
+idle) naming each command (`BgTask.cmd`) and each background subagent (not one in the turn, a `toolu_` id: the turn
+ended with it), `bgGoneText` (a restart's words or sleep's). `tab.bgTold` keeps the ids named (their ends never come):
+never twice; the view leaves it out. A dormant tab gets it as it wakes (restoreNow then). ponytail: claude only; Update when idle doesn't wait for them (a dev
 server never ends).
 
 A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the screen as it exits) drops the tab's

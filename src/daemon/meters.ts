@@ -68,22 +68,27 @@ export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: 
 }
 
 // what a claude tab's chat left running in the background as its process ended (its transcript read now, its last
-// SHARE_READ: bgOf; a task started before that is missed): a restart's restoreNow tells the resumed agent they're gone.
-// None: another agent, a host's, no chat or transcript
+// BG_READ: bgOf; ponytail: a task started before that is missed): a restart's restoreNow and a wake from sleep tell the
+// resumed agent they're gone. None: another agent, a host's, no chat or transcript
+const BG_READ = 8 << 20 // read as each tab is restored, in the way of everything else: the meters' SHARE_READ is 32 MB
 export function bgLeft(tab: Tab): BgTask[] {
   if (tab.preset !== 'claude' || !tab.resumeId || state.workspaces.find(w => w.id === tab.workspace)?.host) return []
-  const file = transcriptOf('claude', accountNamed(tab.account)?.dir ?? homeDir('claude'), tab.resumeId)
-  const size = file ? (statSync(file, { throwIfNoEntry: false })?.size ?? 0) : 0
-  if (!size) return []
-  const n = Math.min(size, SHARE_READ)
-  const buf = Buffer.alloc(n)
-  const fd = openSync(file!, 'r')
   try {
-    readSync(fd, buf, 0, n, size - n)
-  } finally {
-    closeSync(fd)
+    const file = transcriptOf('claude', accountNamed(tab.account)?.dir ?? homeDir('claude'), tab.resumeId)
+    const size = file ? (statSync(file, { throwIfNoEntry: false })?.size ?? 0) : 0
+    if (!size) return []
+    const n = Math.min(size, BG_READ)
+    const buf = Buffer.alloc(n)
+    const fd = openSync(file!, 'r')
+    try {
+      readSync(fd, buf, 0, n, size - n)
+    } finally {
+      closeSync(fd)
+    }
+    return [...bgOf(buf.toString('utf8'), bgNew()).bg.values()]
+  } catch {
+    return [] // gone or unreadable meanwhile: the tab resumes all the same, nothing said
   }
-  return [...bgOf(buf.toString('utf8'), bgNew()).bg.values()]
 }
 
 // the Reader's MCP calls (mcpApps.ts); the newest 200. bumpReader: something to draw came in (a server's apps)

@@ -1286,6 +1286,7 @@ test('a managed policy: its settings locked, remote access off, approvals requir
 
 test('a managed policy that comes after a tab: the tab made in bypass permissions doesn\'t start again in it', async t => {
   const file = join(mkdtempSync('/tmp/laki-policy-'), 'policy.json')
+  t.after(() => rmSync(dirname(file), { recursive: true, force: true }))
   writeFileSync(file, '{}')
   const rig = await fresh(t, { env: { LAKI_POLICY: file } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

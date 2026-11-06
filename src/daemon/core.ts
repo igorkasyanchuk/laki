@@ -616,7 +616,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -1373,12 +1373,12 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // its profile's; no mode when the profile's flags set one
   const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
   const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
-  // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). Its
-  // repo's git folder writable too: a worktree's lives in the main repo's .git, and git commit writes there
+  // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). The
+  // git folders git commit writes in writable too (gitWrites: a worktree's live in the main repo's .git)
   const sandbox = !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
-  const gitDir = sandbox && h === localHooks ? gitCommonDir(state.workspaces.find(w => w.id === tab.workspace)?.path) : undefined // ponytail: a host's isn't added (git commit there is refused in the sandbox)
+  const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path) : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : []), ...(gitDir ? ['--add-dir', gitDir] : [])] // /laki:new
+    argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1414,30 +1414,34 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     } catch {}
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
   }
-  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDir) : [])] // claude's fast and sandbox: its settings file
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
 }
 
-// codex's sandbox: workspace-write, unless its mode or its profile's flags set one already (read-only is stricter); its
-// network on, so laki (the daemon on 127.0.0.1), npm and git push work; the repo's git folder writable (git commit)
-function codexBox(perm: string | undefined, args: string | undefined, gitDir: string | undefined) {
-  const own = permInArgs('codex', args) || perm === 'plan' || perm === 'acceptEdits'
-  return [...(own ? [] : ['-s', 'workspace-write']), '-c', 'sandbox_workspace_write.network_access=true', ...(gitDir ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([gitDir])}`] : [])] // a JSON array of strings is TOML's too
+// codex's sandbox: workspace-write, unless its mode or its profile's flags pick a sandbox already (read-only is
+// stricter; an approval flag alone picks none); its network on, so laki (the daemon on 127.0.0.1), npm and git push
+// work; the git folders git commit writes in writable
+function codexBox(perm: string | undefined, args: string | undefined, gitDirs: string[]) {
+  const own = /(^|\s)(-s|--sandbox|--full-auto)(?=[\s=]|$)|\bsandbox_mode\s*=/.test(args ?? '') || perm === 'plan' || perm === 'acceptEdits'
+  return [...(own ? [] : ['-s', 'workspace-write']), '-c', 'sandbox_workspace_write.network_access=true', ...(gitDirs.length ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(gitDirs)}`] : [])] // a JSON array of strings is TOML's too
 }
 
-// a folder's git folder, the one all its worktrees share (git rev-parse --git-common-dir), read from the files: .git a
-// folder, or a file naming the worktree's own (whose commondir names the shared one). None: not a repo
-export function gitCommonDir(path?: string) {
-  if (!path) return
+// what git commit writes in a sandboxed agent's checkout, as the sandbox sees the paths (/tmp is /private/tmp), read
+// from the files: a worktree's .git file names its own folder (the index, HEAD), whose commondir names the shared one
+// (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
+// ponytail: the repo itself (a local workspace) has them in its own folder, all of it given; none: not a repo
+export function gitWrites(path?: string): string[] {
+  if (!path) return []
   const dotGit = join(path, '.git')
   try {
     const st = statSync(dotGit, { throwIfNoEntry: false })
-    if (!st?.isDirectory() && !st?.isFile()) return
-    const own = st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim())
-    return realpathSync(existsSync(join(own, 'commondir')) ? resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim()) : own) // as the sandbox sees it (/tmp is /private/tmp)
+    if (!st?.isDirectory() && !st?.isFile()) return []
+    const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
+    const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
+    return common === own ? [own] : [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), own]
   } catch {
-    return
+    return []
   }
 }
 
@@ -2722,11 +2726,10 @@ export function restoreNow(id: string) {
   if (ws.archived || sessions.has(id)) return changed(), false
   let ok = true
   try {
-    const left = tracked(t) ? bgLeft(t).filter(x => !t.bgTold?.includes(x.id)) : [] // read before it resumes: what its chat still ran as the daemon went
     const s = spawnTab(t, { resume: true, cwd: a?.cwd })
     restoredAt.set(t.id, Date.now())
     if (a?.cmd) bringBack(s, a.cmd, !!a.run)
-    if (left.length) whenPrompt(s, () => bgGone(t, left))
+    bgTell(t, s, 'restart') // what its chat still ran as the daemon went
   } catch (e) {
     ok = false // shown as ended: Enter tries again
     console.error(`restore ${t.id}:`, (e as Error).message)
@@ -2736,27 +2739,33 @@ export function restoreNow(id: string) {
 }
 
 // a resumed claude whose chat had commands running in the background (Bash run_in_background: a dev server, a watcher)
-// or background subagents as the daemon went (an update, Update when idle, a crash: its process and theirs ended):
-// one message, so it doesn't wait for output that never comes. Sent as yours are (send, when idle). ponytail: claude
-// only (share.ts bgOf reads its transcript); a subagent in the turn at work isn't named (the turn ended with it)
-export const bgGoneText = (left: { kind: string; name: string; cmd?: string; id: string }[]) => {
+// or background subagents as Laki ended its process (a restart: an update, Update when idle, a crash; or sleep, wake's):
+// one message once it's at its prompt, so it doesn't wait for output that never comes. Sent as yours are (send, when
+// idle). Read as it resumes (spawnTab's process has written nothing yet). ponytail: claude only (share.ts bgOf reads its
+// transcript); a subagent in the turn at work isn't named (the turn ended with it)
+export function bgTell(t: Tab, s: Session, why: 'restart' | 'sleep') {
+  const left = tracked(t) ? bgLeft(t).filter(x => !t.bgTold?.includes(x.id)) : []
+  if (left.length) whenPrompt(s, () => bgGone(t, left, why))
+}
+export const bgGoneText = (left: { kind: string; name: string; cmd?: string; id: string }[], why: 'restart' | 'sleep' = 'restart') => {
   const shells = left.filter(x => x.kind === 'shell').map(x => `\`${x.cmd ?? x.name}\``)
   const agents = left.filter(x => x.kind === 'agent' && !x.id.startsWith('toolu_')).map(x => x.name)
+  const did = why === 'sleep' ? 'Laki put this tab to sleep to free memory, which stopped' : 'Laki restarted and stopped'
   return [
-    shells.length && `Laki restarted and stopped the background commands you had running: ${shells.join(', ')}. Start again the ones you still need.`,
-    agents.length && `${shells.length ? 'It also stopped' : 'Laki restarted and stopped'} your background subagents: ${agents.join(', ')}. Start them again if you still need them.`,
+    shells.length && `${did} the background commands you had running: ${shells.join(', ')}. Start again the ones you still need.`,
+    agents.length && `${shells.length ? 'It also stopped' : did} your background subagents: ${agents.join(', ')}. Start them again if you still need them.`,
   ].filter(Boolean).join(' ')
 }
-function bgGone(t: Tab, left: { kind: string; name: string; cmd?: string; id: string }[]) {
-  const text = bgGoneText(left)
+function bgGone(t: Tab, left: { kind: string; name: string; cmd?: string; id: string }[], why: 'restart' | 'sleep') {
+  const text = bgGoneText(left, why)
   if (!text || !state.tabs.includes(t)) return
   t.bgTold = [...(t.bgTold ?? []), ...left.map(x => x.id)].slice(-500) // ponytail: past 500, the oldest show as running again
   save()
-  wsLog({ id: t.workspace }, `${t.name}: told what the restart stopped (${left.length})`)
+  wsLog({ id: t.workspace }, `${t.name}: told what the ${why} stopped (${left.length})`)
   try {
     send({ target: t.id, text, whenIdle: true })
   } catch (e) {
-    log(`restart note ${t.id}: ${(e as Error).message}`)
+    log(`${why} note ${t.id}: ${(e as Error).message}`)
   }
 }
 

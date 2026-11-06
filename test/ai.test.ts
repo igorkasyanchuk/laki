@@ -686,3 +686,21 @@ test('nextPrompt: as a claude turn ends, the next message guessed from it shows 
   await sleep(300)
   assert.equal((await rig.tab(ws.id)).suggest, undefined) // NONE: no guess
 })
+
+test("ai: laki_profiles changes a profile at the user's Yes; its Sandbox stays (Laki AI doesn't set it), bypass with it refused", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [call('c1', 'laki_profiles', { set: [{ name: 'boxed', agent: 'claude', model: 'opus' }] }), call('c2', 'laki_profiles', { set: [{ name: 'boxed', agent: 'claude', perm: 'bypassPermissions' }] })])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  await rig.rpc('presetSave', { name: 'boxed', add: true, set: { agent: 'claude', sandbox: true } })
+  const yes = async (text: string) => {
+    await rig.rpc('aiAsk', { text })
+    return rig.rpc('aiAnswer', { id: (await rig.rpc('aiState')).chat.at(-1).ask.id, n: 0 })
+  }
+  const boxed = async () => (await rig.rpc('state')).presets.find((x: any) => x.name === 'boxed')
+  assert.deepEqual(await yes('boxed on opus'), { saved: true })
+  assert.deepEqual([(await boxed()).model, (await boxed()).sandbox], ['opus', true])
+  await assert.rejects(yes('boxed in bypass'), /turns the agent's sandbox off/)
+  assert.deepEqual([(await boxed()).perm, (await boxed()).sandbox], [undefined, true])
+})

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { type TestContext, test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
 
@@ -292,25 +292,34 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
     const tab = await rig.tab(ws.id)
     return { tab, args: (await until(() => rig.fakeLog().find(l => l.tab === tab.id), 'its start')).args as string[] }
   }
-  // claude: its settings file with the sandbox on, laki outside it; the worktree's git folder (the repo's .git) added
-  const c = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'claude', sandbox: true, fast: true }))
+  const dirs = (args: string[]) => args.flatMap((a, i) => (a === '--add-dir' ? [args[i + 1]] : []))
+  // what git commit writes in a worktree: the repo's objects, refs and logs, the worktree's own folder; not .git's hooks or config
+  const writes = (ws: any) => [...['objects', 'refs', 'logs'].map(d => join(git, d)), realpathSync(join(git, 'worktrees', basename(ws.path)))]
+  // claude: its settings file with the sandbox on, laki outside it; those folders added, first (--add-dir takes every word up to a flag)
+  const cw = await rig.rpc('wsNew', { project: p.id, preset: 'claude', sandbox: true, fast: true })
+  const c = await argsOf(cw)
   assert.equal(c.tab.sandbox, true)
   const file = c.args[c.args.indexOf('--settings') + 1]
   assert.match(file, /claude-settings-fast-sandbox\.json$/)
   const box = JSON.parse(readFileSync(file, 'utf8'))
   assert.deepEqual([box.fastMode, box.sandbox.enabled, box.sandbox.autoAllowBashIfSandboxed, box.sandbox.excludedCommands[0]], [true, true, true, 'laki *'])
   assert.match(box.sandbox.excludedCommands[1], /cli(\.js|\/main\.ts)' \*$/) // the laki command agents are told
-  assert.equal(c.args[c.args.indexOf('--add-dir') + 1], git)
+  assert.deepEqual(dirs(c.args), writes(cw))
+  assert.equal(c.args[0], '--add-dir')
   assert.ok(!('sandbox' in JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8'))))
-  // codex: workspace-write, the git folder writable, the network on; with its own mode, only those two
-  const x = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true }))
-  const roots = `sandbox_workspace_write.writable_roots=${JSON.stringify([git])}`
-  assert.deepEqual(x.args.slice(-6), ['-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots])
-  const ro = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true, perm: 'plan' }))
-  assert.deepEqual(ro.args.slice(-6), ['-s', 'read-only', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots], 'read-only: stricter, kept')
+  // codex: workspace-write, those folders writable, the network on; with its own mode, only those two
+  const xw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true })
+  const x = await argsOf(xw)
+  const roots = (ws: any) => `sandbox_workspace_write.writable_roots=${JSON.stringify(writes(ws))}`
+  assert.deepEqual(x.args.slice(-6), ['-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(xw)])
+  const rw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true, perm: 'plan' })
+  assert.deepEqual((await argsOf(rw)).args.slice(-6), ['-s', 'read-only', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(rw)], 'read-only: stricter, kept')
+  // a profile's approval flag picks no sandbox: workspace-write still goes in
+  await rig.rpc('presetSave', { name: 'cx-never', add: true, set: { agent: 'codex', args: '-a never', sandbox: true } })
+  assert.ok((await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'cx-never' }))).args.join(' ').includes('-s workspace-write'))
   // a local workspace (the repo itself): its own .git
   const local = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true, sandbox: true }))
-  assert.equal(local.args[local.args.indexOf('--add-dir') + 1], git)
+  assert.deepEqual(dirs(local.args), [git])
   // never with bypass permissions: the tab's, the profile's mode or flags; gemini has none
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b1', preset: 'claude', sandbox: true, perm: 'bypassPermissions' }), /turns the agent's sandbox off/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b2', preset: 'gemini', sandbox: true }), /gemini has no sandbox/)

@@ -263,3 +263,24 @@ test("a restart stopped a claude chat's background commands: the resumed tab is 
   await sleep(1500)
   assert.ok(!(await rig.screen(live.id)).includes('Laki restarted'), 'not named twice')
 })
+
+test("sleep stopped a claude chat's background command: the woken tab is told so, once", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, name: 'watch', preset: 'claude', prompt: 'hi' })
+  const tab = await until(async () => (x => x?.last && x.resumeId && x)(await rig.tab(ws.id, 'claude')), 'its first turn')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const at = new Date().toISOString()
+  writeFileSync(join(dir, `${tab.resumeId}.jsonl`), [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'toolu_w', name: 'Bash', input: { command: 'npm run watch', run_in_background: true } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'toolu_w', content: 'Command running in background with ID: w1.' }] }, toolUseResult: { backgroundTaskId: 'w1' } },
+  ].map(x => JSON.stringify({ timestamp: at, ...x })).join('\n') + '\n')
+  assert.equal(await rig.rpc('tabSleep', { tab: tab.id }), true)
+  assert.equal(await rig.rpc('tabWake', { tab: tab.id }), true)
+  const told = 'Laki put this tab to sleep to free memory, which stopped the background commands you had running: `npm run watch`. Start again the ones you still need.'
+  await until(async () => (await rig.tab(ws.id, 'claude')).last === `answer: ${told}`, 'told', 15000)
+  assert.ok(rig.fakeLog().filter((l: any) => l.tab === tab.id && l.args).at(-1).args.includes('--resume'), 'its chat resumed')
+  assert.deepEqual((await rig.tab(ws.id, 'claude')).bgTold, undefined, "the daemon's own, not in the view")
+  await until(() => JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).tabs.find((x: any) => x.id === tab.id).bgTold?.includes('w1'), 'kept: never named again')
+})

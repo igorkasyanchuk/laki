@@ -221,7 +221,7 @@ export const HELP: Record<string, SettingHelp> = {
     cost: 'A higher price per token. A workspace can turn it off for itself.',
   },
   Sandbox: {
-    what: "Starts this profile's agent in its own sandbox: its commands can write only in the worktree and the repo's git folder (so git commit works), not elsewhere on the Mac. Claude Code: its sandbox setting, with Laki's laki command outside it; new websites are asked about. Codex: workspace-write, its network left on (laki, npm, git push).",
+    what: "Starts this profile's agent in its own sandbox: its commands can write only in the worktree and what git commit writes in the repo's git folder (not its hooks or config), not elsewhere on the Mac. Claude Code: its sandbox setting, with Laki's laki command outside it; new websites are asked about. Codex: workspace-write, its network left on (laki, npm, git push).",
     when: 'An agent left alone for a while, or a repo you trust less: a wrong command stays inside the worktree.',
     cost: "Some commands need a yes or fail in it (a global install, a tool that writes in your home folder). Not with Bypass permissions, which turns the sandbox off.",
   },

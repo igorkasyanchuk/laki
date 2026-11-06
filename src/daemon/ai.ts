@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, modelCheck, presets, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -936,7 +936,13 @@ async function saveProfiles(a: AiAct, rpc: Rpc) {
   const add = profilesOf(a.text)
   const same = (x: Preset, y: Preset) => x.name.toLowerCase() === y.name.toLowerCase()
   const have = presets()
-  const changed = (h: Preset, n: Preset): Preset => ({ ...h, ...(h.agent !== n.agent && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast, sandbox: n.sandbox, off: undefined })
+  // its Sandbox stays (Laki AI doesn't set it): refused with a mode that turns it off
+  const changed = (h: Preset, n: Preset): Preset => {
+    const same = h.agent === n.agent
+    const sandbox = h.sandbox && SANDBOX[n.agent as Agent] ? true : undefined
+    if (sandbox && sandboxOff(n.agent, n.perm, same ? h.args : undefined)) throw new Error(`${n.name}: ${SANDBOX_NO}`)
+    return { ...h, ...(!same && { args: undefined, cmd: undefined }), agent: n.agent, model: n.model, effort: n.effort, perm: n.perm, fast: n.fast, sandbox, off: undefined }
+  }
   const next = [...have.map(h => (n => (n ? changed(h, n) : h))(add.find(n => same(n, h)))), ...add.filter(n => !have.some(h => same(n, h)))]
   await rpc('settingsSet', { presets: next })
 }

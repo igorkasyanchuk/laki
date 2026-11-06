@@ -5,7 +5,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { basename } from 'node:path'
 import { type Proc, type ProcUse, type Resources, SLEEP_AFTER, type Tab } from '../shared/types.ts'
 import { scanArtifacts } from './artifacts.ts'
-import { changed, findTab, findWs, log, ports, procs, projectConfig, queued, restoreNow, rt, rtOf, run, sessions, spawnTab, state } from './core.ts'
+import { bgTell, changed, findTab, findWs, log, ports, procs, projectConfig, queued, restoreNow, rt, rtOf, run, sessions, spawnTab, state } from './core.ts'
 import { syncBranches } from './pr.ts'
 import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
@@ -318,7 +318,7 @@ export function wake(id: string) {
   // daemon dropped it (shutdown)
   if (!tab || !asleep.has(id) || !(sessions.has(id) || queued.has(id))) return false
   const done = rtOf(id).done
-  if (!queued.has(id)) spawnTab(tab, { resume: true })
+  if (!queued.has(id)) bgTell(tab, spawnTab(tab, { resume: true }), 'sleep') // its background commands ended with it
   else if (!restoreNow(id)) return false
   Object.assign(rtOf(id), { status: 'running', done })
   tab.usedAt = Date.now() // looked at, typed in, sent to: back at once after the next restart
