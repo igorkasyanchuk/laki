@@ -611,7 +611,7 @@ function boxNo(method: string, p: any) {
     const tab = core.resolveTarget(String((method === 'send' ? p.target : p.tab) ?? ''))
     if (!(tab.kind === 'agent' && core.tracked(tab))) no(method === 'send' ? `send into ${tab.name}, a terminal` : `type into ${tab.name}, a terminal`)
     const text = String((method === 'send' ? p.text : p.data) ?? '')
-    if (/^\s*!/.test(text)) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
+    if (/(?:^|[\x00-\x1f\x7f])[ \t]*!/.test(text.replace(/\x1b\[[0-9;]*[~A-Za-z]/g, '\n'))) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
   }
 }
 // M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's

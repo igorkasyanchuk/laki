@@ -3921,7 +3921,7 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
     lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

@@ -76,7 +76,7 @@ test('GitLab: Ship pushes and opens the MR with glab; an issue by number and the
   const ended = await until(async () => (x => x.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
   assert.equal(ended.code, 0, await rig.screen(tab.id))
   assert.equal(execFileSync('git', ['log', '-1', '--format=%s', ws.branch], { cwd: remote, encoding: 'utf8' }).trim(), 'Fix the cart')
-  assert.match(log(rig), new RegExp(`^glab mr create --fill --yes --source-branch ${ws.branch}$`, 'm'))
+  assert.match(log(rig), new RegExp(`^glab mr create --fill --yes --source-branch ${ws.branch} --target-branch main$`, 'm'))
   assert.ok(!log(rig).includes('gh pr create'))
   assert.equal((await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr, 'the new MR')).forge, 'gitlab')
   // self-hosted: glab signed in to gitlab.acme.dev, not to code.acme.dev
