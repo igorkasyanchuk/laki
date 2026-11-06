@@ -1456,7 +1456,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     } catch (e) {
       wsLog(ws, `${tab.name}: not started: ${(e as Error).message}`)
       try {
-        alertShow({ title: 'Not started', text: `${tab.name}: ${(e as Error).message}`, to: tab.id }, 'notice')
+        alertShow({ title: 'Not started', text: `${tab.name}: ${(e as Error).message}`, to: tab.id, from: { tab: tab.id } }, 'notice') // from it: a minute's limit per tab, so each refused one says so
       } catch {} // a minute's notices used up, or the workspace hidden: daemon.log has it
       throw e
     }
@@ -2750,7 +2750,7 @@ export const bgGoneText = (left: { kind: string; name: string; cmd?: string; id:
 function bgGone(t: Tab, left: { kind: string; name: string; cmd?: string; id: string }[]) {
   const text = bgGoneText(left)
   if (!text || !state.tabs.includes(t)) return
-  t.bgTold = [...(t.bgTold ?? []), ...left.map(x => x.id)].slice(-50)
+  t.bgTold = [...(t.bgTold ?? []), ...left.map(x => x.id)].slice(-500) // ponytail: past 500, the oldest show as running again
   save()
   wsLog({ id: t.workspace }, `${t.name}: told what the restart stopped (${left.length})`)
   try {

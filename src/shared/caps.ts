@@ -14,6 +14,9 @@ export const RPC_NAMES: Record<string, string> = {
   'note.file': 'noteFile',
 }
 export const oldName = (method: string) => (Object.hasOwn(RPC_NAMES, method) ? RPC_NAMES[method] : method)
+// the name a client with a view sends: the namespaced one when the daemon's caps list its namespace, else the old one
+// (an older daemon, or none read yet)
+export const sendAs = (method: string, caps: readonly string[]) => (caps.includes(`ns:${method.split('.')[0]}`) ? method : oldName(method))
 
 // the behaviors the renderer asks about, and the API number each came with: what an older daemon is judged by
 export const CAP_SINCE: Record<string, number> = { 'archive.dirty': 12, layouts: 60, 'ws.peek': 94, 'project.terminal': 107, 'hooks.seen': 146 }

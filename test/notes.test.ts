@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { CAPS, hasCap, oldName } from '../src/shared/caps.ts'
+import { CAPS, hasCap, oldName, sendAs } from '../src/shared/caps.ts'
 import { rpc } from '../src/shared/conn.ts'
 import { API } from '../src/shared/types.ts'
 import { fresh } from './helpers.ts'
@@ -99,6 +99,10 @@ test('caps against an older daemon: hasCap by its API number; the CLI sends a na
   assert.equal(hasCap(null, 'layouts'), false)
   assert.equal(oldName('note.list'), 'noteList')
   assert.equal(oldName('constructor'), 'constructor')
+  assert.equal(sendAs('note.list', []), 'noteList') // the renderer's: no view yet, or an older daemon
+  assert.equal(sendAs('note.list', ['ns:note']), 'note.list')
+  assert.equal(sendAs('noteList', ['ns:note']), 'noteList')
+  assert.equal(sendAs('note.nope', []), 'note.nope') // not an alias: as it is
   const seen: string[] = []
   const srv = createServer(async (req, res) => {
     let b = ''
@@ -110,6 +114,7 @@ test('caps against an older daemon: hasCap by its API number; the CLI sends a na
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
   const home = mkdtempSync(join(tmpdir(), 'laki-old-'))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
   writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: (srv.address() as { port: number }).port, token: 'x' }))
   const was = process.env.LAKI_HOME
   process.env.LAKI_HOME = home

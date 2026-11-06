@@ -2,6 +2,7 @@
 // own call (daemon/ai.ts). Each is one or two rpc calls through the daemon's API; none deletes, archives or ships. Here,
 // not in cli/, so the daemon imports nothing of the CLI.
 import { rpc as conn } from './conn.ts'
+import { oldName } from './caps.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, SECTIONS } from './settingsMap.ts'
@@ -760,4 +761,4 @@ export async function extCall(rpc: Rpc, tool: string, input: unknown, from?: str
 const AI_BY = ['screen', 'browse', 'send'] // said as Laki AI's: its looks (the glow), its sends (not the user's prompt history)
 // chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once);
 // a write names it too: one that's on stays on only from its own page's chat (widget:<id>, the user's), else off
-export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_BY.includes(method) ? { ...params, by: 'ai' } : method === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => (m => rpc(method, AI_BY.includes(m) ? { ...params, by: 'ai' } : m === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (m === 'aiQuestion' || m === 'aiPermission') ? { ...params, chat } : params, ms))(oldName(method)) // by the old name: a namespaced one gets the same

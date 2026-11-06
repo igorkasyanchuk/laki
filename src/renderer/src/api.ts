@@ -3,7 +3,7 @@
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 import type { UpdateState } from '../../shared/update'
-import { oldName } from '../../shared/caps'
+import { sendAs } from '../../shared/caps'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
 export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
@@ -168,6 +168,7 @@ class Api {
       ws.onclose = () => {
         const opened = this.connected
         this.connected = false
+        this.caps = [] // the next daemon's come with its first view: old names till then
         for (const w of this.waiting.values()) w.rej(new Error('disconnected'))
         this.waiting.clear()
         this.emit({ ev: 'close' })
@@ -192,7 +193,7 @@ class Api {
   }
 
   call<T = any>(method: string, params: object = {}): Promise<T> {
-    if (!this.caps.includes(`ns:${method.split('.')[0]}`)) method = oldName(method) // an older daemon (or no view yet): note.list as noteList
+    method = sendAs(method, this.caps) // an older daemon (or no view yet): note.list as noteList
     const id = ++this.seq
     return new Promise((res, rej) => {
       if (this.ws?.readyState !== WebSocket.OPEN) return rej(new Error('not connected'))
@@ -203,7 +204,7 @@ class Api {
 
   // fire and forget (keystrokes, resizes)
   send(method: string, params: object) {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ method, params }))
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ method: sendAs(method, this.caps), params }))
   }
 
   on(f: (m: Msg) => void) {

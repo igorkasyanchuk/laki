@@ -43,7 +43,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki alert <text> [--title t] [--choice A]…  an important card on the user's screen (over every app, until closed); with choices it waits and prints the pick
   laki notice <text> [--title t] [--choice A]… [--to <ws>[/<tab>]|@name]   a card in Laki's window (any page, until closed); Open goes to --to; choices as alert
   laki reminders [rm|done <id>]              the calendar's reminders
-  laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox]
+  laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox]
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask

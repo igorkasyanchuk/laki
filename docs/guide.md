@@ -2455,7 +2455,7 @@ open "http://localhost:$(laki ls --json | jq '.workspaces[] | select(.id == "fix
 # a tab that runs the tests on every change
 laki tab fix-login --cmd "npm test -- --watch"
 
-# a second agent in a workspace that exists, on its own prompt (--name, --model, --effort, --perm, --fast)
+# a second agent in a workspace that exists, on its own prompt (--name, --model, --effort, --perm, --fast, --sandbox|--no-sandbox)
 laki tab fix-login --preset codex --name "codex review" --prompt "Review what claude changed here"
 
 # try another approach without losing this one: a new branch with the same chat
