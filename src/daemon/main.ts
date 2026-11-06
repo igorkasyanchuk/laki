@@ -28,6 +28,7 @@ import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
 import { policyTick } from './policy.ts'
+import * as ticks from './ticks.ts'
 import { ticketTick } from './tickets.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, agentModels, usageWho } from './accounts.ts'
@@ -926,9 +927,9 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
   every(3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
-  every(2000, core.sweepRunning)
+  ticks.register('sweepRunning', 2000, core.sweepRunning)
   every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
-  every(2000, core.shellTick)
+  ticks.register('shellTick', 2000, core.shellTick)
   every(60000, () => resourcesMod.sleepTick())
   every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
   every(300000, policyTick)
@@ -963,6 +964,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
 function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
+  ticks.stopAll()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
   remoteMod.remoteStop()
