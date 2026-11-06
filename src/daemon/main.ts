@@ -923,7 +923,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   remoteMod.setDaemonPort(port)
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
-  every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
+  ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
   every(3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
@@ -933,9 +933,9 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(60000, () => resourcesMod.sleepTick())
   every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
   every(300000, policyTick)
-  every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)
+  ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)
   every(Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps) // Collision radar
-  every(Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
+  ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
   every(30000, () => core.watchLimits())
   every(15000, () => (remoteMod.remoteTick(), remoteMod.shareTick(), remoteMod.tunnelTick()))
   every(30000, () => scheduleMod.scheduleTick())
@@ -943,8 +943,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => scheduleMod.reminderTick())
   every(1800000, () => memoryTick())
   every(30000, () => widgetTick())
-  every(Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
-  every(5000, () => flowTick())
+  ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
+  ticks.register('flowTick', 5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)

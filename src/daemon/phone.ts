@@ -10,6 +10,7 @@ import { dir } from './dir.ts'
 import { pushTo, replies } from './push.ts'
 import { flowHooks } from './schedule.ts'
 import { redact } from './share.ts'
+import { register } from './ticks.ts'
 
 // a push to your phone (push.ts) for a turn that waits or is done: once per state change of a tab (pushed: what went
 // since it last ran; view() clears it), never for a muted tab or workspace, nor a private one in Recording mode
@@ -63,21 +64,21 @@ const nonceFor = (w: Webhook) => (w.answer && answerOk(w) && w.detail !== 'title
 const stillAsks = (a: { tab?: string; flow?: string; key: string }) =>
   a.flow ? flowHooks.waitKey?.(a.flow) === a.key : !!a.tab && state.tabs.some(t => t.id === a.tab) && rtOf(a.tab).status === 'waiting'
 let tapCursor = '' // replies()'s: Telegram's next update, ntfy's last message (a unix time at first)
-let tapTimer: NodeJS.Timeout | undefined
+let tapStop: (() => void) | undefined // ticks.ts' phoneTick, while any ask waits for a tap
 let tapping = false
 let tapFailed = '' // the last failure, logged once until a poll works
 let tapFor = '' // the webhook tapCursor is for: another one (Settings changed meanwhile) starts over
 const tapStart = (w: Webhook) => ((tapFor = `${w.format}|${w.url}`), (tapCursor = w.format === 'telegram' ? '' : String(Math.floor(Date.now() / 1000) - 5)))
 function listen(w: Webhook) {
-  if (tapTimer) return
+  if (tapStop) return
   tapStart(w)
-  tapTimer = setInterval(() => void phoneTick(), 5000)
+  tapStop = register('phoneTick', 5000, () => void phoneTick())
 }
 export async function phoneTick() {
   if (tapping) return
   const w = state.settings?.webhook
   for (const [k, a] of awaiting) if (a.until < Date.now() || !stillAsks(a)) awaiting.delete(k)
-  if (!awaiting.size || !w?.answer || !w.url) return void (clearInterval(tapTimer), (tapTimer = undefined), awaiting.clear())
+  if (!awaiting.size || !w?.answer || !w.url) return void (tapStop?.(), (tapStop = undefined), awaiting.clear())
   if (tapFor !== `${w.format}|${w.url}`) tapStart(w)
   tapping = true
   try {
