@@ -74,10 +74,14 @@ const hook = (ev, payload) => {
   const h = settings.hooks[ev][0].hooks[0]
   // "async": true, as the real one: started now, in the background, not waited for (FAKE_HOOK_DELAY: ms before it gets
   // its input, one that comes late)
+  // FAKE_ASYNC_LAG: ms before it starts at all (its node starts after the next sync hook's, as on a busy Mac)
   if (h.async) {
-    const c = require('child_process').spawn('/bin/sh', ['-c', h.command], { stdio: ['pipe', 'ignore', 'inherit'] })
-    c.stdin.on('error', () => {})
-    return void setTimeout(() => c.stdin.end(JSON.stringify(payload)), Number(process.env.FAKE_HOOK_DELAY) || 0)
+    const go = () => {
+      const c = require('child_process').spawn('/bin/sh', ['-c', h.command], { stdio: ['pipe', 'ignore', 'inherit'] })
+      c.stdin.on('error', () => {})
+      setTimeout(() => c.stdin.end(JSON.stringify(payload)), Number(process.env.FAKE_HOOK_DELAY) || 0)
+    }
+    return void (Number(process.env.FAKE_ASYNC_LAG) ? setTimeout(go, Number(process.env.FAKE_ASYNC_LAG)) : go())
   }
   // as long as its settings say, as the real one waits (a hook 3-5 s on a busy machine: killed, its state lost)
   try { execSync(h.command, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: (h.timeout ?? 60) * 1000 }) } catch {}

@@ -33,7 +33,7 @@ test("codex's update_plan from its transcript; a new ask marks it stale", () => 
 })
 
 test("an agent's to-do list on its tab, gone once all done; a plan to approve while it waits; off: none", async t => {
-  const rig = await fresh(t, { env: { FAKE_TURN_MS: '600' } })
+  const rig = await fresh(t, { env: { FAKE_TURN_MS: '600', FAKE_ASYNC_LAG: '200' } }) // ExitPlanMode's async PreToolUse starts after its Notification: still waiting
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'todo Read;Fix;Test' })
   const tab = async () => (await rig.rpc('state')).tabs.find((x: { workspace: string; kind: string }) => x.workspace === ws.id && x.kind === 'agent')

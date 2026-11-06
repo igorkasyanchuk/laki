@@ -2895,6 +2895,7 @@ function preTool(tab: Tab, pl: any) {
 // a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
 // newest hook taken (hookAt: a PreToolUse or PostToolUse run in the background, come after the turn's Stop or the next
 // ask) changes no state, only what it says of the plan and links
+const ASYNC_SKEW = 500 // ponytail: a busy Mac's node start; an answer within it (rare) waits for the tool's next hook
 function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) return
@@ -2902,7 +2903,11 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const pl = p.payload ?? {}
   const was = r.status
   const at = typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : undefined
-  const late = at !== undefined && at < (r.hookAt ?? 0) && (r.hookAt ?? 0) - at < 30_000 // ponytail: 30 s, so a clock set back doesn't hold its hooks for longer
+  // a tool's async hook started with the ask's sync one (ExitPlanMode's PreToolUse, then its PermissionRequest or
+  // Notification): its node can start a little after the ask's, so one within ASYNC_SKEW of the ask now waiting is from
+  // before it too, never its answer (a tool run after you answer comes later)
+  const skew = r.status === 'waiting' && p.state === 'running' && /^(Pre|Post)ToolUse$/.test(String(pl.hook_event_name)) ? ASYNC_SKEW : 0
+  const late = at !== undefined && at < (r.hookAt ?? 0) + skew && (r.hookAt ?? 0) - at < 30_000 // ponytail: 30 s, so a clock set back doesn't hold its hooks for longer
   if (at !== undefined && !late) r.hookAt = at
   if (p.state !== 'start') tab.usedAt = Date.now() // its agent worked or asked: restoreAll brings it back at once (saved with the next save)
   if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))

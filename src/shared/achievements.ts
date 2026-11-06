@@ -5,7 +5,7 @@
 // (state.json; Reset the interface keeps it)
 import type { IconName } from './icons'
 import type { View } from './types'
-import { oldName } from './caps'
+import { oldName } from './caps.ts'
 
 export const ACH_GROUPS = ['Getting started', 'Agents', 'Git & PRs', 'Workspaces', 'Power user', 'Extensions & AI', 'Experimental', 'Just for fun'] as const
 export type AchGroup = (typeof ACH_GROUPS)[number]
