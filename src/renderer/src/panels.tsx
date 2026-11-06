@@ -980,7 +980,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
     </button>
   )
   const box = canModel && ag && SANDBOX[ag] && (
-    <button type="button" className={`ib nw-fast ${boxPick ? 'on' : ''}`} aria-pressed={boxPick} aria-label="Sandbox" disabled={boxOff} data-tip={boxOff ? SANDBOX_NO : boxPick ? "Sandbox is on: its commands write only in the worktree and the repo's git folder" : "Sandbox: its commands write only in the worktree and the repo's git folder (Settings › Agents & profiles)"} onMouseDown={e => e.preventDefault()} onClick={() => set({ sandbox: !boxPick })}>
+    <button type="button" className={`ib nw-fast ${boxPick ? 'on' : ''}`} aria-pressed={boxPick} aria-label="Sandbox" disabled={boxOff} data-tip={boxOff ? SANDBOX_NO : boxPick ? "Sandbox is on: its commands write only in the worktree and what git commit writes" : "Sandbox: its commands write only in the worktree and what git commit writes (Settings › Agents & profiles)"} onMouseDown={e => e.preventDefault()} onClick={() => set({ sandbox: !boxPick })}>
       <Icon name="lock" />
     </button>
   )

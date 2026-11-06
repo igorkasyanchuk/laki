@@ -279,7 +279,8 @@ agent's `sandbox: false` by main.ts' `agentNo`): claude's `--settings` gets `-sa
 first (it takes every word up to a flag), for each folder `git commit` writes in (`gitWrites`, from `.git` and
 `commondir`, realpath'd: a worktree's own folder, the index and HEAD, and the shared `objects`, `refs` and `logs`; never
 the shared `hooks` or `config`, which git runs outside the sandbox, Laki's own git included; the repo itself, a local
-workspace: its whole `.git`); codex `codexBox`: `-s workspace-write` unless its mode or flags pick a sandbox (read-only
+workspace: its `objects`, `refs` and `logs` only, so its index, HEAD, hooks and config stay read-only and `git commit`
+there runs outside the sandbox); codex `codexBox`: `-s workspace-write` unless its mode or flags pick a sandbox (read-only
 stays; an approval flag like `-a never` picks none), `sandbox_workspace_write.network_access=true` and `writable_roots`
 with those folders (codex keeps a worktree's own folder read-only otherwise: checked with `codex sandbox`, 0.162). Hooks
 and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git

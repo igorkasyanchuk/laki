@@ -317,9 +317,9 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   // a profile's approval flag picks no sandbox: workspace-write still goes in
   await rig.rpc('presetSave', { name: 'cx-never', add: true, set: { agent: 'codex', args: '-a never', sandbox: true } })
   assert.ok((await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'cx-never' }))).args.join(' ').includes('-s workspace-write'))
-  // a local workspace (the repo itself): its own .git
+  // a local workspace (the repo itself): its objects, refs and logs only; never .git itself (its hooks, config, index)
   const local = await argsOf(await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true, sandbox: true }))
-  assert.deepEqual(dirs(local.args), [git])
+  assert.deepEqual(dirs(local.args), ['objects', 'refs', 'logs'].map(d => join(git, d)))
   // never with bypass permissions: the tab's, the profile's mode or flags; gemini has none
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b1', preset: 'claude', sandbox: true, perm: 'bypassPermissions' }), /turns the agent's sandbox off/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'b2', preset: 'gemini', sandbox: true }), /gemini has no sandbox/)

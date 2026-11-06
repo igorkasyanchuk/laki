@@ -258,8 +258,8 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
 const SECRETS: [RegExp, string][] = [
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '••••'],
   [/\b(sk-[A-Za-z0-9_-]{16,}|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AIza[A-Za-z0-9_-]{30,}|npm_[A-Za-z0-9]{30,}|hf_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16})\b/g, '••••'],
-  [/\b([a-z][a-z0-9+.-]*:\/\/[^\s:@/'"<>]+:)[^\s@/'"<>]+@/gi, '$1••••@'],
-  [/\b([A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY)[A-Z0-9_]*\s*[=:]\s*)(?:(['"])[^'"\n]{2,}\2|(?![\d.]+(?![^\s'"&]))[^\s'"&]{4,})/g, '$1••••'], // an env var's way: in capitals; a number isn't one (MAX_TOKENS=4096)
+  [/\b([a-z][a-z0-9+.-]{0,31}:\/\/[^\s:@/'"<>]{1,256}:)[^\s@/'"<>]{1,256}@/gi, '$1••••@'], // bounded: an unbounded scheme or name backtracks over a long word (100 KB: seconds)
+  [/\b([A-Z0-9_]{0,64}(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY)[A-Z0-9_]{0,64}\s*[=:]\s*)(?:(['"])[^'"\n]{2,}\2|(?![\d.]+(?![^\s'"&]))[^\s'"&]{4,})/g, '$1••••'], // an env var's way: in capitals; a number isn't one (MAX_TOKENS=4096)
   [/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, '$1••••'],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '••••'],
   [/([?&](?:token|access_token|key|api_key|apikey|secret|password|auth|sig|signature)=)[^&\s"'#<>]+/gi, '$1••••'],

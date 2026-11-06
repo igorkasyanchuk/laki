@@ -2073,7 +2073,7 @@ and what it costs.
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
   don't use out of them (its tabs still start and resume). *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config), not
-  elsewhere on the Mac. Claude
+  elsewhere on the Mac; in a workspace on the repo itself (not a worktree), `git commit` runs outside it. Claude
   Code: its sandbox setting, Laki's `laki` command run outside it, new websites asked about. Codex: `-s
   workspace-write` with its network on (laki, npm, git push). It can't go with *Bypass permissions* (that turns the
   sandbox off): Settings and the new-workspace page refuse the pair and say why. `laki preset set <name> --sandbox`.

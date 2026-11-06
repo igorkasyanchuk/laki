@@ -82,6 +82,12 @@ test('share: token-shaped strings masked; a picture shown as its link (L9)', () 
   assert.match(masked, /postgres:\/\/me:••••@db\.example\.com/)
   assert.equal(redact('MAX_TOKENS=4096 TOKEN_TTL: 3600'), 'MAX_TOKENS=4096 TOKEN_TTL: 3600') // numbers aren't secrets
   assert.equal(redact('the token: see the docs; a password field; https://example.com/a:b@c'), 'the token: see the docs; a password field; https://example.com/a:b@c') // words about secrets, a path with a colon
+  // long text stays quick (an unbounded scheme or NAME backtracked: 100 KB took seconds, inside the daemon)
+  for (const long of ['sk-'.repeat(34_000), 'TOKEN'.repeat(20_000), 'eyJaaaaaaaaa.'.repeat(8_000), 'x://a'.repeat(20_000)]) {
+    const at = performance.now()
+    redact(long)
+    assert.ok(performance.now() - at < 200, `${long.slice(0, 6)}…: ${Math.round(performance.now() - at)} ms`)
+  }
   const body = shareBody('Claude', [{ who: 'agent', text: 'Look: ![the chart](https://evil.example/pixel.png)' }])
   assert.doesNotMatch(body, /<img/)
   assert.match(body, /<a href="https:\/\/evil\.example\/pixel\.png"[^>]*>the chart<\/a>/)

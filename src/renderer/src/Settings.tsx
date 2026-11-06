@@ -2485,7 +2485,7 @@ export function SettingsPage(p: {
                         {SANDBOX[pr.agent as Agent] && (
                           (off => (
                             <Switch className="switch-row" on={!!pr.sandbox && !off} disabled={off && !pr.sandbox} onChange={on => setPreset(i, { sandbox: on || undefined })}>
-                              <Says title="Sandbox" hint={off ? "Not with bypass permissions (its mode or its flags): that turns the agent's sandbox off" : pr.agent === 'codex' ? 'Its commands write only in the worktree and the repo’s git folder; the network stays on (laki, npm, git push)' : 'Its commands write only in the worktree and the repo’s git folder; laki runs outside it, new websites are asked about'} />
+                              <Says title="Sandbox" hint={off ? "Not with bypass permissions (its mode or its flags): that turns the agent's sandbox off" : pr.agent === 'codex' ? 'Its commands write only in the worktree and what git commit writes (never git’s hooks or config); the network stays on (laki, npm, git push)' : 'Its commands write only in the worktree and what git commit writes (never git’s hooks or config); laki runs outside it, new websites are asked about'} />
                             </Switch>
                           ))(sandboxOff(pr.agent, pr.perm, pr.args))
                         )}

@@ -1430,7 +1430,8 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // what git commit writes in a sandboxed agent's checkout, as the sandbox sees the paths (/tmp is /private/tmp), read
 // from the files: a worktree's .git file names its own folder (the index, HEAD), whose commondir names the shared one
 // (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
-// ponytail: the repo itself (a local workspace) has them in its own folder, all of it given; none: not a repo
+// The repo itself (a local workspace): its objects, refs and logs only, as a worktree's shared folder; its index, HEAD,
+// hooks and config sit in .git itself, so they stay read-only and git commit there runs outside the sandbox. None: not a repo
 export function gitWrites(path?: string): string[] {
   if (!path) return []
   const dotGit = join(path, '.git')
@@ -1439,7 +1440,7 @@ export function gitWrites(path?: string): string[] {
     if (!st?.isDirectory() && !st?.isFile()) return []
     const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
     const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
-    return common === own ? [own] : [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), own]
+    return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...(common === own ? [] : [own])]
   } catch {
     return []
   }

@@ -44,7 +44,7 @@ version it builds, with the date. -->
 
 - *Sandbox* for Claude Code and Codex profiles (Settings › Agents & profiles, 🔒 on the new-workspace page, `laki preset
   set <name> --sandbox`): the agent runs in its own sandbox, its commands writing only in the worktree and what `git
-  commit` writes in the repo's git folder, so one left alone can't touch the rest of your Mac. Codex keeps its network; Claude Code runs `laki`
+  commit` writes in the repo's git folder (never its hooks or config), so one left alone can't touch the rest of your Mac. Codex keeps its network; Claude Code runs `laki`
   outside it. Not with *Bypass permissions*, which turns the sandbox off.
 
 - Claude Code waits less on Laki: its hooks before and after each tool call run in the background, so a tool call no

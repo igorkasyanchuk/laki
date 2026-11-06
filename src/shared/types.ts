@@ -49,7 +49,7 @@ export const neverAsks = (agent?: string, perm?: string, args?: string) => {
 }
 // fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
 export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
-// the agent's own sandbox (a profile's Sandbox switch): its commands write only in the worktree and the repo's git folder.
+// the agent's own sandbox (a profile's Sandbox switch): its commands write only in the worktree and what git commit writes (core.ts gitWrites).
 // claude: its settings file's sandbox (Laki's own laki CLI runs outside it); codex: -s workspace-write, its network on
 export const SANDBOX: Partial<Record<Agent, true>> = { claude: true, codex: true }
 // what turns the sandbox off: bypass permissions (claude's --dangerously-skip-permissions, codex's
