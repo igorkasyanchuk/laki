@@ -23,6 +23,7 @@ import { dir } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
+import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
@@ -2155,12 +2156,19 @@ export async function prHead(proj: Project, ref: string): Promise<PRHead> {
 // title, body and link ahead of the prompt
 async function fromIssue(proj: Project, o: NewWs): Promise<NewWs> {
   if (!o.issue?.trim() || o.issued) return o
-  const { stdout } = await exec(proj, 'gh', ['issue', 'view', '--json', 'number,title,body,url', '--', o.issue.trim()], { timeout: 20000 }).catch(e => {
-    throw new Error(`gh issue view ${o.issue}: ${String(e.stderr || e.message).trim().split('\n')[0]}`)
-  })
-  const i = JSON.parse(stdout) as { number: number; title: string; body?: string; url: string }
+  const lab = (await gitlab.forgeOf(proj)) === 'gitlab' // a GitLab project's, through glab
+  const i = lab
+    ? await gitlab.glabIssue(proj, o.issue.trim().replace(/^#/, ''))
+    : (JSON.parse(
+        (
+          await exec(proj, 'gh', ['issue', 'view', '--json', 'number,title,body,url', '--', o.issue.trim()], { timeout: 20000 }).catch(e => {
+            throw new Error(`gh issue view ${o.issue}: ${String(e.stderr || e.message).trim().split('\n')[0]}`)
+          })
+        ).stdout,
+      ) as { number: number; title: string; body?: string; url: string })
   const body = (i.body ?? '').trim()
-  const prompt = [`Work on GitHub issue #${i.number}: ${i.title}`, i.url, body.length > 8000 ? `${body.slice(0, 8000)}\n… (cut: the rest is on GitHub)` : body, o.prompt?.trim()].filter(Boolean).join('\n\n')
+  const site = lab ? 'GitLab' : 'GitHub'
+  const prompt = [`Work on ${site} issue #${i.number}: ${i.title}`, i.url, body.length > 8000 ? `${body.slice(0, 8000)}\n… (cut: the rest is on ${site})` : body, o.prompt?.trim()].filter(Boolean).join('\n\n')
   return { ...o, prompt, name: o.name || `issue-${i.number}-${slug(i.title).slice(0, 24)}`.replace(/-+$/, ''), issued: { number: i.number, url: i.url, title: i.title } }
 }
 
@@ -3901,15 +3909,16 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   if (h) return h
   // gh asks which repo a PR goes to when origin's network has two (a fork and its parent) and none was picked (gh repo
   // set-default, git's remote.<name>.gh-resolved): origin's, as the PR scans take it; one you picked stays yours
-  const picked = await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')
-  const repo = picked.trim() ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
+  const lab = (await gitlab.forgeOf(ws)) === 'gitlab' // GitLab's: glab mr create (gitlab.ts SHIP_MR)
+  const picked = lab ? '' : await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')
+  const repo = picked.trim() || lab ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
   const R = repo ? ' -R "$LAKI_REPO"' : ''
   const script = [
     'set -e',
     'git add -A',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
-    `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
+    lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
   const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)

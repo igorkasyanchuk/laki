@@ -5,7 +5,7 @@ import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
-import { clock, rowFact, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
+import { clock, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
@@ -335,12 +335,12 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     return (
       <span className="ws-yes">
         {(one || two) && (
-          <span data-tip={`PR #${pr.number} approved${pr.approved?.length ? ` by ${pr.approved.join(', ')}` : ''}${two ? ' (you too)' : ''}`}>
+          <span data-tip={`${prName(pr)} approved${pr.approved?.length ? ` by ${pr.approved.join(', ')}` : ''}${two ? ' (you too)' : ''}`}>
             <Icon name={two ? 'checks' : 'check'} size={11} />
           </span>
         )}
         {eyes && (
-          <span className="ws-eyes" data-tip={`You commented on PR #${pr.number}`}>
+          <span className="ws-eyes" data-tip={`You commented on ${prName(pr)}`}>
             👀
           </span>
         )}

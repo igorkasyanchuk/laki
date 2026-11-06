@@ -597,9 +597,13 @@ export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Sta
   if (w.pending) return { kind: 'later', text: pendingWords(w.pending), tone: w.pending.failed ? 'error' : 'muted' }
   return { kind: 'branch', text: w.branch || 'folder', tone: 'muted' }
 }
+// a PR's number as its forge writes it (a GitLab MR's !n), and its name: PR #n, MR !n
+export const prNo = (pr: Pick<PR, 'number' | 'forge'>) => (pr.forge === 'gitlab' ? `!${pr.number}` : `#${pr.number}`)
+export const prName = (pr: Pick<PR, 'number' | 'forge'>) => `${pr.forge === 'gitlab' ? 'MR' : 'PR'} ${prNo(pr)}`
+export const forgeName = (pr?: Pick<PR, 'forge'>) => (pr?.forge === 'gitlab' ? 'GitLab' : 'GitHub')
 // the Words style's one PR pill: #n and how it stands
 export function prPill(pr: PR): { text: string; tone: RowTone | 'merged' } {
-  const n = `#${pr.number}`
+  const n = prNo(pr)
   if (pr.state === 'MERGED') return { text: `${n} merged`, tone: 'merged' }
   if (pr.state !== 'OPEN') return { text: `${n} closed`, tone: 'muted' }
   if (pr.draft) return { text: `${n} draft`, tone: 'muted' }

@@ -87,7 +87,9 @@ time and AI money per run (`budget: 60 min, $5`).
   too, 👀 you commented), sent to the agent if you like; a failing check's log a click away; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve, close or turn back into a draft from the app, or merge when green, each allowed per project; archived once
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
-  number, and a right click on the PR in the status bar copies its link or `#number`.
+  number, and a right click on the PR in the status bar copies its link or `#number`. GitLab too, through `glab`: a
+  merge request's state, its pipeline as checks, Ship, merge, approve, close, draft and issues (not yet review threads
+  or the PR switches).
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (the branch's or only what isn't committed; against another base branch, picked there; one column or two side by side; files as a list or a tree by folder; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), the branch's commits (pushed or not, each one's diff), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can

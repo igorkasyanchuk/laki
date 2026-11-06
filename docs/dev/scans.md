@@ -146,7 +146,15 @@
   minutes; until its reset, logged with Laki's own gh calls); a turn's end, a branch move and `prRefresh` ask at once.
   Every gh of Laki's is counted by kind (core.ts `ghCount`: `exec`'s, codespace.ts', `ghCard`'s; `ghSaid`), its log
   says the hour's each hour (`ghHour`). `LAKI_PR_BG=1` makes the tests' fast timer scan as the timer does (bg).
-  `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. No PR on the
+  `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now.
+  GitLab (`gitlab.ts`, build prompt 1): `forgeOf` per project (its origin's host: gitlab.com, or one `glab auth status
+  --hostname` accepts, asked once a daemon; anything else, a path too, GitHub's), then `glabPR`: `glab mr view <branch
+  or !n> --output json` and its head pipeline's jobs (`glab api projects/:id/pipelines/<id>/jobs`, `jobsOf`) in the
+  same `PR` shape with `forge: 'gitlab'` (the renderer's `prNo`/`prName`: `!n`, MR). `noMR` is gh's *no pull requests
+  found*. Ship's last line `SHIP_MR`, `fromIssue` `glabIssue`, `issueList` `glabIssues`, `prAct`/`merge`/`prDraft`
+  `glabAct`/`glabDraft`; `prFile` fetches `merge-requests/<n>/head`. GitHub's only (`githubOnly` says so, or nothing):
+  line comments, reviews, `prSay`, `prDiff`, `prThreads`, `prTalk`, Viewed (`prFiles`), `prFromSaid`, `autoPR`, labels.
+  ponytail: `mine` isn't asked (Approve shows on your own MR; GitLab refuses it). `test/gitlab.test.ts`, `fakes/glab`. No PR on the
   branch (and no `prUrl`): `prFromSaid`, the one PR link its agent tabs' last answers name (one, of a repo of `git
   remote -v`; each tried once per workspace, `saidTried`), attached as `prAttach` does, marked `prSaid` (one in `related` never: you
   moved it off); a scheduled run's local workspace's at its

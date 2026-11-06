@@ -2,7 +2,7 @@
 import type { AppCtx } from './appCtx'
 import { type IconName, type MenuItem, Icon, ON, ProjectMark } from './ui'
 import { type ReactNode, useState, useMemo, useRef, useEffect } from 'react'
-import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, rowFact } from './text'
+import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
 import { Glyph, rollup } from './Glyph'
 import { Modal } from './panels'
 import { type Action, wsName } from './appCtx'
@@ -129,9 +129,9 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     const asks = wt.find(t => t.status === 'waiting')
     if (asks) f({ label: `Answer ${asks.name}: ${asks.ask?.question || asks.ask?.options.map(o => o.label).join(' / ') || 'it waits for you'}`, icon: 'bell', run: () => selectTab(asks) })
     const pr = ws.pr?.state === 'OPEN' ? ws.pr : undefined
-    if (pr?.checks === 'fail') f({ label: `Fix CI: send #${pr.number}'s failing checks to the agent`, icon: 'ciFail', run: () => void prFix(ws, 'ci') })
+    if (pr?.checks === 'fail') f({ label: `Fix CI: send ${prNo(pr)}'s failing checks to the agent`, icon: 'ciFail', run: () => void prFix(ws, 'ci') })
     if (pr?.conflict) f({ label: `Resolve conflicts with ${pr.base ?? 'the base'}`, icon: 'conflict', run: () => void prFix(ws, 'conflict') })
-    if (pr && !pr.draft && pr.checks === 'pass' && !pr.conflict && pr.ready !== false && allows(ws, 'merge')) f({ label: `Merge #${pr.number}…`, icon: 'pr', run: () => prAct(ws, 'merge') })
+    if (pr && !pr.draft && pr.checks === 'pass' && !pr.conflict && pr.ready !== false && allows(ws, 'merge')) f({ label: `Merge ${prNo(pr)}…`, icon: 'pr', run: () => prAct(ws, 'merge') })
     if (ws.kind === 'worktree' && !ws.pr && (ws.stat ? ws.stat.files > 0 || ws.stat.dirty > 0 : wt.some(t => t.kind === 'agent' && t.last))) f({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
     if (git && wt.some(t => t.kind === 'agent' && t.done && t.status === 'idle')) f({ label: 'Review changes: the agent is done', icon: 'changes', run: () => showPanel('changes') })
   }

@@ -9,7 +9,7 @@ import { Markdown } from './MarkdownView'
 import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, fileTree, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
+import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
@@ -238,7 +238,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
-function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; empty?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
+function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
   const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree, turn, empty)
   useEffect(() => {
     const f = (e: Event) => ((turnNext.on = false), setScope((e as CustomEvent<Scope>).detail)) // the Reader's card's Review: This turn
@@ -267,7 +267,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
           ...(b.local.length + b.remote.length > 8 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
           { head: `Compare with${b.gone ? ` (${b.base} isn't here any more)` : ''}` },
           ...[...b.local, ...b.remote].map(x => ({ label: x, icon: 'gitBranch', mono: true, hint: x === b.base ? ON : undefined, run: () => pickBase(x) }) as MenuItem),
-          { label: 'Another branch by name…', icon: 'pencil', foot: true, sub: pr ? `PR #${pr.number} keeps its own base on GitHub` : undefined, run: () => void askText('Compare with which branch?', { placeholder: 'release/2.0', ok: 'Change base' }).then(x => x?.trim() && pickBase(x.trim())) },
+          { label: 'Another branch by name…', icon: 'pencil', foot: true, sub: pr ? `${prName(pr)} keeps its own base on ${forgeName(pr)}` : undefined, run: () => void askText('Compare with which branch?', { placeholder: 'release/2.0', ok: 'Change base' }).then(x => x?.trim() && pickBase(x.trim())) },
         ]),
       e2 => setBaseErr((e2 as Error).message),
     )
@@ -404,7 +404,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
           </div>
         )}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
-        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `PR #${pr!.number} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
+        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `${prName(pr!)} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` ${prName(pr)} above shows the PR's.` : ''}</div>}
         {tree
           ? fileTree(files, dirsShut).map(r =>
               'dir' in r ? (

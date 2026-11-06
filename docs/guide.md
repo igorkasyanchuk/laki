@@ -30,8 +30,14 @@ changing it: [AGENTS.md](../AGENTS.md).
   message into an agent, or asks Laki AI, at a time you pick. *Mark as unread* puts a tab's ● back.
 - **Race**: one prompt to several agents (claude, codex…), each in its own worktree; *Compare* lays them side by
   side (status, diff size, what each said last, the files it changed) and *Keep this one* archives the rest.
+- **GitLab**: a project whose `origin` is on gitlab.com, or on a GitLab of your own that `glab` is signed in to
+  (`glab auth login --hostname <host>`), gets its merge request the way a GitHub one gets its PR, through
+  [glab](https://gitlab.com/gitlab-org/cli) (`brew install glab`): its state and its pipeline's jobs as checks in the
+  status bar and the sidebar (`!12`), Ship (`glab mr create --fill`), merge (squash, rebase or merge; the source branch
+  removed unless you keep it), approve, close, draft or ready, and issues (`--issue 12`, the `#` list). Not yet: review
+  threads, line comments, the full review's GitLab side and the PR switches (fix CI, review, merge when green).
 - **Issues and PRs**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as
-  the prompt); `--pr <url>` on a PR's branch, a fork's too. A prompt
+  the prompt; a GitLab project's by its number, through `glab`); `--pr <url>` on a PR's branch, a fork's too. A prompt
   that names a PR (`review https://github.com/o/r/pull/12`) names the workspace after it (`pr-12-<title>`) and links
   it to that PR: its status, author and checks from the start, without checking it out (so no fix/review switches:
   the agent couldn't push to it; `--pr` gives those). The link stays when the agent checks the PR out to review it.
@@ -2327,7 +2333,7 @@ laki project add devbox:~/code/app                      # a folder over SSH (bel
 laki new app --prompt "fix the login redirect"          # worktree + claude with that prompt
 laki new app --preset codex --base develop --name dark
 laki new app --model opus --effort high --prompt "…"   # the agent's model and effort
-laki new app --issue https://github.com/o/app/issues/12 # a GitHub issue as the prompt (gh)
+laki new app --issue https://github.com/o/app/issues/12 # a GitHub issue as the prompt (gh; a GitLab project's: --issue 12, glab)
 laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's branch (gh pr checkout, forks too)
 laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app

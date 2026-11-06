@@ -50,7 +50,7 @@ export function useScope(store: string, pr: boolean, linked: boolean, worktree: 
 export const atHead = <T extends PanelApi>(api: T, on: boolean): T =>
   on ? { ...api, changes: () => api.changes(true), read: (p, base) => api.read(p, base, true), undoHunk: (p, h, l, then) => api.undoHunk(p, h, l, then, true), undoFile: (p, then) => api.undoFile(p, then, true) } : api
 // the switch: Branch (its words: branch), Uncommitted (a worktree's), PR #n
-export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn }: { scope: Scope; onScope: (s: Scope) => void; pr?: { number: number }; worktree: boolean; branch?: string; turn?: boolean }) {
+export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn }: { scope: Scope; onScope: (s: Scope) => void; pr?: { number: number; forge?: 'gitlab' }; worktree: boolean; branch?: string; turn?: boolean }) {
   if (!pr && !worktree && !turn) return null
   return (
     <span className="seg">
@@ -62,7 +62,7 @@ export function ScopeSeg({ scope, onScope, pr, worktree, branch = 'Branch', turn
           Uncommitted
         </button>
       )}
-      {pr && (
+      {pr && pr.forge !== 'gitlab' && (
         <button type="button" className={scope === 'pr' ? 'on' : ''} data-tip={`All of PR #${pr.number}, as GitHub has it (gh pr diff)`} onClick={() => onScope('pr')}>
           PR #{pr.number}
         </button>

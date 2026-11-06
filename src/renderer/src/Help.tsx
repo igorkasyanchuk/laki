@@ -106,7 +106,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
     [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
     [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --model, --effort, --base, --name, --local)'],
     [`${cli} new . --preset codex --prompt "…"`, "in a Laki tab: a workspace in that tab's project (what an agent's /laki:new runs)"],
-    [`${cli} new <project> --issue <url>`, 'a workspace on a GitHub issue: its title and text are the prompt'],
+    [`${cli} new <project> --issue <url>`, 'a workspace on a GitHub issue (a GitLab one by its number, glab): its title and text are the prompt'],
     [`${cli} new <project> --pr <url>`, "a workspace on a PR's branch (a fork's too), its base the PR's"],
     [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
     [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],

@@ -836,6 +836,7 @@ export type PR = {
   body?: string
   updated?: string
   labels?: PRLabel[] // its labels (no description: the Labels menu has the repo's)
+  forge?: 'gitlab' // a GitLab merge request (gitlab.ts, through glab): MR and !n in words; unset: GitHub's
 }
 
 // runAt: when its turn began (the daemon's clock), while it runs or waits

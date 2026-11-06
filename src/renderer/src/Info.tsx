@@ -4,7 +4,7 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { jobOf, MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
 import { Folded } from './MarkdownView'
-import { shortPath } from './text'
+import { prName, shortPath } from './text'
 import { type Tunnel } from './Tunnel'
 import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
@@ -225,7 +225,7 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
   if (!pr) return null
   return (
     <span className="pr-status" onContextMenu={onMenu}>
-      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} aria-label={`PR #${pr.number}: ${pr.title ?? ''}`} onPointerEnter={e => e.pointerType === 'mouse' && rest(e.currentTarget)} onPointerLeave={() => rest()} onPointerDown={() => (clearTimeout(timer.current), setCard(null))} onClick={() => onOpen(pr.url)}>
+      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} aria-label={`${prName(pr)}: ${pr.title ?? ''}`} onPointerEnter={e => e.pointerType === 'mouse' && rest(e.currentTarget)} onPointerLeave={() => rest()} onPointerDown={() => (clearTimeout(timer.current), setCard(null))} onClick={() => onOpen(pr.url)}>
         #{pr.number}
       </button>
       {card && (

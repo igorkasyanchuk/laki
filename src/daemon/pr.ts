@@ -9,6 +9,7 @@ import { inside, MAX_TEXT, textOf } from './files.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
 import { isLive } from './resources.ts'
+import { forgeOf, glabAct, glabDraft, glabIssues, glabPR, glabSays, githubOnly, isLab, noMR } from './gitlab.ts'
 import { gatesKey, widgetEvent } from './widgets.ts'
 
 // ---------- branches: each workspace's follows its folder, the PRs it names, a scan soon after a turn
@@ -295,7 +296,12 @@ export function issueList(o: { project: string }) {
   if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
   const had = issues.get(p.id)
   if (had && Date.now() - had.at < 60_000) return had.list
-  const list = exec(p, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'name={repo}', '-f', `query=${ISSUES_Q}`], { timeout: 30000 })
+  const list = forgeOf(p).then(f => (f === 'gitlab' ? glabIssues(p) : ghIssues(p))).catch(e => (issues.delete(p.id), Promise.reject(e))) // a failure: asked again next time
+  issues.set(p.id, { at: Date.now(), list })
+  return list
+}
+const ghIssues = (p: At) =>
+  exec(p, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'name={repo}', '-f', `query=${ISSUES_Q}`], { timeout: 30000 })
     .then(r =>
       ((JSON.parse(r.stdout || '{}').data?.repository?.issues?.nodes ?? []) as IssueNode[]).map(
         (x): IssueItem => ({
@@ -307,17 +313,15 @@ export function issueList(o: { project: string }) {
         }),
       ),
     )
-    .catch(e => (issues.delete(p.id), Promise.reject(new Error(ghSays(e, 'the repo'))))) // gh's failure or an answer that isn't JSON: asked again next time
-  issues.set(p.id, { at: Date.now(), list })
-  return list
-}
+    .catch(e => Promise.reject(new Error(ghSays(e, 'the repo')))) // gh's failure or an answer that isn't JSON
 
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
   // a worktree's primary PR guessed (prSaid: its prompt or its agent named it; not one you attached or asked for) gives
   // way to its branch's own, once the branch is pushed (a session that opens its own PR: that's the one to follow), and
   // goes to related. Not a local one's: the folder's branch isn't its own
-  const own = ws.kind === 'worktree' && ws.prSaid && ws.prUrl && (await onRemote(ws)) ? await exec(ws, 'gh', ['pr', 'view', ws.branch, '--json', 'url'], { timeout: 20000 }).then(r => String(JSON.parse(r.stdout).url || '')).catch(() => '') : ''
+  const lab = (await forgeOf(ws)) === 'gitlab' // a GitLab project's MR, through glab (gitlab.ts)
+  const own = !lab && ws.kind === 'worktree' && ws.prSaid && ws.prUrl && (await onRemote(ws)) ? await exec(ws, 'gh', ['pr', 'view', ws.branch, '--json', 'url'], { timeout: 20000 }).then(r => String(JSON.parse(r.stdout).url || '')).catch(() => '') : ''
   if (own) {
     const was = ws.prUrl!
     wsLog(ws, `PR: ${own} on ${ws.branch} now${sameRef(own, was) ? '' : `, ${was} only related`}`)
@@ -328,45 +332,48 @@ async function scanPR(ws: Workspace) {
   }
   let pr: PR
   try {
-    const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
-    const j = JSON.parse(stdout)
-    const list: Check[] = newest(j.statusCheckRollup ?? []).map(checkOf)
-    const me = await ghLogin(ws)
-    const who = reviewersOf(j)
-    pr = {
-      number: j.number,
-      state: j.state,
-      url: j.url,
-      checks: checksOf(list),
-      list,
-      title: j.title,
-      author: j.author?.login,
-      mine: j.author?.login && j.author.login === me ? true : undefined,
-      draft: j.isDraft,
-      head: j.headRefOid,
-      review: j.reviewDecision || undefined,
-      ...who,
-      ...yoursOn(j, me, who.approved),
-      conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
-      ...(j.isCrossRepository && { cross: true }),
-      ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
-      base: j.baseRefName,
-      additions: j.additions,
-      deletions: j.deletions,
-      body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
-      updated: j.updatedAt,
-      labels: Array.isArray(j.labels) && j.labels.length ? j.labels.map((l: PRLabel) => labelOf({ name: l.name, color: l.color })) : undefined, // the menu has their words
+    if (lab) pr = await glabPR(ws, checksOf)
+    else {
+      const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
+      const j = JSON.parse(stdout)
+      const list: Check[] = newest(j.statusCheckRollup ?? []).map(checkOf)
+      const me = await ghLogin(ws)
+      const who = reviewersOf(j)
+      pr = {
+        number: j.number,
+        state: j.state,
+        url: j.url,
+        checks: checksOf(list),
+        list,
+        title: j.title,
+        author: j.author?.login,
+        mine: j.author?.login && j.author.login === me ? true : undefined,
+        draft: j.isDraft,
+        head: j.headRefOid,
+        review: j.reviewDecision || undefined,
+        ...who,
+        ...yoursOn(j, me, who.approved),
+        conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
+        ...(j.isCrossRepository && { cross: true }),
+        ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
+        base: j.baseRefName,
+        additions: j.additions,
+        deletions: j.deletions,
+        body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
+        updated: j.updatedAt,
+        labels: Array.isArray(j.labels) && j.labels.length ? j.labels.map((l: PRLabel) => labelOf({ name: l.name, color: l.color })) : undefined, // the menu has their words
+      }
     }
   } catch (e) {
-    wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
+    wsLog(ws, `PR: ${lab ? 'glab mr' : 'gh pr'} view ${ws.prUrl ?? ws.branch}: ${lab ? glabSays(e, 'the MR') : firstLine(e)}`)
     const said = String((e as { stderr?: string }).stderr || (e as Error).message)
     // gh failed (a rate limit, the network, a timeout, an answer that isn't JSON): the last PR stays as it was. ponytail:
     // not marked stale
-    if (!/no pull requests found/i.test(said)) return void (/rate limit/i.test(said) && (limitedAt = Date.now()))
+    if (!(lab ? noMR(said) : /no pull requests found/i.test(said))) return void (/rate limit/i.test(said) && (limitedAt = Date.now()))
     prSeen.set(ws.id, null) // none: the next one found is pr.opened
     noneAt.set(ws.id, Date.now())
     if (prs.delete(ws.id)) changed()
-    if (!ws.prUrl) await prFromSaid(ws)
+    if (!ws.prUrl && !lab) await prFromSaid(ws)
     return
   }
   noneAt.delete(ws.id)
@@ -432,6 +439,7 @@ async function archiveMerged(ws: Workspace, pr: PR) {
 export const retry = new Set<string>() // `<ws>:ci`, `<ws>:merge`: a switch turned on again (wsSet)
 
 async function autoPR(ws: Workspace, pr: PR) {
+  if (isLab(pr)) return // ponytail: the PR switches are gh's (CI logs, review threads); a GitLab MR gets none yet
   // a PR only linked (prLinked): its branch isn't this workspace's, so the agent's push wouldn't reach it
   if (!(ws.autoFix || ws.autoReview || ws.autoMerge || ws.autoLand)) return
   if (pr.state !== 'OPEN' || ws.prLinked) return wsLog(ws, `switches: nothing to do, the PR is ${ws.prLinked ? 'only linked (its branch is not this workspace\'s)' : pr.state}`)
@@ -677,6 +685,7 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, 'a line comment')
   if (!pr.head) throw new Error(`PR #${pr.number}'s head commit isn't known yet: try again in a minute`)
   inside(ws, String(o.path ?? ''))
   if (!Number.isInteger(o.line) || o.line < 1) throw new Error('which line?')
@@ -699,6 +708,7 @@ export async function prReview(o: { ws: string; body?: string; comments: ReviewC
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, 'posting a review')
   if (!pr.head) throw new Error(`PR #${pr.number}'s head commit isn't known yet: try again in a minute`)
   const cs = Array.isArray(o.comments) ? o.comments : []
   if (!cs.length) throw new Error('no comments to post')
@@ -776,9 +786,11 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
     return {}
   }
   const args = o.act === 'approve' ? ['pr', 'review', '--approve', '--', pr.url] : ['pr', 'close', '--', pr.url]
-  await exec(ws, 'gh', args, { timeout: 30000 }).catch(e => {
-    throw new Error(ghSays(e, `PR #${pr.number}`))
-  })
+  if (isLab(pr)) await glabAct(ws, pr, o.act)
+  else
+    await exec(ws, 'gh', args, { timeout: 30000 }).catch(e => {
+      throw new Error(ghSays(e, `PR #${pr.number}`))
+    })
   void scanPRs()
   return {}
 }
@@ -792,9 +804,11 @@ export async function prDraft(o: { ws: string; draft: boolean }) {
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
   const draft = o.draft === true
   if (!!pr.draft === draft) return { draft }
-  await exec(ws, 'gh', ['pr', 'ready', ...(draft ? ['--undo'] : []), '--', pr.url], { timeout: 30000 }).catch(e => {
-    throw new Error(ghSays(e, `PR #${pr.number}`))
-  })
+  if (isLab(pr)) await glabDraft(ws, pr, draft)
+  else
+    await exec(ws, 'gh', ['pr', 'ready', ...(draft ? ['--undo'] : []), '--', pr.url], { timeout: 30000 }).catch(e => {
+      throw new Error(ghSays(e, `PR #${pr.number}`))
+    })
   prs.set(ws.id, { ...pr, draft: draft || undefined })
   changed()
   void scanPRs(false, new Set([ws.id]))
@@ -875,11 +889,13 @@ export async function prLabel(o: { ws: string; label: string; on: boolean }) {
 // gh pr merge by the PR's URL. -R (its repo, from the URL) keeps gh off this worktree's git: without it,
 // --delete-branch also checks out the default branch here and deletes the local one. GitHub deletes the head branch
 // (not a fork's). Then a scan, a moment later: this may run inside one (autoPR)
+// GitLab's: glab mr merge (its source branch removed unless kept; glab sets it to merge when the pipeline passes)
 async function merge(ws: Workspace, pr: PR, how: MergeMethod, deleteBranch: boolean) {
-  const repo = repoOf(pr)
-  await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), '-R', repo, '--', pr.url], { timeout: 60000 }).catch(e => {
-    throw new Error(ghSays(e, `PR #${pr.number}`))
-  })
+  if (isLab(pr)) await glabAct(ws, pr, 'merge', how, deleteBranch)
+  else
+    await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), '-R', repoOf(pr), '--', pr.url], { timeout: 60000 }).catch(e => {
+      throw new Error(ghSays(e, `PR #${pr.number}`))
+    })
   setTimeout(() => void scanPRs(), 1000)
 }
 
@@ -889,6 +905,7 @@ export async function prDiff(ref: string) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, 'the PR view')
   const { stdout } = await exec(ws, 'gh', ['pr', 'diff', '--color=never', '--', pr.url], { timeout: 30000 }).catch(e => {
     throw new Error(ghSays(e, `PR #${pr.number}`))
   })
@@ -906,7 +923,7 @@ export async function prFile(ref: string, path: string) {
   if (typeof path !== 'string' || !path || path.startsWith('/') || path.startsWith('-') || path.split('/').includes('..')) throw new Error('a path in the repo')
   const has = () => git(ws, 'cat-file', '-e', `${pr.head}^{commit}`).then(() => true, () => false)
   if (!(await has())) {
-    await exec(ws, 'git', ['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr.number}/head`], { timeout: 60000 }).catch(() => {})
+    await exec(ws, 'git', ['fetch', '--no-tags', '--quiet', 'origin', isLab(pr) ? `merge-requests/${pr.number}/head` : `pull/${pr.number}/head`], { timeout: 60000 }).catch(() => {})
     if (!(await has())) throw new Error(`PR #${pr.number}'s head isn't in this clone (git fetch it)`)
   }
   const show = `${pr.head}:${path}`
@@ -950,6 +967,7 @@ export async function prFiles(ref: string): Promise<{ id: string; files: Record<
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (isLab(pr)) return { id: '', files: {} } // ponytail: Viewed is GitHub's (its GraphQL); a GitLab MR's are this Mac's only
   const files: Record<string, string> = {}
   let id = ''
   let after: string | undefined
@@ -986,7 +1004,7 @@ export async function prViewed(p: { ws: string; path: string; viewed: boolean; i
 export async function prThreads(ref: string, all = false) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
-  if (!pr) return []
+  if (!pr || isLab(pr)) return [] // GitHub's only, for now
   const { threads } = await reviewThreads(ws, pr.number, all)
   return threads.map(t => ({
     path: t.path,
@@ -1005,6 +1023,7 @@ export async function prSay(o: { ws: string; body: string }) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, 'a comment from Laki')
   const body = String(o.body ?? '')
   if (!body.trim()) throw new Error('the comment is empty')
   if (body.length > 65000) throw new Error("too long for a GitHub comment (65,000 characters at most)")
@@ -1025,7 +1044,7 @@ const TALK_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
 export async function prTalk(ref: string) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
-  if (!pr) return []
+  if (!pr || isLab(pr)) return [] // GitHub's only, for now
   const { stdout } = await exec(ws, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr.number}`, '-f', `query=${TALK_QUERY}`], { timeout: 20000 }).catch(e => {
     throw new Error(`gh couldn't read the PR's comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
   })

@@ -21,7 +21,7 @@ import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
-import { fileTree } from './text'
+import { fileTree, prName } from './text'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
@@ -71,7 +71,7 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -602,12 +602,12 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                     <button type="button" className={tab === 'mine' ? 'on' : ''} onClick={() => pickTab('mine')} data-tip="Your comments, not sent yet">
                       Yours{notes.length > 0 && ` ${notes.length}`}
                     </button>
-                    <button type="button" className={tab === 'pr' ? 'on' : ''} onClick={() => pickTab('pr')} data-tip={`PR #${pr.number}: its title and description`}>
+                    <button type="button" className={tab === 'pr' ? 'on' : ''} onClick={() => pickTab('pr')} data-tip={`${prName(pr)}: its title and description`}>
                       PR
                     </button>
-                    <button type="button" className={tab === 'gh' ? 'on' : ''} onClick={() => pickTab('gh')} data-tip={`Everyone's on PR #${pr.number}: the open threads, then the conversation`}>
+                    {pr.forge !== 'gitlab' && <button type="button" className={tab === 'gh' ? 'on' : ''} onClick={() => pickTab('gh')} data-tip={`Everyone's on PR #${pr.number}: the open threads, then the conversation`}>
                       GitHub{ghN > 0 && ` ${ghN}`}
-                    </button>
+                    </button>}
                   </span>
                 ) : (
                   <h3>Comments {notes.length > 0 && <span className="sp-count">{notes.length}</span>}</h3>
@@ -670,7 +670,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 </>
               ) : tab === 'pr' && pr ? (
                 <div className="fr-pr">
-                  <h3>{pr.title || `PR #${pr.number}`}</h3>
+                  <h3>{pr.title || prName(pr)}</h3>
                   <div className="fr-pr-meta muted small">
                     <span>#{pr.number}</span>
                     {pr.author && (

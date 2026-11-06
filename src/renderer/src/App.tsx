@@ -38,7 +38,7 @@ import { groupsOf, type Layout, move, resize, tabsOf, fillRoles, type Role, role
 import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
-import { actionsFor, mentionsOf, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
+import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
@@ -905,7 +905,7 @@ export function App() {
     return {
       branch: `${w.branch || w.path.split('/').pop()} · $PORT ${w.port}`,
       agents: view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent').map(t => `${t.name}${t.progress ? ` ${t.progress.pct}%` : ''}`).join(' · '),
-      pr: pr && { state: prState(pr), text: `#${pr.number} ${pr.title}`, meta: [pr.author && !pr.mine && `by ${pr.author}`, (pr.list?.length || pr.checks) && ciText(pr), pr.review && REVIEW[pr.review], pr.conflict && pr.state === 'OPEN' && 'conflicts'].filter(Boolean).join(' · ') },
+      pr: pr && { state: prState(pr), text: `${prNo(pr)} ${pr.title}`, meta: [pr.author && !pr.mine && `by ${pr.author}`, (pr.list?.length || pr.checks) && ciText(pr), pr.review && REVIEW[pr.review], pr.conflict && pr.state === 'OPEN' && 'conflicts'].filter(Boolean).join(' · ') },
       lines: [
         w.stat && (w.stat.add > 0 || w.stat.del > 0 || w.stat.dirty > 0) && `+${w.stat.add} −${w.stat.del} in ${w.stat.files} ${w.stat.files === 1 ? 'file' : 'files'}${w.stat.dirty ? `, ${w.stat.dirty} not committed` : ''}`,
         w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
@@ -1497,7 +1497,7 @@ export function App() {
     facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
     if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty ? (stops ? 'warn' : 'bad') : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept in the stopped codespace' : 'lost'}` : 'none uncommitted' })
     if (pk.ahead) facts.push({ label: 'Commits', icon: 'gitCommit', tone: pk.unpushed ? 'warn' : 'ok', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
-    if (pr) facts.push({ label: 'PR', icon: merged ? 'gitMerge' : 'pr', pr: prState(pr), chip: merged ? 'Merged' : pr.draft && open ? 'Draft' : open ? 'Open' : 'Closed', value: `#${pr.number}${pr.title ? ` · ${pr.title}` : ''} (stays on GitHub)` })
+    if (pr) facts.push({ label: pr.forge === 'gitlab' ? 'MR' : 'PR', icon: merged ? 'gitMerge' : 'pr', pr: prState(pr), chip: merged ? 'Merged' : pr.draft && open ? 'Draft' : open ? 'Open' : 'Closed', value: `${prNo(pr)}${pr.title ? ` · ${pr.title}` : ''} (stays on ${forgeName(pr)})` })
     if (pr?.author) facts.push({ label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` })
     facts.push({ label: 'Tabs', icon: 'terminal', tone: busy.length ? 'warn' : undefined, value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
     if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
@@ -2565,12 +2565,12 @@ export function App() {
     if (act === 'merge') {
       const del = { label: 'Delete the branch on GitHub', on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
-      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w), mergeVerdict(pr))) !== 1) return
-      return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged PR #${pr.number}`, undefined, undefined, true))
+      if ((await choose(`${verb} ${prName(pr)} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w), mergeVerdict(pr))) !== 1) return
+      return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged ${prName(pr)}`, undefined, undefined, true))
     }
     const close = act === 'close'
-    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; it can be reopened on GitHub.'].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
-    call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
+    if (!(await ask(close ? `Close ${prName(pr)}?` : `Approve ${prName(pr)}?`, { text: [pr.title, close && `Without merging; it can be reopened on ${forgeName(pr)}.`].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
+    call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed ${prName(pr)}` : `Approved ${prName(pr)}`, undefined, undefined, true), () => {})
   }
   // the waiting tabs of the workspaces this tab's agent started (fromTab), for its pane's foot (WorkerAsks)
   const workerAsks = (tab: string) => {
@@ -2579,7 +2579,7 @@ export function App() {
   }
   const prDraft = (w: WorkspaceView) => {
     const pr = w.pr
-    if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `PR #${pr.number} is ready for review` : `PR #${pr.number} is a draft`, undefined, undefined, true), () => {})
+    if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `${prName(pr)} is ready for review` : `${prName(pr)} is a draft`, undefined, undefined, true), () => {})
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
     { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', tip: 'Reads its checks, reviews and state again now', run: refreshPR },

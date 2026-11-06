@@ -13,7 +13,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--template <name>]     the prompt through one of your prompt templates
             [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
             [--group <name>]        under that group of the project in the sidebar (its template and agent too)
-            [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)
+            [--issue <url|number>]  a GitHub or GitLab (glab) issue's title and text as the prompt
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
                                     tab, a PR the prompt names is only related (its own PR is its PR)

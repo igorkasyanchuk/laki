@@ -1,0 +1,18 @@
+#!/bin/sh
+# fake glab: GitLab's MRs, issues and pipelines from files in $FAKE_GLAB ($HOME/glab), when there; every call logged
+echo "glab $*" >> "${FAKE_LOG:-/dev/null}"
+d=${FAKE_GLAB:-$HOME/glab}
+f() { [ -f "$d/$1" ] && cat "$d/$1"; }
+[ -f "$d/noauth" ] && { echo 'glab: no token found for gitlab.com. Run glab auth login' >&2; exit 1; }
+case "$1 $2" in
+  "auth status") h=$(f host); case "$*" in *"--hostname $h") [ -n "$h" ] && exit 0 ;; esac; echo "x ${4:-gitlab.com} has not been authenticated with glab" >&2; exit 1 ;;
+  "mr view") f "mr-$(echo "$3" | tr / -).json" || { echo "no open merge request available for \"$3\"" >&2; exit 1; } ;;
+  "mr create") b=; p=; for a in "$@"; do [ "$p" = --source-branch ] && b=$a; p=$a; done
+    mkdir -p "$d"; printf '{"iid":7,"state":"opened","web_url":"https://gitlab.com/o/repo/-/merge_requests/7","title":"%s","sha":"abc","target_branch":"main","author":{"username":"me"}}\n' "$b" > "$d/mr-$(echo "$b" | tr / -).json"
+    echo "https://gitlab.com/o/repo/-/merge_requests/7" ;;
+  "mr merge"|"mr approve"|"mr close"|"mr update") [ -f "$d/refuse" ] && { cat "$d/refuse" >&2; exit 1; }; echo ok ;;
+  "issue view") f "issue-$3.json" || { echo '404 Not Found' >&2; exit 1; } ;;
+  "issue list") f issues.json || echo '[]' ;;
+  "api projects/:id/pipelines/"*) i=${2#projects/:id/pipelines/}; f "jobs-${i%/jobs}.json" || echo '[]' ;;
+  *) echo "fake glab: $*" >&2; exit 1 ;;
+esac

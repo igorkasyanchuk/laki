@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- GitLab merge requests through `glab`: a project on gitlab.com (or a GitLab of yours glab is signed in to) shows its
+  MR (`!12`) with its pipeline's jobs as checks; Ship opens one, and merge, approve, close, draft and issues (`--issue
+  12`, the `#` list) go through glab. Review threads and the PR switches are GitHub's only for now.
+
 - Workflows and extensions start on events from outside: `issue.labeled` (someone labels a GitHub issue) and
   `webhook` (a POST from GitHub, Linear, a CI job…, its signature checked; Settings › Tunnels › *Webhooks*, *Expose to
   the internet* through Cloudflare or Tailscale Funnel). A new template: *Issue labelled → a workspace with an agent*.
