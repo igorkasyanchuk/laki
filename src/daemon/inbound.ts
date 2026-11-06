@@ -67,6 +67,7 @@ const RATE = 60
 const NAME = /^[a-z0-9][a-z0-9-]{0,39}$/
 const secretsDir = () => join(dir, 'hooks')
 const secretOf = (name: string) => {
+  if (!NAME.test(name)) return // a hook's name only: never a path out of <data>/hooks
   try {
     return readFileSync(join(secretsDir(), name), 'utf8').trim()
   } catch {}

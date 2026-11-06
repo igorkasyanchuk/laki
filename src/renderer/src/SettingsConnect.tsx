@@ -619,7 +619,11 @@ export function WebhooksSection({ call, projects }: { call: <T>(m: string, p?: o
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const load = () => call<HookState>('hookList').then(setSt, e => setErr(String(e?.message ?? e)))
-  useEffect(() => void load(), [])
+  useEffect(() => {
+    void load()
+    const t = setInterval(() => void load(), 4000) // its port comes after an add; a tunnel comes up or goes down on its own
+    return () => clearInterval(t)
+  }, [])
   const act = (f: () => Promise<unknown>) => (setBusy(true), setErr(''), f().then(load, e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
   const copy = (text: string) => void navigator.clipboard.writeText(text)
   return (
@@ -630,7 +634,7 @@ export function WebhooksSection({ call, projects }: { call: <T>(m: string, p?: o
             <Says title={`${h.name} · ${HOOK_KINDS.find(k => k[0] === h.kind)?.[1] ?? h.kind}`} hint={h.url ?? h.local ?? 'starting…'} />
             <span className="grow" />
             {(h.url ?? h.local) && <IconButton icon="copy" title="Copy its URL" onClick={() => copy(h.url ?? h.local!)} />}
-            <button type="button" className="link small" onClick={() => void call<{ secret: string }>('hookSecret', { name: h.name }).then(r => copy(r.secret))}>
+            <button type="button" className="link small" onClick={() => void call<{ secret: string }>('hookSecret', { name: h.name }).then(r => copy(r.secret), e => setErr(String(e?.message ?? e)))}>
               Copy secret
             </button>
             <IconButton icon="trash" title="Remove it" onClick={() => act(() => call('hookRm', { name: h.name }))} />

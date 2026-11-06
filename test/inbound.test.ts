@@ -90,6 +90,8 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
   const tab = await until(() => rig.tab(ws.id), 'its agent')
   for (const m of ['hookAdd', 'hookRm', 'hookSecret', 'hookExpose']) await assert.rejects(rig.rpc(m, { name: 'x', on: true, from: { tab: tab.id } }), /an agent can't/, m)
+  await assert.rejects(rig.rpc('settingsSet', { inHooks: [], from: { tab: tab.id } }), /an agent can't change that setting/, 'nor through settings')
+  assert.equal((await rig.rpc('hookSecret', { name: '../daemon.json' })).secret, '', 'a name, never a path')
   await rig.rpc('hookRm', { name: 'gh' })
   assert.ok(!existsSync(secretFile))
   assert.equal(await post('/hook/gh', body, { 'x-hub-signature-256': sig(g.secret, body) }), 404)

@@ -1434,7 +1434,7 @@ export function App() {
     const running = ts.filter(t => t.status !== 'exited')
     if (running.length && !settings.closeNoAsk && !(await ask(`Close ${ts.map(t => t.name).join(', ')}?`, { text: `${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`, ok: 'Close', danger: true }))) return
     for (const t of ts) await call('tabClose', { id: t.id })
-    if (ts.length === 1 && kb.reopenTab) toast(`Closed ${ts[0].name} · ${keyShow(kb.reopenTab)} brings it back`)
+    if (ts.length === 1 && (ts[0].kind === 'agent' || ts[0].kind === 'shell') && kb.reopenTab) toast(`Closed ${ts[0].name} · ${keyShow(kb.reopenTab)} brings it back`)
   }
   // ⇧⌘T, the + menu's Recently closed: a tab you closed back in its workspace, its chat resumed (the newest, or index's)
   const reopenTab = async (w = ws, index?: number) => {
