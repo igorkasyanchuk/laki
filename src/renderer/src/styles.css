@@ -918,6 +918,8 @@ html.away .voice-bar { animation-play-state: running !important; } /* paused at 
 .nw-top > :first-child { flex-shrink: 1; min-width: 7em; }
 .nw-top > .nw-base { flex-shrink: 1; min-width: 6em; }
 .nw-top > label.nw-base { flex-shrink: 6; }
+.nw-top > .nw-machine { flex-shrink: 2; min-width: 6em; } /* a codespace's machine: its price cut before the agent's chip is pushed out */
+.nw-top .nw-machine > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nw-top-end .nw-pick { max-width: 170px; }
 .nw-top .nw-base .nw-chip-input { flex: 0 1 auto; min-width: 3ch; text-overflow: ellipsis; }
 .narrow .nw-top { flex-wrap: wrap; } /* a phone's: each a finger's size, as many rows as it takes */

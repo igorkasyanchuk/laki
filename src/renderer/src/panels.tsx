@@ -555,7 +555,8 @@ export function About({ onClose }: { onClose: () => void }) {
 // a codespace's machine type (codespace.ts machines): its cores, memory and disk, about its price an hour
 type CsMachine = { name: string; display: string; cpus?: number; memory?: number; storage?: number; perHour?: number }
 const GB = (n?: number) => (n ? `${Math.round(n / 2 ** 30)} GB` : '')
-const machineText = (m: CsMachine) => (m.cpus ? [`${m.cpus} cores`, m.memory && `${GB(m.memory)} RAM`, m.storage && `${GB(m.storage)} disk`, m.perHour !== undefined && `≈ $${m.perHour.toFixed(2)}/h`].filter(Boolean).join(' · ') : m.display)
+// short: the chip's (its cores and price; the menu has the rest)
+const machineText = (m: CsMachine, short = false) => (m.cpus ? [`${m.cpus} cores`, !short && m.memory && `${GB(m.memory)} RAM`, !short && m.storage && `${GB(m.storage)} disk`, m.perHour !== undefined && `≈ $${m.perHour.toFixed(2)}/h`].filter(Boolean).join(' · ') : m.display)
 const CS_FIX = 'gh auth refresh -s codespace' // codespace.ts SCOPE's fix: copied from the page
 export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; named?: boolean; local?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; fan?: string[]; pr?: string; place?: string; vars?: boolean; noSetup?: boolean; codespace?: string; startAt?: number | 'limit' } // startAt: its agent later (the Start chip; never kept); codespace: a cloud workspace (settings.cloud) on that machine type; perm: PERMS' id; noSetup: without the setup script (the where menu's New worktree, no setup; never kept, not in a draft either); vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
@@ -1066,9 +1067,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
                     )}
                   </span>
                 ) : (
-                  <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its machine type: GitHub bills by it" onClick={machineMenu}>
+                  <button type="button" className="nw-pick nw-machine" aria-haspopup="menu" data-tip="Its machine type: GitHub bills by it" onClick={machineMenu}>
                     <Icon name="cloud" />
-                    <span>{(m => (m ? machineText(m) : p.codespace || 'Machine type'))(machines.find(m => m.name === p.codespace))}</span>
+                    <span>{(m => (m ? machineText(m, true) : p.codespace || 'Machine type'))(machines.find(m => m.name === p.codespace))}</span>
                     <Icon name="chevron" size={11} />
                   </button>
                 ))}
