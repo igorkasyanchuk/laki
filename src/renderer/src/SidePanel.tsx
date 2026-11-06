@@ -239,7 +239,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
 // scope (Diff.tsx useScope): the branch's, only what isn't committed (a worktree's), or the PR's diff (gh pr diff)
 // instead of the workspace's, first for a workspace that only links its PR
 function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string; forge?: 'gitlab' }; linked?: boolean; empty?: boolean; worktree: boolean; turn?: boolean; onOpen: (url: string) => void }) {
-  const [scope, setScope] = useScope('laki.changesScope', !!pr, !!linked, worktree, turn, empty)
+  const [scope, setScope] = useScope('laki.changesScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, turn, empty)
   useEffect(() => {
     const f = (e: Event) => ((turnNext.on = false), setScope((e as CustomEvent<Scope>).detail)) // the Reader's card's Review: This turn
     window.addEventListener('laki-scope', f)
@@ -404,7 +404,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
           </div>
         )}
         {vw.err && <div className="warn small pad">{vw.err}</div>}
-        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `${prName(pr!)} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` ${prName(pr)} above shows the PR's.` : ''}</div>}
+        {d && !files.length && <div className="muted small pad">{inTurn ? 'That turn changed nothing.' : all ? `${prName(pr!)} changes nothing.` : scope === 'uncommitted' ? 'Nothing uncommitted: every change is in a commit. Branch shows them.' : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr && pr.forge !== 'gitlab' ? ` ${prName(pr)} above shows the PR's.` : ''}</div>}
         {tree
           ? fileTree(files, dirsShut).map(r =>
               'dir' in r ? (

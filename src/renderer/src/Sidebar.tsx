@@ -5,7 +5,7 @@ import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
-import { clock, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
+import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
@@ -397,7 +397,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {(xs => xs.length > 0 && <div className="wp-line wp-ext"><RowMarks widgets={xs} ws={w.id} api={{ ...widgetApi, full: (id, at) => (setPeek(null), widgetApi.full(id, at)) }} /></div>)(rowMarks((view.widgets ?? []).filter(x => !x.project || x.project === w.project), w.id))}
         <div className="wp-acts">
           <button onClick={() => (setPeek(null), setWsId(w.id), setDialog(null))}>Open</button>
-          {pr && <button onClick={() => openExternal(pr.url)}>PR #{pr.number} on GitHub</button>}
+          {pr && <button onClick={() => openExternal(pr.url)}>{prName(pr)} on {forgeName(pr)}</button>}
           <span className="spacer" />
           <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
         </div>

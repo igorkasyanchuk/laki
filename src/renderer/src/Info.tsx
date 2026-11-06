@@ -4,13 +4,14 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { jobOf, MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
 import { Folded } from './MarkdownView'
-import { prName, shortPath } from './text'
+import { prName, prNo, shortPath } from './text'
 import { type Tunnel } from './Tunnel'
 import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
 export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds (an older daemon: none)
 export type PRInfo = {
   number: number
+  forge?: 'gitlab' // a GitLab MR: !n, no PR switches (GitHub's only)
   state: string // OPEN, MERGED, CLOSED
   url: string
   checks: '' | 'pass' | 'fail' | 'pending'
@@ -195,7 +196,7 @@ export function PrCard({ pr, linked, face = true, onOpen }: { pr: PRInfo; linked
         {face && <Avatar login={pr.author} size={16} />}
         <span className={`wp-pr-state ${prState(pr)}`}>{prState(pr)}</span>
         <span className="wp-pr-title">
-          #{pr.number} {pr.title}
+          {prNo(pr)} {pr.title}
         </span>
       </a>
       <div className="wp-pr-meta">
@@ -226,7 +227,7 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
   return (
     <span className="pr-status" onContextMenu={onMenu}>
       <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} aria-label={`${prName(pr)}: ${pr.title ?? ''}`} onPointerEnter={e => e.pointerType === 'mouse' && rest(e.currentTarget)} onPointerLeave={() => rest()} onPointerDown={() => (clearTimeout(timer.current), setCard(null))} onClick={() => onOpen(pr.url)}>
-        #{pr.number}
+        {prNo(pr)}
       </button>
       {card && (
         <div className="ws-peek pr-peek" style={{ left: card.left, bottom: card.bottom }} onPointerEnter={() => clearTimeout(timer.current)} onPointerLeave={() => rest()}>
@@ -244,7 +245,7 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
               <Icon name="conflict" size={11} /> conflicts
             </button>
           )}
-          <AutoToggles w={w} onToggle={onToggle} />
+          {pr.forge !== 'gitlab' && <AutoToggles w={w} onToggle={onToggle} />}
         </>
       )}
     </span>
@@ -382,7 +383,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
   return (
     <section className="pr-sec">
       <h3>
-        <Icon name="pr" /> Pull request
+        <Icon name="pr" /> {pr?.forge === 'gitlab' ? 'Merge request' : 'Pull request'}
       </h3>
       {!pr ? (
         <>
@@ -396,7 +397,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
       ) : (
         <>
           <a className="pr-title" href={pr.url} onClick={e => (e.preventDefault(), onOpen(pr.url))}>
-            {pr.title} <span className="pr-num">#{pr.number}</span>
+            {pr.title} <span className="pr-num">{prNo(pr)}</span>
           </a>
           <div className="pr-meta">
             <span className={`tag tag-${prState(pr)}`}>{prState(pr)}</span>
@@ -415,14 +416,14 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
             {pr.updated && <span>updated {ago(pr.updated)}</span>}
           </div>
           <Reviewers pr={pr} />
-          {(!!pr.labels?.length || onLabel) && (
+          {(!!pr.labels?.length || (onLabel && pr.forge !== 'gitlab')) && (
             <div className="pr-labels">
               {pr.labels?.map(l => (
                 <span key={l.name} className="pr-label" style={l.color ? ({ '--lc': `#${l.color}` } as CSSProperties) : undefined}>
                   {l.name}
                 </span>
               ))}
-              {onLabel && (
+              {onLabel && pr.forge !== 'gitlab' && (
                 <button className="pr-label-add" aria-label="Labels" data-tip="Put a label on it or take one off (gh pr edit)" onClick={labelMenu}>
                   <Icon name="tag" />
                   {!pr.labels?.length && 'Label'}
@@ -464,7 +465,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
           </div>
           {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} html />}
           {open && <Checks pr={pr} onOpen={onOpen} onLog={onLog} />}
-          {open && (
+          {open && pr.forge !== 'gitlab' && (
             <div className="pr-block">
               <h4>Let the agent fix</h4>
               <AutoToggles w={w} onToggle={onToggle} names={['failing CI', 'review comments', 'conflicts']} row={k => send(FIX[k]!)} keys={FIXES} />
@@ -473,7 +474,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
               {w.autoMerge && (w.mergeTries ?? 0) > w.prTries && <span className="warn small">Gave up on the conflicts after {w.prTries} tries; turn conflicts off and on to try again.</span>}
             </div>
           )}
-          {open && can('land') && !w.prLinked && (
+          {open && can('land') && !w.prLinked && pr.forge !== 'gitlab' && (
             <div className="pr-block">
               <h4>When it's green</h4>
               <AutoToggles w={w} onToggle={onToggle} names={['', '', '', MERGE_WORDS[method]]} keys={['autoLand']} />

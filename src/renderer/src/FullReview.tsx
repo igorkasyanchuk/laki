@@ -21,7 +21,7 @@ import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
-import { fileTree, prName } from './text'
+import { fileTree, prName, prNo } from './text'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
@@ -72,7 +72,7 @@ type At = { path: string; line: DiffLine; from?: number; text: string } // the b
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
 export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
-  const [scope, setScope] = useScope('laki.reviewScope', !!pr, !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
+  const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
   const api = atHead(wsApi, unc) // its reads and reverts against HEAD
@@ -662,8 +662,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                       <span className="muted small">No agent running here</span>
                     )}
                     {pr && (
-                      <button disabled={busy || !notes.length} onClick={post} data-tip={`One review on GitHub, as you: each line must be in PR #${pr.number}'s diff`}>
-                        Post on #{pr.number}
+                      <button disabled={busy || !notes.length || pr.forge === 'gitlab'} onClick={post} data-tip={pr.forge === 'gitlab' ? 'GitHub only for now: send them to the agent' : `One review on GitHub, as you: each line must be in PR #${pr.number}'s diff`}>
+                        Post on {prNo(pr)}
                       </button>
                     )}
                   </div>
@@ -672,7 +672,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 <div className="fr-pr">
                   <h3>{pr.title || prName(pr)}</h3>
                   <div className="fr-pr-meta muted small">
-                    <span>#{pr.number}</span>
+                    <span>{prNo(pr)}</span>
                     {pr.author && (
                       <>
                         <Avatar login={pr.author} size={14} />
