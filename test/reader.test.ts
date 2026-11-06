@@ -1,7 +1,7 @@
 // Reader view: a claude tab's chat from its transcript (meters.ts chatRead), read on as it grows; the same v: nothing new;
 // no transcript: none; an agent's call refused.
 import assert from 'node:assert/strict'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -54,6 +54,42 @@ test('tabHandover: a codex tab beside the claude one, told to read a handover of
   const prompt = await until(() => (f => existsSync(f) && (l => l.includes('"bin":"codex"') && l)(readFileSync(f, 'utf8')))(join(rig.home, 'fake.log')), 'codex started')
   assert.ok(String(prompt).includes(r.file), 'its prompt names the handover')
 })
+
+// the handover carries the chat's pictures and files: pasted ones (base64 blocks), paths into Laki's images or the temp
+// folder; not a secret's name nor a worktree file; 20 at most
+test('tabHandover: pictures and files from the chat copied beside it, their paths rewritten; .env and worktree files left', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
+  mkdirSync(join(rig.data, 'images'), { recursive: true })
+  const shot = join(rig.data, 'images', 'shot.png')
+  writeFileSync(shot, png)
+  const env = join(rig.home, 'secrets', '.env')
+  mkdirSync(join(rig.home, 'secrets'))
+  writeFileSync(env, 'TOKEN=x')
+  writeFileSync(join(ws.path, 'cart.ts'), 'x')
+  const pic = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: png.toString('base64') } }
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'chat-p.jsonl'), line({ type: 'user', message: { content: [{ type: 'text', text: `The mock-up: ${shot}, the keys in ${env}, see ${join(ws.path, 'cart.ts')}.` }, pic] } }) + line({ type: 'assistant', message: { content: [{ type: 'text', text: 'On it.' }] } }))
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-p' } })
+  await until(async () => (await rig.rpc('chatRead', { tab: tab.id })).said, 'its chat')
+  const r = await rig.rpc('tabHandover', { tab: tab.id })
+  const md = readFileSync(r.file, 'utf8')
+  assert.match(md, /## Pictures and files\n\nFrom the chat, copied here: open each first \(Claude Code: Read; Codex: view_image\)/)
+  const copies = [...md.matchAll(/^- (\S+) \((?:a picture pasted in the chat|was (\S+))\)$/gm)]
+  assert.deepEqual(copies.map(m => m[2]).sort(), [shot, undefined].sort(), 'the pasted picture and the image path, nothing else')
+  for (const [, copy] of copies) assert.deepEqual([readFileSync(copy).equals(png), statOf(copy) & 0o777], [true, 0o600])
+  assert.ok(!md.includes(`The mock-up: ${shot}`) && md.includes(`The mock-up: ${copies.find(m => m[2])![1]}`), 'its path rewritten to the copy')
+  assert.ok(md.includes(env) && md.includes(join(ws.path, 'cart.ts')), 'a .env and a worktree file: named as they were, not copied')
+  // 20 at most, the newest
+  writeFileSync(join(dir, 'chat-p.jsonl'), Array.from({ length: 25 }, () => line({ type: 'user', message: { content: [pic] } })).join(''))
+  const r2 = await rig.rpc('tabHandover', { tab: tab.id })
+  assert.equal([...readFileSync(r2.file, 'utf8').matchAll(/^- \S+ \((a picture pasted in the chat|was \S+)\)$/gm)].length, 20)
+})
+const statOf = (f: string) => statSync(f).mode
 
 // a claude chat's lines: its transcript, read as the Reader does (its first turn over, so its end doesn't race)
 async function chatTab(rig: any, session: string) {

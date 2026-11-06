@@ -1601,7 +1601,8 @@ over.
 
 **Continue in Codex** (or *Claude Code*): a Claude Code or Codex tab's right click starts the other agent in a tab beside
 it, in the same worktree, told to read a handover first: a file in the workspace's storage folder with the chat so far
-(your messages and its answers) and the files changed against the base. For a usage limit or a stuck agent; the first
+(your messages and its answers), the pictures and files you showed it (copied beside it) and the files changed
+against the base. For a usage limit or a stuck agent; the first
 tab stays as it was.
 
 **Important alerts**: ask an agent for one ("show me an important alert in this question using Laki") and it runs

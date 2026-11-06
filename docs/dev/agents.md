@@ -78,7 +78,12 @@ what the view shows on the tab's runtime:
 - `tabHandover` (`tab`, `to`: the other of claude and codex; the tab menu's *Continue in Codex / Claude Code*, refused
   from an agent): a handover in the storage folder (`handover-<from>-to-<to>-<stamp>.md`: `chatRead`'s your messages and
   its answers since its last `new` line (`sinceNew`: a `/clear`'s earlier chat stays out, the side chat's too), the newest `HANDOVER_MAX`, and `diff`'s files), then `addTab` of the other agent's first profile told to
-  read it (a host's: in the prompt). Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
+  read it (a host's: in the prompt). Its pictures and files (`handoverPics`): Claude's base64 image blocks and Codex's
+  `data:` URLs and `local_images` from the tab's transcript (`transcriptOf`), and paths the chat names in `<data>/images`,
+  `<data>/files`, the storage folder or the temp folder, copied to `handover-<stamp>/` beside it (0700, files 0600), each
+  path in the text rewritten to its copy, listed under *Pictures and files* and named in the prompt; never one inside
+  the worktree, a secret's name (`.env`, `*.pem`, `id_*`, `*key*`), over 10 MB, or past the newest 20. ponytail: a host's
+  workspace (no storage folder) carries none. Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
 
 `daemon/secrets.ts`: `laki secret <what>` (MCP's `laki_secret`; `SECRET_WAIT`, the CLI's rpc waits as long):
 `secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`) on the tab (waiting while

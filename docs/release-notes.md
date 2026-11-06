@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- *Continue in Codex / Claude Code* brings the chat's pictures and files along: the screenshots you pasted and the
+  files you pointed it at are copied beside the handover, and the next agent is told to open them first.
+
 - ⇧⌘T reopens the tab you closed, the way a browser does: an agent's chat resumed, a shell in its folder.
   The tab bar's + menu lists the last 10 (File › *Reopen Closed Tab*), and ⌘W's note says how to bring it back.
 

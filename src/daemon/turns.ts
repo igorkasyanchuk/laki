@@ -5,8 +5,9 @@
 // runtime (suggest, changes).
 
 import { execFile } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
 import { addTab, changed, findWs, presets, rtOf, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
@@ -14,7 +15,8 @@ import { dir } from './dir.ts'
 import { diff, inside } from './files.ts'
 import { chatRead } from './meters.ts'
 import { aiOnce, hasKey } from './ai.ts'
-import { accountEnv, accountFor } from './accounts.ts'
+import { accountEnv, accountFor, accountNamed, homeDir } from './accounts.ts'
+import { transcriptOf } from './share.ts'
 import { execGroup, own } from './resources.ts'
 
 const SUGGEST_SYSTEM = `You guess the next message a developer sends their coding agent (Claude Code or Codex), from their last message and the agent's answer. Answer with that message alone: one short line, at most 15 words, in their voice, an instruction or a question ("run the tests", "now add a test for it"). No quotes, no preamble. When the answer asks them to pick or confirm, the likely pick. When there is no clear next step, answer NONE.`
@@ -71,15 +73,87 @@ export async function tabHandover(o: { tab?: string; to?: string }) {
   }
   const d = state.projects.find(p => p.id === ws.project)?.git === false ? undefined : await diff(ws.id).catch(() => undefined)
   const changes = d?.files.length ? `${d.files.map(f => `- ${f.path} (+${f.add} −${f.del})`).join('\n')}\n\nThe whole diff: \`git diff ${d.from}\` (new files aren't committed: \`git status\`).` : 'Nothing yet.'
-  const md = `# Handover from ${from}\n\n${from} worked on this task in this worktree until now; you carry on. Below: its chat with the user (${parts.length < said.length ? `the last ${parts.length} of ${said.length} messages` : 'all of it'}), then what it changed.\n\n## The chat\n\n${parts.join('\n') || '(nothing said yet)'}\n## What changed against ${d?.base ?? ws.base}\n\n${changes}\n`
   const folder = storageOf(ws)
-  const file = folder && join(folder, `handover-${tab.preset}-to-${to}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.md`)
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+  const chat = parts.join('\n')
+  const pics = folder ? handoverPics(tab, ws, chat, join(folder, `handover-${stamp}`)) : { text: chat, list: [] } // ponytail: a host's workspace (no storage folder) carries none
+  const picsMd = pics.list.length ? `## Pictures and files\n\nFrom the chat, copied here: open each first (Claude Code: Read; Codex: view_image).\n\n${pics.list.map(x => `- ${x}`).join('\n')}\n\n` : ''
+  const md = `# Handover from ${from}\n\n${from} worked on this task in this worktree until now; you carry on. Below: its chat with the user (${parts.length < said.length ? `the last ${parts.length} of ${said.length} messages` : 'all of it'}), then what it changed.\n\n## The chat\n\n${pics.text || '(nothing said yet)'}\n${picsMd}## What changed against ${d?.base ?? ws.base}\n\n${changes}\n`
+  const file = folder && join(folder, `handover-${tab.preset}-to-${to}-${stamp}.md`)
   if (file) writeFileSync(file, md, { mode: 0o600 })
-  const prompt = `You're taking over this task from ${from}, which worked on it in this worktree until now. ${file ? `Read ${file} first: its chat with the user and what it changed.` : `Its chat with the user and what it changed:\n\n${md}`}\n\nThen carry on from where it stopped: check the code as it is now, don't redo what's done, and finish what the user asked last.`
+  const prompt = `You're taking over this task from ${from}, which worked on it in this worktree until now. ${file ? `Read ${file} first: its chat with the user and what it changed${pics.list.length ? `, then each picture and file it lists (Claude Code: Read; Codex: view_image)` : ''}.` : `Its chat with the user and what it changed:\n\n${md}`}\n\nThen carry on from where it stopped: check the code as it is now, don't redo what's done, and finish what the user asked last.`
   const preset = presets().find(p => p.agent === to && !p.off)?.name ?? to
   const t = addTab(ws.id, { preset, prompt, name: `${to}: continued` })
   wsLog(ws, `${tab.name} handed over to ${t.name}${file ? `: ${file}` : ''}`)
   return { tab: t.id, name: t.name, ...(file && { file }) }
+}
+
+// a handover's pictures and files: Claude's pasted pictures (base64 image blocks in its transcript), Codex's (data:
+// URLs, local_images' paths), and paths the chat names in Laki's pasted images or files, the workspace's storage folder
+// or the temp folder: copied to <storage>/handover-<stamp>/ (0700, files 0600), each path in the text rewritten to its
+// copy. Not one inside the worktree (the next agent reads it there), a secret's name, over 10 MB, nor past the newest 20
+const PIC_MAX = 10 << 20
+const PICS = 20
+const SECRET_NAME = /^\.env|\.pem$|^id_|key/i
+const real = (p: string) => {
+  try {
+    return realpathSync(p)
+  } catch {}
+}
+export function handoverPics(tab: Tab, ws: Workspace, text: string, to: string): { text: string; list: string[] } {
+  const found: ({ data: Buffer; ext: string } | { path: string })[] = []
+  const agent = tab.preset === 'claude' || tab.preset === 'codex' ? tab.preset : undefined
+  const file = agent && tab.resumeId ? transcriptOf(agent, accountNamed(tab.account ?? '')?.dir ?? homeDir(agent), tab.resumeId) : undefined
+  const walk = (v: any, key = ''): void => {
+    if (typeof v === 'string') {
+      const m = /^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/s.exec(v)
+      if (m) found.push({ data: Buffer.from(m[2], 'base64'), ext: m[1].replace('jpeg', 'jpg') })
+      else if (key === 'local_images' && v.startsWith('/')) found.push({ path: v })
+    } else if (Array.isArray(v)) v.forEach(x => walk(x, key))
+    else if (v && typeof v === 'object') {
+      if (v.type === 'image' && v.source?.type === 'base64' && typeof v.source.data === 'string') found.push({ data: Buffer.from(v.source.data, 'base64'), ext: /(png|jpe?g|gif|webp)/.exec(String(v.source.media_type))?.[1]?.replace('jpeg', 'jpg') ?? 'png' })
+      else for (const [k, x] of Object.entries(v)) walk(x, k === 'local_images' ? k : key)
+    }
+  }
+  try {
+    if (file && statSync(file).size < 256 << 20)
+      for (const line of readFileSync(file, 'utf8').split('\n')) {
+        if (!line.includes('image')) continue // a picture's line says so (image, input_image, local_images, data:image)
+        try {
+          const j = JSON.parse(line)
+          if (j.type === 'user' || j.type === 'response_item' || j.type === 'event_msg') walk(j)
+        } catch {}
+      }
+  } catch {}
+  const roots = [join(dir, 'images'), join(dir, 'files'), storageOf(ws), tmpdir(), '/tmp'].flatMap(r => (r && real(r) ? [real(r)! + sep] : []))
+  const said = [...new Set([...text.matchAll(/(?<![\w.~-])\/[^\s'"`<>()[\]{}]+/g)].map(m => m[0].replace(/[.,:;!?]+$/, '')))]
+  for (const p of said) found.push({ path: p })
+  const tree = real(ws.path)
+  const keep = found.filter(f => {
+    if ('data' in f) return f.data.length > 0 && f.data.length <= PIC_MAX
+    const r = real(f.path)
+    const st = r ? statSync(r, { throwIfNoEntry: false }) : undefined
+    return !!r && !!st?.isFile() && st.size <= PIC_MAX && !SECRET_NAME.test(basename(r)) && !(tree && (r + sep).startsWith(tree + sep)) && roots.some(x => r.startsWith(x)) && !r.startsWith(to + sep)
+  })
+  const seen = new Set<string>()
+  const list: string[] = []
+  let out = text
+  let n = 0
+  const once = (f: (typeof keep)[number]) => {
+    if ('data' in f) return true
+    const r = real(f.path)!
+    if (seen.has(r)) return false
+    seen.add(r)
+    return true
+  }
+  for (const f of keep.filter(once).slice(-PICS)) {
+    mkdirSync(to, { recursive: true, mode: 0o700 })
+    const copy = join(to, 'data' in f ? `picture-${++n}.${f.ext}` : `${++n}-${basename(f.path)}`)
+    if ('data' in f) writeFileSync(copy, f.data, { mode: 0o600 })
+    else (copyFileSync(f.path, copy), chmodSync(copy, 0o600), (out = out.split(f.path).join(copy)))
+    list.push('data' in f ? `${copy} (a picture pasted in the chat)` : `${copy} (was ${f.path})`)
+  }
+  return { text: out, list }
 }
 
 // ---------- each turn's changes (settings.turnChanges, on unless false): a card under the Reader's last answer
