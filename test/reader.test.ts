@@ -200,4 +200,9 @@ test("chatRead: a failed call counts on its run, a stop marks what it stopped, a
   writeFileSync(join(dir, 'chat-g.jsonl'), line({ type: 'user', message: { content: 'Start over' } }))
   const c = await until(async () => (r => r.said?.at(-1)?.text === 'Start over' && r)(await rig.rpc('chatRead', { tab: tab.id })), 'the new chat')
   assert.deepEqual(c.said.slice(3).map((x: any) => x.who), ['you', 'new', 'you'])
+  // a handover (and a side chat) take the chat the agent has now, not the one before the /clear
+  const md = readFileSync((await rig.rpc('tabHandover', { tab: tab.id })).file, 'utf8')
+  assert.match(md, /### The user\n\nStart over/)
+  assert.doesNotMatch(md, /Run the tests|Now deploy it/)
+  await assert.rejects(rig.rpc('imageRead', { path: join(dir, 'a.png'), from: { tab: tab.id } }), /read a picture anywhere/) // the user's hover card's
 })

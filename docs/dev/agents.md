@@ -77,7 +77,7 @@ what the view shows on the tab's runtime:
   but NONE is the tab's `suggest` while it's idle; the Reader's box shows it as its placeholder, Tab takes it, Esc hides it;
 - `tabHandover` (`tab`, `to`: the other of claude and codex; the tab menu's *Continue in Codex / Claude Code*, refused
   from an agent): a handover in the storage folder (`handover-<from>-to-<to>-<stamp>.md`: `chatRead`'s your messages and
-  its answers, the newest `HANDOVER_MAX`, and `diff`'s files), then `addTab` of the other agent's first profile told to
+  its answers since its last `new` line (`sinceNew`: a `/clear`'s earlier chat stays out, the side chat's too), the newest `HANDOVER_MAX`, and `diff`'s files), then `addTab` of the other agent's first profile told to
   read it (a host's: in the prompt). Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
 
 `daemon/secrets.ts`: `laki secret <what>` (MCP's `laki_secret`; `SECRET_WAIT`, the CLI's rpc waits as long):

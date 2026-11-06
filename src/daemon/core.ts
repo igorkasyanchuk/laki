@@ -763,7 +763,7 @@ export const agentSaid = (ws: string, at: string) => {
 }
 
 // tabs: every pane on screen; tab: the focused one (older clients send only that)
-const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
+export const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
 const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
 export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null }) {

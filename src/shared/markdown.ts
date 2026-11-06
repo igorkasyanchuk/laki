@@ -305,7 +305,7 @@ export function lineBreaks(src: string) {
     .map((l, i, all) => {
       if (/^\s*(```|~~~)/.test(l)) return (fence = !fence), l
       const next = all[i + 1]
-      return !fence && l.trim() && next?.trim() && !STARTS.test(next) && !/^\s*(#|\|)/.test(l) ? `${l}<br>` : l
+      return !fence && l.trim() && next?.trim() && !STARTS.test(next) && !/^\s*(#|\|)/.test(l) && !/(\\| {2})$/.test(l) ? `${l}<br>` : l // a backslash or two spaces: a break already (`\<br>` would show the tag)
     })
     .join('\n')
 }

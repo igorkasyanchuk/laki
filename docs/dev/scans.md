@@ -58,6 +58,7 @@
     yours with it, the last line, offering *Edit and resend* (its text back in the box). A tab's session changing (a
     `/clear`: SessionStart's new `session_id`) keeps the chat read so far as `past`, ended by a `{ who: 'new' }` line,
     sent before the new chat (`from` then counts back for MCP Apps' `at`); in memory, a daemon restart forgets it.
+    The handover and the side chat (turns.ts `sinceNew`) take only what comes after the last `new` line: the chat the agent has.
     `settings.readerScroll` false: a send doesn't pin it to the bottom. `settings.sendKey` (`mod`): keys.ts `sendIs`
     for every chat box (`setSendKey` as each window's settings come).
   - Claude's API retries: share.ts `meterOf` reads `{ type: 'system', subtype: 'api_error' }` lines (`retryAttempt`,

@@ -9,7 +9,7 @@
 // (noticesTo); --to names the session it's about, its Open button goes there
 import { randomUUID } from 'node:crypto'
 import { ALERT_WAIT, HIDDEN, type Tab } from '../shared/types.ts'
-import { broadcast, clients, findWs, log, resolveTarget, state, type Conn } from './core.ts'
+import { broadcast, clients, findWs, log, resolveTarget, shown, state, type Conn } from './core.ts'
 import { aiMayAlert } from './ai.ts'
 import { hidden } from './phone.ts'
 
@@ -105,7 +105,7 @@ const close = (id: string) => {
 export function alertsSeen(c: Conn) {
   const v = c.view
   if (!v?.focused || c.remote) return
-  const on = v.tabs ?? (v.tab ? [v.tab] : [])
+  const on = shown(v)
   for (const [id, tab] of tells) if (on.includes(tab)) tells.delete(id), broadcast({ ev: 'alertDone', id })
 }
 

@@ -129,4 +129,5 @@ test('lineBreaks: a card\'s line breaks kept (a link at a line\'s end too), not 
   assert.doesNotMatch(h, /<li>[^<]*<br>|a<br>/) // a list's items stay as they are
   assert.match(h, /<h1>T<\/h1><p>x<\/p>/)
   assert.match(h, /<pre><code>c1\nc2<\/code><\/pre>/)
+  assert.doesNotMatch(markdownHtml(lineBreaks('one\\\ntwo  \nthree')), /&lt;br|<br><br>/) // a break already: not another
 })

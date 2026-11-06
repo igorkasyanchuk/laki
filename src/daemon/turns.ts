@@ -50,6 +50,8 @@ turnEnds.add((tab, o) => {
 // old tab stays as it is. ponytail: the chat as it was said, not summed up by a model; a host's workspace (no storage
 // folder) gets it in the prompt
 const HANDOVER_MAX = 40_000
+// the chat the agent has now: the Reader's lines after its last New session (a /clear), not the earlier ones it shows above
+const sinceNew = <T extends { who: string }>(said: T[]) => said.slice(said.findLastIndex(x => x.who === 'new') + 1)
 export async function tabHandover(o: { tab?: string; to?: string }) {
   const tab = state.tabs.find(t => t.id === o.tab)
   if (!tab || !tracked(tab) || (tab.preset !== 'claude' && tab.preset !== 'codex')) throw new Error('a Claude Code or Codex tab hands its chat over')
@@ -58,7 +60,7 @@ export async function tabHandover(o: { tab?: string; to?: string }) {
   const ws = findWs(tab.workspace)
   if (ws.archived) throw new Error(`${ws.name ?? ws.id} is archived: restore it first`)
   const from = AGENT_NAMES[tab.preset as 'claude']
-  const said = (chatRead({ tab: tab.id }).said ?? []).filter(x => x.who === 'you' || x.who === 'agent')
+  const said = sinceNew(chatRead({ tab: tab.id }).said ?? []).filter(x => x.who === 'you' || x.who === 'agent')
   const parts: string[] = []
   let n = 0
   for (const x of [...said].reverse()) {
@@ -264,7 +266,7 @@ export async function sideAsk(p: { tab: string; text: string }) {
       if (!aiOn(state.settings) || ((state.settings?.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) throw new Error("a side chat about this agent uses Laki AI's model: turn Laki AI on (Settings › AI)")
       const chat = chatRead({ tab: tab.id })
       if (!('said' in chat) || !Array.isArray(chat.said)) throw new Error(`Laki can't read ${tab.name}'s chat: a side chat works with Claude Code and Codex, on this Mac`)
-      const said = chat.said.map((x: { who: string; text: string }) => `${x.who === 'you' ? 'User' : x.who === 'agent' ? 'Agent' : 'Tool'}: ${x.text}`).join('\n\n')
+      const said = sinceNew(chat.said).map((x: { who: string; text: string }) => `${x.who === 'you' ? 'User' : x.who === 'agent' ? 'Agent' : 'Tool'}: ${x.text}`).join('\n\n')
       const before = s.said.slice(0, -1).map(x => `${x.who === 'you' ? 'Q' : 'A'}: ${x.text}`).join('\n\n')
       text = (await aiOnce({ system: `${SIDE_NOTE} You only have the chat below, not the files.`, prompt: `The main chat so far (its end):\n${said.length > SIDE_CHAT ? `…${said.slice(-SIDE_CHAT)}` : said || '(nothing yet)'}\n\n${before ? `Earlier side questions:\n${before}\n\n` : ''}The question: ${q}`, ask: `side chat: ${q.slice(0, 80)}` })).trim()
     }
