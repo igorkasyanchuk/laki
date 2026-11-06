@@ -26,7 +26,7 @@ const fileData = (f: File) =>
   })
 const day = (t: number) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
 const named = (n: { title: string }) => n.title || 'Untitled'
-const order = (l: Item[]) => [...l].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at - a.at) // as noteList's
+const order = (l: Item[]) => [...l].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.at - a.at) // as note.list's
 
 export default function NotesPage({ id, api, onOpen, onClose }: { id: string; api: NotesApi; onOpen: (id: string) => void; onClose: () => void }) {
   const [list, setList] = useState<Item[] | null>(null)
@@ -38,7 +38,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const [menu, openMenu] = useMenu()
   const qNow = useRef(q)
   qNow.current = q
-  const load = () => api.call<Item[]>('noteList', { q: qNow.current }).then(l => (setList(l), setErr('')), e => setErr((e as Error).message))
+  const load = () => api.call<Item[]>('note.list', { q: qNow.current }).then(l => (setList(l), setErr('')), e => setErr((e as Error).message))
   useEffect(() => {
     const t = setTimeout(load, q ? 150 : 0)
     return () => clearTimeout(t)
@@ -46,15 +46,15 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const shown = (list ?? []).filter(n => !only || n.color === only)
   const open = id || (!q && !only ? list?.[0]?.id : undefined) // none asked for: the first
   const colors = TAB_COLORS.filter(c => list?.some(n => n.color === c))
-  const make = () => api.call<Note>('noteNew', { color: only ?? undefined }).then(n => (q ? setQ('') : void load(), onOpen(n.id)), e => setErr((e as Error).message)) // a search typed: clearing it loads
+  const make = () => api.call<Note>('note.new', { color: only ?? undefined }).then(n => (q ? setQ('') : void load(), onOpen(n.id)), e => setErr((e as Error).message)) // a search typed: clearing it loads
   // a save's item in the list as it is now, not the whole list read again (a search's match: at the next one)
   const saved = (it: Item) => setList(l => l && order(l.map(x => (x.id === it.id ? it : x))))
-  const save = (nid: string, c: Change) => api.call<Item>('noteSave', { id: nid, ...c }).then(saved)
+  const save = (nid: string, c: Change) => api.call<Item>('note.save', { id: nid, ...c }).then(saved)
   const remove = (n: Item) =>
     void ask(`Delete ${named(n)}?`, { text: 'The note and the files in it go for good.', ok: 'Delete', danger: true }).then(y => {
       if (!y) return
       const next = shown[shown.findIndex(x => x.id === n.id) + 1] ?? shown[shown.findIndex(x => x.id === n.id) - 1]
-      api.call('noteRm', { id: n.id }).then(() => (setList(l => l && l.filter(x => x.id !== n.id)), n.id === open && onOpen(next?.id ?? '')), e => setErr((e as Error).message)) // out of the list at once: the first open next isn't it
+      api.call('note.rm', { id: n.id }).then(() => (setList(l => l && l.filter(x => x.id !== n.id)), n.id === open && onOpen(next?.id ?? '')), e => setErr((e as Error).message)) // out of the list at once: the first open next isn't it
     })
   const colorItems = (n: Item, set: (c: string | null) => void): MenuItem[] => [{ colors: TAB_COLORS, value: n.color, pick: c => set(c === 'none' ? null : c) }, ...(n.color ? [{ label: 'No color', icon: 'x', run: () => set(null) } as MenuItem] : [])]
   const rowMenu = (e: React.MouseEvent, n: Item) => (
@@ -139,12 +139,12 @@ function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { 
   const [err, setErr] = useState('')
   const pending = useRef<Change | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => void api.call<Note>('noteGet', { id }).then(setN, e => setErr((e as Error).message)), [])
+  useEffect(() => void api.call<Note>('note.get', { id }).then(setN, e => setErr((e as Error).message)), [])
   const flush = () => {
     clearTimeout(timer.current)
     const p = pending.current
     pending.current = null
-    if (p) return api.call<Item>('noteSave', { id, ...p }).then(onSaved, e => setErr((e as Error).message))
+    if (p) return api.call<Item>('note.save', { id, ...p }).then(onSaved, e => setErr((e as Error).message))
   }
   useEffect(() => () => void flush(), []) // leaving it (another note, the page closed) saves
   // a row's right click pins or colors it too: the list's item, as it changes
@@ -154,7 +154,7 @@ function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { 
     clearTimeout(timer.current)
     timer.current = setTimeout(flush, 600)
   }
-  const now = (c: Change) => (setN(x => x && { ...x, ...c, color: c.color === null ? undefined : (c.color ?? x.color) }), api.call<Item>('noteSave', { id, ...c }).then(onSaved, e => setErr((e as Error).message)))
+  const now = (c: Change) => (setN(x => x && { ...x, ...c, color: c.color === null ? undefined : (c.color ?? x.color) }), api.call<Item>('note.save', { id, ...c }).then(onSaved, e => setErr((e as Error).message)))
   if (err) return <div className="note-edit"><p className="warn small">{err}</p></div>
   if (!n) return <div className="note-edit muted small">Loading…</div>
   const { color, pinned } = n
@@ -173,8 +173,8 @@ function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { 
         <SpecEditor
           initial={{ blocks: n.blocks }}
           files={{
-            upload: f => fileData(f).then(data => api.call<{ path: string }>('noteUpload', { id, name: f.name, data }).then(r => r.path)),
-            resolve: path => api.call<{ image?: string }>('noteFile', { id, path }).then(r => r.image ?? path),
+            upload: f => fileData(f).then(data => api.call<{ path: string }>('note.upload', { id, name: f.name, data }).then(r => r.path)),
+            resolve: path => api.call<{ image?: string }>('note.file', { id, path }).then(r => r.image ?? path),
           }}
           onChange={(blocks, md) => later({ blocks, md })}
         />

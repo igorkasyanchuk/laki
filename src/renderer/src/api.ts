@@ -3,6 +3,7 @@
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 import type { UpdateState } from '../../shared/update'
+import { oldName } from '../../shared/caps'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
 export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
@@ -130,6 +131,7 @@ class Api {
   private listeners = new Set<(m: Msg) => void>()
   private calls = new Set<(method: string, params: any, r: any) => void>() // each call that went well, with its result (App's achievements)
   connected = false
+  private caps: string[] = [] // the daemon's, from its last view
 
   private fails = 0 // connects in a row that never opened
   private pinned = false // the remote page: no PIN asked for (or given)
@@ -158,7 +160,10 @@ class Api {
           // unknown method: a daemon older than the app, still running (it outlives updates)
           if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): close this page and restart it from the yellow bar at the top (agents resume)` : m.error))
           else w?.res(m.result)
-        } else this.emit(m)
+        } else {
+          if (m.ev === 'state') this.caps = m.view?.caps ?? [] // the namespaces it takes (caps.ts): call() sends the rest by their old names
+          this.emit(m)
+        }
       }
       ws.onclose = () => {
         const opened = this.connected
@@ -187,6 +192,7 @@ class Api {
   }
 
   call<T = any>(method: string, params: object = {}): Promise<T> {
+    if (!this.caps.includes(`ns:${method.split('.')[0]}`)) method = oldName(method) // an older daemon (or no view yet): note.list as noteList
     const id = ++this.seq
     return new Promise((res, rej) => {
       if (this.ws?.readyState !== WebSocket.OPEN) return rej(new Error('not connected'))

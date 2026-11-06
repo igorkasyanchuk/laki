@@ -1,7 +1,14 @@
 # RPC namespaces and capabilities: the plan (H6.1)
 
-Written 2026-11-06 against API 149. A plan only: no code changed. H6.2 (capabilities) and H6.3 (one namespace as a
-pilot) wait for your OK.
+Written 2026-11-06 against API 149. H6.2 (capabilities) and H6.3 (`note.*` as the pilot) are done, in API 150.
+What came out differently from the plan below:
+
+- One file, `src/shared/caps.ts`, holds `RPC_NAMES` (with `oldName`), `CAP_SINCE`, `CAPS` and `hasCap`: no
+  `rpcNames.ts` of its own.
+- The renderer doesn't ask `hasCap('ns:note')` at each call site: its `api.call` keeps the last view's caps and sends a
+  namespaced name only when they list its namespace, else the old name (no view yet: the old name too). Notes.tsx just
+  calls `note.*`.
+- No log line for an old name's use yet: every caller but Notes still uses old names, so it would say nothing useful.
 
 ## Today
 

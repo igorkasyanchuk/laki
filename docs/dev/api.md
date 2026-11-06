@@ -7,6 +7,15 @@ every view as `api`; a running daemon below the renderer's (it outlives app upda
 electron.vite.config.ts' `__BUILT__`, the build's time, in the daemon and the renderer alike; none from source), gets a yellow bar at the
 top of the main area, *Restart Laki's daemon* (`StaleDaemon` in `ui.tsx`, `.stale-bar`; two clicks: `shutdown`, then main starts the new one).
 
+Namespaces and caps (`src/shared/caps.ts`, the plan: `docs/rpc-namespaces.md`): `RPC_NAMES` maps a namespaced name to
+the flat one the `api` table keeps (`note.list` → `noteList`; Notes only so far). `call()` resolves it first
+(`oldName`), before `whoCalls`, `agentNo`, `remoteNo` and `hookWho`, so an alias passes every check its old name does.
+`CAPS` (in every view as `caps`, and from `ping { caps: true }`: `{ pong, api, caps }`; a plain `ping` stays `'pong'`)
+names the behaviors the renderer gates on and an `ns:<namespace>` per namespace; `hasCap(view, cap)` reads them, and for
+a daemon without caps (before 150) the API number `CAP_SINCE` gives. The renderer's `api.call` sends a namespaced name
+only when the last view's caps list its namespace, else the old one; the CLI's `rpc` (conn.ts) sends it, and on
+`unknown method <it>` once more by the old name, by that one from then on. Achievements match by the old name.
+
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
   worktrees' *When everything is done*): core.ts `whenDone` at each view, beside `keepAwake`: armed by something going
   (an agent running or waiting, a live workflow run, a scheduled task or a workspace's late start due within the hour),

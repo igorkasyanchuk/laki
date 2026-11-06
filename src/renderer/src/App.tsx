@@ -19,6 +19,7 @@ import { type DeskAsk, onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
 import { type ProjectTab } from './Project'
 import { ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../../shared/achievements'
+import { hasCap } from '../../shared/caps'
 import { click as extClick, Glyph as ExtGlyph, imagesVia, insertMenus, inWs, status as extStatus, type WidgetApi, WidgetBody, WidgetButtons, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
 import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
@@ -659,7 +660,7 @@ export function App() {
   useEffect(() => void (document.title = winTitle), [winTitle])
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
-  const layoutsOn = (view?.api ?? 0) >= 60
+  const layoutsOn = hasCap(view, 'layouts')
   const migrated = useRef(false)
   useEffect(() => {
     if (!layoutsOn || !view) return
@@ -1465,7 +1466,7 @@ export function App() {
   // what Delete takes with it, said first, a line each: where it is, uncommitted files, commits not pushed, its PR, agents
   // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
   type Peek = { dirty?: number; ahead?: number; unpushed?: number }
-  const peekWs = async (w: WorkspaceView): Promise<Peek> => ((view?.api ?? 0) >= 94 ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {})
+  const peekWs = async (w: WorkspaceView): Promise<Peek> => (hasCap(view, 'ws.peek') ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {})
   // archive: the same, but the storage folder stays (archive keeps it), and a codespace is stopped, its files kept.
   // Each line's icon is tinted by what it means for you (green: nothing lost, amber: mind it, red: lost), the PR's state
   // is a pill, and the verdict over them sums it up: Safe to delete (merged, or nothing of its own), else what to check
@@ -1533,7 +1534,7 @@ export function App() {
   // archive: asked first, with what goes (its uncommitted changes, with the worktree) and what stays; Undo brings it
   // back. One that changed since it was asked is asked again. asked: the caller asked already (several at once)
   const archive = async (w: WorkspaceView, asked = false) => {
-    const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there
+    const old = !hasCap(view, 'archive.dirty') // its daemon archives whatever is there
     const pk = asked ? {} : await peekWs(w)
     const cs = w.codespace !== undefined // its codespace stops, its files stay
     if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay until GitHub deletes a stopped codespace (after 30 days by default). Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
@@ -2705,7 +2706,7 @@ export function App() {
   }, [])
   const newIn = (p: Project) => (p.kind ? quickNew(p.kind) : newWs(p.id)) // a project head's +
   // a project's or group's +: a workspace, or a terminal in the project's own folder (API 107; before: a workspace at once)
-  const termsOk = (view?.api ?? 0) >= 107
+  const termsOk = hasCap(view, 'project.terminal')
   const termIn = (p: Project, place?: string) => quickNew('shells', undefined, true, { project: p.id, ...(place && { place }) })
   const termWhere = (p: Project) => `in ${p.host ? `${p.host}:` : ''}${shortPath(p.path)}`
   const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')

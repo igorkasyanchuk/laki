@@ -4,6 +4,7 @@ import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readd
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { oldName } from './caps.ts'
 
 // ~/.laki; a Mac that ran Laki as "Laki Electron" keeps its ~/.laki-electron: workspaces' worktrees are in it, and
 // agents find their conversations by those paths
@@ -20,7 +21,22 @@ export function daemonInfo(): DaemonInfo | null {
   }
 }
 
+// a namespaced name (note.list): an older daemon refuses it as unknown, so it's sent once more by its old name (caps.ts),
+// and by that one from then on in this process
+const oldOnly = new Set<string>()
 export async function rpc<T = any>(method: string, params: any = {}, timeoutMs = 30000): Promise<T> {
+  const old = oldName(method)
+  if (old === method || oldOnly.has(method)) return post(old, params, timeoutMs)
+  try {
+    return await post(method, params, timeoutMs)
+  } catch (e) {
+    if ((e as Error).message !== `unknown method ${method}`) throw e
+    oldOnly.add(method)
+    return post(old, params, timeoutMs)
+  }
+}
+
+async function post(method: string, params: any, timeoutMs: number) {
   const info = daemonInfo()
   if (!info) throw new Error('daemon not running')
   const res = await fetch(`http://127.0.0.1:${info.port}/rpc`, {

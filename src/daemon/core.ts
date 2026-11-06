@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
 import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
@@ -645,6 +646,7 @@ export function view(): View {
     imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
+    caps: CAPS,
     built: BUILT,
     today: todayView(),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),

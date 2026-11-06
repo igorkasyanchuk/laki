@@ -35,6 +35,7 @@ import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
 import { lazy, type ReactNode, Suspense } from 'react'
 import { Page, Boundary } from './ui'
+import { hasCap } from '../../shared/caps'
 
 const SpecsPage = lazy(() => import('./Specs')) // BlockNote, Mantine and React Flow with it: loaded as it opens, so on by default costs nothing until then
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // loaded as it opens
@@ -160,7 +161,7 @@ export function Pages({ app }: { app: AppCtx }) {
           renameProjects
           skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
           accounts={layoutsOn ? accountsApi : undefined}
-          hooks={(view.api ?? 0) >= 146 ? () => api.call('hooksSeen') : undefined}
+          hooks={hasCap(view, 'hooks.seen') ? () => api.call('hooksSeen') : undefined}
           ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
           bg={{
             url: bgUrl,

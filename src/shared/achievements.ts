@@ -5,6 +5,7 @@
 // (state.json; Reset the interface keeps it)
 import type { IconName } from './icons'
 import type { View } from './types'
+import { oldName } from './caps'
 
 export const ACH_GROUPS = ['Getting started', 'Agents', 'Git & PRs', 'Workspaces', 'Power user', 'Extensions & AI', 'Experimental', 'Just for fun'] as const
 export type AchGroup = (typeof ACH_GROUPS)[number]
@@ -80,10 +81,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'video', group: 'Just for fun', title: 'Play a video', how: "The sidebar foot's play button: a YouTube video beside your work", icon: 'youtube', go: 'video' },
 ]
 
-// the ones a call earns: its method, and its params when they say more; none when it answered that it didn't do it
+// the ones a call earns: its method (note.new as noteNew), and its params when they say more; none when it answered that it didn't do it
 // ({ held }: a gate held ship, merge or archive; { dirty }: wsArchive ifClean asks first)
 export const earnedBy = (method: string, params: any, r?: any) =>
-  r && typeof r === 'object' && ('held' in r || 'dirty' in r) ? [] : ACHIEVEMENTS.filter(a => a.rpc?.split('|').includes(method) && (!a.ok || a.ok(params ?? {}))).map(a => a.id)
+  r && typeof r === 'object' && ('held' in r || 'dirty' in r) ? [] : ACHIEVEMENTS.filter(a => a.rpc?.split('|').includes(oldName(method)) && (!a.ok || a.ok(params ?? {}))).map(a => a.id)
 // the ones a page earns: its dialog's name (App's pageOf)
 export const pageEarns = (page: string) => ACHIEVEMENTS.filter(a => a.page === page).map(a => a.id)
 // each up's value in a view; then the ones that went up (a number) or changed (a value) since the last

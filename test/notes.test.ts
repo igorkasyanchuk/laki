@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { CAPS, hasCap, oldName } from '../src/shared/caps.ts'
+import { rpc } from '../src/shared/conn.ts'
+import { API } from '../src/shared/types.ts'
 import { fresh } from './helpers.ts'
 
 test('notes: on unless turned off; made, saved, searched, colored, pinned, a file kept, deleted with its files', async t => {
@@ -67,4 +72,50 @@ test("to-dos: a file that doesn't read is never saved over with an empty list", 
   await assert.rejects(rig.rpc('todoListGet'), /doesn't read as JSON/)
   writeFileSync(join(rig.data, 'todo-list.json'), '{}') // JSON, but no list
   await assert.rejects(rig.rpc('todoListGet'), /doesn't read as JSON/)
+})
+
+test('note.* (H6.3): the namespaced names reach the same handlers and checks; caps in the view and from ping', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { notes: false })
+  await assert.rejects(rig.rpc('note.list'), /Notes are off/) // the handler's own check, as noteList's
+  await rig.rpc('settingsSet', { notes: true })
+  const n = await rig.rpc('note.new', { title: 'Pilot' })
+  await rig.rpc('note.save', { id: n.id, blocks: [{ type: 'paragraph' }], md: 'aliases work' })
+  assert.equal((await rig.rpc('noteGet', { id: n.id })).title, 'Pilot') // old and new names: one note
+  assert.deepEqual((await rig.rpc('note.list', { q: 'aliases' })).map((x: any) => x.id), [n.id])
+  await assert.rejects(rig.rpc('note.nope'), /^Error: unknown method note\.nope$/)
+  await assert.rejects(rig.rpc('constructor'), /^Error: unknown method constructor$/) // not the table's prototype
+  assert.equal(await rig.rpc('ping'), 'pong') // what every CLI's alive() checks
+  assert.deepEqual(await rig.rpc('ping', { caps: true }), { pong: true, api: API, caps: CAPS })
+  assert.deepEqual((await rig.rpc('state')).caps, CAPS)
+  assert.ok(CAPS.includes('ns:note') && CAPS.includes('ws.peek'))
+})
+
+test('caps against an older daemon: hasCap by its API number; the CLI sends a name it refuses once more by the old one, then that one', async t => {
+  assert.equal(hasCap({ api: 94 }, 'ws.peek'), true) // no caps: the API number it came with
+  assert.equal(hasCap({ api: 93 }, 'ws.peek'), false)
+  assert.equal(hasCap({ api: 149 }, 'ns:note'), false) // no number for it: only a daemon that lists it
+  assert.equal(hasCap({ api: 200, caps: ['ns:note'] }, 'ws.peek'), false) // caps listed: those only
+  assert.equal(hasCap(null, 'layouts'), false)
+  assert.equal(oldName('note.list'), 'noteList')
+  assert.equal(oldName('constructor'), 'constructor')
+  const seen: string[] = []
+  const srv = createServer(async (req, res) => {
+    let b = ''
+    for await (const c of req) b += c
+    const { method } = JSON.parse(b)
+    seen.push(method)
+    res.end(JSON.stringify(method === 'noteList' ? { result: ['old'] } : { error: `unknown method ${method}` })) // API 149's
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const home = mkdtempSync(join(tmpdir(), 'laki-old-'))
+  writeFileSync(join(home, 'daemon.json'), JSON.stringify({ port: (srv.address() as { port: number }).port, token: 'x' }))
+  const was = process.env.LAKI_HOME
+  process.env.LAKI_HOME = home
+  t.after(() => (was === undefined ? delete process.env.LAKI_HOME : (process.env.LAKI_HOME = was)))
+  assert.deepEqual(await rpc('note.list'), ['old'])
+  assert.deepEqual(await rpc('note.list'), ['old'])
+  await assert.rejects(rpc('note.nope'), /^Error: unknown method note\.nope$/) // not an alias: refused as it is
+  assert.deepEqual(seen, ['note.list', 'noteList', 'noteList', 'note.nope'])
 })

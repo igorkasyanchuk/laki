@@ -13,7 +13,8 @@ import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
-import { HIDDEN } from '../shared/types.ts'
+import { API, HIDDEN } from '../shared/types.ts'
+import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { dir, inRig } from './dir.ts'
@@ -220,7 +221,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 
 type Handler = (p: any, c?: core.Conn) => unknown
 const api: Record<string, Handler> = {
-  ping: () => 'pong',
+  ping: p => (p.caps ? { pong: true, api: API, caps: CAPS } : 'pong'), // plain: 'pong', as every CLI's alive() wants
   state: () => core.view(),
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
   projectRm: p => core.projectRm(p.id),
@@ -734,6 +735,7 @@ async function hookWho(sock: Socket, p: any) {
 const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's daemon that takes none (api.test's)
 
 async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {
+  method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
   if (!TEST_CLOCK && params && typeof params === 'object' && 'now' in params) params = { ...params, now: undefined }

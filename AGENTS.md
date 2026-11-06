@@ -105,7 +105,7 @@ for the part you change, and keep it up to date with the change.
 
 - [docs/dev/api.md](docs/dev/api.md): the daemon's API (`src/daemon/main.ts` `api`): each method over `/rpc` and the
   WebSocket, its events and the view; `laki mcp`, the MCP server.
-- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 146. Bump `API` (`src/shared/types.ts`)
+- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 150. Bump `API` (`src/shared/types.ts`)
   when the renderer starts relying on a new method or daemon behavior (a setting needs no bump); the next one goes at its end.
 - [docs/dev/agents.md](docs/dev/agents.md): profiles and accounts, layouts, agent variables, turns, asks, sessions, sleep,
   terminal queries, agents and their hooks, projects and their trust, presets, interrupts, resume after a restart.
@@ -218,6 +218,7 @@ for the part you change, and keep it up to date with the change.
 | `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall; a list: no
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc`; the daemon's `readJson`, `writeAtomic` (a temp file, then a rename), `move` (across volumes too) and `priorOf` (a Write ask's file as it is, for its diff) |
+| `src/shared/caps.ts` | namespaced method names (`RPC_NAMES`: `note.list` → `noteList`, resolved first in main.ts' `call()`; `oldName`), the daemon's `CAPS` (the view's `caps`, `ping { caps: true }`) and `hasCap` (an older daemon by `CAP_SINCE`'s API numbers): `docs/rpc-namespaces.md` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/renderer/src/Reader.tsx` | Reader view: an agent tab's chat as a conversation, its ask as buttons, a box that sends |
 | `src/shared/nextStep.ts` | One next step: what a workspace needs from you now, from its tabs, check and PR |
