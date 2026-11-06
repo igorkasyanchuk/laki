@@ -126,6 +126,8 @@
               "port.open",
               "gate.held",
               "tool.call",
+              "issue.labeled",
+              "webhook",
               "custom.*"
             ]
           },
