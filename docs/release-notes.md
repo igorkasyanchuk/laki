@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- The archive, delete and close asks show a workspace's PR in its state's color, as the sidebar does: merged purple,
+  closed red, draft gray, open green. The status bar's PR number is purple once merged and red once closed.
 - Archiving a cloud workspace says its codespace keeps your uncommitted files and unpushed commits only until GitHub
   deletes the stopped codespace (30 days by default).
 

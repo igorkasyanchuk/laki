@@ -127,9 +127,10 @@ type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
 type Field = { value: string; placeholder?: string; multi?: boolean } // multi: a text box (Enter a new line, ⌘⏎ OK)
 // a line of ask's facts, under its text; icon: a name (Icon) or an emoji; tone: its icon's color (ok green, warn amber,
-// bad red); chip: a pill before the value in that tone (a PR's Merged)
+// bad red); chip: a pill before the value in that tone (a PR's Merged); pr: a PR's state (Info's prState: open, draft,
+// merged, closed), its icon and chip in that state's color as everywhere else, over tone
 export type Tone = 'ok' | 'warn' | 'bad'
-export type Fact = { label: string; value: ReactNode; icon?: string; tone?: Tone; chip?: string } // value: words, or a few spans (a size's +/−)
+export type Fact = { label: string; value: ReactNode; icon?: string; tone?: Tone; chip?: string; pr?: string } // value: words, or a few spans (a size's +/−)
 export type Verdict = { tone: Tone; text: string } // a line over the facts: what it all comes to (Safe to delete…, Check first…)
 type Asking = { n?: number; title: string; text?: string; verdict?: Verdict; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
@@ -230,12 +231,12 @@ export function AskHost() {
           <dl className="ask-facts">
             {a.facts.map(f => (
               <div key={f.label}>
-                <dt className={f.tone}>
+                <dt className={f.pr ? `ask-pr ${f.pr}` : f.tone}>
                   {f.icon && (isIconName(f.icon) ? <Icon name={f.icon} /> : `${f.icon} `)}
                   {f.label}
                 </dt>
                 <dd>
-                  {f.chip && <span className={`ask-chip ${f.tone ?? ''}`}>{f.chip}</span>}
+                  {f.chip && <span className={`ask-chip ${f.pr ? `ask-pr ${f.pr}` : (f.tone ?? '')}`}>{f.chip}</span>}
                   {f.value}
                 </dd>
               </div>

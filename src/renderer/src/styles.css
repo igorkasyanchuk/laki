@@ -471,7 +471,8 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .pr-pass { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
 .pr-fail { color: var(--error); border-color: color-mix(in srgb, var(--error) 40%, transparent); }
 .pr-pending, .pr-conflict { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
-.pr-merged { color: var(--hunk); }
+.pr-merged { color: var(--tc-purple); } /* a PR's state over its checks', as everywhere: merged purple, closed red */
+.pr-closed { color: var(--error); }
 .empty-side { padding: 12px; }
 .archived .ws { cursor: default; }
 
@@ -783,6 +784,14 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .ask-chip.ok { border-color: color-mix(in srgb, var(--done) 50%, var(--line)); background: color-mix(in srgb, var(--done) 12%, transparent); }
 .ask-chip.warn { border-color: color-mix(in srgb, var(--waiting) 50%, var(--line)); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
 .ask-chip.bad { border-color: color-mix(in srgb, var(--error) 50%, var(--line)); background: color-mix(in srgb, var(--error) 12%, transparent); }
+/* a PR's fact: its state's color, as the sidebar's, the project's and the link cards': open green, draft gray, merged purple, closed red */
+.ask-pr { --pr-c: var(--done); }
+.ask-pr.draft { --pr-c: var(--muted); }
+.ask-pr.merged { --pr-c: var(--tc-purple); }
+.ask-pr.closed { --pr-c: var(--error); }
+.ask-facts dt.ask-pr .icon-svg { color: var(--pr-c); }
+.ask-chip.ask-pr { border-color: color-mix(in srgb, var(--pr-c) 50%, var(--line)); background: color-mix(in srgb, var(--pr-c) 12%, transparent); }
+.ask-chip.ask-pr::before { background-color: var(--pr-c); }
 .ask-verdict { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; padding: 8px 11px; border: 1px solid var(--line); border-radius: var(--rs, 8px); font-size: 12.5px; line-height: 1.4; }
 .ask-verdict .icon-svg { flex: none; margin-top: 1px; }
 .ask-verdict.ok { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); background: color-mix(in srgb, var(--done) 10%, transparent); }
@@ -1158,7 +1167,7 @@ kbd { font-family: var(--mono); }
 @media (hover: none) { .info-facts .info-row > .ib { opacity: 1; } }
 .tag { padding: 0 6px; border-radius: 9px; font-size: 11px; line-height: 17px; border: 1px solid var(--line); color: var(--muted); }
 .tag-open, .tag-approved { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
-.tag-merged { color: var(--hunk); border-color: color-mix(in srgb, var(--hunk) 40%, transparent); }
+.tag-merged { color: var(--tc-purple); border-color: color-mix(in srgb, var(--tc-purple) 40%, transparent); }
 .tag.warn { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
 /* the side panel's Commits: each one's pushed mark (a cloud) or not (an arrow up, in the waiting color) */
 .sp-commit .sp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
