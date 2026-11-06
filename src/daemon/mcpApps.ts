@@ -16,6 +16,7 @@ import { accountNamed } from './accounts.ts'
 import { findTab, findWs, log, state } from './core.ts'
 import { bumpReader, callsOf, chatRead, type McpCall } from './meters.ts'
 import { urlKey, urlKeyOk } from './widgets.ts'
+import { register } from './ticks.ts'
 
 const VERSION = '2025-06-18'
 const UI_MIME = 'text/html;profile=mcp-app'
@@ -166,9 +167,9 @@ function connect(key: string, server: Server, cwd: string): Live {
   conn.catch(() => live.delete(key))
   return l
 }
-setInterval(() => {
+register('mcpAppSweep', 60_000, () => {
   for (const [k, l] of live) if (Date.now() - l.used > IDLE) (live.delete(k), void l.conn.then(c => c.close(), () => {}))
-}, 60_000).unref()
+}, { unref: true })
 
 const uriOf = (t: any) => (x => (typeof x === 'string' && x.startsWith('ui://') ? x : undefined))(t?._meta?.ui?.resourceUri ?? t?._meta?.['ui/resourceUri'])
 function appsOf(key: string, l: Live) {

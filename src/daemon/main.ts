@@ -828,15 +828,15 @@ const server = createServer(async (req, res) => {
 // L15: a refused WebSocket logged once per address and Origin, then how many more once a minute: a page that retries
 // for good doesn't fill daemon.log. ponytail: daemon.log still rotates only as a daemon starts (conn.ts)
 const refused = new Map<string, number>() // the ones since the last minute's line
-let refusedTick: NodeJS.Timeout | undefined
+let refusedStop: (() => void) | undefined
 function refusedWs(who: string) {
   const n = refused.get(who)
   if (n === undefined) log('refused websocket', who)
   refused.set(who, (n ?? -1) + 1)
-  refusedTick ??= setInterval(() => {
+  refusedStop ??= ticks.register('refusedWs', 60000, () => {
     for (const [k, more] of refused) more ? (log(`refused websocket ${k}: ${more} more in the last minute`), refused.set(k, 0)) : refused.delete(k)
-    if (!refused.size) clearInterval(refusedTick), (refusedTick = undefined)
-  }, 60000).unref()
+    if (!refused.size) refusedStop?.(), (refusedStop = undefined)
+  }, { unref: true })
 }
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 34 << 20 }) // an attached 25 MB file (fileSave), in base64. ponytail: /rpc stays at 16 MB: the app's own go over the socket
@@ -906,7 +906,6 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
   })
 })
 
-const timers: NodeJS.Timeout[] = []
 const listening = new Promise<void>(r => server.once('listening', () => r()))
 void remoteMod
   .reapChildren()
@@ -922,37 +921,38 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   chmodSync(info, 0o600)
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   remoteMod.setDaemonPort(port)
-  const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
   ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
-  every(prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
-  every(3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
+  ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
+  ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
   ticks.register('sweepRunning', 2000, core.sweepRunning)
-  every(30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
+  ticks.register('hookTick', 30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
   ticks.register('shellTick', 2000, core.shellTick)
-  every(60000, () => resourcesMod.sleepTick())
-  every(Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
-  every(300000, policyTick)
+  ticks.register('sleepTick', 60000, () => resourcesMod.sleepTick())
+  ticks.register('ticketTick', Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
+  ticks.register('policyTick', 300000, policyTick)
   ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)
-  every(Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps) // Collision radar
+  ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps) // Collision radar
   ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
-  every(30000, () => core.watchLimits())
-  every(15000, () => (remoteMod.remoteTick(), remoteMod.shareTick(), remoteMod.tunnelTick()))
-  every(30000, () => scheduleMod.scheduleTick())
-  every(30000, () => scheduleMod.pendingTick())
-  every(30000, () => scheduleMod.reminderTick())
-  every(1800000, () => memoryTick())
-  every(30000, () => widgetTick())
+  ticks.register('watchLimits', 30000, () => core.watchLimits())
+  ticks.register('remoteTick', 15000, () => remoteMod.remoteTick())
+  ticks.register('shareTick', 15000, () => remoteMod.shareTick())
+  ticks.register('tunnelTick', 15000, () => remoteMod.tunnelTick())
+  ticks.register('scheduleTick', 30000, () => scheduleMod.scheduleTick())
+  ticks.register('pendingTick', 30000, () => scheduleMod.pendingTick())
+  ticks.register('reminderTick', 30000, () => scheduleMod.reminderTick())
+  ticks.register('memoryTick', 1800000, () => memoryTick())
+  ticks.register('widgetTick', 30000, () => widgetTick())
   ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())
-  every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  ticks.register('aiTick', 600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
+  ticks.register('tidy', 3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
   setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)
   if (parent)
-    every(2000, () => {
+    ticks.register('testParent', 2000, () => {
       try {
         process.kill(parent, 0)
       } catch {
@@ -963,7 +963,6 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
 
 function shutdown() {
   log('shutting down')
-  timers.forEach(clearInterval)
   ticks.stopAll()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
