@@ -1,20 +1,30 @@
 // the status bar's Background chip: what the workspace's claude tabs left running in the background (Bash
 // run_in_background shells, background subagents: meters.ts reads them from each chat), and a card listing them, each
 // with Output and Stop as the Reader's chips have, and how many finished. Shown while one runs, and 10 minutes after
-// the last one ended
+// the last one ended. Clear: the finished ones counted so far go (this viewer's, per tab and chat); Run again: the
+// agent is asked to
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { type BgTaskView, type TabView } from '../../shared/types'
-import { Icon, IconButton } from './ui'
+import { Icon, IconButton, keep, load } from './ui'
+import { type BgCleared, bgDoneOf } from './text'
 
 type BgOut = { text: string; size: number; cut?: boolean }
 export type BgApi = { bgOutput: (tab: string, id: string) => Promise<BgOut>; send: (tab: string, text: string) => Promise<unknown> }
 const RECENT = 10 * 60_000
+const CLEARED = 'laki.bgCleared' // each tab's finished count when Clear was clicked, by its chat (text.ts bgDoneOf)
 
 export function BgButton({ tabs, api }: { tabs: TabView[]; api: BgApi }) {
   const [at, setAt] = useState<DOMRect | null>(null)
+  const [cleared, setCleared] = useState<BgCleared>(() => load(CLEARED, {}))
   const live = tabs.filter(t => t.background && t.status !== 'exited')
   const running = live.flatMap(t => t.background!.now.map(task => ({ tab: t, task })))
-  const done = live.reduce((n, t) => n + t.background!.done, 0)
+  const done = live.reduce((n, t) => n + bgDoneOf(t, cleared), 0)
+  const clear = () => {
+    const c = Object.fromEntries([...Object.entries(cleared).filter(([id]) => !live.some(t => t.id === id)).slice(-100), ...live.map(t => [t.id, { chat: t.resumeId, n: t.background!.done }])])
+    setCleared(c)
+    keep(CLEARED, c)
+    if (!running.length) setAt(null)
+  }
   const last = Math.max(0, ...live.map(t => t.background!.at ?? 0))
   if (!running.length && !(done && Date.now() - last < RECENT) && !at) return null
   const tip = running.length ? `Background: ${running.map(r => r.task.name).join(' · ')}` : `Background: ${done} finished`
@@ -24,14 +34,15 @@ export function BgButton({ tabs, api }: { tabs: TabView[]; api: BgApi }) {
         <Icon name={running.length ? 'gear' : 'check'} size={11} />
         {running.length ? `${running.length} running` : `${done} finished`}
       </button>
-      {at && <BgPop anchor={at} tabs={live} api={api} onClose={() => setAt(null)} />}
+      {at && <BgPop anchor={at} tabs={live} cleared={cleared} api={api} onClear={clear} onClose={() => setAt(null)} />}
     </>
   )
 }
 
-function BgPop({ anchor, tabs, api, onClose }: { anchor: DOMRect; tabs: TabView[]; api: BgApi; onClose: () => void }) {
+function BgPop({ anchor, tabs, cleared, api, onClear, onClose }: { anchor: DOMRect; tabs: TabView[]; cleared: BgCleared; api: BgApi; onClear: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   const [out, setOut] = useState<{ tab: string; id: string; got?: BgOut; err?: string; ended?: boolean }>()
+  const [asked, setAsked] = useState<string[]>([]) // Run again's, sent once
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
     window.addEventListener('keydown', f, true) // before the terminal under it
@@ -54,6 +65,11 @@ function BgPop({ anchor, tabs, api, onClose }: { anchor: DOMRect; tabs: TabView[
   const many = tabs.length > 1
   // a subagent in this turn (its call's id) stops with the turn (Esc); a background one or a shell: the agent is asked
   const stop = (t: TabView, x: BgTaskView) => void api.send(t.id, `Stop the background ${x.kind === 'agent' ? 'subagent' : 'task'} ${x.id} (${x.name}) now, with TaskStop (or KillShell), then say it's stopped.`).catch(() => {})
+  // a subagent of a turn (its call's id) ran in the foreground: asked for again as it ran
+  const again = (t: TabView, x: BgTaskView) => {
+    setAsked(a => [...a, `${t.id}:${x.id}`])
+    void api.send(t.id, x.kind === 'agent' ? `Run the ${x.id.startsWith('toolu_') ? '' : 'background '}subagent "${x.name}" again, with the same prompt as before.` : `Run the background task "${x.name}" again (Bash with run_in_background)${x.cmd ? `: ${x.cmd}` : ', with the same command as before'}`).catch(() => setAsked(a => a.filter(k => k !== `${t.id}:${x.id}`)))
+  }
   const row = (t: TabView, x: BgTaskView, ended: boolean) => (
     <li key={`${t.id}:${x.id}:${ended}`} className={ended ? 'ended' : ''}>
       <Icon name={x.kind === 'agent' ? 'agent' : 'terminal'} size={13} />
@@ -61,8 +77,15 @@ function BgPop({ anchor, tabs, api, onClose }: { anchor: DOMRect; tabs: TabView[
         {x.name}
         {many && <span className="muted small"> · {t.name}</span>}
       </span>
-      {ended ? (
-        <span className="muted small">Done</span>
+      {ended && asked.includes(`${t.id}:${x.id}`) ? (
+        <span className="muted small" data-tip={`Asked ${t.name} to run it again`}>Asked</span>
+      ) : ended ? (
+        <>
+          <span className="muted small bg-done">Done</span>
+          <button type="button" className="link small bg-again" data-tip={`Asks ${t.name} to run it again`} onClick={() => again(t, x)}>
+            Run again
+          </button>
+        </>
       ) : (
         <>
           {x.out && (
@@ -83,9 +106,9 @@ function BgPop({ anchor, tabs, api, onClose }: { anchor: DOMRect; tabs: TabView[
       )}
     </li>
   )
-  const done = tabs.reduce((n, t) => n + t.background!.done, 0)
+  const done = tabs.reduce((n, t) => n + bgDoneOf(t, cleared), 0)
   const now = tabs.flatMap(t => t.background!.now.map(x => row(t, x, false)))
-  const last = tabs.flatMap(t => t.background!.last.map(x => ({ t, x }))).slice(0, 5)
+  const last = tabs.flatMap(t => t.background!.last.slice(0, bgDoneOf(t, cleared)).map(x => ({ t, x }))).slice(0, 5)
   return (
     <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()}>
       <div className="tunnel-pop bg-pop" ref={box} role="dialog" aria-label="Background tasks">
@@ -111,7 +134,10 @@ function BgPop({ anchor, tabs, api, onClose }: { anchor: DOMRect; tabs: TabView[
         {done > 0 && (
           <div className="bg-foot muted small">
             <Icon name="layers" size={12} />
-            {done} finished
+            <span className="grow">{done} finished</span>
+            <button type="button" className="link small" data-tip="Hide the finished ones (new ones still show)" onClick={onClear}>
+              Clear
+            </button>
           </div>
         )}
       </div>

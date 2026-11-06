@@ -75,7 +75,8 @@
     The meters read it too (`MeterRun.bg`, `bgDone`: `done`, how many ended, the newest 5, the last one's line time):
     `meterView`'s `background` (`TabView.background`: `now`, `done`, `last`, `at`) is the status bar's Background chip
     (BgTasks.tsx `BgButton`: the workspace's claude tabs, while one runs or 10 minutes after the last ended; its card
-    lists each with Output and Stop as the chips do, the ended ones as Done, *n finished*). None while both meters are off.
+    lists each with Output and Stop as the chips do, the ended ones as Done, *Run again* on hover or Tab (the agent asked to, a shell with its `cmd`; *Asked* after), *n finished* and *Clear*: each
+    tab's `done` kept by its chat in localStorage `laki.bgCleared`, only the ones after it shown: text.ts `bgDoneOf`). None while both meters are off.
   - MCP Apps (`settings.mcpApps`, on unless false; mcpApps.ts): `chatOf`'s `calls` (claude's `mcp__<server>__<tool>`
     calls, their said line `at`, their result: content blocks, `structuredContent`), `callsOf` (the newest 200); main.ts'
     `chatRead` is `chatWithApps`: `appsFor` finds each call's server in the tab's account's `.claude.json` (user and

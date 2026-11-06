@@ -13,6 +13,8 @@ version it builds, with the date. -->
 - While Claude Code waits out a rate limit or an overloaded server, the Reader and the tab say so: its try, the wait
   left, why.
 - When Claude Code asks several questions at once, ← and → go between them on the Reader's and Needs you's cards.
+- In Reader view an agent's question shows once, on the Reader's card (with a permission ask's tool and command), not also on the bar under it.
+- The status bar's Background tasks card: *Clear* hides the finished ones, and a finished one's *Run again* (on hover) asks the agent to run it again.
 - An open artifact (HTML, Markdown, a picture) updates by itself when its file changes.
 - Settings shows *new* by sections with settings you haven't seen since the last version, and on those settings.
 - The sidebar filter keeps one project or several (Shift-click) in view.

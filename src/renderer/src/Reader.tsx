@@ -16,6 +16,7 @@ import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { type Mention, type ReaderLine, readerShown, retrying, retryText, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
+import { optLabel } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
 import { HIDDEN, type TabView } from '../../shared/types'
 
@@ -25,7 +26,7 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+export type ReaderApi = { keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
@@ -214,6 +215,10 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         <div className="rd-ask muted">It asks you to approve its plan: below, where you can change it too.</div>
       ) : tab.ask ? (
         <div className="rd-ask">
+          {tab.ask.tool && (
+            // claude's permission ask: the tool and what it touches, as written (App's ask bar is hidden in the Reader)
+            <span className="rd-perm"><span className="tag">{tab.ask.tool}</span> <span className="mono">{tab.ask.what}</span></span>
+          )}
           <span className="muted">{tab.ask.question || `${tab.name} asks:`}</span>
           {tab.ask.steps && api.keys && (
             <span className="rd-steps small">
@@ -225,8 +230,8 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           {tab.ask.diff && <AskDiff key={tab.ask.what} diff={tab.ask.diff} />}
           <div className="rd-opts">
             {tab.ask.options.map(o => (
-              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} onClick={() => api.answer(tab.id, o.n)}>
-                {o.n}. {o.label}
+              <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} onClick={() => api.answer(tab.id, o.n, o.label)}>
+                {o.n}. {optLabel(tab.ask!, o)}
               </button>
             ))}
           </div>

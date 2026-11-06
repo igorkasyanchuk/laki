@@ -142,6 +142,8 @@ function ruleOf(sug: unknown, root?: string, home?: string) {
 }
 // the menu's "don't ask again" choice (claude: "Yes, and don't ask again for …", "Yes, and always allow access to …")
 export const alwaysOf = (a?: Ask) => a?.options.find(o => /don['’]t ask again|always allow/i.test(o.label))
+// an option's words on a button (the ask bar's, the Reader's): the "don't ask again" one names its rule
+export const optLabel = (a: Ask, o: Ask['options'][number]) => (a.rule && o === alwaysOf(a) ? `Yes, don't ask again for ${a.rule}` : o.label)
 // what it wants to do, for a notification's title: "wants to run", "wants to edit"…
 export const permVerb = (tool: string) =>
   tool === 'Bash' ? 'wants to run'

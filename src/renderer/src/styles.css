@@ -1712,10 +1712,12 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .sb-bg.on svg { animation: spin 2.4s linear infinite; }
 .bg-pop { width: 420px; }
 .bg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.bg-list li { display: flex; align-items: center; gap: 8px; padding: 5px 2px; min-width: 0; }
+.bg-list li { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 2px; min-width: 0; }
 .bg-list li.ended { color: var(--muted); }
 .bg-list .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .bg-list .link.on { text-decoration: underline; }
+@media (hover: hover) { .bg-list li:not(:hover, :focus-within) .bg-again { position: absolute; opacity: 0; pointer-events: none; } .bg-list li:is(:hover, :focus-within) .bg-done { display: none; } } /* Run again on hover, or Tab to it: hidden, not gone */
+@media (hover: none) { .bg-list .bg-done { display: none; } } /* a phone: Run again always */
 .bg-foot { display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .tunnel-pop a { color: var(--accent-ink); }
 .tunnel-head { display: flex; align-items: center; gap: 8px; }
@@ -2718,6 +2720,7 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-ask, .rd-box { flex: none; max-width: 760px; width: 100%; margin: 0 auto; padding: 10px 20px 14px; box-sizing: border-box; }
 .rd-chips, .rd-out { flex: none; max-width: 720px; width: calc(100% - 40px); margin: 0 auto; box-sizing: border-box; } /* the box's column, inside its padding */
 .rd-ask { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); } .rd-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.rd-perm { display: flex; align-items: baseline; gap: 6px; min-width: 0; } .rd-perm .mono { font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 8em; overflow-y: auto; }
 .rd-box { position: relative; display: flex; gap: 8px; align-items: flex-end; } /* @'s menu (pi-complete) over it */
 .rd-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
 .rd-app { display: flex; flex-direction: column; gap: 4px; }

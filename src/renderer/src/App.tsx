@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
-import { alwaysOf, diffCounts, permVerb } from '../../shared/ask'
+import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -2604,7 +2604,7 @@ export function App() {
     appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
-    answer: (tab, n) => void call('answer', { tab, n }).catch(() => {}),
+    answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
     undo: t =>
       void ask(`Undo ${t.name}'s last turn?`, { text: `${t.changes!.n} file${t.changes!.n === 1 ? '' : 's'} back as they were before it: ${t.changes!.files.slice(0, 4).map(f => f.path).join(', ')}${t.changes!.n > 4 ? '…' : ''}. Files it made are removed. Nothing is committed.`, ok: 'Undo', danger: true }).then(ok => void (ok && call<{ files: number }>('turnUndo', { tab: t.id }).then(r => done(`${r.files} file${r.files === 1 ? '' : 's'} back as before the turn`), () => {}))),
@@ -3524,7 +3524,7 @@ export function App() {
             />
           )}
         </div>
-        {tab?.ask && !tab.planAsk /* its plan card has them */ && (
+        {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
           <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff}>{chip => (
           <div className="ask-bar">
@@ -3539,7 +3539,7 @@ export function App() {
               <span className="muted">{tab.name} asks:</span>
             )}
             {tab.ask!.options.map(o => {
-              const label = tab.ask!.rule && o === alwaysOf(tab.ask) ? `Yes, don't ask again for ${tab.ask!.rule}` : o.label
+              const label = optLabel(tab.ask!, o)
               return (
                 <button key={o.n} className={o.n === tab.ask!.options[0].n ? 'primary' : ''} data-tip={o.label} onClick={() => call('answer', { tab: tab.id, n: o.n, label: o.label }).catch(() => {})}>
                   {o.n}. {label.length > 48 ? `${label.slice(0, 46)}…` : label}

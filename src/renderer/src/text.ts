@@ -812,6 +812,11 @@ export function rmVerdict(s: RmState): { tone: 'ok' | 'warn' | 'bad'; text: stri
 
 // claude waiting out an API error this turn (meters.ts' retry: one from before the turn began is stale), and in words:
 // its try, the wait left, why. The Reader's line under the chat, the tab bar's Retrying…
+// the status bar's Background card: a tab's finished ones since Clear, which kept their count by chat (a /clear's new
+// chat, or a count below it, starts from 0 again)
+export type BgCleared = Record<string, { chat?: string; n: number }>
+export const bgDoneOf = (t: Pick<TabView, 'id' | 'resumeId' | 'background'>, c: BgCleared) =>
+  (done => done - (x => (x && x.chat === t.resumeId && x.n <= done ? x.n : 0))(c[t.id]))(t.background?.done ?? 0)
 export const retrying = (t: Pick<TabView, 'status' | 'retry' | 'runAt'>) => t.status === 'running' && !!t.retry && t.retry.at >= (t.runAt ?? 0)
 export function retryText(r: NonNullable<TabView['retry']>, now = Date.now()) {
   const left = Math.ceil((r.until - now) / 1000)

@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, s
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { copyTree } from '../src/shared/conn.ts'
-import { pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
+import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
@@ -428,4 +428,14 @@ test("the Reader's tool calls (Hide successful, Final answer only), its retry li
   setSendKey('mod')
   assert.deepEqual([sendIs(k('Enter')), sendIs(k('Enter', { metaKey: true })), sendIs(k('Enter', { ctrlKey: true }))], [false, true, true])
   setSendKey(undefined)
+})
+
+test("Background tasks' Clear: a tab's finished ones since, by its chat; a new chat or a lower count starts from 0", () => {
+  const t = (resumeId: string, done: number) => ({ id: 'a', resumeId, background: { now: [], done, last: [] } })
+  const c = { a: { chat: 's1', n: 3 } }
+  assert.equal(bgDoneOf(t('s1', 3), c), 0)
+  assert.equal(bgDoneOf(t('s1', 5), c), 2)
+  assert.equal(bgDoneOf(t('s2', 1), c), 1) // a /clear's new chat
+  assert.equal(bgDoneOf(t('s1', 2), c), 2) // fewer than when cleared: counted anew
+  assert.equal(bgDoneOf(t('s1', 4), {}), 4)
 })

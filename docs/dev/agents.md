@@ -111,7 +111,8 @@ A waiting tab's view has `ask` (`shared/ask.ts` `askOf`, over the bottom 16 line
 (`1.`, `2)`…), consecutive, at least two, one of them marked (❯ › > ▶ ● →), box borders stripped; the last such menu
 wins (tested in `test/ask.test.ts`). `answer` reads it again, then sends ↑/↓ one at a time, 40 ms apart (a TUI reads
 a burst as one key; `Session.appCursor` picks `ESC O` or `ESC [`), then ⏎. The renderer's ask bar (App.tsx) shows
-them as buttons for the tab with the keyboard; a permission prompt's notification gets *Allow* / *Deny* (main's
+them as buttons for the tab with the keyboard (not in Reader view: the Reader's card has them, with the tool, what and rule (shared/ask.ts `optLabel`), and answers with
+the label too; the bar comes back while the full review or a phone's panel covers the Reader); a permission prompt's notification gets *Allow* / *Deny* (main's
 `Notification` `actions`; main calls `answer` itself, `pick` first / last, so a closed window doesn't matter). `answer`
 needs the tab waiting and takes one at a time (a second after its Enter too). A waiting tab's output has its menu read
 again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't the ask the last pushed view gave (`askKey`, set in `changed`).

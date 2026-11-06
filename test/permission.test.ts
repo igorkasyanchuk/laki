@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { alwaysOf, diffCounts, lineDiff, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
+import { alwaysOf, diffCounts, lineDiff, optLabel, permDiff, permOf, permVerb } from '../src/shared/ask.ts'
 import { fresh, until } from './helpers.ts'
 import { priorOf } from '../src/shared/conn.ts'
 
@@ -34,6 +34,8 @@ test('permOf: each tool in a line, cut at 300; the first rule or folder suggesti
   const ask = { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'Yes, and don’t ask again for: npm init *' }, { n: 3, label: 'No' }], at: 1 }
   assert.equal(alwaysOf(ask)?.n, 2)
   assert.equal(alwaysOf({ options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }], at: 1 }), undefined)
+  assert.deepEqual(ask.options.map(o => optLabel({ ...ask, rule: 'npm init' }, o)), ['Yes', "Yes, don't ask again for npm init", 'No'])
+  assert.equal(optLabel(ask, ask.options[1]), ask.options[1].label) // no rule: as it reads
 })
 
 test('permDiff: an Edit, MultiEdit or Write as lines kept, gone and new; capped; none without a change', () => {
