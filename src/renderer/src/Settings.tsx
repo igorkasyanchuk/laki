@@ -1727,7 +1727,7 @@ export function SettingsPage(p: {
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
+                    <Says title={`${name} plan limits`} hint={a === 'gemini' ? "The status bar's ring: each model's quota, read with Gemini CLI's own Google sign-in every 5 minutes (nothing written to it)" : `The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
                   </Switch>
                 ))}
                 <label className="switch-row">

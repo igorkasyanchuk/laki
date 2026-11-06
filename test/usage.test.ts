@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -173,4 +173,75 @@ test('usage: Claude asked every 7.5 minutes; told to wait, its Retry-After or lo
   code = 429
   assert.equal((await at(67)).next, undefined) // 7 minutes on: kept
   assert.equal((await at(68)).next, t0 + 78 * min) // back to 10 after an answer
+})
+
+// Gemini CLI: its oauth_creds.json read only; an expired token refreshed once, in memory; the project from
+// loadCodeAssist; each model's bucket a window; an API-key user unknown; a 429 waits as waitOf says
+test('usage: Gemini CLI per model, its expired token refreshed once in memory, nothing written under ~/.gemini', async t => {
+  const hits: { url: string; auth?: string; body: string }[] = []
+  let quota = 200
+  const srv = createServer((q, r) => {
+    let body = ''
+    q.on('data', c => (body += c))
+    q.on('end', () => {
+      hits.push({ url: q.url!, auth: q.headers.authorization, body })
+      const json = (o: object, code = 200, h: Record<string, string> = {}) => (r.writeHead(code, { 'content-type': 'application/json', ...h }), r.end(JSON.stringify(o)))
+      if (q.url === '/token') return json({ access_token: 'fresh-token', expires_in: 3600, refresh_token: 'never-kept' })
+      if (q.url === '/v1internal:loadCodeAssist') return json({ cloudaicompanionProject: 'proj-1' })
+      if (q.url === '/v1internal:retrieveUserQuota') return quota === 429 ? json({}, 429, { 'retry-after': '120' }) : json({ buckets: [{ modelId: 'gemini-2.5-pro', tokenType: 'REQUESTS', remainingFraction: 0.75, resetTime: '2026-11-07T00:00:00Z' }, { modelId: 'models/gemini-2.5-flash', remainingFraction: 0.1 }] })
+      r.writeHead(404).end()
+    })
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  await rig.rpc('settingsSet', { usage: { claude: false, codex: false } })
+  assert.deepEqual(await rig.rpc('usage'), [], 'no Gemini sign-in: not listed')
+  const g = join(rig.home, '.gemini')
+  mkdirSync(g)
+  // Gemini CLI's own client, read from its install: the gemini on PATH ($HOME/bin, first), its core's oauth2.js
+  const pkg = join(rig.home, 'gemini-cli')
+  const core = join(pkg, 'node_modules/@google/gemini-cli-core/dist/src/code_assist')
+  mkdirSync(core, { recursive: true })
+  mkdirSync(join(pkg, 'dist'))
+  writeFileSync(join(pkg, 'package.json'), '{"name":"@google/gemini-cli"}')
+  writeFileSync(join(pkg, 'dist/index.js'), '#!/usr/bin/env node\n')
+  writeFileSync(join(core, 'oauth2.js'), "const OAUTH_CLIENT_ID = 'fake-id.apps.googleusercontent.com';\nconst OAUTH_CLIENT_SECRET = 'fake-secret';\n")
+  mkdirSync(join(rig.home, 'bin'), { recursive: true })
+  symlinkSync(join(pkg, 'dist/index.js'), join(rig.home, 'bin/gemini'))
+  const creds = JSON.stringify({ access_token: 'old-token', refresh_token: 'refresh-1', expiry_date: Date.now() - 1000 })
+  writeFileSync(join(g, 'oauth_creds.json'), creds)
+  const u = await rig.rpc('usage')
+  assert.deepEqual(u.map((x: any) => [x.agent, x.error, x.windows.map((w: any) => [w.label, w.used, w.resets])]), [['gemini', undefined, [['gemini-2.5-pro', 25, Date.parse('2026-11-07T00:00:00Z')], ['gemini-2.5-flash', 90, undefined]]]])
+  assert.deepEqual(hits.map(h => h.url), ['/token', '/v1internal:loadCodeAssist', '/v1internal:retrieveUserQuota'])
+  const form = new URLSearchParams(hits[0].body)
+  assert.deepEqual([form.get('grant_type'), form.get('refresh_token'), form.get('client_id'), form.get('client_secret')], ['refresh_token', 'refresh-1', 'fake-id.apps.googleusercontent.com', 'fake-secret'])
+  assert.equal(hits[2].auth, 'Bearer fresh-token')
+  assert.deepEqual(JSON.parse(hits[2].body), { project: 'proj-1' })
+  assert.equal(readFileSync(join(g, 'oauth_creds.json'), 'utf8'), creds, 'its sign-in untouched')
+  assert.deepEqual(readdirSync(g), ['oauth_creds.json'], 'nothing written under ~/.gemini')
+  // kept 5 minutes; then the token in memory is used, not refreshed again
+  await rig.rpc('usage', { now: Date.now() + 6 * 60_000 })
+  assert.deepEqual(hits.map(h => h.url).filter(x => x === '/token').length, 1, 'refreshed once')
+  // told to wait: Retry-After, the last numbers kept
+  quota = 429
+  const w = await rig.rpc('usage', { now: Date.now() + 12 * 60_000 })
+  assert.match(w[0].error, /asked Laki to check less often/)
+  assert.equal(w[0].windows.length, 2)
+  assert.ok(w[0].next >= Date.now() + 10 * 60_000, 'waits its back-off at least')
+  // no Gemini CLI to read its client from: unknown, Google not asked
+  await rig.stop()
+  rmSync(join(rig.home, 'bin/gemini'))
+  await rig.start()
+  const m = hits.length
+  assert.match((await rig.rpc('usage'))[0].error, /^Unknown: the sign-in expired/)
+  assert.equal(hits.length, m)
+  // an API-key user: unknown, nothing asked
+  await rig.stop()
+  writeFileSync(join(g, 'settings.json'), JSON.stringify({ security: { auth: { selectedType: 'gemini-api-key' } } }))
+  await rig.start()
+  const n = hits.length
+  const k = await rig.rpc('usage')
+  assert.match(k[0].error, /^Unknown: signed in with an API key/)
+  assert.equal(hits.length, n)
 })

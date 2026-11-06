@@ -47,7 +47,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows.
 - **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits.
+  beside each plan's limits (Gemini CLI's quota per model too).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Recording mode**: mark workspaces or projects *Private*; Recording mode (⌘K, the menu bar) hides them everywhere,
   notifications and phone pushes too, while they keep running.

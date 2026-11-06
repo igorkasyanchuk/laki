@@ -312,6 +312,15 @@ answer with numbers (`last`) given meanwhile with the error and `next` (Usage.ts
 (`test/fakes`) reading `$HOME/keychain`: never the real Keychain. Claude's account whose tab wrote `rate_limits` in its
 status line within `STATUS_FRESH` (meters.ts' `statusLimits`, below; main.ts passes it as `usage`'s `own`) isn't asked:
 its 5-hour and weekly windows (`claudeWindows`' labels), the endpoint's others and plan as `last` had them.
+Gemini CLI (`gemini`, CodeNomad's way): only once `~/.gemini/oauth_creds.json` is there (`GEMINI_CLI_HOME`;
+`geminiSigned`, accounts.ts' `usageWho`: one `Who`), read only; an expired `access_token` is refreshed at
+`oauth2.googleapis.com/token` with Gemini CLI's own client, read from its install (`geminiClient`), the new token in memory
+(`geminiToken`, by the refresh token's hash; never the answer's refresh token), nothing written under `~/.gemini`; the
+project `GOOGLE_CLOUD_PROJECT`, else `cloudcode-pa`'s `v1internal:loadCodeAssist` (once); then `retrieveUserQuota`
+(`{ project }`): each bucket's `remainingFraction` and `resetTime` a window labelled by its model (`geminiWindows`). Its
+`settings.json` picking an API key (`gemini-api-key`, `vertex-ai`), or any failure: `Unknown: …`; a 429 as the others.
+Kept 5 minutes; one base URL for all of Google's (`base`, `LAKI_USAGE_API`). Usage.tsx sorts its windows by the models
+Gemini tabs use (`byUse`; the ring's is the first) and folds all but `MODELS_SHOWN` under *More*.
 
 ### Meters
 

@@ -13,7 +13,7 @@ import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type 
 import { changed, presetNamed, q, save, state } from './core.ts'
 import { dir } from './dir.ts'
 import { isLive } from './resources.ts'
-import { claudeCred, keychainService, type Who } from './usage.ts'
+import { claudeCred, geminiSigned, keychainService, type Who } from './usage.ts'
 import { older, tooOld } from './limits.ts'
 
 export const ENV: Record<AccountAgent, string> = { claude: 'CLAUDE_CONFIG_DIR', codex: 'CODEX_HOME' }
@@ -147,7 +147,8 @@ export async function accountView(agent: AccountAgent, id: string): Promise<Acco
   return { ...base, email: typeof cfg?.oauthAccount?.emailAddress === 'string' ? cfg.oauthAccount.emailAddress : undefined, plan: cred?.subscriptionType || undefined, signedIn: !!cred }
 }
 // whose limits the usage ring reads: every account, the agent's own first
-export const usageWho = (): Who[] => ACCOUNT_AGENTS.flatMap(agent => accountIds(agent).map(id => ({ agent, account: id, name: accountNamed(id)?.name ?? 'Default', dir: accountNamed(id)?.dir, default: accountUsed(agent) === id })))
+export const usageWho = (): Who[] => [...ACCOUNT_AGENTS.flatMap(agent => accountIds(agent).map(id => ({ agent, account: id, name: accountNamed(id)?.name ?? 'Default', dir: accountNamed(id)?.dir, default: accountUsed(agent) === id }))),
+  ...(geminiSigned() ? [{ agent: 'gemini', account: HOME_ACCOUNT, name: 'Default', default: true }] : [])] // Gemini: one sign-in, asked only once there is one
 export const accountViews = () => Promise.all(ACCOUNT_AGENTS.flatMap(agent => accountIds(agent).map(id => accountView(agent, id))))
 
 // every account of claude and codex, the agent's own first

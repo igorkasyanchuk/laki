@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Gemini CLI's quota in the plan-limit ring: each model's quota with its reset, read with Gemini CLI's own Google
+  sign-in (nothing written to it), the models your Gemini tabs use first. Settings › Appearance › *Gemini CLI plan limits*.
+
 - *Continue in Codex / Claude Code* brings the chat's pictures and files along: the screenshots you pasted and the
   files you pointed it at are copied beside the handover, and the next agent is told to open them first.
 

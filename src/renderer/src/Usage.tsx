@@ -9,7 +9,9 @@ import { type AgentUsage, HOME_ACCOUNT, type Today, type UsageWindow } from '../
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
-export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' }
+export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' }
+// Gemini's windows are its models' quotas: the models its tabs use first (the ring's is the first), the rest under More
+const byUse = (r: AgentUsage, models: string[]) => (r.agent !== 'gemini' ? r : { ...r, windows: [...r.windows].sort((a, b) => Number(!models.some(m => a.label.startsWith(m))) - Number(!models.some(m => b.label.startsWith(m)))) })
 const NAMES = USAGE_AGENTS
 
 // a window whose reset has passed starts over
@@ -57,8 +59,9 @@ export function Ring({ p }: { p?: number }) {
 }
 
 // onUse: an account made the default for new sessions (the popup's Use); today: what was used today (none: hidden)
-export function UsageButton({ load, onUse, onDays, today }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent }) {
-  const [rows, setRows] = useState<AgentUsage[] | null>(null)
+export function UsageButton({ load, onUse, onDays, today, models = [] }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void; onDays?: () => void; today?: Spent; models?: string[] }) {
+  const [got, setRows] = useState<AgentUsage[] | null>(null)
+  const rows = got && got.map(r => byUse(r, models)) // models: what the Gemini tabs use
   const [at, setAt] = useState<DOMRect | null>(null)
   const loader = useRef(load)
   loader.current = load
@@ -96,6 +99,21 @@ const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent
 
 // today's, its workspaces by name
 export type Spent = Omit<Today, 'ws'> & { ws: { name: string; tokens: number; cost: number }[] }
+
+const MODELS_SHOWN = 2 // Gemini's: the first (its tabs' models), the rest under More
+function windowRow(w: UsageWindow, now: number) {
+  const p = live(w, now)
+  return (
+    <div key={w.label} className="usage-row">
+      <span className="usage-label">{w.label}</span>
+      <span className={`usage-bar ${level(p)}`}>
+        <i style={{ width: `${Math.min(p, 100)}%` }} />
+      </span>
+      <span className="usage-pct">{p}%</span>
+      <span className="muted small usage-when">{w.note ?? (w.resets ? (w.resets <= now ? 'reset since' : `resets ${resetsIn(w.resets, now)}`) : '')}</span>
+    </div>
+  )
+}
 
 function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; today?: Spent; onUse?: (agent: string, account: string) => void; onDays?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
@@ -139,19 +157,13 @@ function UsagePop({ anchor, rows, top, today, onUse, onDays, onClose }: { anchor
                   )
                 ))}
             </div>
-            {r.windows.map(w => {
-              const p = live(w, now)
-              return (
-                <div key={w.label} className="usage-row">
-                  <span className="usage-label">{w.label}</span>
-                  <span className={`usage-bar ${level(p)}`}>
-                    <i style={{ width: `${Math.min(p, 100)}%` }} />
-                  </span>
-                  <span className="usage-pct">{p}%</span>
-                  <span className="muted small usage-when">{w.note ?? (w.resets ? (w.resets <= now ? 'reset since' : `resets ${resetsIn(w.resets, now)}`) : '')}</span>
-                </div>
-              )
-            })}
+            {(r.agent === 'gemini' ? r.windows.slice(0, MODELS_SHOWN) : r.windows).map(w => windowRow(w, now))}
+            {r.agent === 'gemini' && r.windows.length > MODELS_SHOWN && (
+              <details className="usage-more">
+                <summary className="muted small">More ({r.windows.length - MODELS_SHOWN})</summary>
+                {r.windows.slice(MODELS_SHOWN).map(w => windowRow(w, now))}
+              </details>
+            )}
             {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
           </section>
         ))}

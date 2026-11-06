@@ -67,6 +67,7 @@ export const FIND: [string, string, string?][] = [
   ['needs', 'Older finishes go under Earlier', 'stale old done finished earlier fold dim minutes seen all bubbles'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', 'Gemini CLI plan limits', 'usage ring quota per model gemini google'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
   ['appearance', 'Tool calls in the Reader', 'hide tool calls steps bash read search successful failed final answer only chat reader quiet'],
   ['appearance', 'Scroll to latest when sending', 'reader scroll bottom jump yank keep position reading send'],

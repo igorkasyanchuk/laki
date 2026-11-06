@@ -43,8 +43,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   size, line height, weight, cursor and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots and any other file; the agent
   gets the text and their paths. Prompt templates wrap it (`{{prompt}}`).
-- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
-  it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
+- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans (and Gemini CLI's
+  quota); click it for each one (5-hour, weekly, per model) and when it resets, and what the agents used today.
 - **Context meter**: a line along each Claude Code and Codex tab's bottom edge (or a ring on it, or nothing there:
   Settings › Appearance › *Context meter*), and a bar in the status bar, fill as
   its chat's context does (amber past 70%, red past 90%), so you `/compact` or start fresh in time; its tooltip has
@@ -753,7 +753,8 @@ days in `usage-days.json`; your plan bills its own way.
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
-the week per model and extra usage; Codex's 5-hour and weekly windows. Each shows when it resets. The daemon
+the week per model and extra usage; Codex's 5-hour and weekly windows; Gemini CLI's quota per model (the models your
+Gemini tabs use first, the rest under *More*). Each shows when it resets. The daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in

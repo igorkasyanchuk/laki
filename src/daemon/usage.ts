@@ -1,13 +1,15 @@
-// The agents' plan limits for the status bar's ring (Usage.tsx): Claude's 5-hour and weekly windows, Codex's.
+// The agents' plan limits for the status bar's ring (Usage.tsx): Claude's 5-hour and weekly windows, Codex's, Gemini
+// CLI's per model.
 // Read the way Superset, CodexBar and others do: the sign-in the agent already keeps on this Mac (Claude Code's
 // Keychain item or ~/.claude/.credentials.json, Codex's ~/.codex/auth.json), sent to the endpoint the agent's own
 // /usage screen asks. Read-only: a token is never refreshed (a second client refreshing it can sign the agent out);
-// an expired one waits for the agent's next run.
+// an expired one waits for the agent's next run (Gemini's: refreshed in memory, below).
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { readFile, realpath } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import type { AgentUsage, UsageWindow } from '../shared/types.ts'
 
@@ -30,7 +32,7 @@ export const base = (real: string) => {
 type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean; busy?: number } // busy: told to slow down, its Retry-After (ms, 0: none)
 // whose limits: an agent's own sign-in (no dir) or an account's folder (accounts.ts)
 export type Who = { agent: string; account: string; name: string; dir?: string; default: boolean }
-const LOADERS: Record<string, (dir?: string) => Promise<Got>> = { claude, codex }
+const LOADERS: Record<string, (dir?: string) => Promise<Got>> = { claude, codex, gemini }
 
 const pct = (n: number) => Math.max(0, Math.round(n))
 const failed = (e: any) =>
@@ -47,8 +49,8 @@ export const waitOf = (h: string | null, now = Date.now()) => {
   return ms > 0 ? Math.min(ms, 6 * 3600_000) : 0
 }
 
-async function get(url: string, headers: Record<string, string>, expired: string, who: string): Promise<any> {
-  const r = await fetch(url, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error' }) // the token goes to that host only
+async function get(url: string, headers: Record<string, string>, expired: string, who: string, body?: string): Promise<any> {
+  const r = await fetch(url, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error', ...(body !== undefined && { method: 'POST', body }) }) // the token goes to that host only
   if (r.status === 401 || r.status === 403) throw slow(expired)
   if (r.status === 429) throw slow(`${who} asked Laki to check less often`, waitOf(r.headers.get('retry-after')))
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -159,6 +161,84 @@ async function codex(d?: string): Promise<Got> {
   }
   const windows = codexWindows(u)
   return { plan: typeof u?.plan_type === 'string' ? u.plan_type : undefined, windows, error: windows.length ? undefined : 'This plan shows no limits' }
+}
+
+// ---------- Gemini CLI: Code Assist's quota per model (CodeNomad's way: NeuralNomadsAI/CodeNomad#1312)
+// its sign-in, ~/.gemini/oauth_creds.json (GEMINI_CLI_HOME's .gemini), read only. An expired token is refreshed at
+// Google's token endpoint with Gemini CLI's own client, read from its install (geminiClient), the new token kept in
+// memory only: nothing is written under ~/.gemini. Its
+// project: GOOGLE_CLOUD_PROJECT, else loadCodeAssist's (asked once). An API-key user (its settings.json's pick), or any failure: unknown, said
+// plainly, never an error. Each bucket's remainingFraction a window, the model its label
+// Gemini CLI's sign-in client (an installed app's ID and secret: only they renew its sign-in), read from the gemini on
+// PATH each time a token is renewed, never kept in Laki's code or files: its bin's real path (a one-file bundle has
+// them), else its core's code_assist/oauth2.js in a node_modules at or above it (its own, or the global one). None: unknown.
+// ponytail: a shim (asdf, volta) isn't followed to its package, nor a release that renames OAUTH_CLIENT_ID
+async function geminiClient(): Promise<{ client_id: string; client_secret: string } | undefined> {
+  for (const d of (process.env.PATH ?? '').split(delimiter)) {
+    const real = d && (await realpath(join(d, 'gemini')).catch(() => ''))
+    if (!real) continue
+    const files = [real]
+    for (let at = dirname(real); dirname(at) !== at; at = dirname(at)) files.push(join(at, 'node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js'))
+    for (const f of files) {
+      const t = await readFile(f, 'utf8').catch(() => '')
+      const [id, secret] = ['ID', 'SECRET'].map(k => new RegExp(`OAUTH_CLIENT_${k}\\w*\\s*=\\s*['"]([^'"]+)['"]`).exec(t)?.[1])
+      if (id && secret) return { client_id: id, client_secret: secret }
+    }
+    return // the first gemini on PATH, as a shell would run
+  }
+}
+const geminiDir = () => join(process.env.GEMINI_CLI_HOME || homedir(), '.gemini')
+export const geminiSigned = () => existsSync(join(geminiDir(), 'oauth_creds.json'))
+const geminiToken = new Map<string, { access: string; expires: number }>() // by its refresh token's hash
+let geminiProject: string | undefined
+
+export function geminiWindows(u: any): UsageWindow[] {
+  const out: UsageWindow[] = []
+  for (const b of Array.isArray(u?.buckets) ? u.buckets : []) {
+    const f = b?.remainingFraction
+    if (typeof b?.modelId !== 'string' || typeof f !== 'number' || !(f >= 0 && f <= 1)) continue
+    const model = b.modelId.replace(/^models\//, '')
+    const label = out.some(w => w.label === model) && typeof b.tokenType === 'string' ? `${model} · ${b.tokenType.toLowerCase()}` : model
+    if (!out.some(w => w.label === label)) out.push({ label, used: pct(100 - f * 100), resets: when(b.resetTime) })
+  }
+  return out
+}
+
+async function gemini(): Promise<Got> {
+  const unknown = (why: string): Got => ({ windows: [], error: `Unknown: ${why}`, again: true })
+  const set = await readFile(join(geminiDir(), 'settings.json'), 'utf8').then(t => JSON.parse(t), () => ({}))
+  const how = set?.security?.auth?.selectedType ?? set?.selectedAuthType // gemini's sign-in pick, newer or older
+  if (how === 'gemini-api-key' || how === 'vertex-ai') return unknown('signed in with an API key (billed per token, no quota to read)')
+  let c: any
+  try {
+    c = JSON.parse(await readFile(join(geminiDir(), 'oauth_creds.json'), 'utf8'))
+  } catch {
+    return unknown('not signed in with Google: run gemini')
+  }
+  try {
+    const key = createHash('sha256').update(String(c?.refresh_token ?? '')).digest('hex')
+    const kept = geminiToken.get(key)
+    const soon = Date.now() + 60_000
+    let access: string | undefined = typeof c?.access_token === 'string' && c.access_token && Number(c.expiry_date) > soon ? c.access_token : kept && kept.expires > soon ? kept.access : undefined
+    if (!access) {
+      if (typeof c?.refresh_token !== 'string' || !c.refresh_token) return unknown('the sign-in expired: gemini renews it on its next run')
+      const app = await geminiClient()
+      if (!app) return unknown('the sign-in expired: gemini renews it on its next run')
+      const at = Date.now()
+      const r = await get(`${base('https://oauth2.googleapis.com')}/token`, { 'Content-Type': 'application/x-www-form-urlencoded' }, 'Sign-in expired: gemini renews it on its next run', 'Google', new URLSearchParams({ grant_type: 'refresh_token', refresh_token: c.refresh_token, ...app }).toString())
+      if (typeof r?.access_token !== 'string' || typeof r.expires_in !== 'number') return unknown('Google gave no token')
+      geminiToken.set(key, { access: r.access_token, expires: at + r.expires_in * 1000 }) // never its refresh token
+      access = r.access_token
+    }
+    const headers = { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' }
+    const ca = base('https://cloudcode-pa.googleapis.com')
+    geminiProject ??= process.env.GOOGLE_CLOUD_PROJECT || ((await get(`${ca}/v1internal:loadCodeAssist`, headers, 'Sign-in expired', 'Google', JSON.stringify({ metadata: { ideType: 'IDE_UNSPECIFIED', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' } })))?.cloudaicompanionProject as string | undefined) || undefined
+    if (!geminiProject) return unknown('no Code Assist project for this sign-in')
+    const windows = geminiWindows(await get(`${ca}/v1internal:retrieveUserQuota`, headers, 'Sign-in expired', 'Google', JSON.stringify({ project: geminiProject })))
+    return windows.length ? { windows } : unknown('Google shows no quota for this sign-in')
+  } catch (e: any) {
+    return e?.busy !== undefined ? fail(e) : unknown(failed(e)) // told to wait: waitOf's; anything else: unknown
+  }
 }
 
 // ---------- each agent's answer, kept for its TTL (AGAIN or BACK_OFF when it says so); callers asking meanwhile share

@@ -2036,6 +2036,7 @@ export function App() {
   }
   useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, settings.fun, settings.videoButton, settings.timerButton, settings.statusBar, sideOpen, !!view, rail]) // a new font, a button more or less (the rail takes two): measured again
   const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
+  const geminiModels = [...new Set((view?.tabs ?? []).filter(t => t.preset === 'gemini').flatMap(t => (m => (m ? [m] : []))(t.model ?? view?.presets.find(p => p.name === t.profile)?.model)))] // their quotas first
   // a plan limit past settings.usageAt as Usage.tsx reads them: a toast, and a notification unless you're looking (or
   // notify is off); once per window per reset (laki.limitsTold), told or not as it crosses (seen: each window's last %)
   // ponytail: only while the app is open with the ring on screen; the daemon doesn't watch usage on its own
@@ -3122,7 +3123,7 @@ export function App() {
   const statusBar = view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own
             <>
               {ctxOn && tab?.context && (
