@@ -297,7 +297,7 @@ export const markdownHtml = (src: string) => html(markdown(src))
 // a line break kept as one (chat-like: a card's words as written): a <br> at a line's end (inline's own; a backslash
 // would end up in a link the line ends with), not in a fence, on a heading or table row, nor before a line that starts
 // a block (a list item, a quote…)
-const STARTS = /^\s*([-*+]\s|\d+[.)]\s|#|>|\||```|~~~)/
+const STARTS = /^\s*([-*+]\s|\d+[.)]\s|#|>|\||```|~~~|[-=]{2,}\s*$)/ // the last: a heading's underline
 export function lineBreaks(src: string) {
   let fence = false
   return src

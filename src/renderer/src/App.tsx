@@ -1693,7 +1693,11 @@ export function App() {
       })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
     if (w?.host) return Promise.reject(new Error('Not a file of this workspace')) // a full path on its host: not this Mac's
-    return api.call<{ image?: string }>('imageRead', { path }).then(r => r.image) // anywhere on this Mac: a scratchpad's, /tmp's, a pasted one
+    // anywhere on this Mac: a scratchpad's, /tmp's; refused (remote access, a daemon before API 151): a pasted one's
+    return api.call<{ image?: string }>('imageRead', { path }).then(
+      r => r.image,
+      () => api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture'))),
+    )
   }
   const openPath = async (tab: string, path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(tab)?.workspace)

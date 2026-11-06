@@ -67,13 +67,14 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   useEffect(() => {
     if (active && !tab.ask) box.current?.focus({ preventScroll: true })
   }, [active, !!tab.ask])
-  // several questions on its card (claude's tabs over the menu): ←/→ outside a text field go between them, as in its terminal
+  // several questions on its card (claude's tabs over the menu): ←/→ outside a text field go between them, as in its
+  // terminal; one a card took already (Needs you's, focused) isn't sent again
   const steps = active && !!tab.ask?.steps && !!api.keys
   useEffect(() => {
     if (!steps) return
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
-      if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || t.closest('input, textarea, select, [contenteditable="true"], .xterm')) return
+      if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || t.closest('input, textarea, select, [contenteditable="true"], .xterm')) return
       e.preventDefault()
       api.keys!(tab.id, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C')
     }

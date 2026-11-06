@@ -9,7 +9,7 @@ import { HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, typ
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, presetOf, state } from './core.ts'
 import { dir } from './dir.ts'
-import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, type Said, transcriptOf } from './share.ts'
+import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, num, type Said, transcriptOf } from './share.ts'
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 
@@ -201,6 +201,8 @@ export function usageDays() {
       }
   return { keep: USAGE_KEEP, rows: [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 })).sort((a, b) => a.day.localeCompare(b.day)) }
 }
+// ponytail: claude's API retries (meterOf's retry: the Reader's line, the tab's Retrying…) come with this read too; both
+// meters off, none show
 export function meterTick() {
   if (state.settings?.contextMeter === false && state.settings?.costs === false) return
   let any = false
@@ -247,7 +249,6 @@ export const STATUS_FRESH = 10 * 60_000
 export const statusOn = () => state.settings?.statusBridge !== false
 type Line = { mtime: number; session?: string; used?: number; pct?: number; max?: number; limits: UsageWindow[] }
 const lines = new Map<string, Line>()
-const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 // a tab's, read again only when it changed (an mtime of its own); none: not written, or the setting off
 export function statusOf(t: Tab): Line | undefined {
   if (!statusOn() || t.preset !== 'claude') return

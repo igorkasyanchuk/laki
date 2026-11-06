@@ -1766,7 +1766,7 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown> } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; stat?: (path: string) => Promise<{ size: number; at?: number }>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown> } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string; media?: string } | { error: string }
@@ -1834,11 +1834,17 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const api = useRef(a)
   api.current = a
   useEffect(() => void api.current.list().then(f => (setFiles(f), setErr('')), e => setErr(String(e?.message ?? e))), [ws, n])
-  // one shown big: the list again every 2 s, so a file written anew (its time) is read again (seen's key) and shown.
-  // ponytail: a walk of the storage folder each time; fine for an agent's few hundred files
+  // one shown big: its size and time every 2 s (stat); written anew, the list again, so it's read again (seen's key by
+  // its time) and shown
   useEffect(() => {
-    if (big === null) return
-    const t = setInterval(() => document.visibilityState === 'visible' && api.current.list().then(f => setFiles(was => (JSON.stringify(was) === JSON.stringify(f) ? was : f)), () => {}), 2000)
+    if (big === null || !api.current.stat) return
+    let was = ''
+    const t = setInterval(
+      () =>
+        document.visibilityState === 'visible' &&
+        api.current.stat!(big).then(s => (k => (was && k !== was && api.current.list().then(f => setFiles(f), () => {}), (was = k)))(`${s.size}@${s.at}`), () => {}),
+      2000,
+    )
     return () => clearInterval(t)
   }, [big, ws])
   useEffect(() => setDir(''), [ws])

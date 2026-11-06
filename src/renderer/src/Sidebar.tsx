@@ -3,7 +3,7 @@
 // the peek card App shows over everything). App renders them with what appCtx.ts says they read.
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
-import { ask, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
+import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, rowFact, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
@@ -22,6 +22,9 @@ const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Pl
 
 // the rows and what they need: a workspace's row, a group's, the ones being made, the peek card; several picked at
 // once (⌘-click, ⇧-click), the timers' menus, the + menus
+// a project's mark when it has no icon of its own: its kind's, a host's, a plain folder's, a repo's
+const markOf = (p: Project): IconName => (p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork')
+
 export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const { anchor, busyWith, call, done, doStep, dropAgent, dropOn, dropProps, find, flowsOn, fold, folded, going, kh, kindOf, live, making, mark, markUnread, narrow, needAfter, needsYou, newWs, openMenu, openProject, order, peek, peekBox, peekStat, peekTimer, picked, pinned, projOf, quickNew, radarOf, rail, railKind, railOf, rawKind, restart, restore, ring, rows, selectTab, setDialog, setOverlapsAt, setPeek, setPicked, setSideOpen, setTimer, settings, setWsId, showPanel, sortedRows, sortItems, stepOf, stepsOn, termIn, termsOk, termWhere, timers, tint, toast, view, waits, widgetApi, ws, wsAt, wsMenu } = app
   const peekAt = (id?: string, el?: HTMLElement) => {
@@ -404,10 +407,12 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   // a sep (a group, as the app calls it): a named head over a project's workspaces up to the next one, dragged like a
   // row; a workspace dropped on it goes first under it. n: how many it holds; folded (a click) it hides them: hid,
   // their busiest state on it
-  // the sidebar's filter: does it show this one
+  // the sidebar's filter: does it show this one. only: the projects picked that are still here (one archived or removed
+  // meanwhile counts as none)
+  const only = (find?.projects ?? []).filter(id => view.projects.some(p => p.id === id))
   const shows = (w: WorkspaceView) => {
     if (!find) return true
-    if (find.projects?.length && !find.projects.includes(w.project)) return false
+    if (only.length && !only.includes(w.project)) return false
     const q = find.q.trim().toLowerCase()
     const wt = view.tabs.filter(t => t.workspace === w.id)
     if (q && ![wsName(w), w.name, w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
@@ -517,7 +522,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
                 return (
                   <button key={p.id} type="button" className={on ? 'on' : ''} aria-pressed={on} data-tip={on ? 'Click: all projects again · Shift-click: take it out' : 'Click: only this one · Shift-click: add it'} onClick={e => pick(e.shiftKey)} onKeyDown={e => e.key === 'Enter' && e.shiftKey && (e.preventDefault(), pick(true))}>
                     <span className="fp-mark">
-                      <ProjectMark p={p} or={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
+                      <ProjectMark p={p} or={markOf(p)} size={12} />
                       {on && <span className="fp-check"><Icon name="check" size={8} /></span>}
                     </span>
                     {p.name}
@@ -576,7 +581,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
                 <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
               </span>
               <span className="project-icon">
-                <ProjectMark p={p} or={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} />
+                <ProjectMark p={p} or={markOf(p)} />
               </span>
               <span className="project-name">{p.name}</span>
               {shut && mine.length > 0 && (

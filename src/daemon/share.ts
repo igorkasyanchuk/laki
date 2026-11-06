@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
-import { costOf } from '../shared/types.ts'
+import { costOf, type Retry } from '../shared/types.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true } // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
 
@@ -177,10 +177,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
 export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
-// claude waiting out an API error (a rate limit, an overloaded server, a lost connection): its try (n of max), when the
-// next one goes (until), when it said so (at: a turn that started after has none), why in its own words
-export type Retry = { n?: number; max?: number; until: number; at: number; why?: string }
-const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
+export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
 export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {

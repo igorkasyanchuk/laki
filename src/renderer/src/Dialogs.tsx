@@ -561,6 +561,7 @@ export function Pages({ app }: { app: AppCtx }) {
           api={{
             list: () => api.call<Artifact[]>('artifactList', { ws: ws.id }),
             read: (path, media) => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true, media }),
+            stat: path => api.call<{ size: number; at?: number }>('fileRead', { ws: ws.id, path, storage: true, stat: true }),
             open: path => openIn('default', { ws: ws.id, file: path, storage: true }),
             editor: path => openIn('editor', { ws: ws.id, file: path, storage: true }),
             reveal: bridge?.openPath && (path => revealArt(ws, path)),
