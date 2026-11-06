@@ -119,6 +119,15 @@ again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't 
 
 ### Sessions
 
+- **Closed tabs** (⇧⌘T): `tabClose` (yours, the app's ⌘W, `laki tab close`) keeps the tab on its workspace's `closed`
+  (`ClosedTab`: name, kind, preset, profile, resumeId, model, effort, perm, fast, sandbox, account, cmd, a shell's `cwd`
+  from `shellCwd`; newest first, `CLOSED_MAX` 10, in state.json); an exit, a Run ▾ tab's or a workflow's cleanup
+  (`closeTab` without `keep`) isn't kept. Archive drops the list. `tabReopen({ ws, index? })` brings one back through
+  `addTab` with `resume` (and `account`), taking it off the list; a claude or codex chat whose transcript isn't there
+  (`transcriptOf`) starts a new one and says `fresh` (the app's toast); a refusal (a policy, a profile's check) leaves it
+  listed. An agent reopens only in its own workspace (`agentNo`), a sandboxed one not at all (`boxNo`). ponytail: a
+  Browsers page's ⇧⌘T does nothing.
+
 `src/daemon/session.ts`: every PTY is mirrored into an `@xterm/headless` terminal.
 
 - **Attach** sends a snapshot, built with `@xterm/addon-serialize`, plus what serialize leaves out:

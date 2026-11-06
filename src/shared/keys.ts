@@ -14,6 +14,7 @@ export const KEYS = [
   { id: 'newWs', label: 'New workspace', key: '⌘N' },
   { id: 'newTab', label: 'New tab (in a browser: a new page)', key: '⌘T' },
   { id: 'closeTab', label: 'Close the tab (or the file in front in the preview)', key: '⌘W' },
+  { id: 'reopenTab', label: 'Reopen the closed tab (its chat resumed)', key: '⇧⌘T' },
   { id: 'sidebar', label: 'Hide / show the sidebar', key: '⌘B' },
   { id: 'panel', label: 'Side panel', key: '⌥⌘B' },
   { id: 'info', label: 'Workspace info', key: '⌘I' },

@@ -13,14 +13,15 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
-import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { dir } from './dir.ts'
-import { accountEnv, accountFor, accountIds, accounts, claudeVersion, effortsSaid, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
+import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
+import { transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
@@ -1633,7 +1634,7 @@ export function tabSpec(ws: Workspace, o: { kind?: Tab['kind']; preset?: string;
 
 // agent: an agent opened it (tabNew from its tab, a workspace or a run it made), whose: its tab.new is that agent's
 // cwd: a new shell's folder (shellCwd's: where a shell tab of the workspace is now, as a terminal's new tab)
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; resume?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; vars?: boolean; agent?: string; cwd?: string } & Cause): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; resume?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; vars?: boolean; agent?: string; cwd?: string; account?: string } & Cause): Tab {
   const ws = findWs(wsRef)
   const { pr, cmd, preset, kind, model, effort, perm, fast, sandbox } = tabSpec(ws, o)
   if (cmd !== o.cmd) o = { ...o, cmd }
@@ -1649,6 +1650,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm !== undefined && { perm }), ...(fast !== undefined && { fast }), ...(sandbox !== undefined && { sandbox }), ...(kind === 'agent' && { usedAt: Date.now() }) }
   const cwd = kind === 'shell' && !o.cmd ? o.cwd : undefined
   if (o.resume && kind === 'agent') tab.resumeId = o.resume // a chat of its agent's (Import chats): resumed, not a new one
+  if (o.account && kind === 'agent' && isAccountAgent(preset) && accountIds(preset).includes(o.account)) tab.account = o.account // a reopened tab's (spawnTab's accountFor keeps it)
   state.tabs.push(tab)
   save()
   try {
@@ -2063,8 +2065,17 @@ export async function openIn(o: { ws?: string; project?: string; widget?: string
   await run('open', args).catch(openFail)
 }
 
-export function closeTab(id: string) {
+export const CLOSED_MAX = 10
+// keep: a tab you closed (tabClose), kept for ⇧⌘T; not one that exited, nor a Run ▾ tab's or a workflow's cleanup
+export function closeTab(id: string, keep?: { cwd?: string }) {
   const t = findTab(id)
+  const ws = keep && (t.kind === 'agent' || t.kind === 'shell') ? state.workspaces.find(w => w.id === t.workspace) : undefined
+  if (ws) {
+    const c: ClosedTab = { name: t.name, kind: t.kind as ClosedTab['kind'], at: Date.now() }
+    for (const k of ['preset', 'profile', 'resumeId', 'model', 'effort', 'perm', 'fast', 'sandbox', 'account', 'cmd'] as const) if (t[k] !== undefined) (c as any)[k] = t[k]
+    if (keep?.cwd) c.cwd = keep.cwd
+    ws.closed = [c, ...(ws.closed ?? [])].slice(0, CLOSED_MAX)
+  }
   sessions.get(id)?.kill()
   sessions.delete(id)
   asleep.delete(id)
@@ -2075,6 +2086,25 @@ export function closeTab(id: string) {
   statusGone(id)
   save()
   changed()
+}
+
+// ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it
+// was (profile, model, effort, mode, fast, sandbox, account; a shell in its folder). A claude or codex chat that's gone
+// starts a new one (fresh: the app says so); a profile gone: its agent's own; refused (a policy, a gone folder): kept
+export function tabReopen(p: { ws: string; index?: number }): Tab & { fresh?: boolean } {
+  const ws = findWs(String(p.ws ?? ''))
+  if (ws.archived) throw new Error(`${ws.name ?? ws.id} is archived: restore it first`)
+  const i = Number.isInteger(p.index) ? Number(p.index) : 0
+  const c = ws.closed?.[i]
+  if (!c) throw new Error(`no closed tab to bring back in ${ws.name ?? ws.id}`)
+  const agent = c.preset === 'claude' || c.preset === 'codex' ? c.preset : undefined
+  const fresh = !!c.resumeId && !!agent && !transcriptOf(agent, accountNamed(c.account ?? '')?.dir ?? homeDir(agent), c.resumeId)
+  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd } : { preset: c.profile && presetNamed(c.profile) ? c.profile : c.preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account })
+  ws.closed = ws.closed!.filter(x => x !== c)
+  if (!ws.closed.length) delete ws.closed
+  save()
+  changed()
+  return { ...tab, ...(fresh && { fresh }) }
 }
 
 // ---------- workspaces
@@ -2641,6 +2671,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts
   await teardown(ws)
   ws.archived = true
   ws.archivedAt = Date.now()
+  delete ws.closed // ⇧⌘T's: gone with it
   ws.port = 0
   stopTunnels(ws.id) // one started during the teardown
   stopShares({ ws: ws.id })

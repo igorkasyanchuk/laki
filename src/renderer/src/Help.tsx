@@ -25,6 +25,7 @@ const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
     ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
     [k('newWs'), 'new workspace'],
     [`${k('newTab')} / ${k('closeTab')}`, 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],
+    [k('reopenTab'), 'reopen the tab you closed last in this workspace, its chat resumed (the + menu lists the last 10)'],
     ['⌘⇧N', "the tab bar's + menu: shell, an agent or a command (↑↓ ⏎, or its letter)"],
     ['⌘1…⌘9', 'go to a tab'],
     ['⌘↑ / ⌘↓', 'previous / next workspace'],

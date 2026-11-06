@@ -1434,6 +1434,16 @@ export function App() {
     const running = ts.filter(t => t.status !== 'exited')
     if (running.length && !settings.closeNoAsk && !(await ask(`Close ${ts.map(t => t.name).join(', ')}?`, { text: `${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`, ok: 'Close', danger: true }))) return
     for (const t of ts) await call('tabClose', { id: t.id })
+    if (ts.length === 1 && kb.reopenTab) toast(`Closed ${ts[0].name} · ${keyShow(kb.reopenTab)} brings it back`)
+  }
+  // ⇧⌘T, the + menu's Recently closed: a tab you closed back in its workspace, its chat resumed (the newest, or index's)
+  const reopenTab = async (w = ws, index?: number) => {
+    if (!w) return
+    if (!w.closed?.length) return toast('No closed tab to bring back here')
+    const t = await call<TabView & { fresh?: boolean }>('tabReopen', { ws: w.id, ...(index !== undefined && { index }) }).catch(fail)
+    if (!t) return
+    if (t.fresh) toast(`${t.name}: its chat is gone, so it starts a new one`)
+    selectTab(t)
   }
 
   // ⌘↑ ⌘↓: the rows in sight, not those a folded project or group hides
@@ -2733,6 +2743,8 @@ export function App() {
     { label: 'Shell', icon: 'terminal', hint: w?.id === ws?.id ? kh('newTab') : undefined, tip: 'A terminal in the workspace\'s folder', run: () => newTab('shell', undefined, w), cmd: () => newTab('shell', undefined, w, true) }, // cmd: ⌘-click or ⌘⏎, a tab of its own, never a split
     ...(view?.presets ?? []).filter(p => !p.off).map(p => ({ label: p.name, icon: 'agent', sub: p.agent === 'command' ? 'Command' : [AGENT_NAMES[p.agent], p.model].filter(Boolean).join(' · '), tip: `Starts ${p.name} in a new tab here (⌘-click: never in a split)`, run: () => newTab(p.name, undefined, w), cmd: () => newTab(p.name, undefined, w, true) }) as Action),
     { label: 'Command…', icon: 'terminal', tip: 'A tab that runs a command you type', run: () => (w && setWsId(w.id), setDialog('custom')) }, // the dialog is for the selected one
+    // Recently closed: the tabs you closed here, newest first (ponytail: listed in the menu itself, no submenu)
+    ...(w?.closed ?? []).map((c, i): Action => ({ label: `Reopen ${c.name}`, icon: 'undo', hint: i === 0 && w?.id === ws?.id ? kh('reopenTab') : undefined, sub: [c.kind === 'shell' ? 'Shell' : AGENT_NAMES[c.preset as Agent] ?? c.preset, ago(c.at)].filter(Boolean).join(' · '), tip: c.resumeId ? 'Back in a new tab, its chat resumed' : 'Back in a new tab', run: () => void reopenTab(w, i) })),
   ]
   const newTabActions = newTabIn(ws)
   // ⌘J and the Needs you list walk the same list (needsSorted): waiting first, the oldest first; then done, the newest
@@ -3266,7 +3278,7 @@ export function App() {
   const appBase: AppBase = {
     accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
     archive, artMenu, artPage, artView, asFile, attachable, bgUrl, busyWith, byId, call, calOn, canLater, cfgSheet,
-    checking, closePage, closePreview, closeTabs, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
+    checking, closePage, closePreview, closeTabs, reopenTab, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
     extInserts, extItems, extMenus, extModal, extOn, extRun, extWs, fail, find, findIn, fitFoot, floated, floatTab,
     flowItems, flowMenu, flowsHere, flowsOn, fold, folded, fontSize, footButtons, forkWs, full, gallery, gated, git,

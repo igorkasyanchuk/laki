@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- ⇧⌘T reopens the tab you closed, the way a browser does: an agent's chat resumed, a shell in its folder.
+  The tab bar's + menu lists the last 10 (File › *Reopen Closed Tab*), and ⌘W's note says how to bring it back.
+
 - The Reader can hide tool calls: Settings › Appearance › *Tool calls in the Reader*: *Hide successful* (steps that all
   worked fold to one line; a failed one still shows) or *Final answer only*. *Scroll to latest when sending* can be
   turned off to stay where you were reading.

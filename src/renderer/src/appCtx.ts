@@ -134,6 +134,7 @@ export type AppBase = {
   closePage: (w: WorkspaceView) => Promise<void>
   closePreview: () => Promise<undefined>
   closeTabs: (ts: TabView[]) => Promise<void>
+  reopenTab: (w?: WorkspaceView | null, index?: number) => Promise<unknown>
   copy: (text: string) => Promise<void>
   copyTab: (t: TabView) => undefined
   costsOn: boolean

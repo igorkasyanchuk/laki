@@ -8,7 +8,7 @@ import { keyFor, type KeyId } from '../../shared/keys'
 import { pressOf } from '../../shared/widgetSchema'
 
 export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: boolean) {
-  const { canLater, closePage, closePreview, closeTabs, dialog, doStep, editor, extOn, extRun, findIn, git, groups, hereCtx, hist, historyOn, kb, layoutMenu, moveWs, newTab, newWs, nextNeed, openIn, openMenu, openProject, openReview, pickKey, previewed, quickNew, reviewTab, selectGroup, sendLater, setDialog, setFind, setFinds, setPicking, setSideOpen, settings, showInfo, stepOf, stepsOn, tab, toggleArtifacts, toggleFull, togglePanel, toSettings, travel, ws, zoom } = app
+  const { canLater, closePage, closePreview, closeTabs, reopenTab, dialog, doStep, editor, extOn, extRun, findIn, git, groups, hereCtx, hist, historyOn, kb, layoutMenu, moveWs, newTab, newWs, nextNeed, openIn, openMenu, openProject, openReview, pickKey, previewed, quickNew, reviewTab, selectGroup, sendLater, setDialog, setFind, setFinds, setPicking, setSideOpen, settings, showInfo, stepOf, stepsOn, tab, toggleArtifacts, toggleFull, togglePanel, toSettings, travel, ws, zoom } = app
   if (keyRec.on) return // a hotkey being recorded in Settings
   // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
   if (!force && settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
@@ -18,6 +18,7 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     newWs: () => newWs(ws?.project),
     newTab: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
     closeTab: () => (ws?.browser !== undefined ? dialog || closePage(ws) : previewed ? closePreview() : tab && closeTabs([tab])), // a Browsers page: it closes (not under a page or dialog: it isn't in sight); else the file preview first
+    reopenTab: !!ws && ws.browser === undefined && (() => reopenTab()), // ponytail: a Browsers page's ⇧⌘T does nothing (Browser.tsx keeps no closed pages)
     sidebar: () => setSideOpen(o => !o),
     panel: () => ws && togglePanel(),
     info: () => showInfo(),

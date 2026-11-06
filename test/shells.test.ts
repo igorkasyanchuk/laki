@@ -1,6 +1,6 @@
 // Shell tabs: running until the prompt is back; the Terminals and Browsers projects.
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -149,4 +149,61 @@ test('an archived project: out of the view with its workspaces, its shells close
   await rig.rpc('projectArchive', { project: p.id })
   assert.equal((await rig.rpc('projectAdd', { path: rig.repo })).id, p.id)
   assert.ok((await rig.rpc('state')).projects.some((x: { id: string }) => x.id === p.id))
+})
+
+// ⇧⌘T: a tab you closed comes back in its workspace (tabReopen), its chat resumed; kept in state.json, 10 at most
+test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a shell in its folder; 10 kept, archive clears; an agent only in its own workspace', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const wsOf = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
+  const argsOf = (tab: string) => until(() => rig.fakeLog().find((l: any) => l.tab === tab)?.args, 'its start') as Promise<string[]>
+  const transcript = (path: string) => (mkdirSync(join(path, '..'), { recursive: true }), writeFileSync(path, ''))
+  // claude: its chat id (a turn ran), its transcript there: --resume
+  const cw = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'first task', name: 'cl' })
+  const c = await until(async () => (x => x?.resumeId && x)(await rig.tab(cw.id)), 'its chat id')
+  transcript(join(rig.home, '.claude', 'projects', 'x', `${c.resumeId}.jsonl`))
+  await rig.rpc('tabClose', { id: c.id })
+  assert.deepEqual([(await wsOf(cw.id)).closed.length, (await wsOf(cw.id)).closed[0].resumeId], [1, c.resumeId])
+  const c2 = await rig.rpc('tabReopen', { ws: cw.id })
+  assert.deepEqual([c2.name, c2.fresh], [c.name, undefined])
+  const a2 = await argsOf(c2.id)
+  assert.equal(a2[a2.indexOf('--resume') + 1], c.resumeId)
+  assert.equal((await wsOf(cw.id)).closed, undefined, 'taken off the list')
+  // its chat gone: a new one, and the app is told (fresh)
+  rmSync(join(rig.home, '.claude', 'projects'), { recursive: true })
+  await rig.rpc('tabClose', { id: c2.id })
+  const c3 = await rig.rpc('tabReopen', { ws: cw.id })
+  assert.equal(c3.fresh, true)
+  assert.ok(!(await argsOf(c3.id)).includes('--resume'))
+  // codex: resume <thread>
+  const xw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', name: 'cx' })
+  const x = await rig.tab(xw.id)
+  await until(async () => (await rig.screen(x.id)).includes('fake codex'), 'codex up')
+  await rig.rpc('send', { target: xw.id, text: 'hello codex' })
+  const xr = (await until(async () => (await rig.tab(xw.id)).resumeId, 'its thread')) as string
+  transcript(join(rig.home, '.codex', 'sessions', '2026', '11', '06', `rollout-1-${xr}.jsonl`))
+  await rig.rpc('tabClose', { id: x.id })
+  const x2 = await rig.rpc('tabReopen', { ws: xw.id })
+  const xa = await argsOf(x2.id)
+  assert.equal(xa[xa.indexOf('resume') + 1], xr)
+  // a shell: back in the folder it was in
+  const sh = await rig.rpc('tabNew', { ws: xw.id })
+  await until(async () => (await rig.screen(sh.id)).includes('$'), 'its prompt')
+  mkdirSync(join(xw.path, 'deep'))
+  await rig.rpc('input', { tab: sh.id, data: 'cd deep\r' })
+  await until(async () => (await rig.screen(sh.id)).split('$').length > 2, 'cd done')
+  await rig.rpc('tabClose', { id: sh.id })
+  assert.match((await wsOf(xw.id)).closed[0].cwd, /\/deep$/)
+  const sh2 = await rig.rpc('tabReopen', { ws: xw.id })
+  await until(async () => (await rig.screen(sh2.id)).includes('$'), 'the new prompt')
+  await rig.rpc('input', { tab: sh2.id, data: 'pwd\r' })
+  await until(async () => (await rig.screen(sh2.id)).includes('/deep'), 'pwd in deep')
+  // an agent of another workspace can't; its own can
+  await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: { ws: cw.id, tab: c3.id } }), /in its own workspace only/)
+  // 10 at most, the newest first; an archive clears them
+  for (let i = 0; i < 12; i++) await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, name: `s${i}` })).id })
+  assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 2), ['s11', 's10'])
+  assert.equal((await wsOf(xw.id)).closed.length, 10)
+  await rig.rpc('wsArchive', { id: xw.id })
+  assert.equal((await wsOf(xw.id)).closed, undefined)
 })

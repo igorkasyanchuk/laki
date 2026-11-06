@@ -66,7 +66,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and its questions show in the tab that started it, answered there. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
   makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.
-- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; their dev servers' ports in the status bar (not
+- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; ⇧⌘T reopens a tab you closed, its chat resumed (the + menu lists the last 10); their dev servers' ports in the status bar (not
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in

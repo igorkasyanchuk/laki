@@ -1575,6 +1575,7 @@ const appMenu = () => Menu.setApplicationMenu(
         key('Open in Editor', 'CmdOrCtrl+E', 'e'),
         { type: 'separator' },
         bound('Close Tab', 'closeTab'),
+        bound('Reopen Closed Tab', 'reopenTab'),
       ],
     },
     {

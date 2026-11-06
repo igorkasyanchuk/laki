@@ -181,6 +181,8 @@ export function resetOf(windows: UsageWindow[], at: number) {
   const hit = real.filter(w => w.used >= at).map(w => w.resets!)
   return hit.length ? Math.min(...hit) : real.find(w => w.label === '5-hour')?.resets
 }
+// a tab you closed (⌘W), kept for ⇧⌘T: what brings it back (core.ts closeTab, tabReopen); cwd: a shell's folder
+export type ClosedTab = { name: string; kind: 'agent' | 'shell'; preset?: string; profile?: string; resumeId?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; cmd?: string; cwd?: string; at: number }
 export type Workspace = {
   id: string
   project: string
@@ -231,6 +233,7 @@ export type Workspace = {
   csState?: string // its state as gh says it (Available, Shutdown, Starting…), Creating while it's made, Failed when that failed
   csError?: string // why making or starting it failed
   pending?: Pending // its agent starts later
+  closed?: ClosedTab[] // the tabs you closed here, newest first, CLOSED_MAX (core.ts) at most: ⇧⌘T, the + menu
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -972,7 +975,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 151
+export const API = 152
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
