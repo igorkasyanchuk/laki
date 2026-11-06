@@ -513,7 +513,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
           </span>
           {listed.length > 1 && (
             <div className="find-projects" role="group" aria-label="Projects">
-              <button type="button" className={find.projects?.length ? '' : 'on'} onClick={() => setFind({ ...find, projects: undefined })}>
+              <button type="button" className={find.projects?.some(id => listed.some(p => p.id === id)) ? '' : 'on'} onClick={() => setFind({ ...find, projects: undefined })}>
                 All projects
               </button>
               {listed.map(p => {

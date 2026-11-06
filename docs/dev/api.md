@@ -85,8 +85,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `alertDone` event (daemon/alerts.ts). One without choices from a tab (`tells`) goes (`alertDone`) once a focused
   window's `view` shows that tab (`alertsSeen`, main.ts' `view`). Laki AI's (`aiRpc` adds `by: 'ai'` and its `chat`):
   refused unless ai.ts `aiMayAlert` (its chat's last message or *Your instructions* say alert, or `settings.ai.alerts`).
-  The card's text is Markdown (ask.ts: `markdownHtml`, `imgsAsLinks`; its links through main's window-open handler to
-  the browser). `timer`'s `important` (Laki AI's `laki_timer`): a timer that ends as a card.
+  An alert card's text is Markdown (ask.ts: `lineBreaks`, `markdownHtml`, `imgsAsLinks`; its links through main's
+  window-open handler to the browser); any other card's (an ask's command beside its Allow) stays as written. `timer`'s `important` (Laki AI's `laki_timer`): a timer that ends as a card.
 - the calendar's reminders (`settings.calendar`, on unless false; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
   `when.ts` `parseAt`'s words, or words that repeat (`whenOf`: its next time and `every`), `every`, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
   rings again; `done`; `ws`; `important`, on add too: it rings as a card on screen, on its `reminder` event), `reminderRm`, `reminderTick` (every 30 s and as the first client connects; with no client

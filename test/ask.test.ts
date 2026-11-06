@@ -55,3 +55,7 @@ test("ask: claude's several questions at once (its ← tabs → line over the me
   assert.equal(askOf(screen)?.question, 'Which database?')
   assert.equal(askOf('Which database?\n❯ 1. Postgres\n  2. SQLite')?.steps, undefined) // one question: none
 })
+
+test('ask: a line with arrows alone (an answer’s “← previous · next →”) is no question tabs', () => {
+  assert.equal(askOf('← previous · next →\nPick one\n❯ 1. A\n  2. B')?.steps, undefined)
+})

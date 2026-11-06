@@ -820,12 +820,13 @@ export function retryText(r: NonNullable<TabView['retry']>, now = Date.now()) {
 
 // which lines of a Reader chat show with Settings › Appearance › Tool calls in the Reader (tools): all (none); ok: a
 // run of tool calls shows only when one of them failed; final: your messages and each turn's last answer (an answer
-// right before your next message, a new session, or the end). The last line while it runs shows either way
+// right before your next message, a new session, or the end). The last line while it runs, and a run you stopped, show
+// either way
 export type ReaderLine = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true }
 export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {
   return said.map((x, i) => {
     if (!tools || x.who === 'you' || x.who === 'new' || x.who === 'screen' || (running && i === said.length - 1)) return true
-    if (x.who === 'tool') return tools === 'ok' && !!x.fail
+    if (x.who === 'tool') return (tools === 'ok' && !!x.fail) || !!x.stopped // stopped: its Stopped line with it
     const next = said[i + 1]
     return tools === 'ok' || !next || next.who === 'you' || next.who === 'new'
   })

@@ -1696,7 +1696,7 @@ export function App() {
     // anywhere on this Mac: a scratchpad's, /tmp's; refused (remote access, a daemon before API 151): a pasted one's
     return api.call<{ image?: string }>('imageRead', { path }).then(
       r => r.image,
-      () => api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture'))),
+      e => api.call<string>('aiImage', { path }).catch(() => Promise.reject(e)), // neither: imageRead's why
     )
   }
   const openPath = async (tab: string, path: string) => {

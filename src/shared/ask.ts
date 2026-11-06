@@ -9,7 +9,7 @@ const OPTION = /^\s*([❯›>▶●→])?\s*(\d{1,2})[.)]\s+(\S.*?)\s*$/
 const RULE = /^[\s─━═╌╍┄┅╭╮╰╯┌┐└┘├┤┬┴┼-]*$/ // a box's top or bottom: no words
 // claude's questions asked at once (AskUserQuestion with several): a line of their tabs over the menu, ← first and →
 // last (←  ☐ Database  ☐ Auth  ✔ Submit  →); ←/→ go between them
-const STEPS = /^\s*←.*→\s*$/
+const STEPS = /^\s*←.*(☐|☒|☑|✔|✓|□|■|Submit).*→\s*$/ // a box or Submit in it: not just any line with arrows
 export function askOf(text: string, cursor?: number): Ask | undefined {
   const lines = text.split('\n').map(raw => raw.replace(/^[\s│|]+|[\s│|]+$/g, ' '))
   let opts: Ask['options'] = []

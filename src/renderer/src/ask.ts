@@ -2,7 +2,7 @@
 // panel at the bottom right of the screen, a card each, the newest on top. Each: its title, its words, an Edit's or Write's diff, a button
 // per choice, Open, ×; its edge's color by tone (an ask amber, a finish green, a limit red); Close all over two or more.
 // Keys once it's clicked: 1-9 the top card's choices, Esc its ×.
-// Its words as Markdown (links open in the browser: main's window-open handler), a line break kept as one
+// A laki alert's words as Markdown (links open in the browser: main's window-open handler), a line break kept as one
 import { imgsAsLinks, lineBreaks, markdownHtml } from '../../shared/markdown'
 type Action = { text: string }
 type Card = { key: string; tab: string; ask: boolean; tone: 'ask' | 'ok' | 'bad' | 'info'; at: number; title: string; body: string; diff?: string; actions: Action[]; error?: string }
@@ -38,7 +38,9 @@ function cardEl(c: Card) {
   head.append(el('span', '', 'dot'), el('span', c.title, 'title'))
   head.title = c.title
   box.append(x, head)
-  if (c.body) box.append(Object.assign(el('div', '', 'what'), { innerHTML: imgsAsLinks(markdownHtml(lineBreaks(c.body))) })) // markdownHtml escapes every word
+  // a laki alert's words as Markdown (markdownHtml escapes every word); any other card's as written: an ask's command
+  // next to its Allow must read as it runs (no * or backslash taken as formatting)
+  if (c.body) box.append(c.key.startsWith('alert:') ? Object.assign(el('div', '', 'what md'), { innerHTML: imgsAsLinks(markdownHtml(lineBreaks(c.body))) }) : el('pre', c.body, 'what'))
   if (c.diff) box.append(diffEl(c.diff))
   if (c.actions.length) {
     const opts = el('div', '', 'opts')

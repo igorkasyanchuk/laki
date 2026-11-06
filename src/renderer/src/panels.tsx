@@ -1775,6 +1775,21 @@ export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these 
 
 // an HTML or Markdown artifact in the app (Settings › General › Storage: Open artifacts in Laki): HTML in a sandboxed
 // frame (the daemon's /artifact/…: its CSS, scripts and pictures beside it load), Markdown rendered
+// a file's size and time (stat), looked at once and then every ms while the page shows: a change calls onChange
+// (an artifact written again while it's open)
+function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undefined, key: unknown, ms: number, onChange: () => void) {
+  const on = useRef(onChange)
+  on.current = onChange
+  useEffect(() => {
+    if (!stat || key === null) return
+    let was = ''
+    const look = () => document.visibilityState === 'visible' && stat().then(s => (k => (was && k !== was && on.current(), (was = k)))(`${s.size}@${s.at}`), () => {})
+    look()
+    const t = setInterval(look, ms)
+    return () => clearInterval(t)
+  }, [key])
+}
+
 // stamp: its size and time, looked at every 1.5 s while it's open: a change (an agent writes it again) reads it again, a
 // page loads again
 export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
@@ -1782,12 +1797,7 @@ export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onRe
   const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
   useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path, n])
-  useEffect(() => {
-    if (!stamp) return
-    let was = ''
-    const t = setInterval(() => document.visibilityState === 'visible' && stamp().then(s => ((k => (was && k !== was && setN(x => x + 1), (was = k)))(`${s.size}@${s.at}`)), () => {}), 1500)
-    return () => clearInterval(t)
-  }, [path])
+  useChanged(stamp, path, 1500, () => setN(x => x + 1))
   return (
     <Modal title={path} onClose={onClose} wide loose>
       <div className="art-big">
@@ -1836,17 +1846,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   useEffect(() => void api.current.list().then(f => (setFiles(f), setErr('')), e => setErr(String(e?.message ?? e))), [ws, n])
   // one shown big: its size and time every 2 s (stat); written anew, the list again, so it's read again (seen's key by
   // its time) and shown
-  useEffect(() => {
-    if (big === null || !api.current.stat) return
-    let was = ''
-    const t = setInterval(
-      () =>
-        document.visibilityState === 'visible' &&
-        api.current.stat!(big).then(s => (k => (was && k !== was && api.current.list().then(f => setFiles(f), () => {}), (was = k)))(`${s.size}@${s.at}`), () => {}),
-      2000,
-    )
-    return () => clearInterval(t)
-  }, [big, ws])
+  useChanged(api.current.stat && big !== null ? () => api.current.stat!(big) : undefined, big === null ? null : `${ws}/${big}`, 2000, () => void api.current.list().then(f => setFiles(f), () => {}))
   useEffect(() => setDir(''), [ws])
   // dir's own files (links first, newest first, as listed) and its folders (each with its files' count, the newest first)
   const under = (f: Artifact) => !dir || f.path.startsWith(`${dir}/`)
