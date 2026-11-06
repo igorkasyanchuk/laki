@@ -135,3 +135,32 @@ test('laki notice: past 20 the oldest that only tell go, never one that waits; n
   assert.ok(!ws2.events.some(e => e.ev === 'notice' && ['about it', 'n19'].includes(e.text)), 'none about it, none from it')
   assert.ok(ws2.events.some(e => e.ev === 'notice' && e.text === 'from outside'), 'the rest still')
 })
+
+test("laki alert: one that only tells goes once you look at the tab it came from; one with choices stays; Laki AI's only when asked", async t => {
+  const rig = await fresh(t)
+  const ws = await rig.connect()
+  t.after(() => ws.close())
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const [a, b] = [(await rig.rpc('tabNew', { ws: w.id })).id, (await rig.rpc('tabNew', { ws: w.id })).id]
+  const told = await rig.rpc('alertShow', { text: 'Report ready: https://example.com/r', from: { tab: a } })
+  const asked = rig.rpc('alertShow', { text: 'Ship it?', choices: ['Yes'], from: { tab: a } })
+  const q = await until(() => ws.events.find(e => e.ev === 'alert' && e.text === 'Ship it?'), 'the question')
+  await ws.call('view', { tab: b, focused: true }) // another tab: both stay
+  await ws.call('view', { tab: a, focused: false }) // not focused: both stay
+  await rig.rpc('state')
+  assert.ok(!ws.events.some(e => e.ev === 'alertDone'), 'nothing closed yet')
+  await ws.call('view', { tab: a, focused: true })
+  await until(() => ws.events.some(e => e.ev === 'alertDone' && e.id === told.id), 'the told one goes')
+  assert.ok(!ws.events.some(e => e.ev === 'alertDone' && e.id === q.id), 'the question stays')
+  await rig.rpc('alertAnswer', { id: q.id, choice: 'Yes' })
+  assert.equal((await asked).choice, 'Yes')
+
+  // Laki AI (aiRpc's by and chat): refused unless you asked for one, your instructions name alerts, or Settings allows
+  await assert.rejects(rig.rpc('alertShow', { text: 'PR reviewed', by: 'ai', chat: '' }), /only when they ask for one/)
+  await rig.rpc('settingsSet', { ai: { context: 'Send me an alert when a deploy fails' } })
+  assert.equal((await rig.rpc('alertShow', { text: 'Deploy failed', by: 'ai', chat: '' })).shown, true)
+  await rig.rpc('settingsSet', { ai: { alerts: true } })
+  assert.equal((await rig.rpc('alertShow', { text: 'PR reviewed', by: 'ai', chat: '' })).shown, true)
+  assert.equal((await rig.rpc('noticeShow', { text: 'a notice is not an alert', by: 'ai', chat: '' })).shown, true)
+})

@@ -358,8 +358,9 @@ selected workspace's PR is in the status bar.
   answers). Laki must be running: one due while it was closed isn't sent, and a message says so as it opens.
 - The funnel at the top filters the workspaces: words in a name, branch, PR title, author or the PR's number (`14466`
   or `#14466`; ⌘K finds a workspace by it too), and *Needs
-  you*, *Working* or *With a PR*; the projects with none hide, groups too. Esc, the funnel again or the × in the
-  field stops it (⌘K too).
+  you*, *Working* or *With a PR*; the projects with none hide, groups too. Under them a chip per project: a click keeps
+  only that one (again: all), Shift-click (or Shift-⏎) adds or takes out one, a ✓ on each kept; *All projects* clears
+  it. Esc, the funnel again or the × in the field stops it (⌘K too).
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Collapse* / *Expand*;
@@ -1565,6 +1566,19 @@ open in Reader. A tab's right click has it too. Settings › Appearance › *Rea
 ```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,
 marked *Proposal*: what it suggests, not applied.
 
+Settings › Appearance › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds
+into *n steps hidden · Show*; one with a failed call stays, *1 failed* in red) or *Final answer only* (your messages and
+each turn's last answer). The steps at work now always show. *Scroll to latest when sending* (on): off, sending leaves
+you where you were reading. Settings › Keys › *Send with*: ⏎ (⇧⏎ a new line) or ⌘⏎ (⏎ a new line), in the Reader and
+every chat box (Laki AI's, an extension's, a spec's, Side chat).
+
+`/clear` (or Codex's `/new`) starts a new chat in the same tab: the Reader keeps the earlier one above a *New session*
+line. A prompt you stopped (Esc) before any answer says *Stopped before an answer* with *Edit and resend*: it goes back in
+the box to change and send again (nothing is undone: it never answered). While Claude Code waits out an API error (a
+rate limit, an overloaded server), the Reader says so under the chat: its try, the wait left, why; the tab says
+*Retrying…*. When Claude Code asks several questions at once, ← and → (outside a text field) go between them on the
+Reader's card and the Needs you card, your answers kept, as in its terminal.
+
 A turn that changed files gets a card under its last answer: *Edited 3 files +42 −7*, the files (a click on the count
 folds them), *Review* (the side panel's Changes on *This turn*: only that turn's diff) and *Undo* (asked first: the files
 back as they were before the turn, the ones it made removed; refused once one of them changed since, and nothing is
@@ -1593,7 +1607,11 @@ tab stays as it was.
 **Important alerts**: ask an agent for one ("show me an important alert in this question using Laki") and it runs
 `laki alert "Deploy to production now?" --choice Deploy --choice "Not yet"` (or MCP's `laki_alert`): a card at the
 bottom right of your screen, over every app, with a button per choice; your pick goes back to the agent, which goes
-on by it (× says no choice; after 30 minutes it stops waiting). Without choices it just tells you something.
+on by it (× says no choice; after 30 minutes it stops waiting). Without choices it just tells you something, and it goes
+by itself once you look at the tab it came from. Its text is Markdown: links open in your browser, **bold**, `code` and
+lists show as such. Agents send one only when you ask, or your instructions (CLAUDE.md, AGENTS.md) say when; never for
+routine news like a reviewed PR. Laki AI the same: when you ask in its chat, or *Your instructions* name alerts;
+Settings › AI › *Important alerts on its own* lets it send them when it thinks you should know.
 
 **Notices**: the same card inside Laki's window instead of over every app: bottom right, over whatever page is open,
 until you close it (one sent while the app is closed shows when it opens). `laki notice "fix-login is ready for review"
@@ -1851,7 +1869,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
 | ⌘-click a file path | in a terminal's text (`src/app.ts:42`, `./lib/x.go`, `App.tsx:42`): a file of the workspace opens in Laki's preview at that line, ⌘⌥-click in your editor (Settings › Terminal › *A file path clicked* swaps them) |
-| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's. A link behind words (Claude Code's) opens on ⌘-click only; hovering shows where any link goes. Resting on a GitHub PR or issue link shows its card (title, state, author, size; a click opens it on GitHub), and on a picture (a file of the workspace, a pasted screenshot, an https one) shows the picture |
+| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web address shown as it is opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's. A link behind words (Claude Code's) opens on ⌘-click only; hovering shows where any link goes. Resting on a GitHub PR or issue link shows its card (title, state, author, size; a click opens it on GitHub), and on a picture (a file of the workspace, a pasted screenshot, any picture on this Mac by its full path such as `/tmp/…/shot.png`, an https one) shows the picture |
 | select, then *Reply* | in a terminal: the pill under the selected text quotes it to the agent (that tab's, or from a shell its workspace's: a pick when there are several) with your words; ⏎ puts both in its prompt for you to finish, ⌘⏎ sends them (after its turn if it's working) |
 | select, hold ⌥ | the pill offers more: *New workspace* (the new-workspace page with the text as its prompt), *New tab here* (your default agent, started with it), *Ask Laki AI* |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
@@ -2108,6 +2126,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   terminal's ⌘-click would: a document in its app, an HTML page shown in Finder. Each link once. Links come first in
   the strip and open in the browser on a click (a right click: *Copy link*, *Remove the link*),
   and *Info* lists them under *links*. In Files' *Artifacts*, an HTML file opens as a page (*Source*: its text).
+  An artifact you have open (an HTML page, Markdown, a picture) updates by itself when its file is written again.
   Settings › General › Storage shows how much the folder holds (*Show in Finder*) and *Delete files after*: a file
   that hasn't changed for 7, 30, 60, 90 or 180 days or a year goes, checked hourly, or never (the default); only the
   workspaces' own folders, never anything else in the storage folder. Archiving keeps it; deleting the workspace (or removing its

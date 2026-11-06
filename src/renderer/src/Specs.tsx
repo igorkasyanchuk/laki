@@ -5,6 +5,7 @@
 // the new-workspace page with a prompt naming its README.md; a brainstorm has its own chat with Laki AI in a side panel
 // (daemon/ai.ts: it ends after 12 hours unused). New ones start empty or from a template (Templates, settings.planTemplates).
 // Loaded as the page opens (App's lazy import).
+import { sendKeyName, sendTip } from '../../shared/keys'
 import { memo, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planRef } from '../../shared/plans'
 import { type AiMsg, PLAN_KINDS, type Plan, type PlanFile, type PlanKind, type PlanTemplate, type Project } from '../../shared/types'
@@ -556,7 +557,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             rows={2}
             placeholder={d?.chat.length ? 'Ask for more: another option, a darker prototype…' : 'Or say what to explore…'}
             tools={
-              <button className="primary ai-send" aria-label="Ask (⏎)" data-tip={d?.busy ? 'Queue it (⏎): sent with any others when this answer ends' : 'Ask (⏎) · ⇧⏎ a new line'} disabled={!api.aiOn || saving || (!text.trim() && !images.length)} onClick={send}>
+              <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={d?.busy ? `Queue it (${sendKeyName()}): sent with any others when this answer ends` : sendTip('Ask')} disabled={!api.aiOn || saving || (!text.trim() && !images.length)} onClick={send}>
                 <Icon name="arrowRight" size={14} />
               </button>
             }

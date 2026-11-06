@@ -23,6 +23,7 @@ export type NeedsApi = {
   seen: (t: TabView) => void
   seenAll: (ts: TabView[]) => void // Earlier's Seen all
   name: (w: WorkspaceView) => string
+  keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
 }
 
 const EARLIER = 'laki.needsEarlier' // '1': the Earlier row unfolded
@@ -91,6 +92,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return // a button of its own has the key
     const o = opts.find(o => String(o.n) === e.key)
     if (o) e.preventDefault(), api.answer(t, o.n, o.label)
+    else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && waiting && t.ask?.steps && api.keys) e.preventDefault(), api.keys(t, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C') // its other questions
     else if (e.key === 'Enter') e.preventDefault(), api.open(t)
   }
   const last = t.last?.trim().split('\n').find(l => l.trim())?.trim()
@@ -110,6 +112,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
       {!open ? null : waiting ? (
         <>
           <div className="need-q">{t.secret ? `Asks for a secret: ${t.secret.label}` : t.ask?.question || (allow ? 'Asks for permission' : 'Waiting for you')}</div>
+          {t.ask?.steps && api.keys && <div className="need-steps muted small">One of several questions: ← → (the card focused) go between them</div>}
           {t.ask?.diff && (
             // an Edit's or Write's change, before its Yes
             <div className="need-diff" onClick={stop}>

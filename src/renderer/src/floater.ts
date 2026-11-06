@@ -103,6 +103,7 @@ if (mode === 'card') {
   islandPage()
   bridge?.onCard((f, colors) => {
     paint(colors)
+    document.getElementById('island')!.replaceChildren() // the island's card or list, from before a switch to the edge: never under it (the window is this card's size: it showed cut)
     card.classList.toggle('tip', (f.status as string) === 'tip') // a stacked action's name
     if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
     card.style.setProperty('--c', `var(--${f.status})`)

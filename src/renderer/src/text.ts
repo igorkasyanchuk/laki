@@ -809,3 +809,28 @@ export function rmVerdict(s: RmState): { tone: 'ok' | 'warn' | 'bad'; text: stri
   const safe = merged && (s.dirty !== undefined || !s.worktree || !s.lost) ? `PR #${s.pr!.number} is merged${s.dirty === 0 ? ', nothing uncommitted' : ''}${s.ahead && !s.unpushed ? ', all pushed' : ''}` : s.worktree && s.dirty === 0 && !s.ahead ? 'nothing of its own: no changes, no commits' : ''
   return safe ? { tone: 'ok', text: `Safe to ${s.archive ? 'archive' : 'delete'}: ${safe}` } : undefined
 }
+
+// claude waiting out an API error this turn (meters.ts' retry: one from before the turn began is stale), and in words:
+// its try, the wait left, why. The Reader's line under the chat, the tab bar's Retrying…
+export const retrying = (t: Pick<TabView, 'status' | 'retry' | 'runAt'>) => t.status === 'running' && !!t.retry && t.retry.at >= (t.runAt ?? 0)
+export function retryText(r: NonNullable<TabView['retry']>, now = Date.now()) {
+  const left = Math.ceil((r.until - now) / 1000)
+  return [`Waiting out an API error${r.n ? `: try ${r.n}${r.max ? ` of ${r.max}` : ''}` : ''}`, left > 0 ? `next in ${left >= 60 ? `${Math.floor(left / 60)}m ${left % 60}s` : `${left}s`}` : 'retrying now', r.why].filter(Boolean).join(' · ')
+}
+
+// which lines of a Reader chat show with Settings › Appearance › Tool calls in the Reader (tools): all (none); ok: a
+// run of tool calls shows only when one of them failed; final: your messages and each turn's last answer (an answer
+// right before your next message, a new session, or the end). The last line while it runs shows either way
+export type ReaderLine = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true }
+export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefined, running: boolean) {
+  return said.map((x, i) => {
+    if (!tools || x.who === 'you' || x.who === 'new' || x.who === 'screen' || (running && i === said.length - 1)) return true
+    if (x.who === 'tool') return tools === 'ok' && !!x.fail
+    const next = said[i + 1]
+    return tools === 'ok' || !next || next.who === 'you' || next.who === 'new'
+  })
+}
+
+// the sidebar filter's project chips (appCtx Find.projects): a click keeps only that one (again: all), Shift (click or
+// ⏎) adds it or takes it out
+export const pickProject = (on: string[] = [], id: string, more: boolean) => (more ? (on.includes(id) ? on.filter(x => x !== id) : [...on, id]) : on.length === 1 && on[0] === id ? [] : [id])

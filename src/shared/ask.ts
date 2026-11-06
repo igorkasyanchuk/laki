@@ -7,6 +7,9 @@ import type { Ask } from './types.ts'
 // user's own list), not a menu (claude's and codex's menus hide the cursor)
 const OPTION = /^\s*([❯›>▶●→])?\s*(\d{1,2})[.)]\s+(\S.*?)\s*$/
 const RULE = /^[\s─━═╌╍┄┅╭╮╰╯┌┐└┘├┤┬┴┼-]*$/ // a box's top or bottom: no words
+// claude's questions asked at once (AskUserQuestion with several): a line of their tabs over the menu, ← first and →
+// last (←  ☐ Database  ☐ Auth  ✔ Submit  →); ←/→ go between them
+const STEPS = /^\s*←.*→\s*$/
 export function askOf(text: string, cursor?: number): Ask | undefined {
   const lines = text.split('\n').map(raw => raw.replace(/^[\s│|]+|[\s│|]+$/g, ' '))
   let opts: Ask['options'] = []
@@ -22,7 +25,7 @@ export function askOf(text: string, cursor?: number): Ask | undefined {
     else if (n !== opts.length + 1) return // not the next one: some other numbered line
     opts.push({ n, label: m[3].slice(0, 80) })
     if (m[1]) at = n
-    if (opts.length >= 2 && at) (best = { options: [...opts], at, ...(q => q && { question: q })(questionAt(lines, first)) }), (bestAt = first)
+    if (opts.length >= 2 && at) (best = { options: [...opts], at, ...(q => q && { question: q })(questionAt(lines, first)), ...(lines.slice(Math.max(0, first - 8), first).some(l => STEPS.test(l)) && { steps: true }) }), (bestAt = first)
   })
   return cursor !== undefined && cursor >= bestAt ? undefined : best
 }

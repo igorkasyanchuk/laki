@@ -171,7 +171,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) growing in after its marks, which slide left. The PR mark is red
     for a closed PR only: a merged one stays purple.
   - The sidebar's filter (`find`, the head's funnel, ⌘K): `shows` (words in a name, branch, PR title, author or
-    `#n`, and `ONLY`: needs you, working, with a PR); matching rows only, flat (no seps), no drag meanwhile.
+    `#n`, and `ONLY`: needs you, working, with a PR; `find.projects`: the project chips, text.ts `pickProject`, a
+    click one, Shift several); matching rows only, flat (no seps), no drag meanwhile.
   - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's one `img-src` host) before
     the row's PR mark and in the PR section, unless it's `mine`; `settings.avatars === false` (Settings › Appearance's
     *GitHub pictures*, `showAvatars`): none loaded.
@@ -331,7 +332,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   circle grows instead: `.hot`, set by `pointerover`, not `:hover`, which outlives the bar's hiding as a click brings Laki in front); at the end main's `snap` sticks it to the side (left or right) nearest the pointer, animated (another orientation: centered there, its length kept until the page says its own), and
   `floater.json` in userData keeps where (`home`, with its `side`; an older one's: left or right by where it is: a screen gone puts it on the main one, `barAt`, and leaves `home` for
   the screen's return), `#card` (a hover's card, beside the bar toward the screen's middle, click-through: its own
-  window so the bar never moves under the mouse; `floater-hover` and `floater-card` show it only while the cursor is
+  window so the bar never moves under the mouse; the card window holds the island's `#island` too: a card emptied it,
+  as the island's empties `#card`, else one left from the notch showed cut under it; `floater-hover` and `floater-card` show it only while the cursor is
   over the bar and Laki isn't in front: a bar shown again keeps the circle it had under the mouse) and `#voice` (the
   microphone's: a focusable panel, `focus()` makes it key without bringing Laki's window forward; dictation 150 ms
   after the focus; `voiceTo` pick: a "Pick who gets it" row first, nothing sent until one is; new: no list, always a
@@ -438,7 +440,8 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   *Workspace* / *Artifacts* (`PanelApi.artifacts`: `artifactList` as the tree, the preview's `storage` (read-only,
   `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
   *Artifacts: n* toggles `ArtifactsBar`; its ⋯ (`ArtifactsApi` `reveal('')`, `files`: `artifactsInFiles`) and the big
-  view's buttons go to Finder or there. An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
+  view's buttons go to Finder or there (one shown big: the list again every 2 s, a file written anew read again by its
+  time; `ArtifactView` looks at `fileRead`'s `stat` every 1.5 s, a change reads it or loads the page again). An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
   `Modal`; App's `artView`) unless `settings.artifactsIn` is `browser` (Settings › General › Storage; then main's
   `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
@@ -531,7 +534,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   flowVars, presets' env) and `importable` never takes them; an import goes through `paint`, so it's painted and autosaved like typing, after
   `KINDS` refuses a field of the wrong kind: add a new list, object or number setting there). *Find a setting* (`FIND`: section, the title as the page writes it, more
   words; add new settings there) opens a section and lights (`.spot`) the first label, row or heading that starts with
-  the title. Settings' `spot` (App's dialog `{ settings, spot }`: Run ▾'s *Edit the run script…* → Scripts, *Edit actions…* → Actions)
+  the title. FIND is also what's *new*: settingsMap's `freshOf` against `laki.settingsKnown` (every entry at a fresh
+  install), the nav's `.set-new` by a section, SettingsKit's `Fresh` context a chip on its rows (Says) for that visit. Settings' `spot` (App's dialog `{ settings, spot }`: Run ▾'s *Edit the run script…* → Scripts, *Edit actions…* → Actions)
   opens at that `Group`'s card, lit the same way (a ring, a halo and a tint, 2.6 s). Hovering a theme paints it (`applyTheme`), the chosen one again as the mouse leaves `.themes` or the page closes. A
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
   are sections of it, under the nav's *Project settings* head (`ProjectSection`: name, a Memory row (its counts;

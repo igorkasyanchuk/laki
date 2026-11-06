@@ -1,7 +1,7 @@
 // The file preview's Markdown (src/renderer/src/markdown.ts): blocks and inline marks as a tree
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { inline, markdown } from '../src/shared/markdown.ts'
+import { inline, lineBreaks, markdown, markdownHtml } from '../src/shared/markdown.ts'
 
 test('markdown blocks', () => {
   const md = markdown(
@@ -121,4 +121,12 @@ test("GitHub's HTML in Markdown (dependabot's bodies, READMEs): its tags as the 
   // a stray backtick is no code span past its paragraph: the HTML after it still reads
   assert.deepEqual(markdown("don't ` here\n\n<details><summary>N</summary>\n\n<a href=\"https://x.dev\">x</a> `c`\n</details>", true)[1], { t: 'details', open: false, summary: ['N'], blocks: [{ t: 'p', inl: [{ t: 'a', href: 'https://x.dev', kids: ['x'] }, ' ', { t: 'code', text: 'c' }] }] })
   assert.deepEqual(markdown('</details> <summary>x</summary>\n\ntext', true), [{ t: 'p', inl: ['text'] }]) // strays: nothing
+})
+
+test('lineBreaks: a card\'s line breaks kept (a link at a line\'s end too), not in a fence, a heading or before a list', () => {
+  const h = markdownHtml(lineBreaks('Report ready: **59**\nhttps://example.com/r\nlast\n\n- a\n- b\n\n# T\nx\n```\nc1\nc2\n```'))
+  assert.match(h, /<p>Report ready: <strong>59<\/strong><br> ?<a href="https:\/\/example.com\/r"[^>]*>https:\/\/example.com\/r<\/a><br> ?last<\/p>/)
+  assert.doesNotMatch(h, /<li>[^<]*<br>|a<br>/) // a list's items stay as they are
+  assert.match(h, /<h1>T<\/h1><p>x<\/p>/)
+  assert.match(h, /<pre><code>c1\nc2<\/code><\/pre>/)
 })

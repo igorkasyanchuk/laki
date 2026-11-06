@@ -6,6 +6,9 @@ import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, s
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { copyTree } from '../src/shared/conn.ts'
+import { pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
+import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
+import { sendIs, setSendKey } from '../src/shared/keys.ts'
 import { repoOf } from '../src/daemon/codespace.ts'
 import { ntfyReplies, pushRequest, pushText, replies, tapSig } from '../src/daemon/push.ts'
 import { highlight } from '../src/renderer/src/highlight.ts'
@@ -382,4 +385,47 @@ test("a Yes on a notification only for text shown as it is: not cut, no bidi or 
   assert.equal(noteWhole('a\u001Bb'), false, 'an escape')
   assert.equal(noteWhole('rm\u00A0-rf ~'), false, 'a no-break space (HIDDEN: cmdAsk refuses it too)')
   assert.equal(noteWhole('ok\u2028rm -rf ~'), false, 'a line separator')
+})
+
+test("the Reader's tool calls (Hide successful, Final answer only), its retry line; the sidebar's project chips; Settings' new ones; Send with", () => {
+  const said = [
+    { who: 'you' as const, text: 'Fix it' },
+    { who: 'agent' as const, text: 'Looking.' },
+    { who: 'tool' as const, text: 'Read: a.ts\nEdit: a.ts' },
+    { who: 'tool' as const, text: 'Bash: npm test', fail: 1 },
+    { who: 'agent' as const, text: 'Fixed.' },
+    { who: 'new' as const, text: '' },
+    { who: 'you' as const, text: 'Next' },
+    { who: 'tool' as const, text: 'Bash: ls' },
+  ]
+  assert.deepEqual(readerShown(said, undefined, false), said.map(() => true))
+  assert.deepEqual(readerShown(said, 'ok', false), [true, true, false, true, true, true, true, false])
+  assert.deepEqual(readerShown(said, 'final', false), [true, false, false, false, true, true, true, false])
+  assert.equal(readerShown(said, 'final', true).at(-1), true) // the run at work shows
+
+  const r = { n: 2, max: 10, at: 1000, until: 46_000, why: 'Rate limited' }
+  assert.equal(retryText(r, 1000), 'Waiting out an API error: try 2 of 10 · next in 45s · Rate limited')
+  assert.equal(retryText({ ...r, until: 200_000 }, 1000), 'Waiting out an API error: try 2 of 10 · next in 3m 19s · Rate limited')
+  assert.equal(retryText({ at: 0, until: 0 }, 1000), 'Waiting out an API error · retrying now')
+  assert.equal(retrying({ status: 'running', retry: r, runAt: 900 }), true)
+  assert.equal(retrying({ status: 'running', retry: r, runAt: 2000 }), false) // from before this turn
+  assert.equal(retrying({ status: 'idle', retry: r }), false)
+
+  assert.deepEqual(pickProject(undefined, 'a', false), ['a'])
+  assert.deepEqual(pickProject(['a'], 'a', false), []) // again: all
+  assert.deepEqual(pickProject(['a'], 'b', false), ['b'])
+  assert.deepEqual(pickProject(['a'], 'b', true), ['a', 'b'])
+  assert.deepEqual(pickProject(['a', 'b'], 'a', true), ['b'])
+
+  assert.deepEqual(freshOf(null), []) // a fresh install: none new
+  const known = FIND.map(findKey)
+  assert.deepEqual(freshOf(known), [])
+  assert.deepEqual(freshOf(known.filter(k => k !== 'keys|Send with')).map(f => f[1]), ['Send with'])
+
+  const k = (key: string, o: Partial<Record<'shiftKey' | 'altKey' | 'metaKey' | 'ctrlKey', boolean>> = {}) => ({ key, shiftKey: false, altKey: false, metaKey: false, ctrlKey: false, ...o })
+  setSendKey(undefined)
+  assert.deepEqual([sendIs(k('Enter')), sendIs(k('Enter', { shiftKey: true })), sendIs(k('Enter', { metaKey: true })), sendIs(k('a'))], [true, false, true, false])
+  setSendKey('mod')
+  assert.deepEqual([sendIs(k('Enter')), sendIs(k('Enter', { metaKey: true })), sendIs(k('Enter', { ctrlKey: true }))], [false, true, true])
+  setSendKey(undefined)
 })

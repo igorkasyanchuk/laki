@@ -50,8 +50,9 @@ export function tailOf(tab: Tab, t: Tail, fresh: () => void): string | undefined
 // Reader view: a claude or codex tab's chat as what was said (share.ts' chatOf), read on as it grows; v moves with it
 // (the renderer asks every 1.5 s with the v it has: the same, no said back); none: no transcript (another agent, a
 // host's, not written yet). ponytail: the newest 400 sent whole at each change
-// bg: what a claude chat runs in the background now (share.ts bgOf: the chips over the Reader's box)
-type Reader = Tail & { said: Said[]; v: number; bg: BgRead; calls: Map<string, McpCall> }
+// bg: what a claude chat runs in the background now (share.ts bgOf: the chips over the Reader's box). past: the tab's
+// earlier chats (a /clear, codex's /new: its session changed), each ending in a New session line; chat: the one read now
+type Reader = Tail & { said: Said[]; v: number; bg: BgRead; calls: Map<string, McpCall>; ids: Map<string, number>; past?: Said[]; chat?: string }
 const readers = new Map<string, Reader>()
 const bgNew = (): BgRead => ({ bg: new Map(), wait: new Map() })
 const bgDone = (): BgRead => ({ ...bgNew(), done: { n: 0, last: [] } })
@@ -59,12 +60,21 @@ export function chatRead(p: { tab: string; v?: number }): { none?: boolean; v?: 
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) throw new Error('no such tab')
   for (const id of readers.keys()) if (!state.tabs.some(t => t.id === id)) readers.delete(id) // closed tabs'
-  const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0, bg: bgNew(), calls: new Map() }), readers.get(tab.id)!)
-  const text = tailOf(tab, r, () => ((r.said = []), (r.bg = bgNew()), (r.calls = new Map()), r.v++))
-  if (text === undefined) return { none: true }
-  if (text) chatOf(tab.preset!, text, r.said, tab.preset === 'claude' ? r.calls : undefined), tab.preset === 'claude' && bgOf(text, r.bg), r.v++
+  const r = readers.get(tab.id) ?? (readers.set(tab.id, { said: [], v: 0, bg: bgNew(), calls: new Map(), ids: new Map() }), readers.get(tab.id)!)
+  const text = tailOf(tab, r, () => {
+    if (r.chat && r.chat !== tab.resumeId && r.said.length) r.past = [...(r.past ?? []), ...r.said, { who: 'new', text: '' } as Said].slice(-400)
+    r.chat = tab.resumeId
+    ;(r.said = []), (r.bg = bgNew()), (r.calls = new Map()), (r.ids = new Map()), r.v++
+  })
+  if (text === undefined && !r.past) return { none: true } // a /clear's chat not written yet: the earlier ones and the line
+  if (text) chatOf(tab.preset!, text, r.said, tab.preset === 'claude' ? r.calls : undefined, tab.preset === 'claude' ? r.ids : undefined), tab.preset === 'claude' && bgOf(text, r.bg), r.v++
   if (r.calls.size > 300) for (const k of [...r.calls.keys()].slice(0, r.calls.size - 200)) r.calls.delete(k) // the newest 200 (callsOf's)
-  return p.v === r.v ? { v: r.v } : { v: r.v, said: r.said.slice(-400), ...(r.said.length > 400 && { from: r.said.length - 400 }), ...(r.bg.bg.size > 0 && { bg: [...r.bg.bg.values()] }) }
+  if (r.ids.size > 3000) for (const k of [...r.ids.keys()].slice(0, r.ids.size - 2000)) r.ids.delete(k) // a result comes soon after its call
+  if (p.v === r.v) return { v: r.v }
+  const all = r.past ? [...r.past, ...r.said] : r.said
+  const cut = Math.max(0, all.length - 400)
+  const from = cut - (r.past?.length ?? 0) // said[k] is what's sent's [k - from]: MCP Apps' at (mcpApps.ts)
+  return { v: r.v, said: all.slice(cut), ...(from !== 0 && { from }), ...(r.bg.bg.size > 0 && { bg: [...r.bg.bg.values()] }) }
 }
 
 // what a claude tab's chat left running in the background as its process ended (its transcript read now, its last
@@ -212,7 +222,7 @@ function claudeBig(tab: Tab) {
   }
   return false
 }
-export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background'> {
+export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 'background' | 'retry'> {
   const r = meters.get(t.id)
   const m = r?.file?.endsWith(`${t.resumeId}.jsonl`) ? r.m : undefined // another chat's (a /clear): until this one's is read
   const s = (x => (x?.session === t.resumeId ? x : undefined))(statusOn() ? lines.get(t.id) : undefined) // its status line's, this chat's
@@ -224,7 +234,7 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const used = live ?? m?.used
   const bg = m && r!.bg
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
-  return { ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
+  return { ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(m.priced && { cost: Math.round(m.cost * 1e4) / 1e4 }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to

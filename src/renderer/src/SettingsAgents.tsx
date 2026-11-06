@@ -270,6 +270,9 @@ export function AiSection({ api, ai, glow, onGlow, next, onNext, presets, onChan
           <Switch className="switch-row" on={ai.float !== false} onChange={v => onChange({ ...ai, float: v })}>
             <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
           </Switch>
+          <Switch className="switch-row" on={!!ai.alerts} onChange={v => onChange({ ...ai, alerts: v || undefined })}>
+            <Says title="Important alerts on its own" hint="Off: Laki AI puts an important alert on your screen only when you ask for one in the chat, or Your instructions say when. On: also when it thinks you should know" />
+          </Switch>
           <Switch className="switch-row" on={next} onChange={onNext}>
             <Says title="Guess my next prompt" hint="As a Claude Code or Codex turn ends, Laki AI's model guesses what you'd send next; the Reader's empty box shows it greyed out: Tab takes it, Esc hides it. One more request to the model per turn" />
           </Switch>

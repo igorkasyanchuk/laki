@@ -52,6 +52,18 @@
   `diff` (App's ask bar: `AskWrap`'s chip; Needs.tsx' card; floater.ts' `diffEl` on the notch's); `@` in its box: PromptInput's `useComplete` with
   `mentions` (text.ts `mentionsOf`, App's `readerApi`), a line each at send (`withMentions`); your long messages
   (`longSaid`: over 12 lines or 1,000 characters) fold under `.rd-fold`. Tested in `test/reader.test.ts`.
+  - What it shows (`settings.readerTools`: text.ts `readerShown`; hidden runs as *n steps hidden · Show*, `opened` by
+    their first line): a run's `fail` counts its calls whose `tool_result` has `is_error` (`chatOf`'s `ids`, claude's);
+    `stopped` marks the line before claude's *[Request interrupted by user…]* (codex's `<turn_aborted>`), a prompt of
+    yours with it, the last line, offering *Edit and resend* (its text back in the box). A tab's session changing (a
+    `/clear`: SessionStart's new `session_id`) keeps the chat read so far as `past`, ended by a `{ who: 'new' }` line,
+    sent before the new chat (`from` then counts back for MCP Apps' `at`); in memory, a daemon restart forgets it.
+    `settings.readerScroll` false: a send doesn't pin it to the bottom. `settings.sendKey` (`mod`): keys.ts `sendIs`
+    for every chat box (`setSendKey` as each window's settings come).
+  - Claude's API retries: share.ts `meterOf` reads `{ type: 'system', subtype: 'api_error' }` lines (`retryAttempt`,
+    `maxRetries`, `retryInMs`, `error.formatted`) into the meter's `retry`, cleared by its next answer; `meterView` puts
+    it on the tab (`retry`); text.ts `retrying` (only from this turn: `at` ≥ `runAt`) and `retryText`: the Reader's line,
+    the tab bar's *Retrying…*. Read with the meters (`meterTick`, every 10 s).
   - Its chips (claude): share.ts `bgOf` reads the transcript on with `chatOf` (`Reader.bg`): an Agent/Task call runs
     until its result (a background one, `toolUseResult.isAsync`, on under its `agentId` with its `outputFile`), a Bash
     `run_in_background` from its result's ID (`backgroundTaskId`, or the text's) and output file, each until a

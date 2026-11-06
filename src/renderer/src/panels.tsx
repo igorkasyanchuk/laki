@@ -1775,15 +1775,24 @@ export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these 
 
 // an HTML or Markdown artifact in the app (Settings › General › Storage: Open artifacts in Laki): HTML in a sandboxed
 // frame (the daemon's /artifact/…: its CSS, scripts and pictures beside it load), Markdown rendered
-export function ArtifactView({ path, page, read, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
+// stamp: its size and time, looked at every 1.5 s while it's open: a change (an agent writes it again) reads it again, a
+// page loads again
+export function ArtifactView({ path, page, read, stamp, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
+  const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
-  useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path])
+  useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path, n])
+  useEffect(() => {
+    if (!stamp) return
+    let was = ''
+    const t = setInterval(() => document.visibilityState === 'visible' && stamp().then(s => ((k => (was && k !== was && setN(x => x + 1), (was = k)))(`${s.size}@${s.at}`)), () => {}), 1500)
+    return () => clearInterval(t)
+  }, [path])
   return (
     <Modal title={path} onClose={onClose} wide loose>
       <div className="art-big">
         {html ? (
-          page ? <iframe className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>
+          page ? <iframe key={n} className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>
         ) : md === null ? (
           <span className="muted small">Loading…</span>
         ) : typeof md === 'string' ? (
@@ -1825,6 +1834,13 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const api = useRef(a)
   api.current = a
   useEffect(() => void api.current.list().then(f => (setFiles(f), setErr('')), e => setErr(String(e?.message ?? e))), [ws, n])
+  // one shown big: the list again every 2 s, so a file written anew (its time) is read again (seen's key) and shown.
+  // ponytail: a walk of the storage folder each time; fine for an agent's few hundred files
+  useEffect(() => {
+    if (big === null) return
+    const t = setInterval(() => document.visibilityState === 'visible' && api.current.list().then(f => setFiles(was => (JSON.stringify(was) === JSON.stringify(f) ? was : f)), () => {}), 2000)
+    return () => clearInterval(t)
+  }, [big, ws])
   useEffect(() => setDir(''), [ws])
   // dir's own files (links first, newest first, as listed) and its folders (each with its files' count, the newest first)
   const under = (f: Artifact) => !dir || f.path.startsWith(`${dir}/`)
@@ -1904,7 +1920,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if (!c) return full || f.size <= 2 << 20 ? <span className="muted small">Loading…</span> : <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
     if ('error' in c) return <span className="warn small">{c.error}</span>
     if (c.image) return <img src={c.image} alt={f.path} />
-    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
+    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe key={f.at} className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
     if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} html /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
     if (full)
       return (

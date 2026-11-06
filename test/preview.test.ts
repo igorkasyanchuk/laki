@@ -74,3 +74,27 @@ test('laki plan: list, read, new and write specs and brainstorms from a tab', as
   assert.notEqual(r.code, 0, 'never the user’s README.md')
   assert.match((await rig.cli('plan', 'read', p.id, 'idea', 'x')).err, /kind: spec or brainstorm, not idea/)
 })
+
+test("imageRead: a picture anywhere on this Mac by its full path (an image's name and bytes); fileRead's stat: an open artifact's look", async t => {
+  const rig = await fresh(t)
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+  const dir = join(rig.home, 'scratchpad')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'shot.png'), png)
+  writeFileSync(join(dir, 'key.png'), 'not a picture: a key file named .png')
+  writeFileSync(join(dir, 'notes.txt'), 'hi')
+  assert.deepEqual(await rig.rpc('imageRead', { path: join(dir, 'shot.png') }), { size: png.length, image: `data:image/png;base64,${png.toString('base64')}` })
+  await assert.rejects(rig.rpc('imageRead', { path: join(dir, 'key.png') }), /not an image/)
+  await assert.rejects(rig.rpc('imageRead', { path: join(dir, 'notes.txt') }), /not an image/)
+  await assert.rejects(rig.rpc('imageRead', { path: 'shot.png' }), /not an image/) // a full path only
+  await assert.rejects(rig.rpc('imageRead', { path: join(dir, 'gone.png') }), /ENOENT|no such file/)
+
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const store = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).storage, 'its storage folder')
+  writeFileSync(join(store, 'report.html'), '<p>one</p>')
+  const a = await rig.rpc('fileRead', { ws: w.id, path: 'report.html', storage: true, stat: true })
+  assert.deepEqual(Object.keys(a), ['size', 'at'])
+  writeFileSync(join(store, 'report.html'), '<p>two, longer</p>')
+  assert.notEqual((await rig.rpc('fileRead', { ws: w.id, path: 'report.html', storage: true, stat: true })).size, a.size)
+})

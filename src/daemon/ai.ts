@@ -172,6 +172,16 @@ export async function voiceText(o: { audio?: unknown }) {
 }
 const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map(Number) // ms before each try again (tests: shorter)
 
+// laki_alert from Laki AI (alerts.ts): only when you asked for one in that chat's last message, Your instructions name
+// alerts, or Settings › AI's Important alerts on its own is on: never a card over every app for news it picked itself
+const ALERT_SAID = /\balert/i
+export function aiMayAlert(chat?: string) {
+  const s = state.settings?.ai
+  if (s?.alerts || ALERT_SAID.test(s?.context ?? '')) return true
+  const t = threads.get(chat ?? (busy.size === 1 ? [...busy.keys()][0] : '\0'))
+  return !!t && ALERT_SAID.test(t.chat.findLast(m => m.role === 'user')?.text ?? '')
+}
+
 // ---------- the conversations: '' the AI page's, plan:<project>/<kind>/<slug> a spec's or brainstorm's (plans.ts)
 
 // resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.

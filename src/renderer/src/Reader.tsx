@@ -14,22 +14,25 @@ import { daemonBase, openExternal } from './api'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
-import { type Mention, withMentions } from './text'
+import { type Mention, type ReaderLine, readerShown, retrying, retryText, withMentions } from './text'
+import { sendIs } from '../../shared/keys'
 import { planNow } from '../../shared/todos'
 import { HIDDEN, type TabView } from '../../shared/types'
 
-type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
+type Said = ReaderLine // fail: a run of tool calls' failed ones; stopped: you stopped it there; new: a New session line (a /clear)
 // what a claude chat runs in the background (the daemon's share.ts bgOf): subagents and background shells
 type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string }
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+export type ReaderApi = { keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
+// Settings › Appearance's: which tool calls show (text.ts readerShown), and whether sending scrolls to the latest (on unless false)
+export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean }
 
-export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; active: boolean }) {
+export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: ReaderApi; active: boolean; look?: ReaderLook }) {
   const [said, setSaid] = useState<Said[]>()
   const [bg, setBg] = useState<BgTask[]>([])
   const [apps, setApps] = useState<App[]>([])
@@ -43,9 +46,11 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   const [histMenu, history] = usePromptHistory(box, setText) // ↑ in the empty box: your prompts
   const at = useComplete(box, api.mentions && { key: tab.id, mentions: () => api.mentions!(tab) }, setText) // @ a workspace or project
   const pinned = useRef(true) // at the bottom: it stays there as the chat grows
+  const [opened, setOpened] = useState<Set<number>>(new Set()) // the hidden runs shown by a click, by their first line
   useEffect(() => {
     let alive = true
     v.current = undefined
+    setOpened(new Set())
     const go = () =>
       api.read(tab.id, v.current).then(
         r => alive && (setNone(!!r.none), r.said && ((v.current = r.v), setSaid(r.said), setBg(r.bg ?? []), setApps(r.apps ?? []))),
@@ -62,11 +67,24 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
   useEffect(() => {
     if (active && !tab.ask) box.current?.focus({ preventScroll: true })
   }, [active, !!tab.ask])
+  // several questions on its card (claude's tabs over the menu): ←/→ outside a text field go between them, as in its terminal
+  const steps = active && !!tab.ask?.steps && !!api.keys
+  useEffect(() => {
+    if (!steps) return
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || t.closest('input, textarea, select, [contenteditable="true"], .xterm')) return
+      e.preventDefault()
+      api.keys!(tab.id, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C')
+    }
+    addEventListener('keydown', on)
+    return () => removeEventListener('keydown', on)
+  }, [steps, tab.id])
   const send = () => {
     const t = text.trim()
     if (!t) return
     setText('')
-    pinned.current = true
+    if (look.scroll !== false) pinned.current = true // off: you stay where you were reading
     void api.send(tab.id, withMentions(t, api.mentions?.(tab) ?? [])).catch(() => setText(t)) // a line for each @ it names
   }
   const now = tab.plan && !tab.plan.stale ? planNow(tab.plan) : undefined
@@ -127,35 +145,65 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
     </div>
   )
   const uiDraw = useMemo(() => (json: string) => <UiBlock json={json} onSend={text => void api.send(tab.id, text).catch(() => {})} />, [tab.id])
+  // the chat's lines: what Tool calls in the Reader hides goes in runs, each one line (n steps hidden · Show)
+  const running = tab.status === 'running'
+  const shown = useMemo(() => readerShown(said ?? [], look.tools, running), [said, look.tools, running])
+  const line = (x: Said, i: number) => [
+    x.who === 'you' ? (
+      <You key={i} text={x.text} stopped={x.stopped} onEdit={x.stopped && !running && i === said!.length - 1 ? () => (setText(x.text), box.current?.focus()) : undefined} />
+    ) : x.who === 'new' ? (
+      <div key={i} className="rd-new muted small" data-tip="The chat started over here (/clear): the agent doesn't see what's above">
+        New session
+      </div>
+    ) : x.who === 'tool' ? (
+      <details key={i} className={x.fail ? 'rd-tool fail' : 'rd-tool'}>
+        <summary>
+          {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}
+          {x.fail ? ` · ${x.fail} failed` : ''} · {x.text.split('\n').at(-1)}
+        </summary>
+        <pre>{linkify(x.text)}</pre>
+      </details>
+    ) : (
+      <div key={i} className="rd-agent">
+        <Markdown src={x.text} chat />
+      </div>
+    ),
+    ...(x.stopped && x.who !== 'you' ? [<div key={`s${i}`} className="rd-stopped muted small">Stopped</div>] : []),
+    ...apps.filter(a => a.at === i).map(a => <McpApp key={a.id} app={a} tab={tab} api={api} />),
+  ]
+  const rows: React.ReactNode[] = []
+  let run: number[] = []
+  const flush = () => {
+    if (!run.length) return
+    const first = run[0]
+    if (opened.has(first)) rows.push(...run.flatMap(j => line(said![j], j)))
+    else {
+      const n = run.reduce((k, j) => k + (said![j].who === 'tool' ? said![j].text.split('\n').length : 1), 0)
+      rows.push(
+        <button key={`h${first}`} type="button" className="link rd-hidden muted small" data-tip="Settings › Appearance › Tool calls in the Reader hides these" onClick={() => setOpened(o => new Set(o).add(first))}>
+          {n} {n === 1 ? 'step' : 'steps'} hidden · Show
+        </button>,
+        ...run.flatMap(j => apps.filter(a => a.at === j).map(a => <McpApp key={a.id} app={a} tab={tab} api={api} />)), // an app stays: it's the call's own page
+      )
+    }
+    run = []
+  }
+  said?.forEach((x, i) => (shown[i] ? (flush(), rows.push(...line(x, i))) : run.push(i)))
+  flush()
   return (
     <UiBlocks.Provider value={uiDraw}>
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <div className="reader-col">
           {none && !said?.length && <div className="reader-empty muted">{tab.name}'s chat shows here once it has said something.</div>}
-          {said?.map((x, i) => [
-            x.who === 'you' ? (
-              <You key={i} text={x.text} />
-            ) : x.who === 'tool' ? (
-              <details key={i} className="rd-tool">
-                <summary>
-                  {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)} · {x.text.split('\n').at(-1)}
-                </summary>
-                <pre>{linkify(x.text)}</pre>
-              </details>
-            ) : (
-              <div key={i} className="rd-agent">
-                <Markdown src={x.text} chat />
-              </div>
-            ),
-            ...apps.filter(a => a.at === i).map(a => <McpApp key={a.id} app={a} tab={tab} api={api} />),
-          ])}
+          {rows}
           {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
           {tab.status === 'running' && (
             <div className="rd-working muted">
               <Glyph s="running" /> {now ?? 'Working'}…
             </div>
           )}
+          {retrying(tab) && <RetryNote retry={tab.retry!} />}
         </div>
       </div>
       {outBox}
@@ -166,6 +214,13 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
       ) : tab.ask ? (
         <div className="rd-ask">
           <span className="muted">{tab.ask.question || `${tab.name} asks:`}</span>
+          {tab.ask.steps && api.keys && (
+            <span className="rd-steps small">
+              <button type="button" className="link" aria-label="The question before" onClick={() => api.keys!(tab.id, '\x1b[D')}>←</button>
+              One of several questions: ← → go between them, your answers stay
+              <button type="button" className="link" aria-label="The next question" onClick={() => api.keys!(tab.id, '\x1b[C')}>→</button>
+            </span>
+          )}
           {tab.ask.diff && <AskDiff key={tab.ask.what} diff={tab.ask.diff} />}
           <div className="rd-opts">
             {tab.ask.options.map(o => (
@@ -193,7 +248,7 @@ export function Reader({ tab, api, active }: { tab: TabView; api: ReaderApi; act
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
               if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))
               if (historyKey(e, !text)) return void (e.preventDefault(), history()) // your prompts
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) (e.preventDefault(), send())
+              if (sendIs(e) && !e.nativeEvent.isComposing) (e.preventDefault(), send()) // Settings › Keys › Send with
             }}
           />
           <button type="submit" className="primary" disabled={!text.trim()}>
@@ -330,7 +385,8 @@ function McpApp({ app, tab, api }: { app: App; tab: TabView; api: ReaderApi }) {
 // your message: a long one (a pasted log) folds to 10 lines under a fade, Show more opens it
 // ponytail: long by lines or length, not by measuring the wrapped text; a 1,000-character line folds even if it fits
 const longSaid = (s: string) => s.split('\n').length > 12 || s.length > 1000
-function You({ text }: { text: string }) {
+// stopped: you stopped its turn there; onEdit: it never answered it, so Edit and resend puts it back in the box
+function You({ text, stopped, onEdit }: { text: string; stopped?: boolean; onEdit?: () => void }) {
   const [open, setOpen] = useState(false)
   const long = longSaid(text)
   return (
@@ -341,8 +397,28 @@ function You({ text }: { text: string }) {
           {open ? 'Show less' : 'Show more'}
         </button>
       )}
+      {stopped && (
+        <div className="rd-you-stopped small">
+          Stopped before an answer
+          {onEdit && (
+            <button type="button" className="link" data-tip="Puts it back in the box to change and send again (nothing is undone: it never answered)" onClick={onEdit}>
+              Edit and resend
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+// claude waiting out an API error (a rate limit…): its try, the wait left (a second's tick), why
+function RetryNote({ retry }: { retry: NonNullable<TabView['retry']> }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return <div className="rd-retry small">{retryText(retry)}</div>
 }
 
 // what its last turn changed (turns.ts): under its last answer, Review (Changes' This turn) and Undo

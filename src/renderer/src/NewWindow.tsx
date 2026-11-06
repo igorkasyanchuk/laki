@@ -13,6 +13,7 @@ import { NewWorkspace } from './panels'
 import { DeviceTab } from './SidePanel'
 import { FONT_SIZE, termLook } from './Settings'
 import { Term } from './Term'
+import { setSendKey } from '../../shared/keys'
 import { applyTheme, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
 import { ask, AskHost, askText, IconButton, load, Tips } from './ui'
 import { imagesVia, insertMenus } from './Widgets'
@@ -42,6 +43,7 @@ function useView() {
   const theme = JSON.stringify(paintOf(view?.settings))
   useEffect(() => void (view && paint(paintOf(view.settings))), [theme])
   userCss(view?.settings.customCss) // Appearance › Custom CSS, as the app's window
+  setSendKey(view?.settings.sendKey) // Settings › Keys › Send with
   return view
 }
 

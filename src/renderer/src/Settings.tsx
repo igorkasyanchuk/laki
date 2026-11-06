@@ -2,7 +2,7 @@
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
 import { FitAddon } from '@xterm/addon-fit'
-import { FIND, SECTIONS } from '../../shared/settingsMap'
+import { FIND, findKey, freshOf, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
@@ -22,7 +22,7 @@ import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
-import { Group, HelpQ, Says, Scope } from './SettingsKit'
+import { Fresh, Group, HelpQ, Says, Scope } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
@@ -210,6 +210,9 @@ export type AppSettings = Paint & {
   radar?: boolean // Collision radar: overlapping changes between worktrees, checked on its own (unset: off; a workspace's Check overlaps asks)
   reader?: boolean // Reader view: an agent tab as its chat, a Terminal | Reader switch on it (unset: on)
   mcpApps?: boolean // MCP Apps under their calls in the Reader (unset: on)
+  readerTools?: 'ok' | 'final' // the Reader's tool calls: all (unset), hide successful, final answer only
+  readerScroll?: boolean // the Reader scrolls to the latest as you send (unset: on)
+  sendKey?: 'mod' // a chat's box sends with ⌘⏎ (unset: ⏎)
   nextStep?: boolean // One next step: the first item of a workspace's ⋯ menus, ⌘G (unset: on)
   livePlan?: boolean // the agent's plan, live: its to-do list under its tab and on its row (unset: on)
   doneCheck?: boolean // Done means checked: projects' checks as turns end (unset: on)
@@ -795,6 +798,21 @@ export function SettingsPage(p: {
     keep('laki.settingsSec', sec)
     p.onSection?.(sec)
   }, [sec])
+  // settings new since the last version (FIND's entries this Mac hadn't): "new" by their section in the nav; opening it
+  // makes them known, their rows keep a chip for that visit. A fresh install: all known at once, none new
+  const [fresh, setFresh] = useState(() => {
+    const k = load<string[] | null>('laki.settingsKnown', null)
+    if (!k) keep('laki.settingsKnown', FIND.map(findKey))
+    return freshOf(k)
+  })
+  const [freshHere, setFreshHere] = useState<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    const here = fresh.filter(f => f[0] === sec)
+    setFreshHere(new Set(here.map(f => f[1])))
+    if (!here.length) return
+    setFresh(fresh.filter(f => f[0] !== sec))
+    keep('laki.settingsKnown', [...new Set([...load<string[]>('laki.settingsKnown', []), ...here.map(findKey)])])
+  }, [sec])
   const [themeQ, setThemeQ] = useState('') // the themes' name filter
   const [findQ, setFindQ] = useState('') // Find a setting
   const findRef = useRef(findQ)
@@ -1089,6 +1107,7 @@ export function SettingsPage(p: {
               {x.group !== sections[i - 1]?.group && <div className="settings-nav-head">{x.group}</div>}
               <button className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
                 <Icon name={x.icon} /> {x.label}
+                {fresh.some(f => f[0] === x.id) && <span className="set-new" data-tip={`New since your last version: ${fresh.filter(f => f[0] === x.id).map(f => f[1]).join(', ')}`}>new</span>}
               </button>
             </Fragment>
           ))}
@@ -1104,6 +1123,7 @@ export function SettingsPage(p: {
             </button>
           )}
         </nav>
+        <Fresh.Provider value={freshHere}>
         <div className="settings-main form">
           {p.managed && (
             <div className="setting-box managed-box" role="note">
@@ -1684,6 +1704,21 @@ export function SettingsPage(p: {
                     <Says title="MCP Apps in the Reader" hint="A Claude Code tool call whose MCP server has an app for it shows that app under the call. Laki asks the server for its page, as your Claude config says (yours and this folder's servers; never a repo's .mcp.json); the app's links, tool calls and messages ask you first" />
                   </Switch>
                 )}
+                {s.reader !== false && (
+                  <label className="switch-row">
+                    <select value={s.readerTools ?? 'all'} onChange={e => set({ readerTools: e.target.value === 'ok' || e.target.value === 'final' ? e.target.value : undefined })}>
+                      <option value="all">Show all</option>
+                      <option value="ok">Hide successful</option>
+                      <option value="final">Final answer only</option>
+                    </select>
+                    <Says title="Tool calls in the Reader" hint="Hide successful: a run of steps that all worked folds to one line (a failed one still shows). Final answer only: your messages and its last answer of each turn. The steps at work now always show; a click on n steps hidden shows them" />
+                  </label>
+                )}
+                {s.reader !== false && (
+                  <Switch className="switch-row" on={s.readerScroll !== false} onChange={v => set({ readerScroll: v })}>
+                    <Says title="Scroll to latest when sending" hint="Off: sending a message in the Reader leaves you where you were reading" />
+                  </Switch>
+                )}
                 <Switch className="switch-row" on={s.livePlan !== false} onChange={v => set({ livePlan: v })}>
                   <Says title="The agent's plan, live" hint="An agent's own to-do list under its tab as it works, ticking off each step, and n/m on its sidebar row. A plan it asks you to approve shows as a card you can edit: your changes go back to it. Claude Code and Codex" />
                 </Switch>
@@ -2233,6 +2268,19 @@ export function SettingsPage(p: {
               onOverlay={keyOverlay => set({ keyOverlay })}
             />
           )}
+          {sec === 'keys' && (
+            <Group title="Sending" hint="In a chat's box: the Reader, Laki AI, an extension's or a spec's chat, Side chat. ⌘⏎ sends either way">
+              <div className="setting-box">
+                <label className="switch-row">
+                  <select value={s.sendKey === 'mod' ? 'mod' : 'enter'} onChange={e => set({ sendKey: e.target.value === 'mod' ? 'mod' : undefined })}>
+                    <option value="enter">⏎ sends, ⇧⏎ a new line</option>
+                    <option value="mod">⌘⏎ sends, ⏎ a new line</option>
+                  </select>
+                  <Says title="Send with" hint="Chat apps send on ⏎; editors and IDEs on ⌘⏎. New workspaces' prompts always send on ⌘⏎" />
+                </label>
+              </div>
+            </Group>
+          )}
           {sec === 'keys' && globalKeys}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
@@ -2481,6 +2529,7 @@ export function SettingsPage(p: {
             </>
           )}
         </div>
+        </Fresh.Provider>
       </div>
       {toTop}
     </div>

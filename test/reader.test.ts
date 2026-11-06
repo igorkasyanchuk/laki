@@ -167,3 +167,37 @@ require('readline').createInterface({ input: process.stdin }).on('line', l => {
   assert.equal((await fetch(`http://127.0.0.1:${port}${a.src}`)).status, 404) // an address it had: no page either
   await assert.rejects(rig.rpc('mcpAppCall', { tab: tab.id, id: 'toolu_1', name: 'chart' }), /no such app/)
 })
+
+test("chatRead: a failed call counts on its run, a stop marks what it stopped, a /clear's chat comes under a New session line", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const use = (id: string, name: string, input: object) => ({ type: 'tool_use', id, name, input })
+  writeFileSync(
+    join(dir, 'chat-f.jsonl'),
+    line({ type: 'user', message: { content: 'Run the tests' } }) +
+      line({ type: 'assistant', message: { content: [use('t1', 'Bash', { command: 'npm test' }), use('t2', 'Read', { file_path: 'a.ts' })] } }) +
+      line({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: true, content: 'exit 1' }, { type: 'tool_result', tool_use_id: 't2', content: 'ok' }] } }) +
+      line({ type: 'assistant', message: { content: [{ type: 'text', text: 'One fails.' }] } }) +
+      line({ type: 'user', message: { content: 'Now deploy it' } }) +
+      line({ type: 'user', message: { content: [{ type: 'text', text: '[Request interrupted by user]' }] } }),
+  )
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-f' } })
+  const a = await until(async () => (r => r.said && r)(await rig.rpc('chatRead', { tab: tab.id })), 'its chat')
+  assert.deepEqual(a.said, [
+    { who: 'you', text: 'Run the tests' },
+    { who: 'tool', text: 'Bash: npm test\nRead: a.ts', fail: 1 },
+    { who: 'agent', text: 'One fails.' },
+    { who: 'you', text: 'Now deploy it', stopped: true }, // no answer: the Reader's Edit and resend
+  ])
+  // /clear: the next chat's file, the earlier one kept above a New session line (none written yet: the line alone)
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-g' } })
+  const b = await until(async () => (r => r.said?.at(-1)?.who === 'new' && r)(await rig.rpc('chatRead', { tab: tab.id })), 'the line')
+  assert.equal(b.said.length, 5)
+  writeFileSync(join(dir, 'chat-g.jsonl'), line({ type: 'user', message: { content: 'Start over' } }))
+  const c = await until(async () => (r => r.said?.at(-1)?.text === 'Start over' && r)(await rig.rpc('chatRead', { tab: tab.id })), 'the new chat')
+  assert.deepEqual(c.said.slice(3).map((x: any) => x.who), ['you', 'new', 'you'])
+})

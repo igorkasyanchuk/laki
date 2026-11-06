@@ -448,7 +448,7 @@ function addCard(c: Card) {
     w.setAlwaysOnTop(true, 'screen-saver') // over other apps' floating windows too
     w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
     w.webContents.on('will-navigate', e => e.preventDefault())
-    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    w.webContents.setWindowOpenHandler(({ url }) => (/^(https?:\/\/|mailto:)/i.test(url) && void shell.openExternal(url), { action: 'deny' })) // a card's link (its Markdown's: target _blank): the browser
     w.webContents.on('did-finish-load', sendCards)
     w.on('closed', () => cardWin === w && ((cardWin = null), (cardAt = null)))
     if (dev) w.loadURL(new URL('ask.html', `${process.env.ELECTRON_RENDERER_URL}/`).href)

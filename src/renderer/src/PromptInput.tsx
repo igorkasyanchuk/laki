@@ -5,6 +5,7 @@
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, type RefObject, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
+import { sendIs } from '../../shared/keys'
 import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
@@ -380,7 +381,7 @@ export function PromptInput(p: {
         onKeyDown={(e: KeyboardEvent) => {
           if (cmp.key(e)) return
           if (historyKey(e, !p.value)) return e.preventDefault(), history() // an empty box: your prompts
-          if (e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing))) e.preventDefault(), p.onSubmit?.()
+          if (e.key === 'Enter' && (e.metaKey || (p.enter && sendIs(e) && !e.nativeEvent.isComposing))) e.preventDefault(), p.onSubmit?.() // a chat's: Settings › Keys › Send with
         }}
         data-voice-send={p.onSubmit ? '' : undefined} // Send as you stop talking: voice.ts presses its ⌘⏎
         data-history // App's Prompt history key: laki-history

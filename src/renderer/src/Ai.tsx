@@ -2,6 +2,7 @@
 // (daemon/ai.ts), one conversation that works Laki with its tools. Chat: a thread like Claude's, the tools a turn ran
 // folded into one line, the composer at the bottom; Calls: each ask with its tokens, cost and time; Info: how it runs
 // and pays, what it spent, what it can do. Off, or OpenRouter without a key: a note.
+import { sendKeyName, sendTip } from '../../shared/keys'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AI_MODEL, type AiCall, type AiMsg, type AiPast, type AiSettings, type AiTotals } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
@@ -243,7 +244,7 @@ export function AiPage({
                           <Icon name="timer" />
                         </button>
                       )}
-                      <button className="primary ai-send" aria-label="Ask (⏎)" data-tip={d?.busy ? 'Queue it (⏎): sent with any others when this answer ends' : 'Ask (⏎) · ⇧⏎ a new line'} disabled={!can} onClick={ask}>
+                      <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={d?.busy ? `Queue it (${sendKeyName()}): sent with any others when this answer ends` : sendTip('Ask')} disabled={!can} onClick={ask}>
                         <Icon name="arrowRight" size={14} />
                       </button>
                     </>

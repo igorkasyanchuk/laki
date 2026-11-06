@@ -4,6 +4,24 @@ version it builds, with the date. -->
 
 ## Next
 
+- The Reader can hide tool calls: Settings › Appearance › *Tool calls in the Reader*: *Hide successful* (steps that all
+  worked fold to one line; a failed one still shows) or *Final answer only*. *Scroll to latest when sending* can be
+  turned off to stay where you were reading.
+- Settings › Keys › *Send with*: ⏎ or ⌘⏎ sends in the Reader and every chat box.
+- `/clear` in a Claude Code tab keeps the earlier chat in the Reader above a *New session* line. A prompt you stopped
+  before any answer offers *Edit and resend*.
+- While Claude Code waits out a rate limit or an overloaded server, the Reader and the tab say so: its try, the wait
+  left, why.
+- When Claude Code asks several questions at once, ← and → go between them on the Reader's and Needs you's cards.
+- An open artifact (HTML, Markdown, a picture) updates by itself when its file changes.
+- Settings shows *new* by sections with settings you haven't seen since the last version, and on those settings.
+- The sidebar filter keeps one project or several (Shift-click) in view.
+- Hovering a picture's full path in a terminal (a screenshot in `/tmp`, a scratchpad) shows it, anywhere on this Mac.
+- Important alerts: links open in your browser, Markdown shows as such, and one that only tells you something closes
+  once you look at the tab it came from. Agents and Laki AI send them only when you ask (Settings › AI › *Important
+  alerts on its own* to let Laki AI decide).
+- Fixed: hovering a floating bubble after using the notch could show a cut-off session list under its card.
+
 - The archive, delete and close asks show a workspace's PR in its state's color, as the sidebar does: merged purple,
   closed red, draft gray, open green. The status bar's PR number is purple once merged and red once closed.
 - Archiving a cloud workspace says its codespace keeps your uncommitted files and unpushed commits only until GitHub

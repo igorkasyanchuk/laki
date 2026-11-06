@@ -582,7 +582,31 @@ export const MEDIA_MAX = 25 << 20
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), audio or video (`media`, its
 // kind; `src`, its data URL, only asked for: media true, MEDIA_MAX), or only its size. base: an image as it was where
 // the workspace's changes start (diff's base, through git show), for Changes' before and after
-export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean; media?: boolean }) {
+// a picture anywhere on this Mac by its full path (a terminal link's hover card: a screenshot in a scratchpad, /tmp…):
+// an image's name and an image's bytes (a link named .png to a key file shows nothing), 10 MB at most; not over remote
+// access (main.ts REMOTE_NO)
+const MAGIC: Record<string, (b: Buffer) => boolean> = {
+  png: b => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  jpg: b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  gif: b => /^GIF8[79]a/.test(b.toString('latin1', 0, 6)),
+  webp: b => b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP',
+  bmp: b => b.toString('latin1', 0, 2) === 'BM',
+  ico: b => b.readUInt32BE(0) === 0x00000100,
+  svg: b => /<svg[\s>]/i.test(b.toString('utf8', 0, 4096)),
+}
+export function imageRead(p: { path?: unknown }) {
+  const path = typeof p.path === 'string' ? p.path : ''
+  const ext = extname(path).slice(1).toLowerCase().replace('jpeg', 'jpg')
+  if (!path.startsWith('/') || !MAGIC[ext]) throw new Error('not an image')
+  const st = statSync(path)
+  if (!st.isFile()) throw new Error('not a file')
+  if (st.size > 10 << 20) return { size: st.size }
+  const buf = readFileSync(path)
+  if (buf.length < 4 || !MAGIC[ext](buf)) throw new Error('not an image')
+  return { size: buf.length, image: `data:${IMAGES[ext]};base64,${buf.toString('base64')}` }
+}
+
+export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean; media?: boolean; stat?: boolean }) { // stat: its size and time only (an open artifact's look for a change)
   let ws = findWs(o.ws)
   if (o.storage) {
     // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own
@@ -609,6 +633,7 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
   if (ws.host) return hostFileRead(ws, abs, o.path, o.media)
   const st = statSync(abs)
   if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
+  if (o.stat) return { size: st.size, at: st.mtimeMs }
   const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
   if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
   const av = MEDIA[extname(abs).slice(1).toLowerCase()]

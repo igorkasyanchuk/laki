@@ -5,7 +5,7 @@ import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { ask, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
-import { clock, rowFact, prPill, pendingWords, csWord, shortPath, spins, needsSorted } from './text'
+import { clock, rowFact, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
@@ -137,6 +137,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
+    keys: (t, data) => void api.call('input', { tab: t.id, data }).catch(() => {}),
   }
   // a folded project's or sep's busiest workspace state (a setup script counts as running, as on its row)
   const busiest = (list: WorkspaceView[]) => rollup([...view.tabs.filter(t => list.some(w => w.id === t.workspace)), ...(list.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])])
@@ -406,6 +407,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   // the sidebar's filter: does it show this one
   const shows = (w: WorkspaceView) => {
     if (!find) return true
+    if (find.projects?.length && !find.projects.includes(w.project)) return false
     const q = find.q.trim().toLowerCase()
     const wt = view.tabs.filter(t => t.workspace === w.id)
     if (q && ![wsName(w), w.name, w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
@@ -495,7 +497,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         <div className="side-find">
           <div className="find-field">
             <input autoFocus value={find.q} placeholder="Filter: name, branch, PR…" spellCheck={false} onChange={e => setFind({ ...find, q: e.target.value })} onKeyDown={e => e.key === 'Escape' && setFind(null)} />
-            {(find.q || find.only) && <IconButton icon="x" title="Clear and close the filter" onClick={() => setFind(null)} />}
+            {(find.q || find.only || !!find.projects?.length) && <IconButton icon="x" title="Clear and close the filter" onClick={() => setFind(null)} />}
           </div>
           <span className="seg">
             {ONLY.map(([id, label]) => (
@@ -504,6 +506,26 @@ export function Sidebar({ app }: { app: AppCtx }) {
               </button>
             ))}
           </span>
+          {listed.length > 1 && (
+            <div className="find-projects" role="group" aria-label="Projects">
+              <button type="button" className={find.projects?.length ? '' : 'on'} onClick={() => setFind({ ...find, projects: undefined })}>
+                All projects
+              </button>
+              {listed.map(p => {
+                const on = !!find.projects?.includes(p.id)
+                const pick = (more: boolean) => setFind({ ...find, projects: pickProject(find.projects, p.id, more) })
+                return (
+                  <button key={p.id} type="button" className={on ? 'on' : ''} aria-pressed={on} data-tip={on ? 'Click: all projects again · Shift-click: take it out' : 'Click: only this one · Shift-click: add it'} onClick={e => pick(e.shiftKey)} onKeyDown={e => e.key === 'Enter' && e.shiftKey && (e.preventDefault(), pick(true))}>
+                    <span className="fp-mark">
+                      <ProjectMark p={p} or={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
+                      {on && <span className="fp-check"><Icon name="check" size={8} /></span>}
+                    </span>
+                    {p.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
       {picked.length > 0 && (

@@ -14,7 +14,7 @@ import { type Artifact, VIEWED, Loading, Logs, Onboarding, type Meme, type NewWs
 import { type AccountsApi, type AppInfo, designTraits, extMenuItems, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, type RowMark, rowMarkOn, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
-import { isKeyId, type KeyId, keyMap, keyShow } from '../../shared/keys'
+import { isKeyId, type KeyId, keyMap, keyShow, setSendKey } from '../../shared/keys'
 import { type DeskAsk, onDesk } from './Desk'
 import { completeOf, type Inserted, type Inserts, keepFile, VoiceBar } from './PromptInput'
 import { type ProjectTab } from './Project'
@@ -879,6 +879,7 @@ export function App() {
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
   userCss(view?.settings.customCss) // Appearance › Custom CSS
+  setSendKey(view?.settings.sendKey) // Settings › Keys › Send with: the chats' boxes read it as they draw
   // L7: no https picture straight from the window: an extension's through the daemon's /img, GitHub's avatars by the switch
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
@@ -1691,7 +1692,8 @@ export function App() {
         return f ? read(!!f.storage, f.path) : null
       })
     if (w?.storage && path.startsWith(`${w.storage}/`)) return read(true)
-    return api.call<string>('aiImage', { path }).catch(() => Promise.reject(new Error('Not a file of this workspace, nor a pasted picture')))
+    if (w?.host) return Promise.reject(new Error('Not a file of this workspace')) // a full path on its host: not this Mac's
+    return api.call<{ image?: string }>('imageRead', { path }).then(r => r.image) // anywhere on this Mac: a scratchpad's, /tmp's, a pasted one
   }
   const openPath = async (tab: string, path: string) => {
     const w = view?.workspaces.find(x => x.id === byId(tab)?.workspace)
@@ -2593,6 +2595,7 @@ export function App() {
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   const readerApi: ReaderApi = {
     read: (tab, v) => api.call('chatRead', { tab, v }),
+    keys: (tab, data) => void api.call('input', { tab, data }).catch(() => {}), // ←/→ between its questions
     bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),
     appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
@@ -3365,7 +3368,7 @@ export function App() {
                   />
                   {readerOn && readable(byId(id)) && (
                     <>
-                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} />}
+                      {inReader(id) && <Reader tab={byId(id)!} api={readerApi} active={id === tab?.id && !dialog && !reviewOn} look={{ tools: settings.readerTools, scroll: settings.readerScroll }} />}
                       <div className="reader-switch" role="group" aria-label="Show it as">
                         <button className={inReader(id) ? '' : 'on'} aria-pressed={!inReader(id)} onClick={() => setRead(id, 'term')}>Terminal</button>
                         <button className={inReader(id) ? 'on' : ''} aria-pressed={inReader(id)} onClick={() => setRead(id, 'reader')}>Reader</button>

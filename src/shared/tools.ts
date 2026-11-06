@@ -235,7 +235,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_alert',
-    description: "An important alert for the user: a card at the bottom right of their screen, over every app, until they close it. Only when they ask for one (\"show me an important alert\", \"ask me with a Laki alert\"). With choices (up to 6) it waits for their pick, up to 30 minutes, and returns it (choice), or closed / timedOut; without, it shows and returns.",
+    description: "An important alert for the user: a card at the bottom right of their screen, over every app, until they close it. Only when they ask for one (\"show me an important alert\", \"ask me with a Laki alert\") or their instructions say when; never for routine news (a PR reviewed, tests passing, a task done: Laki shows those itself). Its text is Markdown: links open in the browser. With choices (up to 6) it waits for their pick, up to 30 minutes, and returns it (choice), or closed / timedOut; without, it shows and returns.",
     inputSchema: obj({ text: str('what it says, up to 600 characters: the question or the news'), title: str('a few words over it (default: your workspace and tab)'), choices: { type: 'array', items: { type: 'string' }, description: 'the answers to pick from, up to 6: Ship, Wait' } }, ['text']),
     run: a => rpc('alertShow', { text: a.text, title: a.title, choices: a.choices, from: { ws: from, tab: process.env.LAKI_TAB } }, ALERT_WAIT + 30_000),
   },
@@ -761,4 +761,4 @@ export async function extCall(rpc: Rpc, tool: string, input: unknown, from?: str
 const AI_BY = ['screen', 'browse', 'send'] // said as Laki AI's: its looks (the glow), its sends (not the user's prompt history)
 // chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once);
 // a write names it too: one that's on stays on only from its own page's chat (widget:<id>, the user's), else off
-export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => (m => rpc(method, AI_BY.includes(m) ? { ...params, by: 'ai' } : m === 'widgetWrite' ? { ...params, by: 'ai', chat } : chat !== undefined && (m === 'aiQuestion' || m === 'aiPermission') ? { ...params, chat } : params, ms))(oldName(method)) // by the old name: a namespaced one gets the same
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => (m => rpc(method, AI_BY.includes(m) ? { ...params, by: 'ai' } : m === 'widgetWrite' || m === 'alertShow' ? { ...params, by: 'ai', chat } : chat !== undefined && (m === 'aiQuestion' || m === 'aiPermission') ? { ...params, chat } : params, ms))(oldName(method)) // by the old name: a namespaced one gets the same

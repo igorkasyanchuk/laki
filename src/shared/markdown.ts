@@ -294,3 +294,20 @@ function html(bs: Block[]): string {
 }
 
 export const markdownHtml = (src: string) => html(markdown(src))
+// a line break kept as one (chat-like: a card's words as written): a <br> at a line's end (inline's own; a backslash
+// would end up in a link the line ends with), not in a fence, on a heading or table row, nor before a line that starts
+// a block (a list item, a quote…)
+const STARTS = /^\s*([-*+]\s|\d+[.)]\s|#|>|\||```|~~~)/
+export function lineBreaks(src: string) {
+  let fence = false
+  return src
+    .split('\n')
+    .map((l, i, all) => {
+      if (/^\s*(```|~~~)/.test(l)) return (fence = !fence), l
+      const next = all[i + 1]
+      return !fence && l.trim() && next?.trim() && !STARTS.test(next) && !/^\s*(#|\|)/.test(l) ? `${l}<br>` : l
+    })
+    .join('\n')
+}
+// a picture as its link: a page that loads nothing from elsewhere (a shared tab's, a card on screen)
+export const imgsAsLinks = (h: string) => h.replace(/<img src="([^"]*)" alt="([^"]*)"[^>]*>/g, (_, src, alt) => `<a href="${src}" target="_blank" rel="noopener noreferrer nofollow">${alt || src}</a>`)

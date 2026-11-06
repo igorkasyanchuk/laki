@@ -267,7 +267,9 @@ there), folder, folder-new, or a workspace id (its agent gets it). --fresh: a ru
   laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
   laki schedule log`,
   alert: `An important card on the user's screen (bottom right, over every app and Space, until they close it), only
-when they ask for one ("show me an important alert", "ask me with a Laki alert"). With --choice (up to 6) it waits for
+when they ask for one ("show me an important alert", "ask me with a Laki alert") or their instructions (CLAUDE.md,
+AGENTS.md) say when; never for routine news (a PR reviewed, tests passing, a task done: Laki shows those itself).
+Its text is Markdown: links open in the browser. With --choice (up to 6) it waits for
 their pick and prints it; closed without one, or no answer in 30 minutes: exit 1 (give your shell tool its longest
 timeout, as that's longer than most allow by default; MCP's laki_alert waits the same). Without choices it shows and returns.
 

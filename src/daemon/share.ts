@@ -3,11 +3,11 @@
 // prompts, its answers, its tool calls a line each; anything else (a shell, gemini…): the terminal's text.
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { esc, markdownHtml } from '../shared/markdown.ts'
+import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
 import { costOf } from '../shared/types.ts'
 
-export type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
+export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true } // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
 
 // claude's: <its config>/projects/<the folder's>/<session>.jsonl; codex's: <its home>/sessions/y/m/d/rollout-…-<thread>.jsonl
 export function transcriptOf(agent: string, dir: string, id: string): string | undefined {
@@ -22,6 +22,8 @@ export function transcriptOf(agent: string, dir: string, id: string): string | u
 }
 
 // what the agent adds to a prompt (context, a slash command's output), not what you typed
+// claude's word that you stopped its turn (Esc), codex's: marks what came before (stopped), never said as yours
+const STOPPED = /^\s*(\[Request interrupted by user|<turn_aborted>)/
 const NOISE = /^\s*(<(command-|local-command|system-reminder|environment_context|user_instructions|permissions|turn_aborted|user_memory|task-notification|agent-message)|# AGENTS\.md instructions)/ // task-notification, agent-message: claude's word that a background task or subagent ended
 const args = (a: unknown) => {
   if (typeof a !== 'string') return a
@@ -43,11 +45,13 @@ function toolLine(name: string, input: unknown) {
 // a transcript (JSON lines) as what was said, in order, onto out (what its earlier lines said); an agent's answers
 // and tool calls in a row are one each
 // calls: a claude chat's MCP tool calls (mcp__<server>__<tool>), each with the said line it's in (at) and, once it
-// came, its result: the Reader's MCP Apps (mcpApps.ts)
+// came, its result: the Reader's MCP Apps (mcpApps.ts). ids: a claude chat's every tool call, the said line it's in: a
+// result that failed counts on it (fail)
 export type McpCall = { id: string; server: string; tool: string; input: unknown; at: number; result?: unknown; error?: boolean }
-export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: Map<string, McpCall>): Said[] {
+export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: Map<string, McpCall>, ids?: Map<string, number>): Said[] {
   const add = (who: Said['who'], t: unknown) => {
     const text = String(t ?? '').trim()
+    if (who === 'you' && STOPPED.test(text)) return void (out.length && (out[out.length - 1].stopped = true))
     if (!text || (who === 'you' && NOISE.test(text))) return
     const last = out.at(-1)
     if (last && last.who === who && who !== 'you') last.text += (who === 'tool' ? '\n' : '\n\n') + text
@@ -70,9 +74,13 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: M
         else if (j.type === 'assistant' && x.type === 'text') add('agent', x.text)
         else if (j.type === 'assistant' && x.type === 'tool_use') {
           add('tool', toolLine(x.name, x.input))
+          if (ids && typeof x.id === 'string') ids.set(x.id, out.length - 1)
           const m = calls && typeof x.id === 'string' && /^mcp__(.+?)__(.+)$/.exec(String(x.name))
           if (m) calls!.set(x.id, { id: x.id, server: m[1], tool: m[2], input: x.input ?? {}, at: out.length - 1 })
-        } else if (j.type === 'user' && x.type === 'tool_result' && calls?.has(x.tool_use_id)) {
+        } else if (j.type === 'user' && x.type === 'tool_result') {
+          const at = x.is_error ? ids?.get(x.tool_use_id) : undefined
+          if (at !== undefined && out[at]) out[at].fail = (out[at].fail ?? 0) + 1
+          if (!calls?.has(x.tool_use_id)) continue
           const c = calls.get(x.tool_use_id)!
           const r = j.toolUseResult
           // what the app is told (ui/notifications/tool-result): its content blocks, and structuredContent when claude kept it
@@ -168,7 +176,11 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 // and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan } // msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+// claude waiting out an API error (a rate limit, an overloaded server, a lost connection): its try (n of max), when the
+// next one goes (until), when it said so (at: a turn that started after has none), why in its own words
+export type Retry = { n?: number; max?: number; until: number; at: number; why?: string }
+const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
 export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {
@@ -184,7 +196,7 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     x.cost += by * s.cost
   }
   for (const line of jsonl.split('\n')) {
-    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' || !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
+    if (!line.includes(agent === 'claude' ? '"usage"' : 'token_count') && !line.includes('"turn_context"') && (agent === 'claude' ? !line.includes('"api_error"') : !/"update_plan"|"user_message"/.test(line))) continue // most lines: not parsed
     let j: any
     try {
       j = JSON.parse(line)
@@ -193,6 +205,12 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
     }
     const at = dayOf(Date.parse(j.timestamp) || now)
     if (agent === 'claude') {
+      if (j.type === 'system' && j.subtype === 'api_error' && !j.isSidechain) {
+        const at = Date.parse(j.timestamp) || now
+        m.retry = { n: num(j.retryAttempt), max: num(j.maxRetries), at, until: at + (num(j.retryInMs) ?? 0), why: String(j.error?.formatted || j.error?.message || '').slice(0, 120) || undefined }
+        continue
+      }
+      if (j.type === 'assistant' && !j.isSidechain) m.retry = undefined // it answered: the wait's over
       const u = j.type === 'assistant' && j.message?.usage
       if (!u || j.message.model === '<synthetic>') continue // claude's own notes: no call
       const n = { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 }
@@ -255,6 +273,7 @@ export function shareMd(title: string, agent: string, said: Said[]) {
   const parts = [`# ${title}`]
   for (const s of said) {
     if (s.who === 'screen') parts.push(fence(s.text))
+    else if (s.who === 'new') parts.push('---')
     else if (s.who === 'tool') parts.push(s.text.split('\n').map(l => `> ⚙ ${l}`).join('  \n'))
     else parts.push(`**${s.who === 'you' ? 'You' : agent}**\n\n${s.text}`)
   }
@@ -269,13 +288,13 @@ export function shareBody(agent: string, said: Said[]) {
   return said
     .map(s => {
       if (s.who === 'screen') return `<pre class="screen">${esc(s.text)}</pre>`
+      if (s.who === 'new') return '<hr>'
       if (s.who === 'tool') {
         const lines = s.text.split('\n').map(l => `<div>${esc(l)}</div>`).join('')
         const n = s.text.split('\n').length
         return `<details class="tools"${n <= 3 ? ' open' : ''}><summary>${n} tool call${n === 1 ? '' : 's'}</summary>${lines}</details>`
       }
-      // a picture as its link: the page loads nothing from elsewhere (its CSP: img-src data:)
-      const md = markdownHtml(s.text).replace(/<img src="([^"]*)" alt="([^"]*)"[^>]*>/g, (_, src, alt) => `<a href="${src}" target="_blank" rel="noopener noreferrer nofollow">${alt || src}</a>`)
+      const md = imgsAsLinks(markdownHtml(s.text)) // its CSP: img-src data:
       return `<section class="m ${s.who}"><div class="who">${s.who === 'you' ? 'You' : esc(agent)}</div><div class="md">${md}</div></section>`
     })
     .join('')

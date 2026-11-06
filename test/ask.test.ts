@@ -48,3 +48,10 @@ test('ask: a numbered list typed into a prompt box is no menu (the cursor shows 
   assert.equal(askOf(typed, 0)?.at, 1) // above it: the menu stands (a box under a menu)
   assert.equal(askOf(typed, undefined)?.at, 1) // hidden, as in claude's and codex's menus
 })
+
+test("ask: claude's several questions at once (its ← tabs → line over the menu): steps", () => {
+  const screen = ['←  ☐ Database  ☐ Auth  ✔ Submit  →', '', 'Which database?', '', '❯ 1. Postgres', '  2. SQLite', '  3. Type something.'].join('\n')
+  assert.equal(askOf(screen)?.steps, true)
+  assert.equal(askOf(screen)?.question, 'Which database?')
+  assert.equal(askOf('Which database?\n❯ 1. Postgres\n  2. SQLite')?.steps, undefined) // one question: none
+})

@@ -139,8 +139,9 @@ ${USAGE}
    right, over every app, and waits for their pick (up to 30 minutes), printing it; go on by it. It waits longer than a
    shell tool's default allows: give the call your tool's longest timeout (Claude Code's Bash: 600000 ms), or use
    MCP's \`laki_alert\`. Without
-   \`--choice\` it only tells them something (\`--title\` names it). Only when they ask: a question in the chat is
-   the default.
+   \`--choice\` it only tells them something (\`--title\` names it); its text is Markdown, links open in the browser.
+   Only when they ask, or their instructions (CLAUDE.md, AGENTS.md) say when: a question in the chat is the default,
+   and routine news (a PR reviewed, tests passing, a task done) never gets one: Laki shows those itself.
    Something they should see in Laki but not over every app (another session is ready, a heads-up for a session not
    yours): \`laki notice "<text>" --to <workspace>[/<tab>]|@name\` puts a card at the bottom right of Laki's window,
    whatever page is open; its Open goes to that session. \`--choice\` waits for a pick, as with laki alert.

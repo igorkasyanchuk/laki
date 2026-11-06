@@ -82,7 +82,11 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - `alertShow` (`text`, `title`, `choices` up to 6; `from` the caller's tab; refused with no app connected): `laki alert`'s
   card on screen (the `alert` event; App's card, a browser's dialog); with choices it resolves as `alertAnswer` (`id`,
   a `choice` of its own, or none: closed; refused from an agent) comes, else `timedOut` after `ALERT_WAIT`, then the
-  `alertDone` event (daemon/alerts.ts). `timer`'s `important` (Laki AI's `laki_timer`): a timer that ends as a card.
+  `alertDone` event (daemon/alerts.ts). One without choices from a tab (`tells`) goes (`alertDone`) once a focused
+  window's `view` shows that tab (`alertsSeen`, main.ts' `view`). Laki AI's (`aiRpc` adds `by: 'ai'` and its `chat`):
+  refused unless ai.ts `aiMayAlert` (its chat's last message or *Your instructions* say alert, or `settings.ai.alerts`).
+  The card's text is Markdown (ask.ts: `markdownHtml`, `imgsAsLinks`; its links through main's window-open handler to
+  the browser). `timer`'s `important` (Laki AI's `laki_timer`): a timer that ends as a card.
 - the calendar's reminders (`settings.calendar`, on unless false; off: refused, none in the view; done ones in it for 92 days, `REMINDERS_DONE`): `reminderAdd` (`at`: ms or
   `when.ts` `parseAt`'s words, or words that repeat (`whenOf`: its next time and `every`), `every`, `text`, `ws`, `project`, `by`; `REMINDERS_MAX`), `reminderSet` (`text`, `at`: moved later, it
   rings again; `done`; `ws`; `important`, on add too: it rings as a card on screen, on its `reminder` event), `reminderRm`, `reminderTick` (every 30 s and as the first client connects; with no client
@@ -176,7 +180,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `fileUndo` (`path`: its status from `--name-status -M`, untracked as A; its content first kept by `hash-object -w`;
   `git restore --source=<base> --worktree`, an A removed, an R's old path restored and the new removed), `hunkRedo`
   (`id`: `git apply -R`, or the blobs written back; `undos`, the last 20 per workspace in memory); nothing staged;
-  the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads` (each thread's `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
+  the side panel's: `files`, `fileNew`, `imageRead` (a picture anywhere on this Mac by its full path, for a terminal link's hover card: an image's extension and bytes, 10 MB; not over remote access), `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads` (each thread's `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
   comment's `diffHunk`), `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `prAct` (`act` approve, close or merge, each only where the project's `prAllows` says (`config.pr`:

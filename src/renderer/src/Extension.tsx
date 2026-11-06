@@ -7,6 +7,7 @@
 // live says what will, then runs it once (widgetRun once); Turn on shows the same, then turns it on. Undo (and a turn's
 // Undo to here) puts a version back. start: the Desk's Build with AI, the first ask, sent as it opens. Closing goes
 // back where it was opened from. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
+import { sendKeyName, sendTip } from '../../shared/keys'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { type AiMsg, type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
@@ -369,7 +370,7 @@ function Chat({ chat, w, mine, ai, onAsk, undo, err, start, cfg }: { chat: strin
             rows={2}
             placeholder={!w ? 'Describe the extension…' : mine ? `What should change in ${w.name}?` : `Ask about ${w.name}…`}
             tools={
-              <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={busy || saving || (!text.trim() && !images.length)} onClick={send}>
+              <button className="primary ai-send" aria-label={`Ask (${sendKeyName()})`} data-tip={sendTip('Ask')} disabled={busy || saving || (!text.trim() && !images.length)} onClick={send}>
                 <Icon name="arrowRight" size={14} />
               </button>
             }

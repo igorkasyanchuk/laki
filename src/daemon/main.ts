@@ -37,7 +37,7 @@ import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planU
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
 import { sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
-import { alertAnswer, alertShow, noticesTo } from './alerts.ts'
+import { alertAnswer, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { secretAsk, secretGive, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
 import { factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -360,6 +360,7 @@ const api: Record<string, Handler> = {
   files: p => filesMod.files(p.ws, p.project),
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
+  imageRead: p => filesMod.imageRead(p), // a terminal link's picture anywhere on this Mac (its hover card)
   artifactList: p => artifactsMod.artifactList(p.ws),
   linkRm: p => (notAgent(p, "take a kept link off (the user's, in the gallery)"), artifactsMod.linkRm(p.ws, String(p.url ?? ''))), // a kept link taken off (the gallery's right click)
   fileWrite: p => filesMod.fileWrite(p),
@@ -427,7 +428,7 @@ const api: Record<string, Handler> = {
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
-  view: (p, c) => c && core.setView(c, p),
+  view: (p, c) => c && (core.setView(c, p), alertsSeen(c)),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
   scheduleSet: ({ from, ...p }) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
@@ -531,7 +532,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
+const REMOTE_NO = new Set(['imageRead', 'remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
 const REMOTE_KEYS = /^(remote.*|webhook|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))

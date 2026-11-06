@@ -1,20 +1,27 @@
 // Settings' own building blocks: a setting's title and hint, a titled card of settings (Group), a section's scope note.
 // Settings.tsx re-exports it.
-import { type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useId, useRef } from 'react'
+import { createContext, type KeyboardEvent, type MouseEvent, type ReactNode, useContext, useEffect, useId, useRef } from 'react'
 import { HELP } from '../../shared/settingsMap'
 
 // a switch row's text: what it is, and under it a line on what it does
 // a hint's {{variables}} set apart (code.var), easier to pick out of a sentence
 export const withVars = (t: ReactNode) => (typeof t === 'string' && t.includes('{{') ? t.split(/(\{\{[^{}]+\}\})/).map((p, i) => (i % 2 ? <code key={i} className="var">{p}</code> : p)) : t)
+// the titles new since the last version (settingsMap's freshOf) in the section open: a "new" chip on each, this visit
+export const Fresh = createContext<ReadonlySet<string>>(new Set())
 export const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
   <span className="switch-text">
     <span>
       {title}
       {typeof title === 'string' && <HelpQ title={title} />}
+      {typeof title === 'string' && <NewChip title={title} />}
     </span>
     {hint && <span className="muted">{withVars(hint)}</span>}
   </span>
 )
+
+function NewChip({ title }: { title: string }) {
+  return useContext(Fresh).has(title) ? <span className="set-new">new</span> : null
+}
 
 // a ? beside a setting that assumes agent know-how (settingsMap's HELP, by its title): a card of what it does, when to
 // turn it on and what it costs. A popover (the top layer: no group clips it), placed under the ? (its source). Inside a

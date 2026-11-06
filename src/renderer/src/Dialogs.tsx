@@ -579,6 +579,7 @@ export function Pages({ app }: { app: AppCtx }) {
           path={artView.path}
           page={artPage(w, artView.path)}
           read={() => api.call<FileContent>('fileRead', { ws: w.id, path: artView.path, storage: true })}
+          stamp={() => api.call<{ size: number; at?: number }>('fileRead', { ws: w.id, path: artView.path, storage: true, stat: true })}
           onExternal={bridge?.openPath && (() => inBrowser(w, artView.path))}
           onFile={asFile(w, artView.path)}
           onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, storage: true }))}

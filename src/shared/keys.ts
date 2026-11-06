@@ -91,6 +91,14 @@ export const keyClash = (id: KeyId, m: KeyMap, others: [string, string][] = []) 
 }
 
 // keys to read: ⏎, the arrows and ⌫ for their names
+// Settings › Keys › Send with (sendKey): ⏎ (unset; ⇧⏎ a new line) or ⌘⏎ (mod; ⏎ a new line) in a chat's box: the
+// Reader, Laki AI's, an extension's or a spec's chat, Side chat. ⌘⏎ sends either way. Each window sets it as its
+// settings come (setSendKey), as setIconLook. ponytail: the bubbles' reply box keeps ⏎ (its window has no settings)
+let sendMod = false
+export const setSendKey = (k?: string) => void (sendMod = k === 'mod')
+export const sendIs = (e: { key: string; shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean }) => e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!sendMod && !e.shiftKey && !e.altKey))
+export const sendKeyName = () => (sendMod ? '⌘⏎' : '⏎')
+export const sendTip = (what: string) => `${what} (${sendKeyName()}) · ${sendMod ? '⏎' : '⇧⏎'} a new line`
 export const keyShow = (k: string) => k.replace(/Enter$/, '⏎').replace(/Arrow(Up|Down|Left|Right)$/, (_, d: string) => ({ Up: '↑', Down: '↓', Left: '←', Right: '→' })[d]!).replace(/Backspace$/, '⌫')
 
 // hold ⌘ (App's KeyOverlay): a badge beside each element marked data-key="<id>" (the ones on screen), and a strip for

@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto'
 import { ALERT_WAIT, HIDDEN, type Tab } from '../shared/types.ts'
 import { broadcast, clients, findWs, log, resolveTarget, state, type Conn } from './core.ts'
+import { aiMayAlert } from './ai.ts'
 import { hidden } from './phone.ts'
 
 const CHOICES = 6
@@ -25,6 +26,10 @@ const sent = new Map<string, number[]>()
 // the notices up (their events, as sent), oldest first. ponytail: in memory, the newest NOTICES
 const notices = new Map<string, Record<string, unknown>>()
 const NOTICES = 20
+// the alerts up that only tell (no choices), from a tab: id → that tab. A focused window showing the tab closes them
+// (alertsSeen): you're where it was sent from. ponytail: in memory, the newest TOLD
+const tells = new Map<string, string>()
+const TOLD = 50
 // --to: as laki send's target (a tab, @name, <workspace>[/<tab>]); a workspace without an agent: the workspace
 const about = (ref: string): { ws: string; tab?: Tab } => {
   try {
@@ -39,7 +44,9 @@ const wsName = (id: string) => state.workspaces.find(w => w.id === id)?.name ?? 
 const named = (tab: { workspace: string; name: string }) => `${wsName(tab.workspace)} · ${tab.name}`
 const hides = (ws?: string) => hidden(state.workspaces.find(w => w.id === ws))
 
-export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string } }, kind: 'alert' | 'notice' = 'alert') {
+export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknown; to?: unknown; from?: { tab?: string; ws?: string }; by?: unknown; chat?: unknown }, kind: 'alert' | 'notice' = 'alert') {
+  // Laki AI's (aiRpc's by and chat): only when you asked for one, or allowed it
+  if (kind === 'alert' && o.by === 'ai' && !aiMayAlert(typeof o.chat === 'string' ? o.chat : undefined)) throw new Error("not sent: Laki AI puts an important alert on the user's screen only when they ask for one (or Settings › AI › Important alerts on its own is on). Say it in the chat instead")
   const text = clean(o.text, 600)
   if (!text) throw new Error(`what should it say? laki ${kind} "Deploy is ready: ship it?" --choice Ship --choice Wait`)
   const choices = [...new Set((Array.isArray(o.choices) ? o.choices : []).map(c => clean(c, 60)).filter(Boolean))]
@@ -64,6 +71,10 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
     for (const old of told.slice(0, Math.max(0, notices.size + 1 - NOTICES))) close(old)
     notices.set(id, ev)
   }
+  if (kind === 'alert' && !choices.length && tab) {
+    tells.set(id, tab.id)
+    if (tells.size > TOLD) tells.delete(tells.keys().next().value!)
+  }
   broadcast(ev)
   log(`${kind} ${id}${tab ? ` from ${tab.id}` : ''}${to ? ` about ${to.tab?.id ?? to.ws}` : ''}: ${text.slice(0, 80)}`)
   if (!choices.length) return { id, shown: true }
@@ -82,11 +93,20 @@ export function alertShow(o: { text?: unknown; title?: unknown; choices?: unknow
 
 // a notice without a wait goes on its ×; one with, as a close
 const close = (id: string) => {
+  tells.delete(id) // a told alert closed: nothing to close later
   const w = waits.get(id)
   if (w) return w.finish({ id, closed: true }), true
   if (!notices.delete(id)) return false
   broadcast({ ev: 'alertDone', id })
   return true
+}
+
+// a window's view (main.ts' view): focused on a tab an alert that only tells came from, that card goes
+export function alertsSeen(c: Conn) {
+  const v = c.view
+  if (!v?.focused || c.remote) return
+  const on = v.tabs ?? (v.tab ? [v.tab] : [])
+  for (const [id, tab] of tells) if (on.includes(tab)) tells.delete(id), broadcast({ ev: 'alertDone', id })
 }
 
 // the notices up, for a window that connects (main.ts): none from or about a workspace Recording mode hides now

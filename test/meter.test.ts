@@ -151,3 +151,14 @@ test('meter: each day by model, for the Usage page; a day past and a model of it
   const c = meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5-codex' } }) + tokenCount({ total_tokens: 900 }, { total_tokens: 900 }), meterNew(now), now)
   assert.deepEqual(c.days, { [dayOf(now)]: { 'gpt-5-codex': { tokens: 900, cost: c.cost } } })
 })
+
+test("meter: claude waiting out an API error (its api_error line) until it answers", () => {
+  const m = meterNew(now)
+  const err = (n: number, ms: number) => line({ type: 'system', subtype: 'api_error', level: 'error', timestamp: at(0), error: { message: 'Overloaded', formatted: 'Rate limited' }, retryInMs: ms, retryAttempt: n, maxRetries: 10 })
+  meterOf('claude', err(1, 5000), m, now)
+  assert.deepEqual(m.retry, { n: 1, max: 10, at: Date.parse(at(0)), until: Date.parse(at(0)) + 5000, why: 'Rate limited' })
+  meterOf('claude', err(2, 30000), m, now) // the next try's replaces it
+  assert.equal(m.retry?.n, 2)
+  meterOf('claude', said('m9', 'claude-sonnet-4-5', { input_tokens: 1, output_tokens: 1 }), m, now)
+  assert.equal(m.retry, undefined) // it answered
+})

@@ -3,6 +3,7 @@
 // Send to main chat is a send that waits for its turn's end (by: side, so not one of your prompts).
 import { useEffect, useRef, useState } from 'react'
 import type { TabView } from '../../shared/types'
+import { sendIs } from '../../shared/keys'
 import { api } from './api'
 import { Markdown } from './MarkdownView'
 import { IconButton } from './ui'
@@ -66,7 +67,7 @@ export function SideChat({ tab, onSent }: { tab: TabView; onSent: (text: string)
       </div>
       {err && <p className="field-err">{err}</p>}
       <form className="sc-box" onSubmit={e => (e.preventDefault(), ask())}>
-        <textarea value={text} rows={2} placeholder={`Ask about ${tab.name}…`} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), ask())} />
+        <textarea value={text} rows={2} placeholder={`Ask about ${tab.name}…`} onChange={e => setText(e.target.value)} onKeyDown={e => sendIs(e) && !e.nativeEvent.isComposing && (e.preventDefault(), ask())} />
         <button type="submit" className="primary" disabled={!text.trim() || !!s?.busy}>
           Ask
         </button>

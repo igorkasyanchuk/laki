@@ -45,6 +45,7 @@ export const FIND: [string, string, string?][] = [
   ['ai', 'Runs with', 'backend openrouter claude -p codex exec model'],
   ['ai', 'OpenRouter API key', 'token secret ai'],
   ['ai', 'Spending', 'cost usage tokens ai today month'],
+  ['ai', 'Important alerts on its own', 'laki alert card screen notify important minor news when asked'],
   ['ai', 'Guess my next prompt', 'suggest suggestion next prompt ghost autocomplete reader tab'],
   ['ai', "Laki's skill", 'tools prs notes memory shells actions templates ask options remove'],
   ['ai', 'Show costs ($)', 'hide cost money dollars price spend'],
@@ -67,6 +68,9 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Reader view', 'reader chat conversation transcript terminal read phone messages'],
+  ['appearance', 'Tool calls in the Reader', 'hide tool calls steps bash read search successful failed final answer only chat reader quiet'],
+  ['appearance', 'Scroll to latest when sending', 'reader scroll bottom jump yank keep position reading send'],
+  ['keys', 'Send with', 'enter cmd command return send message newline chat composer reader ai'],
   ['appearance', 'MCP Apps in the Reader', 'mcp app apps ui resource server tool reader interactive'],
   ['appearance', 'One next step', 'next step menu what now answer merge ship archive fix ci ⌘g'],
   ['appearance', "The agent's plan, live", 'plan todo to-do list steps progress tasks approve plan mode checklist'],
@@ -291,3 +295,8 @@ export const HELP: Record<string, SettingHelp> = {
     cost: "A shutdown closes your other apps too, as macOS's own would.",
   },
 }
+
+// Settings' new ones since this Mac last looked (the nav's "new" by a section, a chip on the row): FIND's entries not in
+// known (by section and title, kept by the app: laki.settingsKnown). None known yet (a fresh install): none new, all known
+export const findKey = (f: [string, string, string?]) => `${f[0]}|${f[1]}`
+export const freshOf = (known: string[] | null) => (known ? FIND.filter(f => !known.includes(findKey(f))) : [])
