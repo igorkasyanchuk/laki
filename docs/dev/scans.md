@@ -2,6 +2,14 @@
 
 ### Scans
 
+- The loops (`src/daemon/ticks.ts`, H4): every periodic one goes through `register(name, ms, fn, { idle })`, listed at
+  its top with its period and idle class. Idle (main.ts' `setIdle`): no client connected, or no window shown (every
+  client's `view.shown` false) and no agent `running`. Then `slow` loops (the scans, meters, PR scans, sleep, hooks,
+  tickets, widgets) run every 5th tick (`SLOW`), `pause` ones (`shellTick`, `factsTick`, already quiet with no window)
+  not at all, and `keep` ones (anything with a deadline: schedules, pending starts, reminders, remote access, shares,
+  tunnels, plan-limit resets, workflows' waits, phone taps; and the rare ones) as ever; the next tick after someone
+  looks is full speed. Off in the rig (tests call with no window), `LAKI_IDLE=1` on; `test/ticks.test.ts`.
+  `scripts/mem.sh` prints the daemon's idle CPU (its own, not its children's).
 - Shells (`shellTick`, every 2 s): a local shell tab whose terminal's foreground process group (`ps -o pid=,tpgid=`,
   one call for all) isn't the shell's own is `running` in `view` (`busyShells`): the spinner while a command runs (its first
   `SHELL_SPIN`, 5 s, only, a Run tab's too: the renderer's `text.ts` `shownStatus`; vim or a server would spin for good), not

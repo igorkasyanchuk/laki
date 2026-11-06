@@ -921,19 +921,22 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   chmodSync(info, 0o600)
   log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   remoteMod.setDaemonPort(port)
-  ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts)
+  // H4.5: idle, nobody looking: no client connected, or no window shown and no agent running (ticks.ts' slow and pause).
+  // Not in the rig, where tests call with no window: LAKI_IDLE=1 tests it
+  if (!inRig() || process.env.LAKI_IDLE === '1') ticks.setIdle(() => !core.clients.size || (![...core.clients].some(c => c.view?.shown !== false) && !core.state.tabs.some(t => core.rt.get(t.id)?.status === 'running')))
+  ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts, { idle: 'slow' })
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
-  ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick())) // LAKI_PR_BG: tests of the timer's own (bg) scans
+  ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick()), { idle: 'slow' }) // LAKI_PR_BG: tests of the timer's own (bg) scans
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
-  ticks.register('sweepRunning', 2000, core.sweepRunning)
-  ticks.register('hookTick', 30000, () => core.hookTick()) // hooks not heard: a tab's strip says so
-  ticks.register('shellTick', 2000, core.shellTick)
-  ticks.register('sleepTick', 60000, () => resourcesMod.sleepTick())
-  ticks.register('ticketTick', Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick()) // linked tickets: each due workspace's script
+  ticks.register('sweepRunning', 2000, core.sweepRunning, { idle: 'slow' })
+  ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so
+  ticks.register('shellTick', 2000, core.shellTick, { idle: 'pause' })
+  ticks.register('sleepTick', 60000, () => resourcesMod.sleepTick(), { idle: 'slow' })
+  ticks.register('ticketTick', Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick(), { idle: 'slow' }) // linked tickets: each due workspace's script
   ticks.register('policyTick', 300000, policyTick)
-  ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats)
-  ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps) // Collision radar
-  ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick) // claude's and codex's transcripts: the tabs' context and usage
+  ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats, { idle: 'slow' })
+  ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps, { idle: 'slow' }) // Collision radar
+  ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), metersMod.meterTick, { idle: 'slow' }) // claude's and codex's transcripts: the tabs' context and usage
   ticks.register('watchLimits', 30000, () => core.watchLimits())
   ticks.register('remoteTick', 15000, () => remoteMod.remoteTick())
   ticks.register('shareTick', 15000, () => remoteMod.shareTick())
@@ -942,8 +945,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('pendingTick', 30000, () => scheduleMod.pendingTick())
   ticks.register('reminderTick', 30000, () => scheduleMod.reminderTick())
   ticks.register('memoryTick', 1800000, () => memoryTick())
-  ticks.register('widgetTick', 30000, () => widgetTick())
-  ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick()) // workspace facts read again (tests' faster)
+  ticks.register('widgetTick', 30000, () => widgetTick(), { idle: 'slow' })
+  ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick(), { idle: 'pause' }) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())
   ticks.register('aiTick', 600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   ticks.register('tidy', 3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
