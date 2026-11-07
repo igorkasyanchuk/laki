@@ -709,7 +709,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu-sub { color: var(--muted); font-size: 11.5px; line-height: 1.35; overflow-wrap: anywhere; }
 .menu-hint { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .menu-hint.long { flex: 0 1000 auto; min-width: 0; } /* a long one (a path) gives way first: the label keeps its words; a key's stays whole */
-.menu-text.keep { flex-basis: auto; } /* beside it: from its words' width, not 0 (else the path takes the room and Copy path reads C.) */
+.menu-text.keep { flex: 1 0 auto; max-width: 70%; } /* beside it: its words' width, never shrunk: a share of the overflow, even 0.1px, ellipsized Copy path to Copy pa… (70%: a very long label still gives way) */
 .menu-pill { flex: none; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font: 10.5px/16px var(--mono); }
 .menu-pill.good { border-color: color-mix(in srgb, var(--done) 65%, transparent); color: var(--done); }
 .menu-pill.warn { border-color: color-mix(in srgb, var(--waiting) 65%, transparent); color: var(--waiting); }
