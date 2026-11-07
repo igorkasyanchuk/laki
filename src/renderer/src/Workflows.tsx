@@ -40,6 +40,7 @@ const RUNS_SHOWN = 12
 const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', extension: 'teal', end: 'gray' }
 const STATUS_WORDS: Record<string, string> = { queued: 'queued', running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
 const statusWords = (r: { status: string; hold?: number }) => (r.hold ? 'pausing' : STATUS_WORDS[r.status]) // Pause after this block, asked: its block finishing
+const atEnd = (r: { wait?: FlowRun['wait'] }) => r.wait?.kind === 'hold' && r.wait.end !== undefined // parked before the run's end: cur is the block it finished
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
 // unsaved edits, by workflow: kept while Laki runs, whatever closes the editor (the rail, another page, a notification)
@@ -369,7 +370,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                     <b>{r.task || r.name}</b>
                     <span className="muted">
                       {r.name} · {statusWords(r)}
-                      {!ended(r) && r.block ? ` · ${r.block}` : ''}
+                      {!ended(r) && r.block ? ` · ${atEnd(r) ? 'the end' : r.block}` : ''}
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
                     <span className="sched-acts" onClick={e => e.stopPropagation()}>
@@ -2312,7 +2313,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           </span>
         </div>
         <span className="grow" />
-        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{statusWords(r)}{!over && r.cur ? ` · ${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
+        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{statusWords(r)}{!over && r.cur ? ` · ${atEnd(r) ? 'the end' : blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
         {w && !w.archived && (
           <button className="btn" onClick={() => api.openWs(w.id)}>
             <Icon name={w.kind === 'worktree' ? 'fork' : 'folder'} size={12} /> {w.name ?? w.id}

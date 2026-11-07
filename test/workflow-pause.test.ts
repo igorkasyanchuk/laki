@@ -6,6 +6,24 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
 
+// a run block with nowhere for ok to go: the run's end; when done: archive (unset in a worktree)
+const TAIL = `# Tail
+One command, then the end.
+
+runs in: worktree · session: new
+
+## start
+input: task
+next: one
+
+## one
+run: sleep 2
+fail: bad
+
+## bad
+end: failed
+`
+
 const HOLD = `# Hold
 Two commands.
 
@@ -105,4 +123,20 @@ test('workflow pause after this block: parks before the next, Resume once; a res
   r = await rig.rpc('flowStop', { id: c.id })
   assert.deepEqual([r.status, r.hold], ['stopped', undefined])
   await assert.rejects(rig.rpc('flowHold', { id: 'nope', on: true }), /no workflow run nope/)
+
+  // paused before the end: no archive until Resume, then done and archived as ever
+  await rig.rpc('flowSave', { id: 'tail', text: TAIL })
+  const d = await rig.rpc('flowStart', { workflow: 'tail', project: p.id, task: 'fourth' })
+  await until(async () => (await get(d.id)).cur === 'one', 'd on one')
+  await rig.rpc('flowHold', { id: d.id, on: true })
+  r = await parked(d.id)
+  assert.deepEqual([r.status, r.cur, r.wait.end], ['paused', 'one', "one's ok leads nowhere: the end"])
+  assert.match((await rig.cli('flow', 'show', d.id)).out, /paused before the end/)
+  const wsOf = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws)
+  await sleep(500)
+  assert.ok(!(await wsOf()).archived, 'not archived while parked')
+  r = await rig.rpc('flowHold', { id: d.id, on: false })
+  assert.equal(r.status, 'done')
+  assert.ok(r.log.some((l: string) => /done: one's ok leads nowhere: the end$/.test(l)))
+  await until(async () => (await wsOf()).archived, 'archived once done')
 })

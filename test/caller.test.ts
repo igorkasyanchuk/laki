@@ -59,6 +59,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
     curl('prThreads', { ws: 'x', all: true }),
     curl('prTalk', { ws: 'x' }),
     curl('alertAnswer', { id: 'x', choice: 'Yes' }),
+    curl('flowHold', { id: 'x', on: false }),
   )
   for (const [i, what] of ['answer what Laki asks', "answer Laki AI's questions", "answer an agent's question", "edit an extension's files", 'start remote access', 'change that setting', 'compact memories (they go to a model)'].entries())
     assert.equal(said[i].error, `an agent can't ${what}: it's the user's (ask them)`)
@@ -70,6 +71,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   assert.equal(said[12].error, "an agent can't read everyone's PR comments (only trusted reviewers' go to agents): it's the user's (ask them)")
   assert.equal(said[13].error, "an agent can't read everyone's PR conversation (only trusted reviewers' go to agents): it's the user's (ask them)")
   assert.equal(said[14].error, "an agent can't answer the user's alert (they pick on its card): it's the user's (ask them)") // else it could pick its own alert's answer
+  assert.equal(said[15].error, "an agent can't resume a workflow run the user paused: it's the user's (ask them)") // its pause holds what comes next
   assert.equal((await rig.rpc('state')).settings.env, undefined)
 
   // keys: into its own tab while it asks something, refused; another workspace's tab asks first, as a send does

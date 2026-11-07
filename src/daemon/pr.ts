@@ -280,10 +280,11 @@ export async function ghRepos(p: At): Promise<{ remote: string; repo: string }[]
   return [...seen.values()]
 }
 // each repo's list, its items marked with their repo; one gh can't read (a remote gone, no access) left out, unless
-// none could be: then the first one's failure
+// none could be: then the first one's failure. ponytail: left out in the daemon's log only, not in the list
 async function eachRepo<T>(repos: string[], one: (repo: string) => Promise<T[]>): Promise<(T & { repo: string })[]> {
   const got = await Promise.allSettled(repos.map(r => one(r).then(l => l.map(x => ({ ...x, repo: r })))))
   if (!got.some(g => g.status === 'fulfilled')) throw (got[0] as PromiseRejectedResult).reason
+  got.forEach((g, i) => g.status === 'rejected' && log(`${repos[i]} left out: ${firstLine(g.reason)}`))
   return got.flatMap(g => (g.status === 'fulfilled' ? g.value : []))
 }
 
