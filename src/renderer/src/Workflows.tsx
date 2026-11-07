@@ -2311,7 +2311,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           </span>
         </div>
         <span className="grow" />
-        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{STATUS_WORDS[r.status]}{!over && r.cur ? ` · ${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
+        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{r.hold ? 'pausing' : STATUS_WORDS[r.status]}{!over && r.cur ? ` · ${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
         {w && !w.archived && (
           <button className="btn" onClick={() => api.openWs(w.id)}>
             <Icon name={w.kind === 'worktree' ? 'fork' : 'folder'} size={12} /> {w.name ?? w.id}
@@ -2327,7 +2327,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           </button>
         )}
         {!over && r.status !== 'queued' && (parked || r.hold ? (
-          <button className="btn primary" onClick={() => hold(false)} data-tip={parked ? 'Goes on from there: the next block starts' : 'Takes the pause back: it goes on after this block'}><Icon name="run" size={11} /> Resume</button>
+          <button className="btn primary" onClick={() => hold(false)} data-tip={parked ? 'Goes on from there: the next block starts' : 'Takes the pause back: it goes on after this block'}><Icon name="run" size={11} /> {parked ? 'Resume' : 'Keep going'}</button>
         ) : (
           <button className="btn" onClick={() => hold(true)} data-tip="The block it's on finishes; no next block, retry or archive starts until Resume"><Icon name="pause" size={11} /> Pause after this block</button>
         ))}

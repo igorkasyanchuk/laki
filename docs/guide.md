@@ -1550,7 +1550,7 @@ again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake). *Pau
 `laki flow pause <run>`) lets the block it's on finish (a command, an agent's turn) and parks the run before the next
 one: no next block, try again or archive starts, its working time stops, and a restart keeps it parked. *Resume*
 (`laki flow resume <run>`) goes on from there, without running a finished block again; while it's still pausing,
-Resume takes the pause back. *Stop run* ends it at once (its agents stay as they are, in their tabs).
+*Keep going* takes the pause back. *Stop run* ends it at once (its agents stay as they are, in their tabs).
 
 Each workflow's row says how its runs went: how many, ✓ the share of the last 30 days' that ended done, ⏱ a done run's
 median time and $ what a run spends on average (its AI calls and decisions; agents' turns aren't counted). A workflow
