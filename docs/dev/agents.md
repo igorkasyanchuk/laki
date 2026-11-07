@@ -131,7 +131,8 @@ again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't 
   `addTab` with `resume` (and `account`), taking it off the list; a claude or codex chat whose transcript isn't there
   (`transcriptOf`) starts a new one and says `fresh` (the app's toast); a refusal (a policy, a profile's check) leaves it
   listed. An agent reopens only in its own workspace (`agentNo`), and only what it could start itself (`agentNoCmd`: no
-  command of its own, none that never asks); a sandboxed one not at all (`boxNo`). ponytail: a
+  command of its own, none that never asks; none outside its profile's sandbox), the tab then the agent's (its
+  `tab.new` too); a sandboxed one not at all (`boxNo`). ponytail: a
   Browsers page's ⇧⌘T does nothing.
 
 `src/daemon/session.ts`: every PTY is mirrored into an `@xterm/headless` terminal.
@@ -303,7 +304,8 @@ finds the repo and its config, so one the agent wrote (`core.fsmonitor`, `core.h
 scans and your git; a rebase's or cherry-pick's sequence (`rebase-merge`, `sequencer`: a todo's `exec`) is left out too
 and asks (codex keeps that folder and `.git` read-only itself; checked with `codex sandbox`, 0.162.1). claude gets the folder
 (`--add-dir` takes folders): its sandbox keeps `.git`, `commondir`, `config.worktree` and `.git/config` read-only itself
-(2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked. Hooks
+(2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked, and claude's leaves `rebase-merge` and
+`sequencer` writable there (a todo's `exec` runs as you when you continue that rebase). Hooks
 and codex's notify run outside the sandbox (the agent's own runner), so `laki hook` isn't touched. ponytail: a host's git
 folders aren't added.
 `fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json` (or `-fast-gated`), the same with `fastMode`; codex `-c

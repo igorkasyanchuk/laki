@@ -1429,6 +1429,10 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
   return [...(own ? [] : ['-s', 'workspace-write']), '-c', 'sandbox_workspace_write.network_access=true', ...(gitDirs.length ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify(gitDirs)}`] : [])] // a JSON array of strings is TOML's too
 }
 
+// a worktree's own folder: what git add, commit, switch, reset and merge write (each file and its lock), its reflog and
+// refs; not a rebase's or a cherry-pick's sequence (rebase-merge, sequencer: a todo's exec lines), which asks
+// ponytail: a git op writing elsewhere there (bisect, sparse-checkout) fails in the sandbox and asks
+const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs']
 // what git commit writes in a sandboxed agent's checkout, as the sandbox sees the paths (/tmp is /private/tmp), read
 // from the files: a worktree's .git file names its own folder (the index, HEAD), whose commondir names the shared one
 // (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
@@ -1438,11 +1442,8 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // gitdir and config.worktree say where git finds the repo and its config (one the agent wrote: core.fsmonitor or
 // core.hooksPath, a program run as you by Laki's scans and your git); codex keeps the folder read-only itself. claude's
 // --add-dir takes folders: it gets the folder, and its sandbox guards .git, commondir and config.worktree (2.1.319, checked
-// with claude -p). ponytail: an older claude's isn't checked
-// a worktree's own folder: what git add, commit, switch, reset and merge write (each file and its lock), its reflog and
-// refs; not a rebase's or a cherry-pick's sequence (rebase-merge, sequencer: a todo's exec lines), which asks
-// ponytail: a git op writing elsewhere there (bisect, sparse-checkout) fails in the sandbox and asks
-const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs']
+// with claude -p). ponytail: an older claude's isn't checked, and claude's leaves that folder's rebase-merge and sequencer
+// writable (a todo's exec line runs as you when you continue that rebase)
 export function gitWrites(path?: string, files = false): string[] {
   if (!path) return []
   const dotGit = join(path, '.git')
@@ -2101,7 +2102,8 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 // ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it
 // was (profile, model, effort, mode, fast, sandbox, account; a shell in its folder). A claude or codex chat that's gone
 // starts a new one (fresh: the app says so); a profile gone: its agent's own; refused (a policy, a gone folder): kept.
-// An agent's (from its tab): as its laki tab, no command of its own and none that never asks (agentNoCmd)
+// An agent's (from its tab): as its laki tab, no command of its own, none that never asks (agentNoCmd), none outside its
+// profile's sandbox; the tab and its tab.new the agent's
 export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown; tab?: unknown } }): Tab & { fresh?: boolean } {
   const ws = findWs(String(p.ws ?? ''))
   if (ws.archived) throw new Error(`${ws.name ?? ws.id} is archived: restore it first`)
@@ -2111,8 +2113,12 @@ export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown
   const agent = c.preset === 'claude' || c.preset === 'codex' ? c.preset : undefined
   const fresh = !!c.resumeId && !!agent && !transcriptOf(agent, accountNamed(c.account ?? '')?.dir ?? homeDir(agent), c.resumeId)
   const preset = c.profile && presetNamed(c.profile) ? c.profile : c.preset
-  if (c.kind === 'agent' && agentCaller(p.from)) agentNoCmd({ preset, cmd: c.cmd, perm: c.perm })
-  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account })
+  const by = agentCaller(p.from) && callerAgent(p.from) // its tab.new: the agent's, as tabNew's
+  if (by && c.kind === 'agent') {
+    agentNoCmd({ preset, cmd: c.cmd, perm: c.perm })
+    if (c.sandbox === false) throw new Error("an agent can't start an agent outside its profile's sandbox: it's the user's (ask them)") // main.ts agentNo's for tabNew
+  }
+  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd, agent: by || undefined } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account, agent: by || undefined })
   ws.closed = ws.closed!.filter(x => x !== c)
   if (!ws.closed.length) delete ws.closed
   save()

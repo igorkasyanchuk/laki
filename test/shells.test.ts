@@ -205,8 +205,11 @@ test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a
   await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: by }), /never asks/)
   await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, cmd: 'sleep 60', name: 'own' })).id })
   await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: by }), /a command of its own/)
-  assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 2), ['own', 'yolo'], 'kept for you')
-  assert.equal((await rig.rpc('tabReopen', { ws: xw.id, index: 1 })).name, 'yolo') // yours
+  await rig.rpc('presetSave', { name: 'boxed', add: true, set: { agent: 'claude', sandbox: true } })
+  await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, preset: 'boxed', sandbox: false, name: 'open' })).id })
+  await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: by }), /outside its profile's sandbox/)
+  assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 3), ['open', 'own', 'yolo'], 'kept for you')
+  assert.equal((await rig.rpc('tabReopen', { ws: xw.id, index: 2 })).name, 'yolo') // yours
   // 10 at most, the newest first; an archive clears them
   for (let i = 0; i < 12; i++) await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, name: `s${i}` })).id })
   assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 2), ['s11', 's10'])

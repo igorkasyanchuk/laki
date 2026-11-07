@@ -315,7 +315,7 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   const x = await argsOf(xw)
   const roots = (ws: any) => `sandbox_workspace_write.writable_roots=${JSON.stringify(codexWrites(ws))}`
   assert.deepEqual(x.args.slice(-6), ['-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(xw)])
-  const listed = JSON.parse(x.args.at(-1)!.split('=')[1]) as string[]
+  const listed = (a => JSON.parse(a.slice(a.indexOf('=') + 1)))(x.args.at(-1)!) as string[]
   for (const f of ['', 'commondir', 'gitdir', 'config.worktree', 'rebase-merge']) assert.ok(!listed.includes(join(own(xw), f)), `not ${f || 'the folder'}`)
   const rw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true, perm: 'plan' })
   assert.deepEqual((await argsOf(rw)).args.slice(-6), ['-s', 'read-only', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(rw)], 'read-only: stricter, kept')
