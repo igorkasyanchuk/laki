@@ -1545,7 +1545,11 @@ the same workspace with the run's variables, so the agents before it don't run (
 archived, Restore it first (or Run again). A run stopped by a restart goes on at its block: an agent whose chat
 came back is told to finish that step (not given the whole prompt again, so it doesn't start over), one in a new chat
 gets the prompt again, one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
-again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
+again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake). *Pause after this block* (the run's page,
+`laki flow pause <run>`) lets the block it's on finish (a command, an agent's turn) and parks the run before the next
+one: no next block, try again or archive starts, its working time stops, and a restart keeps it parked. *Resume*
+(`laki flow resume <run>`) goes on from there, without running a finished block again; while it's still pausing,
+Resume takes the pause back. *Stop run* ends it at once (its agents stay as they are, in their tabs).
 
 Each workflow's row says how its runs went: how many, ✓ the share of the last 30 days' that ended done, ⏱ a done run's
 median time and $ what a run spends on average (its AI calls and decisions; agents' turns aren't counted). A workflow
@@ -1568,6 +1572,7 @@ laki flow on <workflow>                        # turn on again one paused after 
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
 laki flow check .laki/workflows               # check workflow files (a folder: each .md), no app needed: CI, a hook
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
+laki flow pause <run> | flow resume <run>      # pause after the block it's on | go on from there
 ```
 
 ### Reader view
@@ -2379,6 +2384,7 @@ laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule archive|restore|rm <id>
 laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
+laki flow pause <run> | flow resume <run>               # pause a run after its block | go on
 laki flow again <run> [--from <block>] | flow trash | flow restore <trash-id>   # a run again | deleted workflows
 laki flow on <workflow> [project]                       # a paused workflow on again
 laki flow check [file.md… | folder]                     # check workflow files, no daemon (none: ./.laki/workflows)

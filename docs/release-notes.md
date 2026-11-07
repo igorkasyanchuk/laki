@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: *Pause after this block* on a run's page (`laki flow pause <run>`). The block it's on finishes, the run
+  parks before the next one (no next block, try again or archive), and *Resume* goes on from there, even after a
+  restart.
+
 - GitLab merge requests through `glab`: a project on gitlab.com (or a GitLab of yours glab is signed in to) shows its
   MR (`!12`) with its pipeline's jobs as checks; Ship opens one, and merge, approve, close, draft and issues (`--issue
   12`, the `#` list) go through glab. Review threads and the PR switches are GitHub's only for now.

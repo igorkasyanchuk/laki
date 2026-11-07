@@ -22,7 +22,8 @@ short version.
   ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
 show you what a run made (a window, a popover in the corner, a macOS notification), and name outputs (`{{steps.sum.title}}`) the next blocks use; your own
 variables (`{{vars.REPO}}`), a workflow's or global. A schedule can start one, and Laki AI makes or changes one with
-you. Each run keeps its decisions and log: run it again, or again from any block; a run in a workspace you have, its
+you. Each run keeps its decisions and log: run it again, or again from any block; pause it after the block it's on
+and resume later; a run in a workspace you have, its
 worktree archived when it's done, each agent block's permission mode, a deleted one in the trash for 30 days,
 `laki flow check` for a repo's CI, and each workflow's runs at a glance (one failing by itself 5 times pauses;
 `laki flow on` turns it on again). Seven templates to start from (fix CI, review a PR, feature to PR, an issue labelled…); events from outside too: a GitHub issue labelled, or a webhook (Settings › Tunnels › *Webhooks*, signatures checked), and a try as if

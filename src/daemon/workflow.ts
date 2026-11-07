@@ -515,8 +515,10 @@ function next() {
   }
 }
 
-function enter(r: FlowRun, b: Block, again = false): void {
+// cut: a restart's, the block it cut short: it finishes first, a pause asked for waits until after it
+function enter(r: FlowRun, b: Block, again = false, cut = false): void {
   if (!live(r)) return
+  if (r.hold && !cut) return park(r, b, again) // Pause after this block: the one before is done, this one waits for Resume
   if (!again) {
     const n = (r.visits[b.id] ?? 0) + 1
     if (b.max && n > b.max.n) {
@@ -534,13 +536,24 @@ function enter(r: FlowRun, b: Block, again = false): void {
 }
 
 function leave(r: FlowRun, b: Block, exit: string, why: string, you = false): void {
-  if (!live(r) || r.cur !== b.id) return // a late event: the run moved on, or ended
+  if (!live(r) || r.cur !== b.id || r.wait?.kind === 'hold') return // a late event: the run moved on, ended, or is parked
   if (!you && BAD_EXITS.includes(exit) && retry(r, b, why)) return
   decide(r, b, exit, why, you)
   say(r, `${blockName(b)} → ${exit}: ${why}`)
   const e = exitsOf(b).find(x => x.name === exit)
-  if (!e?.to) return BAD_EXITS.includes(exit) ? stuck(r, b, `${blockName(b)}: ${why}`) : finish(r, 'done', `${blockName(b)}'s ${exit} leads nowhere: the end`)
+  if (!e?.to && BAD_EXITS.includes(exit)) return stuck(r, b, `${blockName(b)}: ${why}`)
+  if (!e?.to) return r.hold ? park(r, undefined, false, `${blockName(b)}'s ${exit} leads nowhere: the end`) : finish(r, 'done', `${blockName(b)}'s ${exit} leads nowhere: the end`) // parked: no archive before Resume
   enter(r, blockOf(r, e.to)!)
+}
+
+// Pause after this block (flowHold): parked before b (cur, not entered: no visit counted, nothing of it runs), or
+// before the run's end (b none: end, finish's words). Its working time stops (sample: running only); Resume enters it
+function park(r: FlowRun, b: Block | undefined, again: boolean, end?: string) {
+  sample(r) // its working time up to now
+  delete r.hold
+  Object.assign(r, { status: 'paused' as FlowStatus, at: Date.now(), wait: b ? { kind: 'hold', ...(again && { again }) } : { kind: 'hold', end }, ...(b && { cur: b.id }) })
+  say(r, `paused before ${b ? blockName(b) : 'the end'}: Resume goes on from there`)
+  touch()
 }
 
 // retry: a bad exit with tries left enters the block again after a wait (RETRY_WAIT), not counted as a visit (an agent's
@@ -1414,6 +1427,34 @@ async function tidy(r: FlowRun) {
 }
 const tidying = new Set<string>()
 
+// Pause after this block (on: true): the block it's on finishes, then the run parks before the next (park); Resume (on:
+// false) enters it then, once: the wait is gone before it does. On a run still pausing, Resume only takes the pause back.
+// ponytail: a parked run keeps its slot (at once:), as a run waiting for you does
+export function flowHold(o: { id: string; on: boolean }) {
+  const r = flowGet(o)
+  if (!live(r)) throw new Error(`that run is ${r.status} already`)
+  const w = r.wait
+  if (o.on) {
+    if (r.status === 'queued') throw new Error("that run hasn't started yet")
+    if (w?.kind === 'hold') throw new Error('that run is paused already')
+    if (!r.hold) (r.hold = Date.now()), say(r, `pausing: ${r.cur ? `${blockName(blockOf(r, r.cur) ?? ({ id: r.cur } as Block))} finishes, then ` : ''}no next block starts until Resume`), touch()
+    return r
+  }
+  if (w?.kind !== 'hold') {
+    if (!r.hold) throw new Error("that run isn't paused")
+    delete r.hold
+    say(r, 'Resume: the pause is taken back')
+    touch()
+    return r
+  }
+  Object.assign(r, { status: 'running' as FlowStatus, wait: undefined, clock: Date.now() })
+  say(r, 'Resume')
+  const b = blockOf(r, r.cur)
+  if (w.end !== undefined || !b) finish(r, 'done', w.end || 'the end')
+  else enter(r, b, !!w.again)
+  return r
+}
+
 export function flowStop(o: { id: string }) {
   const r = flowGet(o)
   if (!live(r)) throw new Error(`that run is ${r.status} already`)
@@ -1493,7 +1534,7 @@ export function flowResume() {
   // queued ones wait on (flowTick's next); one cut short before it had a workspace goes back in the queue
   const requeue = runs().filter(r => going(r) && !r.ws && !r.cur && r.started < boot)
   for (const r of requeue) (r.status = 'queued'), say(r, 'Laki restarted before its workspace was made: queued again')
-  const back = runs().filter(r => going(r) && !asks(r) && r.started < boot)
+  const back = runs().filter(r => going(r) && !asks(r) && r.wait?.kind !== 'hold' && r.started < boot) // parked: it waits for Resume
   const was = new Map(back.map(r => [r, r.cur]))
   const chats = new Map(back.map(r => [r, tabOf(r.cur && r.tabs[r.cur])?.resumeId])) // each agent's chat now: by the time it's entered a new one may have started
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
@@ -1505,7 +1546,7 @@ export function flowResume() {
       if (!live(r) || !b || asks(r) || r.cur !== was.get(r)) continue // moved on meanwhile: that block is under way
       if (r.wait?.kind === 'wait' || r.wait?.kind === 'retry') continue // flowTick
       if (b.kind === 'agent') r.resumed = { block: b.id, chat: chats.get(r) }
-      enter(r, b, true)
+      enter(r, b, true, true)
     }
   }, RESUME_AFTER).unref()
 }

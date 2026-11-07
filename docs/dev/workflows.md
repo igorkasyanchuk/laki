@@ -126,6 +126,15 @@ leaves the wait to `flowTick`. Past `at once` (`going`: live and not queued) `fl
 (`queueOrder`: Run First's `promoted`, the newest first, cleared as it starts; then the oldest), its `at once` the
 run's own copy. `flowResume` leaves queued ones (one cut short before its workspace: queued again);
 `flowStop`/`flowForget` end one without a workspace; a schedule's run queues (core's skip while one is live stays).
+Pause after this block (`flowHold` `on: true`, the run page's button, `laki flow pause <run>`): `r.hold` (saved at
+once) and nothing else; the block it's on goes on. The next `enter` (a next block, a retry's `again`, Try again, Give it
+more) or `leave` with nowhere to go `park`s instead: `sample` first, then `status: 'paused'`, `wait` `{ kind: 'hold' }`
+with `cur` the block not entered yet (no visit, nothing of it ran; `again`: a retry's), or `{ kind: 'hold', end }`
+before the run's end (finish's words: no `tidy` archive yet). `leave` drops any event while parked. Resume (`on:
+false`) clears the wait and sets `clock` before it `enter`s (or `finish`es done), so a second Resume finds no hold; on
+a run still pausing it only takes `hold` back. `flowResume` (a restart) leaves a parked run waiting and re-enters a
+pausing one's cut-short block with `cut` (`enter`'s 4th argument): it finishes first, then parks. A parked run keeps
+its slot. Stop stays Stop: its agents stay in their tabs.
 A Start's `inputs` (`FlowInput`: `inputsOf` reads the line, `name[?][:kind][=default]`, `inputText` writes it; `kind` as
 written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default and every `{{inputs.x}}` or `of`/label
 `inputs.x` not declared): `flowStart` `inputs` through `inputVals` (defaults, a needed one, a number, a choice; a name it

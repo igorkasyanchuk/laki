@@ -587,7 +587,8 @@ async function main() {
     case 'workflow': {
       // workflows (experimental): laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | show|stop <run> | answer <run> <n> [words]
       const [sub = 'ls', id, ...words] = rest
-      const status = (r: FlowView | FlowRun) => `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}`
+      const status = (r: FlowView | FlowRun) =>
+        r.wait?.kind === 'hold' ? `paused before ${r.wait.end !== undefined ? 'the end' : r.cur}` : `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}${r.hold ? ', pausing after it' : ''}`
       if (sub === 'ls') {
         const list: WorkflowItem[] = await rpc('flowList', {})
         const runs: FlowView[] = (await rpc('state')).flows ?? []
@@ -652,7 +653,12 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | on <workflow> [project] | check [file.md… | folder] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
+      if (sub === 'pause' || sub === 'resume') {
+        if (!id) throw new Error(`usage: laki flow ${sub} <run>`)
+        const r: FlowRun = await rpc('flowHold', { id, on: sub === 'pause' })
+        return out(r, `${id}  ${status(r)}`)
+      }
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | on <workflow> [project] | check [file.md… | folder] | trash | restore <trash-id> | show|stop|pause|resume <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

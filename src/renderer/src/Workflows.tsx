@@ -2266,7 +2266,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
   const [pick, setPick] = useState<string | null>(null)
   const [win, setWin] = useState<Shown | null>(null) // what a Show you showed, again
   // again as the view says it moved (status, block, a decision)
-  useEffect(() => void api.call<FlowRun>('flowGet', { id }).then(setR, onGone), [id, entry?.status, entry?.cur, entry?.decisions, entry?.at, entry?.wait?.kind, entry?.turns])
+  useEffect(() => void api.call<FlowRun>('flowGet', { id }).then(setR, onGone), [id, entry?.status, entry?.cur, entry?.decisions, entry?.at, entry?.wait?.kind, entry?.turns, entry?.hold])
   // the log while it goes: every few seconds (an agent's turn adds lines without moving the view)
   useEffect(() => {
     if (mode !== 'log' || !entry || ended(entry)) return
@@ -2282,7 +2282,8 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
     if (next && next !== d.block) lit.taken.add(`${d.block}>${next}`)
     lit.state[d.block] = d.bad ? 'failed' : 'done'
   })
-  if (r.cur) lit.state[r.cur] = r.status === 'waiting' ? 'waiting' : r.status === 'running' || r.status === 'paused' ? 'running' : r.status === 'failed' ? 'failed' : 'done'
+  const parked = r.wait?.kind === 'hold' ? r.wait : undefined // Pause after this block: before cur (not entered yet), or before the end
+  if (r.cur && !(parked && parked.end === undefined)) lit.state[r.cur] = r.status === 'waiting' ? 'waiting' : r.status === 'running' || r.status === 'paused' ? 'running' : r.status === 'failed' ? 'failed' : 'done'
   const last = r.decisions.at(-1)
   if (r.status === 'running' && r.cur && last && last.block !== r.cur) lit.live = `${last.block}>${r.cur}`
   const tabOfBlock = (id?: string) => (id && r.ws && tabs.includes(r.tabs[id]) ? r.tabs[id] : undefined) // an agent block's session, while it's open
@@ -2293,6 +2294,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
   const answer = (n: number) => api.call('flowAnswer', { id, n, text: typed }).then(x => (setTyped(''), setR(x)), e => api.toast((e as Error).message))
   const first = () => api.call('flowFirst', { id }).then(setR, e => api.toast((e as Error).message))
   const stop = async () => (await ask('Stop this run?', { text: 'Its agents stay as they are, in their tabs.', ok: 'Stop', danger: true })) && api.call('flowStop', { id }).then(setR, e => api.toast((e as Error).message))
+  const hold = (on: boolean) => api.call<FlowRun>('flowHold', { id, on }).then(setR, e => api.toast((e as Error).message)) // Pause after this block, Resume
   const picked = pick ? r.flow.blocks.find(b => b.id === pick) : undefined
   const vars = Object.entries(r.vars).filter(([k]) => !pick || k === 'task' || k === 'answer' || k.startsWith(`steps.${pick}.`))
   const decisions = [...r.decisions].reverse().filter(d => !pick || d.block === pick)
@@ -2324,7 +2326,12 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
             <Icon name="arrowUp" size={11} /> Run First
           </button>
         )}
-        {!over && <button className="btn" onClick={stop}><Icon name="stop" size={11} /> Stop</button>}
+        {!over && r.status !== 'queued' && (parked || r.hold ? (
+          <button className="btn primary" onClick={() => hold(false)} data-tip={parked ? 'Goes on from there: the next block starts' : 'Takes the pause back: it goes on after this block'}><Icon name="run" size={11} /> Resume</button>
+        ) : (
+          <button className="btn" onClick={() => hold(true)} data-tip="The block it's on finishes; no next block, retry or archive starts until Resume"><Icon name="pause" size={11} /> Pause after this block</button>
+        ))}
+        {!over && <button className="btn" onClick={stop} data-tip="Ends the run now; its agents stay as they are, in their tabs"><Icon name="stop" size={11} /> Stop run</button>}
         {over && (
           <button className="btn" onClick={() => onAgain(r.id)} data-tip="A new run: its task and inputs, the workflow as it is now. A block’s right click: Run from here">
             <Icon name="refresh" size={11} /> Run again
@@ -2384,6 +2391,8 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
       {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
       {menu}
       {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts {r.pick ? 'in the workspace you picked' : r.where === 'main' ? 'in the project’s folder' : 'in a worktree of its own'} once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
+      {r.hold && !parked && <div className="wf-note">Pausing: {r.cur ? `${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })} is finishing. ` : ''}No next block will start.</div>}
+      {parked && <div className="wf-note">Paused before {parked.end !== undefined ? 'the end' : blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur ?? '', kind: 'agent' })}{parked.again ? ' (its try again)' : ''}: Resume goes on from there.</div>}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />

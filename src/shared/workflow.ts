@@ -862,7 +862,7 @@ export const FLOW_ENDED: FlowStatus[] = ['done', 'stopped', 'failed']
 export const runOf = (r: { workflow: string; source: WorkflowSource; project: string }, w: { id: string; source: WorkflowSource; project?: string }) => r.workflow === w.id && r.source === w.source && (w.source !== 'project' || r.project === w.project)
 export type Decision = { at: number; block: string; exit: string; why: string; ms?: number; you?: boolean; bad?: boolean }
 // what a run waits on: an ask (yours, a confirm before an outward action, a stuck block), an agent's turn, a command,
-// a wait block, a usage limit
+// a wait block, a usage limit, your Resume
 export type FlowWait =
   | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number } // tab, used: a stalled agent's (stuck), what its block's turn has had of its timeout
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
@@ -870,6 +870,7 @@ export type FlowWait =
   | { kind: 'run' | 'wait' }
   | { kind: 'retry'; until: number } // a bad exit's try again, at until
   | { kind: 'limit'; tab: string; until?: number }
+  | { kind: 'hold'; again?: boolean; end?: string } // Pause after this block: parked before cur (again: its retry, not a new visit), or before the run's end (end: finish's words)
   | { kind: 'agent-ask'; tab: string; question: string; options: string[]; ns: number[]; used?: number } // its agent asks (a permission prompt): options its menu's choices (ns: their numbers), then Stop the run
 export type FlowRun = {
   id: string
@@ -899,6 +900,7 @@ export type FlowRun = {
   cur?: string // the block it's on
   at?: number // since when
   wait?: FlowWait
+  hold?: number // Pause after this block: when you asked; the block on finishes, then the run parks (wait hold) before the next
   visits: Record<string, number>
   tries?: Record<string, number> // each block's tries again since it was entered (retry:)
   vars: Record<string, string>
