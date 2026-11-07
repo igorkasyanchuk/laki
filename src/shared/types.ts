@@ -671,7 +671,29 @@ export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
 // model's id (unset: VOICE_MODEL). fn: cloud only, hold Fn to talk anywhere in Laki, let go to insert (unset: on)
 // on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
-export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean } // send: Send as you stop talking (cloud, off unless true: voice.ts)
+export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean; fixes?: string } // send: Send as you stop talking (cloud, off unless true: voice.ts); fixes: Word fixes, a line each (voiceFix)
+// Settings › Voice's Word fixes on a cloud transcript: a line each, `heard → meant` (or -> or =; heard may be several
+// words, or several forms with commas: `lucky, lakey → Laki`), each heard form as a whole word in any case, the
+// longest first. What changed comes back for the bar to say. ponytail: VOICE_FIXES lines at most; no fuzzy matching
+export const VOICE_FIXES = 200
+export function voiceFix(text: string, fixes?: string): { text: string; fixed: string[] } {
+  const rules = String(fixes ?? '')
+    .split('\n')
+    .slice(0, VOICE_FIXES)
+    .flatMap(l => (m => (m ? m[1].split(',').map(h => [h.trim().replace(/\s+/g, ' '), m[2].trim()] as const) : []))(/^(.+?)\s*(?:→|->|=)\s*(.+)$/.exec(l.trim())))
+    .filter(([h, m]) => h && m && h.length <= 100 && m.length <= 100)
+    .sort((a, b) => b[0].length - a[0].length)
+  if (!rules.length) return { text, fixed: [] }
+  const fixed = new Set<string>()
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${rules.map(([h]) => esc(h)).join('|')})(?![\\p{L}\\p{N}])`, 'giu')
+  const out = text.replace(re, w => {
+    const r = rules.find(([h]) => h.toLowerCase() === w.replace(/\s+/g, ' ').toLowerCase())!
+    if (w !== r[1]) fixed.add(`${w} → ${r[1]}`)
+    return r[1]
+  })
+  return { text: out, fixed: [...fixed] }
+}
 export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
 export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false // Settings › Voice: on unless turned off
 

@@ -2217,7 +2217,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   open its emoji picker or dictation as well (*Open Keyboard settings*). *Send as you stop talking* (off): letting go
   of Fn, or the mic's stop, sends it too: a prompt box's message (the new-workspace page, Laki AI, Send later, the
   Board's to-do), or an idle agent's prompt in its terminal; a shell, any other field, or an agent asking something
-  just gets the text.
+  just gets the text. *Word fixes*: names the model keeps getting wrong, a line each, what it writes → what you
+  meant (`lucky, lakey → Laki`, `work tree → worktree`); whole words in any case, done in Laki after the transcript
+  comes back (nothing more goes to OpenRouter), and the bar says what it changed (⌘Z in the field takes it back).
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

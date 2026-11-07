@@ -11,7 +11,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmS
 import { readJson } from '../shared/conn.ts'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools } from '../shared/tools.ts'
-import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
+import { AGENTS, AI_ACTS, AI_PERM, AI_MODEL, PERMS, aiOn, VOICE_MODEL, voiceFix, voiceOn, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, modelCheck, presets, state } from './core.ts'
 import { dir } from './dir.ts'
@@ -159,7 +159,7 @@ export async function voiceText(o: { audio?: unknown }) {
       throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 90 seconds' : e.message}`)
     })
     const j: any = await res.json().catch(() => ({}))
-    if (res.ok && !j.error) return { text: String(j.text ?? '').trim() }
+    if (res.ok && !j.error) return (f => ({ text: f.text, ...(f.fixed.length && { fixed: f.fixed }) }))(voiceFix(String(j.text ?? '').trim(), state.settings?.voice?.fixes)) // Word fixes: what changed, for the bar
     const busy = res.status === 429 || res.status >= 500
     if (busy && n < VOICE_AGAIN.length) {
       await new Promise(r => setTimeout(r, VOICE_AGAIN[n]))

@@ -84,10 +84,11 @@ async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
   try {
     // decoding resamples to the context's rate: 16 kHz, its first channel
     const buf = await new OfflineAudioContext(1, 1, RATE).decodeAudioData(await audio.arrayBuffer())
-    const { text } = await api.call<{ text: string }>('voiceText', { audio: base64(wavOf(buf.getChannelData(0), RATE)) })
+    const { text, fixed } = await api.call<{ text: string; fixed?: string[] }>('voiceText', { audio: base64(wavOf(buf.getChannelData(0), RATE)) })
     if (mine !== writing) return
     set({ phase: 'idle' })
     if (text) await insert(text, target, may)
+    if (text && fixed?.length) say([now.said, `Word fixes: ${fixed.join(', ')}`].filter(Boolean).join(' · ')) // ⌘Z in the field takes the text back
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }

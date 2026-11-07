@@ -152,6 +152,7 @@ export const FIND: [string, string, string?][] = [
   ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
   ['voice', 'Send as you stop talking', 'auto send submit enter release let go stop talking voice dictation agent prompt'],
+  ['voice', 'Word fixes', 'vocabulary dictionary words names terms correct correction replace mishearing misheard spelling voice dictation transcript'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
   ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],

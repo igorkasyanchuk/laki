@@ -274,7 +274,8 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
 - voice (`voiceOn`: `settings.voice.on` unless false; off: the mic is macOS dictation, no hold Fn, and `voiceText`
   refuses; Settings › Voice, always there: picking an Engine clears an old `on: false`): `voiceText` (`audio`: WAV in base64, 24 MB of it at most; the AI's key,
   `<data>/ai-key`): OpenRouter's `POST /audio/transcriptions` with `voice.model` (unset: `VOICE_MODEL`,
-  microsoft/mai-transcribe-2), returns `{ text }`; a 429 or 5xx is tried again after `VOICE_AGAIN` (1 s, 2.5 s;
+  microsoft/mai-transcribe-2), returns `{ text }` after `voice.fixes` (Word fixes: types.ts `voiceFix`, `heard → meant`
+  lines, `VOICE_FIXES` at most, whole words in any case, the longest first; `fixed`: what changed, for the bar); a 429 or 5xx is tried again after `VOICE_AGAIN` (1 s, 2.5 s;
   `LAKI_VOICE_AGAIN`: tests' shorter waits), then refused with OpenRouter's message and the provider's `raw`; nothing kept. `LAKI_AI_API` is tests' fake, as for Laki AI. The
   renderer's `voice.ts`: engine `device` (unset) is macOS dictation as before; `cloud` records (`getUserMedia`,
   `MediaRecorder`, decoded to 16 kHz mono, `text.ts` `wavOf`) from the prompt's mic or while Fn is held (its capture

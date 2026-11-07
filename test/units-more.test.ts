@@ -16,7 +16,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
+import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -438,4 +438,15 @@ test("Background tasks' Clear: a tab's finished ones since, by its chat; a new c
   assert.equal(bgDoneOf(t('s2', 1), c), 1) // a /clear's new chat
   assert.equal(bgDoneOf(t('s1', 2), c), 2) // fewer than when cleared: counted anew
   assert.equal(bgDoneOf(t('s1', 4), {}), 4)
+})
+
+test('Word fixes (Settings › Voice): heard → meant as whole words in any case, several forms, the longest first; what changed said', () => {
+  const fixes = 'lucky, lakey → Laki\nwork tree -> worktree\nnotify = ntfy\nwork → job\n# not a rule\n → nothing\nc++ → C++'
+  assert.deepEqual(voiceFix('Open lucky and add a Work  Tree, then notify me', fixes), { text: 'Open Laki and add a worktree, then ntfy me', fixed: ['lucky → Laki', 'Work  Tree → worktree', 'notify → ntfy'] })
+  assert.deepEqual(voiceFix('Lakeyside luckyday plucky notifying', fixes), { text: 'Lakeyside luckyday plucky notifying', fixed: [] }, 'whole words only')
+  assert.deepEqual(voiceFix('Laki at work, Лакі', fixes), { text: 'Laki at job, Лакі', fixed: ['work → job'] }, 'right already: not said')
+  assert.deepEqual(voiceFix('use c++ here', fixes), { text: 'use C++ here', fixed: ['c++ → C++'] }, 'a symbol in it: escaped')
+  assert.deepEqual(voiceFix('plain prose stays', ''), { text: 'plain prose stays', fixed: [] })
+  assert.deepEqual(voiceFix('a b', undefined), { text: 'a b', fixed: [] })
+  assert.equal(voiceFix('x', Array(VOICE_FIXES).fill('y → z').concat('x → past the cap').join('\n')).text, 'x', `${VOICE_FIXES} lines at most`)
 })

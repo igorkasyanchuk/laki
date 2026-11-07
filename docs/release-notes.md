@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › Voice › *Word fixes* (Cloud): a line each, what it writes → what you meant (`lucky → Laki`), so
+  dictated prompts keep your repo, model and CLI names; the bar says what it changed.
+
 - A fork with several GitHub remotes (`origin` and `upstream`): `#` in a prompt lists every repo's open PRs and
   issues, each with its `owner/repo`, so upstream's #42 is never your fork's #42. Starting upstream's PR on a branch
   your fork has too gets its own branch (`acme/feature`).
