@@ -17,7 +17,7 @@ const entries = join(sshDir, 'codespaces')
 export const CS_ROOT = process.env.LAKI_CS_ROOT || '/workspaces'
 export const sshF = () => (existsSync(CONFIG) ? ['-F', CONFIG] : [])
 // owner/repo of a github.com remote (https, ssh or scp's form)
-export const ghRepo = (url: string) => /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1]
+export const ghRepo = (url: string) => /(?:^|[@/])github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] // github.com itself: not notgithub.com
 // a remote's URL as gh's -R takes it, [HOST/]OWNER/REPO: git@host:o/r.git, ssh://git@host:22/o/r, https://host/o/r.git;
 // none for a path or anything else
 export const repoOf = (url: string) => (m => m && `${m[1]}/${m[2]}`)(/^(?:[a-z][\w+.-]*:\/\/)?(?:[^@/\s]+@)?([^/:\s]+)(?::\d+)?[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/i.exec(url.trim()))

@@ -178,8 +178,7 @@ export async function prFromSaid(ws: Workspace) {
   if (urls.size !== 1 || saidTried.get(ws.id) === url || ws.related?.some(u => sameRef(u, url))) return // related: you moved it off, or it was
   saidTried.set(ws.id, url)
   const repo = url.split('/').slice(3, 5).join('/').toLowerCase()
-  const remotes = (await git(ws, 'remote', '-v').catch(() => '')).toLowerCase() // origin\tgit@github.com:o/r.git (fetch)
-  if (![...remotes.matchAll(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?\s/g)].some(m => m[1] === repo)) return wsLog(ws, `PR: its agent named ${url}, not a repo of its remotes`)
+  if (!(await ghRepos(ws)).some(r => r.repo.toLowerCase() === repo)) return wsLog(ws, `PR: its agent named ${url}, not a repo of its remotes`)
   await prAttach({ ws: ws.id, pr: url }, true).catch(e => wsLog(ws, `PR: its agent named ${url}: ${firstLine(e)}`))
 }
 
@@ -297,7 +296,8 @@ export async function prList(o: { project: string; who?: 'mine' | 'others' | 'al
   const p = findProject(o.project)
   if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
   const fields = 'number,title,author,url,headRefName,baseRefName,isDraft,reviewDecision,updatedAt,headRepository,headRepositoryOwner'
-  const repos = (await ghRepos(p)).map(r => r.repo)
+  const all = await ghRepos(p)
+  const repos = all.map(r => r.repo)
   const many = repos.length > 1
   const ask = (repo?: string): Promise<PRItem[]> =>
     exec(p, 'gh', ['pr', 'list', ...(repo ? ['--repo', repo] : []), '--state', 'open', '--limit', '100', '--json', fields, ...(o.who === 'mine' ? ['--author', '@me'] : [])], { timeout: 30000 }).then(
@@ -306,7 +306,7 @@ export async function prList(o: { project: string; who?: 'mine' | 'others' | 'al
     )
   const [list, me] = await Promise.all([many ? eachRepo(repos, ask) : ask().then(l => l.map(x => ({ ...x, repo: undefined }))), ghLogin(p)])
   if (o.who === 'others' && !me) throw new Error("couldn't tell your GitHub login (gh api user): try again, or ask for all")
-  const origin = repos[0]?.toLowerCase()
+  const origin = all.find(r => r.remote === 'origin')?.repo.toLowerCase() // none on github.com: no worktree by branch
   const ours = (x: PRItem) => !many || `${x.headRepositoryOwner?.login}/${x.headRepository?.name}`.toLowerCase() === origin // upstream's own feature isn't your feature
   return list
     .filter(x => o.who !== 'others' || !me || x.author?.login !== me)

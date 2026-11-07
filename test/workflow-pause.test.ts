@@ -96,5 +96,13 @@ test('workflow pause after this block: parks before the next, Resume once; a res
   assert.equal(await ran(b.id), 'one\n', 'cut short before its echo, then once')
   assert.match((await rig.cli('flow', 'show', b.id)).out, /paused before two/)
   assert.equal((await rig.rpc('flowStop', { id: b.id })).status, 'stopped', 'Stop still ends a parked run')
+  // stopped while pausing: no pause left on it; on must be true or false
+  const c = await rig.rpc('flowStart', { workflow: 'hold', project: p.id, task: 'third' })
+  await until(async () => (await get(c.id)).cur === 'one', 'c on one')
+  await assert.rejects(rig.rpc('flowHold', { id: c.id, on: 'false' }), /on: true pauses, false resumes/)
+  await assert.rejects(rig.rpc('flowHold', { id: c.id, on: false }), /isn't paused/)
+  await rig.rpc('flowHold', { id: c.id, on: true })
+  r = await rig.rpc('flowStop', { id: c.id })
+  assert.deepEqual([r.status, r.hold], ['stopped', undefined])
   await assert.rejects(rig.rpc('flowHold', { id: 'nope', on: true }), /no workflow run nope/)
 })

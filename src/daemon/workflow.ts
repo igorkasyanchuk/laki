@@ -1351,6 +1351,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   if (!live(r)) return
   sample(r)
   kill0(r)
+  delete r.hold // a pause asked for: nothing left to pause
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
   say(r, `${status}: ${why}`)
   // ended ones past FLOWS_KEPT go, the oldest first
@@ -1432,6 +1433,7 @@ const tidying = new Set<string>()
 // ponytail: a parked run keeps its slot (at once:), as a run waiting for you does
 export function flowHold(o: { id: string; on: boolean }) {
   const r = flowGet(o)
+  if (typeof o.on !== 'boolean') throw new Error('on: true pauses, false resumes')
   if (!live(r)) throw new Error(`that run is ${r.status} already`)
   const w = r.wait
   if (o.on) {
@@ -1441,7 +1443,7 @@ export function flowHold(o: { id: string; on: boolean }) {
     return r
   }
   if (w?.kind !== 'hold') {
-    if (!r.hold) throw new Error("that run isn't paused")
+    if (!r.hold) throw new Error(r.wait?.kind === 'limit' ? 'that run waits for its usage limit to reset: it goes on by itself' : "that run isn't paused")
     delete r.hold
     say(r, 'Resume: the pause is taken back')
     touch()

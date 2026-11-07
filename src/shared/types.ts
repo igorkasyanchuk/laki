@@ -686,11 +686,11 @@ export function voiceFix(text: string, fixes?: string): { text: string; fixed: s
   if (!rules.length) return { text, fixed: [] }
   const fixed = new Set<string>()
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+')
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${rules.map(([h]) => esc(h)).join('|')})(?![\\p{L}\\p{N}])`, 'giu')
-  const out = text.replace(re, w => {
-    const r = rules.find(([h]) => h.toLowerCase() === w.replace(/\s+/g, ' ').toLowerCase())!
-    if (w !== r[1]) fixed.add(`${w} → ${r[1]}`)
-    return r[1]
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${rules.map(([h]) => `(${esc(h)})`).join('|')})(?![\\p{L}\\p{N}])`, 'giu') // a group per rule: the one that matched says which
+  const out = text.replace(re, (w, ...g) => {
+    const meant = rules[g.findIndex(x => x !== undefined)][1]
+    if (w !== meant) fixed.add(`${w} → ${meant}`)
+    return meant
   })
   return { text: out, fixed: [...fixed] }
 }

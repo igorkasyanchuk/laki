@@ -447,6 +447,7 @@ test('Word fixes (Settings › Voice): heard → meant as whole words in any cas
   assert.deepEqual(voiceFix('Laki at work, Лакі', fixes), { text: 'Laki at job, Лакі', fixed: ['work → job'] }, 'right already: not said')
   assert.deepEqual(voiceFix('use c++ here', fixes), { text: 'use C++ here', fixed: ['c++ → C++'] }, 'a symbol in it: escaped')
   assert.deepEqual(voiceFix('plain prose stays', ''), { text: 'plain prose stays', fixed: [] })
+  assert.deepEqual(voiceFix('a \u017Fs here', 'ss → x'), { text: 'a x here', fixed: ['\u017Fs → x'] }, 'matched by case folding (long s): its own rule, never a throw')
   assert.deepEqual(voiceFix('a b', undefined), { text: 'a b', fixed: [] })
   assert.equal(voiceFix('x', Array(VOICE_FIXES).fill('y → z').concat('x → past the cap').join('\n')).text, 'x', `${VOICE_FIXES} lines at most`)
 })

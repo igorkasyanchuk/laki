@@ -88,7 +88,7 @@ async function write(audio: Blob, target: HTMLElement | null, may: boolean) {
     if (mine !== writing) return
     set({ phase: 'idle' })
     if (text) await insert(text, target, may)
-    if (text && fixed?.length) say([now.said, `Word fixes: ${fixed.join(', ')}`].filter(Boolean).join(' · ')) // ⌘Z in the field takes the text back
+    if (text && fixed?.length && now.phase === 'idle') say([now.said, `Word fixes: ${fixed.join(', ')}`].filter(Boolean).join(' · ')) // ⌘Z in the field takes the text back
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }

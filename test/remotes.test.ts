@@ -21,6 +21,7 @@ test("every GitHub remote: each one's issues and PRs with its repo, #42 twice; o
   git('remote', 'add', 'again', 'https://github.com/ME/Shop') // origin's repo by HTTPS, another case: once
   git('remote', 'add', 'gone', 'https://github.com/old/shop.git') // gh can't read it
   git('remote', 'add', 'work', 'git@gitlab.example:me/shop.git') // not GitHub: not asked
+  git('remote', 'add', 'look', 'https://notgithub.com/evil/shop.git') // a host that only ends in github.com: not GitHub
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
 
@@ -35,7 +36,7 @@ test("every GitHub remote: each one's issues and PRs with its repo, #42 twice; o
   assert.match(log(), /gh api graphql -f owner=me -f name=shop /)
   assert.match(log(), /gh api graphql -f owner=acme -f name=shop /)
   assert.match(log(), /gh api graphql -f owner=old -f name=shop /)
-  assert.doesNotMatch(log(), /owner=ME|gitlab\.example|owner=\{owner\}/)
+  assert.doesNotMatch(log(), /owner=ME|owner=evil|gitlab\.example|owner=\{owner\}/)
 
   // PRs: each repo's (--repo), its repo with it; a worktree on its branch only for a PR whose head is origin's
   const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'feature' })

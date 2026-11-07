@@ -2283,7 +2283,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
     lit.state[d.block] = d.bad ? 'failed' : 'done'
   })
   const parked = r.wait?.kind === 'hold' ? r.wait : undefined // Pause after this block: before cur (not entered yet), or before the end
-  if (r.cur && !(parked && parked.end === undefined)) lit.state[r.cur] = r.status === 'waiting' ? 'waiting' : r.status === 'running' || r.status === 'paused' ? 'running' : r.status === 'failed' ? 'failed' : 'done'
+  if (r.cur && !parked) lit.state[r.cur] = r.status === 'waiting' ? 'waiting' : r.status === 'running' || r.status === 'paused' ? 'running' : r.status === 'failed' ? 'failed' : 'done'
   const last = r.decisions.at(-1)
   if (r.status === 'running' && r.cur && last && last.block !== r.cur) lit.live = `${last.block}>${r.cur}`
   const tabOfBlock = (id?: string) => (id && r.ws && tabs.includes(r.tabs[id]) ? r.tabs[id] : undefined) // an agent block's session, while it's open
