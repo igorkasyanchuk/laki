@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
+import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
 import { isLive } from './resources.ts'
@@ -267,27 +268,56 @@ function ghLogin(at: At) {
   return p
 }
 
+// a project's GitHub repositories (git remote -v), one per owner/name (a repo's SSH and HTTPS remotes: once, any case),
+// origin's first: the issues and PRs of each (a fork's upstream too) for # completion and laki_prs.
+// ponytail: github.com only; a GitHub Enterprise remote is left to gh's own pick
+export async function ghRepos(p: At): Promise<{ remote: string; repo: string }[]> {
+  const seen = new Map<string, { remote: string; repo: string }>()
+  const lines = (await git(p, 'remote', '-v').catch(() => '')).split('\n').map(l => l.split(/\s+/))
+  for (const [remote, url, how] of lines.sort((a, b) => Number(b[0] === 'origin') - Number(a[0] === 'origin'))) { // origin's spelling of a repo wins
+    const repo = how === '(fetch)' ? ghRepo(url) : undefined
+    if (repo && !seen.has(repo.toLowerCase())) seen.set(repo.toLowerCase(), { remote, repo })
+  }
+  return [...seen.values()]
+}
+// each repo's list, its items marked with their repo; one gh can't read (a remote gone, no access) left out, unless
+// none could be: then the first one's failure
+async function eachRepo<T>(repos: string[], one: (repo: string) => Promise<T[]>): Promise<(T & { repo: string })[]> {
+  const got = await Promise.allSettled(repos.map(r => one(r).then(l => l.map(x => ({ ...x, repo: r })))))
+  if (!got.some(g => g.status === 'fulfilled')) throw (got[0] as PromiseRejectedResult).reason
+  return got.flatMap(g => (g.status === 'fulfilled' ? g.value : []))
+}
+
 // Laki AI's laki_prs: a project's open PRs (gh pr list), yours, everyone else's or all, each with the workspace that has
-// it (by its URL), if one does; mine: the author's the login, or the list is --author @me's (no login needed)
+// it (by its URL, else a worktree on its branch: with several repos, only a PR whose head is origin's), if one does;
+// mine: the author's the login, or the list is --author @me's (no login needed). Several GitHub remotes (a fork's
+// origin and upstream): each one's (--repo), its repo with it
+type PRItem = { number: number; title: string; author?: { login: string }; url: string; headRefName: string; baseRefName: string; isDraft: boolean; reviewDecision: string; updatedAt: string; headRepository?: { name: string }; headRepositoryOwner?: { login: string } }
 export async function prList(o: { project: string; who?: 'mine' | 'others' | 'all' }) {
   const p = findProject(o.project)
   if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
-  const fields = 'number,title,author,url,headRefName,baseRefName,isDraft,reviewDecision,updatedAt'
-  const [{ stdout }, me] = await Promise.all([
-    exec(p, 'gh', ['pr', 'list', '--state', 'open', '--limit', '100', '--json', fields, ...(o.who === 'mine' ? ['--author', '@me'] : [])], { timeout: 30000 }).catch(e => Promise.reject(new Error(ghSays(e, 'the repo')))),
-    ghLogin(p),
-  ])
+  const fields = 'number,title,author,url,headRefName,baseRefName,isDraft,reviewDecision,updatedAt,headRepository,headRepositoryOwner'
+  const repos = (await ghRepos(p)).map(r => r.repo)
+  const many = repos.length > 1
+  const ask = (repo?: string): Promise<PRItem[]> =>
+    exec(p, 'gh', ['pr', 'list', ...(repo ? ['--repo', repo] : []), '--state', 'open', '--limit', '100', '--json', fields, ...(o.who === 'mine' ? ['--author', '@me'] : [])], { timeout: 30000 }).then(
+      r => JSON.parse(r.stdout || '[]'),
+      e => Promise.reject(new Error(ghSays(e, repo ?? 'the repo'))),
+    )
+  const [list, me] = await Promise.all([many ? eachRepo(repos, ask) : ask().then(l => l.map(x => ({ ...x, repo: undefined }))), ghLogin(p)])
   if (o.who === 'others' && !me) throw new Error("couldn't tell your GitHub login (gh api user): try again, or ask for all")
-  const list: { number: number; title: string; author?: { login: string }; url: string; headRefName: string; baseRefName: string; isDraft: boolean; reviewDecision: string; updatedAt: string }[] = JSON.parse(stdout || '[]')
+  const origin = repos[0]?.toLowerCase()
+  const ours = (x: PRItem) => !many || `${x.headRepositoryOwner?.login}/${x.headRepository?.name}`.toLowerCase() === origin // upstream's own feature isn't your feature
   return list
     .filter(x => o.who !== 'others' || !me || x.author?.login !== me)
-    .map(x => ({ number: x.number, title: x.title, author: x.author?.login, mine: o.who === 'mine' || (!!me && x.author?.login === me), url: x.url, branch: x.headRefName, base: x.baseRefName, draft: x.isDraft || undefined, review: x.reviewDecision || undefined, updated: x.updatedAt, workspace: state.workspaces.find(w => !w.archived && w.prUrl === x.url)?.id ?? state.workspaces.find(w => !w.archived && w.project === p.id && w.kind === 'worktree' && w.branch === x.headRefName)?.id }))
+    .map(x => ({ number: x.number, title: x.title, author: x.author?.login, mine: o.who === 'mine' || (!!me && x.author?.login === me), url: x.url, branch: x.headRefName, base: x.baseRefName, draft: x.isDraft || undefined, review: x.reviewDecision || undefined, updated: x.updatedAt, ...(x.repo && { repo: x.repo }), workspace: state.workspaces.find(w => !w.archived && w.prUrl === x.url)?.id ?? (ours(x) ? state.workspaces.find(w => !w.archived && w.project === p.id && w.kind === 'worktree' && w.branch === x.headRefName)?.id : undefined) }))
 }
 
 // issueList: the repo's open issues, newest first, with who is assigned and the PRs that close each (open, draft,
 // merged, closed: someone may have it already), for the prompt boxes' # completion; one GraphQL call ({owner} and
-// {repo}: gh's, from the folder's remote), a minute per project
-export type IssueItem = { number: number; title: string; url: string; assignees: string[]; prs: { number: number; url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] }
+// {repo}: gh's, from the folder's remote; several GitHub remotes: one per repo, each issue with its repo, so #42 of
+// upstream and #42 of origin are two), a minute per project
+export type IssueItem = { number: number; title: string; url: string; assignees: string[]; prs: { number: number; url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[]; repo?: string }
 const ISSUES_Q = 'query($owner:String!,$name:String!){repository(owner:$owner,name:$name){issues(states:OPEN,first:50,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number title url assignees(first:5){nodes{login}} closedByPullRequestsReferences(first:5,includeClosedPrs:true){nodes{number url state isDraft}}}}}}'
 type IssueNode = { number: number; title: string; url: string; assignees?: { nodes?: { login: string }[] }; closedByPullRequestsReferences?: { nodes?: { number: number; url: string; state: string; isDraft?: boolean }[] } }
 const issues = new Map<string, { at: number; list: Promise<IssueItem[]> }>()
@@ -296,12 +326,15 @@ export function issueList(o: { project: string }) {
   if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
   const had = issues.get(p.id)
   if (had && Date.now() - had.at < 60_000) return had.list
-  const list = forgeOf(p).then(f => (f === 'gitlab' ? glabIssues(p) : ghIssues(p))).catch(e => (issues.delete(p.id), Promise.reject(e))) // a failure: asked again next time
+  const list = forgeOf(p)
+    .then(async f => (f === 'gitlab' ? glabIssues(p) : (rs => (rs.length > 1 ? eachRepo(rs, r => ghIssues(p, r)) : ghIssues(p)))((await ghRepos(p)).map(r => r.repo))))
+    .catch(e => (issues.delete(p.id), Promise.reject(e))) // a failure: asked again next time
   issues.set(p.id, { at: Date.now(), list })
   return list
 }
-const ghIssues = (p: At) =>
-  exec(p, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'name={repo}', '-f', `query=${ISSUES_Q}`], { timeout: 30000 })
+// repo: owner/name (-f: a name all digits stays a string); none: gh's {owner} and {repo}
+const ghIssues = (p: At, repo?: string) =>
+  exec(p, 'gh', ['api', 'graphql', ...(repo ? ['-f', `owner=${repo.split('/')[0]}`, '-f', `name=${repo.split('/')[1]}`] : ['-F', 'owner={owner}', '-F', 'name={repo}']), '-f', `query=${ISSUES_Q}`], { timeout: 30000 })
     .then(r =>
       ((JSON.parse(r.stdout || '{}').data?.repository?.issues?.nodes ?? []) as IssueNode[]).map(
         (x): IssueItem => ({
@@ -313,7 +346,7 @@ const ghIssues = (p: At) =>
         }),
       ),
     )
-    .catch(e => Promise.reject(new Error(ghSays(e, 'the repo')))) // gh's failure or an answer that isn't JSON
+    .catch(e => Promise.reject(new Error(ghSays(e, repo ?? 'the repo')))) // gh's failure or an answer that isn't JSON
 
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)

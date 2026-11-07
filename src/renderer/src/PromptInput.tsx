@@ -181,7 +181,7 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
   const w = o.ws ? view?.workspaces.find(x => x.id === o.ws) : undefined
   const proj = view?.projects.find(x => x.id === (w?.project ?? o.project))
   if (!view || !proj || proj.kind) return undefined
-  type Item = { number: number; title: string; url: string; assignees?: string[]; prs?: { number: number; state: string }[] } // an issue's: who has it, the PRs that close it
+  type Item = { number: number; title: string; url: string; assignees?: string[]; prs?: { number: number; state: string }[]; repo?: string } // an issue's: who has it, the PRs that close it; repo: several GitHub remotes'
   return {
     key: w?.id ?? proj.id,
     agent: o.agent,
@@ -190,7 +190,7 @@ export function completeOf(view: View | null, o: { ws?: string; project?: string
       proj.git !== false
         ? () =>
             Promise.all([api.call<Item[]>('prList', { project: proj.id, who: 'all' }), api.call<Item[]>('issueList', { project: proj.id }).catch(() => [] as Item[])]).then(([prs, issues]) =>
-              [...prs.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'PR' as const })), ...issues.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'issue' as const, assignees: x.assignees, prs: x.prs }))].sort((a, b) => b.n - a.n),
+              [...prs.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'PR' as const, repo: x.repo })), ...issues.map(x => ({ n: x.number, title: x.title, url: x.url, kind: 'issue' as const, assignees: x.assignees, prs: x.prs, repo: x.repo }))].sort((a, b) => b.n - a.n),
             )
         : undefined,
     templates: () => templatesFor(view.settings?.templates, proj.config?.templates),

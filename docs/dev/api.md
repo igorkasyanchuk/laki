@@ -131,7 +131,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   prompt given, the name `issue-<n>-<slug>`; the workspace keeps `issue`;
 - a PR (`wsNew` `pr`: a URL or number; not local, not a race): `prHead` (`gh pr view <ref> --json …`; `ghSays` turns gh's
   failures into a line: not installed, signed out, not found), then `worktree add --detach` and `gh pr checkout <url>
-  --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`; refused when a workspace or the repo has it
+  --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`, likewise a PR of another remote's repo on its
+  own branch: upstream's `feature` is `acme/feature` beside origin's; refused when a workspace or the repo has it
   checked out: "already checked out in workspace <id>", which the app offers to open). A prompt that names a PR
   (`prIn`, no `pr`: `fromPRLink`) only links it: the workspace keeps `linked` as `prUrl` and `prLinked` (`autoPR` skips it, the app shows no
   switches: its branch isn't the PR's; a local one too: `scanPRs` takes any workspace with a `prUrl`; a branch move keeps
@@ -256,7 +257,10 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   move the clock; every 10 minutes); the AI page's earlier chats: `aiChats`, `aiOpen` (`id`), `aiChatRm` (`id`); `aiImage`
   (`path`: a message's pasted image, `imageOk`'s only, as a data URL);
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
-  for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6 with `looks` (each a UI kit `ui` over its `data`, `size`: Ai.tsx draws the option so, Widgets.tsx' `KitBody`; ai.ts `lookOf`, 16 KB), or `act`:
+  for mine, each with the workspace that has it by `prUrl` or branch; several GitHub remotes (pr.ts `ghRepos`: `git
+  remote -v`, a repo once whatever its URL or case, origin's first): `--repo` each (`eachRepo`: one gh can't read left
+  out unless all are), each PR with its `repo`, by branch only when its head is origin's; `issueList` the same, its
+  GraphQL's `-f owner= -f name=` per repo), `aiQuestion` (`text`, `options` 2-6 with `looks` (each a UI kit `ui` over its `data`, `size`: Ai.tsx draws the option so, Widgets.tsx' `KitBody`; ai.ts `lookOf`, 16 KB), or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, run (`text`: a command for a shell tab, `runIn`'s words, Yes runs it), or widget, turning an extension on (`laki_extension_on`; its words say
   what it runs, `widgetTrust.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
   Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads

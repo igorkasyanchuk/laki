@@ -36,9 +36,9 @@ case "$1 $2" in
   "api repos/"*"/codespaces/machines") # $FAKE_GH/cs-noscope: gh's words for a token without the codespace scope
     [ -f "$FAKE_GH/cs-noscope" ] && { echo 'gh: This API operation needs the "codespace" scope. To request it, run:  gh auth refresh -h github.com -s codespace' >&2; exit 1; }
     echo '{"total_count":2,"machines":[{"name":"basicLinux32gb","display_name":"2 cores, 8 GB RAM, 32 GB storage","cpus":2,"memory_in_bytes":8589934592,"storage_in_bytes":34359738368},{"name":"standardLinux32gb","display_name":"4 cores, 16 GB RAM, 32 GB storage","cpus":4,"memory_in_bytes":17179869184,"storage_in_bytes":34359738368}]}' ;;
-  "pr list") # the widgets' (widgets/): $FAKE_GH/prlist.json, --jq applied with the real jq
-    j=; au=; p=; for a in "$@"; do [ "$p" = --jq ] && j=$a; [ "$p" = --author ] && au=$a; p=$a; done
-    out=$(f prlist.json || echo '[]')
+  "pr list") # the widgets' (widgets/): $FAKE_GH/prlist.json (--repo o/r: prlist-o_r.json first), --jq applied with the real jq
+    j=; au=; rp=; p=; for a in "$@"; do [ "$p" = --jq ] && j=$a; [ "$p" = --author ] && au=$a; [ "$p" = --repo ] && rp=$a; p=$a; done
+    out=$( { [ -n "$rp" ] && f "prlist-$(printf %s "$rp" | tr / _).json"; } || f prlist.json || echo '[]')
     # --author: that login's (any case, as GitHub's search); @me: anyone's here
     [ -n "$au" ] && [ "$au" != @me ] && out=$(printf '%s' "$out" | jq --arg a "$au" '[.[] | select((.author.login | ascii_downcase) == ($a | ascii_downcase))]')
     if [ -n "$j" ]; then printf '%s' "$out" | jq "$j"; else printf '%s\n' "$out"; fi ;;
@@ -51,7 +51,12 @@ case "$1 $2" in
   "run view") # --log-failed: $FAKE_GH/run-<job>.log, else run.log, else gh's 404
     j=; p=; for a in "$@"; do [ "$p" = --job ] && j=$a; p=$a; done
     f "run-$j.log" || f run.log || { echo 'failed to get run log: HTTP 404: Not Found (https://api.github.com/repos/o/r/actions/jobs/'"$j"'/logs)' >&2; exit 1; } ;;
-  "api graphql") case "$*" in *closedByPullRequestsReferences*) f issues.json || exit 1 ;; *) f graphql.json || exit 1 ;; esac ;; # issueList's: issues.json
+  "api graphql") # issueList's: issues.json (owner=o name=r: issues-o_r.json first)
+    case "$*" in
+      *closedByPullRequestsReferences*) o=; n=; for a in "$@"; do case $a in owner=*) o=${a#owner=} ;; name=*) n=${a#name=} ;; esac; done
+        f "issues-${o}_${n}.json" || f issues.json || exit 1 ;;
+      *) f graphql.json || exit 1 ;;
+    esac ;;
   "api user") f user || echo me ;;
   "api rate_limit") f ratelimit.json || exit 1 ;; # the PR scan's quota check: --jq .resources.graphql's answer
   "label list") f labels.json || echo "[]" ;;

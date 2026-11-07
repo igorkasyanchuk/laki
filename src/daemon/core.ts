@@ -36,7 +36,7 @@ import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, sta
 import { collisions, inside, scanOverlaps, scanStats, stats, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
-import { headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
+import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { alertShow } from './alerts.ts'
@@ -2295,8 +2295,11 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it (by URL) for the PR status
   if (o.pr?.trim() && (o.local || proj.git === false)) throw new Error('a PR needs a worktree: a git project, not Local')
   const pr = o.pr?.trim() ? await prHead(proj, o.pr.trim()) : undefined
-  // a fork's branch as <owner>/<branch> (gh's own name for a fork's main): never one of yours of the same name
-  const local = pr && (pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : pr.headRefName)
+  // a fork's branch as <owner>/<branch> (gh's own name for a fork's main): never one of yours of the same name; so is
+  // a PR of another remote's repo on its own branch (upstream's feature, origin a fork with a feature of its own)
+  const prRepo = pr && /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\//.exec(pr.url)?.[1]
+  const origin = pr && !pr.isCrossRepository && prRepo ? (await ghRepos(proj)).find(r => r.remote === 'origin')?.repo : undefined
+  const local = pr && (pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : origin && origin.toLowerCase() !== prRepo!.toLowerCase() ? `${prRepo!.split('/')[0]}/${pr.headRefName}` : pr.headRefName)
   if (pr) {
     const have = state.workspaces.find(w => w.project === proj.id && !w.archived && w.kind === 'worktree' && w.branch === local)
     if (have) throw new Error(`PR #${pr.number}'s branch ${local} is already checked out in workspace ${have.id}`)

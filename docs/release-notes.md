@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- A fork with several GitHub remotes (`origin` and `upstream`): `#` in a prompt lists every repo's open PRs and
+  issues, each with its `owner/repo`, so upstream's #42 is never your fork's #42. Starting upstream's PR on a branch
+  your fork has too gets its own branch (`acme/feature`).
+
 - Workflows: *Pause after this block* on a run's page (`laki flow pause <run>`). The block it's on finishes, the run
   parks before the next one (no next block, try again or archive), and *Resume* goes on from there, even after a
   restart.

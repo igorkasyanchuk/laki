@@ -739,9 +739,10 @@ export function triggerAt(v: string, caret: number): Trigger | null {
   const s = /(^|\n)\/([^\s/]*)$/.exec(before)
   return s ? { ch: '/', q: s[2], from: caret - s[2].length - 1 } : null
 }
-export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue'; assignees?: string[]; prs?: { number: number; state: string }[] }
-// an issue's row: who has it and the PRs that close it (#12 draft), so you don't start what someone already does
-const refSub = (r: Ref) => [r.kind, r.assignees?.length ? r.assignees.map(a => `@${a}`).join(', ') : '', r.prs?.length ? r.prs.map(q => `#${q.number} ${q.state}`).join(', ') : ''].filter(Boolean).join(' · ')
+export type Ref = { n: number; title: string; url: string; kind: 'PR' | 'issue'; assignees?: string[]; prs?: { number: number; state: string }[]; repo?: string } // repo: owner/name, when the project has several GitHub remotes
+// an issue's row: its repo (several remotes: upstream's #42 isn't origin's), who has it and the PRs that close it (#12
+// draft), so you don't start what someone already does
+const refSub = (r: Ref) => [r.repo, r.kind, r.assignees?.length ? r.assignees.map(a => `@${a}`).join(', ') : '', r.prs?.length ? r.prs.map(q => `#${q.number} ${q.state}`).join(', ') : ''].filter(Boolean).join(' · ')
 // the rows a trigger offers, 8 at most: files (changed ones first when nothing is typed), refs by number or title words,
 // templates by name
 export type AgentCommand = { name: string; sub: string; skill?: boolean } // the daemon's agentCommands: /name (codex's skills $name)
@@ -756,7 +757,7 @@ export function completions(t: Trigger, o: { files?: string[]; changed?: string[
   if (t.ch === '#') {
     const words = q.replace(/^#/, '').split(/\s+/).filter(Boolean)
     return (o.refs ?? [])
-      .filter(r => words.every(w => String(r.n).startsWith(w) || r.title.toLowerCase().includes(w)))
+      .filter(r => words.every(w => String(r.n).startsWith(w) || r.title.toLowerCase().includes(w) || !!r.repo?.toLowerCase().includes(w))) // its repo's name too: #upstream 42
       .slice(0, max)
       .map(r => ({ label: `#${r.n} ${r.title}`, sub: refSub(r), value: r.url }))
   }
