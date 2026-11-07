@@ -299,7 +299,7 @@ workspace: its `objects`, `refs` and `logs` only, so its index, HEAD, hooks and 
 there runs outside the sandbox); codex `codexBox`: `-s workspace-write` unless its mode or flags pick a sandbox (read-only
 stays; an approval flag like `-a never` picks none), `sandbox_workspace_write.network_access=true` and `writable_roots`
 with those folders, a worktree's own folder as the files git writes there (`OWN_WRITES`: the index, HEAD, a merge's
-files, each with its lock, `logs`, `refs`), never the folder: its `commondir`, `gitdir` and `config.worktree` say where git
+files, each with its lock, `logs`, `refs`; and the repo's `packed-refs`, else each commit says it can't lock it), never the folder: its `commondir`, `gitdir` and `config.worktree` say where git
 finds the repo and its config, so one the agent wrote (`core.fsmonitor`, `core.hooksPath`) would run as you in Laki's
 scans and your git; a rebase's or cherry-pick's sequence (`rebase-merge`, `sequencer`: a todo's `exec`) is left out too
 and asks (codex keeps that folder and `.git` read-only itself; checked with `codex sandbox`, 0.162.1). claude gets the folder

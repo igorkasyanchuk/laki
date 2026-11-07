@@ -297,7 +297,7 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   const writes = (ws: any) => [...['objects', 'refs', 'logs'].map(d => join(git, d)), realpathSync(join(git, 'worktrees', basename(ws.path)))]
   // codex's: that folder's files git writes, never the folder (its commondir, gitdir, config.worktree: where git finds the repo's config)
   const own = (ws: any) => realpathSync(join(git, 'worktrees', basename(ws.path)))
-  const codexWrites = (ws: any) => [...writes(ws).slice(0, 3), ...[...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs'].map(f => join(own(ws), f))]
+  const codexWrites = (ws: any) => [...writes(ws).slice(0, 3), join(git, 'packed-refs'), join(git, 'packed-refs.lock'), ...[...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs'].map(f => join(own(ws), f))]
   // claude: its settings file with the sandbox on, laki outside it; those folders added, first (--add-dir takes every word up to a flag)
   const cw = await rig.rpc('wsNew', { project: p.id, preset: 'claude', sandbox: true, fast: true })
   const c = await argsOf(cw)

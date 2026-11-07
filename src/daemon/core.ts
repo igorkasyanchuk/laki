@@ -1452,7 +1452,8 @@ export function gitWrites(path?: string, files = false): string[] {
     if (!st?.isDirectory() && !st?.isFile()) return []
     const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
     const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
-    return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...(common === own ? [] : files ? OWN_WRITES.map(f => join(own, f)) : [own])]
+    const packed = files ? ['packed-refs', 'packed-refs.lock'].map(f => join(common, f)) : [] // ref data as refs/ is: without it, each commit says "Unable to create packed-refs.lock"
+    return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...packed, ...(common === own ? [] : files ? OWN_WRITES.map(f => join(own, f)) : [own])]
   } catch {
     return []
   }
@@ -2113,12 +2114,12 @@ export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown
   const agent = c.preset === 'claude' || c.preset === 'codex' ? c.preset : undefined
   const fresh = !!c.resumeId && !!agent && !transcriptOf(agent, accountNamed(c.account ?? '')?.dir ?? homeDir(agent), c.resumeId)
   const preset = c.profile && presetNamed(c.profile) ? c.profile : c.preset
-  const by = agentCaller(p.from) && callerAgent(p.from) // its tab.new: the agent's, as tabNew's
+  const by = agentCaller(p.from) ? callerAgent(p.from) : undefined // its tab.new: the agent's, as tabNew's
   if (by && c.kind === 'agent') {
     agentNoCmd({ preset, cmd: c.cmd, perm: c.perm })
     if (c.sandbox === false) throw new Error("an agent can't start an agent outside its profile's sandbox: it's the user's (ask them)") // main.ts agentNo's for tabNew
   }
-  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd, agent: by || undefined } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account, agent: by || undefined })
+  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd, agent: by } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account, agent: by })
   ws.closed = ws.closed!.filter(x => x !== c)
   if (!ws.closed.length) delete ws.closed
   save()
