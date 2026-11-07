@@ -2100,9 +2100,12 @@ and what it costs.
   environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
   don't use out of them (its tabs still start and resume). *Sandbox* starts the agent in its own sandbox: its commands
-  can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config), not
-  elsewhere on the Mac; in a workspace on the repo itself (not a worktree), `git commit` runs outside it. The tabs and
-  workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. Claude
+  can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
+  the files that say where git finds them), not elsewhere on the Mac; in a workspace on the repo itself (not a
+  worktree), `git commit` runs outside it, as does a rebase in a Codex tab. The tabs and
+  workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. It
+  can still message another agent (`laki send`, `laki ask`) or ask Laki AI: one that isn't sandboxed asks you before it
+  acts only as its own mode says, so keep those in a mode that asks. Claude
   Code: its sandbox setting, Laki's `laki` command run outside it, new websites asked about. Codex: `-s
   workspace-write` with its network on (laki, npm, git push). It can't go with *Bypass permissions* (that turns the
   sandbox off): Settings and the new-workspace page refuse the pair and say why. `laki preset set <name> --sandbox`.

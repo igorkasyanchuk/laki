@@ -284,7 +284,7 @@ test("a permission mode and fast mode go into the agent's flags, kept for restar
   assert.deepEqual((await start({ preset: 'cxs' })).modes, ['read-only'])
 })
 
-test("the Sandbox switch: claude's sandbox settings with the repo's git folder added, codex's workspace-write with it writable and its network on; never with bypass permissions", async t => {
+test("the Sandbox switch: claude's sandbox settings with the repo's git folder added, codex's workspace-write with its files writable (never commondir) and its network on; never with bypass permissions", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const git = realpathSync(join(rig.repo, '.git'))
@@ -295,6 +295,9 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   const dirs = (args: string[]) => args.flatMap((a, i) => (a === '--add-dir' ? [args[i + 1]] : []))
   // what git commit writes in a worktree: the repo's objects, refs and logs, the worktree's own folder; not .git's hooks or config
   const writes = (ws: any) => [...['objects', 'refs', 'logs'].map(d => join(git, d)), realpathSync(join(git, 'worktrees', basename(ws.path)))]
+  // codex's: that folder's files git writes, never the folder (its commondir, gitdir, config.worktree: where git finds the repo's config)
+  const own = (ws: any) => realpathSync(join(git, 'worktrees', basename(ws.path)))
+  const codexWrites = (ws: any) => [...writes(ws).slice(0, 3), ...[...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs'].map(f => join(own(ws), f))]
   // claude: its settings file with the sandbox on, laki outside it; those folders added, first (--add-dir takes every word up to a flag)
   const cw = await rig.rpc('wsNew', { project: p.id, preset: 'claude', sandbox: true, fast: true })
   const c = await argsOf(cw)
@@ -310,8 +313,10 @@ test("the Sandbox switch: claude's sandbox settings with the repo's git folder a
   // codex: workspace-write, those folders writable, the network on; with its own mode, only those two
   const xw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true })
   const x = await argsOf(xw)
-  const roots = (ws: any) => `sandbox_workspace_write.writable_roots=${JSON.stringify(writes(ws))}`
+  const roots = (ws: any) => `sandbox_workspace_write.writable_roots=${JSON.stringify(codexWrites(ws))}`
   assert.deepEqual(x.args.slice(-6), ['-s', 'workspace-write', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(xw)])
+  const listed = JSON.parse(x.args.at(-1)!.split('=')[1]) as string[]
+  for (const f of ['', 'commondir', 'gitdir', 'config.worktree', 'rebase-merge']) assert.ok(!listed.includes(join(own(xw), f)), `not ${f || 'the folder'}`)
   const rw = await rig.rpc('wsNew', { project: p.id, preset: 'codex', sandbox: true, perm: 'plan' })
   assert.deepEqual((await argsOf(rw)).args.slice(-6), ['-s', 'read-only', '-c', 'sandbox_workspace_write.network_access=true', '-c', roots(rw)], 'read-only: stricter, kept')
   // a profile's approval flag picks no sandbox: workspace-write still goes in

@@ -1378,7 +1378,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). The
   // git folders git commit writes in writable too (gitWrites: a worktree's live in the main repo's .git)
   const sandbox = sandboxed(tab)
-  const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path) : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
+  const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   if (tab.preset === 'claude') {
     argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
     if (again) argv.push('--resume', again)
@@ -1433,8 +1433,17 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // from the files: a worktree's .git file names its own folder (the index, HEAD), whose commondir names the shared one
 // (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
 // The repo itself (a local workspace): its objects, refs and logs only, as a worktree's shared folder; its index, HEAD,
-// hooks and config sit in .git itself, so they stay read-only and git commit there runs outside the sandbox. None: not a repo
-export function gitWrites(path?: string): string[] {
+// hooks and config sit in .git itself, so they stay read-only and git commit there runs outside the sandbox. None: not a repo.
+// files (codex's writable_roots take files): the worktree's own folder as OWN_WRITES, never the folder, whose commondir,
+// gitdir and config.worktree say where git finds the repo and its config (one the agent wrote: core.fsmonitor or
+// core.hooksPath, a program run as you by Laki's scans and your git); codex keeps the folder read-only itself. claude's
+// --add-dir takes folders: it gets the folder, and its sandbox guards .git, commondir and config.worktree (2.1.319, checked
+// with claude -p). ponytail: an older claude's isn't checked
+// a worktree's own folder: what git add, commit, switch, reset and merge write (each file and its lock), its reflog and
+// refs; not a rebase's or a cherry-pick's sequence (rebase-merge, sequencer: a todo's exec lines), which asks
+// ponytail: a git op writing elsewhere there (bisect, sparse-checkout) fails in the sandbox and asks
+const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs']
+export function gitWrites(path?: string, files = false): string[] {
   if (!path) return []
   const dotGit = join(path, '.git')
   try {
@@ -1442,7 +1451,7 @@ export function gitWrites(path?: string): string[] {
     if (!st?.isDirectory() && !st?.isFile()) return []
     const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
     const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
-    return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...(common === own ? [] : [own])]
+    return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...(common === own ? [] : files ? OWN_WRITES.map(f => join(own, f)) : [own])]
   } catch {
     return []
   }
