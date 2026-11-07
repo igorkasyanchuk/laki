@@ -61,6 +61,7 @@ version it builds, with the date. -->
   closed red, draft gray, open green. The status bar's PR number is purple once merged and red once closed.
 - Archiving a cloud workspace says its codespace keeps your uncommitted files and unpushed commits only until GitHub
   deletes the stopped codespace (30 days by default).
+- Fixed: the cost meter and today's spend counted a Claude answer twice when a subagent wrote between its blocks.
 
 - A managed policy also holds for tabs made before it: one it refuses (an agent turned off, *Bypass permissions* when
   approvals are required) doesn't start again after a restart, a wake or Enter.

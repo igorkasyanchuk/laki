@@ -51,6 +51,10 @@ test("meter: claude's context is the last answer's prompt; tokens summed once pe
   assert.ok(Math.abs(m.cost - cost) < 1e-9, `${m.cost} ≠ ${cost}`)
   assert.ok(m.priced)
   assert.equal(m.max, undefined, "claude's transcript doesn't say its window")
+  // a subagent's lines between two blocks of one answer: that answer still counted once (H8.2 #5)
+  const sub = meterOf('claude', said('a', 'claude-sonnet-4-5', u(10, 0, 0, 5)) + said('s2', 'claude-haiku-4-5', u(7, 0, 0, 3), 0, { isSidechain: true }) + said('a', 'claude-sonnet-4-5', u(10, 0, 0, 300)), meterNew(now), now)
+  assert.equal(sub.tokens, 10 + 300 + (7 + 3))
+  assert.ok(Math.abs(sub.cost - (3 * 10 + 15 * 300 + 1 * 7 + 5 * 3) / 1e6) < 1e-12, String(sub.cost))
   // an unknown model: tokens, no price
   const n = meterOf('claude', said('x', 'claude-next-1', u(1, 0, 0, 1)), meterNew(now), now)
   assert.deepEqual([n.tokens, n.cost, n.priced], [2, 0, undefined])

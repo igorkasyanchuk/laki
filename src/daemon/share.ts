@@ -176,7 +176,7 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 // and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
 type Spent = { tokens: number; cost: number; day: string; model?: string }
 export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; msg?: string; was?: Spent; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; msg, was: claude's last message and what it counted; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+export type Meter = { used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry } // retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
 export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
@@ -213,11 +213,19 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       const n = { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 }
       const cost = costOf(j.message.model, n)
       if (cost !== undefined) m.priced = true
-      // an answer is a line per block, each with its usage so far: the last one counts (ponytail: a subagent's lines in
-      // between count it twice)
-      if (m.was && j.message.id && j.message.id === m.msg) add(m.was, -1)
-      m.msg = j.message.id
-      add((m.was = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at, model: j.message.model }))
+      // an answer is a line per block, each with its usage so far: the last one counts, by its id, so a subagent's lines
+      // in between don't count it twice
+      const id = j.message.id
+      const was = id && m.seen?.get(id)
+      if (was) add(was, -1)
+      const spent: Spent = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at, model: j.message.model }
+      add(spent)
+      if (id) {
+        const seen = (m.seen ??= new Map())
+        seen.delete(id)
+        seen.set(id, spent)
+        if (seen.size > 50) seen.delete(seen.keys().next().value!)
+      }
       if (!j.isSidechain) m.used = n.input + n.write + n.read // a subagent's is a context of its own
     } else {
       const p = j.payload

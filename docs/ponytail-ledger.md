@@ -60,7 +60,7 @@ agent-vs-user boundary (per-tab tokens), is under Issues because it's L and need
   codespace workspace with a changed file, and one with an unpushed commit, both come back dirty; a clean one stops.
   *Done (H8.2) the lighter way:* the archive ask says the codespace keeps its files only until GitHub deletes it, and
   names its uncommitted files and unpushed commits (text.ts `rmVerdict`'s `cs`, `test/template.test.ts`); not held.
-- [ ] **5. `src/daemon/share.ts:201`: a subagent's lines make an answer's usage count twice.** Correctness, S. The
+- [x] **5. `src/daemon/share.ts:201`: a subagent's lines make an answer's usage count twice.** Correctness, S. The
   cost meter and today's spend are money on screen; an answer is a line per block, and a sidechain line between two
   of them means the earlier one isn't taken back. Fix: remember the last usage per message id (a small map, the last
   50 ids), and take that one back, not only the previous line's. Test: `test/meter.test.ts`: a fake transcript with
