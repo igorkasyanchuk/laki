@@ -299,10 +299,11 @@ workspace: its `objects`, `refs` and `logs` only, so its index, HEAD, hooks and 
 there runs outside the sandbox); codex `codexBox`: `-s workspace-write` unless its mode or flags pick a sandbox (read-only
 stays; an approval flag like `-a never` picks none), `sandbox_workspace_write.network_access=true` and `writable_roots`
 with those folders, a worktree's own folder as the files git writes there (`OWN_WRITES`: the index, HEAD, a merge's
-files, each with its lock, `logs`, `refs`; and the repo's `packed-refs`, else each commit says it can't lock it), never the folder: its `commondir`, `gitdir` and `config.worktree` say where git
+files, `SQUASH_MSG`, each with its lock, `logs`, `refs`; and the repo's `packed-refs`, its `.lock` (else each commit says it can't lock it) and `.new` (a rewrite: a packed branch deleted, `fetch --prune`)), never the folder: its `commondir`, `gitdir` and `config.worktree` say where git
 finds the repo and its config, so one the agent wrote (`core.fsmonitor`, `core.hooksPath`) would run as you in Laki's
 scans and your git; a rebase's or cherry-pick's sequence (`rebase-merge`, `sequencer`: a todo's `exec`) is left out too
-and asks (codex keeps that folder and `.git` read-only itself; checked with `codex sandbox`, 0.162.1). claude gets the folder
+and asks, as do `git stash` and `git commit <paths>` (their temp index is named by its pid: `index.stash.<pid>`,
+`next-index-<pid>.lock`) (codex keeps that folder and `.git` read-only itself; checked with `codex sandbox`, 0.162.1). claude gets the folder
 (`--add-dir` takes folders): its sandbox keeps `.git`, `commondir`, `config.worktree` and `.git/config` read-only itself
 (2.1.319, checked with `claude -p`). ponytail: an older claude's isn't checked, and claude's leaves `rebase-merge` and
 `sequencer` writable there (a todo's `exec` runs as you when you continue that rebase). Hooks

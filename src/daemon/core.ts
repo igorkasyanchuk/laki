@@ -1431,8 +1431,9 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 
 // a worktree's own folder: what git add, commit, switch, reset and merge write (each file and its lock), its reflog and
 // refs; not a rebase's or a cherry-pick's sequence (rebase-merge, sequencer: a todo's exec lines), which asks
-// ponytail: a git op writing elsewhere there (bisect, sparse-checkout) fails in the sandbox and asks
-const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs']
+// ponytail: a git op writing elsewhere there fails in the sandbox and asks: git stash and git commit <paths> (a temp index
+// named by its pid: index.stash.<pid>, next-index-<pid>.lock), bisect, sparse-checkout
+const OWN_WRITES = [...['index', 'HEAD', 'ORIG_HEAD', 'AUTO_MERGE', 'FETCH_HEAD', 'COMMIT_EDITMSG', 'MERGE_HEAD', 'MERGE_MSG', 'MERGE_MODE', 'SQUASH_MSG', 'CHERRY_PICK_HEAD', 'REVERT_HEAD'].flatMap(f => [f, `${f}.lock`]), 'logs', 'refs']
 // what git commit writes in a sandboxed agent's checkout, as the sandbox sees the paths (/tmp is /private/tmp), read
 // from the files: a worktree's .git file names its own folder (the index, HEAD), whose commondir names the shared one
 // (objects, refs, logs). Not the shared one's hooks or config, which run outside the sandbox (git there, Laki's own).
@@ -1452,7 +1453,7 @@ export function gitWrites(path?: string, files = false): string[] {
     if (!st?.isDirectory() && !st?.isFile()) return []
     const own = realpathSync(st.isDirectory() ? dotGit : resolve(path, /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'))![1].trim()))
     const common = existsSync(join(own, 'commondir')) ? realpathSync(resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())) : own
-    const packed = files ? ['packed-refs', 'packed-refs.lock'].map(f => join(common, f)) : [] // ref data as refs/ is: without it, each commit says "Unable to create packed-refs.lock"
+    const packed = files ? ['packed-refs', 'packed-refs.lock', 'packed-refs.new'].map(f => join(common, f)) : [] // ref data as refs/ is: without it, each commit says "Unable to create packed-refs.lock"; .new: a rewrite (a packed branch deleted, fetch --prune)
     return [...['objects', 'refs', 'logs'].map(d => join(common, d)).filter(d => existsSync(d)), ...packed, ...(common === own ? [] : files ? OWN_WRITES.map(f => join(own, f)) : [own])]
   } catch {
     return []
