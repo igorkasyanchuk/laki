@@ -134,6 +134,11 @@ for the part you change, and keep it up to date with the change.
 - **Tests never touch** the real `~/.laki`, `~/.laki-electron`, `~/.claude` or `~/.codex`: `test/helpers.ts` `fresh()`
   gives each its own `LAKI_HOME`, `HOME` and daemon.
 - **Never stop the maintainer's daemon** (`~/.laki` or `~/.laki-electron`, real agents in it), and never point tests at it.
+- **No credentials in the repo**, anywhere in its history: no OAuth client IDs or secrets, tokens, API keys or
+  passwords, not even another app's "public" ones (Laki ships to everyone). Read them at runtime from where they live
+  (the other app's install, as usage.ts `geminiClient` reads Gemini CLI's; the user's own config; the Keychain), and
+  never write them to a log, the view or a file of Laki's. Tests use fakes that look like no real one (`fake-secret`).
+  One committed by mistake: rewrite the unpushed commits so none has it (GitHub's push protection refuses the push).
 
 ## Files
 
