@@ -71,11 +71,13 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   assert.equal(await post('/hook/gh', body), 401)
   assert.equal(await post('/hook/any', body, { 'x-laki-key': k.secret }), 202)
   assert.equal(await post('/hook/any', body, { 'x-laki-key': 'nope' }), 401)
+  for (let i = 0; i < 61; i++) await post('/hook/any', body) // an outsider's unsigned ones don't use up its minute
+  assert.equal(await post('/hook/any', body, { 'x-laki-key': k.secret }), 202)
   assert.equal(await post('/hook/nope', body), 404)
   assert.equal(await post('/rpc', JSON.stringify({ method: 'state' })), 404)
   assert.equal(await fetch(`http://127.0.0.1:${st.port}/`).then(r => r.status), 404)
   assert.ok([413, 'reset'].includes(await post('/hook/any', Buffer.alloc((1 << 20) + 10), { 'x-laki-key': k.secret })), 'over 1 MB')
-  assert.equal((await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'webhook').length, 2)
+  assert.equal((await rig.rpc('widgetEvents')).filter((e: any) => e.event === 'webhook').length, 3)
   // Expose: a quick tunnel to its port only; one that never came up isn't shown as exposed
   await assert.rejects(rig.rpc('hookExpose', { on: true }))
   assert.equal((await rig.rpc('hookList')).via, undefined)
@@ -92,7 +94,7 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   for (const m of ['hookAdd', 'hookRm', 'hookSecret', 'hookExpose']) await assert.rejects(rig.rpc(m, { name: 'x', on: true, from: { tab: tab.id } }), /an agent can't/, m)
   await assert.rejects(rig.rpc('settingsSet', { inHooks: [], from: { tab: tab.id } }), /an agent can't change that setting/, 'nor through settings')
   assert.equal((await rig.rpc('hookSecret', { name: '../daemon.json' })).secret, '', 'a name, never a path')
-  await rig.rpc('hookRm', { name: 'gh' })
+  await rig.rpc('hookRm', { name: ' GH' }) // as hookAdd keeps names
   assert.ok(!existsSync(secretFile))
   assert.equal(await post('/hook/gh', body, { 'x-hub-signature-256': sig(g.secret, body) }), 404)
 })

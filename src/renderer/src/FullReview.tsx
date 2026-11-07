@@ -395,7 +395,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const hideFiles = (off: boolean) => (setFilesOff(off), store(FILES_OFF, off))
   const [side, setSide] = useState<'mine' | 'pr' | 'gh'>(() => load<'mine' | 'pr' | 'gh' | ''>(SIDE, '') || (notes.length || !pr ? 'mine' : 'gh'))
   const pickTab = (s: 'mine' | 'pr' | 'gh') => (setSide(s), store(SIDE, s))
-  const tab = pr ? side : 'mine'
+  const tab = pr ? (side === 'gh' && pr.forge === 'gitlab' ? 'pr' : side) : 'mine' // an MR has no GitHub tab
   const right = notesOff ? STRIP : nw
   const left = filesOff ? STRIP : fw
 

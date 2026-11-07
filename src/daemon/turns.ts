@@ -5,8 +5,10 @@
 // runtime (suggest, changes).
 
 import { execFile } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { createInterface } from 'node:readline'
 import { basename, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
@@ -76,7 +78,7 @@ export async function tabHandover(o: { tab?: string; to?: string }) {
   const folder = storageOf(ws)
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
   const chat = parts.join('\n')
-  const pics = folder ? handoverPics(tab, ws, chat, join(folder, `handover-${stamp}`)) : { text: chat, list: [] } // ponytail: a host's workspace (no storage folder) carries none
+  const pics = folder ? await handoverPics(tab, ws, chat, join(folder, `handover-${stamp}`)) : { text: chat, list: [] } // ponytail: a host's workspace (no storage folder) carries none
   const picsMd = pics.list.length ? `## Pictures and files\n\nFrom the chat, copied here: open each first (Claude Code: Read; Codex: view_image).\n\n${pics.list.map(x => `- ${x}`).join('\n')}\n\n` : ''
   const md = `# Handover from ${from}\n\n${from} worked on this task in this worktree until now; you carry on. Below: its chat with the user (${parts.length < said.length ? `the last ${parts.length} of ${said.length} messages` : 'all of it'}), then what it changed.\n\n## The chat\n\n${pics.text || '(nothing said yet)'}\n${picsMd}## What changed against ${d?.base ?? ws.base}\n\n${changes}\n`
   const file = folder && join(folder, `handover-${tab.preset}-to-${to}-${stamp}.md`)
@@ -91,7 +93,9 @@ export async function tabHandover(o: { tab?: string; to?: string }) {
 // a handover's pictures and files: Claude's pasted pictures (base64 image blocks in its transcript), Codex's (data:
 // URLs, local_images' paths), and paths the chat names in Laki's pasted images or files, the workspace's storage folder
 // or the temp folder: copied to <storage>/handover-<stamp>/ (0700, files 0600), each path in the text rewritten to its
-// copy. Not one inside the worktree (the next agent reads it there), a secret's name, over 10 MB, nor past the newest 20
+// copy. Not one inside the worktree (the next agent reads it there), a secret's name, over 10 MB, nor past the newest 20;
+// a picture once (Codex's transcript has each twice: its response_item's and its event_msg's). The transcript is read a
+// line at a time, so a long one doesn't hold the daemon up
 const PIC_MAX = 10 << 20
 const PICS = 20
 const SECRET_NAME = /^\.env|\.(pem|key|p12)$|^id_[a-z0-9]+|(^|[-_.])(api[-_]?key|secret|token|credentials?)([-_.]|$)/i
@@ -100,7 +104,7 @@ const real = (p: string) => {
     return realpathSync(p)
   } catch {}
 }
-export function handoverPics(tab: Tab, ws: Workspace, text: string, to: string): { text: string; list: string[] } {
+export async function handoverPics(tab: Tab, ws: Workspace, text: string, to: string): Promise<{ text: string; list: string[] }> {
   const found: ({ data: Buffer; ext: string } | { path: string })[] = []
   const agent = tab.preset === 'claude' || tab.preset === 'codex' ? tab.preset : undefined
   const file = agent && tab.resumeId ? transcriptOf(agent, accountNamed(tab.account ?? '')?.dir ?? homeDir(agent), tab.resumeId) : undefined
@@ -117,7 +121,7 @@ export function handoverPics(tab: Tab, ws: Workspace, text: string, to: string):
   }
   try {
     if (file && statSync(file).size < 256 << 20)
-      for (const line of readFileSync(file, 'utf8').split('\n')) {
+      for await (const line of createInterface({ input: createReadStream(file, 'utf8'), crlfDelay: Infinity })) {
         if (!line.includes('image')) continue // a picture's line says so (image, input_image, local_images, data:image)
         try {
           const j = JSON.parse(line)
@@ -140,8 +144,7 @@ export function handoverPics(tab: Tab, ws: Workspace, text: string, to: string):
   let out = text
   let n = 0
   const once = (f: (typeof keep)[number]) => {
-    if ('data' in f) return true
-    const r = real(f.path)!
+    const r = 'data' in f ? createHash('sha1').update(f.data).digest('hex') : real(f.path)!
     if (seen.has(r)) return false
     seen.add(r)
     return true

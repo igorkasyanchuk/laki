@@ -47,7 +47,7 @@ export const machines = async (repo: string) =>
   ((JSON.parse(await gh(['api', `repos/${repo}/codespaces/machines`])).machines ?? []) as { name: string; display_name?: string; cpus?: number; memory_in_bytes?: number; storage_in_bytes?: number }[]).map(m => ({ name: m.name, display: m.display_name || m.name, ...(typeof m.cpus === 'number' && { cpus: m.cpus, perHour: +(m.cpus * CORE_HOUR).toFixed(2) }), ...(typeof m.memory_in_bytes === 'number' && { memory: m.memory_in_bytes }), ...(typeof m.storage_in_bytes === 'number' && { storage: m.storage_in_bytes }) }))
 
 // a file into the codespace (cloud workspaces' .worktreeinclude copy); its folder made first (hosts.ts)
-export const cp = (name: string, from: string, to: string) => gh(['codespace', 'cp', '-c', name, '-e', from, `remote:${to}`], 60000)
+export const cp = (name: string, from: string, to: string) => gh(['codespace', 'cp', '-c', name, from, `remote:${to}`], 60000) // no -e: the remote shell would read the name
 
 // gh waits while it's made; its name is the last line it prints. --default-permissions: a devcontainer asking for more
 // would wait on a question no one sees

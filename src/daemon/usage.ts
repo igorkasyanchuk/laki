@@ -166,9 +166,10 @@ async function codex(d?: string): Promise<Got> {
 // ---------- Gemini CLI: Code Assist's quota per model (CodeNomad's way: NeuralNomadsAI/CodeNomad#1312)
 // its sign-in, ~/.gemini/oauth_creds.json (GEMINI_CLI_HOME's .gemini), read only. An expired token is refreshed at
 // Google's token endpoint with Gemini CLI's own client, read from its install (geminiClient), the new token kept in
-// memory only: nothing is written under ~/.gemini. Its
-// project: GOOGLE_CLOUD_PROJECT, else loadCodeAssist's (asked once). An API-key user (its settings.json's pick), or any failure: unknown, said
-// plainly, never an error. Each bucket's remainingFraction a window, the model its label
+// memory only: nothing is written under ~/.gemini. Its project: GOOGLE_CLOUD_PROJECT, else loadCodeAssist's (asked
+// once). An API-key user (its settings.json's pick), or any failure: unknown, said plainly, never an error. Each
+// bucket's remainingFraction a window, the model its label (gemini(), below)
+
 // Gemini CLI's sign-in client (an installed app's ID and secret: only they renew its sign-in), read from the gemini on
 // PATH each time a token is renewed, never kept in Laki's code or files: its bin's real path (a one-file bundle has
 // them), else its core's code_assist/oauth2.js in a node_modules at or above it (its own, or the global one). None: unknown.

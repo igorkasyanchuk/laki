@@ -84,8 +84,9 @@ test('tabHandover: pictures and files from the chat copied beside it, their path
   for (const [, copy] of copies) assert.deepEqual([readFileSync(copy).equals(png), statOf(copy) & 0o777], [true, 0o600])
   assert.ok(!md.includes(`The mock-up: ${shot}`) && md.includes(`The mock-up: ${copies.find(m => m[2])![1]}`), 'its path rewritten to the copy')
   assert.ok(md.includes(env) && md.includes(join(ws.path, 'cart.ts')), 'a .env and a worktree file: named as they were, not copied')
-  // 20 at most, the newest
-  writeFileSync(join(dir, 'chat-p.jsonl'), Array.from({ length: 25 }, () => line({ type: 'user', message: { content: [pic] } })).join(''))
+  // 20 at most, the newest; the same picture twice (Codex's transcript has each twice) copied once
+  const nth = (i: number) => ({ ...pic, source: { ...pic.source, data: Buffer.concat([png, Buffer.from([i])]).toString('base64') } })
+  writeFileSync(join(dir, 'chat-p.jsonl'), Array.from({ length: 25 }, (_, i) => line({ type: 'user', message: { content: [nth(i), nth(i)] } })).join(''))
   const r2 = await rig.rpc('tabHandover', { tab: tab.id })
   assert.equal([...readFileSync(r2.file, 'utf8').matchAll(/^- \S+ \((a picture pasted in the chat|was \S+)\)$/gm)].length, 20)
 })

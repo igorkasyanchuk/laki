@@ -13,6 +13,6 @@ case "$1 $2" in
   "mr merge"|"mr approve"|"mr close"|"mr update") [ -f "$d/refuse" ] && { cat "$d/refuse" >&2; exit 1; }; echo ok ;;
   "issue view") f "issue-$3.json" || { echo '404 Not Found' >&2; exit 1; } ;;
   "issue list") f issues.json || echo '[]' ;;
-  "api projects/:id/pipelines/"*) i=${2#projects/:id/pipelines/}; f "jobs-${i%/jobs}.json" || echo '[]' ;;
+  "api projects/:id/pipelines/"*) i=${2#projects/:id/pipelines/}; f "jobs-${i%%/*}.json" || echo '[]' ;;
   *) echo "fake glab: $*" >&2; exit 1 ;;
 esac

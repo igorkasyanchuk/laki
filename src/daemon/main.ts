@@ -611,7 +611,9 @@ function boxNo(method: string, p: any) {
     const tab = core.resolveTarget(String((method === 'send' ? p.target : p.tab) ?? ''))
     if (!(tab.kind === 'agent' && core.tracked(tab))) no(method === 'send' ? `send into ${tab.name}, a terminal` : `type into ${tab.name}, a terminal`)
     const text = String((method === 'send' ? p.text : p.data) ?? '')
-    if (/(?:^|[\x00-\x1f\x7f])[ \t]*!/.test(text.replace(/\x1b\[[0-9;]*[~A-Za-z]/g, '\n'))) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
+    // no editing keys (arrows, Backspace, ⌃U…): with them `a!`, ←, ⌫ leaves a ! first, in one call or over several
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)) no(`send editing keys into ${tab.name} (they could make a ! line its agent runs as a command)`)
+    if (/(?:^|[\r\n])[ \t]*!/.test(text)) no(`send a ! line (${tab.name}'s agent runs it as a command)`)
   }
 }
 // M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's

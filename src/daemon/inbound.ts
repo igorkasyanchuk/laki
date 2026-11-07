@@ -58,7 +58,7 @@ async function issuesOf(p: Project) {
 }
 
 // ---------- webhook: a server of its own on 127.0.0.1 and a random port, never the daemon's. Only POST /hook/<name>,
-// a body up to 1 MB, RATE a minute per hook; nothing else (no /rpc, no pages). Each request is checked against its
+// a body up to 1 MB, RATE signed ones a minute per hook; nothing else (no /rpc, no pages). Each request is checked against its
 // hook's secret: GitHub's X-Hub-Signature-256 (HMAC-SHA256 of the raw body), Linear's Linear-Signature (the same, in
 // hex), else X-Laki-Key. A failed check is a 401, logged once a minute per hook. Then webhook { name, event (X-GitHub-
 // Event, else the body's type), body }. Expose: a quick cloudflared tunnel, or tailscale funnel, to that port only
@@ -101,10 +101,6 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
   const hook = hooks().find(h => h.name === name)
   if (req.method !== 'POST' || !hook) return void (answer(res, 404, { error: 'not found' }), req.resume())
   const now = Date.now()
-  const s = seen.get(name)
-  const slot = s && now - s.at < 60000 ? s : { at: now, n: 0 }
-  seen.set(name, slot)
-  if (++slot.n > RATE) return void (res.setHeader('retry-after', String(Math.ceil((slot.at + 60000 - now) / 1000))), answer(res, 429, { error: 'too many: 60 a minute' }), req.resume())
   const chunks: Buffer[] = []
   let size = 0
   req.on('data', (c: Buffer) => {
@@ -120,6 +116,11 @@ function onRequest(req: IncomingMessage, res: ServerResponse) {
       if (now - (told.get(name) ?? 0) > 60000) told.set(name, now), log(`webhook ${name}: refused a request that failed its ${hook.kind === 'key' ? 'X-Laki-Key' : `${hook.kind} signature`} check`)
       return answer(res, 401, { error: 'signature' })
     }
+    // RATE a minute, of the signed ones only: an outsider's unsigned requests can't use up a hook's minute
+    const s = seen.get(name)
+    const slot = s && now - s.at < 60000 ? s : { at: now, n: 0 }
+    seen.set(name, slot)
+    if (++slot.n > RATE) return void (res.setHeader('retry-after', String(Math.ceil((slot.at + 60000 - now) / 1000))), answer(res, 429, { error: 'too many: 60 a minute' }))
     let body: unknown = raw.toString('utf8')
     try {
       body = JSON.parse(String(body))
@@ -174,7 +175,7 @@ export function hookAdd(o: { name: string; kind?: string; project?: string }) {
 }
 export const hookSecret = (o: { name: string }) => ({ secret: secretOf(String(o.name)) ?? '' })
 export function hookRm(o: { name: string }) {
-  const name = String(o.name ?? '')
+  const name = String(o.name ?? '').trim().toLowerCase() // as hookAdd keeps it
   state.settings = { ...state.settings, inHooks: hooks().filter(h => h.name !== name) }
   if (existsSync(join(secretsDir(), name)) && NAME.test(name)) rmSync(join(secretsDir(), name), { force: true })
   if (!hooks().length) hookStop()

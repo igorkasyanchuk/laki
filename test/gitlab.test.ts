@@ -25,7 +25,7 @@ test('GitLab: a gitlab.com project’s MR by glab (its pipeline’s jobs as chec
   )
   assert.deepEqual(pr.list, [{ name: 'test', state: 'fail', url: 'https://gitlab.com/o/repo/-/jobs/1', took: 61 }, { name: 'lint', state: 'pass' }, { name: 'deploy', state: 'skip' }])
   assert.match(log(rig), new RegExp(`^glab mr view ${ws.branch} --output json$`, 'm'))
-  assert.match(log(rig), /^glab api projects\/:id\/pipelines\/44\/jobs$/m)
+  assert.match(log(rig), /^glab api projects\/:id\/pipelines\/44\/jobs\?per_page=100$/m)
   // the actions: glab's, by the MR's number
   await rig.rpc('prDraft', { ws: ws.id, draft: false })
   await rig.rpc('prAct', { ws: ws.id, act: 'approve' })
@@ -65,6 +65,7 @@ test('GitLab: Ship pushes and opens the MR with glab; an issue by number and the
   writeFileSync(join(lab, 'issues.json'), JSON.stringify([issue]))
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   assert.deepEqual(await rig.rpc('issueList', { project: p.id }), [{ number: 5, title: 'Cart rounds wrong', url: 'https://gitlab.com/o/repo/-/issues/5', assignees: ['ann'], prs: [] }])
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, issue: '--repo=x/y' }), /which GitLab issue\? its number/, 'never a flag to glab')
   const iw = await rig.rpc('wsNew', { project: p.id, issue: '#5', prompt: 'keep it small' })
   assert.equal(iw.id, 'issue-5-cart-rounds-wrong')
   const agent = (await rig.rpc('state')).tabs.find((x: any) => x.workspace === iw.id && x.kind === 'agent')

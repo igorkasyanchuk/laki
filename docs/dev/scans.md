@@ -149,7 +149,7 @@
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now.
   GitLab (`gitlab.ts`, build prompt 1): `forgeOf` per project (its origin's host: gitlab.com, or one `glab auth status
   --hostname` accepts, asked once a daemon; anything else, a path too, GitHub's), then `glabPR`: `glab mr view <branch
-  or !n> --output json` and its head pipeline's jobs (`glab api projects/:id/pipelines/<id>/jobs`, `jobsOf`) in the
+  or !n> --output json` and its head pipeline's jobs (`glab api projects/:id/pipelines/<id>/jobs?per_page=100`, `jobsOf`) in the
   same `PR` shape with `forge: 'gitlab'` (the renderer's `prNo`/`prName`: `!n`, MR). `noMR` is gh's *no pull requests
   found*. Ship's last line `SHIP_MR`, `fromIssue` `glabIssue`, `issueList` `glabIssues`, `prAct`/`merge`/`prDraft`
   `glabAct`/`glabDraft`; `prFile` fetches `merge-requests/<n>/head`. GitHub's only (`githubOnly` says so, or nothing):

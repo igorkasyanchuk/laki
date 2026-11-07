@@ -113,7 +113,7 @@ Tested in `test/share.test.ts`.
 ### Webhooks
 
 `inbound.ts`' server (`hookServe`, once `settings.inHooks` has one; `hookStop` at shutdown): `127.0.0.1`, a random port,
-never the daemon's; only `POST /hook/<name>` (404 else, `/rpc` too), `BODY_MAX` 1 MB (413), `RATE` 60 a minute per hook
+never the daemon's; only `POST /hook/<name>` (404 else, `/rpc` too), `BODY_MAX` 1 MB (413), `RATE` 60 signed ones a minute per hook (an outsider's unsigned ones don't count)
 (429 with Retry-After). Each request's check (`signed`, `timingSafeEqual`): `github` `X-Hub-Signature-256`
 (`sha256=` + HMAC-SHA256 of the raw body), `linear` `Linear-Signature` (its hex), `key` `X-Laki-Key`; a failure 401,
 logged once a minute per hook (`told`). Then `webhook` `{ name, event, body, project? }`, 202. `hookAdd` (a name,

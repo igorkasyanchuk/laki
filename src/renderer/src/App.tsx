@@ -2563,13 +2563,13 @@ export function App() {
     if (!pr) return
     if (act === 'draft') return prDraft(w)
     if (act === 'merge') {
-      const del = { label: 'Delete the branch on GitHub', on: true }
+      const del = { label: `Delete the branch on ${forgeName(pr)}`, on: true }
       const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
       if ((await choose(`${verb} ${prName(pr)} into ${pr.base ?? 'its base'}?`, pr.title, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del, undefined, prFacts(w), mergeVerdict(pr))) !== 1) return
       return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged ${prName(pr)}`, undefined, undefined, true))
     }
     const close = act === 'close'
-    if (!(await ask(close ? `Close ${prName(pr)}?` : `Approve ${prName(pr)}?`, { text: [pr.title, close && `Without merging; it can be reopened on ${forgeName(pr)}.`].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
+    if (!(await ask(close ? `Close ${prName(pr)}?` : `Approve ${prName(pr)}?`, { text: [pr.title, close && `Without merging; it can be reopened on ${forgeName(pr)}.`].filter(Boolean).join('\n'), facts: prFacts(w), ok: close ? (pr.forge === 'gitlab' ? 'Close merge request' : 'Close pull request') : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed ${prName(pr)}` : `Approved ${prName(pr)}`, undefined, undefined, true), () => {})
   }
   // the waiting tabs of the workspaces this tab's agent started (fromTab), for its pane's foot (WorkerAsks)
@@ -2581,26 +2581,26 @@ export function App() {
     const pr = w.pr
     if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `${prName(pr)} is ready for review` : `${prName(pr)} is a draft`, undefined, undefined, true), () => {})
   }
-  const prMenu = (w: WorkspaceView): MenuItem[] => [
-    { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', tip: 'Reads its checks, reviews and state again now', run: refreshPR },
+  const prMenu = (w: WorkspaceView, F = forgeName(w.pr), K = w.pr?.forge === 'gitlab' ? 'MR' : 'PR'): MenuItem[] => [ // F, K: GitHub's PR or GitLab's MR
+    { label: `Refresh from ${F}`, icon: 'refresh', key: 'r', tip: 'Reads its checks, reviews and state again now', run: refreshPR },
     ...(w.pr
       ? [
-          { label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem,
-          { label: 'Open its checks', icon: 'link', key: 'c', tip: 'Its CI checks on GitHub', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem,
-          { label: 'Copy PR link', icon: 'copy', key: 'l', run: () => copy(w.pr!.url) } as MenuItem,
-          { label: `Copy #${w.pr.number}`, icon: 'copy', key: 'n', run: () => copy(`#${w.pr!.number}`) } as MenuItem,
+          { label: `Open the ${K}`, icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem,
+          { label: 'Open its checks', icon: 'link', key: 'c', tip: `Its CI checks on ${F}`, run: () => openExternal(`${w.pr!.url}/${w.pr!.forge === 'gitlab' ? 'pipelines' : 'checks'}`) } as MenuItem,
+          { label: `Copy ${K} link`, icon: 'copy', key: 'l', run: () => copy(w.pr!.url) } as MenuItem,
+          { label: `Copy ${prNo(w.pr)}`, icon: 'copy', key: 'n', run: () => copy(prNo(w.pr!)) } as MenuItem,
         ]
       : []),
     ...(w.pr?.state === 'OPEN'
       ? [
           null,
-          ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: 'Merges it on GitHub, after you confirm', run: () => prAct(w, 'merge') } as MenuItem] : []),
-          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: 'Approves it on GitHub as you, after you confirm', run: () => prAct(w, 'approve') } as MenuItem]),
-          { label: w.pr.draft ? 'Ready for review' : 'Convert to draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? 'Out of draft on GitHub: reviewers are asked' : 'Back to a draft on GitHub: it went ready too early', run: () => prDraft(w) } as MenuItem,
-          ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, tip: 'Closes it on GitHub without merging, after you confirm', run: () => prAct(w, 'close') } as MenuItem] : []),
+          ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', tip: `Merges it on ${F}, after you confirm`, run: () => prAct(w, 'merge') } as MenuItem] : []),
+          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', good: true, tip: `Approves it on ${F} as you, after you confirm`, run: () => prAct(w, 'approve') } as MenuItem]),
+          { label: w.pr.draft ? 'Ready for review' : 'Convert to draft', icon: w.pr.draft ? 'eye' : 'pencil', key: 'f', tip: w.pr.draft ? `Out of draft on ${F}: reviewers are asked` : `Back to a draft on ${F}: it went ready too early`, run: () => prDraft(w) } as MenuItem,
+          ...(allows(w, 'close') ? [{ label: `Close ${K}…`, icon: 'x', danger: true, tip: `Closes it on ${F} without merging, after you confirm`, run: () => prAct(w, 'close') } as MenuItem] : []),
         ]
       : []),
-    ...(w.pr ? [null, { label: `Detach PR #${w.pr.number}`, icon: 'unlink', key: 'd', sub: 'Only related, kept off this workspace (Attach a PR brings it back)', run: () => detachPr(w) } as MenuItem] : []),
+    ...(w.pr ? [null, { label: `Detach ${prName(w.pr)}`, icon: 'unlink', key: 'd', sub: 'Only related, kept off this workspace (Attach a PR brings it back)', run: () => detachPr(w) } as MenuItem] : []),
   ]
 
   // right click on a tab (or a pane header: one session)

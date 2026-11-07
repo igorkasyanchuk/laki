@@ -35,6 +35,7 @@ console.log(process.argv[3] + ' ' + process.argv[5] + ': ' + (await r.text()).re
     ['send', { target: `${ws.id}/${other}`, text: '!touch /tmp/x' }, 'bang'],
     ['send', { target: `${ws.id}/${other}`, text: 'ok\n!touch /tmp/x' }, 'bang2'],
     ['input', { tab: other, data: '\u0015!touch /tmp/x\r' }, 'bang3'],
+    ['input', { tab: other, data: 'a!\u001b[D\u007ftouch /tmp/x\r' }, 'bang4'],
     ['send', { target: `${ws.id}/${other}`, text: 'hello' }, 'hello'],
   ]
   const line = calls.map(([m, params, tag]) => `${process.execPath} ${script} ${join(rig.data, 'daemon.json')} ${m} '${JSON.stringify(params)}' ${tag} >> ${out} 2>&1`).join('; ')
@@ -50,7 +51,8 @@ console.log(process.argv[3] + ' ' + process.argv[5] + ': ' + (await r.text()).re
   assert.match(said.run, /a sandboxed agent can't start a Run ▾ action/)
   assert.match(said.toshell, /a sandboxed agent can't send into/)
   assert.match(said.keys, /a sandboxed agent can't type into/)
-  for (const k of ['bang', 'bang2', 'bang3']) assert.match(said[k], /a sandboxed agent can't send a ! line/, k) // its start, a later line's, after a control key
+  for (const k of ['bang', 'bang2']) assert.match(said[k], /a sandboxed agent can't send a ! line/, k) // its start, a later line's
+  for (const k of ['bang3', 'bang4']) assert.match(said[k], /a sandboxed agent can't send editing keys/, k) // ⌃U, or a!, ←, ⌫: a ! first
   assert.doesNotMatch(said.hello, /error/i, 'a prompt to another agent still goes')
   const tabs = (await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id)
   assert.equal(tabs.find((x: any) => x.name === 'kid')?.sandbox, true, 'its new tab: sandboxed')

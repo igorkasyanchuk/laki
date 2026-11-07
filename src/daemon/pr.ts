@@ -988,7 +988,9 @@ export async function prFiles(ref: string): Promise<{ id: string; files: Record<
 // prViewed: ticks (or unticks) a file of the PR as viewed, on GitHub as its own box does
 export async function prViewed(p: { ws: string; path: string; viewed: boolean; id?: string }) {
   const ws = findWs(p.ws)
-  if (!prs.get(ws.id)) throw new Error(`${ws.id} has no PR`)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, 'Viewed on the forge')
   if (typeof p.path !== 'string' || !p.path) throw new Error('path?')
   const id = p.id || (await prFiles(ws.id)).id
   const op = p.viewed ? 'markFileAsViewed' : 'unmarkFileAsViewed'

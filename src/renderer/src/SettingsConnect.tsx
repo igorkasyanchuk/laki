@@ -625,7 +625,7 @@ export function WebhooksSection({ call, projects }: { call: <T>(m: string, p?: o
     return () => clearInterval(t)
   }, [])
   const act = (f: () => Promise<unknown>) => (setBusy(true), setErr(''), f().then(load, e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
-  const copy = (text: string) => void navigator.clipboard.writeText(text)
+  const copy = (text: string) => void navigator.clipboard.writeText(text).catch(e => setErr(`Not copied: ${e?.message ?? e}`))
   return (
     <Group title="Webhooks" hint="A POST from GitHub, Linear, a CI job or anything else starts the workflows and extensions on: webhook, its request as event.body. Each request is checked against its hook's secret">
       <div className="setting-box">

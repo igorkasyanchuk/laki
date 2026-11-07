@@ -55,12 +55,13 @@ const JOB: Record<string, Check['state']> = { success: 'pass', failed: 'fail', r
 export const jobsOf = (jobs: any[]): Check[] => (Array.isArray(jobs) ? jobs : []).map(j => ({ name: String(j?.name ?? '?'), state: JOB[String(j?.status)] ?? 'pending', ...(typeof j?.web_url === 'string' && { url: j.web_url }), ...(typeof j?.duration === 'number' && { took: Math.round(j.duration) }) }))
 const STATE: Record<string, string> = { opened: 'OPEN', merged: 'MERGED', closed: 'CLOSED', locked: 'CLOSED' }
 
-// the workspace's MR (by its branch, or the linked one's !n) as a PR; checks from its head pipeline's jobs
+// the workspace's MR (by its branch, or the linked one's !n) as a PR; checks from its head pipeline's jobs (100: GitLab's
+// page is 20, and a failing job past it would read as passing). ponytail: a pipeline over 100 jobs reads its first 100
 export async function glabPR(ws: Workspace, checksOf: (l: Check[]) => PR['checks']): Promise<PR> {
   const ref = ws.prUrl ? (/\/merge_requests\/(\d+)/.exec(ws.prUrl)?.[1] ?? ws.branch) : ws.branch
   const j = JSON.parse(await glab(ws, ['mr', 'view', ref, '--output', 'json'], 20000))
   const pipe = j.head_pipeline ?? j.pipeline
-  const list = pipe?.id ? jobsOf(JSON.parse(await glab(ws, ['api', `projects/:id/pipelines/${Number(pipe.id)}/jobs`], 20000).catch(() => '[]'))) : []
+  const list = pipe?.id ? jobsOf(JSON.parse(await glab(ws, ['api', `projects/:id/pipelines/${Number(pipe.id)}/jobs?per_page=100`], 20000).catch(() => '[]'))) : []
   const ms = String(j.detailed_merge_status ?? '')
   return {
     number: j.iid,
@@ -92,6 +93,7 @@ export const glabDraft = (ws: Workspace, pr: PR, draft: boolean) => glab(ws, ['m
 
 // fromIssue's: a GitLab issue by its number
 export async function glabIssue(at: At, n: string) {
+  if (!/^\d+$|^https:\/\//.test(n)) throw new Error(`which GitLab issue? its number, not ${n}`) // never a flag to glab
   const i = JSON.parse(await glab(at, ['issue', 'view', n, '--output', 'json'], 20000).catch(e => Promise.reject(new Error(glabSays(e, `issue #${n}`)))))
   return { number: Number(i.iid), title: String(i.title ?? ''), body: typeof i.description === 'string' ? i.description : '', url: String(i.web_url ?? '') }
 }
