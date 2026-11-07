@@ -455,7 +455,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         if (!w) throw new Error(`no workflow ${a.id}`)
         return { id: w.id, source: w.source, project: w.project, name: w.name, problems: w.problems, file: w.text, actions }
       }
-      return { workflows: list.map(w => ({ id: w.id, source: w.source, project: w.project, name: w.name, desc: w.desc, problems: w.problems, ...(w.stats && { stats: w.stats }), ...(w.stats?.paused && { paused: w.stats.paused.why }) })), actions, runs: (v.flows ?? []).map((r: { id: string; name: string; task: string; status: string; block?: string; ws?: string }) => ({ id: r.id, workflow: r.name, task: r.task, status: r.status, block: r.block, workspace: r.ws })) }
+      return { workflows: list.map(w => ({ id: w.id, source: w.source, project: w.project, name: w.name, desc: w.desc, problems: w.problems, ...(w.stats && { stats: w.stats }), ...(w.stats?.paused && { paused: w.stats.paused.why }) })), actions, runs: (v.flows ?? []).map((r: { id: string; name: string; task: string; status: string; block?: string; ws?: string; hold?: number; wait?: { kind: string } }) => ({ id: r.id, workflow: r.name, task: r.task, status: r.hold ? 'pausing: its block finishes, then it waits for the user’s Resume' : r.wait?.kind === 'hold' ? 'paused by the user: Resume goes on' : r.wait?.kind === 'limit' ? 'paused at a usage limit: goes on when it resets' : r.status, block: r.block, workspace: r.ws })) }
     },
   },
   {

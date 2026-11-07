@@ -22,6 +22,7 @@ test("every GitHub remote: each one's issues and PRs with its repo, #42 twice; o
   git('remote', 'add', 'gone', 'https://github.com/old/shop.git') // gh can't read it
   git('remote', 'add', 'work', 'git@gitlab.example:me/shop.git') // not GitHub: not asked
   git('remote', 'add', 'look', 'https://notgithub.com/evil/shop.git') // a host that only ends in github.com: not GitHub
+  git('remote', 'add', 'www', 'https://www.github.com/acme/shop') // GitHub's own host: upstream's repo, once
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
 

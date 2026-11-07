@@ -39,6 +39,7 @@ const H = 58
 const RUNS_SHOWN = 12
 const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', extension: 'teal', end: 'gray' }
 const STATUS_WORDS: Record<string, string> = { queued: 'queued', running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
+const statusWords = (r: { status: string; hold?: number }) => (r.hold ? 'pausing' : STATUS_WORDS[r.status]) // Pause after this block, asked: its block finishing
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
 // unsaved edits, by workflow: kept while Laki runs, whatever closes the editor (the rail, another page, a notification)
@@ -367,7 +368,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                     <span className="wf-status-dot" />
                     <b>{r.task || r.name}</b>
                     <span className="muted">
-                      {r.name} · {STATUS_WORDS[r.status]}
+                      {r.name} · {statusWords(r)}
                       {!ended(r) && r.block ? ` · ${r.block}` : ''}
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
@@ -901,7 +902,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         )}
         <button className="btn" disabled={!dirty && !item.byAgent && !item.untrusted} onClick={save} data-tip={item.byAgent ? 'An agent wrote it: saving it here says you read it, and lets schedules, events and agents run it' : item.untrusted ? "From this repo: saving it here says you read it, and lets schedules, events and agents run it" : '⌘S'}>{dirty || item.byAgent || item.untrusted ? 'Save' : 'Saved'}</button>
         {runs.length > 0 && (
-          <button className="btn" onClick={() => onOpenRun(runs[0].id)} data-tip={runs.map(r => `${r.task || r.name}: ${STATUS_WORDS[r.status]}`).join('\n')}>
+          <button className="btn" onClick={() => onOpenRun(runs[0].id)} data-tip={runs.map(r => `${r.task || r.name}: ${statusWords(r)}`).join('\n')}>
             <span className="wf-dot" /> {runs.length} running
           </button>
         )}
@@ -2311,7 +2312,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onA
           </span>
         </div>
         <span className="grow" />
-        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{r.hold ? 'pausing' : STATUS_WORDS[r.status]}{!over && r.cur ? ` · ${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
+        <span className="wf-pill" data-status={r.status}>{r.status === 'running' && <span className="wf-gear"><Icon name="gear" size={11} /></span>}{statusWords(r)}{!over && r.cur ? ` · ${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur, kind: 'agent' })}` : ''}</span>
         {w && !w.archived && (
           <button className="btn" onClick={() => api.openWs(w.id)}>
             <Icon name={w.kind === 'worktree' ? 'fork' : 'folder'} size={12} /> {w.name ?? w.id}
