@@ -261,7 +261,7 @@ const SECRETS: [RegExp, string][] = [
   [/\b([a-z][a-z0-9+.-]{0,31}:\/\/[^\s:@/'"<>]{1,256}:)[^\s@/'"<>]{1,256}@/gi, '$1••••@'], // bounded: an unbounded scheme or name backtracks over a long word (100 KB: seconds)
   [/\b([A-Z0-9_]{0,64}(?:SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY)[A-Z0-9_]{0,64}\s*[=:]\s*)(?:(['"])[^'"\n]{2,}\2|(?![\d.]+(?![^\s'"&]))[^\s'"&]{4,})/g, '$1••••'], // an env var's way: in capitals; a number isn't one (MAX_TOKENS=4096)
   [/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, '$1••••'],
-  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '••••'],
+  [/(?<![\w-])eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,}/g, '••••'], // at a run's start, not \b: after each - of eyJ-eyJ-… it scanned the rest again (100 KB: 3 s). ponytail: x-eyJ… stays
   [/([?&](?:token|access_token|key|api_key|apikey|secret|password|auth|sig|signature)=)[^&\s"'#<>]+/gi, '$1••••'],
 ]
 export const redact = (t: string) => SECRETS.reduce((s, [re, to]) => s.replace(re, to), t)

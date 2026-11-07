@@ -130,7 +130,8 @@ again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't 
   (`closeTab` without `keep`) isn't kept. Archive drops the list. `tabReopen({ ws, index? })` brings one back through
   `addTab` with `resume` (and `account`), taking it off the list; a claude or codex chat whose transcript isn't there
   (`transcriptOf`) starts a new one and says `fresh` (the app's toast); a refusal (a policy, a profile's check) leaves it
-  listed. An agent reopens only in its own workspace (`agentNo`), a sandboxed one not at all (`boxNo`). ponytail: a
+  listed. An agent reopens only in its own workspace (`agentNo`), and only what it could start itself (`agentNoCmd`: no
+  command of its own, none that never asks); a sandboxed one not at all (`boxNo`). ponytail: a
   Browsers page's ⇧⌘T does nothing.
 
 `src/daemon/session.ts`: every PTY is mirrored into an `@xterm/headless` terminal.

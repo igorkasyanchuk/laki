@@ -120,8 +120,8 @@ logged once a minute per hook (`told`). Then `webhook` `{ name, event, body, pro
 `NAME`; a kind; a project) writes its secret to `<data>/hooks/<name>` (0600, never state.json) and returns it once;
 `hookSecret` reads it again, `hookRm` drops both, `hookList` the hooks with their local and public URLs. `hookExpose`:
 remote.ts' `hookPublish`, a quick cloudflared tunnel to that port (`cloudflare`) or `tailscale funnel` (`tailscale`,
-funnel), its `url`, `down` when it went. All four but `hookList` refused from an agent (`AGENT_NO`), `hookSecret` and
-`hookExpose` over remote access (`REMOTE_NO`). Settings › Tunnels › Webhooks (SettingsConnect.tsx `WebhooksSection`).
+funnel), its `url`, `down` when it went. All four but `hookList` refused from an agent (`AGENT_NO`), and over remote access
+(`REMOTE_NO`). Settings › Tunnels › Webhooks (SettingsConnect.tsx `WebhooksSection`).
 ponytail: funnel takes port 443's root, as remote access over tailscale does.
 
 ### Remote access

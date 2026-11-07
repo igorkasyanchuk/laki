@@ -541,7 +541,7 @@ const api: Record<string, Handler> = {
 }
 
 // remote access's page (a phone): what it needs from there, not what outlives its session or opens Laki wider (M4)
-const REMOTE_NO = new Set(['hookSecret', 'hookExpose', 'imageRead', 'remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
+const REMOTE_NO = new Set(['hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart', 'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave', 'hook']) // hookAdd: a new webhook and its secret; presetSave: a profile's args and env, as REMOTE_KEYS' presets; hook: agents' own (hookWho)
 const REMOTE_KEYS = /^(remote.*|webhook|inHooks|widgetDirs|widgetDev|presets|env|tunnel|customCss|editorCmd|editors)$/ // settings it may send back unchanged (Settings saves them all), not change; customCss: every window's look (it could hide or fake a button); editorCmd, editors: what Open in editor (⌘E) runs
 // a settingsSet that changes one of these (sent back unchanged is fine: Settings saves them all)
 const changes = (p: any, keys: RegExp) => Object.keys(p ?? {}).some(k => keys.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k]))

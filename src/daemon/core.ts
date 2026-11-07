@@ -2091,8 +2091,9 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 
 // ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it
 // was (profile, model, effort, mode, fast, sandbox, account; a shell in its folder). A claude or codex chat that's gone
-// starts a new one (fresh: the app says so); a profile gone: its agent's own; refused (a policy, a gone folder): kept
-export function tabReopen(p: { ws: string; index?: number }): Tab & { fresh?: boolean } {
+// starts a new one (fresh: the app says so); a profile gone: its agent's own; refused (a policy, a gone folder): kept.
+// An agent's (from its tab): as its laki tab, no command of its own and none that never asks (agentNoCmd)
+export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown; tab?: unknown } }): Tab & { fresh?: boolean } {
   const ws = findWs(String(p.ws ?? ''))
   if (ws.archived) throw new Error(`${ws.name ?? ws.id} is archived: restore it first`)
   const i = Number.isInteger(p.index) ? Number(p.index) : 0
@@ -2100,7 +2101,9 @@ export function tabReopen(p: { ws: string; index?: number }): Tab & { fresh?: bo
   if (!c) throw new Error(`no closed tab to bring back in ${ws.name ?? ws.id}`)
   const agent = c.preset === 'claude' || c.preset === 'codex' ? c.preset : undefined
   const fresh = !!c.resumeId && !!agent && !transcriptOf(agent, accountNamed(c.account ?? '')?.dir ?? homeDir(agent), c.resumeId)
-  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd } : { preset: c.profile && presetNamed(c.profile) ? c.profile : c.preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account })
+  const preset = c.profile && presetNamed(c.profile) ? c.profile : c.preset
+  if (c.kind === 'agent' && agentCaller(p.from)) agentNoCmd({ preset, cmd: c.cmd, perm: c.perm })
+  const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account })
   ws.closed = ws.closed!.filter(x => x !== c)
   if (!ws.closed.length) delete ws.closed
   save()

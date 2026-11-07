@@ -152,7 +152,7 @@ test('an archived project: out of the view with its workspaces, its shells close
 })
 
 // ⇧⌘T: a tab you closed comes back in its workspace (tabReopen), its chat resumed; kept in state.json, 10 at most
-test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a shell in its folder; 10 kept, archive clears; an agent only in its own workspace', async t => {
+test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a shell in its folder; 10 kept, archive clears; an agent only in its own workspace, only what it could start', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const wsOf = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)
@@ -198,8 +198,15 @@ test('a closed tab reopens: claude and codex resumed, a gone chat starts anew, a
   await until(async () => (await rig.screen(sh2.id)).includes('$'), 'the new prompt')
   await rig.rpc('input', { tab: sh2.id, data: 'pwd\r' })
   await until(async () => (await rig.screen(sh2.id)).includes('/deep'), 'pwd in deep')
-  // an agent of another workspace can't; its own can
+  // an agent of another workspace can't; its own can, but not one it couldn't start itself: bypass permissions, a command
   await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: { ws: cw.id, tab: c3.id } }), /in its own workspace only/)
+  const by = { ws: xw.id, tab: x2.id }
+  await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, preset: 'claude', perm: 'bypassPermissions', name: 'yolo' })).id })
+  await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: by }), /never asks/)
+  await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, cmd: 'sleep 60', name: 'own' })).id })
+  await assert.rejects(rig.rpc('tabReopen', { ws: xw.id, from: by }), /a command of its own/)
+  assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 2), ['own', 'yolo'], 'kept for you')
+  assert.equal((await rig.rpc('tabReopen', { ws: xw.id, index: 1 })).name, 'yolo') // yours
   // 10 at most, the newest first; an archive clears them
   for (let i = 0; i < 12; i++) await rig.rpc('tabClose', { id: (await rig.rpc('tabNew', { ws: xw.id, name: `s${i}` })).id })
   assert.deepEqual((await wsOf(xw.id)).closed.map((c: any) => c.name).slice(0, 2), ['s11', 's10'])
