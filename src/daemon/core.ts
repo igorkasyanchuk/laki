@@ -3074,12 +3074,12 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
-      inboxTurn(tab, 'waiting', text || 'needs you')
       phone(tab, 'waiting', text)
       setTimeout(() => {
         // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
         const s = sessions.get(tab.id)
         if (r.status !== 'waiting') return
+        inboxTurn(tab, 'waiting', text || 'needs you') // a moment later too: one over at once needed nobody
         const options = s && !s.exited ? s.ask()?.options : undefined
         widgetEvent('turn.waiting', { question: text.slice(0, 2000), options, ...(r.perm && { tool: r.perm.tool, what: r.perm.what }) }, tab.workspace, tab)
         for (const f of turnWaits)

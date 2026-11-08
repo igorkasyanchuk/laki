@@ -61,3 +61,7 @@ test('no answer from main: nothing goes', async () => {
   const r = rig()
   assert.equal((await unloadStep({ ...r.args, mem: async () => null })).unload, undefined)
 })
+
+test('a budget that is no positive number is off', async () => {
+  for (const budgetMb of [Number('x'), -1, 0]) assert.equal((await unloadStep({ ...rig().args, budgetMb })).unload, undefined)
+})

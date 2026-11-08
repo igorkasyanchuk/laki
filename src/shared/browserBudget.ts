@@ -11,7 +11,7 @@ export type Unload = { kb: number; over: boolean; unload?: string; held: { ws: s
 export async function unloadStep(o: { budgetMb: number; guests: Map<string, number>; used: Map<string, number>; current: () => string | null | undefined; mem: (ids: number[]) => Promise<{ kb: number } | null>; guard: (id: number) => Promise<string | undefined> }): Promise<Unload> {
   const m = await o.mem([...o.guests.values()])
   const kb = m?.kb ?? 0
-  if (!m || kb <= o.budgetMb * 1024) return { kb, over: false, held: [] }
+  if (!m || !(o.budgetMb > 0) || kb <= o.budgetMb * 1024) return { kb, over: false, held: [] } // settingsSet keeps any value: not a number is off
   const when = (ws: string) => o.used.get(ws) ?? 0
   const newest = [...o.guests.keys()].sort((a, b) => when(b) - when(a))
   const kept = new Set(newest.slice(0, KEEP))

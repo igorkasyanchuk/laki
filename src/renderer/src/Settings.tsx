@@ -954,16 +954,17 @@ export function SettingsPage(p: {
   }, [sec, !!p.hooks])
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
   // codex: its notify, only as a turn ends; the others: the last hook, or none yet (and how many tabs aren't heard)
+  const native = (h: HookSeen) => h.native && <span data-tip={`Laki compares what this agent reports through its terminal (OSC 7501) with its hooks, and only counts it: what a tab shows still comes from hooks.${h.native.last ? ` Last difference, ${ago(h.native.last.at)}: it said ${h.native.last.native}, hooks said ${h.native.last.hook}.` : ''}`}> · native status: {h.native.agree} agree, {h.native.differ} differ</span>
   const hookSays = (agent: Preset['agent']) => {
     const h = hooks[agent]
     if (agent === 'command' || !h) return undefined
     const profiles = n(presets.filter(x => x.agent === agent).length, 'profile')
-    if (agent === 'codex') return <span className="muted small" data-tip="Codex tells Laki only as a turn ends (its notify); the rest comes from its screen">{profiles} · notify only</span>
+    if (agent === 'codex') return <span className="muted small" data-tip="Codex tells Laki only as a turn ends (its notify); the rest comes from its screen">{profiles} · notify only{native(h)}</span>
     const says = h.at ? `last hook ${ago(h.at)}` : `no hooks yet${h.tabs ? ` (${n(h.tabs, 'tab')})` : ''}`
     return (
       <span className={`muted small hook-seen ${h.deaf ? 'warn' : ''}`} data-tip={h.deaf ? `${n(h.deaf, 'tab')} not heard: each one's pane says the likely why` : "When Laki last heard this agent's hooks: they say when it asks and finishes"}>
         {profiles} · {says} {h.deaf ? '⚠' : h.at ? '✓' : ''}
-        {h.native && <span data-tip={`Laki compares what this agent reports through its terminal (OSC 7501) with its hooks, and only counts it: what a tab shows still comes from hooks.${h.native.last ? ` Last difference, ${ago(h.native.last.at)}: it said ${h.native.last.native}, hooks said ${h.native.last.hook}.` : ''}`}> · native status: {h.native.agree} agree, {h.native.differ} differ</span>}
+        {native(h)}
       </span>
     )
   }
