@@ -24,6 +24,8 @@ test('facts: the checker knows the vocabulary, needs scope workspace, takes tip 
 
 test("facts: a per-workspace one gets its workspace's facts in its ui and $LAKI_FACTS, and fetches again as they change", async t => {
   const rig = await fresh(t)
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // the fake's PR for every branch would land whenever its scan does
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
   make(rig, 'fx', {
