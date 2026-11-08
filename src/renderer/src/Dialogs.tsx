@@ -2,7 +2,6 @@
 // schedulesFor…) says: Pages, in the main area (Settings, Help, the AI page, the board, New workspace…), and Dialogs,
 // over everything (Ship, Check overlaps, the timers', renames, a project's notes…). App renders them with what
 // appCtx.ts says they read.
-import { Inbox } from './Inbox'
 import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, specsOf, wsName } from './appCtx'
 import { type AccountsApi, SettingsPage, type SkillInfo, FONT_SIZE } from './Settings'
 import { api, bridge, openExternal } from './api'
@@ -597,7 +596,7 @@ export function Pages({ app }: { app: AppCtx }) {
 
 // the dialogs over everything (and the keys overlay, between them as it always was)
 export function Dialogs({ app }: { app: AppCtx }) {
-  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, flowsOn, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws } = app
+  const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws } = app
   // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
   // template: the default prompt template of a new workspace under it ('' none)
   // a group's name and defaults (Edit group: template, agent, where, permission mode, model, effort, base; '' none)
@@ -691,28 +690,6 @@ export function Dialogs({ app }: { app: AppCtx }) {
               )}
             </Modal>
           ))(view.workspaces.find(x => x.id === overlapsAt.w))}
-      {app.inboxOn && (
-        <Inbox
-          key={String(!!settings.recording) /* Recording on: what was listed goes at once */}
-          onBack={() => void (!dialog && tab && xterms.get(tab.id)?.focus())}
-          at={view!.inbox?.at}
-          unread={view!.inbox?.unread ?? 0}
-          call={call}
-          canOpen={e => (e.run ? flowsOn : e.kind === 'reminder' || live.some(w => w.id === e.ws))}
-          onOpen={e => {
-            void call('inboxRead', { ids: [e.id] }).catch(() => {})
-            app.setInboxOn(false)
-            setDialog(null)
-            if (narrow) setSideOpen(false)
-            const t = view!.tabs.find(x => x.id === e.tab)
-            if (e.run) setDialog({ workflows: '', run: e.run })
-            else if (t && t.status !== 'exited') selectTab(t.id)
-            else if (live.some(w => w.id === e.ws)) setWsId(e.ws!)
-            else setDialog('calendar') // a reminder whose workspace went
-          }}
-          onClose={() => app.setInboxOn(false)}
-        />
-      )}
       {dialog === 'video' && (
         <Prompt
           title="Watch a YouTube video"

@@ -356,8 +356,6 @@ WebSocket events:
 `view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen), `focused` and `browse` (the app's
 window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
 
-`inboxList`, `inboxRead` (`ids`: those; none: every one showing), `inboxClear`: the notification inbox (`docs/dev/scans.md`); the last two aren't an agent's (`agentNo`).
-
 ### MCP
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's

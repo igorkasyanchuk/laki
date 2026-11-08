@@ -11,8 +11,6 @@ short version.
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card, the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets.
-- **Notification inbox**: the bell (⌘K: *Open notifications*) keeps what finished, failed or asked for you, read or not, the
-  newest 200, after the toast has gone and across restarts. *Open* goes to where it happened.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from

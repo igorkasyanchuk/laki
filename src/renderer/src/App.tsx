@@ -456,7 +456,6 @@ export function App() {
   const { notices, answer: answerNotice } = useNotices() // laki notice's cards, in the same corner
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
-  const [inboxOn, setInboxOn] = useState(false)
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
@@ -1564,7 +1563,7 @@ export function App() {
   }
   useEffect(() => {
     if (!picked.length) return
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && !dialog && !document.querySelector('.menu, .overlay, .inbox-pop') /* a menu's or an ask's Esc is theirs */ && (e.preventDefault(), e.stopPropagation(), setPicked([]))
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !dialog && !document.querySelector('.menu, .overlay') /* a menu's or an ask's Esc is theirs */ && (e.preventDefault(), e.stopPropagation(), setPicked([]))
     window.addEventListener('keydown', f, true) // before the terminal: Esc here isn't the agent's
     return () => window.removeEventListener('keydown', f, true)
   }, [picked.length > 0, !!dialog])
@@ -3140,7 +3139,6 @@ export function App() {
           {(settings.videoButton !== false || !!video) && <IconButton icon="youtube" title="Watch a YouTube video while you work (off: Settings › Appearance)" label={words ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />}
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={words ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           {(settings.timerButton !== false || timers.length + watches.length > 0) && <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)" label={words ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />}
-          <IconButton icon="bell" className="inbox-bell" title={view?.inbox?.unread ? `Notifications: ${view.inbox.unread} unread` : 'Notifications'} label={words ? 'Inbox' : undefined} on={inboxOn} badge={view?.inbox?.unread} onClick={() => setInboxOn(o => !o)} />
           <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
           {!rail && !bar && (
             <>
@@ -3307,7 +3305,7 @@ export function App() {
 
   // what App's parts read (appCtx.ts), built after everything in it is
   const appBase: AppBase = {
-    budgetSaid, inboxOn, setInboxOn, accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
+    budgetSaid, accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
     archive, artMenu, artPage, artView, asFile, attachable, bgUrl, busyWith, byId, call, calOn, canLater, cfgSheet,
     checking, closePage, closePreview, closeTabs, reopenTab, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,

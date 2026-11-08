@@ -8,11 +8,10 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { type CheckRun, type CheckStepName, checkOk, type DoneCheck, type Preset, type Tab, type Workspace } from '../shared/types.ts'
-import { rtOf, broadcast, changed, checkHooks, checks, git, plainEnv, presets, projectConfig, send, settingUp, shell, state, storageOf, tracked, turnEnds, wsLog } from './core.ts'
+import { broadcast, changed, checkHooks, checks, git, plainEnv, presets, projectConfig, send, settingUp, shell, state, storageOf, tracked, turnEnds, wsLog } from './core.ts'
 import { dir } from './dir.ts'
 import { diff } from './files.ts'
 import { killGroup } from './resources.ts'
-import { inboxTurn } from './inbox.ts'
 import { phone } from './phone.ts'
 import { aiOnce } from './ai.ts'
 import { treeOf } from './turns.ts'
@@ -163,7 +162,6 @@ export async function check(tab: Tab, o: { force?: boolean } = {}) {
 function say(ws: Workspace, tab: Tab, status: 'skipped' | 'passed' | 'failed' | 'over', text: string) {
   if (status !== 'skipped') wsLog(ws, `check: ${status}: ${text}`)
   broadcast({ ev: 'check', ws: ws.id, tab: tab.id, status, text })
-  if (status !== 'failed') inboxTurn(tab, status === 'over' ? 'failed' : 'done', status === 'skipped' ? rtOf(tab.id).last || 'finished' : status === 'passed' ? `done and checked: ${text}` : `over to you: ${text}`) // failed: sent back, the agent works on
   if (status === 'over') phone(tab, 'waiting', `${tab.name}: ${text}`)
 }
 

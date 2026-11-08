@@ -302,8 +302,6 @@ export type AppBase = {
   setArtsIn: Dispatch<SetStateAction<string | null>>
   setArtView: Dispatch<SetStateAction<{ ws: string; path: string } | null>>
   setDialog: Dispatch<SetStateAction<Dialog>>
-  inboxOn: boolean // the notification list: over whatever page is open, not one of them
-  setInboxOn: Dispatch<SetStateAction<boolean>>
   setExtModal: Dispatch<SetStateAction<{ wid: string; ws?: string | undefined; m: SayModal; n: number } | null>>
   setFind: Dispatch<SetStateAction<Find | null>>
   setFinds: Dispatch<SetStateAction<Record<string, number>>>

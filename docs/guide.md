@@ -259,10 +259,6 @@ selected workspace's PR is in the status bar.
   tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
   take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
   (5, 15, 30 or 60 minutes, or never).
-- **Notifications**, the bell in the sidebar's foot or the status bar (⌘K: *Open notifications*): what finished, failed or asked
-  for you (agents, workflows, reminders), the newest 200, kept after the toast has gone and across restarts. *Unread* and *All*,
-  a check to mark one read, *Mark all read*, *Clear all*; *Open* goes to where it happened, as it is now. An ask is never answered
-  from here. In Recording mode a private workspace's stay out of the list.
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message

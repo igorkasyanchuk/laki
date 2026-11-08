@@ -11,7 +11,6 @@ import { addTab, broadcast, byTab, changed, clients, findProject, findWs, preset
 import { dir } from './dir.ts'
 import { usage } from './usage.ts'
 import { isLive } from './resources.ts'
-import { inboxAdd } from './inbox.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 // ---------- the board's to-dos (Board.tsx): prompts waiting for a workspace; starting one is wsNew, then todoRm
@@ -133,7 +132,6 @@ export function reminderTick(now = Date.now()) {
   const due = state.reminders!.filter(r => !r.fired && !r.done && r.at <= now)
   for (const r of due) {
     broadcast({ ev: 'reminder', reminder: r.id, text: r.text, at: r.at, ws: r.ws, ...(r.important && { important: true }) }) // not id: that would make it a reply
-    inboxAdd({ kind: 'reminder', title: 'Reminder', text: r.text, ...(r.ws && { ws: r.ws }), ...(r.project && { project: r.project }) })
     // a repeating one: its next time after now (the ones missed while nobody heard ring as this one)
     const rule = r.every ? parseWhen(r.every, now) : undefined
     const next = rule && !('error' in rule) ? nextRun(rule, Math.max(now, r.at)) : undefined

@@ -11,9 +11,6 @@ version it builds, with the date. -->
 - Settings › Agents & profiles shows how an agent's own terminal status (OSC 7501) compares with its hooks. Only counted
   for now: what a tab shows still comes from hooks.
 
-- A notification inbox: the bell keeps what finished, failed or asked for you (agents, workflows, reminders), the newest
-  200, after the toast is gone and across restarts. Unread and All, Mark read, Clear; Open goes to where it happened.
-
 - Settings › Voice › *Word fixes* (Cloud): a line each, what it writes → what you meant (`lucky → Laki`), so
   dictated prompts keep your repo, model and CLI names; the bar says what it changed.
 

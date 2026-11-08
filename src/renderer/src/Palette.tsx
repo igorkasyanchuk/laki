@@ -166,7 +166,6 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit
   a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
   a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
-  a({ label: 'Open notifications: what finished, failed or asked for you', icon: 'bell', run: () => app.setInboxOn(true) })
   if (!achKept.off) a({ label: 'Achievements: what to try next', icon: 'trophy', run: () => setDialog('achievements') })
   if (specsOn) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
   if (flowsOn) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
