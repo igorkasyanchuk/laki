@@ -28,6 +28,8 @@ test('OSC 7501: a report parsed by the protocol, a bad one dropped whole', () =>
   assert.equal(parseReport(`state=idle:x=${'a'.repeat(4100)}`), undefined, 'over the limit')
   assert.equal(parseReport(`state=idle:msg=${b64('two\nlines')}`), undefined, 'a control character')
   assert.equal(parseReport('state=idle:msg=a'), undefined, "base64 that doesn't decode")
+  assert.equal(parseReport('state=idle:msg=not base64!'), undefined, 'characters base64 never has')
+  assert.equal(parseReport('state=idle:title=a@b'), undefined)
   assert.equal(parseReport(`state=idle:msg=${Buffer.from([0xff, 0xfe]).toString('base64')}`), undefined, 'not UTF-8')
   assert.equal(parseReport(`state=idle:title=${b64('x'.repeat(193))}`), undefined)
 })
@@ -35,6 +37,7 @@ test('OSC 7501: a report parsed by the protocol, a bad one dropped whole', () =>
 test('OSC 7501: a child never moves its parent; clear takes what is under it; the prompt ends what was working', () => {
   const r = new ProgramRecords()
   assert.equal(r.report('state=working:app=claude-code'), true)
+  assert.equal(r.report('state=working:app=claude-code:progress=5'), false, 'the same state again: no change to settle')
   assert.equal(r.report('state=idle:id=sub1'), false, "a child's isn't the root's")
   assert.equal(r.report('state=working:id=sub1/x'), false)
   assert.equal(r.root()!.state, 'working')

@@ -465,7 +465,7 @@ export type AccountView = { id: string; agent: AccountAgent; name: string; dir: 
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit; a plan limit nearly used (the app's own: usage)
 export type ProgramState = 'idle' | 'working' | 'done' | 'blocked' | 'error' // OSC 7501's (daemon/program.ts)
-// what an agent's OSC 7501 root said against its status from hooks: compared after each report settles; last: the last that differed
+// what an agent's OSC 7501 root said against its status from hooks: compared once each change of state settles; last: the last that differed
 export type NativeSeen = { agree: number; differ: number; last?: { at: number; native: ProgramState; hook: string; app?: string } }
 export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
 export type TurnFile = { path: string; add: number; del: number; status: string } // status: git's A, M, D (no renames)

@@ -143,11 +143,11 @@ app.on('web-contents-created', (_e, wc) => {
     guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
     guest.on('context-menu', (_e, p) => (p.isEditable && (g.typed = true), pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))) // a field's menu has Paste
     // what the memory budget mustn't unload (browser-guard), seen from here, not told by the page
-    const g: Guest = { typed: false, media: false, downloads: 0 }
+    const g: Guest = { typed: false, media: 0, downloads: 0 }
     guests.set(guest, g)
-    guest.on('did-navigate', () => ((g.typed = false), (g.media = false))) // a new document: what was typed in the last one is gone anyway
-    guest.on('media-started-playing', () => (g.media = true))
-    guest.on('media-paused', () => (g.media = false))
+    guest.on('did-navigate', () => ((g.typed = false), (g.media = 0))) // a new document: what was typed in the last one is gone anyway
+    guest.on('media-started-playing', () => g.media++) // per player: one pausing leaves the others
+    guest.on('media-paused', () => (g.media = Math.max(0, g.media - 1)))
     guest.on('before-input-event', (_e, i) => {
       if (i.type === 'keyDown' && !NOT_TYPING.test(i.key) && (!(i.meta || i.control) || /^[vxz]$/i.test(i.key))) g.typed = true // IME and dead keys too: uncertain counts
     })
@@ -162,7 +162,7 @@ app.on('web-contents-created', (_e, wc) => {
 // the memory budget's guards (Settings › Resources; shared/browserBudget.ts). Anything uncertain holds the page: a typed
 // key counts as an edit until it navigates, shortcuts too, and a check that fails or takes too long holds it.
 // ponytail: the form check is the main frame's: a box ticked in a cross-origin frame with the mouse alone isn't seen
-type Guest = { typed: boolean; media: boolean; downloads: number }
+type Guest = { typed: boolean; media: number; downloads: number }
 const NOT_TYPING = /^(Shift|Control|Alt|Meta|CapsLock|Tab|Escape|Arrow\w+|PageUp|PageDown|Home|End|F\d+)$/
 const guests = new WeakMap<Electron.WebContents, Guest>()
 const FORM_EDITED = `[...document.querySelectorAll('input,textarea,select')].some(e => e.tagName === 'SELECT' ? (e.multiple ? [...e.options].some(o => o.selected !== o.defaultSelected) : [...e.options].some(o => o.defaultSelected) ? !e.options[e.selectedIndex]?.defaultSelected : e.selectedIndex > 0) : e.type === 'checkbox' || e.type === 'radio' ? e.checked !== e.defaultChecked : e.type !== 'hidden' && e.value !== e.defaultValue)`

@@ -252,7 +252,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget,
             <label className="row">
               Budget (MB)
               <span className="grow" />
-              <input type="number" style={{ width: 100 }} min={256} step={256} defaultValue={browserBudget} key={browserBudget} onBlur={e => { const n = Math.round(Number(e.target.value)); if (!(n >= 256)) e.target.value = String(browserBudget); else if (n !== browserBudget) onBrowserBudget(n) }} />
+              <input type="number" style={{ width: 100 }} min={256} step={256} defaultValue={browserBudget} key={browserBudget} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()} onBlur={e => { const n = Math.round(Number(e.target.value)); if (!(n >= 256)) e.target.value = String(browserBudget); else if (n !== browserBudget) onBrowserBudget(n) }} />
             </label>
           )}
           {api.budgetSaid?.() && <div className="muted small">{api.budgetSaid()}</div>}

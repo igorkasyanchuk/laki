@@ -40,7 +40,7 @@ export function parseReport(d: string): ProgramRecord | { clear: true; id?: stri
     if (eq < 0) continue
     const k = pair.slice(0, eq).trim()
     const v = pair.slice(eq + 1).trim()
-    if (k.length > 16 || (k === 'id' && !idOk(v))) return undefined // an id skipped as a bad pair would be the root's: state=clear:id=a@b, every record
+    if (k.length > 16 || (k === 'id' && !idOk(v)) || ((k === 'msg' || k === 'title') && !VALUE.test(v))) return undefined // an id skipped as a bad pair would be the root's: state=clear:id=a@b, every record; a bad msg or title drops it too, whatever's wrong with it
     if (KEY.test(k) && VALUE.test(v)) kv.set(k, v)
   }
   const id = kv.get('id')
@@ -80,9 +80,10 @@ export class ProgramRecords {
       for (const id of [...this.records.keys()]) if (id === r.id || id.startsWith(`${r.id}/`)) this.records.delete(id)
       return false
     }
+    const was = this.records.get(r.id)?.state
     this.records.delete(r.id) // last in the Map: the most recently updated
     this.records.set(r.id, r)
     if (this.records.size > MAX_RECORDS) this.records.delete([...this.records.keys()].find(id => id !== '')!)
-    return r.id === ''
+    return r.id === '' && was !== r.state // the same state again (its progress, say) restarts no settling
   }
 }

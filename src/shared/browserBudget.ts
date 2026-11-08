@@ -17,7 +17,7 @@ export async function unloadStep(o: { budgetMb: number; guests: Map<string, numb
   const kept = new Set(newest.slice(0, KEEP))
   const held: Unload['held'] = []
   for (const ws of newest.reverse()) {
-    if (ws === o.current() || kept.has(ws)) continue
+    if (ws === o.current() || kept.has(ws) || !o.guests.has(ws)) continue // has: closed during an earlier page's check
     const why = await o.guard(o.guests.get(ws)!).catch(() => 'can’t tell what it’s doing')
     if (why) held.push({ ws, why })
     else if (ws !== o.current() && o.guests.has(ws)) return { kb, over: true, unload: ws, held }

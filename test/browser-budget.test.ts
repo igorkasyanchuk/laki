@@ -57,6 +57,14 @@ test('a guard that fails holds the page; you moving to it during the check saves
   assert.notEqual(u.unload, 'a')
 })
 
+test('a page closed during another check is neither asked about nor said', async () => {
+  const r = rig({ held: { a: 'is playing' } })
+  const u = await unloadStep({ ...r.args, guard: async id => (r.args.guests.delete('b'), r.args.guard(id)) })
+  assert.equal(u.unload, 'c')
+  assert.deepEqual(r.asked, ['a', 'c'])
+  assert.deepEqual(u.held, [{ ws: 'a', why: 'is playing' }])
+})
+
 test('no answer from main: nothing goes', async () => {
   const r = rig()
   assert.equal((await unloadStep({ ...r.args, mem: async () => null })).unload, undefined)
