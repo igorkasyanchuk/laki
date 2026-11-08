@@ -55,6 +55,10 @@ errors), `blocked` (popups, and navigations off localhost, refused), 20 of each,
 how many more); a click that changed nothing on the same page looks once more a second later (a fetch's answer). The CLI prints `browseSays`; MCP's `laki_browser` gives it as JSON. ponytail: main's code, no test
 drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-more.test.ts`.
 
+### The memory budget for hidden Browsers pages
+
+`settings.browserBudget` (MB; unset or 0: off; Settings › Resources, in the app only). Every 15 s App calls `unloadStep` (`shared/browserBudget.ts`, pure): main's `browser-mem` adds up the guests' processes, each once (`app.getAppMetrics`), and over budget the oldest hidden page goes, one a step, the way Resources' Stop does (out of `browsed`; opening it loads `w.browser`). Never the current workspace (asked again after each await) or the two last used (`KEEP`). `browser-guard` holds a page for what main sees itself, per guest (`guests`, `did-attach-webview`): media playing, a download, `debugger` attached or DevTools open, a key typed since it navigated, and the form check in an isolated world; a check that fails or takes over 1.5 s holds it too. `budgetSaid`: why nothing went, shown in Resources. ponytail: a box ticked with the mouse in a cross-origin frame isn't seen; Browsers workspaces only, not the Preview or agent browsers.
+
 ### Renderer
 
 `src/renderer/src`:

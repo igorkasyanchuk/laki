@@ -338,6 +338,7 @@ export type AppBase = {
   setVideo: Dispatch<SetStateAction<{ src: string; play?: boolean | undefined; at?: number | undefined; min?: boolean | undefined } | null>>
   setWatch: (id: string, f: (w: Watch) => Watch | null) => void
   setWsId: Dispatch<SetStateAction<string | null>>
+  budgetSaid: { current: string } // the memory budget: why nothing could be unloaded
   sharing: string | null
   shotKey: string | false | null
   showInfo: (on?: boolean) => void

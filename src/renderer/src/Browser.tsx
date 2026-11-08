@@ -13,7 +13,7 @@ import { IconButton, useMenu } from './ui'
 
 const shown = (u: string) => (u === 'about:blank' ? '' : u)
 
-export function BrowserPane({ url, hidden, onPage, onOpen, onShot }: { url: string; hidden: boolean; onPage: (url: string, title: string) => void; onOpen: (url: string) => void; onShot?: (r: { path?: string; error?: string }) => void }) {
+export function BrowserPane({ url, hidden, onPage, onOpen, onShot, onGuest }: { onGuest?: (id: number | null) => void; url: string; hidden: boolean; onPage: (url: string, title: string) => void; onOpen: (url: string) => void; onShot?: (r: { path?: string; error?: string }) => void }) {
   const [addr, setAddr] = useState(shown(url))
   const [menu, openMenu] = useMenu()
   const shot = (whole: boolean, save: boolean) => {
@@ -28,6 +28,8 @@ export function BrowserPane({ url, hidden, onPage, onOpen, onShot }: { url: stri
   const input = useRef<HTMLInputElement>(null)
   const page = useRef(onPage)
   page.current = onPage
+  const guest = useRef(onGuest)
+  guest.current = onGuest
   // its methods throw until it's attached and ready
   const on = (f: (v: any) => unknown) => {
     try {
@@ -48,6 +50,7 @@ export function BrowserPane({ url, hidden, onPage, onOpen, onShot }: { url: stri
       setAddr(shown(e.url))
       if (/^https?:\/\//.test(e.url)) page.current(e.url, title)
     }
+    v.addEventListener('dom-ready', () => on(x => guest.current?.(x.getWebContentsId()))) // the memory budget's handle on it
     v.addEventListener('did-navigate', (e: any) => ((title = ''), at(e))) // a new page: its title comes after (page-title-updated)
     v.addEventListener('did-navigate-in-page', (e: any) => e.isMainFrame && at(e))
     v.addEventListener('page-title-updated', (e: any) => {
@@ -62,6 +65,7 @@ export function BrowserPane({ url, hidden, onPage, onOpen, onShot }: { url: stri
     return () => {
       v.remove()
       view.current = null
+      guest.current?.(null)
     }
   }, [])
   const go = () => {

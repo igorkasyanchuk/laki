@@ -1,3 +1,4 @@
+import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
 import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
@@ -2649,6 +2650,31 @@ export function App() {
     window.addEventListener('laki-stop', f)
     return () => window.removeEventListener('laki-stop', f)
   }, [])
+  // Settings › Resources' memory budget (shared/browserBudget.ts): over it, the oldest hidden page nothing holds is unloaded,
+  // the way Stop does; opening it loads its saved address. budgetSaid: why nothing could be, for that page
+  const guests = useRef(new Map<string, number>())
+  const usedAt = useRef(new Map<string, number>())
+  const budgetSaid = useRef('')
+  useEffect(() => {
+    if (ws?.browser !== undefined) usedAt.current.set(ws.id, Date.now())
+  }, [ws?.id])
+  const browserBudget = view?.settings.browserBudget ?? 0
+  useEffect(() => {
+    budgetSaid.current = ''
+    if (!browserBudget || !bridge?.browserMem || !bridge.browserGuard) return
+    let busy = false
+    const step = async () => {
+      if (busy) return
+      busy = true
+      const r = await unloadStep({ budgetMb: browserBudget, guests: guests.current, used: usedAt.current, current: () => wsNow.current, mem: bridge!.browserMem!, guard: bridge!.browserGuard! }).catch(() => null)
+      busy = false
+      if (r?.unload) setBrowsed(b => b.filter(id => id !== r.unload))
+      const name = (id: string) => (w => (w ? wsName(w) : id))(viewRef.current?.workspaces.find(w => w.id === id))
+      budgetSaid.current = r?.over && !r.unload ? `Over budget, nothing to unload: ${r.held.map(h => `${name(h.ws)} ${h.why}`).join('; ') || 'the pages left are the ones you used last'}` : ''
+    }
+    const t = setInterval(() => void step(), 15000)
+    return () => clearInterval(t)
+  }, [browserBudget])
   // a page's address and title: the workspace's (its sidebar name), once it settles
   const pageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pageSeen = (id: string, url: string, title: string) => {
@@ -3278,7 +3304,7 @@ export function App() {
 
   // what App's parts read (appCtx.ts), built after everything in it is
   const appBase: AppBase = {
-    accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
+    budgetSaid, accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
     archive, artMenu, artPage, artView, asFile, attachable, bgUrl, busyWith, byId, call, calOn, canLater, cfgSheet,
     checking, closePage, closePreview, closeTabs, reopenTab, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
@@ -3437,7 +3463,7 @@ export function App() {
             )}
             {browsed.flatMap(id => {
               const w = live.find(x => x.id === id)
-              return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
+              return w?.browser !== undefined ? [<BrowserPane key={id} onGuest={g => (g ? guests.current.set(id, g) : guests.current.delete(id))} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
             {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
           </div>

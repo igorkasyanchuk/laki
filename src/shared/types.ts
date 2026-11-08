@@ -601,6 +601,7 @@ export type Settings = {
   archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
   prBots?: string[] // review bots whose threads the review switch sends (unset: PR_BOTS)
+  browserBudget?: number // MB hidden Browsers pages may hold before the oldest is unloaded (unset, 0: never): Settings › Resources
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
   inHooks?: InHook[] // Settings › Webhooks: the hooks a POST from outside starts workflows by (inbound.ts; their secrets in <data>/hooks)

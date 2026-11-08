@@ -142,6 +142,15 @@ app.on('web-contents-created', (_e, wc) => {
     // the popup itself opens no more windows: its links to a new one load in it
     guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
     guest.on('context-menu', (_e, p) => pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))
+    // what the memory budget mustn't unload (browser-guard), seen from here, not told by the page
+    const g: Guest = { typed: false, media: false, downloads: 0 }
+    guests.set(guest, g)
+    guest.on('did-navigate', () => (g.typed = false)) // a new document: what was typed in the last one is gone anyway
+    guest.on('media-started-playing', () => (g.media = true))
+    guest.on('media-paused', () => (g.media = false))
+    guest.on('before-input-event', (_e, i) => {
+      if (i.type === 'keyDown' && (((i.key.length === 1 || i.key === 'Backspace' || i.key === 'Delete' || i.key === 'Enter') && !i.meta && !i.control) || (i.meta && /^[vx]$/i.test(i.key)))) g.typed = true
+    })
     // new and close tab (⌘T, ⌘W: Settings › Keys') are the app's (open another page, close this one), not the page's:
     // it gets the keys while it has the focus
     guest.on('before-input-event', (e, i) => {
@@ -149,6 +158,32 @@ app.on('web-contents-created', (_e, wc) => {
       if (id === 'newTab' || id === 'closeTab') e.preventDefault(), wc.send('browser-key', id)
     })
   })
+})
+// the memory budget's guards (Settings › Resources; shared/browserBudget.ts). Anything uncertain holds the page: a typed
+// key counts as an edit until it navigates, shortcuts too, and a check that fails or takes too long holds it.
+// ponytail: the form check is the main frame's: a box ticked in a cross-origin frame with the mouse alone isn't seen
+type Guest = { typed: boolean; media: boolean; downloads: number }
+const guests = new WeakMap<Electron.WebContents, Guest>()
+const FORM_EDITED = `[...document.querySelectorAll('input,textarea,select')].some(e => e.tagName === 'SELECT' ? [...e.options].some(o => o.selected !== o.defaultSelected) : e.type === 'checkbox' || e.type === 'radio' ? e.checked !== e.defaultChecked : e.type !== 'hidden' && e.value !== e.defaultValue)`
+const ISOLATED = 1999 // a world of its own: the page's scripts can't reach what this reads or say what it returns
+const guestOf = (id: unknown) => (wc => (wc && !wc.isDestroyed() && guests.has(wc) ? wc : undefined))(typeof id === 'number' ? webContents.fromId(id) : undefined)
+// the guests' memory: each process once (pages can share one)
+ipcMain.handle('browser-mem', (e, ids: unknown) => {
+  if (e.sender !== win?.webContents || !Array.isArray(ids)) return null
+  const pids = new Set(ids.map(guestOf).flatMap(wc => wc?.getOSProcessId() || []))
+  return { kb: app.getAppMetrics().reduce((n, m) => n + (pids.has(m.pid) ? m.memory.workingSetSize : 0), 0) }
+})
+ipcMain.handle('browser-guard', async (e, id: unknown) => {
+  if (e.sender !== win?.webContents) return 'can’t tell what it’s doing'
+  const wc = guestOf(id)
+  const g = wc && guests.get(wc)
+  if (!wc || !g) return 'can’t tell what it’s doing'
+  if (g.media || wc.isCurrentlyAudible()) return 'is playing'
+  if (g.downloads) return 'is downloading'
+  if (wc.debugger.isAttached() || wc.isDevToolsOpened()) return 'is being inspected or automated'
+  if (g.typed) return 'has typing that may be unsaved'
+  const edited = await Promise.race([wc.executeJavaScriptInIsolatedWorld(ISOLATED, [{ code: FORM_EDITED }]).catch(() => undefined), new Promise(r => setTimeout(r, 1500))])
+  return edited === false ? undefined : edited ? 'has form edits' : 'can’t tell what it’s doing'
 })
 // a Browsers page's right click: its link, image, selection or field, back, forward, reload, and Inspect Element (the
 // page's DevTools). ponytail: no spelling suggestions
@@ -208,6 +243,12 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL(), d.mediaType === 'video'))
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
   const b = session.fromPartition(BROWSER)
+  b.on('will-download', (_e, item, wc) => {
+    const g = wc && guests.get(wc)
+    if (!g) return
+    g.downloads++
+    item.once('done', () => g.downloads--)
+  })
   b.setUserAgent((chromeUA = b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, '')))
   // Google's sign-in: Firefox's user agent in the requests too, and none of Chrome's client hints (googleSignIn)
   b.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (d, cb) =>

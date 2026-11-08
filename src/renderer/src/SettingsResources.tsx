@@ -2,7 +2,8 @@
 // Settings.tsx re-exports it.
 import { type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
-import { Icon } from './ui'
+import { BUDGET_DEFAULT } from '../../shared/browserBudget'
+import { Icon, Switch } from './ui'
 import { Group } from './SettingsKit'
 
 // Resources: what Laki and each tab use now (the daemon's ps, every 3 s while it's open), and idle agents put to sleep
@@ -13,6 +14,7 @@ export type ResourcesApi = {
   wsName: (id: string) => string
   sleep: (tab: string) => Promise<unknown>
   open: (tab: string) => void
+  budgetSaid?: () => string // the memory budget: why nothing could be unloaded
   procs?: () => Promise<{ pid: number; name: string; stop?: string }[]> // the app's: what each process holds (main's)
   stop?: (what: string) => void // free one: the video, a widget, the preview, the bubbles, an agent browser
   stopOther?: (key: string) => Promise<unknown> // end one the daemon runs: Laki AI's ask, a tunnel, remote access
@@ -67,7 +69,7 @@ function ResGraph() {
   )
 }
 
-export function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void }) {
+export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget, onBrowserBudget }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void; browserBudget: number; onBrowserBudget?: (mb: number) => void }) {
   const [r, setR] = useState<Resources | null>(null)
   const [named, setNamed] = useState<{ pid: number; name: string; stop?: string }[]>([])
   const [open, setOpen] = useState<string | null>(null) // the row whose processes show
@@ -241,6 +243,21 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: Resou
           </>
         )}
       </Group>
+      {onBrowserBudget && (
+        <Group title="Hidden browser pages" hint="Over the budget, the oldest Browsers page you aren't on is unloaded; opening it loads its address again (what you typed or scrolled to isn't kept). Never the one you're on, the last ones you used, or a page playing, downloading, being inspected, or with typing or form edits.">
+          <Switch className="switch-row" on={browserBudget > 0} onChange={on => onBrowserBudget(on ? BUDGET_DEFAULT : 0)}>
+            Unload hidden pages over a memory budget
+          </Switch>
+          {browserBudget > 0 && (
+            <label className="row">
+              Budget (MB)
+              <span className="grow" />
+              <input type="number" style={{ width: 100 }} min={256} step={256} defaultValue={browserBudget} key={browserBudget} onBlur={e => { const n = Math.round(Number(e.target.value)); if (n >= 256 && n !== browserBudget) onBrowserBudget(n) }} />
+            </label>
+          )}
+          {api.budgetSaid?.() && <div className="muted small">{api.budgetSaid()}</div>}
+        </Group>
+      )}
       <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host. After a restart, one unused this long stays asleep until you open it.">
         <label>
           Sleep idle agents after

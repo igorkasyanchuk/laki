@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › Resources › *Hidden browser pages*: a memory budget (off unless you turn it on). Over it, the oldest Browsers
+  page you aren't on is unloaded and loads its address again when you open it. Never one playing, downloading, being
+  inspected, or with typing or form edits; if every page is held, it says why.
+
 - Settings › Agents & profiles shows how an agent's own terminal status (OSC 7501) compares with its hooks. Only counted
   for now: what a tab shows still comes from hooks.
 

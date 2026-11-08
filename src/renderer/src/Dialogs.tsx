@@ -192,6 +192,7 @@ export function Pages({ app }: { app: AppCtx }) {
             stopOther: key => api.call('resourceStop', { key }),
             open: tab => (setDialog(null), selectTab(tab), view.tabs.find(t => t.id === tab)?.asleep && call('tabWake', { tab }).catch(() => {})),
             procs: bridge?.procs,
+            budgetSaid: () => app.budgetSaid.current,
             // main's (the bubbles, an agent browser), else the page's own frames (laki-stop: the video, a widget, the preview)
             stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
             widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,

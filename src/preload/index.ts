@@ -74,6 +74,8 @@ contextBridge.exposeInMainWorld('laki', {
   // theme's colors; opts: the working circles' style, cards on hover, the + and how its actions show
   floats: (items: object[], colors: Record<string, string>, opts?: object) => ipcRenderer.send('floats', items, colors, opts),
   procs: (): Promise<{ pid: number; name: string; stop?: string }[]> => ipcRenderer.invoke('procs'), // Settings › Resources: what each process holds
+  browserMem: (ids: number[]): Promise<{ kb: number } | null> => ipcRenderer.invoke('browser-mem', ids), // the memory budget: what these pages hold
+  browserGuard: (id: number): Promise<string | undefined> => ipcRenderer.invoke('browser-guard', id), // why this page can't be unloaded, if so
   procStop: (what: string) => ipcRenderer.send('proc-stop', what), // the bubbles, an agent browser
   // the bubbles' own windows (floater.html): the bar (the list in; its height, a hover and a click out) and the card
   floater: {

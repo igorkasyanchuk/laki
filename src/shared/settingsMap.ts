@@ -202,6 +202,7 @@ export const FIND: [string, string, string?][] = [
   ['achievements', 'Show achievements', 'trophy trophies badges unlock tour learn gamification'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
+  ['resources', 'Unload hidden pages over a memory budget', 'browser memory ram free webview discard tabs'],
 ]
 
 // the ? beside a setting that assumes agent know-how (SettingsKit's Says, by its title as the page writes it): what it

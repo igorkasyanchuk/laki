@@ -2278,6 +2278,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   message (`laki send`, a scheduled task, the PR buttons) resumes the chat (`--resume`), and a message waits until
   it's up. Never one with a dev server listening under it, getting PR feedback (the PR switches), or on an SSH
   host. An agent grows the longer it runs; a resumed one starts small.
+- *Hidden browser pages* (Resources; off unless you turn it on, 2 GB to start): over the budget, the oldest Browsers page you aren't on
+  is unloaded, one every 15 seconds at most; opening it loads its address again, but what you typed or scrolled to isn't kept. Never the
+  page you're on, the two you used last, or one playing, downloading, being inspected, or with typing or form edits. Pressing a key in a page
+  counts as typing until it navigates. Every page held: nothing goes, and the section says why.
 - *Project settings*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one

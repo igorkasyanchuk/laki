@@ -120,6 +120,8 @@ time and AI money per run (`budget: 60 min, $5`).
   ([headless.md](headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, extensions, the preview or the floating bubbles stop with a click.
+- **Hidden browser pages**: an optional memory budget unloads the oldest Browsers page you aren't on; it never touches one playing,
+  downloading, being inspected, or with typing or form edits.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.

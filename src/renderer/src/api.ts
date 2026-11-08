@@ -47,6 +47,8 @@ type Bridge = {
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void
+  browserMem?(ids: number[]): Promise<{ kb: number } | null>
+  browserGuard?(id: number): Promise<string | undefined>
   onDeepLink?(cb: (url: string) => void): void
   onFolders?(cb: (paths: string[]) => void): () => void // folders dropped on the Dock icon: projects, as a drop on the window
   capture?(webContentsId: number): Promise<string>
