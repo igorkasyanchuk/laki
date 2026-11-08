@@ -10,11 +10,10 @@ import { join } from 'node:path'
 import { type CheckRun, type CheckStepName, checkOk, type DoneCheck, type Preset, type Tab, type Workspace } from '../shared/types.ts'
 import { broadcast, changed, checkHooks, checks, git, plainEnv, presets, projectConfig, send, settingUp, shell, state, storageOf, tracked, turnEnds, wsLog } from './core.ts'
 import { dir } from './dir.ts'
-import { diff } from './files.ts'
+import { diff, treeOf } from './files.ts'
 import { killGroup } from './resources.ts'
 import { phone } from './phone.ts'
 import { aiOnce } from './ai.ts'
-import { treeOf } from './turns.ts'
 
 export const CHECK_TRIES = 3 // failures in a row sent back to the agent, then it's over to you
 const STEP_MIN = Number(process.env.LAKI_CHECK_MIN) || 10 // a script's minutes (tests' fewer)

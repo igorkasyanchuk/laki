@@ -181,8 +181,9 @@ export function repoFiles(w: Entry): { names: string[]; bad?: string } {
   let listed: string[] | undefined
   const trees: string[] = [] // a submodule, an untracked folder (a nested repo too): walked
   if (w.project && !w.agentDev) try { // an agent's folder: never git's listing, whose .gitignore it writes
+    // core.fsmonitor: its folder may be a repo of an agent's own, and git run in it would run that program as you
     // ponytail: two sync gits per run (trusted), as the walk was; cache by the index's and the folder's mtimes if it shows
-    const ls = (...a: string[]) => execFileSync('git', ['ls-files', '-z', ...a, '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
+    const ls = (...a: string[]) => execFileSync('git', ['-c', 'core.fsmonitor=false', 'ls-files', '-z', ...a, '--', '.'], { cwd: d, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0').filter(Boolean)
     const staged = ls('--stage') // <mode> <sha> <stage>\t<path>: 160000, a gitlink
     const others = ls('--others', '--directory') // ignored ones too; a folder git has nothing of as <dir>/
     listed = []
@@ -213,7 +214,7 @@ export function repoFiles(w: Entry): { names: string[]; bad?: string } {
 // belongs in its state)
 function ignoredOf(w: Entry, names: string[]) {
   try {
-    const ig = new Set(execFileSync('git', ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', '.'], { cwd: w.dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0'))
+    const ig = new Set(execFileSync('git', ['-c', 'core.fsmonitor=false', 'ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', '.'], { cwd: w.dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000, maxBuffer: 16 << 20 }).split('\0'))
     return names.filter(n => ig.has(n)).sort()
   } catch {
     return []

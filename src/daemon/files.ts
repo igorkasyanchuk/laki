@@ -2,15 +2,55 @@
 // reads and writes. core.ts imports it, and its users import it directly.
 
 import { randomBytes } from 'node:crypto'
-import { closeSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
 import { type Blame, type Stat, type Workspace } from '../shared/types.ts'
-import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, q, run, save, state, within } from './core.ts'
+import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, noNested, q, run, save, state, within } from './core.ts'
+import { dir } from './dir.ts'
 import { away, hostUp, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
+
+// ---------- the worktree as a tree
+
+export const turnDir = join(dir, 'turns')
+const lines = new Map<string, Promise<unknown>>() // by workspace: one git add at a time on its index
+export const g = async (ws: Workspace, args: string[], env?: NodeJS.ProcessEnv) => (await run('git', ['-c', 'core.quotePath=false', '--literal-pathspecs', ...noNested(ws, args)], { cwd: ws.path, env: env ?? process.env, maxBuffer: 256 << 20 })).stdout
+const emptyDir = (p: string) => {
+  try {
+    return !readdirSync(p).length
+  } catch {
+    return false
+  }
+}
+// the worktree as a tree, untracked files too (turns.ts' turns, verify.ts' Done check; Ship's, fresh: the index as it is
+// now, as git add -A would start from, what you staged by hand or took out included)
+export function treeOf(ws: Workspace, fresh = false) {
+  const run1 = async () => {
+    mkdirSync(turnDir, { recursive: true, mode: 0o700 })
+    const idx = join(turnDir, `${ws.id}.index`)
+    const env = { ...process.env, GIT_INDEX_FILE: idx }
+    if (fresh || !existsSync(idx))
+      try {
+        copyFileSync(resolve(ws.path, (await g(ws, ['rev-parse', '--git-path', 'index'])).trim()), idx) // its stat data: add -A hashes only what changed
+      } catch {
+        await g(ws, ['read-tree', 'HEAD'], env).catch(() => {}) // a repo with no commit yet: none
+      }
+    // a gitlink: add -A runs git status in it, under its config (core.ts' noNested), and takes no flag against it. Off
+    // this index (Laki's, the agent can't touch it), add -A takes the folder back by its HEAD alone
+    const links = (await g(ws, ['ls-files', '-s', '-z'], env)).split('\0').filter(l => l.startsWith('160000 ')).map(l => ({ sha: l.split(' ')[1], path: l.slice(l.indexOf('\t') + 1) }))
+    if (links.length) await g(ws, ['update-index', '--force-remove', '--', ...links.map(l => l.path)], env)
+    await g(ws, ['add', '-A'], env)
+    // a submodule never checked out (an empty folder, as git worktree add leaves it): nothing for add -A to take back
+    for (const l of links) if (emptyDir(join(ws.path, l.path))) await g(ws, ['update-index', '--add', '--cacheinfo', `160000,${l.sha},${l.path}`], env)
+    return (await g(ws, ['write-tree'], env)).trim()
+  }
+  const p = (lines.get(ws.id) ?? Promise.resolve()).then(run1, run1)
+  lines.set(ws.id, p.catch(() => {}))
+  return p
+}
 
 // ---------- the diff against the base
 
@@ -515,7 +555,7 @@ export async function files(ref: string, project?: string) {
     const out = stdout.split('\n').filter(Boolean).map(l => l.slice(2))
     return { files: out.slice(0, MAX_FILES), changed: {}, cut: out.length > MAX_FILES }
   }
-  if (!ws.host && !existsSync(join(ws.path, '.git'))) {
+  if (!ws.host && (state.projects.find(p => p.id === ws.project)?.git === false || !existsSync(join(ws.path, '.git')))) {
     const out: string[] = []
     const walk = (dir: string) => {
       let es: Dirent[]

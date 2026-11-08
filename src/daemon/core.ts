@@ -33,7 +33,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { collisions, inside, scanOverlaps, scanStats, stats, viewWs } from './files.ts'
+import { collisions, inside, scanOverlaps, scanStats, stats, treeOf, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -875,9 +875,24 @@ export function ghHour() {
   ghCalls.since = Date.now()
 }
 
+// a sandboxed agent can make a repo inside its worktree with a config of its own (core.fsmonitor: a program), and link it
+// in the index. git status, diff and add go in to ask if it's dirty, and run that outside the sandbox as you. Flags, as
+// a .gitmodules the agent writes (ignore = none, fetchRecurseSubmodules) beats diff.ignoreSubmodules and fetch's config
+// (turns.ts' treeOf: add -A has no flag). dirty: a moved commit still shows. ponytail: uncommitted work inside a
+// submodule counts as clean (wsPeek, Archive if clean); status --porcelain can't tell a real submodule from the agent's
+const NESTED: Record<string, string[]> = { status: ['--ignore-submodules=dirty'], diff: ['--ignore-submodules=dirty', '--submodule=short'], show: ['--submodule=short'], fetch: ['--no-recurse-submodules'] } // short: your diff.submodule=diff runs git in there too
+export function noNested(at: At, args: string[]) {
+  // a folder project is no repo to Laki, whatever .git an agent made in it: this git would be under that config
+  if (state.projects.find(p => p.id === (at as { project?: string }).project)?.git === false) throw new Error(`${at.path}: not a git repo`)
+  let i = 0
+  while (args[i] === '-c' || args[i]?.startsWith('--')) i += args[i] === '-c' ? 2 : 1 // git's own, before the command
+  return [...args.slice(0, i + 1), ...(NESTED[args[i]] ?? []), ...args.slice(i + 1)]
+}
+
 // a command in a folder: here, or on its SSH host (with the PATH its login shell has)
 export async function exec(at: At, cmd: string, args: string[], o: { timeout?: number; maxBuffer?: number } = {}) {
   if (cmd === 'gh') ghCount(args)
+  if (cmd === 'git') args = noNested(at, args)
   if (!at.host) return run(cmd, args, { cwd: at.path, maxBuffer: 64 << 20, ...o })
   const h = await hostUp(at.host)
   return slot(at.host, () => run('ssh', [...sshOpts(at.host!), at.host!, `export PATH=${q(h.path)}; cd ${q(at.path)} && exec ${[cmd, ...args].map(q).join(' ')}`], { maxBuffer: 64 << 20, ...o }))
@@ -3949,15 +3964,18 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   const picked = lab ? '' : await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')
   const repo = picked.trim() || lab ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
   const R = repo ? ' -R "$LAKI_REPO"' : ''
+  // git add -A here would go into a nested repo (noNested), so what treeOf stages. ponytail: a host's keeps git add -A
+  // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
+  const tree = ws.host ? '' : await treeOf(ws, true)
   const script = [
     'set -e',
-    'git add -A',
+    tree ? 'git read-tree --reset "$LAKI_TREE"' : 'git add -A',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
     lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

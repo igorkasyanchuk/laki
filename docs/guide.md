@@ -2103,7 +2103,11 @@ and what it costs.
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
   the files that say where git finds them), not elsewhere on the Mac; in a workspace on the repo itself (not a
   worktree), `git commit` runs outside it. In a Codex tab, so do a rebase, `git stash` and a commit of some files only
-  (`git commit <file>`): Codex asks first. The tabs and workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. It
+  (`git commit <file>`): Codex asks first. A sandboxed agent can still make a git repo inside its worktree, with a config
+  that names a program; Laki's own git stays out of it, but `git status`, `git diff` or `git merge` **you** run in that
+  worktree goes in and runs that program as you, and so does a shell prompt that shows git status or an editor's git
+  panel, with nothing typed. Check it for a nested `.git` first (`find . -mindepth 2 -name .git`).
+  The tabs and workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. It
   can still message another agent (`laki send`, `laki ask`) or ask Laki AI: one that isn't sandboxed asks you before it
   acts only as its own mode says, so keep those in a mode that asks. Claude
   Code: its sandbox setting, Laki's `laki` command run outside it, new websites asked about. Codex: `-s

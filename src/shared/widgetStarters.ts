@@ -284,7 +284,7 @@ base=\${base#origin/}
 cd "$LAKI_PATH" || exit 1
 mark="$(git rev-parse --git-common-dir)/laki-fetched-$(printf %s "$base" | tr -c 'A-Za-z0-9._-' _)" # empty: it worked
 if git remote get-url origin >/dev/null 2>&1 && [ -z "$(find "$mark" -mmin -15 2>/dev/null)" ]; then
-  git fetch -q origin "$base" >/dev/null 2>&1 & f=$!
+  git fetch -q --no-recurse-submodules origin "$base" >/dev/null 2>&1 & f=$!
   ( sleep 20; kill $f ) >/dev/null 2>&1 & k=$! # macOS has no timeout
   if wait $f; then : >"$mark"; else echo failed >"$mark"; fi
   kill $k 2>/dev/null
@@ -316,6 +316,9 @@ TOOLS='Read,Edit,Write,Glob,Grep,Bash(git fetch:*),Bash(git merge:*),Bash(git st
 json() { printf '%s' "$1" | tr '\\t' ' ' | tr -d '\\000-\\010\\013-\\037' | awk 'BEGIN { printf "\\"" } { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); printf "%s%s", (NR > 1 ? "\\\\n" : ""), $0 } END { printf "\\"" }'; }
 toast() { printf '{"toast": %s}\\n' "$(json "$1")"; exit 0; }
 modal() { printf '{"modal": {"title": %s, "text": %s}}\\n' "$(json "$1")" "$(json "$2")"; exit 0; } # exit 0: a failed action's output isn't read
+# a repo checked out inside this one: git merge goes into it and obeys its config, and there's no flag against that. An
+# agent's sandbox doesn't reach this script. ponytail: one linked after this check still gets in
+nested() { git ls-files -s | grep '^160000' | cut -f2 | while read -r p; do [ -e "$p/.git" ] && echo "$p"; done; }
 
 cd "$LAKI_PATH" || modal 'Pull main' 'No workspace folder'
 base=\${WIDGET_BRANCH:-\${LAKI_BASE:-main}} # the setting, else the branch it came off
@@ -351,12 +354,13 @@ Open an agent in this workspace (or answer the one that asks), or pick git or ai
   toast "Asked the agent to merge $up"
   ;;
 git)
-  [ -z "$(git status --porcelain --untracked-files=no)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
-  [ "$up" = "$base" ] || out=$(git fetch -q origin "$base" 2>&1) || modal "Couldn't fetch $base" "$out"
+  [ -z "$(nested)" ] || modal "Couldn't merge $up" "$(nested | head -1) is a repo inside this one: merging here would run its config. Merge it yourself, or pick agent."
+  [ -z "$(git status --porcelain --untracked-files=no --ignore-submodules=dirty)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
+  [ "$up" = "$base" ] || out=$(git fetch -q --no-recurse-submodules origin "$base" 2>&1) || modal "Couldn't fetch $base" "$out"
   n=$(git rev-list --count "HEAD..$up") || modal "Couldn't merge $up" "No branch $up"
   [ "$n" = 0 ] && toast "Up to date with $up"
   out=$(git merge --no-edit "$up" 2>&1) && toast "Merged $up ($n new)"
-  files=$(git diff --name-only --diff-filter=U)
+  files=$(git diff --ignore-submodules=dirty --name-only --diff-filter=U)
   if [ -z "$files" ]; then
     git merge --abort 2>/dev/null
     modal "Couldn't merge $up" "$out"
@@ -364,7 +368,8 @@ git)
   later "git merge $up stopped on conflicts in: $(echo $files). Resolve each, keeping what both sides meant (no conflict markers left), run the project's tests and fix what the merge broke, then git add them and git commit --no-edit. End with one short line: what you resolved and whether the tests pass." "Conflicts in $(echo $files)"
   ;;
 ai)
-  [ -z "$(git status --porcelain --untracked-files=no)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
+  [ -z "$(nested)" ] || modal "Couldn't merge $up" "$(nested | head -1) is a repo inside this one: merging here would run its config. Merge it yourself, or pick agent."
+  [ -z "$(git status --porcelain --untracked-files=no --ignore-submodules=dirty)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
   later "$(prompt)" "Merging $up"
   ;;
 *) modal 'Pull main' "How: agent, git or ai, not $WIDGET_HOW" ;;

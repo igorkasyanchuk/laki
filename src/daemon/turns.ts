@@ -4,17 +4,15 @@
 // (Tab takes it). main.ts imports it (turnStarts, turnEnds), core doesn't: core keeps what the view shows on the tab's
 // runtime (suggest, changes).
 
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
-import { basename, join, resolve, sep } from 'node:path'
-import { promisify } from 'node:util'
+import { basename, join, sep } from 'node:path'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
 import { addTab, changed, findWs, presets, rtOf, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
 import { dir } from './dir.ts'
-import { diff, inside } from './files.ts'
+import { diff, g, inside, treeOf, turnDir } from './files.ts'
 import { chatRead } from './meters.ts'
 import { aiOnce, hasKey } from './ai.ts'
 import { accountEnv, accountFor, accountNamed, homeDir } from './accounts.ts'
@@ -167,31 +165,8 @@ export async function handoverPics(tab: Tab, ws: Workspace, text: string, to: st
 // ponytail: the last turn per tab, in memory (a restart forgets it); this Mac's git workspaces (no host); a tree is a
 // loose object git may prune after two weeks
 export const TURN_FILES = 50
-const turnDir = join(dir, 'turns')
-const execP = promisify(execFile)
 type Turn = { before: string; after: string; files: TurnFile[] }
 const cuts = new Map<string, { start?: Promise<string | undefined>; last?: string; turn?: Turn }>() // by tab
-const lines = new Map<string, Promise<unknown>>() // by workspace: one git add at a time on its index
-const g = (ws: Workspace, args: string[], env?: NodeJS.ProcessEnv) => execP('git', ['-c', 'core.quotePath=false', '--literal-pathspecs', ...args], { cwd: ws.path, env: env ?? process.env, maxBuffer: 64 << 20 }).then(r => r.stdout)
-// the worktree as a tree, untracked files too (verify.ts' Done check takes it as well)
-export function treeOf(ws: Workspace) {
-  const run = async () => {
-    mkdirSync(turnDir, { recursive: true, mode: 0o700 })
-    const idx = join(turnDir, `${ws.id}.index`)
-    const env = { ...process.env, GIT_INDEX_FILE: idx }
-    if (!existsSync(idx))
-      try {
-        copyFileSync(resolve(ws.path, (await g(ws, ['rev-parse', '--git-path', 'index'])).trim()), idx) // its stat data: add -A hashes only what changed
-      } catch {
-        await g(ws, ['read-tree', 'HEAD'], env).catch(() => {}) // a repo with no commit yet: none
-      }
-    await g(ws, ['add', '-A'], env)
-    return (await g(ws, ['write-tree'], env)).trim()
-  }
-  const p = (lines.get(ws.id) ?? Promise.resolve()).then(run, run)
-  lines.set(ws.id, p.catch(() => {}))
-  return p
-}
 const wsFor = (tab: Tab) => {
   const ws = state.workspaces.find(w => w.id === tab.workspace)
   const ok = ws && !ws.archived && !ws.host && state.settings?.turnChanges !== false && tracked(tab) && (tab.preset === 'claude' || tab.preset === 'codex') && state.projects.find(p => p.id === ws.project)?.git !== false && existsSync(ws.path)

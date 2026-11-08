@@ -1,7 +1,7 @@
 // Worktrees and their files: ignored files copied, .laki.json's trust, setup, diff, the side panel's files, a folder without git.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
@@ -419,6 +419,91 @@ test("a turn's changes: the worktree as it starts and ends; This turn's diff; Un
   await turn(() => {}) // a turn that changes nothing: no card
   await sleep(500)
   assert.equal((await rig.tab(ws.id)).changes, undefined)
+})
+
+test("a nested repo an agent made: its config never runs in Laki's git, whatever its .gitmodules says (status, diff, a turn's snapshot, fetch)", async t => {
+  const rig = await fresh(t)
+  const ran = join(rig.home, 'ran')
+  const evil = join(rig.home, 'evil.sh')
+  writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+  const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe' })
+  const nest = (at: string) => {
+    git(at, 'init', '-q', 'sub')
+    writeFileSync(join(at, 'sub/b'), 'y\n')
+    git(join(at, 'sub'), 'add', 'b')
+    git(join(at, 'sub'), 'commit', '-qm', 's')
+    git(at, 'add', 'sub')
+    git(join(at, 'sub'), 'config', 'core.fsmonitor', evil)
+    writeFileSync(join(at, '.gitmodules'), '[submodule "sub"]\n\tpath = sub\n\turl = ./sub\n\tignore = none\n\tfetchRecurseSubmodules = true\n')
+    writeFileSync(join(at, 'sub/b'), 'dirty\n')
+  }
+  const untouched = (what: string) => assert.ok(!existsSync(ran), `${what} ran it, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
+  git(rig.repo, 'remote', 'add', 'origin', rig.repo)
+  nest(rig.repo)
+  git(rig.repo, 'fetch', '-q', 'origin', 'main') // the rig's own git does go in: the trap is set
+  assert.ok(existsSync(ran), 'plain git fetch runs it')
+  rmSync(ran)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { syncBase: 'origin' })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  untouched('wsNew (its fetch of the base)')
+  const tab = await until(async () => (x => x?.resumeId && x.status === 'idle' && x)(await rig.tab(ws.id)), 'claude up')
+  nest(ws.path)
+  git(ws.path, 'status', '--porcelain')
+  assert.ok(existsSync(ran), 'plain git status runs it')
+  rmSync(ran)
+  assert.ok((await rig.rpc('wsPeek', { id: ws.id })).dirty > 0)
+  assert.match((await rig.rpc('diff', { ws: ws.id })).diff, /\.gitmodules/)
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'go' } })
+  await sleep(300)
+  writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { hook_event_name: 'Stop', last_assistant_message: 'Done.' } })
+  const ch = await until(async () => (await rig.tab(ws.id)).changes, 'its changes')
+  assert.deepEqual(ch.files.map((f: any) => f.path), ['x.txt'])
+  untouched('a scan, the diff or the snapshot')
+  const shipped = await rig.rpc('ship', { ws: ws.id, message: 'Shipped' })
+  const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === shipped.id)), 'ship done', 15000)
+  assert.equal(ended.code, 0, await rig.screen(shipped.id))
+  untouched('Ship')
+  assert.equal(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'Shipped')
+  assert.match(execFileSync('git', ['ls-tree', 'HEAD', 'x.txt', 'sub'], { cwd: ws.path, encoding: 'utf8' }), /x\.txt[\s\S]*160000 commit|160000 commit[\s\S]*x\.txt/) // the link still goes with it
+})
+
+test('a submodule never checked out stays in what Ship commits', async t => {
+  const rig = await fresh(t)
+  const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+  git(rig.repo, 'update-index', '--add', '--cacheinfo', `160000,${git(rig.repo, 'rev-parse', 'HEAD').trim()},lib`)
+  git(rig.repo, 'commit', '-qm', 'a submodule')
+  git(rig.repo, 'remote', 'add', 'origin', rig.repo)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+  const tab = await rig.rpc('ship', { ws: ws.id, message: 'Shipped' })
+  const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
+  assert.equal(ended.code, 0, await rig.screen(tab.id))
+  assert.match(git(ws.path, 'ls-tree', 'HEAD', 'lib'), /^160000 commit/)
+})
+
+test("a folder project: a .git an agent made in it is never used", async t => {
+  const rig = await fresh(t)
+  const ran = join(rig.home, 'ran')
+  const evil = join(rig.home, 'evil.sh')
+  writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+  const folder = join(rig.home, 'plain')
+  mkdirSync(folder)
+  writeFileSync(join(folder, 'a.txt'), 'a\n')
+  const p = await rig.rpc('projectAdd', { path: folder })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const git = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: folder, stdio: 'pipe' })
+  git('init', '-q')
+  git('add', 'a.txt')
+  git('commit', '-qm', 'i')
+  git('config', 'core.fsmonitor', evil)
+  writeFileSync(join(folder, 'a.txt'), 'b\n')
+  await assert.rejects(rig.rpc('diff', { ws: ws.id }), /not a git repo/)
+  assert.deepEqual((await rig.rpc('files', { ws: ws.id })).changed, {}) // the walk's, not git's
+  await sleep(300)
+  assert.ok(!existsSync(ran), 'its program ran')
 })
 
 test("Change base: a worktree's diff against another branch; its own branch, an option or none refused; an agent's refused; a deleted one said", async t => {

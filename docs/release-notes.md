@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Security: a sandboxed agent's nested git repo can no longer run a program of its own through Laki's git (scans, diffs,
+  Ship) or by adding a project. Uncommitted work inside a submodule no longer counts as a change in Laki.
+
 - Settings › Resources › *Hidden browser pages*: a memory budget (off unless you turn it on). Over it, the oldest Browsers
   page you aren't on is unloaded and loads its address again when you open it. Never one playing, downloading, being
   inspected, or with typing or form edits; if every page is held, it says why.
