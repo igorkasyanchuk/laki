@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Settings › Agents & profiles shows how an agent's own terminal status (OSC 7501) compares with its hooks. Only counted
+  for now: what a tab shows still comes from hooks.
+
 - A notification inbox: the bell keeps what finished, failed or asked for you (agents, workflows, reminders), the newest
   200, after the toast is gone and across restarts. Unread and All, Mark read, Clear; Open goes to where it happened.
 

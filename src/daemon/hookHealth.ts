@@ -4,6 +4,9 @@
 import { accessSync, constants, existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
+// OSC 7501's root against the status hooks gave (shadow: core's programSeen only counts it)
+export const nativeAgrees = (native: string, status: string) => status === (native === 'working' ? 'running' : native === 'blocked' ? 'waiting' : 'idle')
+
 export type HookWhy = { why: string; detail?: string } // detail: what to look at, to copy (a file:line, the args, the command)
 
 // a path as you'd say it: inside the workspace relative, in your home with ~

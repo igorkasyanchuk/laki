@@ -357,3 +357,16 @@ A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the s
 `resumeId` (Enter starts a new chat) only when it exits within `RESUME_FAIL` (30 s) of starting: later, a chat's own
 words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:
 the code, the seconds it ran, its last lines.
+
+### OSC 7501 (shadow)
+
+An agent can say what it's doing through its own terminal: the Program Status Protocol (`daemon/program.ts`). Only an agent's tab answers
+the query (`OSC 7501 ; ?`, `Session.programReport`, straight to the PTY: xterm.js has no OSC 7501, so never twice) and keeps records,
+one per id, on its `Session`: a new start has none, and exit, a reset (RIS), a clear and a new shell prompt (OSC 133 A: working and
+blocked) end them. A report that breaks a limit is dropped whole; an id out of the grammar too (skipped as a bad pair, it would be the
+root's: `state=clear:id=a@b` would clear everything). A child's report never moves its parent. `msg` and `title` are checked, not kept.
+
+Shadow: once the root's report has stood 2 s (`PROGRAM_SETTLE`; a hook and a report of one change never come at once) `programSeen`
+counts it against the status from hooks (`nativeAgrees`), per agent since the daemon started: `hooksSeen`'s `native`, Settings › Agents &
+profiles' line. Nothing else reads the records: a tab's status, notifications, asks and approvals stay with hooks, so a file shown in a tab
+can't move them. Next, once the counts say so: a fresh report overriding hooks for working, idle and done, under a written policy.

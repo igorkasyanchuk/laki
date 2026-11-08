@@ -10,12 +10,14 @@ import headless from '@xterm/headless'
 import serializeAddon from '@xterm/addon-serialize'
 import { askOf } from '../shared/ask.ts'
 import type { Ask } from '../shared/types.ts'
+import { PROGRAM_REPLY, ProgramRecords } from './program.ts'
 
 export type Client = { id: number; send(msg: unknown): void }
 
 type IPty = ReturnType<typeof pty.spawn>
 
 const SCROLLBACK = 5000
+const PROGRAM_SETTLE = 2000 // a report has stood this long before it's compared: a hook and a report of one change never come at once
 
 // The serialize addon drops OSC 8 links (claude's [#12](url), with FORCE_HYPERLINK): a reattached terminal would show
 // #12 and lose the URL. Its row writer gets a buffer whose cells carry the link's open and close in their text: a
@@ -78,6 +80,10 @@ export class Session {
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
   onHook: (data: string) => void = () => {} // OSC 7717: a hook on an SSH host reports through the tab's own terminal (core.ts)
+  agent = false // an agent's tab: only there is OSC 7501 answered or kept (core.ts spawnTab)
+  readonly program = new ProgramRecords() // what it says through OSC 7501 (program.ts): this start's only
+  onProgram: () => void = () => {} // its root record, once it has stood PROGRAM_SETTLE
+  private settle?: ReturnType<typeof setTimeout>
   hookKey = '' // this start's key, LAKI_HOOK in its env: what its hooks carry (core.ts spawnTab, hookOk)
 
   constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number }) {
@@ -89,6 +95,9 @@ export class Session {
     keepLinks(this.ser, (this.term as any)._core)
     this.term.onTitleChange(t => (this.title = t))
     this.term.parser.registerOscHandler(7717, d => (this.onHook(d), true))
+    this.term.parser.registerOscHandler(7501, d => (this.programReport(d), true))
+    this.term.parser.registerOscHandler(133, d => (d.startsWith('A') && this.program.prompt(), false)) // a new prompt
+    this.term.parser.registerEscHandler({ final: 'c' }, () => (this.program.clear(), false)) // RIS
     // headless replies go to the PTY only while no client answers instead
     this.term.onData(d => {
       if (!this.responder && !this.exited) this.pty.write(d)
@@ -99,10 +108,20 @@ export class Session {
       const exitCode = signal ? 128 + signal : code // killed: not a clean exit
       this.exited = true
       this.exitCode = exitCode
+      this.program.clear()
+      clearTimeout(this.settle)
       this.output(this.note || `\r\n\x1b[2m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
       for (const c of this.clients.keys()) c.send({ ev: 'exit', tab: this.tab, code: exitCode })
       this.onExit(exitCode)
     })
+  }
+
+  private programReport(d: string) {
+    if (!this.agent || this.exited) return
+    if (d.trim() === '?') return void this.pty.write(PROGRAM_REPLY) // only here: xterm.js has no OSC 7501, so never twice
+    if (!this.program.report(d)) return
+    clearTimeout(this.settle) // one timer however many reports
+    this.settle = setTimeout(() => this.onProgram(), PROGRAM_SETTLE)
   }
 
   output(d: string) {

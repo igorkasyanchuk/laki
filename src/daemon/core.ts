@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
-import { SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -41,7 +41,7 @@ import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, un
 import { ticketOf } from './tickets.ts'
 import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
 import { alertShow } from './alerts.ts'
-import { hookCause, type HookWhy } from './hookHealth.ts'
+import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 
 export const run = promisify(execFile)
 
@@ -1505,6 +1505,8 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey }) }), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   s.hookKey = hookKey
+  s.agent = tab.kind === 'agent'
+  s.onProgram = () => programSeen(tab, s)
   sessions.set(tab.id, s)
   const born = Date.now()
   const r = rtOf(tab.id)
@@ -3504,8 +3506,19 @@ function hookWhy(t: Tab, ws: Workspace) {
   return hookCause({ agent: t.preset!, cwd: ws.path, files, args: pr?.args, env: own && { where: own[0], dir: own[1]!.CLAUDE_CONFIG_DIR! }, argv: hookArgv })
 }
 // Settings › Agents & profiles: each agent's last hook, its live tabs and how many of them aren't heard
+// OSC 7501 in shadow (program.ts): the root's report against the status from hooks, counted per agent since the daemon started
+const natives = new Map<string, NativeSeen>()
+function programSeen(tab: Tab, s: Session) {
+  const root = s.program.root()
+  if (!root || !tab.preset || !tracked(tab) || asleep.has(tab.id) || s.exited) return
+  const n = natives.get(tab.preset) ?? { agree: 0, differ: 0 }
+  natives.set(tab.preset, n)
+  const hook = rtOf(tab.id).status
+  if (nativeAgrees(root.state, hook)) n.agree++
+  else (n.differ++, (n.last = { at: Date.now(), native: root.state, hook, ...(root.app && { app: root.app }) }))
+}
 export const hooksSeen = () =>
-  Object.fromEntries(AGENTS.map(a => [a, { ...(heard.has(a) && { at: heard.get(a) }), tabs: state.tabs.filter(t => t.preset === a && tracked(t) && isLive(t)).length, deaf: state.tabs.filter(t => t.preset === a && deafOf(t.id)).length }]))
+  Object.fromEntries(AGENTS.map(a => [a, { ...(natives.has(a) && { native: natives.get(a) }), ...(heard.has(a) && { at: heard.get(a) }), tabs: state.tabs.filter(t => t.preset === a && tracked(t) && isLive(t)).length, deaf: state.tabs.filter(t => t.preset === a && deafOf(t.id)).length }]))
 
 // a command line that runs an agent: its program (or a node/bun/deno/python script's) named as one, a path or not
 // ponytail: by name; an agent under another name (an alias to a wrapper script) still spins
