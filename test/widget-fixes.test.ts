@@ -1,7 +1,7 @@
 // Extensions' fixes (Part B): an agent's source waits out its every, a workspace's last events, one queued refresh,
 // failures back off, a notice said only once seen
 import { strict as assert } from 'node:assert'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fixtureWidgets, fresh, sleep, until } from './helpers.ts'
@@ -69,7 +69,9 @@ test("a workspace's archive and removal reach its per-workspace extension, which
 test('events: one refresh waits per extension, not one per event', async t => {
   const rig = await fresh(t)
   const home = rig.env.HOME
-  make(rig, 'busy', { name: 'Busy', fetch: `sleep 0.4; echo x >> "${home}/fetch.log"; echo "{}"`, on: { 'turn.done': 'refresh' } })
+  const go = join(home, 'go') // a fetch waits for it: gone while the events come, so a busy machine can't end one mid-burst
+  writeFileSync(go, '')
+  make(rig, 'busy', { name: 'Busy', fetch: `until [ -f "${go}" ]; do sleep 0.05; done; echo x >> "${home}/fetch.log"; echo "{}"`, on: { 'turn.done': 'refresh' } })
   await rig.rpc('widgetReload')
   await rig.rpc('widgetSet', { id: 'busy', on: true })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -77,8 +79,11 @@ test('events: one refresh waits per extension, not one per event', async t => {
   const ta = await until(() => rig.tab(a.id).then((t: any) => t?.last && t), 'its first turn over')
   await until(async () => !(await find(rig, 'busy')).running, 'the first fetch done')
   await sleep(600) // the first turn's own refresh, if any
-  const before = existsSync(join(home, 'fetch.log')) ? readFileSync(join(home, 'fetch.log'), 'utf8').trim().split('\n').length : 0
+  await until(async () => !(await find(rig, 'busy')).running, 'that refresh done too') // one still under way would count as the events'
+  const before =existsSync(join(home, 'fetch.log')) ? readFileSync(join(home, 'fetch.log'), 'utf8').trim().split('\n').length : 0
+  rmSync(go)
   await Promise.all(Array.from({ length: 6 }, () => rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'x' } })))
+  writeFileSync(go, '')
   await sleep(2500)
   const after = readFileSync(join(home, 'fetch.log'), 'utf8').trim().split('\n').length
   assert.ok(after - before <= 2, `${after - before} fetches for 6 events: one now, one queued`)

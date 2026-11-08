@@ -151,7 +151,7 @@ test("an extension run's gh calls: counted in its log line and Runs; GitHub's ra
   await rig.rpc('widgetReload')
   await rig.rpc('widgetSet', { id: 'g', on: true })
   await rig.rpc('settingsSet', { widgetLogs: true })
-  await rig.rpc('widgetRun', { id: 'g' })
+  await until(async () => (await rig.rpc('widgetRun', { id: 'g' })).ok, 'a run of its own') // turning it on fetches: "already fetching" until that's over
   let seen = (await logs(rig, 'g')).lines.map((l: any) => `${l.level} ${l.src} ${l.text}`)
   assert.ok(seen.some((l: string) => /^info fetch ran \(\w+\) in \d+ ms, exit 0, \d+ B, gh 2×$/.test(l)), seen.join('\n'))
   assert.equal((await rig.rpc('widgetRuns', { id: 'g' })).runs.find((r: any) => !r.action).gh, 2)
