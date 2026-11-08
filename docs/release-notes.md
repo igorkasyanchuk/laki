@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.46.0 · Nov 9, 2026
 
 - Security: a sandboxed agent's nested git repo can no longer run a program of its own through Laki's git (scans, diffs,
   Ship) or by adding a project. Uncommitted work inside a submodule no longer counts as a change in Laki.
