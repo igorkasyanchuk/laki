@@ -691,7 +691,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
               )}
             </Modal>
           ))(view.workspaces.find(x => x.id === overlapsAt.w))}
-      {dialog === 'inbox' && (
+      {app.inboxOn && (
         <Inbox
           at={view!.inbox?.at}
           unread={view!.inbox?.unread ?? 0}
@@ -699,6 +699,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
           canOpen={e => (e.run ? flowsOn : e.kind === 'reminder' || live.some(w => w.id === e.ws))}
           onOpen={e => {
             void call('inboxRead', { ids: [e.id] }).catch(() => {})
+            app.setInboxOn(false)
             setDialog(null)
             const t = view!.tabs.find(x => x.id === e.tab)
             if (e.run) setDialog({ workflows: '', run: e.run })
@@ -706,7 +707,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
             else if (live.some(w => w.id === e.ws)) setWsId(e.ws!)
             else setDialog('calendar') // a reminder whose workspace went
           }}
-          onClose={() => setDialog(null)}
+          onClose={() => app.setInboxOn(false)}
         />
       )}
       {dialog === 'video' && (

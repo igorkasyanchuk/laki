@@ -13,10 +13,14 @@ export function Inbox({ at, unread, call, canOpen, onOpen, onClose }: { at?: num
   const [all, setAll] = useState(unread === 0) // nothing unread: what there was
   const [sure, setSure] = useState(false)
   const box = useRef<HTMLDivElement>(null)
-  const load = () => void call<InboxEntry[]>('inboxList').then(setList, () => setList([]))
+  const asked = useRef(0)
+  const load = () => {
+    const n = ++asked.current // the last asked wins, whichever answers last
+    void call<InboxEntry[]>('inboxList').then(l => n === asked.current && setList(l), () => n === asked.current && setList([]))
+  }
   useEffect(load, [at, unread])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), onClose())
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopImmediatePropagation(), onClose()) // its own: not the page's under it
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [])
@@ -26,12 +30,15 @@ export function Inbox({ at, unread, call, canOpen, onOpen, onClose }: { at?: num
     const el = box.current!
     el.style.left = `${Math.max(8, Math.min(r?.width ? r.left : 8, innerWidth - el.offsetWidth - 8))}px`
     el.style.bottom = `${r?.width ? Math.max(8, innerHeight - r.top + 6) : 8}px`
+    const was = document.activeElement as HTMLElement | null
+    el.focus({ preventScroll: true }) // keys are the list's now, not the terminal's behind it
+    return () => was?.focus?.({ preventScroll: true })
   }, [])
   const read = (ids?: string[]) => void call('inboxRead', ids ? { ids } : {}).then(load, () => {})
   const shown = (list ?? []).filter(e => all || !e.read)
   return (
     <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()}>
-      <div className="inbox-pop" ref={box} role="dialog" aria-label="Notifications">
+      <div className="inbox-pop" ref={box} tabIndex={-1} role="dialog" aria-label="Notifications">
         <div className="inbox-head">
           <b>Notifications{unread ? ` (${unread} unread)` : ''}</b>
           <span className="grow" />
@@ -55,7 +62,7 @@ export function Inbox({ at, unread, call, canOpen, onOpen, onClose }: { at?: num
         <div className="inbox-list">
           {list && !shown.length && <div className="inbox-none muted">{all ? 'Nothing yet: finished agents, failed workflows, reminders and asks land here.' : 'Nothing unread.'}</div>}
           {shown.map(e => (
-            <div key={e.id} className={`inbox-row ${e.read ? '' : 'unread'} ${e.kind}`}>
+            <div key={e.id} className={`inbox-row ${e.read ? '' : 'unread'} k-${e.kind}`}>
               <Icon name={ICONS[e.kind]} />
               <div className="inbox-words">
                 <div className="inbox-title" title={e.title}>{e.title}</div>

@@ -165,7 +165,7 @@ app.on('web-contents-created', (_e, wc) => {
 type Guest = { typed: boolean; media: boolean; downloads: number }
 const NOT_TYPING = /^(Shift|Control|Alt|Meta|CapsLock|Tab|Escape|Arrow\w+|PageUp|PageDown|Home|End|F\d+)$/
 const guests = new WeakMap<Electron.WebContents, Guest>()
-const FORM_EDITED = `[...document.querySelectorAll('input,textarea,select')].some(e => e.tagName === 'SELECT' ? [...e.options].some(o => o.selected !== o.defaultSelected) : e.type === 'checkbox' || e.type === 'radio' ? e.checked !== e.defaultChecked : e.type !== 'hidden' && e.value !== e.defaultValue)`
+const FORM_EDITED = `[...document.querySelectorAll('input,textarea,select')].some(e => e.tagName === 'SELECT' ? (e.multiple ? [...e.options].some(o => o.selected !== o.defaultSelected) : [...e.options].some(o => o.defaultSelected) ? !e.options[e.selectedIndex]?.defaultSelected : e.selectedIndex > 0) : e.type === 'checkbox' || e.type === 'radio' ? e.checked !== e.defaultChecked : e.type !== 'hidden' && e.value !== e.defaultValue)`
 const ISOLATED = 1999 // a world of its own: the page's scripts can't reach what this reads or say what it returns
 const guestOf = (id: unknown) => (wc => (wc && !wc.isDestroyed() && guests.has(wc) ? wc : undefined))(typeof id === 'number' ? webContents.fromId(id) : undefined)
 // the guests' memory: each process once (pages can share one)

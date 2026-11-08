@@ -3072,7 +3072,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       r.status = 'waiting'
       r.limit = undefined
       if (again) break
-      const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
+      const text = String(pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : ''))
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
       phone(tab, 'waiting', text)
       setTimeout(() => {
