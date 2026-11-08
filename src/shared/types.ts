@@ -464,6 +464,8 @@ export const HOME_ACCOUNT = 'home'
 export type AccountView = { id: string; agent: AccountAgent; name: string; dir: string; email?: string; plan?: string; signedIn: boolean; default: boolean }
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit; a plan limit nearly used (the app's own: usage)
+// the notification inbox's records (daemon/inbox.ts); run: a workflow run's, project: for Recording mode once its workspace is gone
+export type InboxEntry = { id: string; at: number; kind: 'done' | 'failed' | 'limit' | 'waiting' | 'reminder'; title: string; text: string; ws?: string; tab?: string; run?: string; project?: string; read?: boolean; private?: boolean }
 export type NotifyKind = 'waiting' | 'done' | 'limit' | 'usage'
 export type TurnFile = { path: string; add: number; del: number; status: string } // status: git's A, M, D (no renames)
 export type TurnChanges = { at: number; add: number; del: number; n: number; files: TurnFile[] } // n: how many files; files: the first TURN_FILES
@@ -983,7 +985,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
 export type ArchivedProject = { id: string; name: string; path: string; host?: string; archived: number; workspaces: number }
-export type View = { modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+export type View = { inbox?: { unread: number; at: number } /* the notification inbox: daemon/inbox.ts */; modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
@@ -1004,7 +1006,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 154
+export const API = 155
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

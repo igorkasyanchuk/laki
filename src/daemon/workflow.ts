@@ -19,6 +19,7 @@ import { flowFiles, flowHooks } from './schedule.ts'
 import { ciLogs, prAct, scanPRs } from './pr.ts'
 import { isLive, killGroup } from './resources.ts'
 import { linkAdd } from './artifacts.ts'
+import { inboxAdd } from './inbox.ts'
 import { flowAsk, flowPhone } from './phone.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
@@ -306,6 +307,7 @@ export function flowRevert(o: Ref & { at: number; by?: 'agent' }) {
 
 const runs = () => (state.flows ??= [])
 const live = (r: FlowRun) => !FLOW_ENDED.includes(r.status)
+const inboxFlow = (r: FlowRun, kind: 'waiting' | 'failed', text: string) => inboxAdd({ kind, title: `Workflow · ${r.flow.name}`, text, run: r.id, ...(r.ws && { ws: r.ws }), ...(r.project && { project: r.project }) })
 // #5: what a run causes (its workspace, tabs, ship, archive): its id and one hop more than the event that started it (core's Cause)
 const hop = (r: FlowRun) => (r.hops ?? 0) + 1
 const cause = (r: FlowRun) => ({ run: r.id, hops: hop(r) })
@@ -1054,6 +1056,7 @@ function unsure(r: FlowRun, b: Block, names: string[]) {
   say(r, `asks you: ${q.ask}`, odds)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: q.ask })
+  inboxFlow(r, 'waiting', `asks you: ${q.ask}`)
   flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, `${blockName(b)}: ${q.ask}`, options, r.wait && 'show' in r.wait ? r.wait.show : undefined)
 }
 
@@ -1237,6 +1240,7 @@ function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, sh
   say(r, `asks you: ${question}`, show)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
+  inboxFlow(r, 'waiting', `asks you: ${question}`)
   flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, question, options, show)
 }
 function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop the run'], more?: { tab: string; used: number }) {
@@ -1363,6 +1367,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
   widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws, undefined, { ...(r.by && { from: { agent: r.by } }), hops: (r.hops ?? 0) + 1 }) // an agent's run: its end is the agent's event; one hop more than the event that started it
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
+  if (status === 'failed') inboxFlow(r, 'failed', why || 'failed')
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
   void tidy(r)

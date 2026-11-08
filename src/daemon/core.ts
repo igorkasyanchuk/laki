@@ -30,6 +30,7 @@ import { type Client, Session } from './session.ts'
 import { type GateBy, toolFlag, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
+import { inboxTurn, inboxView } from './inbox.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
@@ -648,6 +649,7 @@ export function view(): View {
     imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
+    inbox: inboxView(),
     caps: CAPS,
     built: BUILT,
     today: todayView(),
@@ -766,7 +768,7 @@ export const agentSaid = (ws: string, at: string) => {
 
 // tabs: every pane on screen; tab: the focused one (older clients send only that)
 export const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
-const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
+export const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
 export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null }) {
   const hidden = c.view?.shown === false
@@ -3070,6 +3072,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
+      inboxTurn(tab, 'waiting', text || 'needs you')
       phone(tab, 'waiting', text)
       setTimeout(() => {
         // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
@@ -3112,6 +3115,9 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       if (refused) r.last = refused
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
+      if (r.limit) inboxTurn(tab, 'limit', 'hit a usage limit')
+      else if (p.state === 'failed') inboxTurn(tab, 'failed', r.last || 'failed')
+      else if (!checkHooks.will?.(tab)) inboxTurn(tab, 'done', r.last || 'finished') // a check follows: its result (verify.ts' say)
       if (!r.limit) phone(tab, 'done', r.last ?? '')
       if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
       else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)

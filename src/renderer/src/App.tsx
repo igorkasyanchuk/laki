@@ -3111,6 +3111,7 @@ export function App() {
           {(settings.videoButton !== false || !!video) && <IconButton icon="youtube" title="Watch a YouTube video while you work (off: Settings › Appearance)" label={words ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />}
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={words ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           {(settings.timerButton !== false || timers.length + watches.length > 0) && <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch (off: Settings › Appearance)" label={words ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />}
+          <IconButton icon="bell" className="inbox-bell" title={view?.inbox?.unread ? `Notifications: ${view.inbox.unread} unread` : 'Notifications'} label={words ? 'Inbox' : undefined} on={dialog === 'inbox'} badge={view?.inbox?.unread} onClick={() => setDialog(d => (d === 'inbox' ? null : 'inbox'))} />
           <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={words} />
           {!rail && !bar && (
             <>

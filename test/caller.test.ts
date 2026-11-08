@@ -64,6 +64,8 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   for (const [i, what] of ['answer what Laki asks', "answer Laki AI's questions", "answer an agent's question", "edit an extension's files", 'start remote access', 'change that setting', 'compact memories (they go to a model)'].entries())
     assert.equal(said[i].error, `an agent can't ${what}: it's the user's (ask them)`)
   assert.equal(said[7].error, undefined)
+  const [box] = await agent(curl('inboxClear', {}))
+  assert.equal(box.error, "an agent can't change the user's notifications: it's the user's (ask them)")
   assert.equal(said[8].error, "an agent can't post a PR review as you: it's the user's (ask them)")
   assert.equal(said[9].error, "an agent can't comment on a PR as you: it's the user's (ask them)")
   assert.equal(said[10].error, "an agent can't approve a PR as you: it's the user's (ask them)")

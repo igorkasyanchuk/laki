@@ -223,6 +223,14 @@ gone or archived workspace is a failed run.
 
 ### Notifications
 
+The inbox (`daemon/inbox.ts`, the bell's `Inbox.tsx`, `<data>/inbox.json`, 0600): the newest 200 of a turn done, failed or at a
+limit, an ask, a workflow's failure or question and a reminder, recorded where they happen (`inboxTurn`, `inboxAdd`), so
+with no window open too, each once: a reconnect adds none. A turn a Done check follows is recorded by the check's `say`.
+No ask's buttons and at most 300 characters of text: Open reads the workspace and tab as they are by then. On screen in
+a focused window (`viewed`): read already. Muted: none. Recording mode: a private workspace's are out of the list, the
+count, Mark all read and Clear, and kept. The view has only `inbox` (`unread`, `at`, bumped by each change); an agent can
+read it but not `inboxRead` or `inboxClear` (`agentNo`).
+
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
 `settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`. A waiting
