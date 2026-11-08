@@ -117,6 +117,10 @@ test('inbox: ids that are no list mark nothing; a repeated ask is one row', asyn
   await new Promise(r => setTimeout(r, 1000))
   assert.equal((await asks()).length, 1, 'said again: one row')
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
+  await new Promise(r => setTimeout(r, 100))
+  await ask('waiting for your input') // a new ask, worded the same
+  await until(async () => (await asks()).length === 2, 'its own row')
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
   await ask(42) // not text: it still lands, and the hook isn't broken by it
   await until(async () => (await asks())[0].text === '42', 'a number as text')
   await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })

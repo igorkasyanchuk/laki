@@ -8,11 +8,13 @@ import { Icon, IconButton } from './ui'
 
 const ICONS: Record<InboxEntry['kind'], IconName> = { done: 'check', failed: 'x', limit: 'clock', waiting: 'bell', reminder: 'calendar' }
 
-export function Inbox({ at, unread, call, canOpen, onOpen, onClose }: { at?: number; unread: number; call: <T>(method: string, p?: object) => Promise<T>; canOpen: (e: InboxEntry) => boolean; onOpen: (e: InboxEntry) => void; onClose: () => void }) {
+export function Inbox({ at, unread, call, canOpen, onOpen, onClose, onBack }: { onBack: () => void; at?: number; unread: number; call: <T>(method: string, p?: object) => Promise<T>; canOpen: (e: InboxEntry) => boolean; onOpen: (e: InboxEntry) => void; onClose: () => void }) {
   const [list, setList] = useState<InboxEntry[] | null>(null)
   const [all, setAll] = useState(unread === 0) // nothing unread: what there was
   const [sure, setSure] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  const back = useRef(onBack)
+  back.current = onBack
   const asked = useRef(0)
   const load = () => {
     const n = ++asked.current // the last asked wins, whichever answers last
@@ -32,7 +34,8 @@ export function Inbox({ at, unread, call, canOpen, onOpen, onClose }: { at?: num
     el.style.bottom = `${r?.width ? Math.max(8, innerHeight - r.top + 6) : 8}px`
     const was = document.activeElement as HTMLElement | null
     el.focus({ preventScroll: true }) // keys are the list's now, not the terminal's behind it
-    return () => was?.focus?.({ preventScroll: true })
+    // back where the keys were; the bell had them only because it was clicked (Space there would open this again)
+    return () => (was?.isConnected && was !== document.body && !was.closest('.inbox-bell') ? was.focus({ preventScroll: true }) : back.current())
   }, [])
   const read = (ids?: string[]) => void call('inboxRead', ids ? { ids } : {}).then(load, () => {})
   const shown = (list ?? []).filter(e => all || !e.read)

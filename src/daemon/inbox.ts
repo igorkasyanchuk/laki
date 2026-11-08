@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import type { InboxEntry, Tab } from '../shared/types.ts'
-import { changed, log, state, viewed } from './core.ts'
+import { changed, log, rtOf, state, viewed } from './core.ts'
 import { dir } from './dir.ts'
 
 const MAX = 200
@@ -52,7 +52,8 @@ export function inboxTurn(tab: Tab, kind: 'done' | 'failed' | 'limit' | 'waiting
   const w = state.workspaces.find(x => x.id === tab.workspace)
   if (tab.muted || w?.muted) return
   const last = all().find(x => x.tab === tab.id)
-  if (kind === 'waiting' && last?.kind === 'waiting' && !last.read && last.text === clip(text)) return // the same ask said again (a Notification hook repeats)
+  const since = rtOf(tab.id).waitAt // this wait's start: an earlier one's row, worded the same, isn't it
+  if (kind === 'waiting' && last?.kind === 'waiting' && !last.read && since && last.at >= since && last.text === clip(text)) return // the same ask said again (a Notification hook repeats)
   inboxAdd({ kind, title: `${w?.name ?? tab.workspace} · ${tab.name}`, text, ws: tab.workspace, tab: tab.id, ...(viewed(tab.id) && { read: true }) })
 }
 

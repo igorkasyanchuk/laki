@@ -693,6 +693,8 @@ export function Dialogs({ app }: { app: AppCtx }) {
           ))(view.workspaces.find(x => x.id === overlapsAt.w))}
       {app.inboxOn && (
         <Inbox
+          key={String(!!settings.recording) /* Recording on: what was listed goes at once */}
+          onBack={() => void (!dialog && tab && xterms.get(tab.id)?.focus())}
           at={view!.inbox?.at}
           unread={view!.inbox?.unread ?? 0}
           call={call}
@@ -701,6 +703,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
             void call('inboxRead', { ids: [e.id] }).catch(() => {})
             app.setInboxOn(false)
             setDialog(null)
+            if (narrow) setSideOpen(false)
             const t = view!.tabs.find(x => x.id === e.tab)
             if (e.run) setDialog({ workflows: '', run: e.run })
             else if (t && t.status !== 'exited') selectTab(t.id)

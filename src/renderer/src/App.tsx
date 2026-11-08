@@ -2664,17 +2664,19 @@ export function App() {
     budgetSaid.current = ''
     if (!browserBudget || !bridge?.browserMem || !bridge.browserGuard) return
     let busy = false
+    let on = true
     const step = async () => {
       if (busy) return
       busy = true
       const r = await unloadStep({ budgetMb: browserBudget, guests: guests.current, used: usedAt.current, current: () => wsNow.current, mem: bridge!.browserMem!, guard: bridge!.browserGuard! }).catch(() => null)
       busy = false
+      if (!on) return
       if (r?.unload) setBrowsed(b => b.filter(id => id !== r.unload))
       const name = (id: string) => (w => (w ? wsName(w) : id))(viewRef.current?.workspaces.find(w => w.id === id))
       budgetSaid.current = r?.over && !r.unload ? `Over budget, nothing to unload: ${r.held.map(h => `${name(h.ws)} ${h.why}`).join('; ') || 'the pages left are the ones you used last'}` : ''
     }
     const t = setInterval(() => void step(), 15000)
-    return () => clearInterval(t)
+    return () => ((on = false), clearInterval(t))
   }, [browserBudget])
   // a page's address and title: the workspace's (its sidebar name), once it settles
   const pageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
