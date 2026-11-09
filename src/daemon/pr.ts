@@ -106,8 +106,7 @@ const checkTime = (t: unknown) => (typeof t === 'string' && !t.startsWith('0001'
 // finished one goes by when it really ran (its start, else its end, else the oldest): cancelled before it started, it
 // never beats the run that replaced it
 function newest(rollup: any[]): any[] {
-  const real = (t: unknown) => (t && !String(t).startsWith('0001') ? String(t) : '')
-  const at = (c: any) => (c.status === 'COMPLETED' ? real(c.startedAt) || real(c.completedAt) : real(c.startedAt) || '9')
+  const at = (c: any) => (c.status === 'COMPLETED' ? checkTime(c.startedAt) || checkTime(c.completedAt) || 0 : checkTime(c.startedAt) || Infinity)
   const by = new Map<string, any>()
   for (const c of rollup) {
     const k = `${c.workflowName ?? ''}/${c.name || c.context || ''}`
@@ -422,7 +421,7 @@ async function scanPR(ws: Workspace) {
   if (same && (pr.state !== 'OPEN' || (pr.checks !== 'pending' && pr.conflict !== undefined))) quietAt.set(ws.id, Date.now())
   else quietAt.delete(ws.id)
   const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0
-  wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)
+  wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing${count('cancelled') ? `, ${count('cancelled')} cancelled` : ''}), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)
   if (!same) {
     prs.set(ws.id, pr)
     changed()
