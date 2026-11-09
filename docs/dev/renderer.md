@@ -718,4 +718,9 @@ Fix (check, CI, conflicts, changes asked for), Merge (a PR open: waiting or read
 in Answer, Review or Fix (`test/next-step.test.ts`). An empty column is a 34px strip (`.board-col.empty`), wide under the
 pointer or a dragged to-do.
 
+The Review tab's room (U6): FullReview watches its own width (a ResizeObserver on its root). The diff keeps `DIFF_MIN`
+(480px): short of it the comments fold to their strip (`autoOff`: not saved, `laki.reviewNotesOff` stays yours), then
+`onTight` has App hide the side panel while the Review tab shows (`reviewTight`, back as you leave the tab); under
+`HEAD_MIN` (720px) the head's count is `+a −d` without its "n files".
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

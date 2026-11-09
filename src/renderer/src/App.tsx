@@ -2050,6 +2050,8 @@ export function App() {
   const statKey = ws?.stat ? JSON.stringify([ws.stat, (ws.prLinked || !ws.stat.files) && ws.pr?.head]) : '' // FullReview reads again as it moves; the PR's head only where it opens on the PR's diff
   const reviewTab = !!ws && settings.fullReview !== false && git && !!ws.stat && (!!ws.stat.files || ws.pr?.state === 'OPEN') && ws.browser === undefined && !isTerm(ws) && !ws.archived
   const reviewOn = reviewTab && !!reviewing[ws!.id]
+  const [reviewTight, setReviewTight] = useState(false) // U6: FullReview's diff had under 480px: the side panel is away until you leave the tab
+  useEffect(() => void (reviewOn || setReviewTight(false)), [reviewOn])
   const openReview = () => ws && setReviewing(m => ({ ...m, [ws.id]: true }))
   useEffect(() => void (reviewOn && ws && setReviewSeen(m => (m[ws.id] === statKey ? m : { ...m, [ws.id]: statKey }))), [reviewOn, ws?.id, statKey])
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
@@ -3534,7 +3536,7 @@ export function App() {
               const w = live.find(x => x.id === id)
               return w?.browser !== undefined ? [<BrowserPane key={id} onGuest={g => (g ? guests.current.set(id, g) : guests.current.delete(id))} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} onShot={r => (r.error ? toast(`No screenshot: ${r.error}`) : r.path ? toast(`Saved to Downloads: ${r.path.split('/').pop()}`, () => void bridge?.openPath?.(r.path!), 'Open', true) : done('Screenshot copied'))} />] : []
             })}
-            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} />}
+            {reviewOn && ws && <FullReview key={ws.id} ws={ws.id} base={ws.base} branch={ws.branch} pr={ws.pr} linked={ws.prLinked} empty={!ws.stat?.files} worktree={ws.kind === 'worktree'} api={reviewApi(ws)} stat={statKey} onOpen={openExternal} onTight={() => setReviewTight(true)} />}
           </div>
           {tabsAt === 'right' && <TabStrip app={app} />}
           {previewed && ws && (
@@ -3588,7 +3590,7 @@ export function App() {
             )}
             </div>
           )}
-          {panelShown && ws && ( // the right panel: Info, Files, Changes, Review, Preview
+          {panelShown && !(reviewOn && reviewTight) && ws && ( // the right panel: Info, Files, Changes, Review, Preview (U6: not beside a Review tab too narrow for its diff)
             <SidePanel
               w={infoOf(ws)}
               git={git}

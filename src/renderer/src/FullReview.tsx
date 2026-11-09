@@ -39,6 +39,8 @@ const NOTES = 'laki.reviewNotes' // each workspace's comments not sent yet
 const VIEWED = 'laki.reviewed' // each workspace's files viewed here: path → its diff's hash
 const FILES_W = 'laki.reviewFilesW' // the files' column's width
 const NOTES_W = 'laki.reviewNotesW' // the comments' column's width
+const DIFF_MIN = 480 // U6: the diff's least width
+const HEAD_MIN = 720 // under it the head's count is +a −d alone
 const NOTES_OFF = 'laki.reviewNotesOff' // true: the comments hidden to a strip
 const FILES_OFF = 'laki.reviewFilesOff' // true: the files hidden to a strip, likewise
 const SIDE = 'laki.reviewSide' // the comments' column: yours (mine), the PR's description (pr) or GitHub's (gh)
@@ -71,7 +73,7 @@ const STATES: Record<string, [string, string]> = { APPROVED: ['approved', 'good'
 type At = { path: string; line: DiffLine; from?: number; text: string } // the box: the line it's on, a range's first number
 type Blamed = { key: string; old?: Blame | string; new?: Blame | string } // key: the diff it was read for; a string: why there's none
 
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void }) {
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -396,8 +398,21 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const [side, setSide] = useState<'mine' | 'pr' | 'gh'>(() => load<'mine' | 'pr' | 'gh' | ''>(SIDE, '') || (notes.length || !pr ? 'mine' : 'gh'))
   const pickTab = (s: 'mine' | 'pr' | 'gh') => (setSide(s), store(SIDE, s))
   const tab = pr ? (side === 'gh' && pr.forge === 'gitlab' ? 'pr' : side) : 'mine' // an MR has no GitHub tab
-  const right = notesOff ? STRIP : nw
   const left = filesOff ? STRIP : fw
+  // U6: the diff keeps DIFF_MIN of the tab's own width (a ResizeObserver: the side panel and the sidebar take theirs):
+  // too narrow, the comments fold to their strip first (not saved: your choice comes back with the room), then the side
+  // panel goes while this tab shows (onTight: App's, until you leave it), then the head's count loses its "n files"
+  const [rw, setRw] = useState(0)
+  useEffect(() => {
+    const o = new ResizeObserver(([e]) => setRw(Math.round(e.contentRect.width)))
+    o.observe(root.current!)
+    return () => o.disconnect()
+  }, [])
+  const autoOff = !notesOff && rw > 0 && rw - left - nw < DIFF_MIN
+  const noNotes = notesOff || autoOff
+  const right = noNotes ? STRIP : nw
+  const tight = rw > 0 && rw - left - STRIP < DIFF_MIN
+  useEffect(() => void (tight && onTight?.()), [tight])
 
   const add_ = files.reduce((n, f) => n + (f.add ?? 0), 0)
   const del_ = files.reduce((n, f) => n + (f.del ?? 0), 0)
@@ -438,7 +453,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         <span className="muted small grow">
           {d ? (
             <>
-              {files.length} file{files.length === 1 ? '' : 's'} · <span className="add">+{add_}</span> <span className="del">−{del_}</span>
+              {!(rw > 0 && rw < HEAD_MIN) && `${files.length} file${files.length === 1 ? '' : 's'} · `}<span className="add">+{add_}</span> <span className="del">−{del_}</span>
               {unc ? ' not committed' : !pr && !worktree ? ` vs ${d.base}` : ''}
             </>
           ) : err ? '' : 'Loading…'}
@@ -455,7 +470,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
-      <div className="fr-cols" style={{ gridTemplateColumns: `${left}px minmax(0, 1fr) ${right}px` }}>
+      <div className="fr-cols" style={{ gridTemplateColumns: `${left}px minmax(min(${DIFF_MIN}px, 100% - ${left + right}px), 1fr) ${right}px` }}>
         {filesOff ? (
           <button type="button" className="fr-strip left" onClick={() => hideFiles(false)} data-tip="Show the files">
             <Icon name="files" />
@@ -583,8 +598,8 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           })}
           {rv.bar}
         </div>
-        {notesOff ? (
-          <button type="button" className="fr-strip" onClick={() => hideNotes(false)} data-tip="Show the comments">
+        {noNotes ? (
+          <button type="button" className="fr-strip" onClick={() => hideNotes(false)} data-tip={autoOff ? 'The comments: folded while the diff has no room (widen the window, or hide the files)' : 'Show the comments'}>
             <Icon name="messages" />
             <span className="fr-vert">
               Comments{notes.length > 0 && ` · ${notes.length}`}

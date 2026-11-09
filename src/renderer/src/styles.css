@@ -1453,6 +1453,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .full-review:focus { outline: none; } /* it takes the keyboard as it opens (j k v c): no ring for that */
 .fr-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
 .fr-head .seg button { padding-inline: 10px; }
+.fr-head > .muted.grow { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* U6: its count never wraps */
 .fr-keys { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
 .fr-cols { position: relative; flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; } /* FullReview sets the widths */
 .fr-edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 4; } /* inside the diff's padding: never over the files' scrollbar or Viewed boxes */
