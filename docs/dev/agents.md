@@ -193,7 +193,7 @@ replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki
 Hooks in the background: this Mac's claude runs its PreToolUse and PostToolUse hooks with `"async": true` (claude
 2.1.318 has it; it doesn't wait, and it enforces no timeout on them), so a tool call no longer waits for two starts of
 `laki hook` (Electron as node: ~45 ms to start, ~60 ms a hook here; 10 tool calls of the fake claude: 1.8 s of hooks a
-turn before, ~40 ms after). A tab started while a tool gate is on gets `-gated`, whose PreToolUse is waited for (it may
+turn before, ~40 ms after). S8: one started with none on is kept in core.ts' `ungated`; once a gate is on (`toolGateOn`) the view marks it (`ungated`: the tab's *No gate* mark, a count on the extension's page) and `gateRestart` (`{ tab? }`, the user's) starts the idle, not asking ones again, resumed (`{ restarted, left }`). A tab started while a tool gate is on gets `-gated`, whose PreToolUse is waited for (it may
 answer); a gate turned on later reaches running tabs as they start again (Turn on says so). `laki hook` sends `at`, its
 process's start (`performance.timeOrigin`), and `turn` keeps the newest it took (`Runtime.hookAt`): one that started
 before it (a PostToolUse after the turn's Stop, a PreToolUse after the ask PermissionRequest made) changes no state,
