@@ -67,6 +67,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   lists what finished, what waits for you and which PRs moved.
 - **Follow the system**: Settings › Appearance › Theme › *Follow the system* paints a light theme while macOS is light
   and a dark one while it's dark (pick each); it turns with the system, terminals too.
+- **Simple row**: Settings › Appearance › Sidebar rows › *Simple row* (off by default) makes a workspace's row its name
+  and one next-step chip, or the turn's time while its agent works; the other marks show on hover and in its card.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›

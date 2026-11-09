@@ -530,6 +530,7 @@ export type Settings = {
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   hideEmpty?: boolean // the sidebar leaves out a project with no row to show (none, all archived, all pinned): Appearance › Sidebar rows › Empty projects off (unset: shown)
+  simpleRow?: boolean // B4: Appearance › Sidebar rows › Simple row (off unless true): a row is its name and one next-step chip, the other marks on hover
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // a sidebar row's other marks, each on unless false (step: off unless true; conflict, ci: unset, as prIcon)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   usageAt?: number // a plan limit's % that notifies (notifyOn.usage): 75, 90, 95 (unset: USAGE_AT, 90)

@@ -167,6 +167,7 @@ export type AppSettings = Paint & {
   avatars?: boolean // GitHub's pictures of PR authors and reviewers (unset: on; off: none loaded)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   hideEmpty?: boolean // Appearance › Sidebar rows › Empty projects off: a project with no row to show is left out
+  simpleRow?: boolean // B4: a row is its name and one chip
   rowMarks?: Partial<Record<'step' | 'author' | 'conflict' | 'ci' | 'radar' | 'plan' | 'ticket', boolean>> // the sidebar rows' other marks (ROW_MARKS)
   timers?: boolean // a turn's time on its tab and row (unset: off)
   contextMeter?: boolean | 'line' | 'ring' | 'status' // a claude or codex chat's context: the status bar's, and its tab's line (unset, true) or ring; false: none
@@ -1747,6 +1748,9 @@ export function SettingsPage(p: {
               <div className="setting-box">
                 <Switch className="switch-row" on={s.hideEmpty !== true} onChange={v => set({ hideEmpty: !v })}>
                   <Says title="Empty projects" hint="Projects with no workspace to show: none, all archived, or all in Pinned. Off keeps the list short; the selected workspace's project and a filter's hits still show, and the new-workspace page still lists them all" />
+                </Switch>
+                <Switch className="switch-row" on={s.simpleRow === true} onChange={v => set({ simpleRow: v })}>
+                  <Says title="Simple row" hint="A name and one next-step chip (Answer, Review, CI, Merge), or the turn's time while the agent works. The other marks show on hover and in the row's card" />
                 </Switch>
                 {ROW_MARKS.map(([m, title, hint]) => (!rowMarkUsed(s, m) ? null : (
                   <Fragment key={m}>

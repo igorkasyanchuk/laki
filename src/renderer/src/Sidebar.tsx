@@ -172,10 +172,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     const fact = words ? rowFact(w, wt) : undefined
     const pill = words && w.pr && settings.prIcon !== false ? prPill(w.pr) : undefined
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
+    const simple = settings.simpleRow === true // B4: a name and one next-step chip (or the turn's time); the other marks on hover and in the peek card
     return (
       <div
         key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
@@ -198,9 +199,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {stepsOn && mark('step') && !projOf(w)?.kind && !w.term && (st => st && !st.busy && !['conflict', 'ci'].includes(st.id) /* its ⚠ and red mark say those */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
+        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
-        {settings.timers && <TurnTime tabs={wt} />}
+        {(settings.timers || simple) && (simple ? <span className="ws-keep"><TurnTime tabs={wt} /></span> : <TurnTime tabs={wt} />)}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
           <span className="ws-stat">
             <span className="add">+{short(w.stat.add)}</span>
