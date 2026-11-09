@@ -47,6 +47,13 @@ test('tool gates: a no denies the call, a changed input is asked of you, the res
   for (const id of ['guard', 'second']) await rig.rpc('widgetSet', { id, on: true })
   assert.ok(existsSync(flag), 'the flag: the hook waits')
   assert.deepEqual((await rig.rpc('state')).widgets.find((w: any) => w.id === 'guard').gates, ['tool'])
+  // S8: this tab started before any gate was on: marked, restarted while idle (resumed), then covered; an agent can't
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle')
+  assert.equal((await rig.tab(ws.id)).ungated, true)
+  await assert.rejects(rig.rpc('gateRestart', { from: { ws: ws.id, tab: tab.id } }), /an agent can't restart tabs to put them under a tool gate/)
+  assert.deepEqual(await rig.rpc('gateRestart', {}), { restarted: 1, left: 0 })
+  assert.equal((await rig.tab(ws.id)).ungated, undefined)
+  assert.deepEqual(await rig.rpc('gateRestart', {}), { restarted: 0, left: 0 })
   assert.match((await rig.rpc('widgetWhat', { id: 'guard' })).text, /It sees each tool call Claude makes/)
 
   const no = await rig.rpc('hook', { tab: tab.id, state: 'running', payload: pre('Bash', { command: 'rm -rf build' }) })

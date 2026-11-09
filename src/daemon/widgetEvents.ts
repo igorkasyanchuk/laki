@@ -167,8 +167,10 @@ const TOOL_IN_MAX = 1 << 20 // a call's input past it (a big Write): gates see i
 const CUT_AT = 64 << 10
 const cutBig = (v: unknown) => (isObj(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' && x.length > CUT_AT ? `${x.slice(0, CUT_AT)}… (cut)` : x])) : v)
 export const toolFlag = () => join(dir, 'tool-gates')
+let gateOn = false
+export const toolGateOn = () => gateOn // some tool gate is on (as toolGateFlag last saw it)
 export function toolGateFlag() {
-  const on = [...widgets.values()].some(w => onOf(w) && gatesOf(w, 'tool').length)
+  const on = (gateOn = [...widgets.values()].some(w => onOf(w) && gatesOf(w, 'tool').length))
   try {
     if (on) existsSync(toolFlag()) || writeFileSync(toolFlag(), '')
     else rmSync(toolFlag(), { force: true })

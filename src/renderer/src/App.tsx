@@ -2328,6 +2328,8 @@ export function App() {
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
     list: view?.widgets ?? [],
+    ungated: view?.tabs.filter(t => t.ungated).length,
+    gateRestart: () => call<{ restarted: number; left: number }>('gateRestart', {}).then(r => (r.left && toast(`${r.left} still at work or asking: restart once idle`), r)),
     home: view?.widgetHome,
     // turned on with a setting it needs still empty: its page, at that field; a repo's (.laki/extensions) shows what
     // it runs first (repoSheet), on only for the files shown

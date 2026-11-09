@@ -18,6 +18,8 @@ export type WidgetsApi = {
   home?: string // Laki's own widgets folder
   set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; fit?: boolean; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[]; hours?: string }) => Promise<unknown> // hours: its own working hours ('': Settings'); seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on: a place too
+  ungated?: number // S8: claude tabs started before a tool gate was on
+  gateRestart?: () => Promise<{ restarted: number; left: number }> // the idle ones again, their chats resumed
   hours?: string // Settings › Extensions' working hours (settings.widgetHours): an extension's own empty one says it
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)

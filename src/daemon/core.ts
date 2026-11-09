@@ -27,7 +27,7 @@ import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
 import { procParent, procPeer } from './peer.ts'
 import { type Client, Session } from './session.ts'
-import { type GateBy, toolFlag, toolGate, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
+import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
@@ -618,7 +618,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -1395,7 +1395,9 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const sandbox = sandboxed(tab)
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   if (tab.preset === 'claude') {
-    argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated: existsSync(toolFlag()), sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
+    const gated = existsSync(toolFlag())
+    gated ? ungated.delete(tab.id) : ungated.add(tab.id) // S8: a gate turned on later doesn't reach it until it starts again
+    argv = ['claude', ...gitDirs.flatMap(d => ['--add-dir', d]), '--settings', join(h.dir, claudeFile({ fast, gated, sandbox })), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new; --add-dir first: it takes every word after it up to a flag (the prompt too)
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1477,6 +1479,17 @@ export function gitWrites(path?: string, files = false): string[] {
 
 export type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string }
 
+// S8: claude tabs started with no tool gate on (their PreToolUse hook doesn't wait for one): once a gate is on, the view
+// marks them (ungated) and gateRestart starts the idle ones again, their chats resumed. ponytail: a closed tab's id stays
+const ungated = new Set<string>()
+const uncovered = (t: Tab) => t.preset === 'claude' && ungated.has(t.id) && toolGateOn() && !!sessions.get(t.id) && !sessions.get(t.id)!.exited && !asleep.has(t.id)
+export function gateRestart(p: { tab?: string } = {}) {
+  const all = state.tabs.filter(t => uncovered(t) && (!p.tab || t.id === findTab(p.tab).id))
+  const idle = all.filter(t => rtOf(t.id).status === 'idle' && !asking(t.id))
+  for (const t of idle) spawnTab(t, { resume: true })
+  if (idle.length) changed()
+  return { restarted: idle.length, left: all.length - idle.length }
+}
 export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
   if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`)

@@ -462,6 +462,15 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
         </div>
       )}
       {on && w.gates?.includes('tool') && <p className="muted small">Its tool gate reaches a Claude Code tab as the tab starts: new tabs get it at once, the ones running now once they start again (a new tab, or Laki's daemon restarted).</p>}
+      {on && w.gates?.includes('tool') && !!cfg.ungated && (
+        <p className="small">
+          {cfg.ungated} Claude {cfg.ungated === 1 ? 'tab' : 'tabs'} started earlier and {cfg.ungated === 1 ? "isn't" : "aren't"} covered (marked <b>No gate</b>).{' '}
+          <button type="button" className="sm" onClick={() => void cfg.gateRestart?.().catch(() => {})}>
+            Restart the idle ones
+          </button>{' '}
+          (their chats resume)
+        </p>
+      )}
       {err && r && <div className="ai-err">{err}</div>}
       <div className="ext-ai-btns">
         <button onClick={onClose}>Cancel</button>
