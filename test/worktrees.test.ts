@@ -487,7 +487,7 @@ for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['Gi
     git(join(ws.path, 'sub'), 'config', 'core.fsmonitor', evil)
     writeFileSync(join(ws.path, 'x.txt'), 'x\n')
     const noShip = async () => {
-      await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'Shipped' }), /can't ship: "sub" is a git repo inside this workspace that main doesn't have/)
+      await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'Shipped' }), /can't ship: "sub" is a git repo inside this workspace that main and your checkout don't both have as a submodule/)
       assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === ws.id && x.name === 'ship'), 'no Ship tab')
       assert.ok(!existsSync(ran), 'its config ran')
     }
@@ -534,6 +534,24 @@ for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['Gi
     assert.match(git(ws.path, 'ls-files', '-s', 'sub'), /^160000/, 'the trap was set')
     assert.ok(!existsSync(ran), `its config ran, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
   })
+
+test("Ship: an agent moving the base branch onto its own link is still refused (your checkout's index hasn't got it)", async t => {
+  const rig = await fresh(t)
+  const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  git(ws.path, 'init', '-q', 'sub')
+  writeFileSync(join(ws.path, 'sub/b'), 'y\n')
+  git(join(ws.path, 'sub'), 'add', 'b')
+  git(join(ws.path, 'sub'), 'commit', '-qm', 's')
+  git(ws.path, 'add', 'sub')
+  git(ws.path, 'commit', '-qm', 'the link')
+  git(ws.path, 'update-ref', 'refs/heads/main', 'HEAD') // the sandbox writes refs
+  assert.match(git(ws.path, 'ls-tree', 'main', 'sub'), /^160000/, 'the base has it now')
+  writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'Shipped' }), /"sub" is a git repo/)
+  assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === ws.id && x.name === 'ship'), 'no Ship tab')
+})
 
 test('a submodule in the base, checked out, still ships', async t => {
   const rig = await fresh(t)

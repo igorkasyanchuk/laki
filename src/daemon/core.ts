@@ -4051,18 +4051,21 @@ export async function gated(step: Gate, ws: Workspace, o: GateOpts) {
   return { held }
 }
 
-const gitlinks = async (ws: Workspace, tree: string) => (await git(ws, 'ls-tree', '-r', '-z', tree)).split('\0').filter(l => l.startsWith('160000 ')).map(l => l.slice(l.indexOf('\t') + 1))
-// the gitlinks in Ship's tree that the merge base with ws.base doesn't have (no merge base: all of them). Staged, one sends
-// gh pr create or glab mr create, without --head, into plain git status: that goes into the repo and runs its config's
-// program as you, outside the sandbox. By path, so a real submodule moved to a new commit still ships.
-// ponytail: an agent can replace the .git of a submodule already in the base, or move the base branch (its sandbox writes
-// refs) onto a commit with its link: that repo's config still runs. Ship would need a status-free gh and glab to close it
+// ls-tree's or ls-files -s's lines (both: the mode first, the path after a tab): the gitlinks' paths
+const gitlinks = async (at: At, ...args: string[]) => (await git(at, ...args)).split('\0').filter(l => l.startsWith('160000 ')).map(l => l.slice(l.indexOf('\t') + 1))
+// the gitlinks in Ship's tree that aren't both in the merge base with ws.base (no merge base: none is) and in your own
+// checkout's index. Staged, one sends gh pr create or glab mr create, without --head, into plain git status: that goes into
+// the repo and runs its config's program as you, outside the sandbox. By path, so a real submodule moved to a new commit
+// still ships. The index because a sandboxed agent writes refs (a branch moved onto a commit with its link) but never that
+// file. ponytail: an agent can replace the .git of a submodule already in both, and that repo's config still runs: Ship
+// would need a status-free gh and glab to close it. A submodule new on the base waits until your checkout has it
 async function nestedRepos(ws: Workspace, tree: string) {
-  const links = await gitlinks(ws, tree)
+  const links = await gitlinks(ws, 'ls-tree', '-r', '-z', tree)
   if (!links.length) return []
   const base = await git(ws, 'merge-base', ws.base, 'HEAD').catch(() => '')
-  const had = new Set(base ? await gitlinks(ws, base) : [])
-  return links.filter(l => !had.has(l))
+  const inBase = new Set(base ? await gitlinks(ws, 'ls-tree', '-r', '-z', base) : [])
+  const yours = new Set(await gitlinks(findProject(ws.project), 'ls-files', '-s', '-z'))
+  return links.filter(l => !inBase.has(l) || !yours.has(l))
 }
 
 export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
@@ -4085,7 +4088,7 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
   const tree = ws.host ? '' : await treeOf(ws, true)
   const nested = tree ? await nestedRepos(ws, tree) : []
-  if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])} ${nested.length > 1 ? `and ${nested.length - 1} more are git repos` : 'is a git repo'} inside this workspace that ${ws.base} doesn't have, and a repo's config can run a program as you. Delete the folder, or add the submodule on ${ws.base} first, then ship again`)
+  if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])} ${nested.length > 1 ? `and ${nested.length - 1} more are git repos` : 'is a git repo'} inside this workspace that ${ws.base} and your checkout don't both have as a submodule, and a repo's config can run a program as you. Delete the folder, or add the submodule on ${ws.base} in your checkout first, then ship again`)
   const script = [
     'set -e',
     tree ? 'git read-tree --reset "$LAKI_TREE"' : 'git add -A',

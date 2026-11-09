@@ -2116,8 +2116,8 @@ and what it costs.
   that names a program; Laki's own git stays out of it, but `git status`, `git diff` or `git merge` **you** run in that
   worktree goes in and runs that program as you, and so does a shell prompt that shows git status or an editor's git
   panel, with nothing typed. Check it for a nested `.git` first (`find . -mindepth 2 -name .git`). *Ship* refuses a
-  workspace with such a repo and names it (delete its folder, or add it as a submodule on the base first); a submodule
-  the base already has still ships. No agent, sandboxed or not, can change a tab's permission mode, by Laki's command or by typing Shift-Tab into it.
+  workspace with such a repo and names it (delete its folder, or add it as a submodule on the base, in your own checkout, first); a submodule
+  that the base and your checkout both have still ships. No agent, sandboxed or not, can change a tab's permission mode, by Laki's command or by typing Shift-Tab into it.
   The tabs and workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. It
   can still message another agent (`laki send`, `laki ask`) or ask Laki AI: one that isn't sandboxed asks you before it
   acts only as its own mode says, so keep those in a mode that asks. Claude

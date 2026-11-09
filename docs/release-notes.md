@@ -8,8 +8,8 @@ version it builds, with the date. -->
   send its thread again.
 - A cancelled CI check is its own state: grey, not *CI failing*, no *Fix CI*, and never green, so *Merge when green* waits
   for a re-run or a push. On GitLab a canceled job no longer reads as a pass.
-- *Ship* refuses a workspace with a git repo inside it that its base branch doesn't have, and names it: a repo an agent
-  made could run a program as you when the PR opens. A submodule the base already has still ships.
+- *Ship* refuses a workspace with a git repo inside it that its base branch and your checkout don't both have, and names
+  it: a repo an agent made could run a program as you when the PR opens. A submodule they both have still ships.
 - Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
   and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
   Two neutral themes made for it: Frosted and Frosted Light.
