@@ -907,7 +907,7 @@ test('archiveIdle: a worktree untouched for the period goes, with Undo; each rea
 })
 
 test('archiveIdle keeps a workspace with a working agent, a queued message, a dev server or an open PR (unless told not to)', async t => {
-  const rig = await fresh(t, { config: { run: 'sleep 100' } })
+  const rig = await fresh(t, { config: { run: 'sleep 100', test: 'sleep 100' } })
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -935,5 +935,8 @@ test('archiveIdle keeps a workspace with a working agent, a queued message, a de
   await rig.rpc('settingsSet', { archiveIdleKeepPR: false })
   assert.deepEqual(await tick(), [], 'a dev server')
   await rig.rpc('tabClose', { id: dev.id })
+  const script = await rig.rpc('run', { ws: ws.id, script: 'test' })
+  assert.deepEqual(await tick(), [], 'a script')
+  await rig.rpc('tabClose', { id: script.id })
   assert.deepEqual(await tick(), [ws.id], 'told not to keep it')
 })

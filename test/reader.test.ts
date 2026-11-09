@@ -268,6 +268,9 @@ test('a draft: kept per tab through a restart and a closed tab (⇧⌘T), out of
   assert.deepEqual(await draftOf(back.id), { text: 'half a thought' })
   assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === back.id).drafted, true)
 
+  assert.equal(back.draft, undefined, 'not in what tabReopen answers')
+  assert.equal((await rig.rpc('tabSet', { id: back.id, color: 'red' })).draft, undefined, 'nor tabSet')
+
   await rig.rpc('tabDraft', { tab: back.id, text: '' })
   assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === back.id).drafted, undefined, 'sent: gone')
   await rig.rpc('tabDraft', { tab: back.id, text: 'y'.repeat(200_000) })

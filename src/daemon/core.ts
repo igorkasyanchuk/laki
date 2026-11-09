@@ -1783,7 +1783,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
   if (o.muted !== undefined) t.muted = o.muted || undefined
   save()
   changed()
-  return t
+  return { ...t, draft: undefined } // an agent names its own tab: what you typed stays yours
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
@@ -2131,9 +2131,11 @@ export function bypassNo(t: Tab) {
 
 // a running claude's permission mode, by its own ⇧⇥ (mid-turn too), read back from its footer after each press: nothing
 // is assumed about its cycle. Round to where it began: that mode isn't in its cycle. Not persisted: a resume starts as
-// the tab says (t.perm), and the chip reads what's really on. ponytail: claude only, codex's /approvals is a menu to drive
+// the tab says (t.perm), and the chip reads what's really on. ponytail: claude only, codex's /approvals is a menu to drive;
+// ⇧⇥ is the only way in, so a tab that allows Bypass passes through it for a moment on the way to a mode beyond it
 const MODE_PRESSES = 8
 const MODE_WAIT = 2000
+const switching = new Set<string>() // two picks at once would each press, and overshoot
 export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
   const t = findTab(String(p.tab ?? ''))
   const s = sessions.get(t.id)
@@ -2145,21 +2147,26 @@ export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
     const no = bypassNo(t)
     if (no) throw new Error(no)
   }
-  const r = rtOf(t.id)
-  const start = claudeMode(s.screenText(6))
-  let now = start
-  for (let i = 0; i < MODE_PRESSES && now !== mode; i++) {
-    const was = now
-    s.write('\x1b[Z') // shift-tab
-    const until = Date.now() + MODE_WAIT
-    while ((now = claudeMode(s.screenText(6))) === was && Date.now() < until && !s.exited) await new Promise(ok => setTimeout(ok, 40))
-    if (now === was) throw new Error("it didn't change mode")
-    if (now === start) throw new Error(`${CLAUDE_MODES.find(([id]) => id === mode)![1]} isn't among the modes it offers`)
+  if (switching.has(t.id)) throw new Error('it is still switching')
+  switching.add(t.id)
+  try {
+    const start = claudeMode(s.screenText(6))
+    let now = start
+    for (let i = 0; i < MODE_PRESSES && now !== mode; i++) {
+      const was = now
+      s.write('\x1b[Z') // shift-tab
+      const until = Date.now() + MODE_WAIT
+      while ((now = claudeMode(s.screenText(6))) === was && Date.now() < until && !s.exited) await new Promise(ok => setTimeout(ok, 40))
+      if (now === was) throw new Error("it didn't change mode")
+      if (now === start) throw new Error(`${CLAUDE_MODES.find(([id]) => id === mode)![1]} isn't among the modes it offers`)
+    }
+    if (now !== mode) throw new Error("it didn't reach that mode")
+    rtOf(t.id).mode = mode
+    changed()
+    return { mode }
+  } finally {
+    switching.delete(t.id)
   }
-  if (now !== mode) throw new Error("it didn't reach that mode")
-  r.mode = mode
-  changed()
-  return { mode }
 }
 
 // what's typed in a tab's Reader box and not sent: read (no text), or kept (debounced by the Reader), through restarts,
@@ -2203,7 +2210,7 @@ export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown
   if (!ws.closed.length) delete ws.closed
   save()
   changed()
-  return { ...tab, ...(fresh && { fresh }) }
+  return { ...tab, draft: undefined, ...(fresh && { fresh }) }
 }
 
 // a project whose origin is on GitHub (the new-workspace page's In a codespace): its .git/config's remote "origin",
@@ -3069,7 +3076,7 @@ function preTool(tab: Tab, pl: any) {
 const failLine = (err: unknown, last: unknown) => (typeof err === 'string' && err ? err : err ? JSON.stringify(err) : String(last ?? '')).split('\n').find(l => l.trim())?.trim().slice(0, 200) || 'API error'
 const CONTINUE_MS = Number(process.env.LAKI_CONTINUE_MS ?? 60_000)
 function continueLater(tab: Tab, r: Runtime) {
-  if (!state.settings?.continueOnError || r.autoContinued) return
+  if (!state.settings?.continueOnError || r.autoContinued || tab.flow) return // a workflow's: its engine decides
   r.autoContinued = true
   const said = r.failed
   setTimeout(() => {
@@ -3634,7 +3641,7 @@ export const agentRuns = (args: string): Agent | undefined => {
 // (a menu: waiting; what BUSY says it shows while it works: running; else idle, ● done if you weren't looking)
 // ponytail: no notifications or turn timers for it; start the agent in its own tab for those
 const busyShells = new Set<string>()
-const shellAgents = new Map<string, { agent: Agent; status: Status }>()
+export const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // who runs a laki command: the tab main.ts finds its process in (tabOfPeer), else what its $LAKI_WORKSPACE and
 // $LAKI_TAB say (the CLI passes them): an agent when that tab is an agent's, or a shell tab running one (shellAgents: the
 // view's runs); you typing in a shell tab, or outside Laki, aren't. Its workspace, else nothing

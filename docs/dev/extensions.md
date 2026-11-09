@@ -192,7 +192,7 @@ action has 2 minutes), its last line pushed back as `last` (`laki widget push --
 `test/widget-check.test.ts` with the fake claude's plain `-p`.
 
 Events, streams, push (Part 5; `test/widget-events.test.ts`): `types.ts` `WIDGET_EVENTS`; core calls `widgetEvent(name,
-fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.failed` on a failure or limit, `turn.waiting`
+fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.failed` on a failure or limit, `turn.long` from `longTurnTick`, `turn.waiting`
 800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
 null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
 MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`; an agent's, `from.agent`, when an agent made it:

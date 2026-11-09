@@ -14,6 +14,9 @@ test('claudeMode: the footer as claude draws it, an answer that mentions a mode 
   assert.equal(claudeMode('  ⏵⏵ auto mode on'), 'auto')
   assert.equal(claudeMode('  ⏵⏵ bypass permissions on'), 'bypassPermissions')
   assert.equal(claudeMode('I turned plan mode on for you'), 'default')
+  assert.equal(claudeMode('> plan mode on'), 'default', 'typed in its prompt')
+  assert.equal(claudeMode('plan mode on'), 'default')
+  assert.equal(claudeMode("  ⏵⏵ don't ask on"), 'dontAsk')
 })
 
 const started = async (rig: any, o: object = {}) => {
@@ -45,6 +48,12 @@ test('tabMode: goes to the mode asked by shift-tab, mid-turn too, and the view s
   await assert.rejects(rig.rpc('tabMode', { tab, mode: 'bypassPermissions' }), /Only a tab started with Bypass/)
   assert.equal((await view()).mode, 'default', 'nothing pressed')
   await assert.rejects(rig.rpc('tabMode', { tab, mode: 'nope' }), /no permission mode called nope/)
+
+  // two picks at once: one presses, the other is told
+  const both = await Promise.allSettled([rig.rpc('tabMode', { tab, mode: 'plan' }), rig.rpc('tabMode', { tab, mode: 'plan' })])
+  assert.deepEqual(both.map(x => x.status).sort(), ['fulfilled', 'rejected'])
+  assert.equal((await view()).mode, 'plan', 'not past it')
+  await rig.rpc('tabMode', { tab, mode: 'default' })
 
   // mid-turn
   await rig.rpc('send', { target: tab, text: 'slow one' })
@@ -80,8 +89,10 @@ test('tabMode: a tab started with Bypass can come back to it; a mode its build n
   writeFileSync(policy, JSON.stringify({ bypass: false }))
   await rig.stop()
   await rig.start()
-  const v = (await rig.rpc('state')).tabs.find((x: any) => x.id === tab)
-  if (v?.status !== 'exited') await assert.rejects(rig.rpc('tabMode', { tab, mode: 'bypassPermissions' }), /managed policy|only a running/)
+  const plain = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', perm: '' })
+  const seen = await until(async () => (x => x?.mode && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === plain.id)), 'read')
+  assert.match(seen.bypassNo, /managed policy/)
+  await assert.rejects(rig.rpc('tabMode', { tab: plain.id, mode: 'bypassPermissions' }), /managed policy/)
 })
 
 test('tabMode: a build whose footer never changes is told, nothing is assumed', async t => {

@@ -30,7 +30,7 @@ import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import { nextStep, type Step, type StepId } from '../../shared/nextStep'
-import { Reader, type ReaderApi, readable } from './Reader'
+import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
 import { type Collision } from '../../shared/overlap'
 import icon from './icon.svg'
@@ -1445,7 +1445,7 @@ export function App() {
   const closeTabs = async (ts: TabView[]) => {
     const running = ts.filter(t => t.status !== 'exited')
     if (running.length && !settings.closeNoAsk && !(await ask(`Close ${ts.map(t => t.name).join(', ')}?`, { text: `${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`, ok: 'Close', danger: true }))) return
-    for (const t of ts) await call('tabClose', { id: t.id })
+    for (const t of ts) await flushDraft(t.id), await call('tabClose', { id: t.id })
     if (ts.length === 1 && (ts[0].kind === 'agent' || ts[0].kind === 'shell') && kb.reopenTab) toast(`Closed ${ts[0].name} · ${keyShow(kb.reopenTab)} brings it back`)
   }
   // ⇧⌘T, the + menu's Recently closed: a tab you closed back in its workspace, its chat resumed (the newest, or index's)

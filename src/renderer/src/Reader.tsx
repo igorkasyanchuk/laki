@@ -39,15 +39,23 @@ export const modeItems = (tab: TabView, set: (mode: string) => unknown): MenuIte
     const no = id === 'bypassPermissions' ? tab.bypassNo : undefined
     return { label, sub: no ?? sub, hint: tab.mode === id ? ON : undefined, danger: id === 'bypassPermissions', off: !!no, run: () => void (no || set(id)) }
   })
-export const modeLabel = (mode?: string) => (mode === 'auto' ? 'Auto' : CLAUDE_MODES.find(([id]) => id === mode)?.[1])
+export const modeLabel = (mode?: string) => (mode === 'auto' ? 'Auto' : mode === 'dontAsk' ? "Don't ask" : CLAUDE_MODES.find(([id]) => id === mode)?.[1])
 
 // the Reader's box, per tab: here at once (a switch of tabs), in the daemon a moment after you stop typing
 const drafts = new Map<string, string>()
-const draftTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const draftsDue = new Map<string, { at: ReturnType<typeof setTimeout>; go: () => Promise<unknown> }>()
 function keepDraft(id: string, text: string, save: ReaderApi['draft']) {
   drafts.set(id, text)
-  clearTimeout(draftTimers.get(id))
-  draftTimers.set(id, setTimeout(() => void (draftTimers.delete(id), save(id, text).catch(() => {})), 600))
+  clearTimeout(draftsDue.get(id)?.at)
+  const go = () => (draftsDue.delete(id), save(id, text).catch(() => {}))
+  draftsDue.set(id, { at: setTimeout(go, 600), go })
+}
+// now, not in a moment: a tab about to close keeps what was just typed (the daemon moves its draft to ⇧⌘T's list)
+export function flushDraft(id: string) {
+  const due = draftsDue.get(id)
+  if (!due) return
+  clearTimeout(due.at)
+  return due.go()
 }
 export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: ReaderApi; active: boolean; look?: ReaderLook }) {
   const [said, setSaid] = useState<Said[]>()

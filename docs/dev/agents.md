@@ -325,6 +325,10 @@ with no hook and no key (a resumed chat's recap): `sweepRunning` (every 2s) sets
 without output when its last 15 lines lack "esc to interrupt" (claude and codex show it, and redraw, while
 they work).
 
+A turn that ends on an API error (`turn`'s `failed`, not a limit, a refused model or an Esc) keeps its line in `r.failed` (the view's `failed`, only while idle) until a new turn or `failDismiss`: the Reader, Needs you, One next step and the palette offer Continue, which is `send`'s `continue`. `settings.continueOnError`: `continueLater`, once per turn (`autoContinued`, `contSent`: a UserPromptSubmit that isn't its continue starts over), `LAKI_CONTINUE_MS` later, never in a workflow's tab.
+
+A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the chip (`Reader.tsx` `modeItems`, also the tab's menu). Not kept across a restart: a resume starts as `t.perm` says.
+
 ### Resume
 
 `state.json` keeps projects, workspaces, tabs and resume ids (`save`: fsync, then rename; `load` copies one that

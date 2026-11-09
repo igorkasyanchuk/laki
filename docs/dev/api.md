@@ -356,6 +356,12 @@ WebSocket events:
 `view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen), `focused` and `browse` (the app's
 window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
 
+- `limits` (`{ agent?, from? }`, `laki limits`, MCP's `laki_limits`): `usage`'s own cache and back-off for each account, only the agents the managed policy allows; no `name` or `account` in Recording mode unless the caller's workspace isn't private.
+- `tabDraft` (`{ tab, text? }`): a Reader box's unsent text, read or kept; on the tab (`draft`, never in the view: `drafted`; `tabSet` and `tabReopen` answer without it), moved to `closed` by `closeTab` and back by `tabReopen`; agents refused (`agentNo`, by the peer: `FROM`).
+- `tabMode` (`{ tab, mode }`): a running claude's mode by its own ⇧⇥, read back from its footer after each press (`claudeMode`); one at a time per tab; agents refused. The view's `mode` (kept by `sweepRunning`) and `bypassNo` (why not Bypass: the policy, its sandbox, how it started).
+- `failDismiss` (`{ tab }`): clears a tab's `failed`.
+- `archiveIdleTick`, `longTurnTick` (`{ now }`: tests'): the loops below.
+
 ### MCP
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's

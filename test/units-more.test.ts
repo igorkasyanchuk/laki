@@ -482,5 +482,8 @@ test('voiceFillers: standalone hesitations go in each language, with their comma
   same('Um carro e dois')
   same('Um, dois, três')
   same('ну и что')
+  same('We went to the ER, then home and it was fine')
+  same('She studied at UM and it is great')
+  is('first line\num we can go on', 'first line\nwe can go on')
   same('嗯嗯我知道')
 })

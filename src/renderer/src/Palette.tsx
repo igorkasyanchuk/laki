@@ -131,6 +131,8 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     const f = (x: Action) => items.push({ ...x, kind: 'for' })
     const asks = wt.find(t => t.status === 'waiting')
     if (asks) f({ label: `Answer ${asks.name}: ${asks.ask?.question || asks.ask?.options.map(o => o.label).join(' / ') || 'it waits for you'}`, icon: 'bell', run: () => selectTab(asks) })
+    const failed = wt.find(t => t.failed)
+    if (failed) f({ label: `Continue ${failed.name}: ${failed.failed}`, icon: 'run', run: () => void call('send', { target: failed.id, text: 'continue' }).catch(() => {}) })
     const pr = ws.pr?.state === 'OPEN' ? ws.pr : undefined
     if (pr?.checks === 'fail') f({ label: `Fix CI: send ${prNo(pr)}'s failing checks to the agent`, icon: 'ciFail', run: () => void prFix(ws, 'ci') })
     if (pr?.conflict) f({ label: `Resolve conflicts with ${pr.base ?? 'the base'}`, icon: 'conflict', run: () => void prFix(ws, 'conflict') })
@@ -231,8 +233,9 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     wsActions.forEach(a)
     if (canOverlap(ws)) a({ id: 'overlaps', label: 'Check overlaps…', icon: 'gitCompare', run: () => checkOverlaps(ws) })
     if (tab && !tab.share) a({ id: 'share', label: 'Share live view…', icon: 'globe', run: () => setSharing(tab.id) })
+    const layouts = layoutMenu()
     for (const p of LAYOUT_PRESETS) {
-      const m = layoutMenu().find((x): x is Extract<MenuItem, { run: () => void }> => !!x && 'label' in x && x.label === p.name && !!x.run)
+      const m = layouts.find((x): x is Extract<MenuItem, { run: () => void }> => !!x && 'label' in x && x.label === p.name && !!x.run)
       if (m) a({ id: `layout-${p.id}`, label: `Layout: ${p.name}`, icon: m.icon ?? 'layers', run: m.run })
     }
     if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: kh('closeTab'), run: closePreview })

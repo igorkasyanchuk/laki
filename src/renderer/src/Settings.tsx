@@ -558,6 +558,8 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
   const [only, setOnly] = useState(false) // Assigned
   useEffect(() => () => void (keyRec.on = false), [])
   const shown = (label: string, k: string) => (!only || !!k) && (pressed ? k === pressed : !q.trim() || label.toLowerCase().includes(q.trim().toLowerCase()))
+  const mine = KEYS.filter(x => shown(x.label, m[x.id]))
+  const theirs = COMMANDS.filter(x => shown(x.label, c[x.id] ?? ''))
   const setCmd = (id: string, k: string) => onCmds(Object.fromEntries(Object.entries({ ...c, [id]: k }).filter(([, v]) => v)))
   const set = (id: KeyId, k: string) => onChange(Object.fromEntries(KEYS.map(x => [x.id, x.id === id ? k : m[x.id]] as const).filter(([i, v]) => v !== KEYS.find(x => x.id === i)!.key)))
   return (
@@ -575,7 +577,7 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
           <button type="button" className={only ? 'on' : ''} onClick={() => setOnly(true)}>Assigned</button>
         </span>
       </div>
-      <Group
+      {!!mine.length && <Group
         title="Laki's keys"
         act={
           <button type="button" disabled={KEYS.every(x => m[x.id] === x.key)} onClick={() => onChange({})}>
@@ -584,7 +586,7 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
         }
       >
         <div className="setting-box">
-          {KEYS.filter(x => shown(x.label, m[x.id])).map(x => {
+          {mine.map(x => {
             const clash = keyClash(x.id, m, [...others, ...cmdOthers(c)])
             return (
               <div className="switch-row" key={x.id}>
@@ -594,10 +596,10 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
             )
           })}
         </div>
-      </Group>
-      <Group title="⌘K commands" hint="None has a key until you give it one. A command that doesn't apply where you are lets the key go on">
+      </Group>}
+      {!!theirs.length && <Group title="⌘K commands" hint="None has a key until you give it one. A command that doesn't apply where you are lets the key go on">
         <div className="setting-box">
-          {COMMANDS.filter(x => shown(x.label, c[x.id] ?? '')).map(x => {
+          {theirs.map(x => {
             const clash = cmdClash(x.id, c, m, others)
             return (
               <div className="switch-row" key={x.id}>
@@ -607,7 +609,8 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
             )
           })}
         </div>
-      </Group>
+      </Group>}
+      {!mine.length && !theirs.length && <p className="muted small">No key matches.</p>}
       <Group title="Show the keys">
         <div className="setting-box">
           <Switch className="switch-row" on={overlay} onChange={onOverlay}>

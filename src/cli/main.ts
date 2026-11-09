@@ -252,7 +252,7 @@ async function main() {
       const list: AgentUsage[] = await rpc('limits', { agent: typeof flags.agent === 'string' ? flags.agent : undefined, from: caller() }, 30000)
       const when = (at: number) => {
         const d = new Date(at)
-        return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : d.toLocaleDateString([], { weekday: 'short' })
+        return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : d.toLocaleDateString([], { weekday: 'short' })
       }
       const rows = list.map(u => [u.agent, u.name ?? '-', u.error ? `error: ${u.error}` : ''].concat(u.windows.map(w => `${w.label} ${w.used}% used${w.resets ? ` · resets ${when(w.resets)}` : ''}${w.note ? ` (${w.note})` : ''}`)))
       const wide = (i: number) => Math.max(...rows.map(r => r[i].length))

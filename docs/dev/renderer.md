@@ -66,6 +66,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
 - **`App.tsx`**: the state, effects, toolbar, send bar and status bar. Its parts read it through `appCtx.ts` (`AppCtx`,
   built each render): the sidebar (`Sidebar.tsx`), the tab bar (`TabBar.tsx`), the menus (`menus.ts`), the palette and
   its items (`Palette.tsx`), the keys (`keydown.ts` `onKey`), the pages and dialogs (`Dialogs.tsx`).
+  - ⌘K commands' keys: `shared/keys.ts` `COMMANDS`, `settings.cmdKeys`; `keydown.ts` builds `paletteItems` only when a press matches and runs the item with that `id` (one that doesn't apply now lets the key go on).
   - Keys are handled in a capture-phase `keydown`; xterm never sees ⌘ keys. Settings › Keys' (`shared/keys.ts` `KEYS`:
     17 actions, an id, words and a default each; `settings.keys` over them, `keyMap`: '' none, one `keyOk` refuses (no
     ⌘, ⌥ or ⌃) the default) go first, after the picker's: `kb`, `keyFor` (the layout's character, `keyLabel(e, true)`,

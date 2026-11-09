@@ -40,8 +40,8 @@ export const CLAUDE_MODES: [id: string, label: string, sub: string][] = [
   ['bypassPermissions', 'Bypass', 'Never asks: anything goes'],
 ]
 // the mode claude's footer shows, from its screen's bottom lines; none shown: 'default'
-const MODE_LINE = /^\s*\S{0,3}\s*(accept edits|plan mode|auto mode|bypass permissions) on\b/gm
-const MODE_IDS: Record<string, string> = { 'accept edits': 'acceptEdits', 'plan mode': 'plan', 'auto mode': 'auto', 'bypass permissions': 'bypassPermissions' }
+const MODE_LINE = /^\s*[^\x00-\x7f\s]{1,3}\s*(accept edits|plan mode|auto mode|bypass permissions|don't ask) on\b/gm // its ⏵⏵ or ⏸ first: `> plan mode on` is what you typed
+const MODE_IDS: Record<string, string> = { 'accept edits': 'acceptEdits', 'plan mode': 'plan', 'auto mode': 'auto', 'bypass permissions': 'bypassPermissions', "don't ask": 'dontAsk' }
 export const claudeMode = (screen: string) => (m => (m ? MODE_IDS[m[1]] : 'default'))([...screen.matchAll(MODE_LINE)].at(-1))
 export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
 // a profile's flags that set how freely it acts already: then no mode of Laki's goes in (agentCmd), and one that never
@@ -736,6 +736,7 @@ export function voiceFillers(text: string): { text: string; n: number } {
     const [all, lead, word, trail = ''] = m
     const low = word.toLowerCase()
     const comma = /[,，、]/.test(lead + trail)
+    if (word.length > 1 && word === word.toUpperCase() && word !== low) continue // ER, UM: abbreviations
     if ((/^um+$/.test(low) && !en) || (low === 'er' && !(en && comma)) || ((low === 'ну' || low === '嗯') && !trail)) continue
     copy(m.index)
     at = m.index + all.length
@@ -743,7 +744,7 @@ export function voiceFillers(text: string): { text: string; n: number } {
     const before = out.trimEnd()
     const rest = text.slice(at)
     const wide = /[，、]/.test(lead + trail)
-    const ended = !before || /[.!?…。！？\n]$/.test(before)
+    const ended = !before || /[.!?…。！？\n]$/.test(before) || lead.includes('\n')
     if (ended) (out += lead), (up ||= /^\p{Lu}/u.test(word))
     else if (trail && !/[,，、]/.test(trail)) out = before + trail.trim() + m[4]
     else if (!rest) out = before
