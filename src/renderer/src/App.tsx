@@ -3371,6 +3371,15 @@ export function App() {
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
         {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {connected && view.diskFull && (
+          <div className="stale-bar" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>The disk is full.</b> Laki can't save its state ({Math.round(view.diskFull.free / 1e6)} MB free): it keeps it in memory and saves once there's room. Don't quit Laki until then.
+            </span>
+            <button onClick={() => setDialog({ section: 'resources' })}>What Laki holds</button>
+          </div>
+        )}
         {connected && view.whenDone && (
           <div className="stale-bar soft" role="alert">
             <Icon name={view.whenDone.act === 'lock' ? 'lock' : view.whenDone.act === 'sleep' ? 'moon' : 'power'} size={16} />

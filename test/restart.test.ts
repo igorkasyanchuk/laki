@@ -2,7 +2,7 @@
 // a test's daemon gone with its test process.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -283,4 +283,22 @@ test("sleep stopped a claude chat's background command: the woken tab is told so
   assert.ok(rig.fakeLog().filter((l: any) => l.tab === tab.id && l.args).at(-1).args.includes('--resume'), 'its chat resumed')
   assert.deepEqual((await rig.tab(ws.id, 'claude')).bgTold, undefined, "the daemon's own, not in the view")
   await until(() => JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).tabs.find((x: any) => x.id === tab.id).bgTold?.includes('w1'), 'kept: never named again')
+})
+
+test('R4: a full disk: the state stays in memory and the view says so; saved once there is room; no worktree made meanwhile', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const flag = join(rig.data, 'test-disk-full')
+  const saved = () => JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8'))
+  writeFileSync(flag, '')
+  await rig.rpc('settingsSet', { prScan: 7 }) // a save: it fails, nothing thrown
+  const v = await rig.rpc('state')
+  assert.equal(typeof v.diskFull?.free, 'number')
+  assert.equal(v.settings.prScan, 7, 'in memory')
+  assert.notEqual(saved().settings?.prScan, 7, 'not on disk')
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'no-room' }), /MB free: not enough to make a worktree/)
+  rmSync(flag)
+  await rig.rpc('settingsSet', { prScan: 8 }) // the next save
+  assert.equal((await rig.rpc('state')).diskFull, undefined)
+  assert.equal(saved().settings.prScan, 8)
 })

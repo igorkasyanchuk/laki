@@ -6,7 +6,7 @@
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
-import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { type Perm, permOf } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -19,7 +19,7 @@ import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
-import { dir } from './dir.ts'
+import { dir, inRig } from './dir.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
@@ -172,16 +172,45 @@ export function load() {
   slugActions() // actions from before slugs
 }
 
-export function save() {
-  const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
+// R4: a full disk (ENOSPC, a quota's EDQUOT) no longer throws out of whatever saved: the state stays in memory, the view
+// says so (diskFull: the bytes free), and it's written at the next save and every 30 s (main.ts' diskTick) until one
+// works. Any other error is thrown as before. <data>/test-disk-full: a test's full disk (a rig's daemon only)
+let diskFull: { free: number } | undefined
+export const diskFullNow = () => diskFull
+export const freeBytes = (at: string) => {
   try {
-    fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
-    writeFileSync(fd, JSON.stringify(state, null, 2))
-    fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
-  } finally {
-    closeSync(fd)
+    const s = statfsSync(at)
+    return s.bavail * s.bsize
+  } catch {
+    return undefined // no answer: not a reason to refuse
   }
-  renameSync(statePath + '.tmp', statePath)
+}
+// before a worktree is made or files copied into one: under 500 MB free it would likely stop halfway
+export const DISK_FLOOR = 500e6
+export function roomFor(at: string, what: string) {
+  const free = inRig() && existsSync(join(dir, 'test-disk-full')) ? 0 : freeBytes(at)
+  if (free !== undefined && free < DISK_FLOOR) throw new Error(`the disk has ${Math.round(free / 1e6)} MB free: not enough to ${what}. Free some space (Settings › Resources shows what Laki holds), then try again`)
+}
+export function save() {
+  try {
+    if (inRig() && existsSync(join(dir, 'test-disk-full'))) throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
+    const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
+    try {
+      fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
+      writeFileSync(fd, JSON.stringify(state, null, 2))
+      fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
+    } finally {
+      closeSync(fd)
+    }
+    renameSync(statePath + '.tmp', statePath)
+  } catch (e) {
+    if (!['ENOSPC', 'EDQUOT'].includes((e as NodeJS.ErrnoException).code ?? '')) throw e
+    const first = !diskFull
+    diskFull = { free: freeBytes(dir) ?? 0 }
+    if (first) log('state not saved: the disk is full (kept in memory, tried again every 30 s)'), changed()
+    return
+  }
+  if (diskFull) (diskFull = undefined), log('state saved again: the disk has room'), changed()
 }
 
 // ---------- hooks: how agents report their state (absolute paths: they run from any shell)
@@ -648,6 +677,7 @@ export function view(): View {
     imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
+    ...(diskFull && { diskFull }),
     caps: CAPS,
     built: BUILT,
     today: todayView(),
@@ -850,6 +880,7 @@ const hasRef = (at: At, ref: string) => git(at, 'rev-parse', '--verify', '--quie
 // ponytail: read once per repo per daemon (by its host and path); a config changed meanwhile counts after a restart
 const ownWorkers = new Map<string, Promise<boolean>>()
 function worktreeAdd(proj: Project, ...args: string[]) {
+  if (!proj.host) roomFor(proj.path, 'make a worktree') // R4
   const key = `${proj.host ?? ''}:${proj.path}`
   let own = ownWorkers.get(key)
   if (!own) ownWorkers.set(key, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1

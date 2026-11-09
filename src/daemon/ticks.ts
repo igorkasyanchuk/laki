@@ -24,6 +24,7 @@
 //   scheduleTick   30 s   keep   scheduled tasks due
 //   pendingTick    30 s   keep   workspaces' later starts due
 //   reminderTick   30 s   keep   reminders due
+//   diskTick       30 s   keep   the state saved again after a full disk (core.ts save), only while it's full
 //   widgetTick     30 s   slow   extensions' fetches, each when due
 //   issueTick      60 s   slow   issue.labeled: GitHub's issue events, while something listens (inbound.ts)
 //   prTick         60 s   slow   PR scans (gh), each workspace every settings.prScan minutes

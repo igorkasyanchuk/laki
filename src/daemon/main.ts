@@ -1037,6 +1037,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts, { idle: 'slow' })
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick()), { idle: 'slow' }) // LAKI_PR_BG: tests of the timer's own (bg) scans
+  ticks.register('diskTick', 30_000, () => void (core.diskFullNow() && core.save()), { idle: 'keep' }) // R4: a full disk: the state written once there's room
   ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
   ticks.register('sweepRunning', 2000, core.sweepRunning, { idle: 'slow' })
