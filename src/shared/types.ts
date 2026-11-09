@@ -679,7 +679,7 @@ export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 // OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
 // model's id (unset: VOICE_MODEL). fn: cloud only, hold Fn to talk anywhere in Laki, let go to insert (unset: on)
 // on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
-export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean; fixes?: string } // send: Send as you stop talking (cloud, off unless true: voice.ts); fixes: Word fixes, a line each (voiceFix)
+export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean; send?: boolean; fixes?: string; fillers?: boolean } // send: Send as you stop talking (cloud, off unless true: voice.ts); fixes: Word fixes, a line each (voiceFix); fillers: Remove filler words (voiceFillers, unset: on)
 // Settings › Voice's Word fixes on a cloud transcript: a line each, `heard → meant` (or -> or =; heard may be several
 // words, or several forms with commas: `lucky, lakey → Laki`), each heard form as a whole word in any case, the
 // longest first. What changed comes back for the bar to say. ponytail: VOICE_FIXES lines at most; no fuzzy matching
@@ -701,6 +701,45 @@ export function voiceFix(text: string, fixes?: string): { text: string; fixed: s
     return meant
   })
   return { text: out, fixed: [...fixed] }
+}
+// Settings › Voice's Remove filler words: standalone hesitations go, with the comma or space they leave, the sentence's
+// capital moving to the next word. Some are words elsewhere, so: um only among English words (Portuguese's "um carro"),
+// er only set off by a comma too (German's "er ist", Dutch's "er is"), ну and 嗯 only followed by punctuation ("ну и что").
+const FILLER = /(\s*[,，、]?\s*)((?<![\p{L}\p{N}'’-])(?:um+|uh+|er|hm+|ähm*|euh+|э{2,}|ну)(?![\p{L}\p{N}'’-])|えーと|ええと|えっと|嗯)(\s*[,，、]|\s*[.…。！？!?]+(?=\s|$))?(\s*)/giu
+const ENGLISH = /\b(the|and|is|are|we|it|this|that|to|of|should|think|can|you)\b/i
+export function voiceFillers(text: string): { text: string; n: number } {
+  const en = ENGLISH.test(text)
+  let out = ''
+  let at = 0
+  let n = 0
+  let up = false // a capital to hand on
+  const copy = (end: number) => {
+    let chunk = text.slice(at, end)
+    if (up && chunk) (chunk = chunk.replace(/^(\s*)(\p{Ll})/u, (_, s, c) => s + c.toUpperCase())), (up = false)
+    out += chunk
+  }
+  for (const m of text.matchAll(FILLER)) {
+    const [all, lead, word, trail = ''] = m
+    const low = word.toLowerCase()
+    const comma = /[,，、]/.test(lead + trail)
+    if ((/^um+$/.test(low) && !en) || (low === 'er' && !(en && comma)) || ((low === 'ну' || low === '嗯') && !trail)) continue
+    copy(m.index)
+    at = m.index + all.length
+    n++
+    const before = out.trimEnd()
+    const rest = text.slice(at)
+    const wide = /[，、]/.test(lead + trail)
+    const ended = !before || /[.!?…。！？\n]$/.test(before)
+    if (ended) (out += lead), (up ||= /^\p{Lu}/u.test(word))
+    else if (trail && !/[,，、]/.test(trail)) out = before + trail.trim() + m[4]
+    else if (!rest) out = before
+    else if (wide) out = before + (lead || trail).trim()
+    else if (lead.includes(',') && !trail.includes(',')) out = before + lead
+    else out = `${before} `
+  }
+  if (!n) return { text, n: 0 }
+  copy(text.length)
+  return { text: out.trim(), n }
 }
 export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
 export const voiceOn = (s?: { voice?: VoiceSettings }) => s?.voice?.on !== false // Settings › Voice: on unless turned off

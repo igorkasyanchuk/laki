@@ -7,6 +7,7 @@ version it builds, with the date. -->
 - Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
   and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
   Two neutral themes made for it: Frosted and Frosted Light.
+- Settings › Voice › *Remove filler words* (on): "um", "uh" and their like in other languages come out of what you dictate.
 - `laki limits [--agent claude] [--json]`, and `laki_limits` for agents and Laki AI: how much of each Claude, Codex and
   Gemini plan is used and when it resets, so an agent can pick where to start long work.
 - Settings › Git & worktrees › *Archive workspaces untouched for*: 3, 7, 14 or 30 days (off by default). Laki archives

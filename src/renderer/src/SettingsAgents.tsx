@@ -143,6 +143,11 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
           <Group title="Word fixes" hint="Names it keeps getting wrong: a line each, what it writes → what you meant. Any case, whole words; the bar says what it changed">
             <textarea className="mono" rows={4} maxLength={20000} spellCheck={false} value={v.fixes ?? ''} placeholder={'lucky, lakey → Laki\nwork tree → worktree\nnotify → ntfy'} aria-label="Word fixes" onChange={e => onChange({ ...v, fixes: e.target.value || undefined })} />
             <p className="muted small">Done here, after the transcript comes back: nothing more goes to OpenRouter.</p>
+            <div className="setting-box">
+              <Switch className="switch-row" on={v.fillers !== false} onChange={fillers => onChange({ ...v, fillers })}>
+                <Says title="Remove filler words" hint="Um, uh, hmm and the like, in the languages it knows; words that mean something (like, so) stay. The bar says how many went" />
+              </Switch>
+            </div>
           </Group>
           <Group title="When you stop talking">
             <div className="setting-box">

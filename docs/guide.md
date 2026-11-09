@@ -2232,6 +2232,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   just gets the text. *Word fixes*: names the model keeps getting wrong, a line each, what it writes → what you
   meant (`lucky, lakey → Laki`, `work tree → worktree`); whole words in any case, done in Laki after the transcript
   comes back (nothing more goes to OpenRouter), and the bar says what it changed (⌘Z in the field takes it back).
+  *Remove filler words* (on) drops standalone hesitations (um, uh, hmm, äh, euh, えーと, 嗯, эээ…) the same way; words that
+  mean something stay.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

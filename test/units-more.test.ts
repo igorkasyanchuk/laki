@@ -16,7 +16,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFix } from '../src/shared/types.ts'
+import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -450,4 +450,37 @@ test('Word fixes (Settings › Voice): heard → meant as whole words in any cas
   assert.deepEqual(voiceFix('a \u017Fs here', 'ss → x'), { text: 'a x here', fixed: ['\u017Fs → x'] }, 'matched by case folding (long s): its own rule, never a throw')
   assert.deepEqual(voiceFix('a b', undefined), { text: 'a b', fixed: [] })
   assert.equal(voiceFix('x', Array(VOICE_FIXES).fill('y → z').concat('x → past the cap').join('\n')).text, 'x', `${VOICE_FIXES} lines at most`)
+})
+
+test('voiceFillers: standalone hesitations go in each language, with their comma or space; words that mean something stay', () => {
+  const same = (s: string) => assert.deepEqual(voiceFillers(s), { text: s, n: 0 }, s)
+  const is = (s: string, text: string, n = 1) => assert.deepEqual(voiceFillers(s), { text, n }, s)
+  is('Um, I think we should, uh, ship it', 'I think we should ship it', 2)
+  is('um we should ship', 'we should ship')
+  is('Ship it, um.', 'Ship it.')
+  is('we should uh ship this', 'we should ship this')
+  is('Hmm, let me think', 'Let me think')
+  is('Uh. Okay, this is it.', 'Okay, this is it.')
+  is('It works. Um, what next?', 'It works. What next?')
+  is('Um, uh, we can', 'We can', 2)
+  is('we can, er, go', 'we can go')
+  is('Äh, ich denke schon', 'Ich denke schon')
+  is('Ähm, das geht', 'Das geht')
+  is('Euh, je pense que oui', 'Je pense que oui')
+  is('えーと、明日やります', '明日やります')
+  is('嗯，我觉得可以', '我觉得可以')
+  is('我觉得，嗯，可以', '我觉得，可以')
+  is('Ну, я думаю', 'Я думаю')
+  is('Эээ, давай', 'Давай')
+  is('Uh', '')
+  same('Um')
+  same('I like it, so, ship the thing')
+  same('uh-huh, that is it')
+  same('the umbrella and the error')
+  same('er ist müde')
+  same('Da steht er, um zu gehen')
+  same('Um carro e dois')
+  same('Um, dois, três')
+  same('ну и что')
+  same('嗯嗯我知道')
 })

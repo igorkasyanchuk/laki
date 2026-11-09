@@ -30,7 +30,7 @@ worktree archived when it's done, each agent block's permission mode, a deleted 
 on an event, the last one or a sample (`laki flow run --event`), questions answered from the phone, and a budget of
 time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
-  Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
+  Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
   with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Reader view**: a Claude Code or Codex tab as its chat (your messages, its answers, its steps folded), with a box to
   write in (`@` names another workspace or project for the agent; a long message of yours folds to 10 lines, *Show more*); a switch per tab, phones open in it. Under a turn that changed files, a card: what it changed, *Review*
