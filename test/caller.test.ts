@@ -87,6 +87,11 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   const second = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id // its workspace's other agent, asking
   await rig.rpc('hook', { tab: second, state: 'waiting', payload: { message: 'Claude needs your permission' } })
   assert.match((await agent(curl('input', { tab: second, data: '1' })))[0].error, /an agent can't type into a tab that asks something/)
+  await rig.rpc('tabDraft', { tab, text: 'my half-written thought' })
+  const [read, wrote] = await agent(curl('tabDraft', { tab }), curl('tabDraft', { tab, text: 'x' }))
+  assert.match(read.error, /an agent can't read or change what the user is typing/)
+  assert.match(wrote.error, /an agent can't read or change/)
+  await rig.rpc('tabDraft', { tab, text: '' })
 
   // a caller gone before it's looked up (the request sent, its socket closed): refused, never yours
   const half = await new Promise<string>((ok, bad) => {

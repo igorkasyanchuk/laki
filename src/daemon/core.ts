@@ -618,7 +618,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -632,7 +632,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+      return { ...w, closed: w.closed?.map(({ draft: _, ...c }) => c), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -2104,6 +2104,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
     const c: ClosedTab = { name: t.name, kind: t.kind as ClosedTab['kind'], at: Date.now() }
     for (const k of ['preset', 'profile', 'resumeId', 'model', 'effort', 'perm', 'fast', 'sandbox', 'account', 'cmd'] as const) if (t[k] !== undefined) (c as any)[k] = t[k]
     if (keep?.cwd) c.cwd = keep.cwd
+    if (t.draft) c.draft = t.draft
     ws.closed = [c, ...(ws.closed ?? [])].slice(0, CLOSED_MAX)
   }
   sessions.get(id)?.kill()
@@ -2116,6 +2117,22 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   statusGone(id)
   save()
   changed()
+}
+
+// what's typed in a tab's Reader box and not sent: read (no text), or kept (debounced by the Reader), through restarts,
+// a closed tab (closeTab, tabReopen) and an archive; deleted with its tab. Yours alone: no agent reads or sets it
+export const DRAFT_MAX = 100_000
+export function tabDraft(p: { tab?: unknown; text?: unknown }) {
+  const t = findTab(String(p.tab ?? ''))
+  if (p.text === undefined) return { text: t.draft ?? '' }
+  const text = String(p.text).slice(0, DRAFT_MAX)
+  if (text === (t.draft ?? '')) return {}
+  const flips = !t.draft !== !text
+  if (text) t.draft = text
+  else delete t.draft
+  save()
+  if (flips) changed() // the mark on its tab
+  return {}
 }
 
 // ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it
@@ -2138,6 +2155,7 @@ export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown
     if (c.sandbox === false) throw new Error("an agent can't start an agent outside its profile's sandbox: it's the user's (ask them)") // main.ts agentNo's for tabNew
   }
   const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd, agent: by } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account, agent: by })
+  if (c.draft) state.tabs.find(t => t.id === tab.id)!.draft = c.draft
   ws.closed = ws.closed!.filter(x => x !== c)
   if (!ws.closed.length) delete ws.closed
   save()

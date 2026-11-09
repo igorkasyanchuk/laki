@@ -243,3 +243,38 @@ test("chatRead: a failed call counts on its run, a stop marks what it stopped, a
   assert.doesNotMatch(md, /Run the tests|Now deploy it/)
   await assert.rejects(rig.rpc('imageRead', { path: join(dir, 'a.png'), from: { tab: tab.id } }), /read a picture anywhere/) // the user's hover card's
 })
+
+test('a draft: kept per tab through a restart and a closed tab (⇧⌘T), out of the view, gone with its workspace', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id), 'its agent')
+  const draftOf = (id: string) => rig.rpc('tabDraft', { tab: id })
+  const inView = async () => JSON.stringify(await rig.rpc('state'))
+  assert.deepEqual(await draftOf(tab.id), { text: '' })
+  await rig.rpc('tabDraft', { tab: tab.id, text: 'half a thought' })
+  assert.deepEqual(await draftOf(tab.id), { text: 'half a thought' })
+  assert.equal((await rig.tab(ws.id)).drafted, true)
+  assert.ok(!(await inView()).includes('half a thought'), 'the view says there is one, never what it says')
+
+  await rig.stop()
+  await rig.start()
+  assert.deepEqual(await draftOf(tab.id), { text: 'half a thought' }, 'through a restart')
+
+  // ⇧⌘T: closed, its draft stays out of the view's list; brought back, a new tab with the draft
+  await rig.rpc('tabClose', { id: tab.id })
+  assert.ok(!(await inView()).includes('half a thought'))
+  const back = await rig.rpc('tabReopen', { ws: ws.id })
+  assert.deepEqual(await draftOf(back.id), { text: 'half a thought' })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === back.id).drafted, true)
+
+  await rig.rpc('tabDraft', { tab: back.id, text: '' })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === back.id).drafted, undefined, 'sent: gone')
+  await rig.rpc('tabDraft', { tab: back.id, text: 'y'.repeat(200_000) })
+  assert.equal((await draftOf(back.id)).text.length, 100_000, 'capped')
+  await rig.rpc('tabDraft', { tab: back.id, text: 'through an archive' })
+  await rig.rpc('wsArchive', { id: ws.id, force: true })
+  assert.deepEqual(await draftOf(back.id), { text: 'through an archive' })
+  await rig.rpc('wsRm', { id: ws.id, force: true })
+  await assert.rejects(draftOf(back.id), /no tab|not found/i)
+})

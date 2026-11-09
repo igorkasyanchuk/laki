@@ -102,6 +102,7 @@ export function TabList({ app }: { app: AppCtx }) {
             <span>{ts.map(t => t.name).join(' · ')}</span>
             {ts.some(t => t.compacting) && <span className="tab-compact">Compacting…</span>}
             {ts.some(retrying) && <span className="tab-compact">Retrying…</span>}
+            {ts.some(t => t.drafted) && <span className="tab-compact" data-tip="Typed in its box and not sent">Draft</span>}
             {ts.filter(t => t.alias).map(t => <span key={t.id} className="tab-alias">@{t.alias}</span> /* laki name: what other agents call it */)}
             {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}

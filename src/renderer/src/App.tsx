@@ -2621,6 +2621,7 @@ export function App() {
   const inReader = (id: string) => readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader'
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   const readerApi: ReaderApi = {
+    draft: (tab, text) => api.call('tabDraft', { tab, text }),
     read: (tab, v) => api.call('chatRead', { tab, v }),
     keys: (tab, data) => void api.call('input', { tab, data }).catch(() => {}), // ←/→ between its questions
     bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),

@@ -26,19 +26,34 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+export type ReaderApi = { draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
 // Settings › Appearance's: which tool calls show (text.ts readerShown), and whether sending scrolls to the latest (on unless false)
 export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean }
 
+// the Reader's box, per tab: here at once (a switch of tabs), in the daemon a moment after you stop typing
+const drafts = new Map<string, string>()
+const draftTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function keepDraft(id: string, text: string, save: ReaderApi['draft']) {
+  drafts.set(id, text)
+  clearTimeout(draftTimers.get(id))
+  draftTimers.set(id, setTimeout(() => void (draftTimers.delete(id), save(id, text).catch(() => {})), 600))
+}
 export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: ReaderApi; active: boolean; look?: ReaderLook }) {
   const [said, setSaid] = useState<Said[]>()
   const [bg, setBg] = useState<BgTask[]>([])
   const [apps, setApps] = useState<App[]>([])
   const [none, setNone] = useState(false)
-  const [text, setText] = useState('')
+  const [text, setText] = useState(() => drafts.get(tab.id) ?? '') // what's typed and not sent: kept (keepDraft)
+  const kept = useRef(text)
+  useEffect(() => {
+    if (text !== kept.current) keepDraft(tab.id, (kept.current = text), api.draft)
+  }, [text, tab.id, api.draft])
+  useEffect(() => {
+    if (tab.drafted && !drafts.has(tab.id)) void api.draft(tab.id).then(r => r.text && setText(now => now || ((kept.current = r.text!), r.text!))).catch(() => {}) // after a restart, or a tab brought back
+  }, [tab.id]) // eslint-disable-line
   const [hid, setHid] = useState<string>() // the guess Esc hid (settings.nextPrompt's tab.suggest)
   const ghost = !text && tab.status === 'idle' && tab.suggest && tab.suggest !== hid ? tab.suggest : undefined
   const v = useRef<number>(undefined)
