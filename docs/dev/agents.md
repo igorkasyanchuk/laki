@@ -362,6 +362,41 @@ A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the s
 words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:
 the code, the seconds it ran, its last lines.
 
+### Design: terminals that outlive the daemon (R6, not built)
+
+A proposal, for the maintainer's OK before any code. node-pty's children belong to the daemon (session.ts), so a crash,
+`laki stop` or an app update that restarts an older daemon ends every turn. *Update when idle* avoids the last; nothing
+avoids the first two.
+
+- **A pty host.** One small process (`src/ptyhost/main.ts`, its own build entry) owns the ptys and a ring buffer of
+  each one's output (the last 2 MB). No state.json, no git, no hooks logic: it changes rarely, so app updates seldom
+  need it restarted. Started by the daemon when missing, detached, as the daemon is by the app.
+- **Protocol.** A unix socket `<data>/pty.sock` (0600, in the 0700 data folder; no TCP listener), length-prefixed JSON
+  frames: `spawn { id, file, args, cwd, env, cols, rows }`, `write { id, data }`, `resize`, `kill { id, signal }`,
+  `list` (ids, pids, sizes, exit codes), `attach { id, from }` (replays the buffer from an offset, then streams),
+  `hello { version }`. Output frames carry an offset so a daemon that reconnects asks for exactly what it missed.
+- **The daemon's side.** `Session` talks to the host instead of node-pty. On start it calls `list`, re-attaches every
+  id it has a tab for, and rebuilds the headless xterm mirror by replaying the buffer (the same path a snapshot takes
+  now). A tab whose pty is gone is restored as today (`restoreAll`, resume).
+- **Hooks.** `LAKI_HOOK` is per start and lives in the agent's environment, which survives. The daemon must keep each
+  start's key across its own restart: saved with the tab in state.json (0600) rather than in memory.
+- **Versions.** `hello` carries the protocol version. A newer daemon speaks to an older host as long as the version
+  matches; when it doesn't, the daemon waits for every pty to be idle (the *Update when idle* rule) and restarts the
+  host, or does it at once when the user says so.
+- **Security.** The socket is the only way in and is the user's alone; the host accepts no command that isn't in the
+  list above and never reads files. A sandboxed agent must not reach the socket: deny it in the sandbox profile, with
+  daemon.json.
+- **Linux and SSH hosts.** The same on Linux (unix sockets, node-pty). A host's tab is an ssh process on this Mac: it
+  survives with its pty; the remote side is unchanged.
+- **Tests.** `fresh()` starts a host per rig in its temp data folder with `LAKI_TEST_PARENT` (it exits when the test's
+  process is gone, as the daemon does). New tests: a daemon killed mid-turn, started again, the turn still running and
+  its output complete; a host of another version restarted only when idle.
+- **Risks.** Two long-lived processes to reason about; a buffer replay that differs from what xterm saw (resizes mid
+  stream: record resize events in the buffer); an orphaned host after an uninstall (it exits when it has no ptys and no
+  daemon for 10 minutes); memory (2 MB × tabs, bounded).
+- **Rollout.** Behind `settings.ptyHost` (off): first the host and the protocol with tests; then shell tabs only; then
+  agents; default on after two releases without a report. Until then, make *Update when idle* the default.
+
 ### OSC 7501 (shadow)
 
 An agent can say what it's doing through its own terminal: the Program Status Protocol (`daemon/program.ts`). Only an agent's tab answers
