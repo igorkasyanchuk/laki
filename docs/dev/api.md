@@ -40,6 +40,7 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
   `.git/worktrees/<x>/gitdir` may name any folder); refused from an agent, `AGENT_NO`): a project's ⋯ › *Import
   worktrees…* (panels.tsx `ImportWorktrees`);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
+- `projectClone { url, into? }` (U7): `git clone` of an `https://`, `ssh://` or `git@host:path` URL, `owner/repo` (GitHub's: `gh repo clone`, else https) or a repo's folder here, into `<into>/<name>` (unset: `~/code` when it's there, else beside the last project, else home), then `projectAdd`. Argv only, `--` before the URL, `protocol.ext.allow=never`; anything else (`ext::`, `file://`, `http://`, a leading `-`) is refused. A failed clone leaves no folder. Yours only (`FROM`, `AGENT_NO`).
   and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
   refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:

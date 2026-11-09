@@ -2,6 +2,7 @@
 // the user, files and tabs are its own workspace's, a PR isn't merged as you, the settings and switches that are yours,
 // and Recording mode's private workspaces. test/caller.test.ts proves the from is its process's, whatever it says
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -93,4 +94,23 @@ test('S7: Recording mode: an agent gets no private workspace, its tabs or a priv
   assert.doesNotMatch(JSON.stringify(theirs), /secret-client/)
   assert.ok(theirs.workspaces.some((w: any) => w.id === one.id) && !theirs.tabs.some((x: any) => x.workspace === two.id))
   assert.match(JSON.stringify(await rig.rpc('state')), /secret-client/, 'yours: all of it (the window veils its rows)')
+})
+
+test('U7: Clone a repository: a local repo or a URL into a folder, added as a project; no program-running transport; not an agent', async t => {
+  const rig = await fresh(t)
+  const bare = join(rig.home, 'shop.git')
+  execFileSync('git', ['clone', '-q', '--bare', rig.repo, bare])
+  const p = await rig.rpc('projectClone', { url: bare, into: join(rig.home, 'code') })
+  assert.equal(p.path.endsWith('/code/shop'), true)
+  assert.equal(p.git, true)
+  assert.ok(existsSync(join(p.path, '.git')))
+  assert.ok((await rig.rpc('state')).projects.some((x: { id: string }) => x.id === p.id))
+  await assert.rejects(rig.rpc('projectClone', { url: bare, into: join(rig.home, 'code') }), /is already there/)
+  for (const url of ['ext::sh -c id', '--upload-pack=id x', 'file:///etc', '-x/y', 'http://plain.example/x.git', ''])
+    await assert.rejects(rig.rpc('projectClone', { url, into: join(rig.home, 'no') }), /what to clone/, url)
+  await assert.rejects(rig.rpc('projectClone', { url: join(rig.home, 'none.git'), into: join(rig.home, 'no') }), /what to clone/)
+  assert.equal(existsSync(join(rig.home, 'no')), false)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = await rig.tab(ws.id)
+  await assert.rejects(rig.rpc('projectClone', { url: bare, into: join(rig.home, 'two'), from: { ws: ws.id, tab: tab.id } }), /clone a repository/)
 })

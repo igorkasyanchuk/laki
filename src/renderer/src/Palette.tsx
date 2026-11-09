@@ -168,6 +168,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ id: 'start', label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
   a({ id: 'browser', label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
   a({ id: 'ssh', label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
+  a({ id: 'clone', label: 'Clone a repository… (a URL, or owner/repo)', icon: 'github', run: () => setDialog('clone') })
   a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
   a({ id: 'themes', label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit
   a({ id: 'schedules', label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })

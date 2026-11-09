@@ -3527,7 +3527,7 @@ export function App() {
                       <StarLaki />
                     </>
                   ) : (
-                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} check={() => api.call<Doctor>('doctor')} />
+                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} />
                   )
                 )}
               </div>

@@ -58,6 +58,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
+- **Clone a repository**: Welcome's *Clone a repository…* (⌘K too) takes a URL (`https://`, `ssh://`, `git@host:…`) or
+  `owner/repo`, clones it into `~/code` (or the folder you name) and adds it as a project.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›

@@ -33,7 +33,7 @@ import { SchedulesPage } from './Schedules'
 import { spanText, type Collision } from '../../shared/overlap'
 import { Palette, paletteItems } from './Palette'
 import { KeyOverlay } from './KeyOverlay'
-import { lazy, type ReactNode, Suspense } from 'react'
+import { lazy, type ReactNode, Suspense, useState } from 'react'
 import { Page, Boundary } from './ui'
 import { hasCap } from '../../shared/caps'
 
@@ -599,6 +599,7 @@ export function Pages({ app }: { app: AppCtx }) {
 // the dialogs over everything (and the keys overlay, between them as it always was)
 export function Dialogs({ app }: { app: AppCtx }) {
   const { addTimer, byId, call, checking, copy, dialog, done, earn, extInserts, gated, hereCtx, live, narrow, newTab, newWs, overlapsAt, panelApi, prFix, projOf, radarKey, radarOf, restart, selectTab, setDialog, setOverlapsAt, setRadarHid, setSideOpen, setTimer, settings, setVideo, setWsId, showNew, tab, timers, toast, touch, view, ws } = app
+  const [cloning, setCloning] = useState(false)
   // a sep: name it (a new one goes at the top: groups are made from the project's ⋯ only), or rename it
   // template: the default prompt template of a new workspace under it ('' none)
   // a group's name and defaults (Edit group: template, agent, where, permission mode, model, effort, base; '' none)
@@ -883,6 +884,22 @@ export function Dialogs({ app }: { app: AppCtx }) {
             }}
           />
         ))(view.projects.find(p => p.id === dialog.importWt))}
+      {dialog === 'clone' && ( // U7: Welcome's and ⌘K's
+        <Prompt
+          title="Clone a repository"
+          placeholder="https://github.com/owner/repo, git@host:owner/repo.git, or owner/repo"
+          hint="Cloned with your own git (gh for owner/repo, with its sign-in), then added as a project."
+          picks={[{ label: 'Into', none: '~/code, else beside your last project', options: [], free: true }]}
+          busy={cloning ? 'Cloning…' : undefined}
+          onClose={() => setDialog(null)}
+          onSubmit={async (url, [into]) => {
+            setCloning(true)
+            const p = await call<{ id: string }>('projectClone', { url, into }).finally(() => setCloning(false)) // a failure: the toast says git's last line
+            setDialog(null)
+            newWs(p.id)
+          }}
+        />
+      )}
       {dialog && typeof dialog === 'object' && 'attachPr' in dialog && (w => w && (
         <Prompt
           title="Attach a pull request"

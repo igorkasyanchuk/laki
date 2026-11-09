@@ -1730,7 +1730,7 @@ const CLOUDFLARED_WHY =
   "Cloudflare's free tunnel, no account needed. Laki uses it for public links: share a workspace's dev server (the globe next to a port in the status bar), and open Laki itself from your phone (Settings › Remote access)."
 
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
-export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: () => void; check: () => Promise<Doctor> }) {
+export function Welcome({ onOpen, onSsh, onClone, check }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)
   const [busy, setBusy] = useState(false)
   const again = () => (setBusy(true), void check().then(setD, () => {}).finally(() => setBusy(false))) // R12: no restart of Laki to see a new install
@@ -1759,6 +1759,9 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
         <Icon name="folderPlus" size={22} />
         <b>Open a project folder</b>
         <span className="muted">or drop one on the window · ⌘O</span>
+      </button>
+      <button className="welcome-ssh" onClick={onClone}>
+        <Icon name="github" /> Clone a repository…
       </button>
       <button className="welcome-ssh" onClick={onSsh}>
         <Icon name="server" /> Open a folder over SSH…

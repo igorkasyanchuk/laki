@@ -1226,6 +1226,37 @@ export function storageOf(ws: Workspace) {
 
 // ---------- projects
 
+// U7: a repository cloned and added as a project (Welcome's and ⌘K's Clone a repository). url: https://, ssh://,
+// git@host:path, owner/repo (GitHub's: gh's clone, so its sign-in is used; without gh, https) or a repo's folder here.
+// Never a transport that runs a program (ext::, file://, a leading -): argv, no shell, -- before the url. into: the
+// folder it goes under (unset: ~/code when it's there, else beside the last project, else home)
+// ponytail: no progress lines, the dialog spins until git ends (15 minutes at most); an event per line if it matters
+const CLONE_URL = /^(https:\/\/|ssh:\/\/|git@[\w.-]+:)[\w@:/.~%+-]+$/
+const GH_REPO = /^\w[\w.-]*\/[\w.-]+$/
+export async function projectClone(url: unknown, into?: unknown): Promise<Project> {
+  const u = typeof url === 'string' ? url.trim() : ''
+  const local = isAbsolute(u) && existsSync(u)
+  const gh = !local && GH_REPO.test(u)
+  if (!local && !gh && !CLONE_URL.test(u)) throw new Error('what to clone: https://…, ssh://…, git@host:owner/repo.git, or owner/repo on GitHub')
+  const last = state.projects.findLast(p => !p.host && !p.kind)
+  const parent = typeof into === 'string' && into.trim() ? resolve(tilde(into.trim())) : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
+  const name = (u.split(/[/:]/).filter(Boolean).at(-1) ?? '').replace(/\.git$/, '')
+  if (!name || name.startsWith('.') || name.startsWith('-')) throw new Error(`no folder name in ${JSON.stringify(u)}`)
+  const dest = join(parent, name)
+  if (existsSync(dest)) throw new Error(`${dest} is already there: open it as a project, or clone into another folder`)
+  mkdirSync(parent, { recursive: true })
+  const opts = { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 15 * 60_000, maxBuffer: 1 << 22 }
+  const clone = (x: string) => run('git', ['-c', 'protocol.ext.allow=never', 'clone', '--', x, dest], opts)
+  try {
+    if (gh) await run('gh', ['repo', 'clone', u, dest], opts).catch(() => (rmSync(dest, { recursive: true, force: true }), clone(`https://github.com/${u}.git`)))
+    else await clone(u)
+  } catch (e) {
+    rmSync(dest, { recursive: true, force: true }) // half a clone: none
+    throw new Error(`clone failed: ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n').at(-1)}`)
+  }
+  return projectAdd(dest)
+}
+
 // a git repository (its top level), or any other folder (git: false)
 // back: an archived project's folder added again brings it back (yours; an agent's is refused: the user does)
 export async function projectAdd(path: string, back = true): Promise<Project> {
