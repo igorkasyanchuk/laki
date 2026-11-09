@@ -325,6 +325,10 @@ test('copying ignored files: one the branch has stays, nothing through a link ou
   assert.equal(readFileSync(join(a.path, '.env'), 'utf8'), 'from main\n')
   assert.equal(readFileSync(join(a.path, 'sub/secret'), 'utf8'), 'shh\n')
   assert.equal(lstatSync(join(a.path, 'dangling'), { throwIfNoEntry: false }), undefined)
+  // F7: cloned where the filesystem can, copied where it can't: either way its own file, a write to one leaves the other
+  writeFileSync(join(a.path, '.env'), 'the worktree\'s\n')
+  assert.equal(readFileSync(join(rig.repo, '.env'), 'utf8'), 'from main\n')
+  writeFileSync(join(a.path, '.env'), 'from main\n')
 
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'from other', base: 'other' })
   assert.equal(readFileSync(join(b.path, '.env'), 'utf8'), 'from the branch\n') // there already: it stays

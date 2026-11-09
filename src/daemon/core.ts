@@ -2710,6 +2710,8 @@ export const within = (root: string, p: string) => p === root || p.startsWith(ro
 // and the agent start; with settings.copyIgnored every ignored file, with copyUntracked the untracked ones too. One
 // already in the worktree stays; a symlink counts only when it points inside the repo. A failure is a line in
 // daemon.log, not a failed workspace. Copied one by one, awaited: node_modules' thousands don't hold the daemon up
+// ponytail: file by file (each one's link and place checked), not one cp -c -R of a whole folder: faster still, with
+// those checks done for the folder as a whole; and no spare worktree kept ready
 async function copyIncludes(proj: Project, ws: Workspace) {
   const list = projectConfig(ws).copy
   const pats = (Array.isArray(list) ? list : []).filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => `--exclude=${p.trim()}`)
@@ -2718,6 +2720,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   const { copyIgnored, copyUntracked } = state.settings ?? {}
   if (!pats.length && !copyIgnored && !copyUntracked) return
   const copied: string[] = []
+  const began = Date.now()
   try {
     const root = realpathSync(proj.path)
     const to = realpathSync(ws.path)
@@ -2746,7 +2749,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
         if (!within(to, realpathSync(dirname(dst)))) continue
         if (link) await symlink(readlinkSync(from), dst)
         else {
-          await copyFile(src, dst)
+          await copyFile(src, dst, fsConstants.COPYFILE_FICLONE) // F7: a clone where the filesystem has them (APFS, btrfs, XFS): no bytes copied, its own file as soon as either is written; else a plain copy, by itself
           await chmod(dst, statSync(src).mode & 0o7777)
         }
         copied.push(rel)
@@ -2757,7 +2760,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   } catch (e) {
     log(`copy into ${ws.id}: ${(e as Error).message}`)
   }
-  if (copied.length) log(`copied into ${ws.id}: ${copied.length > 50 ? `${copied.length} files` : copied.join(', ')}`)
+  if (copied.length) log(`copied into ${ws.id} in ${Date.now() - began} ms: ${copied.length > 50 ? `${copied.length} files` : copied.join(', ')}`)
 }
 
 async function teardown(ws: Workspace) {
