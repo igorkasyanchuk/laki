@@ -35,3 +35,19 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   if (done && o.git !== false) return { id: 'look', label: 'Review changes', tip: `${done.name} is done: what it changed`, tab: done.id }
   if (w.kind === 'worktree' && changed) return { id: 'ship', label: 'Ship', tip: 'Commit, push, open a PR', tone: 'go' }
 }
+
+// U5: the Board's columns, from the same rules: what the sidebar's Needs you counts (needsTab) is always in Answer, Review
+// or Fix, never in Working, Merge or Done. setup: its setup script runs
+export const needsTab = (t: TabView) => t.status === 'waiting' || !!t.secret || !!t.failed || (!!t.done && t.status === 'idle')
+export const BOARD = [['working', 'Working'], ['answer', 'Answer'], ['review', 'Review'], ['fix', 'Fix'], ['merge', 'Merge'], ['done', 'Done']] as const
+export type BoardCol = (typeof BOARD)[number][0]
+export function boardCol(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): BoardCol {
+  const mine = tabs.filter(t => t.workspace === w.id)
+  if (mine.some(t => t.status === 'waiting' || t.secret || t.failed)) return 'answer'
+  const needs = mine.some(needsTab) // a finish you haven't looked at
+  const st = nextStep(w, tabs, o)
+  if (!needs && (w.setup || st?.id === 'working')) return 'working'
+  if (st && ['check', 'conflict', 'ci', 'review'].includes(st.id)) return 'fix'
+  if (needs || st?.id === 'look' || st?.id === 'ship') return 'review'
+  return st?.id === 'merge' || st?.id === 'wait' ? 'merge' : 'done'
+}

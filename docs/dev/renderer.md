@@ -712,4 +712,10 @@ The status bar (U3), left to right: the context meter, the branch, the codespace
 checks, conflicts, Info.tsx `AutoChip`: *Auto n/3*, a click opens the switches with a line each), Artifacts; after the
 spacer the ports and the plan's limits (`UsageButton`), then Recording, remote access, the update, widgets, the trophy.
 
+The Board's columns (U5): nextStep.ts `boardCol`, from `nextStep` and `needsTab` (the sidebar's Needs you rule, App's
+`needsYou` without mute): Working, Answer (an ask, a secret, a failed agent), Review (a finish not looked at, look, ship),
+Fix (check, CI, conflicts, changes asked for), Merge (a PR open: waiting or ready), Done. What Needs you counts is always
+in Answer, Review or Fix (`test/next-step.test.ts`). An empty column is a 34px strip (`.board-col.empty`), wide under the
+pointer or a dragged to-do.
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

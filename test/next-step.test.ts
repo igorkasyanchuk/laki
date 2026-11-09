@@ -2,7 +2,7 @@
 // to you, a closed PR, conflicts, CI, a review, the radar, merge, look, ship; busy while an agent or CI works.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { nextStep } from '../src/shared/nextStep.ts'
+import { nextStep, boardCol, needsTab } from '../src/shared/nextStep.ts'
 import type { TabView, WorkspaceView } from '../src/shared/types.ts'
 
 const ws = (o: object = {}) => ({ id: 'w', kind: 'worktree', ...o }) as unknown as WorkspaceView
@@ -36,4 +36,34 @@ test('One next step: Continue for a turn that ended on an API error, after an as
   const failed = { id: 't', workspace: 'w', kind: 'agent', status: 'idle', name: 'claude', failed: 'API Error: 500' } as unknown as TabView
   assert.equal(id({ id: 'w', kind: 'worktree' } as WorkspaceView, [failed]), 'continue')
   assert.equal(id({ id: 'w', kind: 'worktree' } as WorkspaceView, [failed, { ...failed, id: 'u', failed: undefined, status: 'waiting' } as TabView]), 'answer')
+})
+
+test("U5: the Board's columns follow the next step, and hold what the sidebar's Needs you counts", () => {
+  const col = (w: WorkspaceView, tabs: TabView[] = []) => boardCol(w, tabs, { merge: true })
+  assert.equal(col(ws({ pr: pr({ checks: 'fail' }) })), 'fix')
+  assert.equal(col(ws({ pr: pr({ conflict: true }) })), 'fix')
+  assert.equal(col(ws(), [tab({ status: 'waiting', ask: { options: [] } })]), 'answer')
+  assert.equal(col(ws({ pr: pr() }), [tab({ status: 'waiting' })]), 'answer') // an ask first, whatever its PR
+  assert.equal(col(ws(), [tab({ status: 'running' })]), 'working')
+  assert.equal(col(ws({ setup: true })), 'working')
+  assert.equal(col(ws(), [tab({ done: true })]), 'review')
+  assert.equal(col(ws({ pr: pr() })), 'merge')
+  assert.equal(col(ws({ pr: pr({ checks: 'pending' }) })), 'merge')
+  assert.equal(col(ws({ pr: pr({ state: 'MERGED' }) })), 'done')
+  assert.equal(col(ws()), 'done')
+  // every workspace the sidebar counts is in Answer, Review or Fix: never in Working, Merge or Done
+  const cases: [WorkspaceView, TabView[]][] = [
+    [ws(), [tab({ status: 'waiting' })]],
+    [ws(), [tab({ failed: 'API error' }), tab({ id: 'u', status: 'running' })]],
+    [ws(), [tab({ done: true }), tab({ id: 'u', status: 'running' })]],
+    [ws({ pr: pr() }), [tab({ done: true })]],
+    [ws({ pr: pr({ state: 'MERGED' }) }), [tab({ done: true })]],
+    [ws({ pr: pr({ checks: 'fail' }) }), [tab({ done: true })]],
+    [ws(), [tab({ secret: { what: 'a token' } })]],
+    [ws(), [tab({})]],
+    [ws({ pr: pr() }), [tab({ status: 'running' })]],
+  ]
+  const needs = cases.filter(([, tabs]) => tabs.some(needsTab))
+  assert.equal(needs.length, 7)
+  for (const [w, tabs] of cases) assert.equal(['answer', 'review', 'fix'].includes(col(w, tabs)), tabs.some(needsTab), JSON.stringify([w, tabs]))
 })

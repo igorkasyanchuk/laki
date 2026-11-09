@@ -1,10 +1,11 @@
-// The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by where it is (its agents
-// at work, waiting for you, done, a PR open, merged), and To do: prompts waiting for a workspace. Start, or a drag
+// The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by what it needs next (nextStep.ts
+// boardCol, the row chip's and ⌘G's rules: Working, Answer, Review, Fix, Merge, Done), and To do: prompts waiting for a workspace. Start, or a drag
 // onto another column, makes one with the default agent; a click on a card opens its workspace, a right click (or ⋯)
-// is its menu: open, archive, delete; Merged's ⋯ archives them all. A to-do takes screenshots and files pasted or dropped
+// is its menu: open, archive, delete; Done's ⋯ archives the merged ones. A to-do takes screenshots and files pasted or dropped
 // in: their paths go after its text as it starts.
 import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
-import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
+import { BOARD, type BoardCol, boardCol } from '../../shared/nextStep'
+import type { Todo, View, WorkspaceView } from '../../shared/types'
 import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
@@ -20,28 +21,15 @@ export type BoardApi = {
   saveFile: (base64: string, name: string) => Promise<string> // fileSave: another file's
   rm: (id: string) => Promise<unknown>
   menu: (e: MouseEvent, w: WorkspaceView) => void // a card's: open, archive, delete
-  archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Merged's ⋯
+  archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Done's ⋯: the merged ones
+  merge: (w: WorkspaceView) => boolean // its project lets the app merge (nextStep's)
 }
 
-const COLUMNS = [
-  ['running', 'Running'],
-  ['waiting', 'Needs you'],
-  ['done', 'Done'],
-  ['pr', 'PR open'],
-  ['merged', 'Merged'],
-] as const
-type Column = (typeof COLUMNS)[number][0]
 const TODO = 'text/x-laki-todo' // a dragged to-do's id
 const isImage = (p: string) => /\/images\/[^/]+$/.test(p) // imageSave's (<data>/images/…), else fileSave's (<data>/files/<id>/<name>)
 
-// where a workspace is: what its agents do first (a usage limit resumes by itself: still running; a failed one needs
-// you), then its PR
-function columnOf(w: WorkspaceView, tabs: TabView[]): Column {
-  const s = w.setup ? 'running' : rollup(tabs.filter(t => t.kind === 'agent')) // agents' turns: a shell's dev server isn't one
-  if (s === 'waiting' || tabs.some(t => t.kind === 'agent' && t.status === 'exited' && t.code !== 0)) return 'waiting' // a failed agent stays to read
-  if (s === 'running' || s === 'limit') return 'running'
-  return w.pr?.state === 'MERGED' ? 'merged' : w.pr?.state === 'OPEN' ? 'pr' : 'done'
-}
+const TIPS: Record<BoardCol, string> = { working: 'An agent works, or its setup runs', answer: 'An agent asks you, or stopped', review: 'An agent finished: look at what it changed, then ship', fix: 'A failing check, CI, conflicts or a review asking for changes', merge: 'A PR open: its CI and reviews, then merge', done: 'Nothing left: merged, closed or untouched' }
+const merged = (ws: { w: WorkspaceView }[]) => ws.map(c => c.w).filter(w => w.kind === 'worktree' && w.pr?.state === 'MERGED')
 
 export function BoardPage({ view, timers, going = {}, api, onClose }: { view: View; timers?: boolean; going?: Record<string, string>; api: BoardApi; onClose: () => void }) {
   const [pick, setPick] = useState('')
@@ -57,7 +45,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
     .filter(w => !w.archived && !w.term && projects.some(p => p.id === w.project)) // a project's terminal: not a task
     .map(w => {
       const tabs = view.tabs.filter(t => t.workspace === w.id)
-      return { w, tabs, col: columnOf(w, tabs) }
+      return { w, tabs, col: boardCol(w, view.tabs, { merge: api.merge(w), git: view.projects.find(p => p.id === w.project)?.git !== false }) }
     })
   const todos = view.todos ?? []
   const start = (t: Todo) => {
@@ -141,16 +129,17 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
             </form>
           )}
         </section>
-        {COLUMNS.map(([col, title]) => {
+        {BOARD.map(([col, title]) => {
           const ws = cards.filter(c => c.col === col)
           return (
-            <section key={col} className={`board-col ${over === col ? 'over' : ''}`} {...drop(col)}>
+            // U5: none in it: a narrow strip, its name down it and 0; wide again under the pointer or a dragged to-do
+            <section key={col} className={`board-col ${over === col ? 'over' : ''} ${ws.length ? '' : 'empty'}`} data-tip={ws.length ? undefined : TIPS[col]} {...drop(col)}>
               <h3>
-                {title} <span className="board-count">{ws.length || ''}</span>
-                {col === 'merged' && ws.some(c => c.w.kind === 'worktree') && (
+                {title} <span className="board-count">{ws.length || 0}</span>
+                {col === 'done' && merged(ws).length > 0 && (
                   <>
                     <span className="spacer" />
-                    <IconButton icon="more" title="Archive them all" onClick={e => api.archiveAll(e, ws.map(c => c.w).filter(w => w.kind === 'worktree'))} />
+                    <IconButton icon="more" title="Archive the merged ones" onClick={e => api.archiveAll(e, merged(ws))} />
                   </>
                 )}
               </h3>

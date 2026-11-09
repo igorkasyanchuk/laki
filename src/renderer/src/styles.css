@@ -2382,6 +2382,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .board { display: flex; gap: 12px; align-items: stretch; overflow-x: auto; flex: 1; min-height: 0; } /* each column the page's height: an empty one is still a lane, and a drop target */
 .board-col { flex: 1 0 210px; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius); background: var(--side); border: 1px solid var(--line); min-height: 0; overflow-y: auto; }
 .board-col.over { border-color: var(--accent); }
+.board-col.empty:not(:hover, .over) { flex: 0 0 34px; padding: 10px 6px; overflow: hidden; }
+.board-col.empty:not(:hover, .over) h3 { writing-mode: vertical-rl; white-space: nowrap; align-items: center; }
+.narrow .board-col.empty h3 { writing-mode: horizontal-tb; }
 .board-col h3 { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; }
 .board-count { font-weight: 400; }
 .board-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 9px 10px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; min-width: 0; }

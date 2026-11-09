@@ -30,7 +30,7 @@ import { type ExtTab } from './Extension'
 import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
-import { nextStep, type Step, type StepId } from '../../shared/nextStep'
+import { needsTab, nextStep, type Step, type StepId } from '../../shared/nextStep'
 import { flushDraft, Reader, type ReaderApi, readable } from './Reader'
 import { AskWrap, turnNext } from './Diff'
 import { type Collision } from '../../shared/overlap'
@@ -824,7 +824,7 @@ export function App() {
   }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
   const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
-  const needsYou = (t: TabView) => (t.status === 'waiting' || !!t.secret || !!t.failed || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
+  const needsYou = (t: TabView) => needsTab(t) && !t.muted && !quiet.has(t.workspace)
   // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
   const hid = useRef(new Set<string>()) // Recording mode's hidden workspaces (veiled): their events say nothing

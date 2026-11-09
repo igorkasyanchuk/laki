@@ -77,7 +77,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   (MCP's `expect_url`) on a click or fill says which page it's meant for: on any other it's refused and nothing changes.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
   a workspace, a tab or a page of the app.
-- **Board**: every workspace in a column by where it is (running, needs you, done, PR open, merged), and to-dos
+- **Board**: every workspace in a column by what it needs next (Working, Answer, Review, Fix, Merge, Done: the sidebar's rules), and to-dos
   that start a workspace.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it works Laki for you: starts
   workspaces, reviews PRs in their own worktrees, sends prompts, tells you what your agents are doing, makes extensions. It runs on
