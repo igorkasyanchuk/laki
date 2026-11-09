@@ -723,4 +723,11 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 `onTight` has App hide the side panel while the Review tab shows (`reviewTight`, back as you leave the tab); under
 `HEAD_MIN` (720px) the head's count is `+a −d` without its "n files".
 
+The type scale (B1): `--fs-1`…`--fs-5` (11, 12, 13, 15, 20px: counts and kbd, secondary, body, panel titles, page
+titles) in styles.css `:root`; every `font-size` in px is one of them, but under 10px (badges) and over 22px (display
+numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). Motion (B5): `--t-fast`, `--t-mid`,
+`--t-slow` and `--ease`, used by one block under `prefers-reduced-motion: no-preference`, each selector in `:where()` so
+an element's own rule and Animations: high win: hover colors, the side panel and the sidebar coming in (no width is
+animated: the terminal fits once), menus and dialogs, a Needs you card arriving, a row that starts to need you (`b-lit`).
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

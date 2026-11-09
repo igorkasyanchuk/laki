@@ -26,6 +26,18 @@ test('no * or :not() under a :has() in our stylesheets', () => {
   assert.ok(under.test('.page-body:has(.bn-container) :is(.notes-side > *'))
 })
 
+// B1: the type scale. A size in px is one of --fs-1…5; its own only under 10px (badges) or over 22px (display numbers);
+// em, rem, inherit, a setting's variable and a calc() are relative to something else
+test('every font-size is a step of the type scale', () => {
+  for (const f of ['styles.css', 'look.css', 'plans.css', 'workflows.css']) {
+    const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    for (const [, v] of css.matchAll(/font-size:\s*([^;}]+)/g)) {
+      const px = /^(\d+(?:\.\d+)?)px( !important)?$/.exec(v.trim())
+      assert.ok(!px || +px[1] < 10 || +px[1] > 22, `${f}: font-size: ${v.trim()} (use var(--fs-1…5))`)
+    }
+  }
+})
+
 // themes.ts gateRules: a rule only for another look or motion than <html>'s gets a selector nothing has
 test("a look's or motion's rules are told apart by their selectors", async () => {
   const { selectorsOf, gateOf } = await import('../src/renderer/src/themes.ts')
