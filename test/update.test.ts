@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { feedName, feedOf, heldUntil, newer, RELEASES, releaseOf } from '../src/shared/update.ts'
+import { feedName, feedOf, heldUntil, newer, RELEASES, releaseOf, verdict } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -37,6 +37,20 @@ test("the app checks the repo releases go to (package.json's build.publish)", ()
 test('the app menu\'s Check for Updates… link opens General at its Updates group', () => {
   assert.deepEqual(parseLink('laki://settings/general?spot=Updates'), { to: 'settings', section: 'general', spot: 'Updates' })
   assert.deepEqual(parseLink('laki://settings/general'), { to: 'settings', section: 'general' })
+})
+
+test('R7 verdict: a skipped version is not offered, the next one is; the delay holds a release unless let in', () => {
+  const rel = (version: string, at = '2026-11-01T00:00:00Z') => ({ version, notes: '', url: '', at, feed: true })
+  const now = Date.parse('2026-11-02T00:00:00Z')
+  assert.equal(verdict(null, '0.47.0', {}, 0, now), 'none')
+  assert.equal(verdict(rel('0.47.0'), '0.47.0', {}, 0, now), 'none')
+  assert.equal(verdict(rel('0.48.0'), '0.47.0', {}, 0, now), 'offer')
+  assert.equal(verdict(rel('0.48.0'), '0.47.0', { pass: '0.48.0' }, 0, now), 'passed')
+  assert.equal(verdict(rel('0.49.0'), '0.47.0', { pass: '0.48.0' }, 0, now), 'offer', 'a newer one')
+  assert.equal(verdict(rel('0.48.0'), '0.48.0', { pass: '0.48.0' }, 0, now), 'none', 'installed by hand: nothing to skip')
+  assert.equal(typeof verdict(rel('0.48.0'), '0.47.0', {}, 7, now), 'number', 'held by the delay')
+  assert.equal(verdict(rel('0.48.0'), '0.47.0', { skip: '0.48.0' }, 7, now), 'offer', 'Skip the delay once')
+  assert.equal(verdict(rel('0.48.0'), '0.47.0', { pass: '0.48.0', skip: '0.48.0' }, 7, now), 'passed')
 })
 
 test('heldUntil: a release waits out the update delay from its publish date', () => {

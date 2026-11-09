@@ -658,7 +658,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
     return () => (clearInterval(t), off())
   }, [])
   if (!u) return null
-  const run = (op: 'check' | 'download' | 'install' | 'skip') =>
+  const run = (op: 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass') =>
     void bridge!.update!(op).then(setU, (e: Error) => setU(x => x && { ...x, status: 'error', error: e.message }))
   const l = u.latest
   const page = () => openExternal(l?.url ?? RELEASES_URL)
@@ -669,6 +669,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
     : u.status === 'ready' ? `${l?.version} is downloaded: restart to finish. Your agents keep running.`
     : u.status === 'error' ? u.error
     : l ? `Laki ${l.version} is out`
+    : u.passed ? `Laki ${u.passed} is out: you skipped it, so the next one is offered`
     : u.held ? `Laki ${u.held.version} is out: offered on ${new Date(u.held.until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, by your update delay`
     : u.checked ? `Up to date · checked ${ago(u.checked)}`
     : 'Not checked yet'
@@ -698,7 +699,16 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
           <button type="button" onClick={() => run('skip')} data-tip={`Offer ${u.held.version} now; later releases wait as before`}>
             Skip the delay once
           </button>
+        ) : u.passed && u.status === 'none' ? (
+          <button type="button" onClick={() => run('unpass')} data-tip={`Offer ${u.passed} after all`}>
+            Offer it again
+          </button>
         ) : null}
+        {l && u.status === 'available' && (
+          <button type="button" onClick={() => run('pass')} data-tip={`Don't offer ${l.version}: the next release is offered as usual`}>
+            Skip this version
+          </button>
+        )}
         <button type="button" disabled={u.status === 'checking' || u.status === 'downloading' || u.status === 'ready'} onClick={() => run('check')}>
           Check now
         </button>
@@ -711,6 +721,13 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
           </a>
         </div>
       )}
+      <p className="muted small update-back">
+        A release went wrong for you?{' '}
+        <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>
+          Earlier versions ↗
+        </a>{' '}
+        have their own downloads: install one over this copy, your data stays.
+      </p>
       <Switch className="switch-row" on={on} onChange={onOn}>
         <Says title="Check for updates" hint="At launch and every 4 hours Laki asks GitHub for its newest release: the status bar says so until you update, a toast once per version. Nothing downloads until you click Update." />
       </Switch>

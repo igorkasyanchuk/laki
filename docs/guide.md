@@ -2580,7 +2580,7 @@ turns it off; the app menu's *Check for Updates…* asks now). A new version sho
 a click opens Settings › Updates) until you update, and says so once in a toast; nothing downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
 signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
 your own: the release's page). Pre-releases are never offered. *Update delay* (none, 1, 3, 7, 14 or 30 days) offers a
-release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now.
+release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now. *Skip this version* passes on the release offered (the next one is offered as usual; *Offer it again* undoes it), and *Earlier versions* opens the releases page if you need to go back one.
 *Update when idle* (beside *Update to x.y* and *Restart to update*) waits until no agent works or asks you, then
 downloads if it must, restarts Laki on the new version, and, once every agent is idle, restarts its daemon too (tabs
 resume); *Cancel* stops it. An agent can ask for it (`laki update --when-idle`, MCP's `laki_update_when_idle`): its own

@@ -13,6 +13,7 @@ version it builds, with the date. -->
 - Tool gates: Claude tabs started before a gate was turned on are marked *No gate*, and the extension's page offers *Restart the idle ones* (their chats resume).
 - A window that stops responding offers *Wait* or *Reload* after 10 seconds; the app keeps its own log (`app.log`, next to `daemon.log`), and `daemon.log` no longer grows without bound while the daemon runs.
 - A full disk no longer breaks Laki: a bar says so, the state is kept in memory and saved once there's room, and a new worktree isn't started with under 500 MB free.
+- Updates: *Skip this version*, and an *Earlier versions* link to go back one.
 - Recording mode now hides private workspaces from agents, Laki AI and remote access too, not only from the window.
 
 ## 0.47.0 · Nov 9, 2026

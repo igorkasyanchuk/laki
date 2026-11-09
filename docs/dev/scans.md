@@ -290,7 +290,7 @@ A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minute
 
 ### Updates
 
-`src/main/update.ts` (main) and `src/shared/update.ts` (pure, tested in `test/update.test.ts`): `updater` checks
+`src/main/update.ts` (main) and `src/shared/update.ts` (pure, tested in `test/update.test.ts`; R7: `verdict` decides none, passed, held or offer; *Skip this version* keeps `pass` in update.json, the state's `passed`, *Offer it again* clears it; it's main's file, no setting an agent could change): `updater` checks
 `api.github.com/repos/<RELEASES>/releases/latest` (`RELEASES`: package.json's `build.publish`, the test holds them
 equal; pre-releases and drafts never answer) through `net.fetch`, `newer` than `app.getVersion()`: `available`
 with `releaseOf`'s notes, page and `feed` (the release has `update-mac-<arch>.json`); a 404 (none published) is up to

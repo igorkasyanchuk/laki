@@ -7,18 +7,18 @@ import { app, autoUpdater, net } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { feedName, heldUntil, newer, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState } from '../shared/update.ts'
+import { feedName, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState, verdict } from '../shared/update.ts'
 
 // update.json: `told`, the last version the app was told about (one toast each); `skip`, the one Skip the delay once let in
 const toldFile = () => join(app.getPath('userData'), 'update.json')
-const kept = (): { told?: string; skip?: string } => {
+const kept = (): { told?: string; skip?: string; pass?: string } => {
   try {
     return JSON.parse(readFileSync(toldFile(), 'utf8'))
   } catch {
     return {}
   }
 }
-const keep = (o: { told?: string; skip?: string }) => {
+const keep = (o: { told?: string; skip?: string; pass?: string }) => {
   try {
     writeFileSync(toldFile(), JSON.stringify({ ...kept(), ...o }))
   } catch {} // unwritable: it may be told again, the check still answered
@@ -62,12 +62,21 @@ export function updater(send: (s: UpdateState) => void) {
   // the last check's release against this version and the delay: offered, held until it's old enough, or none
   function judge(auto: boolean) {
     const latest = fetched
-    if (!latest || !newer(latest.version, s.version)) return set({ status: 'none', latest: undefined, held: undefined })
-    const until = kept().skip === latest.version ? undefined : heldUntil(latest.at, delay)
-    if (until) return set({ status: 'none', latest: undefined, held: { version: latest.version, until } }) // not told yet: its toast comes when it's offered
+    const v = verdict(latest, s.version, kept(), delay)
+    if (!latest || v === 'none') return set({ status: 'none', latest: undefined, held: undefined, passed: undefined })
+    if (v === 'passed') return set({ status: 'none', latest: undefined, held: undefined, passed: latest.version }) // R7: yours to skip; a newer one is offered
+    if (typeof v === 'number') return set({ status: 'none', latest: undefined, passed: undefined, held: { version: latest.version, until: v } }) // not told yet: its toast comes when it's offered
     const fresh = kept().told !== latest.version // seen by any check: no toast for it later
     if (fresh) keep({ told: latest.version })
-    set({ status: 'available', latest, found: auto && fresh, held: undefined })
+    set({ status: 'available', latest, found: auto && fresh, held: undefined, passed: undefined })
+  }
+
+  // R7: Skip this version (the one offered), and Offer it again; update.json keeps it, so a restart remembers
+  function pass(on = true) {
+    if (on ? s.status !== 'available' || !s.latest : !s.passed) return s
+    keep({ pass: on ? s.latest!.version : '' })
+    judge(false)
+    return s
   }
 
   // Settings' Skip the delay once: the held release is offered now (kept by its version, so a restart remembers it)
@@ -121,5 +130,5 @@ export function updater(send: (s: UpdateState) => void) {
     every = setInterval(() => void check(true), UPDATE_EVERY)
   }
 
-  return { state: () => s, check, download, install, skip, auto }
+  return { state: () => s, check, download, install, skip, pass, auto }
 }

@@ -16,6 +16,15 @@ export type UpdateState = {
   install: boolean // this copy replaces itself: a Mac, packaged, Developer ID signed; else Download is the release page
   found?: boolean // this state's check found a version not told about before (the app's toast)
   held?: { version: string; until: number } // a newer release Settings' Update delay holds back until then (ms)
+  passed?: string // R7: the newest release is one you chose to skip (Skip this version): not offered until a newer one is out
+}
+
+// R7: what the newest release is to this copy: none (not newer), passed (the one you skipped, exactly), a time it's
+// held until (the update delay; skip: Skip the delay once let that version in), or offer
+export function verdict(latest: Release | null | undefined, version: string, o: { skip?: string; pass?: string }, delay: number, now = Date.now()): 'none' | 'passed' | 'offer' | number {
+  if (!latest || !newer(latest.version, version)) return 'none'
+  if (o.pass === latest.version) return 'passed'
+  return (o.skip === latest.version ? undefined : heldUntil(latest.at, delay, now)) ?? 'offer'
 }
 
 // Settings › Updates' Update delay: a release is offered once it's that many days old (unset: at once)

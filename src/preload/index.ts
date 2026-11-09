@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('laki', {
   // Screenshot to Laki AI's ('' none; false: it's off); macOS only: main's screenshot is screencapture
   ...(process.platform === 'darwin' && { shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label) }),
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
-  update: (op: 'state' | 'check' | 'download' | 'install' | 'skip'): Promise<object | null> => ipcRenderer.invoke('update', op),
+  update: (op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<object | null> => ipcRenderer.invoke('update', op),
   updateAuto: (on: boolean, days?: number) => ipcRenderer.send('update-auto', on, days),
   onUpdate: (cb: (s: object) => void) => {
     const f = (_e: unknown, s: object) => cb(s)

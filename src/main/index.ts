@@ -449,7 +449,7 @@ app.on('will-quit', () => globalShortcut.unregisterAll())
 const updates = updater(s => win?.webContents.send('update', s))
 autoUpdater.on('before-quit-for-update', () => (quitting = true))
 ipcMain.handle('update', (e, op: unknown) =>
-  !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : op === 'skip' ? updates.skip() : updates.state(),
+  !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : op === 'skip' ? updates.skip() : op === 'pass' ? updates.pass() : op === 'unpass' ? updates.pass(false) : updates.state(),
 )
 // Settings' Check for updates and Update delay (days)
 ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.auto(on === true, typeof days === 'number' && days > 0 && days <= 365 ? days : 0))

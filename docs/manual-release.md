@@ -170,6 +170,18 @@ A full run takes 30 to 60 minutes; Linux x64, emulated on Apple silicon, is the 
 - **A bad published release**: don't delete or replace it; release a patch (`npm run release -- patch`). An older
   build must never follow a newer one: a newer daemon may already have written `state.json`.
 
+## Pulling a bad release
+
+The app asks GitHub for the releases repo's *latest* release, so that is the one switch:
+
+1. On the releases repo, edit the bad release and tick **Set as a pre-release** (or delete it). *Latest* is then the
+   one before it, and no copy is offered the bad one from the next check on (at launch, then every 4 hours).
+2. Copies that already updated stay on it: the app never goes down a version by itself. Tell those users to take the
+   earlier dmg from the releases page (Settings › General › Updates has the *Earlier versions* link) and install it over
+   their copy; their data in `~/.laki` stays. If the bad version changed state.json's shape, say so in the release's notes.
+3. Ship the fix as the next version. Users who clicked *Skip this version* on the bad one are offered it as usual.
+4. The Homebrew cask: `scripts/release.sh tap <previous version>` writes the tap's cask for that version again.
+
 ## Not yet
 
 - The daemon restarting itself after an update once agents are idle (the yellow bar asks you); the AppImage updating
