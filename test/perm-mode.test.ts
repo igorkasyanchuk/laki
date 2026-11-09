@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { claudeMode } from '../src/shared/types.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, sleep, until } from './helpers.ts'
 
 test('claudeMode: the footer as claude draws it, an answer that mentions a mode is no footer', () => {
   assert.equal(claudeMode('  ? for shortcuts'), 'default')
@@ -66,6 +66,28 @@ test('tabMode: goes to the mode asked by shift-tab, mid-turn too, and the view s
 
   const shell = await rig.rpc('tabNew', { ws: ws.id })
   await assert.rejects(rig.rpc('tabMode', { tab: shell.id, mode: 'plan' }), /only a running Claude Code tab/)
+})
+
+test("an agent can't press Shift-Tab by input, whole or split, nor by send; its plain Esc and the user's own Shift-Tab still work", async t => {
+  const rig = await fresh(t)
+  const { ws, tab } = await started(rig)
+  const from = { ws: ws.id, tab }
+  const no = /an agent can't change a permission mode/
+  const mode = async () => (await rig.tab(ws.id)).mode
+  for (const data of ['\x1b[Z', 'x\x1b[Zy', '\x1b[1;2Z', '\x1b[9;2u', '\x1b[27;2;9~']) await assert.rejects(rig.rpc('input', { tab, data, from }), no, JSON.stringify(data))
+  await rig.rpc('input', { tab, data: '\x1b', from }) // a plain Esc
+  await assert.rejects(rig.rpc('input', { tab, data: '[Z', from }), no, 'the rest of it, in a second call')
+  await assert.rejects(rig.rpc('send', { target: tab, text: '[Z', enter: false, from }), no, 'the rest of it, by send')
+  await rig.rpc('input', { tab, data: '[', from })
+  await assert.rejects(rig.rpc('input', { tab, data: 'Z', from }), no, 'in three')
+  await rig.rpc('input', { tab, data: 'a', from }) // anything else, and it's only text
+  await rig.rpc('input', { tab, data: '[Z', from })
+  await rig.rpc('send', { target: tab, text: '\x1b[Z', enter: false, from }) // typeInto strips it: no key
+  await sleep(400)
+  assert.equal(await mode(), 'default', 'nothing pressed')
+
+  await rig.rpc('input', { tab, data: '\x1b[Z' })
+  await until(async () => (await mode()) === 'acceptEdits', 'the user pressed it', 10000)
 })
 
 test('tabMode: a tab started with Bypass can come back to it; a mode its build never shows is said, not assumed; the policy refuses', async t => {

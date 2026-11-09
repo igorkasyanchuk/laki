@@ -358,7 +358,7 @@ window: it can run the agent browser). Tabs on screen in a focused window get no
 
 - `limits` (`{ agent?, from? }`, `laki limits`, MCP's `laki_limits`): `usage`'s own cache and back-off for each account, only the agents the managed policy allows; no `name` or `account` in Recording mode unless the caller's workspace isn't private.
 - `tabDraft` (`{ tab, text? }`): a Reader box's unsent text, read or kept; on the tab (`draft`, never in the view: `drafted`; `tabSet` and `tabReopen` answer without it), moved to `closed` by `closeTab` and back by `tabReopen`; agents refused (`agentNo`, by the peer: `FROM`).
-- `tabMode` (`{ tab, mode }`): a running claude's mode by its own ⇧⇥, read back from its footer after each press (`claudeMode`); one at a time per tab; agents refused. The view's `mode` (kept by `sweepRunning`) and `bypassNo` (why not Bypass: the policy, its sandbox, how it started).
+- `tabMode` (`{ tab, mode }`): a running claude's mode by its own ⇧⇥, read back from its footer after each press (`claudeMode`); one at a time per tab; agents refused, and so is their `input` or `send` of that key (`shiftTabNo`). The view's `mode` (kept by `sweepRunning`) and `bypassNo` (why not Bypass: the policy, its sandbox, how it started).
 - `failDismiss` (`{ tab }`): clears a tab's `failed`.
 - `archiveIdleTick`, `longTurnTick` (`{ now }`: tests', `archiveIdleTick`'s only under the rig's `LAKI_TEST_PARENT`): the loops below.
 - `longStop` (`{ tab }`, agents refused): a long turn's notification's Stop, `{ stopped }`: its Esc while the turn it told of runs.

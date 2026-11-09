@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- *Ship* refuses a workspace with a git repo inside it that its base branch doesn't have, and names it: a repo an agent
+  made could run a program as you when the PR opens. A submodule the base already has still ships.
 - Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
   and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
   Two neutral themes made for it: Frosted and Frosted Light.

@@ -3278,11 +3278,12 @@ export function progress(o: { tab?: string; pct: number; note?: string }) {
 // typeInto pastes text and presses Enter (enter: false leaves it in the prompt). One message at a time per tab: a
 // queued delivery and a send at the same moment must not interleave their text and Enters.
 const typing = new WeakMap<Session, Promise<void>>()
+// no escapes (a \x1b[201~ in it would end the paste and type the rest as keys), nor other controls (a CI log's
+// ⌃C or ⌃D would be keys to the agent): only tab and newline stay
+export const noKeys = (t: string) => t.replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
 export function typeInto(s: Session, text: string | Promise<string>, enter = true) {
   const next = (typing.get(s) ?? Promise.resolve()).then(async () => {
-    // no escapes (a \x1b[201~ in it would end the paste and type the rest as keys), nor other controls (a CI log's
-    // ⌃C or ⌃D would be keys to the agent): only tab and newline stay
-    const t = (await text).replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
+    const t = noKeys(await text)
     await new Promise<void>(done => {
       s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
       if (!enter) return done()
@@ -4050,6 +4051,20 @@ export async function gated(step: Gate, ws: Workspace, o: GateOpts) {
   return { held }
 }
 
+const gitlinks = async (ws: Workspace, tree: string) => (await git(ws, 'ls-tree', '-r', '-z', tree)).split('\0').filter(l => l.startsWith('160000 ')).map(l => l.slice(l.indexOf('\t') + 1))
+// the gitlinks in Ship's tree that the merge base with ws.base doesn't have (no merge base: all of them). Staged, one sends
+// gh pr create or glab mr create, without --head, into plain git status: that goes into the repo and runs its config's
+// program as you, outside the sandbox. By path, so a real submodule moved to a new commit still ships.
+// ponytail: an agent can replace the .git of a submodule already in the base, or move the base branch (its sandbox writes
+// refs) onto a commit with its link: that repo's config still runs. Ship would need a status-free gh and glab to close it
+async function nestedRepos(ws: Workspace, tree: string) {
+  const links = await gitlinks(ws, tree)
+  if (!links.length) return []
+  const base = await git(ws, 'merge-base', ws.base, 'HEAD').catch(() => '')
+  const had = new Set(base ? await gitlinks(ws, base) : [])
+  return links.filter(l => !had.has(l))
+}
+
 export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
@@ -4069,6 +4084,8 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   // git add -A here would go into a nested repo (noNested), so what treeOf stages. ponytail: a host's keeps git add -A
   // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
   const tree = ws.host ? '' : await treeOf(ws, true)
+  const nested = tree ? await nestedRepos(ws, tree) : []
+  if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])}${nested.length > 1 ? ` and ${nested.length - 1} more` : ''} is a git repo inside this workspace that ${ws.base} doesn't have, and its config could run a program as you. Delete its folder, or add it as a submodule on ${ws.base} first, then ship again`)
   const script = [
     'set -e',
     tree ? 'git read-tree --reset "$LAKI_TREE"' : 'git add -A',
