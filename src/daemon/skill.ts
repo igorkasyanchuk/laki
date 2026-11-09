@@ -427,6 +427,7 @@ own the plan, the order and what counts as done. ${run} Below, \`laki\` stands f
     laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
     laki send <ws>[/<tab>] --when-idle '…'                # a follow-up, queued until its turn ends (without --when-idle: now)
     laki diff <ws> [--uncommitted]                        # what it changed
+    laki limits [--agent claude] [--json]                 # how much of each plan is used and when it resets: before long work, pick the agent or account with room left
 
 Models: claude and codex take their own names (\`--model opus\`, \`--model gpt-5.5\`); opencode takes \`provider/model\`
 exactly as \`opencode models\` lists it (OpenRouter's too: \`openrouter/<org>/<model>\`): run it first, never guess. Laki

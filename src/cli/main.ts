@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { AGENTS, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { AGENTS, type AgentUsage, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { askAgent, newWsKit, state } from '../shared/tools.ts'
@@ -39,6 +39,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'new' && a === '--tab') tabs.push(argv[++i] ?? '') // laki new's only
   else if (!textOnly && args[0] === 'pr' && (a === '--draft' || a === '--ready')) flags[k] = true // laki pr's only
   else if (!textOnly && args[0] === 'update' && a === '--off') flags.off = true // laki update's only
+  else if (!textOnly && args[0] === 'limits' && a === '--agent') flags.agent = argv[++i] ?? '' // laki limits' only
   else if (!textOnly && args[0] === 'rename' && a === '--asked') flags.asked = true // laki rename's only: elsewhere it's a word
   else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
   else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
@@ -246,6 +247,16 @@ async function main() {
         }
       }
       return
+    }
+    case 'limits': {
+      const list: AgentUsage[] = await rpc('limits', { agent: typeof flags.agent === 'string' ? flags.agent : undefined, from: caller() }, 30000)
+      const when = (at: number) => {
+        const d = new Date(at)
+        return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : d.toLocaleDateString([], { weekday: 'short' })
+      }
+      const rows = list.map(u => [u.agent, u.name ?? '-', u.error ? `error: ${u.error}` : ''].concat(u.windows.map(w => `${w.label} ${w.used}% used${w.resets ? ` · resets ${when(w.resets)}` : ''}${w.note ? ` (${w.note})` : ''}`)))
+      const wide = (i: number) => Math.max(...rows.map(r => r[i].length))
+      return out(list, rows.map(r => [r[0].padEnd(wide(0)), r[1].padEnd(wide(1)), ...r.slice(2).filter(Boolean)].join('  ')).join('\n') || 'no plan limits to show')
     }
     case 'project': {
       const [sub, arg] = rest

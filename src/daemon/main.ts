@@ -27,7 +27,7 @@ import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
 import * as phoneMod from './phone.ts'
-import { policyTick } from './policy.ts'
+import { policy, policyTick } from './policy.ts'
 import * as ticks from './ticks.ts'
 import { hookAdd, hookExpose, hookList, hookRm, hookSecret, hookStop, inboundStart } from './inbound.ts'
 import { ticketTick } from './tickets.ts'
@@ -403,6 +403,14 @@ const api: Record<string, Handler> = {
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
   cloudflared: (o: { ws?: string }) => remoteMod.cloudflared(o),
   usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, metersMod.statusLimits), // claude's status line's, while fresh
+  // laki limits, laki_limits: usage's own cache and back-off (no request the status bar's ring wouldn't make), only the
+  // agents the managed policy allows. Recording mode: no account names, unless the caller's workspace isn't a private one
+  limits: async (p?: { agent?: unknown; from?: { ws?: unknown; tab?: unknown } }) => {
+    const only = policy()?.agents
+    const list = await usage(core.state.settings?.usage, usageWho().filter(w => (!p?.agent || w.agent === p.agent) && (!only || only.includes(w.agent))), undefined, metersMod.statusLimits)
+    const ws = core.state.workspaces.find(w => w.id === core.agentCaller(p?.from))
+    return core.state.settings?.recording && (!ws || phoneMod.hidden(ws)) ? list.map(u => ({ ...u, name: undefined, account: undefined })) : list
+  },
   accounts: () => accountViews(),
   accountAdd: p => accountAdd(p),
   accountSet: p => accountSet(p),
@@ -561,7 +569,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
+const FROM = new Set(['limits', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)

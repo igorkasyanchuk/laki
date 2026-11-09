@@ -222,6 +222,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     run: a => rpc('progress', { tab: process.env.LAKI_TAB, pct: a.pct, note: a.note }),
   },
   {
+    name: "laki_limits",
+    description: "How much of each agent's plan is used and when each limit resets: Claude's, Codex's and Gemini's, per signed-in account. Read only, from what Laki keeps (no extra requests). An agent whose numbers can't be read has its own error; the others still come back. Before long work: pick the account or agent with room left, or wait for a reset.",
+    inputSchema: obj({ agent: str('only this agent: claude, codex or gemini') }),
+    run: a => rpc('limits', { agent: a.agent, from: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB } }),
+  },
+  {
     name: 'laki_update_when_idle',
     description: "Update Laki once no agent works or asks the user anything: the app installs its newest release (your own turn goes on: Laki's daemon keeps running), then restarts its daemon when every agent is idle (yours too; tabs resume). on: false cancels it.",
     inputSchema: obj({ on: { type: 'boolean', description: 'false: cancel it' } }),

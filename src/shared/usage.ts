@@ -4,6 +4,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki help [command]                         this, or one command's details and examples (laki <command> --help too)
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
+  laki limits [--agent claude] [--json]       how much of each agent's plan is used, and when it resets
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
   laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
@@ -181,6 +182,7 @@ or the words after <ws>) its agent starts on it, as a new workspace's does; --na
 ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
 
   laki progress 40 "Parser done, writing tests"`,
+  limits: `Prints each signed-in account of Claude, Codex and Gemini: its 5-hour, weekly or per-model use and when each resets. Read only, from the numbers Laki keeps for the status bar (no extra requests). An agent whose numbers can't be read says why on its own line; the others still come back. Look before a long task: pick the account or agent with room left, or wait for a reset.\n\nExample:\n  laki limits --agent codex --json`,
   secret: `In an agent's tab: ask the user for a secret (an API key, a token, a password) without it going into the chat.
 They type it on a masked card under your tab; you get only the path of a 0600 file in $LAKI_STORAGE_FOLDER that holds
 it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat "$path"). Waits up to 15 minutes;

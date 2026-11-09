@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { base, claudeWindows, codexWindows, waitOf } from '../src/daemon/usage.ts'
+import { tools } from '../src/shared/tools.ts'
 import { fresh } from './helpers.ts'
 
 test('usage: the windows of Claude and Codex answers', () => {
@@ -244,4 +246,48 @@ test('usage: Gemini CLI per model, its expired token refreshed once in memory, n
   const k = await rig.rpc('usage')
   assert.match(k[0].error, /^Unknown: signed in with an API key/)
   assert.equal(hits.length, n)
+})
+
+test('laki limits: each agent read or its own error, --agent, --json; the policy, and Recording mode without account names; laki_limits', async t => {
+  const srv = createServer((q, r) => {
+    if (q.url === '/api/oauth/usage') {
+      r.writeHead(200, { 'content-type': 'application/json' })
+      return r.end(JSON.stringify({ five_hour: { utilization: 62, resets_at: new Date(Date.now() + 3600e3).toISOString() }, seven_day: { utilization: 41 } }))
+    }
+    r.writeHead(500).end() // codex's reader fails
+  })
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const policy = join(mkdtempSync(join(tmpdir(), 'laki-policy-')), 'policy.json')
+  t.after(() => rmSync(dirname(policy), { recursive: true, force: true }))
+  writeFileSync(policy, '{}')
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_POLICY: policy } })
+  mkdirSync(join(rig.home, '.claude'))
+  writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'fake-token', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max' } }))
+  mkdirSync(join(rig.home, '.codex'))
+  writeFileSync(join(rig.home, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'fake-token', account_id: 'acc-1' } }))
+
+  const { code, out } = await rig.cli('limits')
+  assert.equal(code, 0)
+  const [claude, codex] = out.trim().split('\n')
+  assert.match(claude, /^claude\s+Default\s+5-hour 62% used · resets \d\d:\d\d\s+Weekly 41% used$/)
+  assert.match(codex, /^codex\s+Default\s+error: HTTP 500$/)
+
+  const one = JSON.parse((await rig.cli('limits', '--agent', 'claude', '--json')).out)
+  assert.deepEqual([one.length, one[0].agent, one[0].name, one[0].plan], [1, 'claude', 'Default', 'max'])
+  assert.deepEqual(JSON.parse((await rig.cli('limits', '--agent', 'grok', '--json')).out), [])
+  assert.match((await rig.cli('limits', '--agent', 'grok')).out, /no plan limits to show/)
+
+  await rig.rpc('settingsSet', { recording: true })
+  assert.deepEqual((await rig.rpc('limits')).map((u: any) => [u.agent, u.name, u.account]), [['claude', undefined, undefined], ['codex', undefined, undefined]])
+  await rig.rpc('settingsSet', { recording: false })
+
+  writeFileSync(policy, JSON.stringify({ agents: ['codex'] }))
+  await rig.stop()
+  await rig.start()
+  assert.deepEqual((await rig.rpc('limits')).map((u: any) => u.agent), ['codex'], 'only what the policy allows')
+
+  // the same for agents and Laki AI
+  const tool = tools(rig.rpc as any).find(x => x.name === 'laki_limits')!
+  assert.deepEqual((await tool.run({}) as any[]).map(u => u.agent), ['codex'])
 })
