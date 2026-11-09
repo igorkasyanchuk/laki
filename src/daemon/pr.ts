@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
-import { inside, MAX_TEXT, textOf } from './files.ts'
+import { inside, MAX_TEXT, scanStats, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
@@ -644,6 +644,31 @@ function tellAgent(ws: Workspace, text: string) {
   const r = send({ target: tab.id, text, whenIdle: true })
   wsLog(ws, `to ${tab.name}: ${'queued' in r ? `queued (${r.queued} waiting): it's ${rtOf(tab.id).status}${rtOf(tab.id).limit ? ', at its usage limit' : ''}` : 'typed in'}: ${text.split('\n')[0].slice(0, 120)}`)
   return r
+}
+
+// F8: Update (the status bar's ↓n): the base merged into the workspace's branch when that is clean (merge-tree said so:
+// git merge, no editor), else over to its agent, as the fix-conflicts switch says it; rebase: onto the base, put back
+// as it was when it stops. Never a fetch, never a push
+export async function wsUpdate(o: { ws: string; how?: unknown }) {
+  const ws = findWs(o.ws)
+  if (ws.kind !== 'worktree' || !ws.base) throw new Error(`${ws.id} has no base branch to update from`)
+  if (o.how === 'rebase') {
+    await git(ws, 'rebase', ws.base).catch(async e => {
+      await git(ws, 'rebase', '--abort').catch(() => {})
+      throw new Error(`rebase onto ${ws.base} stopped (put back as it was): ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n')[0]}`)
+    })
+    wsLog(ws, `update: rebased onto ${ws.base}`)
+    void scanStats()
+    return { rebased: true }
+  }
+  const clean = await git(ws, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', ws.base).then(() => true, () => false)
+  if (!clean) return { ...tellAgent(ws, `This branch is behind ${ws.base}, and merging it in conflicts. Merge it in (git merge ${ws.base}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, commit the merge, then say what you changed.`), told: true }
+  await git(ws, 'merge', '--no-edit', ws.base).catch(e => {
+    throw new Error(`merging ${ws.base} in: ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n')[0]}`)
+  })
+  wsLog(ws, `update: merged ${ws.base} in`)
+  void scanStats()
+  return { merged: true }
 }
 
 // what to tell the agent about a PR: settings.prPrompts' or PR_PROMPTS' text, its {{pr}}, {{url}} and {{base}} filled in

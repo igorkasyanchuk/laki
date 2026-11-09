@@ -1464,6 +1464,20 @@ export function App() {
     const r = await call<{ stopped: string[] }>('stopAll', {})
     toast(`Stopped ${r.stopped.length} of ${at.length}`)
   }
+  // F8: the status bar's ↓n: the base merged in (clean), or its agent asked to (conflicts); a rebase asks first when the
+  // branch is pushed (a force push would follow, yours to do)
+  const behindMenu = (w: WorkspaceView): MenuItem[] => [
+    { head: `${w.stat?.behind} behind ${w.base}` },
+    { label: w.stat?.clean ? `Update: merge ${w.base} in` : `Update: ask the agent to merge ${w.base} in (conflicts)`, icon: 'gitCompare', run: () => void call<{ merged?: boolean; told?: boolean }>('wsUpdate', { ws: w.id }).then(r => toast(r.merged ? `Merged ${w.base} in` : 'Its agent merges it in and resolves the conflicts')).catch(() => {}) },
+    {
+      label: `Rebase onto ${w.base}…`,
+      icon: 'fork',
+      run: async () => {
+        if (w.pr && !(await ask(`Rebase ${w.branch}?`, { text: `It has a PR (#${w.pr.number}): after a rebase the branch needs a force push, which Laki never does for you.`, ok: 'Rebase' }))) return
+        await call('wsUpdate', { ws: w.id, how: 'rebase' }).then(() => toast(`Rebased onto ${w.base}`)).catch(() => {})
+      },
+    },
+  ]
   const reopenTab = async (w = ws, index?: number) => {
     if (!w) return
     if (!w.closed?.length) return toast('No closed tab to bring back here')
@@ -3233,6 +3247,12 @@ export function App() {
                   <Icon name="fork" size={11} />
                   {branchFull ? ws.branch : shortBranch(ws.branch)}
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
+                </button>
+              )}
+              {git && !!ws.stat?.behind && (
+                // F8: its base has commits it hasn't (as this clone has the base: no fetch): Update merges it in, or rebases
+                <button className="sb-behind" data-tip={`${ws.stat.behind} commit${ws.stat.behind > 1 ? 's' : ''} behind ${ws.base}${ws.stat.clean ? ': merging it in is clean' : ': merging it in conflicts'} · click: update`} onClick={e => openMenu(e, behindMenu(ws))}>
+                  ↓{ws.stat.behind}
                 </button>
               )}
               {ws.codespace !== undefined && (

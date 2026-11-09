@@ -664,6 +664,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .status .pr { border: none; background: none; padding: 0; display: inline-flex; align-items: center; gap: 3px; }
 .ci-mark { display: inline-flex; align-items: center; gap: 3px; }
 .status .sb-branch svg { vertical-align: -1px; margin-right: 4px; }
+.status .sb-behind { flex: none; padding: 0 5px; border: none; border-radius: 999px; background: color-mix(in srgb, var(--waiting) 18%, transparent); color: var(--waiting); font-size: var(--fs-1); line-height: 16px; cursor: pointer; }
 /* every control in the bar at least 20px (macOS's smallest), the icon-only ones that wide too */
 .status button { min-height: 20px; }
 .status :is(.usage-btn, .tunnel-btn, .port-stop) { min-width: 20px; justify-content: center; }

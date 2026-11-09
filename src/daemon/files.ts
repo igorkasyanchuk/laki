@@ -433,6 +433,11 @@ async function statOf(w: Workspace): Promise<Stat> {
       if (!b.subarray(0, 8000).includes(0)) st.add += b.length && b.toString('utf8').split('\n').length - (b[b.length - 1] === 10 ? 1 : 0)
     } catch {}
   }
+  // F8: how far its base has moved on, and whether merging it in would be clean (merge-tree: no worktree touched)
+  if (w.kind === 'worktree' && w.base) {
+    const [behind, ahead] = (await git(w, '--no-optional-locks', 'rev-list', '--left-right', '--count', `${w.base}...HEAD`).catch(() => '')).trim().split(/\s+/).map(Number)
+    if (behind > 0) Object.assign(st, { behind, ahead: ahead || 0, clean: await git(w, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', w.base).then(() => true, () => false) })
+  }
   return st
 }
 // the hover card's: one workspace's now (the scan keeps only the shown ones'); none off a git repo or for a codespace asleep

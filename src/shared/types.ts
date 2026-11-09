@@ -977,7 +977,7 @@ export type NamedTunnel = { name?: string; domain?: string }
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
 // (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's); made and gone:
 // files created (untracked ones too) and deleted, of those files
-export type Stat = { add: number; del: number; files: number; dirty: number; made?: number; gone?: number }
+export type Stat = { add: number; del: number; files: number; dirty: number; made?: number; gone?: number; behind?: number; ahead?: number; clean?: boolean } // F8: commits its base has that it hasn't (behind) and the other way (ahead), as this clone has the base (no fetch); clean: merging the base in would have no conflicts (behind only)
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)

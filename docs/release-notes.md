@@ -31,6 +31,7 @@ version it builds, with the date. -->
 - Laki's own theme pair, *Laki* and *Laki Light* (the mark's orange as the accent), first in Get started's themes; the default theme is unchanged.
 - Empty pages show what they will hold: faint sample rows on Schedule, Workflows, Notes and My Desk; the Reader's empty chat offers three prompts that fill the box.
 - Files copied into a new worktree (`.worktreeinclude`, *Copy ignored files*) are cloned where the disk can (APFS): no extra space until one is changed.
+- A branch behind its base shows *↓n* beside it in the status bar: *Update* merges the base in when that's clean, or asks the agent to when it conflicts; *Rebase* too. Nothing is fetched or pushed for you.
 - *Archive if clean* counts a submodule's uncommitted work and ignored files that aren't rebuilt (not `node_modules`), and says what it would lose.
 - Safer Ship: `gh pr create` always gets `--head` (and the base), the ship tab's git never runs a repo's fsmonitor program, a submodule whose `.git` was swapped is refused, and a host's commit is built from Laki's own tree as on this Mac.
 

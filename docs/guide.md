@@ -69,6 +69,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   and a dark one while it's dark (pick each); it turns with the system, terminals too.
 - **Simple row**: Settings › Appearance › Sidebar rows › *Simple row* (off by default) makes a workspace's row its name
   and one next-step chip, or the turn's time while its agent works; the other marks show on hover and in its card.
+- **Behind the base**: *↓n* beside the branch in the status bar counts the commits its base has that it hasn't (as
+  your clone has the base: no fetch). A click: *Update* merges the base in when that's clean, or hands the conflicts
+  to its agent; *Rebase onto …* asks first when the branch has a PR. Laki never pushes it.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›
