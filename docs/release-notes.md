@@ -26,6 +26,7 @@ version it builds, with the date. -->
 - *Do not disturb* (⌘K): 30 minutes, an hour or until tomorrow 9:00 without notifications, sounds or phone pushes, except an important workspace's ask; a moon in the status bar ends it, and one card says what finished, what waits and which PRs moved.
 - One type scale: five text sizes (11, 12, 13, 15, 20) instead of fourteen; body text is 13px.
 - Small, even motion: hover colors, menus, dialogs, the side panel and a row that starts to need you ease in (off with *Animations: none* or the system's Reduce motion).
+- *Follow the system* (Settings › Appearance › Theme, Get started's *Match the system*): a light theme while macOS is light, a dark one while it's dark, each your pick.
 - *Archive if clean* counts a submodule's uncommitted work and ignored files that aren't rebuilt (not `node_modules`), and says what it would lose.
 - Safer Ship: `gh pr create` always gets `--head` (and the base), the ship tab's git never runs a repo's fsmonitor program, a submodule whose `.git` was swapped is refused, and a host's commit is built from Laki's own tree as on this Mac.
 

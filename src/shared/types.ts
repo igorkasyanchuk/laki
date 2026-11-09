@@ -542,6 +542,9 @@ export type Settings = {
   mcpApps?: boolean // MCP Apps in the Reader (mcpApps.ts: Laki asks your MCP servers for an app's page): on unless false
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: each agent's accounts in order; a tab at its plan limit goes on on the next one (core's fallback). Unset or empty: off
   theme?: string
+  themeAuto?: boolean // B3: Appearance's Follow the system: themeLight while the system is light, themeDark while dark (themes.ts themeFor)
+  themeLight?: string
+  themeDark?: string
   glass?: boolean // a see-through, blurred window
   glassWindow?: number // how see-through glass makes the window, the sidebar, the terminals: %
   glassSide?: number

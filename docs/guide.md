@@ -65,6 +65,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Do not disturb**: ⌘K › *Do not disturb: 30 minutes / 1 hour / until tomorrow 9:00*. No notifications, sounds or
   phone pushes meanwhile, except an important workspace's ask. The status bar's moon ends it early; as it ends, one card
   lists what finished, what waits for you and which PRs moved.
+- **Follow the system**: Settings › Appearance › Theme › *Follow the system* paints a light theme while macOS is light
+  and a dark one while it's dark (pick each); it turns with the system, terminals too.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›

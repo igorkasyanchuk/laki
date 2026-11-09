@@ -693,13 +693,13 @@ ipcMain.on('full-screen', (e, on: boolean) => {
   if (!on) focusFull = null
 })
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
-ipcMain.on('glass', (e, on: boolean, light?: boolean, frosted?: boolean) => {
+ipcMain.on('glass', (e, on: boolean, light?: boolean | null, frosted?: boolean) => {
   if (!from(e)) return
   float = !!frosted
   if (mac) win?.setWindowButtonPosition(lights())
   // the blur takes the window's appearance: a light theme's over a dark Mac's blur is grey under its dark text and icons.
   // ponytail: app-wide, so pages that follow prefers-color-scheme (an artifact, an extension's) follow the theme meanwhile
-  nativeTheme.themeSource = on ? (light ? 'light' : 'dark') : 'system'
+  nativeTheme.themeSource = on && light != null ? (light ? 'light' : 'dark') : 'system' // B3: no light given: a theme that follows the system, and so does the blur
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })

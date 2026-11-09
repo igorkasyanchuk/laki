@@ -41,7 +41,7 @@ import { parseLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Commits, type Edit, edited, type FileContent, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, SidePanel, type Thread } from './SidePanel'
 import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySuggestions, noteCut, noteWhole, pendingWords, clock, csWord, initials, isStale, limitsCrossed, limitText, Line, nameOf, needsSorted, type RunAction, shortPath, spins, spinsUntil, STALE_AFTER, USAGE_AT, withPaths, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
+import { applyTheme, blurred, css, DARK, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
@@ -326,6 +326,7 @@ const NARROW = media('(max-width: 640px)') // under the app window's minWidth (7
 const TOUCH = media('(pointer: coarse)')
 const LESS = media(LESS_CLEAR) // macOS's Reduce transparency and Increase contrast: applyTheme reads them, App repaints
 const MORE = media(MORE_CONTRAST)
+const SYS_DARK = media(DARK)
 
 // keys a phone's keyboard lacks, typed into the focused pane (claude and codex ask with arrows, Esc, ⇧⇥)
 const KEYS: [string, string][] = [['esc', '\x1b'], ['tab', '\t'], ['⇧tab', '\x1b[Z'], ['^C', '\x03'], ['←', '\x1b[D'], ['↑', '\x1b[A'], ['↓', '\x1b[B'], ['→', '\x1b[C'], ['⏎', '\r']]
@@ -870,12 +871,13 @@ export function App() {
   const paint = paintOf(view?.settings)
   const lessClear = useSyncExternalStore(LESS.on, LESS.now)
   const moreContrast = useSyncExternalStore(MORE.on, MORE.now)
-  const theme = paintKey(paint) + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') + (bgUrl ? ` ${bgUrl}` : '') // terminals repaint when it changes
+  const sysDark = useSyncExternalStore(SYS_DARK.on, SYS_DARK.now) // B3: a theme that follows the system: painted again, terminals too, as it turns
+  const theme = paintKey(paint) + (paint.themeAuto ? ` ${sysDark}` : '') + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') + (bgUrl ? ` ${bgUrl}` : '') // terminals repaint when it changes
   const painted = useRef<string | null>(null)
   const glassed = useRef('')
   if (view && painted.current !== theme) {
     // the window's own blur, light or dark as the theme is
-    const blur = blurred(paint), light = !!THEMES.find(t => t.id === paint.theme)?.light
+    const blur = blurred(paint), light = paint.themeAuto ? undefined : !!THEMES.find(t => t.id === paint.theme)?.light // B3: following the system, the blur does too
     const float = paint.design === 'frosted' // the traffic lights inside the floating sidebar
     if (glassed.current !== `${blur} ${light} ${float}`) (glassed.current = `${blur} ${light} ${float}`), bridge?.glass?.(blur, light, float)
     painted.current = theme

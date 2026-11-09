@@ -305,7 +305,7 @@ const ALL_STEPS = STEPS
 // U1: never a step for a page that's off (a new install's Labs: Workflows)
 export const stepsOf = (s?: { workflows?: boolean }) => STEPS.filter(x => x.id !== 'workflows' || s?.workflows !== false)
 
-export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, steps: STEPS = ALL_STEPS }: { steps?: typeof ALL_STEPS; done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
+export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, auto, onAuto, steps: STEPS = ALL_STEPS }: { auto?: boolean; onAuto?: (on: boolean) => void; steps?: typeof ALL_STEPS; done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
   const n = STEPS.filter(x => done.has(x.id)).length
   const next = STEPS.find(x => !done.has(x.id))?.id // the one step in the accent: the rest wait their turn
   return (
@@ -313,7 +313,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, 
       <div className="onboard">
         <div className="ob-bar" style={{ '--p': `${(n / STEPS.length) * 100}%` } as CSSProperties} />
         <p className="muted small">{n === STEPS.length ? 'All done. Enjoy Laki!' : `${n} of ${STEPS.length} done. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
-        <ThemeRow theme={theme} onTheme={onTheme} />
+        <ThemeRow theme={theme} onTheme={onTheme} auto={auto} onAuto={onAuto} />
         <div className="ob-steps">
         {STEPS.map(x => (
           <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
@@ -344,7 +344,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, 
 
 // Get started's theme step: the real themes as cards in a row, dark or light; a click (or ← → in the row) paints Laki
 // with it at once, ‹ › scroll a page
-function ThemeRow({ theme, onTheme }: { theme: string; onTheme: (id: string) => void }) {
+function ThemeRow({ theme, onTheme, auto, onAuto }: { theme: string; onTheme: (id: string) => void; auto?: boolean; onAuto?: (on: boolean) => void }) {
   const cur = THEMES.find(t => t.id === theme) ?? THEMES[0]
   const [light, setLight] = useState(!!cur.light)
   const list = THEMES.filter(t => !!t.light === light)
@@ -363,6 +363,11 @@ function ThemeRow({ theme, onTheme }: { theme: string; onTheme: (id: string) => 
           <span className="muted small">A click paints Laki at once; Settings › Appearance has them all, with fonts and glass</span>
         </div>
         <span className="seg">
+          {onAuto && (
+            <button className={auto ? 'on' : ''} aria-pressed={!!auto} data-tip="Light while macOS is light, dark while it's dark (Settings › Appearance picks the two themes)" onClick={() => onAuto(!auto)}>
+              Match the system
+            </button>
+          )}
           {([['Dark', false], ['Light', true]] as const).map(([w, l]) => (
             <button key={w} className={light === l ? 'on' : ''} aria-pressed={light === l} onClick={() => setLight(l)}>
               {w}

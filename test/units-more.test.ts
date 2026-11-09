@@ -526,3 +526,15 @@ test('voiceFillers: standalone hesitations go in each language, with their comma
   is('first line\num we can go on', 'first line\nwe can go on')
   same('嗯嗯我知道')
 })
+
+test('B3: Follow the system picks the theme by the system: your two, else the picked one for its kind, else Paper or Midnight', async () => {
+  const { themeFor } = await import('../src/renderer/src/themes.ts')
+  assert.equal(themeFor({ theme: 'dawn' }, true), 'dawn') // off: the picked one, whatever the system
+  assert.equal(themeFor({}, false), 'default')
+  assert.deepEqual([themeFor({ themeAuto: true }, true), themeFor({ themeAuto: true }, false)], ['default', 'paper'])
+  assert.deepEqual([themeFor({ themeAuto: true, theme: 'dawn' }, true), themeFor({ themeAuto: true, theme: 'dawn' }, false)], ['default', 'dawn'])
+  const both = { themeAuto: true, theme: 'dawn', themeLight: 'paper', themeDark: 'default' }
+  assert.deepEqual([themeFor(both, true), themeFor(both, false)], ['default', 'paper'])
+  assert.equal(themeFor({ themeAuto: true, themeDark: 'paper' }, true), 'default') // a light one saved as the dark: not taken
+  assert.equal(themeFor({ themeAuto: true, themeLight: 'gone' }, false), 'paper')
+})

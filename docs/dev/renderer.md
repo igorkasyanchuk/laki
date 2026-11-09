@@ -730,4 +730,11 @@ numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). 
 an element's own rule and Animations: high win: hover colors, the side panel and the sidebar coming in (no width is
 animated: the terminal fits once), menus and dialogs, a Needs you card arriving, a row that starts to need you (`b-lit`).
 
+Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
+(your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
+`prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);
+App's paint key has the system's side too, so terminals repaint. With it on, the `glass` IPC gets no `light`, and main
+leaves `nativeTheme.themeSource` at `system` (forced, the page's `prefers-color-scheme` would stop following the Mac).
+ponytail: the bubbles, the cards on screen and the Dock icon keep what they had.
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

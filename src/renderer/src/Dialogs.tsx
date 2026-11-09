@@ -327,6 +327,8 @@ export function Pages({ app }: { app: AppCtx }) {
           onOff={() => (setOnboard(o => ({ ...o, off: true })), setDialog(null))}
           theme={settings.theme ?? 'default'}
           onTheme={theme => call('settingsSet', { theme }).catch(() => {})}
+          auto={!!settings.themeAuto}
+          onAuto={themeAuto => call('settingsSet', { themeAuto }).catch(() => {})}
         />
       )}
       {dialog === 'scriptLogs' && <ScriptLogs load={() => api.call<ScriptRun[]>('scriptLogs')} copy={copy} onClose={() => setDialog({ section: 'general' })} />}

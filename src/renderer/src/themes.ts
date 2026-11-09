@@ -1091,8 +1091,8 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
+export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'themeAuto', 'themeLight', 'themeDark', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -1212,9 +1212,22 @@ export function gateRules(now: Record<string, string | undefined>) {
 
 // paints <html> with a theme (an unknown id is the default), or a whole Paint
 // solid: a window with no blur behind it (NewWindow.tsx)
+// B3: Follow the system (Appearance): with themeAuto, the light theme while the system is light and the dark one while
+// it's dark (unset: the picked theme for its own kind, Paper or Midnight for the other); without, the picked theme
+export const DARK = '(prefers-color-scheme: dark)'
+export const themeFor = (p: Pick<Paint, 'theme' | 'themeAuto' | 'themeLight' | 'themeDark'>, dark: boolean) => {
+  const has = (id?: string, light = false) => (t => (t && !!t.light === light ? t.id : undefined))(THEMES.find(x => x.id === (id || 'default')))
+  if (!p.themeAuto) return p.theme || 'default'
+  return dark ? has(p.themeDark) ?? has(p.theme) ?? 'default' : has(p.themeLight, true) ?? has(p.theme, true) ?? 'paper'
+}
+// every window that painted (the app's, the new-workspace, AI and floated ones) paints again as the system turns
+let last: [string | Paint, boolean] | undefined
+if (typeof matchMedia === 'function') matchMedia(DARK).addEventListener('change', () => last && typeof last[0] !== 'string' && last[0].themeAuto && applyTheme(...last))
+
 export function applyTheme(p: string | Paint = '', solid = false) {
+  last = [p, solid]
   const o: Paint = { ...paintOf(typeof p === 'string' ? { theme: p } : p), ...((solid || asked(LESS_CLEAR)) && { glass: false, sideClear: 0 }) }
-  const t = THEMES.find(x => x.id === o.theme) ?? THEMES[0]
+  const t = THEMES.find(x => x.id === themeFor(o, asked(DARK))) ?? THEMES[0]
   const root = document.documentElement
   const st = root.style
   for (const k of Array.from(st)) if (k.startsWith('--')) st.removeProperty(k)

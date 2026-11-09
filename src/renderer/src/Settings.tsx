@@ -11,7 +11,7 @@ import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, BG, GLASS, type Paint, paintKey, paintOf, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
+import { applyTheme, BG, GLASS, type Paint, paintKey, paintOf, preview, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
@@ -2082,6 +2082,24 @@ export function SettingsPage(p: {
               </div>
               </Group>
               <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.themeAuto} onChange={v => paint({ themeAuto: v })}>
+                  <Says title="Follow the system" hint="A light theme while macOS is light, a dark one while it's dark: it turns with the system, terminals and all. Off, the theme picked below stays" />
+                </Switch>
+                {s.themeAuto &&
+                  ([['themeLight', 'Light', true], ['themeDark', 'Dark', false]] as const).map(([k, label, light]) => (
+                    <label key={k} className="switch-row">
+                      <select value={themeFor({ ...s, themeAuto: true }, !light)} onChange={e => paint({ [k]: e.target.value })}>
+                        {THEMES.filter(t => !!t.light === light).map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Says title={`${label} theme`} hint={light ? 'While the system is light' : 'While the system is dark'} />
+                    </label>
+                  ))}
+              </div>
               <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name, game or film (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
               {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
               {(
