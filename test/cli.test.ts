@@ -84,7 +84,7 @@ test('cli: laki progress, an agent\'s estimate on its tab until its turn ends; L
   assert.match(r.err, /a percentage/)
   assert.match((await rig.cli('progress', '5')).err, /which tab/)
   await rig.rpc('input', { tab: tab.id, data: '\x1b' })
-  await until(async () => (await rig.rpc('state')).tabs.find((t: any) => t.id === tab.id).status === 'idle', 'interrupted')
+  await until(async () => (await rig.rpc('state')).tabs.find((t: any) => t.id === tab.id).status === 'idle', 'interrupted').catch(async e => { throw new Error(`${e.message}; its screen: ${await rig.screen(tab.id)}`) })
   assert.equal(await cur(), undefined, 'gone with the turn')
 })
 

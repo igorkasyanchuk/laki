@@ -3456,7 +3456,7 @@ function interrupted(id: string, s: Session) {
   const r = rtOf(id)
   if (r.status !== 'running' && r.status !== 'waiting') return
   const at = (r.escAt = Date.now())
-  for (const ms of [300, 1000, 2500])
+  for (const ms of [300, 1000, 2500, 6000, 12000]) // a loaded Mac draws it late
     setTimeout(() => {
       if (r.escAt !== at || (r.status !== 'running' && r.status !== 'waiting')) return // a new turn since
       if (!/interrupted/i.test(s.screenText(6))) return
