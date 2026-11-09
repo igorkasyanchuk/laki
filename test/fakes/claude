@@ -115,7 +115,6 @@ let MENU = MENU0
 let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
-  if (text.startsWith('osc ')) process.stdout.write(text.slice(4).replaceAll('\\e', '\x1b').replaceAll('\\a', '\x07')) // a report through the terminal (OSC 7501)
   hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode|apierror|continue)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
   statusLine()
   // "todo a;b;c": its to-do list (TodoWrite) as its turn starts, the first under way; "todo! …": every one done
@@ -164,6 +163,8 @@ const turn = text => {
     busy = false
     process.stdout.write(`answer: ${text}\r\n> `)
     hook('Stop', { last_assistant_message: `answer: ${text}` })
+    // a report through the terminal (OSC 7501), after Stop is heard: its compare, 2 s on, finds the tab idle however busy the Mac
+    if (text.startsWith('osc ')) process.stdout.write(text.slice(4).replaceAll('\\e', '\x1b').replaceAll('\\a', '\x07'))
   }, Number(process.env.FAKE_TURN_MS || 300))
 }
 const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume', '--model', '--plugin-dir', '--append-system-prompt'].includes(args[i - 1]))
