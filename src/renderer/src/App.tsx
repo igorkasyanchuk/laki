@@ -1839,7 +1839,7 @@ export function App() {
   const inBrowser = (w: WorkspaceView, path: string) => (/\.html?$/i.test(path) && artPage(w, path) ? void bridge?.openExternal?.(artPage(w, path)!) : void bridge?.openPath?.(`${w.storage}/${path}`))
   const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : inBrowser(w, path))
   // the file itself (file://), when you ask: its scripts run as a local page (the viewer's Open file, the right click's)
-  const asFile = (w: WorkspaceView, path: string) => (bridge?.openFile && w.storage && /\.html?$/i.test(path) ? () => void bridge!.openFile!(`${w.storage}/${path}`, w.storage!).then(r => r === 'missing' && toast(`Not there: ${path}`), fail) : undefined)
+  const asFile = (w: WorkspaceView, path: string) => (bridge?.openFile && w.storage && /\.html?$/i.test(path) ? () => void bridge!.openFile!(`${w.storage}/${path}`, w.storage!).then(r => (r === 'viewer' ? openArt(w, path) : r === 'missing' && toast(`Not there: ${path}`)), fail) : undefined)
   // an artifact's right click (Files' Artifacts, the status bar's strip and its big view): open it, Finder, the clipboard
   const artMenu = (w: WorkspaceView, path: string): MenuItem[] => {
     const full = `${w.storage}/${path}`

@@ -43,6 +43,11 @@ diff --git package-lock.json package-lock.json
 +b`
 
 test('rangesOf: the base lines each hunk changes; a new file whole; lockfiles left out', () => {
+  // S11: files named as Object's own (constructor, __proto__) are files like any other
+  const odd = rangesOf('diff --git constructor constructor\n--- constructor\n+++ constructor\n@@ -2 +2 @@\ndiff --git __proto__ __proto__\n--- __proto__\n+++ __proto__\n@@ -5,2 +5 @@\n')
+  assert.deepEqual(Object.entries(odd), [['constructor', [[2, 2]]], ['__proto__', [[5, 6]]]])
+  assert.deepEqual(overlaps(odd, odd).map(o => o.file), ['constructor', '__proto__'])
+  assert.deepEqual(overlaps(odd, {}), [])
   assert.deepEqual(rangesOf(DIFF), { 'cart.ts': [[3, 4], [10, 10], [1, 1]], 'new.ts': [[0, 0]], 'gone.ts': [[1, 4]] })
 })
 

@@ -24,7 +24,7 @@ type Bridge = {
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
   onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
   copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
-  openFile?(path: string, root: string): Promise<'opened' | 'missing'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
+  openFile?(path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean, light?: boolean, float?: boolean): void

@@ -6,7 +6,7 @@ import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
@@ -1536,9 +1536,17 @@ ipcMain.handle('open-file', async (e, path: unknown, root: unknown) => {
   if (!win || e.sender !== win.webContents || typeof path !== 'string' || typeof root !== 'string' || !path.startsWith('/') || !root.startsWith('/')) return 'missing'
   const [real, top] = await Promise.all([realpath(path).catch(() => ''), realpath(root).catch(() => '')])
   if (!real || !top || !real.startsWith(`${top}/`) || !/\.html?$/i.test(real) || !(await stat(real).catch(() => null))?.isFile()) return 'missing'
+  // S11: as file:// in your browser its scripts run outside Laki's viewer (its CSP, no network): asked once per file
+  if (!fileOk.has(real)) {
+    const r = await dialog.showMessageBox(win, { type: 'question', message: `Open ${basename(real)} in your browser?`, detail: "An agent may have written this page. Opened as a file, its scripts run in your browser, outside Laki's viewer.", buttons: ['Open in the browser', 'Open in the viewer instead', 'Cancel'], defaultId: 1, cancelId: 2 })
+    if (r.response === 2) return 'opened' // nothing to say
+    if (r.response === 1) return 'viewer'
+    fileOk.add(real)
+  }
   await shell.openExternal(pathToFileURL(real).href)
   return 'opened'
 })
+const fileOk = new Set<string>() // pages you said yes to (until Laki quits)
 
 // an artifact to the clipboard (the app window's, right click › Copy): a picture as a picture, any other file as the file
 // itself (Finder, Slack and mail paste it); its text the renderer copies on its own

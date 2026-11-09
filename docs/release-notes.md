@@ -7,6 +7,8 @@ version it builds, with the date. -->
 - Safer: an agent can no longer switch its own permission mode, or type a `!` command from its sandbox, by sending keys as bytes.
 - Safer: an agent's `laki rm` (a workspace, a project, a scheduled task) asks you first; it changes files and closes tabs only in its own workspace, can't share a tab's page, and can't merge a PR or flip a PR switch as you.
 - Safer: agents can't change your voice dictionary, Laki AI's instructions or your keys; a ⌘K command's key never takes over ⌘C, ⌘V or ⌘Q.
+- Safer: an agent's `laki rename --asked` of a workspace you named asks you; an HTML artifact opened in your browser asks once first, with *Open in the viewer instead*.
+- Auto-continue after an API error no longer types over a prompt you're writing.
 - Recording mode now hides private workspaces from agents, Laki AI and remote access too, not only from the window.
 
 ## 0.47.0 · Nov 9, 2026

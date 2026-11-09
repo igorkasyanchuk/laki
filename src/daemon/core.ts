@@ -345,7 +345,7 @@ export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's o
 // What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
 const LAKI_NOTE = () =>
   `You run in a tab of Laki, an app that runs coding agents side by side, each task in a workspace of its own (a git worktree or a folder). Its CLI is \`${LAKI_CLI}\`, \`laki\` below (\`laki help\` lists it all); \`.\` is your workspace ($LAKI_WORKSPACE). Use it when it helps, quietly:
-- \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar). A name the user gave it stays (Laki refuses yours): rename it then only when they ask, with \`--asked\`.
+- \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar). A name the user gave it stays (Laki refuses yours): rename it then only when they ask, with \`--asked\` (Laki has them confirm it).
 - \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
@@ -3079,7 +3079,8 @@ function continueLater(tab: Tab, r: Runtime) {
   r.autoContinued = true
   const said = r.failed
   setTimeout(() => {
-    if (r.failed !== said || r.status !== 'idle' || tab.queue?.length || !state.tabs.includes(tab)) return
+    // S11: nor over what you're typing there (a draft, keys in the last minute): its Enter would send your half line
+    if (r.failed !== said || r.status !== 'idle' || tab.queue?.length || !state.tabs.includes(tab) || tab.draft || Date.now() - (keysAt.get(tab.id) ?? 0) < 60000) return
     r.contSent = true
     try {
       send({ target: tab.id, text: 'continue' })

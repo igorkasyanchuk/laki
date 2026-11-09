@@ -307,7 +307,7 @@ const api: Record<string, Handler> = {
   presetSave: async p => (await presetAsk(p), core.presetSave(p)), // laki preset: one profile; an agent's asked in the app first
   openIn: ({ from: _, ...p }) => core.openIn(p as Parameters<typeof core.openIn>[0]), // from: whoCalls' (agentNo: no file of an agent's opened by its default app)
   apps: () => core.apps(),
-  wsSet: p => core.wsOut(core.wsSet(p)),
+  wsSet: async p => core.wsOut(core.wsSet(await renameAsk(p))),
   reorder: p => core.reorder(p),
   imageSave: p => core.imageSave(p),
   bgSet: p => core.bgSet(p), // Settings › Appearance › Background image
@@ -784,6 +784,15 @@ async function rmAsk(p: any, what: string, text: string) {
   const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'remove', agent, from: ws, to: '', target: what, text, ws: by, tab: p.from.tab })
   if (how !== 'once') throw new Error(`${what}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+}
+// S11: --asked is the agent's own word. Its rename of a workspace you named asks you; said yes, it's asked
+async function renameAsk(p: any) {
+  if (!core.agentCaller(p.from)) return p
+  const { asked: _, ...q } = p
+  const w = q.name === undefined ? undefined : core.findWs(String(q.id ?? ''))
+  if (!w?.named || !p.asked || !String(q.name ?? '').trim() || q.auto) return q // no --asked: core's refusal says how
+  await rmAsk(p, `rename the workspace ${w.name ?? w.id} to ${String(q.name).trim().slice(0, 80)}`, 'You named it, so its name stays unless you say so.')
+  return { ...q, asked: true }
 }
 async function wsRmAsk(p: any) {
   const by = core.agentCaller(p.from)

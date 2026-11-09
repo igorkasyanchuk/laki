@@ -465,6 +465,10 @@ test('Word fixes (Settings › Voice): heard → meant as whole words in any cas
 
 test('voiceFillers: standalone hesitations go in each language, with their comma or space; words that mean something stay', () => {
   const same = (s: string) => assert.deepEqual(voiceFillers(s), { text: s, n: 0 }, s)
+  // S11: long runs of spaces (a pasted table) take no time: 3 s for 2,000 before
+  const t0 = Date.now()
+  assert.equal(voiceFillers(`so${' '.repeat(50000)}we ship, um, today${' '.repeat(50000)}`).n, 1)
+  assert.ok(Date.now() - t0 < 500, `${Date.now() - t0} ms`)
   const is = (s: string, text: string, n = 1) => assert.deepEqual(voiceFillers(s), { text, n }, s)
   is('Um, I think we should, uh, ship it', 'I think we should ship it', 2)
   is('um we should ship', 'we should ship')

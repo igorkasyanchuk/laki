@@ -414,7 +414,18 @@ test('a name you gave a workspace stays: an agent renames it only when you asked
   const no = await rig.cli('rename', '.', 'other')
   assert.notEqual(no.code, 0)
   assert.match(no.err, /--asked/)
-  assert.equal((await rig.cli('rename', '.', 'Cart v2', '--asked')).code, 0)
+  // S11: --asked is the agent's word: you say yes in the app (no window: refused; a no: the name stays)
+  assert.match((await rig.cli('rename', '.', 'Cart v2', '--asked')).err, /says yes in Laki's window, and it isn't open/)
+  const app = await connect(rig)
+  for (const allow of ['deny', 'once']) {
+    const going = rig.cli('rename', '.', 'Cart v2', '--asked')
+    const ask = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'remove' && !m.seen), 'asked in the app', 30000)
+    ask.seen = true
+    assert.match(ask.target, /rename the workspace Cart to Cart v2/)
+    await rig.rpc('widgetToolAnswer', { req: ask.req, allow })
+    assert.equal((await going).code === 0, allow === 'once')
+  }
+  app.close()
   delete rig.env.LAKI_WORKSPACE
   delete rig.env.LAKI_TAB
   assert.deepEqual([(await now()).name, (await now()).named], ['Cart v2', true])

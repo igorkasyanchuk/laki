@@ -15,6 +15,8 @@ export const RADAR_SKIP = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.
 // A change of b lines from a is [a, a+b-1]; an insertion after line a (b 0) is [a, a]: it touches a and a+1
 export function rangesOf(diff: string): Ranges {
   const out: Ranges = {}
+  // S11: an own key each, also for a file named constructor or __proto__ (out[file] ??= [] found Object's there)
+  const at = (f: string) => (Object.hasOwn(out, f) || Object.defineProperty(out, f, { value: [], enumerable: true, writable: true, configurable: true }), out[f])
   let file = ''
   let fresh = false
   for (const l of diff.split('\n')) {
@@ -27,7 +29,7 @@ export function rangesOf(diff: string): Ranges {
       if (!m) continue
       const a = Number(m[1])
       const b = m[2] === undefined ? 1 : Number(m[2])
-      ;(out[file] ??= []).push(fresh ? [0, 0] : b ? [a, a + b - 1] : [Math.max(a, 1), Math.max(a, 1)]) // -0,0: before the first line
+      at(file).push(fresh ? [0, 0] : b ? [a, a + b - 1] : [Math.max(a, 1), Math.max(a, 1)]) // -0,0: before the first line
     }
   }
   return out
@@ -41,7 +43,7 @@ const span = (xs: Span[]): Span => (xs.some(whole) ? [0, 0] : [Math.min(...xs.ma
 export function overlaps(mine: Ranges, theirs: Ranges): Overlap[] {
   const out: Overlap[] = []
   for (const [file, xs] of Object.entries(mine)) {
-    const ys = theirs[file]
+    const ys = Object.hasOwn(theirs, file) ? theirs[file] : undefined
     if (!ys) continue
     const a = xs.filter(x => ys.some(y => meet(x, y)))
     if (a.length) out.push({ file, mine: span(a), theirs: span(ys.filter(y => a.some(x => meet(x, y)))) })

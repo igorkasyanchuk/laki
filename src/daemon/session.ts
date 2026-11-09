@@ -81,6 +81,7 @@ export class Session {
   onOutput: (data: string) => void = () => {}
   onHook: (data: string) => void = () => {} // OSC 7717: a hook on an SSH host reports through the tab's own terminal (core.ts)
   agent = false // an agent's tab: only there is OSC 7501 answered or kept (core.ts spawnTab)
+  private programAsked = false
   readonly program = new ProgramRecords() // what it says through OSC 7501 (program.ts): this start's only
   onProgram: () => void = () => {} // its root record, once it has stood PROGRAM_SETTLE
   private settle?: ReturnType<typeof setTimeout>
@@ -118,7 +119,7 @@ export class Session {
 
   private programReport(d: string) {
     if (!this.agent || this.exited) return
-    if (d.trim() === '?') return void this.pty.write(PROGRAM_REPLY) // only here: xterm.js has no OSC 7501, so never twice
+    if (d.trim() === '?') return void (this.programAsked || ((this.programAsked = true), this.pty.write(PROGRAM_REPLY))) // only here: xterm.js has no OSC 7501, so never twice; S11: once a start (a loop of queries would be a loop of writes)
     if (!this.program.report(d)) return
     clearTimeout(this.settle) // one timer however many reports
     this.settle = setTimeout(() => this.onProgram(), PROGRAM_SETTLE)

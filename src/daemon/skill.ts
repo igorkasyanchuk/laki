@@ -1,9 +1,9 @@
 // The agent skill: SKILL.md and a launcher for the CLI in each agent's skills folder (~/.claude/skills/laki,
 // ~/.codex/…, ~/.gemini/…, ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
 // when the user asks (Settings), and again as a daemon starts when a Laki update changed one installed for it
-import { chmodSync, closeSync, type Dirent, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, type Dirent, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { BRAINSTORM_METHOD, BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { groupRule } from '../shared/tools.ts'
 import { USAGE } from '../shared/usage.ts'
@@ -556,7 +556,16 @@ export function agentCommands(o: { agent: string; project?: string }): { name: s
   const out = new Map<string, { name: string; sub: string; skill?: boolean }>()
   const add = (name: string, file: string, skill?: boolean) => out.has(name) || out.set(name, { name, sub: said(file), skill })
   // commands: every .md under it, a folder's as its name and a colon (claude's namespacing)
-  const commands = (at: string, prefix = '', ns = '') => {
+  // S11: a link that leads out of the commands folder isn't read (a repo's .claude/commands/x.md -> ~/.ssh/id_rsa: its
+  // first line would show in the / menu)
+  const within = (top: string, file: string) => {
+    try {
+      return realpathSync(file).startsWith(`${realpathSync(top)}${sep}`)
+    } catch {
+      return false
+    }
+  }
+  const commands = (at: string, prefix = '', ns = '', root?: string) => {
     let es: Dirent[] = []
     try {
       es = readdirSync(at, { withFileTypes: true })
@@ -564,8 +573,8 @@ export function agentCommands(o: { agent: string; project?: string }): { name: s
       return
     }
     for (const e of es.slice(0, 300))
-      if (e.isDirectory() && !ns) commands(join(at, e.name), prefix, `${e.name}:`)
-      else if ((e.isFile() || e.isSymbolicLink()) && e.name.endsWith('.md')) add(`${prefix}${ns}${e.name.slice(0, -3)}`, join(at, e.name))
+      if (e.isDirectory() && !ns) commands(join(at, e.name), prefix, `${e.name}:`, root ?? at)
+      else if ((e.isFile() || (e.isSymbolicLink() && within(root ?? at, join(at, e.name)))) && e.name.endsWith('.md')) add(`${prefix}${ns}${e.name.slice(0, -3)}`, join(at, e.name))
   }
   const skillsIn = (at: string, sign: string) => {
     try {

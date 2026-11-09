@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('laki', {
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard
-  openFile: (path: string, root: string): Promise<'opened' | 'missing'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
+  openFile: (path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean, light?: boolean, float?: boolean) => ipcRenderer.send('glass', on, light, float), // the window's blur behind see-through backgrounds
