@@ -697,3 +697,5 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 Laki was built twice while the stack was picked; the Go + Wails build is now its own repository
 and nothing here keeps it in step. Many renderer files were
 shared with it: some class and variable names in `look.css` and `themes.ts` are its, and harmless here.
+
+Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

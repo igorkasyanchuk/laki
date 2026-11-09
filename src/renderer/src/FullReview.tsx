@@ -285,7 +285,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     if (!el) return
     const heads = [...el.querySelectorAll<HTMLElement>('[data-file]')]
     const top = el.getBoundingClientRect().top + 8
-    const h = heads.filter(x => x.getBoundingClientRect().top <= top).at(-1) ?? heads[0]
+    const h = heads.filter(x => (x.parentElement ?? x).getBoundingClientRect().top <= top).at(-1) ?? heads[0] // its section's box (R10: a head inside one off screen isn't laid out; asking would lay every file out each frame)
     if (h) setCur(h.dataset.file!)
   }
   const go = (p: string) => (setCur(p), body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(p)}"]`)?.scrollIntoView({ block: 'start' }))

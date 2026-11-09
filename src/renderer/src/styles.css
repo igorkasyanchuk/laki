@@ -3369,3 +3369,11 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .managed-box { border-left: 3px solid var(--waiting); margin-bottom: 12px; } /* Settings: a managed policy's locks (policy.ts) */
 .ws-ticket { flex: 0 1 auto; min-width: 0; max-width: calc(10ch + 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; padding: 0 5px; font: 10.5px/16px var(--mono); color: var(--fg); border: 1px solid var(--line); border-radius: var(--rs, 4px); cursor: pointer; } /* a linked ticket's key (daemon/tickets.ts) */
 .board-ticket { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* R10: long lists skip what's off screen. A file's diff (Changes, Review), an answer in the Reader and a Board card are
+   laid out and painted only near the viewport; auto: each keeps the height it had once shown, so the scrollbar settles.
+   Find in page, a tab order and scrollIntoView still reach them. They contain their paint: nothing of theirs may hang
+   outside their box. */
+.sp-change { content-visibility: auto; contain-intrinsic-block-size: auto 34px; }
+.rd-agent { content-visibility: auto; contain-intrinsic-block-size: auto 120px; }
+.board-card { content-visibility: auto; contain-intrinsic-block-size: auto 96px; }
