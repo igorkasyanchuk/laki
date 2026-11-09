@@ -418,7 +418,9 @@ selected workspace's PR is in the status bar.
 - *Private* (a workspace's or a project's ⋯): Recording mode (⌘K, the menu bar icon's *Recording Mode*) hides private
   workspaces, and every workspace of a private project, from the sidebar, rail pins, the Board, Bird view, the bubbles,
   ⌘K, the Dock and menu bar counts, notifications and phone pushes, so a screen share or a recording shows none of
-  them; they keep running. The status bar says *Recording* while it's on; a click there turns it off.
+  them; they keep running. Agents, Laki AI and remote access's page don't get them either while it's on (`laki ls`
+  from an agent's tab, MCP's state): their names, branches and last answers stay out of other agents' context. The
+  status bar says *Recording* while it's on; a click there turns it off.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
   many it holds. *Sort workspaces ›* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the

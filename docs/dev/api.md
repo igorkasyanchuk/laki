@@ -380,7 +380,7 @@ else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: 
 and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
-`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve and close too; `shutdown`, `laki stop`; `checkAgain`, `checkStop`; each one in `FROM` or `CALLER`, checked as the daemon loads, and `notAgent` reads `from` or `caller`: a `from` the RPC says alone was an agent's to leave out), `projectTrust` with a `hash`, `projectSet` with `config` or
+`answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve, close and merge too (S3: a merge puts code in the base unread; `wsSet`'s `autoFix`, `autoReview`, `autoMerge`, `autoLand` are the user's as well); `shutdown`, `laki stop`; `checkAgain`, `checkStop`; each one in `FROM` or `CALLER`, checked as the daemon loads, and `notAgent` reads `from` or `caller`: a `from` the RPC says alone was an agent's to leave out), `projectTrust` with a `hash`, `projectSet` with `config` or
 `memory` and `memoryAdd` `auto: false` (`--mine`) (N15: what runs in every new workspace, and the list every agent starts
 with; an agent adds learned ones, `by` its found tab), `settingsSet` changing a `REMOTE_KEYS` setting and `input` into a tab that
 asks something (`core.asking`); a sandboxed agent's (`boxNo`, `core.boxedCaller`: its tab's `sandboxed`) `tabNew`, `wsNew`
@@ -398,3 +398,15 @@ templates), and Laki AI's `SYSTEM` has it pick the group that fits (`shared/tool
 mean, a general one last, none when none plainly fits; the laki skill's `laki new --group` too). Each workspace's
 `related` and `from` too; `laki_new_workspace` `link` is `wsNew`'s, and `tools(rpc, from)`'s `from` (the CLI's
 `$LAKI_WORKSPACE`; the daemon drops its own at start, so Laki AI's have none) its `from`. Tested in `test/cli.test.ts`.
+
+More of `agentNo` (teardown S1–S11, `test/agent-gates.test.ts`): `input`'s `data` and `send`'s `text` must be strings for
+every caller (`text()`: the gates read `String(x)`, node-pty writes an array as bytes); `wsRm`, `projectRm` and
+`scheduleRm` from an agent ask in the app (`rmAsk`: a `toolAsk` with `cross: 'remove'`, once only; a worker the agent
+started itself is its own to delete; no window: refused); `fileWrite`, `fileNew`, `fileUndo`, `hunkUndo`, `hunkRedo`
+(`FILE_EDITS`) only in the agent's own workspace and never under `.git`; `tabClose` only its own workspace's tabs;
+`tabSet` only its own tab; `shareStart` never; `openIn` with `app: 'default'` and a `file` never (a page it wrote would
+run outside Laki). A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
+`AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`. Recording mode (S7): `state` from an agent,
+Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
+`recorded` (no private workspace, its tabs, nor a private project); `whoCalls` looks the caller of `state` up only
+while that mode hides something.
