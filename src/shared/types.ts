@@ -1068,7 +1068,7 @@ export type View = { dnd?: { until: number } /* U8: Do not disturb is on, until 
 // S7: the view an agent, MCP or Laki AI gets while Recording mode is on: no private workspace (its own or its project's
 // private), its tabs, layout and today's use, nor a private project; the app's window gets them all and veils the rows
 export function recorded(v: View): View {
-  if (!v.settings?.recording) return v
+  if (!v?.settings?.recording) return v
   const off = new Set(v.projects.filter(p => p.private).map(p => p.id))
   const gone = new Set(v.workspaces.filter(w => w.private || off.has(w.project)).map(w => w.id))
   if (!gone.size && !off.size) return v
@@ -1137,7 +1137,7 @@ export function urlIs(cur: string, want: string): boolean {
 // Recording mode (settings.recording): private workspaces (theirs, or their project's) out of the view a window draws, so
 // the sidebar, rail pins, Board, Bird view, bubbles, ⌘K, counts, notifications and pages never show them; they keep running
 export function veiled(v: View): View {
-  if (!v.settings?.recording) return v
+  if (!v?.settings?.recording) return v
   const ps = new Set(v.projects.filter(p => p.private).map(p => p.id))
   const ws = new Set(v.workspaces.filter(w => w.private || ps.has(w.project)).map(w => w.id))
   if (!ps.size && !ws.size) return v

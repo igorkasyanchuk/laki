@@ -436,9 +436,20 @@ async function statOf(w: Workspace): Promise<Stat> {
   // F8: how far its base has moved on, and whether merging it in would be clean (merge-tree: no worktree touched)
   if (w.kind === 'worktree' && w.base) {
     const [behind, ahead] = (await git(w, '--no-optional-locks', 'rev-list', '--left-right', '--count', `${w.base}...HEAD`).catch(() => '')).trim().split(/\s+/).map(Number)
-    if (behind > 0) Object.assign(st, { behind, ahead: ahead || 0, clean: await git(w, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', w.base).then(() => true, () => false) })
+    if (behind > 0) Object.assign(st, { behind, ahead: ahead || 0, clean: await mergeClean(w) })
   }
   return st
+}
+// would merging its base in be clean: merge-tree's answer (exit 1: conflicts; anything else, an old git: not known),
+// kept while neither HEAD nor the base moved (the stats scan asks every few seconds)
+const cleanAt = new Map<string, { key: string; clean: boolean }>()
+export async function mergeClean(w: Workspace): Promise<boolean | undefined> {
+  const key = await git(w, '--no-optional-locks', 'rev-parse', 'HEAD', w.base).catch(() => '')
+  const had = cleanAt.get(w.id)
+  if (key && had?.key === key) return had.clean
+  const clean = await git(w, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', w.base).then(() => true, e => ((e as { code?: unknown }).code === 1 ? false : undefined))
+  if (key && clean !== undefined) cleanAt.set(w.id, { key, clean })
+  return clean
 }
 // the hover card's: one workspace's now (the scan keeps only the shown ones'); none off a git repo or for a codespace asleep
 export async function wsStat(o: { ws: string }): Promise<Stat | null> {

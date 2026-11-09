@@ -632,6 +632,7 @@ function boxNo(method: string, p: any) {
   if (method === 'wsNew' && (p.preset || core.state.settings?.agent) === 'shell') no('open a terminal') // a race's: refused as no agent (wsFan)
   if ((method === 'tabNew' || method === 'wsNew' || method === 'wsFan') && p.sandbox !== false) p.sandbox = true // false: agentNo's refusal; an agent without one (gemini…): modelCheck's
   if (method === 'run') no('start a Run ▾ action')
+  if (method === 'wsUpdate') no('update a branch through Laki (the merge and its git hooks run outside its sandbox)')
   if (method === 'projectAdd') no('add a project (a repo it made, its hooks and config run as you once a workspace starts there)')
   if (method === 'tabReopen') no('reopen a closed tab (a terminal, or an agent outside its sandbox)')
   if (FILE_EDITS.has(method)) no('change files through Laki (the daemon writes them, not its sandbox)')

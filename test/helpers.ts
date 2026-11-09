@@ -12,10 +12,10 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const fakes = join(root, 'test/fakes')
 const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
 
-// R9: one multiplier for every wait (until's limits, sleep's settles): LAKI_TEST_SLOW, else from the load as this file
+// R9: one multiplier for every wait's limit (until, seen; not sleep): LAKI_TEST_SLOW, else from the load as this file
 // starts (1 on a quiet machine, up to 3 with more runnable processes than cores: a release build beside the tests)
 export const SLOW = Number(process.env.LAKI_TEST_SLOW) || Math.max(1, Math.min(3, Math.round(loadavg()[0] / cpus().length)))
-export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms * SLOW))
+export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms)) // as written: a settle's length is part of some tests (a timer's seconds, a debounce)
 
 // whether a process exists (signal 0 only checks)
 export function running(pid: number) {

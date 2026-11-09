@@ -186,6 +186,7 @@ let diskFull: { free: number } | undefined
 export const diskFullNow = () => diskFull
 export const freeBytes = (at: string) => {
   try {
+    while (!existsSync(at) && dirname(at) !== at) at = dirname(at) // a folder not made yet: its volume is its nearest one's
     const s = statfsSync(at)
     return s.bavail * s.bsize
   } catch {
@@ -888,7 +889,7 @@ const hasRef = (at: At, ref: string) => git(at, 'rev-parse', '--verify', '--quie
 // ponytail: read once per repo per daemon (by its host and path); a config changed meanwhile counts after a restart
 const ownWorkers = new Map<string, Promise<boolean>>()
 function worktreeAdd(proj: Project, ...args: string[]) {
-  if (!proj.host) roomFor(proj.path, 'make a worktree') // R4
+  if (!proj.host) roomFor(args.find(a => isAbsolute(a)) ?? proj.path, 'make a worktree') // R4: where the worktree goes (the worktrees folder may be on another volume)
   const key = `${proj.host ?? ''}:${proj.path}`
   let own = ownWorkers.get(key)
   if (!own) ownWorkers.set(key, (own = git(proj, 'config', '--get', 'checkout.workers').then(v => v !== '', () => false))) // unset: exit 1
@@ -3569,7 +3570,8 @@ export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown })
 export function dndDigest(d: NonNullable<State['dnd']>) {
   const name = (id: string) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : ''))(state.tabs.find(t => t.id === id))
   const done = d.log.filter(x => x.kind === 'done' && name(x.tab)).map(x => `Finished: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
-  const waits = d.log.filter(x => x.kind === 'wait' && name(x.tab) && rt.get(x.tab)?.status === 'waiting').map(x => `Waits: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
+  const said = new Map(d.log.filter(x => x.kind === 'wait').map(x => [x.tab, x.text])) // its last ask's words; one that waited before it began has none
+  const waits = state.tabs.filter(t => rt.get(t.id)?.status === 'waiting').map(t => `Waits: ${name(t.id)}${said.get(t.id) ? `: ${said.get(t.id)}` : ''}`)
   const moved = state.workspaces.flatMap(w => {
     const pr = prs.get(w.id)
     const now = pr && `${pr.state}:${pr.checks ?? ''}`

@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
-import { inside, MAX_TEXT, scanStats, textOf } from './files.ts'
+import { inside, MAX_TEXT, mergeClean, scanStats, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
 import { phone } from './phone.ts'
@@ -661,9 +661,9 @@ export async function wsUpdate(o: { ws: string; how?: unknown }) {
     void scanStats()
     return { rebased: true }
   }
-  const clean = await git(ws, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', ws.base).then(() => true, () => false)
-  if (!clean) return { ...tellAgent(ws, `This branch is behind ${ws.base}, and merging it in conflicts. Merge it in (git merge ${ws.base}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, commit the merge, then say what you changed.`), told: true }
-  await git(ws, 'merge', '--no-edit', ws.base).catch(e => {
+  if ((await mergeClean(ws)) === false) return { ...tellAgent(ws, `This branch is behind ${ws.base}, and merging it in conflicts. Merge it in (git merge ${ws.base}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, commit the merge, then say what you changed.`), told: true }
+  await git(ws, 'merge', '--no-edit', ws.base).catch(async e => {
+    await git(ws, 'merge', '--abort').catch(() => {}) // merge-tree had no answer and it conflicts: put back as it was
     throw new Error(`merging ${ws.base} in: ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n')[0]}`)
   })
   wsLog(ws, `update: merged ${ws.base} in`)

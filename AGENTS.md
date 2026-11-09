@@ -33,8 +33,8 @@ npm run dev                       # Electron + renderer dev server on :5199
   - The rig's daemon has `LAKI_TEST_PARENT`, the test's pid: it shuts down once that process is gone (main.ts, every
     2 s), so a test run killed midway leaves no daemon running (`test/restart.test.ts`).
   - Waits: `until(f, what, ms)` polls (a pass returns at once), `seen(app, e => …)` waits for a daemon event on a
-    connected window; both, and `sleep`, are multiplied by `SLOW`: `LAKI_TEST_SLOW=2`, else from the load as the file
-    starts (1 to 3). A timeout says what it waited for and the multiplier.
+    connected window; both limits are multiplied by `SLOW`: `LAKI_TEST_SLOW=2`, else from the load as the file
+    starts (1 to 3); `sleep` is as written. A timeout says what it waited for and the multiplier.
   - A file's tests run one after another, the files 4 at a time in name order: keep a file under a minute (the
     longest now, `pr` and `widget-events`, about that), else split it by topic as `daemon` was (`agents`, `presets`,
     `restart`, `worktrees`), or it's the run's tail.

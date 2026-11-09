@@ -30,6 +30,7 @@ console.log(process.argv[3] + ' ' + process.argv[5] + ': ' + (await r.text()).re
     ['wsNew', { project: p.id, preset: 'shell', name: 'sh' }, 'wsshell'],
     ['wsNew', { project: p.id, preset: 'gemini', name: 'gm' }, 'gemini'],
     ['run', { ws: ws.id, script: 'dev' }, 'run'],
+    ['wsUpdate', { ws: ws.id }, 'update'],
     ['projectAdd', { path: rig.repo }, 'project'],
     ['send', { target: `${ws.id}/${shell}`, text: 'touch /tmp/x' }, 'toshell'],
     ['input', { tab: shell, data: 'touch /tmp/x\r' }, 'keys'],
@@ -50,6 +51,7 @@ console.log(process.argv[3] + ' ' + process.argv[5] + ': ' + (await r.text()).re
   for (const k of ['shell', 'wsshell']) assert.match(said[k], /a sandboxed agent can't open a terminal/, k)
   assert.match(said.gemini, /gemini has no sandbox here/)
   assert.match(said.run, /a sandboxed agent can't start a Run ▾ action/)
+  assert.match(said.update, /a sandboxed agent can't update a branch through Laki/) // the merge's git hooks would run outside
   assert.match(said.project, /a sandboxed agent can't add a project/) // a repo it made: its hooks would run outside
   assert.match(said.toshell, /a sandboxed agent can't send into/)
   assert.match(said.keys, /a sandboxed agent can't type into/)

@@ -1468,7 +1468,7 @@ export function App() {
   // branch is pushed (a force push would follow, yours to do)
   const behindMenu = (w: WorkspaceView): MenuItem[] => [
     { head: `${w.stat?.behind} behind ${w.base}` },
-    { label: w.stat?.clean ? `Update: merge ${w.base} in` : `Update: ask the agent to merge ${w.base} in (conflicts)`, icon: 'gitCompare', run: () => void call<{ merged?: boolean; told?: boolean }>('wsUpdate', { ws: w.id }).then(r => toast(r.merged ? `Merged ${w.base} in` : 'Its agent merges it in and resolves the conflicts')).catch(() => {}) },
+    { label: w.stat?.clean !== false ? `Update: merge ${w.base} in` : `Update: ask the agent to merge ${w.base} in (conflicts)`, icon: 'gitCompare', run: () => void call<{ merged?: boolean; told?: boolean }>('wsUpdate', { ws: w.id }).then(r => toast(r.merged ? `Merged ${w.base} in` : 'Its agent merges it in and resolves the conflicts')).catch(() => {}) },
     {
       label: `Rebase onto ${w.base}…`,
       icon: 'fork',
@@ -1642,9 +1642,9 @@ export function App() {
     call<TabView>('run', { ws: w.id, script: k }).then(selectTab, () => {})
   }
   // the panel on the right, on a tab: Info (⌘I), Files, Changes, Review, Preview
-  const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true))
+  const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true), setReviewTight(false)) // asked for: it shows, beside a narrow Review tab too
   const panelShown = panelOpen
-  const togglePanel = (t = panelTab) => (panelShown && t === panelTab ? setPanelOpen(false) : showPanel(t))
+  const togglePanel = (t = panelTab) => (panelShown && !(reviewOn && reviewTight) && t === panelTab ? setPanelOpen(false) : showPanel(t)) // one U6 hid: a click brings it back
   const info = panelOpen && panelTab === 'info'
   const showInfo = (on = !info) => (on ? showPanel('info') : setPanelOpen(false))
   // the run script: its tab, Run ▾
@@ -3251,7 +3251,7 @@ export function App() {
               )}
               {git && !!ws.stat?.behind && (
                 // F8: its base has commits it hasn't (as this clone has the base: no fetch): Update merges it in, or rebases
-                <button className="sb-behind" data-tip={`${ws.stat.behind} commit${ws.stat.behind > 1 ? 's' : ''} behind ${ws.base}${ws.stat.clean ? ': merging it in is clean' : ': merging it in conflicts'} · click: update`} onClick={e => openMenu(e, behindMenu(ws))}>
+                <button className="sb-behind" data-tip={`${ws.stat.behind} commit${ws.stat.behind > 1 ? 's' : ''} behind ${ws.base}${ws.stat.clean ? ': merging it in is clean' : ws.stat.clean === false ? ': merging it in conflicts' : ''} · click: update`} onClick={e => openMenu(e, behindMenu(ws))}>
                   ↓{ws.stat.behind}
                 </button>
               )}
