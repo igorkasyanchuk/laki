@@ -2,6 +2,7 @@
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpus, loadavg } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -11,7 +12,10 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const fakes = join(root, 'test/fakes')
 const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
 
-export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+// R9: one multiplier for every wait (until's limits, sleep's settles): LAKI_TEST_SLOW, else from the load as this file
+// starts (1 on a quiet machine, up to 3 with more runnable processes than cores: a release build beside the tests)
+export const SLOW = Number(process.env.LAKI_TEST_SLOW) || Math.max(1, Math.min(3, Math.round(loadavg()[0] / cpus().length)))
+export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms * SLOW))
 
 // whether a process exists (signal 0 only checks)
 export function running(pid: number) {
@@ -24,7 +28,7 @@ export function running(pid: number) {
 }
 
 export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 20000): Promise<T> { // room for a loaded machine: a pass returns at once
-  const end = Date.now() + ms
+  const end = Date.now() + ms * SLOW
   let last: unknown
   while (Date.now() < end) {
     try {
@@ -33,10 +37,12 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
     } catch (e) {
       last = e
     }
-    await sleep(50)
+    await new Promise(r => setTimeout(r, 50))
   }
-  throw new Error(`timed out waiting for ${what}${last ? `: ${last}` : ''}`)
+  throw new Error(`timed out after ${(ms * SLOW) / 1000} s waiting for ${what}${last ? `: ${last}` : ''}${SLOW > 1 ? ` (waits ×${SLOW}: LAKI_TEST_SLOW or the load)` : ''}`)
 }
+// a daemon event a connected window (connect's) got, or gets: no sleep, a clear message when it never comes
+export const seen = <E extends { ev?: string }>(app: { events: E[] }, is: (e: E) => unknown, what = 'an event', ms?: number) => until(() => app.events.find(is), what, ms)
 
 export type Rig = Awaited<ReturnType<typeof fresh>>
 // links and my-prs (test/widgets: extensions that came with Laki before 0.44), copied into this rig as a folder of yours

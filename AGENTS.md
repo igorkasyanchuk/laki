@@ -13,6 +13,7 @@ npm install
 npm run typecheck                 # tsc --noEmit
 npm test                          # node:test, every file, 4 at a time: ~5 min on an 8-core Mac (6 was no quicker there)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
+npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
@@ -30,6 +31,9 @@ npm run dev                       # Electron + renderer dev server on :5199
     sets `LAKI_PAGE` to a folder of the test's own, so remote access never serves the build.
   - The rig's daemon has `LAKI_TEST_PARENT`, the test's pid: it shuts down once that process is gone (main.ts, every
     2 s), so a test run killed midway leaves no daemon running (`test/restart.test.ts`).
+  - Waits: `until(f, what, ms)` polls (a pass returns at once), `seen(app, e => …)` waits for a daemon event on a
+    connected window; both, and `sleep`, are multiplied by `SLOW`: `LAKI_TEST_SLOW=2`, else from the load as the file
+    starts (1 to 3). A timeout says what it waited for and the multiplier.
   - A file's tests run one after another, the files 4 at a time in name order: keep a file under a minute (the
     longest now, `pr` and `widget-events`, about that), else split it by topic as `daemon` was (`agents`, `presets`,
     `restart`, `worktrees`), or it's the run's tail.

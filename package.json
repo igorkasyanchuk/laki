@@ -21,6 +21,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
+    "test:fast": "node --experimental-strip-types --no-warnings --test $(grep -L 'fresh(' test/*.test.ts)",
     "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",
     "pack": "electron-vite build && electron-builder --dir --publish never",
     "dmg": "npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg --publish never -c.directories.output=dist/release",
