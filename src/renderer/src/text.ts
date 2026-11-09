@@ -795,12 +795,13 @@ export function menuKeys(acts: { key?: string; label: string }[]) {
 // merged or it has nothing of its own (a worktree with no changes or commits); unknown counts (wsPeek too slow) say nothing,
 // a merged PR's worktree included (its uncommitted files weren't counted)
 // cs: a codespace archived (stopped: its files stay until GitHub deletes it, after its retention period)
-export type RmState = { archive?: boolean; cs?: boolean; worktree: boolean; dirty?: number; ahead?: number; unpushed?: number; lost?: boolean; pr?: { number: number; state: string }; busy: number; artifacts: number; keptArts: boolean }
+export type RmState = { archive?: boolean; cs?: boolean; worktree: boolean; dirty?: number; subs?: number; ignored?: number; ahead?: number; unpushed?: number; lost?: boolean; pr?: { number: number; state: string }; busy: number; artifacts: number; keptArts: boolean }
 export function rmVerdict(s: RmState): { tone: 'ok' | 'warn' | 'bad'; text: string } | undefined {
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? '' : 's'}`
   const merged = s.pr?.state === 'MERGED'
   const open = !!s.pr && !merged && s.pr.state !== 'CLOSED'
-  const lost = s.dirty && s.lost ? [`${n(s.dirty, 'uncommitted file')} ${s.dirty === 1 ? 'is' : 'are'} lost`] : []
+  // subs, ignored: what git status doesn't count (wsPeek's): submodules with uncommitted work, ignored files of its own
+  const lost = (s.lost ? [s.dirty && `${n(s.dirty, 'uncommitted file')} ${s.dirty === 1 ? 'is' : 'are'} lost`, s.subs && `uncommitted work in ${n(s.subs, 'submodule')} is lost`, s.ignored && `${n(s.ignored, 'ignored file')} ${s.ignored === 1 ? 'is' : 'are'} lost`] : []).filter(Boolean) as string[]
   const cs = s.cs && [s.dirty && n(s.dirty, 'uncommitted file'), s.unpushed && n(s.unpushed, 'unpushed commit')].filter(Boolean).join(' and ')
   const mind = [
     cs && `${cs} stay only while the codespace does: GitHub deletes a stopped one after its retention period (30 days by default)`,

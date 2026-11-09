@@ -591,6 +591,61 @@ test('a submodule never checked out stays in what Ship commits', async t => {
   assert.match(git(ws.path, 'ls-tree', 'HEAD', 'lib'), /^160000 commit/)
 })
 
+test("Archive if clean: uncommitted work in a submodule and an ignored file of its own each hold it, said by name; node_modules and your checkout's .env don't; the submodule's config never runs", async t => {
+  const rig = await fresh(t)
+  const ran = join(rig.home, 'ran')
+  const evil = join(rig.home, 'evil.sh')
+  writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+  const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'protocol.file.allow=always', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+  const lib = join(rig.home, 'lib')
+  git(rig.home, 'init', '-q', lib)
+  writeFileSync(join(lib, 'a'), 'a\n')
+  git(lib, 'add', 'a')
+  git(lib, 'commit', '-qm', 'lib')
+  git(rig.repo, 'submodule', 'add', '-q', lib, 'lib')
+  writeFileSync(join(rig.repo, '.gitignore'), 'node_modules/\n.env*\n')
+  git(rig.repo, 'add', '.gitignore')
+  git(rig.repo, 'commit', '-qm', 'a submodule')
+  writeFileSync(join(rig.repo, '.env'), 'A=1\n')
+  writeFileSync(join(rig.repo, '.git/info/exclude'), '.worktreeinclude\n')
+  writeFileSync(join(rig.repo, '.worktreeinclude'), '.env\n')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  git(ws.path, 'submodule', 'update', '--init', '--quiet')
+  assert.equal(readFileSync(join(ws.path, '.env'), 'utf8'), 'A=1\n') // Laki's copy
+  mkdirSync(join(ws.path, 'pkg/node_modules/x'), { recursive: true })
+  writeFileSync(join(ws.path, 'pkg/node_modules/x/index.js'), '1\n')
+  const clean = { dirty: 0, ahead: 0, unpushed: 0 }
+  const peek = () => rig.rpc('wsPeek', { id: ws.id })
+  const archive = () => rig.rpc('wsArchive', { id: ws.id, ifClean: true })
+  assert.deepEqual(await peek(), clean)
+  // a submodule: a tracked file changed, then a new one
+  git(join(ws.path, 'lib'), 'config', 'core.fsmonitor', evil)
+  writeFileSync(join(ws.path, 'lib/a'), 'changed\n')
+  git(ws.path, 'status', '--porcelain')
+  assert.ok(existsSync(ran), 'plain git status runs it: the trap is set')
+  rmSync(ran)
+  assert.deepEqual(await archive(), { dirty: 1, subs: ['lib'] })
+  assert.deepEqual(await peek(), { ...clean, subs: ['lib'] }) // the dialog's
+  writeFileSync(join(ws.path, 'lib/a'), 'a\n') // as committed, at another time
+  assert.deepEqual(await peek(), clean)
+  writeFileSync(join(ws.path, 'lib/new.txt'), 'n\n')
+  assert.deepEqual(await archive(), { dirty: 1, subs: ['lib'] })
+  rmSync(join(ws.path, 'lib/new.txt'))
+  // ignored files: one of its own, then the copied one changed
+  writeFileSync(join(ws.path, '.env.local'), 'SECRET=1\n')
+  assert.deepEqual(await archive(), { dirty: 1, ignored: ['.env.local'] })
+  assert.deepEqual(await peek(), { ...clean, ignored: ['.env.local'] })
+  rmSync(join(ws.path, '.env.local'))
+  writeFileSync(join(ws.path, '.env'), 'A=2\n')
+  assert.deepEqual(await archive(), { dirty: 1, ignored: ['.env'] })
+  writeFileSync(join(ws.path, '.env'), 'A=1\n') // your checkout's bytes again, at another time
+  assert.ok(!existsSync(ran), `its config ran, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
+  assert.equal(await archive(), null) // node_modules alone: archived
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived, true)
+  assert.ok(!existsSync(ws.path))
+})
+
 test("a folder project: a .git an agent made in it is never used", async t => {
   const rig = await fresh(t)
   const ran = join(rig.home, 'ran')

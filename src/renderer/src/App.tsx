@@ -1489,7 +1489,14 @@ export function App() {
   }
   // what Delete takes with it, said first, a line each: where it is, uncommitted files, commits not pushed, its PR, agents
   // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
-  type Peek = { dirty?: number; ahead?: number; unpushed?: number }
+  type Peek = { dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[] }
+  // and what git status doesn't count (the daemon's `unsaved`): uncommitted work inside a submodule, ignored files your
+  // checkout hasn't got the same. Archive's second question (wsArchive's { dirty }) lists them too
+  const few = (a: string[]) => `${a.slice(0, 3).join(', ')}${a.length > 3 ? ` and ${a.length - 3} more` : ''}`
+  const peekFacts = (pk: Peek, kept = false): Fact[] => [
+    ...(pk.subs ? [{ label: 'Submodules', icon: 'gitBranch', tone: kept ? 'warn' : 'bad', value: `${few(pk.subs)}: uncommitted work, ${kept ? 'kept in the stopped codespace' : 'lost'}` } as Fact] : []),
+    ...(pk.ignored ? [{ label: 'Ignored files', icon: 'files', tone: kept ? 'warn' : 'bad', value: `${few(pk.ignored)}: not in your checkout, ${kept ? 'kept in the stopped codespace' : 'lost'}` } as Fact] : []),
+  ]
   const peekWs = async (w: WorkspaceView): Promise<Peek> => (hasCap(view, 'ws.peek') ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {})
   // archive: the same, but the storage folder stays (archive keeps it), and a codespace is stopped, its files kept.
   // Each line's icon is tinted by what it means for you (green: nothing lost, amber: mind it, red: lost), the PR's state
@@ -1509,6 +1516,7 @@ export function App() {
     if (w.kind === 'worktree') facts.push({ label: 'Branch', icon: 'gitBranch', value: `${w.branch} → ${w.base} (${cs && !stops ? 'only what was pushed stays' : 'stays'})` })
     facts.push(cs ? { label: 'Codespace', icon: 'cloud', value: `${w.codespace || '(being made)'}: ${stops ? 'stopped, its files kept' : 'deleted on GitHub'}` } : { label: 'Folder', icon: 'folderOpen', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
     if (pk.dirty !== undefined) facts.push({ label: 'Changes', icon: 'changes', tone: pk.dirty ? (stops ? 'warn' : 'bad') : 'ok', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: ${stops ? 'kept in the stopped codespace' : 'lost'}` : 'none uncommitted' })
+    facts.push(...peekFacts(pk, stops))
     if (pk.ahead) facts.push({ label: 'Commits', icon: 'gitCommit', tone: pk.unpushed ? 'warn' : 'ok', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
     if (pr) facts.push({ label: pr.forge === 'gitlab' ? 'MR' : 'PR', icon: merged ? 'gitMerge' : 'pr', pr: prState(pr), chip: merged ? 'Merged' : pr.draft && open ? 'Draft' : open ? 'Open' : 'Closed', value: `${prNo(pr)}${pr.title ? ` · ${pr.title}` : ''} (stays on ${forgeName(pr)})` })
     if (pr?.author) facts.push({ label: 'Author', icon: 'user', value: `${pr.author}${pr.mine ? ' (you)' : ''}` })
@@ -1516,7 +1524,7 @@ export function App() {
     if (w.ports.length) facts.push({ label: 'Servers', icon: 'server', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
     if (w.artifacts) facts.push({ label: 'Artifacts', icon: 'files', tone: keptArts ? undefined : 'warn', value: `${n(w.artifacts, 'file')}${keptArts ? ' (kept)' : ': deleted'}` })
     facts.push({ label: 'Created', icon: 'clock', value: ago(w.created) })
-    const verdict = rmVerdict({ archive, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
+    const verdict = rmVerdict({ archive, cs: stops, worktree: w.kind === 'worktree', dirty: pk.dirty, subs: pk.subs?.length, ignored: pk.ignored?.length, ahead: pk.ahead, unpushed: pk.unpushed, lost: !stops, pr, busy: busy.length, artifacts: w.artifacts ?? 0, keptArts })
     return { facts, verdict }
   }
   const rmWs = async (w: WorkspaceView) => {
@@ -1559,16 +1567,18 @@ export function App() {
   // back. One that changed since it was asked is asked again. asked: the caller asked already (several at once)
   const archive = async (w: WorkspaceView, asked = false) => {
     const old = !hasCap(view, 'archive.dirty') // its daemon archives whatever is there
-    const pk = asked ? {} : await peekWs(w)
+    const pk: Peek = asked ? {} : await peekWs(w)
     const cs = w.codespace !== undefined // its codespace stops, its files stay
-    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay until GitHub deletes a stopped codespace (after 30 days by default). Restore it from the project's menu." : `Its tabs stop and the worktree is removed${pk.dirty ? ', with its uncommitted changes' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: !!pk.dirty && !cs }))) return
+    const loses = !!(pk.dirty || pk.subs || pk.ignored)
+    if (!asked && !(await ask(`Archive ${wsName(w)}?`, { text: cs ? "Its tabs stop and its codespace stops; its files stay until GitHub deletes a stopped codespace (after 30 days by default). Restore it from the project's menu." : `Its tabs stop and the worktree is removed${loses ? ', with what is only in it' : ''}; the branch stays. Restore it from the project's menu.`, ...(await rmFacts(w, true, pk)), ok: 'Archive', danger: loses && !cs }))) return
     let forced = false
-    const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
-    const r = old && asked ? { dirty: -1 } : await gated(w, 'archive', go(!old && !pk.dirty)) // the changes it was asked about go
+    const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<Peek & { held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
+    const r: (Peek & { held?: GateHeld[] }) | null | undefined = old && asked ? { dirty: -1 } : await gated(w, 'archive', go(!old && !loses)) // what it was asked about goes
     if (r === undefined) return // the toast says why, or it wasn't done
     if (r?.dirty) {
-      const lost = r.dirty > 0 ? `${r.dirty} uncommitted ${r.dirty === 1 ? 'change goes' : 'changes go'} with the worktree` : 'the worktree is removed'
-      if (!(await ask(`Archive ${wsName(w)}?`, { text: `Its tabs stop and ${lost} (the branch stays).`, ok: 'Archive', danger: true }))) return
+      const k = r.dirty - (r.subs?.length ?? 0) - (r.ignored?.length ?? 0) // wsArchive's count is all of them
+      const lost = k > 0 ? `${k} uncommitted ${k === 1 ? 'change goes' : 'changes go'} with the worktree` : r.dirty > 0 ? 'what is only in the worktree goes with it' : 'the worktree is removed'
+      if (!(await ask(`Archive ${wsName(w)}?`, { text: `Its tabs stop and ${lost} (the branch stays).`, facts: peekFacts(r), ok: 'Archive', danger: true }))) return
       if ((await gated(w, 'archive', go(false))) === undefined) return
     }
     done(`Archived ${wsName(w)}`, () => restore(w.id))

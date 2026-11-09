@@ -957,8 +957,10 @@ until you turn them off; *Merge when green* is off until you turn it on. What's 
 refuses it.
 
 *Archive workspace when its PR merges* (Settings › *Git & worktrees*, off by default): the next check after a merge
-archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
-PR: *Undo* in the message brings it back for good. One that can't go says *merged* in the sidebar.
+archives the workspace, if it's clean: nothing uncommitted (in a submodule too), no ignored file of its own (a `.env`
+your checkout hasn't got the same; `node_modules`, `dist` and other folders a setup makes again don't count), no commit
+the PR doesn't have, no agent at work. Once per PR: *Undo* in the message brings it back for good. One that can't go
+says *merged* in the sidebar, and its log says why. Archiving by hand lists the same before you confirm.
 
 *Archive workspaces untouched for* (the same section, off by default; 3, 7, 14 or 30 days): a worktree with no prompt, no
 agent turn, no commit and nobody looking at it for that long is archived, with *Undo*; undone, it isn't picked again for

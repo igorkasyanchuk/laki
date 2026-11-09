@@ -205,8 +205,9 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks first (`peekWs`, `rmFacts` with `archive`: the storage folder kept, a codespace
-    stopped), then `wsArchive` with `ifClean` unless it was dirty when asked, and offers Undo (`wsRestore`); one dirty
-    since is asked again; `asked`: the caller asked once for several (`pickedArchive`, the Board's `archiveAll`). Deleting a
+    stopped), then `wsArchive` with `ifClean` unless it was dirty when asked (`loses`: uncommitted files, a
+    submodule's, ignored files of its own), and offers Undo (`wsRestore`); one dirty since is asked again, with
+    `peekFacts` of what the daemon found; `asked`: the caller asked once for several (`pickedArchive`, the Board's `archiveAll`). Deleting a
     workspace and removing a project say so too. `busyWith` puts `going` on the rows meanwhile (a spinner and
     *archiving…* / *deleting…*), Compare's *Keep this one* too.
   - A new workspace stays in sight (`showNew`, from the new-workspace page, a fork, a restore): `reveal` unfolds the

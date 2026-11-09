@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
@@ -463,7 +463,7 @@ async function archiveMerged(ws: Workspace, pr: PR) {
     ws.autoArchived = undefined // failed: the next scan tries again
     throw e
   })
-  if (r?.dirty) return void ((ws.autoArchived = undefined), wsLog(ws, 'archive on merge: no, uncommitted changes'))
+  if (r?.dirty) return void ((ws.autoArchived = undefined), wsLog(ws, `archive on merge: no, ${unsavedWhy(r)}`))
   // held: not again for this PR (its gates would run at every scan); ponytail: you archive it
   if (r?.held) return void (log(`archive on merge ${ws.id}: held by ${r.held.map(h => h.name).join(', ')}`), wsLog(ws, `archive on merge: held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}`))
   log(`archived ${ws.id}: PR #${pr.number} merged`)
@@ -520,7 +520,7 @@ export async function archiveIdleTick(now = Date.now()) {
     let no = ''
     try {
       const r = await wsArchive(ws.id, { ifClean: true, by: 'auto' })
-      no = r?.dirty ? 'uncommitted changes' : r?.held ? `held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}` : ''
+      no = r?.dirty ? unsavedWhy(r) : r?.held ? `held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}` : ''
     } catch (e) {
       no = `failed: ${(e as Error).message}`
     }

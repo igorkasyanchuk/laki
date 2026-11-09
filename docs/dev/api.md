@@ -105,9 +105,22 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `memoryCompact.days` (`COMPACT_DAYS`, 7; 0: only when full) since the last, or the oldest learned one, and as the learned
   ones reach `MEMORY_MAX`, unless the last run left them full: then by days); Project.tsx' Memory tab: *Compact now*, the last run, Log;
 - `wsPeek` (a worktree's `dirty`: `git status` lines, `ahead`: commits not in its base, `unpushed`: of those on no remote;
-  a git that fails, a local, archived or gone one: none of it): what App's `rmFacts` puts in the delete question (ui.tsx
-  `ask` `facts`, `.ask-facts`; each line's `tone` and `chip`, and text.ts `rmVerdict` over them), waited for 1.5 s at most;
-- `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
+  a git that fails, a local, archived or gone one: none of it; `subs`, `ignored`: `unsaved`'s, below, only when there are
+  some): what App's `rmFacts` puts in the delete question (ui.tsx `ask` `facts`, `.ask-facts`; each line's `tone` and
+  `chip`, and text.ts `rmVerdict` over them; `peekFacts`: the *Submodules* and *Ignored files* lines), waited for 1.5 s at most;
+- `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns
+  `{ dirty }`, the count of all it'd lose, with `subs` and `ignored` when there are some. core.ts `unsaved`: status'
+  lines (`--untracked-files=normal`, whatever your config says), and what `noNested`'s status doesn't count:
+  - `subs`: the submodules (the worktree's index's gitlinks, checked out) with uncommitted work. `SUB_STATUS` asks
+    without the submodule's own config or hooks, which an agent can write: git under a temp git dir of Laki's (only a
+    `HEAD`, the recorded commit), with `GIT_WORK_TREE` the submodule, `GIT_OBJECT_DIRECTORY` its objects and a copy of
+    its index (one git can't read: `read-tree HEAD`); `-c` flags over its config would leave its `filter.*.clean`.
+    One that fails counts. Through `exec`: on a host too;
+  - `ignored`: `status --ignored=matching`'s files and folders, but those under a `REBUILT` name at any depth
+    (node_modules, dist, build, .next, target, .venv, coverage, `__pycache__`, .cache, tmp, log, .DS_Store) and those
+    your checkout has the same (`same`: a folder all through; a file by size and time, else its bytes up to 16 MB), as
+    `copyIncludes`' copies are. On a host every one counts (nothing is copied there), and none inside a submodule does.
+  `unsavedWhy` puts it in words for a log (Archive on merge's, when idle's, a workflow's `stays`);
   `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH);
 - tabs and agents: `tabNew`/`tabClose` (a tab's name: `addTab`, `freeName` numbers it; an agent tab after the
   workspace's first, with a prompt, is `<agent>: <taskTitle(prompt)>` (`shared/types.ts`: its first words, no URLs, paths,

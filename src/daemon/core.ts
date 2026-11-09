@@ -5,7 +5,7 @@
 // reads another's const or let as it loads (test/load-order.test.ts); the data folder is dir.ts', out of it.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { chmod, copyFile, readFile, rm, symlink } from 'node:fs/promises'
+import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { type Perm, permOf } from '../shared/ask.ts'
@@ -909,8 +909,8 @@ export function ghHour() {
 // a sandboxed agent can make a repo inside its worktree with a config of its own (core.fsmonitor: a program), and link it
 // in the index. git status, diff and add go in to ask if it's dirty, and run that outside the sandbox as you. Flags, as
 // a .gitmodules the agent writes (ignore = none, fetchRecurseSubmodules) beats diff.ignoreSubmodules and fetch's config
-// (turns.ts' treeOf: add -A has no flag). dirty: a moved commit still shows. ponytail: uncommitted work inside a
-// submodule counts as clean (wsPeek, Archive if clean); status --porcelain can't tell a real submodule from the agent's
+// (turns.ts' treeOf: add -A has no flag). dirty: a moved commit still shows; uncommitted work inside one doesn't (wsPeek
+// and Archive if clean ask `unsaved`, which looks there its own way)
 const NESTED: Record<string, string[]> = { status: ['--ignore-submodules=dirty'], diff: ['--ignore-submodules=dirty', '--submodule=short'], show: ['--submodule=short'], fetch: ['--no-recurse-submodules'] } // short: your diff.submodule=diff runs git in there too
 export function noNested(at: At, args: string[]) {
   // a folder project is no repo to Laki, whatever .git an agent made in it: this git would be under that config
@@ -2797,18 +2797,74 @@ export async function wsRm(ref: string) {
 }
 // what deleting a worktree workspace takes with it, for the app's question: its uncommitted paths (the folder goes), its
 // commits not in the base and, of those, the ones on no remote (the branch keeps them); a git that fails, or a local one,
-// says nothing of it
-export async function wsPeek(ref: string) {
+// says nothing of it. subs, ignored: unsaved's, only when there are some
+export async function wsPeek(ref: string): Promise<{ dirty?: number; ahead?: number; unpushed?: number; subs?: string[]; ignored?: string[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree' || ws.archived || away(ws) || state.projects.find(p => p.id === ws.project)?.git === false || !(ws.host || existsSync(ws.path))) return {}
   const count = (args: string[]) => git(ws, ...args).then(s => Number(s) || 0, () => undefined)
-  const [dirty, ahead, unpushed] = await Promise.all([
-    git(ws, '--no-optional-locks', 'status', '--porcelain').then(s => s.split('\n').filter(Boolean).length, () => undefined),
+  const [left, ahead, unpushed] = await Promise.all([
+    unsaved(ws).catch(() => undefined),
     count(['rev-list', '--count', `${ws.base}..HEAD`]),
     count(['rev-list', '--count', 'HEAD', '--not', ws.base, '--remotes']),
   ])
-  return { dirty, ahead, unpushed }
+  return { dirty: left?.dirty, ahead, unpushed, ...(left?.subs.length && { subs: left.subs }), ...(left?.ignored.length && { ignored: left.ignored }) }
 }
+
+// what goes with a removed worktree: `dirty`, git status' lines (untracked ones whatever your status.showUntrackedFiles
+// says), and what that status doesn't count:
+// - subs: the submodules with uncommitted work (noNested keeps status out of them). Asked without the submodule's own
+//   config or hooks, which an agent can write (core.fsmonitor: a program): git under a git dir of Laki's, made here and
+//   empty but for HEAD (the commit the worktree records), over the submodule's files, its objects and a copy of its
+//   index (the stat data: only what changed is hashed; one git can't read: the commit's tree, all of it hashed). -c
+//   flags over its config instead would leave its filter.<name>.clean, which status runs too. One that fails counts
+// - ignored: ignored files and folders, but the ones a setup script makes again (REBUILT, at any depth) and the ones your
+//   checkout has the same (copyIncludes' .env: nothing of the worktree's own). ponytail: on a host every one counts
+//   (nothing is copied there; a setup script's .env keeps Archive on merge off: archive it yourself), and an ignored
+//   file inside a submodule doesn't
+const REBUILT = new Set(['node_modules', 'dist', 'build', '.next', 'target', '.venv', 'coverage', '__pycache__', '.cache', 'tmp', 'log', '.DS_Store'])
+const SUB_STATUS = [
+  'set -e',
+  'cd -- "$2"',
+  '[ -e .git ] || exit 0', // never checked out: nothing of yours in it
+  `gd=.git; [ -d .git ] || gd=$(sed -n 's/^gitdir: //p' .git)`,
+  `t=$(mktemp -d); trap 'rm -rf "$t"' EXIT`,
+  'mkdir "$t/refs"; echo "$1" > "$t/HEAD"',
+  'export GIT_DIR="$t" GIT_WORK_TREE="$PWD" GIT_OBJECT_DIRECTORY="$(cd "$gd" && pwd)/objects" GIT_INDEX_FILE="$t/index"',
+  'st() { git -c core.fsmonitor=false --no-optional-locks status --porcelain --untracked-files=normal --ignore-submodules=dirty; }', // fsmonitor: yours (global) would start its daemon on the temp git dir
+  '{ cp "$gd/index" "$t/index" && st; } 2>/dev/null || { rm -f "$t/index"; git read-tree HEAD; st; }',
+].join('\n')
+// a worktree's file or folder that the checkout has too, the same (a folder: all that's in it; a file of another time: by
+// its bytes, up to 16 MB)
+async function same(a: string, b: string): Promise<boolean> {
+  try {
+    const [x, y] = [await lstat(a), await lstat(b)]
+    if (x.isSymbolicLink()) return y.isSymbolicLink() && (await readlink(a)) === (await readlink(b))
+    if (x.isDirectory()) {
+      if (!y.isDirectory()) return false
+      for (const n of await readdir(a)) if (!(await same(join(a, n), join(b, n)))) return false
+      return true
+    }
+    return x.isFile() && y.isFile() && x.size === y.size && (x.mtimeMs === y.mtimeMs || (x.size <= 16 << 20 && (await readFile(a)).equals(await readFile(b))))
+  } catch {
+    return false
+  }
+}
+export async function unsaved(ws: Workspace) {
+  const lines = (await git(ws, '-c', 'core.quotePath=false', '--no-optional-locks', 'status', '--porcelain', '--untracked-files=normal', '--ignored=matching')).split('\n').filter(Boolean) // matching: pkg/node_modules/, not a pkg/ that has nothing else
+  const mine = lines.filter(l => l.startsWith('!! ')).map(l => l.slice(3).replace(/\/$/, ''))
+  const root = ws.host ? '' : findProject(ws.project).path
+  const ignored: string[] = []
+  for (const rel of mine) if (!rel.split('/').some(s => REBUILT.has(s)) && !(root && (await same(join(ws.path, rel), join(root, rel))))) ignored.push(rel)
+  const subs: string[] = []
+  for (const l of (await git(ws, 'ls-files', '-s', '-z')).split('\0').filter(l => l.startsWith('160000 '))) {
+    const path = l.slice(l.indexOf('\t') + 1)
+    if (!subs.includes(path) && (await exec(ws, 'sh', ['-c', SUB_STATUS, 'sh', l.split(' ')[1], path], { timeout: 30000 }).then(r => r.stdout.trim(), () => '?'))) subs.push(path)
+  }
+  return { dirty: lines.length - mine.length, subs, ignored }
+}
+// wsArchive's { dirty } in words, for a log: why it stays
+export const unsavedWhy = (r: { dirty?: number; subs?: string[]; ignored?: string[] }) =>
+  [(r.dirty ?? 0) > (r.subs?.length ?? 0) + (r.ignored?.length ?? 0) && 'uncommitted changes', r.subs && `uncommitted work in a submodule (${r.subs.join(', ')})`, r.ignored && `ignored files your checkout doesn't have (${r.ignored.slice(0, 3).join(', ')}${r.ignored.length > 3 ? '…' : ''})`].filter(Boolean).join(', ')
 // archived workspaces past settings.archivedDays (hourly, and as the daemon starts) are deleted, their branch kept:
 // their worktree went as they were archived. One archived before archivedAt counts from now
 export function archivedTidy(now = Date.now()) {
@@ -2834,15 +2890,17 @@ function rmStorage(ws: Workspace) {
 }
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.
-// ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are
-export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; held?: GateHeld[] } | undefined> {
+// ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are:
+// status' lines, and unsaved's submodules and ignored files (named, when there are some)
+export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; subs?: string[]; ignored?: string[]; held?: GateHeld[] } | undefined> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
   if (ws.codespace === '') throw new Error(making.has(ws.id) ? 'its codespace is still being made' : 'it has no codespace (making it failed): delete it')
   if (ws.host && ws.codespace === undefined) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
   if (o.ifClean && ws.codespace === undefined && (ws.host || existsSync(ws.path))) { // a stopped codespace keeps its files
-    const dirty = (await git(ws, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
-    if (dirty) return { dirty }
+    const u = await unsaved(ws)
+    const dirty = u.dirty + u.subs.length + u.ignored.length
+    if (dirty) return { dirty, ...(u.subs.length && { subs: u.subs }), ...(u.ignored.length && { ignored: u.ignored }) }
   }
   const h = await gated('archive', ws, o)
   if (h) return h

@@ -494,6 +494,7 @@ test('rmVerdict: Delete and Archive sum up what goes, worst first', () => {
   assert.deepEqual(rmVerdict({ ...base, dirty: 0, ahead: 3, unpushed: 1, pr: { number: 7, state: 'OPEN' }, busy: 1 }), { tone: 'warn', text: "Mind: 1 commit not pushed (kept on the branch here); PR #7 isn't merged yet; 1 agent at work stops" })
   assert.deepEqual(rmVerdict({ ...base, dirty: 2, artifacts: 3, pr: { number: 7, state: 'MERGED' } }), { tone: 'bad', text: 'Check first: 2 uncommitted files are lost; 3 artifacts go' })
   assert.equal(rmVerdict({ ...base, dirty: 2, lost: false })?.tone, undefined) // a folder kept: its files stay
+  assert.deepEqual(rmVerdict({ ...base, archive: true, dirty: 0, subs: 1, ignored: 2, pr: { number: 7, state: 'MERGED' } }), { tone: 'bad', text: 'Check first: uncommitted work in 1 submodule is lost; 2 ignored files are lost' }) // what git status doesn't count
   // a codespace archived: its files stay, until GitHub deletes the stopped codespace
   assert.deepEqual(rmVerdict({ ...base, archive: true, cs: true, lost: false, dirty: 2, ahead: 3, unpushed: 1 }), { tone: 'warn', text: 'Mind: 2 uncommitted files and 1 unpushed commit stay only while the codespace does: GitHub deletes a stopped one after its retention period (30 days by default)' })
   assert.equal(rmVerdict({ ...base, archive: true, cs: true, lost: false, dirty: 0, ahead: 0 })?.tone, 'ok')

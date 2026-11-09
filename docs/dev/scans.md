@@ -282,7 +282,8 @@ drops it once `flowHooks.waitKey(id)` (the run's wait's options, none past it) i
 `flowHooks.answer({ id, n: n - 1 })` (`flowAnswer`). Tested in `test/push.test.ts`.
 
 Archive on merge (`archiveMerged`, after `autoPR` in `scanPR`; `settings.archiveMerged`, off by default): a worktree
-whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD` 0 and `wsArchive` `ifClean`; once per
+whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD` 0 and `wsArchive` `ifClean` (status,
+uncommitted work in a submodule, ignored files of its own: `unsaved`, `docs/dev/api.md`; the log names which); once per
 PR (`autoArchived`: an Undo stays). It broadcasts `archived`, which App toasts with Undo (`wsRestore`); a merged PR's
 row says *merged* while the setting is on.
 
