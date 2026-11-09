@@ -2153,6 +2153,7 @@ export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
     const start = claudeMode(s.screenText(6))
     let now = start
     for (let i = 0; i < MODE_PRESSES && now !== mode; i++) {
+      if (asking(t.id)) throw new Error('it began asking you something: answer that first') // there ⇧⇥ would pick an answer
       const was = now
       s.write('\x1b[Z') // shift-tab
       const until = Date.now() + MODE_WAIT

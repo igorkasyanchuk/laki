@@ -44,6 +44,7 @@ export async function suggestNext(tab: Tab, last: string) {
 const LONG_GAP = 300_000
 const longs = new Map<string, { worked: number; at?: number; said?: boolean }>()
 turnEnds.add(tab => void longs.delete(tab.id))
+turnStarts.add(tab => void longs.delete(tab.id)) // an Esc ends a turn with no hook: the next one starts over
 const spell = (ms: number) => (m => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`))(Math.round(ms / 60000))
 export function longTurnTick(now = Date.now()) {
   const min = Number(state.settings?.longTurn)

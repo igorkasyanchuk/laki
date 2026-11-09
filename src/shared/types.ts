@@ -720,7 +720,7 @@ export function voiceFix(text: string, fixes?: string): { text: string; fixed: s
 // capital moving to the next word. Some are words elsewhere, so: um only among English words (Portuguese's "um carro"),
 // er only set off by a comma too (German's "er ist", Dutch's "er is"), ну and 嗯 only followed by punctuation ("ну и что").
 const FILLER = /(\s*[,，、]?\s*)((?<![\p{L}\p{N}'’-])(?:um+|uh+|er|hm+|ähm*|euh+|э{2,}|ну)(?![\p{L}\p{N}'’-])|えーと|ええと|えっと|嗯)(\s*[,，、]|\s*[.…。！？!?]+(?=\s|$))?(\s*)/giu
-const ENGLISH = /\b(the|and|is|are|we|it|this|that|to|of|should|think|can|you)\b/i
+const ENGLISH = /\b(the|and|is|are|we|it|this|that|to|of|should|think|can|you|yes|okay|please|just|let|let's)\b/i
 export function voiceFillers(text: string): { text: string; n: number } {
   const en = ENGLISH.test(text)
   let out = ''

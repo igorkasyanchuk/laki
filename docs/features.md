@@ -63,6 +63,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Hook health**: when an agent's hooks don't reach Laki, its tab says so (asks and finishes then come from its screen
   only) with the likely cause, such as `"disableAllHooks": true` in a settings file; Settings › Agents & profiles shows
   each agent's last hook.
+- **Reader's box**: text you haven't sent stays, tab by tab, through ⇧⌘T, a restart or an archive; a chip changes a running Claude Code tab's permission mode, mid-turn too; a turn that ended on an API error offers *Continue* (or does it once by itself).
 - **Tidy on its own**: worktrees nobody touched for 3 to 30 days archived with Undo (off by default), never one with unsaved work or anything running.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and its questions show in the tab that started it, answered there. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,

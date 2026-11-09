@@ -59,6 +59,12 @@ test('longTurn: told once per turn past the limit, on the phone too; time waitin
   const got = await until(() => existsSync(join(home, 'long.json')) && (x => (x ? JSON.parse(x) : undefined))(readFileSync(join(home, 'long.json'), 'utf8')), 'turn.long')
   assert.deepEqual([got.event, got.minutes, got.tab.id], ['turn.long', 30, tab.id])
 
+  // an Esc ends a turn with no hook: the next prompt starts the clock over, and can be told again
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'again' } })
+  await tick()
+  for (let i = 0; i < 5; i++) assert.deepEqual(await tick(), [], 'from zero')
+  assert.deepEqual(await tick(), [tab.id], 'told again')
+
   // a Mac asleep: a gap counts as five minutes at most
   await hook('idle')
   await hook('running')
@@ -70,7 +76,7 @@ test('longTurn: told once per turn past the limit, on the phone too; time waitin
 
 const failed = (rig: any, id: string) => until(async () => (await rig.tab(id))?.failed, 'the error')
 
-test('an API error: one line, Continue sends continue to the same chat and clears it; Dismiss; not a limit or a refused model', async t => {
+test('an API error: one line, Continue sends continue to the same chat and clears it; Dismiss; not a limit', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'apierror now', name: 'one', local: true })
@@ -90,7 +96,20 @@ test('an API error: one line, Continue sends continue to the same chat and clear
   assert.equal((await rig.tab(ws.id)).failed, undefined, 'a limit has its own wait')
 })
 
-test('continueOnError: once per turn, by itself, after the wait; off, or after your Esc, never', async t => {
+test('an API error after your Esc is no error to go on from', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one', local: true })
+  await until(async () => /> /.test(await rig.screen((await rig.tab(ws.id)).id)), 'claude up')
+  const tab = (await rig.tab(ws.id)).id
+  await rig.rpc('send', { target: tab, text: 'slow one' })
+  await until(async () => (await rig.tab(ws.id)).status === 'running', 'its turn')
+  await rig.rpc('input', { tab, data: '\x1b' })
+  await rig.rpc('hook', { tab, state: 'failed', payload: { error: 'server_error' } })
+  assert.equal((await rig.tab(ws.id)).failed, undefined)
+})
+
+test('continueOnError: once per turn, by itself, after the wait; off, never', async t => {
   const rig = await fresh(t, { env: { LAKI_CONTINUE_MS: '200', FAKE_CONTINUE_FAILS: '1' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one', local: true })

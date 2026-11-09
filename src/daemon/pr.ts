@@ -482,6 +482,7 @@ function idleKeep(ws: Workspace) {
   if (ws.important) return 'marked important'
   if (ws.pending) return 'its agent starts later'
   if (state.settings?.archiveIdleKeepPR !== false && prs.get(ws.id)?.state === 'OPEN') return 'it has an open PR'
+  if (state.settings?.archiveIdleKeepPR !== false && state.settings?.bgRefresh === false && !prs.has(ws.id)) return "its PR isn't known (background refresh is off)"
   if (tabs.some(t => t.queue?.length)) return 'a message is queued'
   if (tabs.some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return 'an agent is at work'
   if (tabs.some(t => { const a = shellAgents.get(t.id); return a && a.status !== 'idle' })) return 'an agent is at work in a terminal'

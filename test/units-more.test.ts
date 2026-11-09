@@ -473,6 +473,7 @@ test('voiceFillers: standalone hesitations go in each language, with their comma
   is('Ну, я думаю', 'Я думаю')
   is('Эээ, давай', 'Давай')
   is('Uh', '')
+  is('Um, yes please', 'Yes please')
   same('Um')
   same('I like it, so, ship the thing')
   same('uh-huh, that is it')
