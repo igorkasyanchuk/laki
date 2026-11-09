@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
+import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,6 +79,14 @@ export function rotateLog(path: string, live = false, max = LOG_MAX) {
   } catch {
     return false
   }
+}
+
+// R2: a dated line in a log of the app's own (main's <data>/app.log), rotated as daemon.log is; it never throws
+export function logLine(path: string, ...a: unknown[]) {
+  try {
+    rotateLog(path)
+    appendFileSync(path, `${new Date().toISOString()} ${a.map(x => (x instanceof Error ? (x.stack ?? x.message) : typeof x === 'string' ? x : JSON.stringify(x))).join(' ')}\n`, { mode: 0o600 })
+  } catch {}
 }
 
 // ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already.

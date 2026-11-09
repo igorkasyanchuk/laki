@@ -8,7 +8,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { ensureDaemon, rpc } from '../shared/conn.ts'
+import { dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -31,6 +31,14 @@ const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: 
 // none reach a launch from Finder or the Dock
 const capture = app.commandLine.getSwitchValue('laki-capture')
 const notifyLog = app.commandLine.getSwitchValue('laki-notify-log')
+// R2: the main process's own log, <data>/app.log (rotated as daemon.log is): what went wrong here used to leave no
+// trace once the window was gone. Errors that nothing caught are logged and the app goes on (Electron's default is a
+// dialog with the stack); a helper process that died too
+const appLog = (...a: unknown[]) => (console.error('laki:', ...a), logLine(join(dataDir(), 'app.log'), ...a))
+process.on('uncaughtException', e => appLog('uncaught:', e))
+process.on('unhandledRejection', e => appLog('unhandled rejection:', e))
+app.on('child-process-gone', (_, d) => d.reason !== 'clean-exit' && appLog(`a ${d.type} process is gone (${d.reason}, ${d.exitCode}${d.name ? `, ${d.name}` : ''})`))
+
 const mac = process.platform === 'darwin' // elsewhere (Linux): the system's title bar, and closing the window quits (no Dock to bring it back)
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
@@ -337,11 +345,28 @@ function create() {
   // isn't reloaded for good; View › Reload is still there)
   let gone = 0
   win.webContents.on('render-process-gone', (_, d) => {
-    console.error(`laki: the window's renderer is gone (${d.reason}, ${d.exitCode})`)
+    appLog(`the window's renderer is gone (${d.reason}, ${d.exitCode})`)
     if (quitting || d.reason === 'clean-exit' || !win || win.isDestroyed() || Date.now() - gone < 60_000) return
     gone = Date.now()
     win?.webContents.reload()
   })
+  // R2: a hung renderer (not gone: no event above). After 10 s of it, asked once: wait on, or load the window again.
+  // Agents are the daemon's: they keep running either way
+  let hung: NodeJS.Timeout | undefined
+  win.on('unresponsive', () => {
+    appLog("the window isn't responding")
+    hung ??= setTimeout(async () => {
+      hung = undefined
+      if (!win || win.isDestroyed()) return
+      const r = await dialog.showMessageBox(win, { type: 'warning', message: "The window isn't responding", detail: 'Your agents keep running in the background. Reload restarts only this window.', buttons: ['Wait', 'Reload'], defaultId: 0, cancelId: 0 })
+      if (r.response !== 1 || !win || win.isDestroyed()) return
+      appLog('the window reloaded after a hang')
+      gone = Date.now() // ours: not the crash handler's reload as well
+      win.webContents.forcefullyCrashRenderer() // a hung page takes no reload
+      win.webContents.reload()
+    }, 10_000)
+  })
+  win.on('responsive', () => (clearTimeout(hung), (hung = undefined)))
   // closing hides: the renderer keeps posting notifications for agents while the app runs windowless
   win.on('close', e => {
     saveWin() // a move just before quitting isn't lost to the timer

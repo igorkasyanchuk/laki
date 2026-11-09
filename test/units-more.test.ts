@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { copyTree, rotateLog } from '../src/shared/conn.ts'
+import { copyTree, logLine, rotateLog } from '../src/shared/conn.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -479,6 +479,10 @@ test('rotateLog: past its size a log moves to .1; one held open for appending is
   assert.equal(rotateLog(f, false, 1000), true, 'not held: a rename')
   assert.deepEqual([existsSync(f), statSync(`${f}.1`).size], [false, 1500])
   assert.equal(rotateLog(join(d, 'none.log')), false)
+  // R2: the app's own log: dated lines, an error's stack, never a throw
+  logLine(join(d, 'app.log'), 'uncaught:', new Error('boom'), { a: 1 })
+  assert.match(readFileSync(join(d, 'app.log'), 'utf8'), /^\d{4}-\d\d-\d\dT\S+ uncaught: Error: boom\n\s+at [\s\S]*\{"a":1\}\n$/)
+  logLine(join(d, 'no', 'such', 'app.log'), 'x')
   rmSync(d, { recursive: true, force: true })
 })
 

@@ -11,6 +11,7 @@ version it builds, with the date. -->
 - Auto-continue after an API error no longer types over a prompt you're writing.
 - A Claude tab's mode chip says *Mode unknown* when Claude's footer isn't on screen, instead of *Ask*.
 - Tool gates: Claude tabs started before a gate was turned on are marked *No gate*, and the extension's page offers *Restart the idle ones* (their chats resume).
+- A window that stops responding offers *Wait* or *Reload* after 10 seconds; the app keeps its own log (`app.log`, next to `daemon.log`), and `daemon.log` no longer grows without bound while the daemon runs.
 - Recording mode now hides private workspaces from agents, Laki AI and remote access too, not only from the window.
 
 ## 0.47.0 · Nov 9, 2026

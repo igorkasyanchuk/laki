@@ -2635,6 +2635,8 @@ Laki starts agents and what Laki does itself, not what you type in a shell tab: 
 
 ## Troubleshooting
 
+- **The window froze or went blank**: after 10 seconds Laki asks *Wait* or *Reload* (your agents keep running either
+  way); `~/.laki/app.log` says what happened.
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.
 - **Laki uses a lot of memory**: Settings › Resources says what: it's nearly always the agents (each Claude is
   200 MB to a few GB after a long day) and what they started. *Sleep* the idle ones, or set *Sleep idle agents
