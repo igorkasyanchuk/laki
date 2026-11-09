@@ -530,7 +530,8 @@ tab (the last place you clicked), ⌘F finds words in the diff's lines instead: 
   default; Settings › Open in › *Per project* shows and changes each project's;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
 - ship: commit, push and open a PR, in a *ship* tab (nothing uncommitted and no commit the base lacks: *nothing to
-  ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo);
+  ship*; a fork with no `gh repo set-default`: the PR opens on origin's repo; into the workspace's base branch when
+  origin has it, else the repo's default);
 - search: the command palette (⌘K);
 - ⋯: the next step first (One next step, below), then split right/down, fork, archive, delete;
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
@@ -2121,7 +2122,7 @@ and what it costs.
   worktree goes in and runs that program as you, and so does a shell prompt that shows git status or an editor's git
   panel, with nothing typed. Check it for a nested `.git` first (`find . -mindepth 2 -name .git`). *Ship* refuses a
   workspace with such a repo and names it (delete its folder, or add it as a submodule on the base, in your own checkout, first); a submodule
-  that the base and your checkout both have still ships. No agent, sandboxed or not, can change a tab's permission mode, by Laki's command or by typing Shift-Tab into it.
+  that the base and your checkout both have still ships, unless its `.git` was swapped for another repo's (delete the folder and run `git submodule update --init`), and nothing Ship runs goes into it. On an SSH host too. No agent, sandboxed or not, can change a tab's permission mode, by Laki's command or by typing Shift-Tab into it.
   The tabs and workspaces it starts are sandboxed too, and it can't open a terminal, run a Run ▾ action or type into a terminal. It
   can still message another agent (`laki send`, `laki ask`) or ask Laki AI: one that isn't sandboxed asks you before it
   acts only as its own mode says, so keep those in a mode that asks. Claude

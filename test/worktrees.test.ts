@@ -576,6 +576,72 @@ test('a submodule in the base, checked out, still ships', async t => {
   assert.match(git(ws.path, 'ls-tree', 'HEAD', 'x.txt'), /x\.txt/)
 })
 
+for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['GitLab', 'https://gitlab.com/o/repo.git']])
+  test(`a real submodule an agent got at (${forge}): its own config never runs in Ship, gh gets --head and --base; its .git swapped for another repo, Ship refuses; put back, it ships`, async t => {
+    const rig = await fresh(t)
+    const ran = join(rig.home, 'ran')
+    const evil = join(rig.home, 'evil.sh')
+    writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+    const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'protocol.file.allow=always', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+    const lib = join(rig.home, 'lib')
+    git(rig.home, 'init', '-q', lib)
+    writeFileSync(join(lib, 'a'), 'a\n')
+    git(lib, 'add', 'a')
+    git(lib, 'commit', '-qm', 'lib')
+    git(rig.repo, 'submodule', 'add', '-q', lib, 'lib')
+    git(rig.repo, 'commit', '-qm', 'a submodule')
+    const remote = join(rig.home, 'remote.git')
+    git(rig.home, 'init', '-q', '--bare', remote)
+    git(rig.repo, 'remote', 'add', 'origin', origin)
+    git(rig.repo, 'config', 'remote.origin.pushurl', remote)
+    git(rig.repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD') // as fetched: origin has the base
+    if (forge === 'GitHub') git(rig.repo, 'config', 'remote.origin.gh-resolved', 'base') // gh repo set-default: no -R
+    if (forge === 'GitHub') mkdirSync(rig.env.FAKE_GH, { recursive: true }), writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // so gh pr create runs
+    const p = await rig.rpc('projectAdd', { path: rig.repo })
+    const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+    git(ws.path, 'submodule', 'update', '--init', '--quiet')
+    const trapped = () => {
+      writeFileSync(join(ws.path, 'lib/a'), `${Math.random()}\n`)
+      git(ws.path, 'status', '--porcelain')
+      assert.ok(existsSync(ran), 'plain git status runs it: the trap is set')
+      rmSync(ran)
+    }
+    const shipped = async (message: string) => {
+      const tab = await rig.rpc('ship', { ws: ws.id, message })
+      const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
+      assert.equal(ended.code, 0, await rig.screen(tab.id))
+      assert.ok(!existsSync(ran), `its config ran, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
+    }
+    // the real one's own config, in the worktree's git dir (a sandboxed claude can write there)
+    git(join(ws.path, 'lib'), 'config', 'core.fsmonitor', evil)
+    trapped()
+    writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+    await shipped('Shipped')
+    assert.match(git(ws.path, 'ls-tree', 'HEAD', 'lib'), /^160000 commit/) // still a submodule in what was shipped
+    assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), forge === 'GitHub' ? new RegExp(`^gh pr create --fill --head o:${ws.branch} --base main$`, 'm') : new RegExp(`^glab mr create --fill --yes --source-branch ${ws.branch} --target-branch main$`, 'm'))
+    // its .git swapped: a repo of the agent's in the submodule's place
+    const real = readFileSync(join(ws.path, 'lib/.git'), 'utf8')
+    rmSync(join(ws.path, 'lib'), { recursive: true })
+    git(ws.path, 'init', '-q', 'lib')
+    writeFileSync(join(ws.path, 'lib/a'), 'a\n')
+    git(join(ws.path, 'lib'), 'add', 'a')
+    git(join(ws.path, 'lib'), 'commit', '-qm', 'not the lib')
+    git(join(ws.path, 'lib'), 'config', 'core.fsmonitor', evil)
+    trapped()
+    writeFileSync(join(ws.path, 'y.txt'), 'y\n')
+    await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'No' }), /can't ship: the submodule "lib" has a \.git that isn't the one git made for it/)
+    assert.ok(!existsSync(ran), 'its config ran')
+    // a .git file naming a repo elsewhere: the same
+    const far = join(rig.home, 'far')
+    execFileSync('mv', [join(ws.path, 'lib/.git'), far])
+    writeFileSync(join(ws.path, 'lib/.git'), `gitdir: ${far}\n`)
+    await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'No' }), /can't ship: the submodule "lib"/)
+    assert.ok(!existsSync(ran), 'its config ran')
+    writeFileSync(join(ws.path, 'lib/.git'), real) // back
+    await shipped('Again')
+    assert.match(git(ws.path, 'ls-tree', 'HEAD', 'y.txt'), /y\.txt/)
+  })
+
 test('a submodule never checked out stays in what Ship commits', async t => {
   const rig = await fresh(t)
   const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })

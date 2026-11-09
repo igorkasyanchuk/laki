@@ -33,7 +33,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { collisions, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, viewWs } from './files.ts'
+import { collisions, gAt, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -4161,20 +4161,32 @@ export async function gated(step: Gate, ws: Workspace, o: GateOpts) {
 
 // ls-tree's or ls-files -s's lines (both: the mode first, the path after a tab): the gitlinks' paths
 const gitlinks = async (at: At, ...args: string[]) => (await git(at, ...args)).split('\0').filter(l => l.startsWith('160000 ')).map(l => l.slice(l.indexOf('\t') + 1))
-// the gitlinks in Ship's tree that aren't both in the merge base with ws.base (no merge base: none is) and in your own
-// checkout's index. Staged, one sends gh pr create or glab mr create, without --head, into plain git status: that goes into
-// the repo and runs its config's program as you, outside the sandbox. By path, so a real submodule moved to a new commit
-// still ships. The index because a sandboxed agent writes refs (a branch moved onto a commit with its link) but never that
-// file. ponytail: an agent can replace the .git of a submodule already in both, and that repo's config still runs: Ship
-// would need a status-free gh and glab to close it. A submodule new on the base waits until your checkout has it
-async function nestedRepos(ws: Workspace, tree: string) {
-  const links = await gitlinks(ws, 'ls-tree', '-r', '-z', tree)
+// the gitlinks in Ship's tree (links) that aren't both in the merge base with ws.base (no merge base: none is) and in your
+// own checkout's index: a repo an agent made, whose config runs a program as you, outside the sandbox, in any git that
+// goes in. By path, so a real submodule moved to a new commit still ships. The index because a sandboxed agent writes refs
+// (a branch moved onto a commit with its link) but never that file. A submodule new on the base waits until your checkout
+// has it
+async function nestedRepos(ws: Workspace, links: string[]) {
   if (!links.length) return []
   const base = await git(ws, 'merge-base', ws.base, 'HEAD').catch(() => '')
   const inBase = new Set(base ? await gitlinks(ws, 'ls-tree', '-r', '-z', base) : [])
   const yours = new Set(await gitlinks(findProject(ws.project), 'ls-files', '-s', '-z'))
   return links.filter(l => !inBase.has(l) || !yours.has(l))
 }
+// and of the real ones, checked out, those whose .git isn't git's own for it: a file naming a folder under the worktree's
+// git dir's modules/ (git submodule update's). A folder, or a file naming another place, is a repo put there instead
+// (rm -rf lib && git init lib): the path is in both trees, its config anyone's. ponytail: a sandboxed claude can write
+// the real one's config too (modules/ is in the folder its --add-dir gets): Ship's own git and gh's and glab's stay out
+// of every submodule (below), your push.recurseSubmodules=on-demand doesn't
+const SWAPPED = [
+  'own=$(cd "$(git rev-parse --git-dir)" && pwd -P)',
+  'for p; do',
+  '  [ -e "./$p/.git" ] || continue', // never checked out
+  `  d=; [ -f "./$p/.git" ] && gd=$(sed -n 's/^gitdir: //p' "./$p/.git") && [ -n "$gd" ] && d=$(cd "./$p" && cd "$gd" 2>/dev/null && pwd -P)`,
+  '  case $d in "$own"/modules/?*) ;; *) printf "%s\\n" "$p" ;; esac',
+  'done',
+].join('\n')
+const swapped = async (ws: Workspace, links: string[]) => (links.length ? (await exec(ws, 'sh', ['-c', SWAPPED, 'sh', ...links])).stdout.split('\n').filter(Boolean) : [])
 
 export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
   const ws = findWs(ref)
@@ -4187,30 +4199,46 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   const h = await gated('ship', ws, o)
   if (h) return h
   // gh asks which repo a PR goes to when origin's network has two (a fork and its parent) and none was picked (gh repo
-  // set-default, git's remote.<name>.gh-resolved): origin's, as the PR scans take it; one you picked stays yours
+  // set-default, git's remote.<name>.gh-resolved): origin's, as the PR scans take it; one you picked stays yours.
+  // --head always: without it gh pr create runs git status in the worktree (and would push). Picked, the branch is
+  // origin's, where Ship pushed it: <its owner>:<branch>, as gh wants a fork's
   const lab = (await gitlab.forgeOf(ws)) === 'gitlab' // GitLab's: glab mr create (gitlab.ts SHIP_MR)
-  const picked = lab ? '' : await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')
-  const repo = picked.trim() || lab ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => ''))
+  const picked = lab ? '' : (await git(ws, 'config', '--get-regexp', '^remote\\..*\\.gh-resolved$').catch(() => '')).trim()
+  const origin = lab ? undefined : cs.repoOf(await git(ws, 'remote', 'get-url', 'origin').catch(() => '')) || undefined
+  const repo = picked ? undefined : origin
   const R = repo ? ' -R "$LAKI_REPO"' : ''
-  // git add -A here would go into a nested repo (noNested), so what treeOf stages. ponytail: a host's keeps git add -A
-  // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
-  const tree = ws.host ? '' : await treeOf(ws, true)
-  const index = join(turnDir, `${ws.id}.ship`)
-  if (tree) copyFileSync(join(turnDir, `${ws.id}.index`), index) // now: a turn's treeOf rewrites that one
-  const nested = tree ? await nestedRepos(ws, tree) : []
+  const head = picked && origin ? `${origin.split('/').at(-2)}:${ws.branch}` : ws.branch
+  // into the workspace's base (off origin/main: main), where origin has that branch; a base that's only here: the
+  // repo's default branch, as gh picks it (glab is told either way, as before)
+  const base = ws.base.replace(/^origin\//, '')
+  const B = !lab && (await hasRef(ws, `refs/remotes/origin/${base}`)) ? ' --base "$LAKI_BASE"' : ''
+  // git add -A here would go into a nested repo (noNested), so what treeOf stages, a host's worktree there
+  const tree = await treeOf(ws, true)
+  const index = await turnIndex(ws, 'ship')
+  await exec(ws, 'cp', [await turnIndex(ws), index]) // now: a turn's treeOf rewrites that one
+  const links = await gitlinks(ws, 'ls-tree', '-r', '-z', tree)
+  const nested = await nestedRepos(ws, links)
   if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])} ${nested.length > 1 ? `and ${nested.length - 1} more are git repos` : 'is a git repo'} inside this workspace that ${ws.base} and your checkout don't both have as a submodule, and a repo's config can run a program as you. Delete the folder, or add the submodule on ${ws.base} in your checkout first, then ship again`)
+  const sw = await swapped(ws, links)
+  if (sw.length) throw new Error(`can't ship: the submodule ${JSON.stringify(sw[0])}${sw.length > 1 ? ` and ${sw.length - 1} more have` : ' has'} a .git that isn't the one git made for it (another repo put in its place), and a repo's config can run a program as you. Delete the folder and run git submodule update --init there (one you made with git init or clone: git submodule absorbgitdirs), then ship again`)
+  // gh's and glab's index (below) without the gitlinks: a git status of theirs then goes into no submodule, whatever
+  // its .git or its config are by then; it counts each as changed, which only their "uncommitted changes" warning says
+  if (links.length) await gAt(ws, index, ['update-index', '--force-remove', '--', ...links])
   const script = [
     'set -e',
-    tree ? 'git read-tree --reset "$LAKI_TREE"' : 'git add -A',
+    // every git from here, gh's and glab's and a submodule's that one of them starts (git hands these on): no fsmonitor
+    // program, whatever a repo's config names. Not core.hooksPath: Ship runs your pre-commit and pre-push hooks
+    'n=${GIT_CONFIG_COUNT:-0}; export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false"',
+    'git read-tree --reset "$LAKI_TREE"',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
-    // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send gh's and
-    // glab's git status in. Theirs reads treeOf's index instead, a copy of Laki's (turnsTidy clears it), its stat data kept
-    ...(tree ? ['export GIT_INDEX_FILE="$LAKI_INDEX"'] : []),
-    lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
+    // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send a
+    // git status of gh's or glab's in. Theirs reads Laki's instead (turnsTidy clears it), its stat data kept
+    'export GIT_INDEX_FILE="$LAKI_INDEX"',
+    lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R} --head "$LAKI_HEAD"${B}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree, LAKI_INDEX: index }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, LAKI_TREE: tree, LAKI_INDEX: index, ...(lab ? { LAKI_BASE: base } : { LAKI_HEAD: head, ...(B && { LAKI_BASE: base }) }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

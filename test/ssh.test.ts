@@ -85,6 +85,45 @@ test('a project over SSH: a worktree, setup, the agent and its hooks, files and 
   assert.ok(!existsSync(ws.path))
 })
 
+test("Ship on a host: a nested repo an agent made there is refused and its config never runs; gone, the commit is Laki's tree, made there", async t => {
+  const rig = await fresh(t)
+  const ran = join(rig.home, 'ran')
+  const evil = join(rig.home, 'evil.sh')
+  writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+  const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+  const remote = join(rig.home, 'remote.git')
+  git(rig.home, 'init', '-q', '--bare', remote)
+  git(rig.repo, 'remote', 'add', 'origin', remote)
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // so gh pr create runs
+  const p = await rig.rpc('projectAdd', { path: `devbox:${rig.repo}` })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.equal(ws.host, 'devbox')
+  git(ws.path, 'init', '-q', 'sub')
+  writeFileSync(join(ws.path, 'sub/b'), 'y\n')
+  git(join(ws.path, 'sub'), 'add', 'b')
+  git(join(ws.path, 'sub'), 'commit', '-qm', 's')
+  git(ws.path, 'add', 'sub')
+  git(join(ws.path, 'sub'), 'config', 'core.fsmonitor', evil)
+  writeFileSync(join(ws.path, 'sub/b'), 'dirty\n')
+  writeFileSync(join(ws.path, 'x.txt'), 'x\n')
+  git(ws.path, 'add', '-A') // what Ship's script ran there
+  assert.ok(existsSync(ran), 'git add -A runs it: the trap is set')
+  rmSync(ran)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'Shipped' }), /can't ship: "sub" is a git repo inside this workspace/)
+  assert.ok(!(await rig.rpc('state')).tabs.some((x: any) => x.workspace === ws.id && x.name === 'ship'), 'no Ship tab')
+  assert.ok(!existsSync(ran), `its config ran, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
+  rmSync(join(ws.path, 'sub'), { recursive: true }) // what the error says to do
+  const tab = await rig.rpc('ship', { ws: ws.id, message: 'Shipped' })
+  const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
+  assert.equal(ended.code, 0, await rig.screen(tab.id))
+  assert.equal(git(remote, 'ls-tree', '--name-only', ws.branch).trim().split('\n').includes('x.txt'), true)
+  assert.equal(git(remote, 'ls-tree', ws.branch, 'sub'), '')
+  assert.deepEqual(readdirSync(join(rig.home, '.laki-host', readdirSync(join(rig.home, '.laki-host'))[0], 'turns')).sort(), [`${ws.id}.index`, `${ws.id}.ship`]) // Laki's indexes, in its folder there
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), new RegExp(`^gh pr create --fill --head ${ws.branch}$`, 'm')) // no --base: origin's main was never fetched
+  assert.ok(!existsSync(ran), 'its config ran')
+})
+
 test('laki project add host:path', async t => {
   const rig = await fresh(t)
   const r = await rig.cli('project', 'add', `devbox:${rig.repo}`)

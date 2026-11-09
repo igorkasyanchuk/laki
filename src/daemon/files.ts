@@ -25,27 +25,36 @@ const emptyDir = (p: string) => {
     return false
   }
 }
+// Laki's index of a workspace (treeOf's; Ship's copy of it, ext ship): in turnDir, a host's in Laki's folder there
+// (hostUp's dir), out of a sandboxed agent's reach as turnDir is. gAt: git on one, there too (each call an ssh)
+export const turnIndex = async (ws: Workspace, ext = 'index') => `${ws.host ? `${(await hostUp(ws.host)).dir}/turns` : turnDir}/${ws.id}.${ext}`
+export const gAt = (ws: Workspace, idx: string, args: string[]) =>
+  ws.host ? exec(ws, 'env', [`GIT_INDEX_FILE=${idx}`, 'git', '-c', 'core.quotePath=false', '--literal-pathspecs', ...noNested(ws, args)]).then(r => r.stdout) : g(ws, args, { ...process.env, GIT_INDEX_FILE: idx })
+const shOk = (ws: Workspace, script: string, ...a: string[]) => exec(ws, 'sh', ['-c', script, 'sh', ...a]).then(() => true, () => false)
 // the worktree as a tree, untracked files too (turns.ts' turns, verify.ts' Done check; Ship's, fresh: the index as it is
-// now, as git add -A would start from, what you staged by hand or took out included)
+// now, as git add -A would start from, what you staged by hand or took out included; a host's worktree: Ship's only)
 export function treeOf(ws: Workspace, fresh = false) {
   const run1 = async () => {
-    mkdirSync(turnDir, { recursive: true, mode: 0o700 })
-    const idx = join(turnDir, `${ws.id}.index`)
-    const env = { ...process.env, GIT_INDEX_FILE: idx }
-    if (fresh || !existsSync(idx))
+    const idx = await turnIndex(ws)
+    const gi = (...args: string[]) => gAt(ws, idx, args)
+    if (ws.host) await shOk(ws, 'mkdir -p "$1" && chmod 700 "$1"', dirname(idx))
+    else mkdirSync(turnDir, { recursive: true, mode: 0o700 })
+    if (fresh || !(ws.host ? await shOk(ws, '[ -e "$1" ]', idx) : existsSync(idx)))
       try {
-        copyFileSync(resolve(ws.path, (await g(ws, ['rev-parse', '--git-path', 'index'])).trim()), idx) // its stat data: add -A hashes only what changed
+        const src = resolve(ws.path, await git(ws, 'rev-parse', '--git-path', 'index')) // its stat data: add -A hashes only what changed (not gi: --git-path index would be Laki's)
+        if (!ws.host) copyFileSync(src, idx)
+        else if (!(await shOk(ws, 'cp "$1" "$2"', src, idx))) throw new Error('no index')
       } catch {
-        await g(ws, ['read-tree', 'HEAD'], env).catch(() => {}) // a repo with no commit yet: none
+        await gi('read-tree', 'HEAD').catch(() => {}) // a repo with no commit yet: none
       }
     // a gitlink: add -A runs git status in it, under its config (core.ts' noNested), and takes no flag against it. Off
     // this index (Laki's, the agent can't touch it), add -A takes the folder back by its HEAD alone
-    const links = (await g(ws, ['ls-files', '-s', '-z'], env)).split('\0').filter(l => l.startsWith('160000 ')).map(l => ({ sha: l.split(' ')[1], path: l.slice(l.indexOf('\t') + 1) }))
-    if (links.length) await g(ws, ['update-index', '--force-remove', '--', ...links.map(l => l.path)], env)
-    await g(ws, ['add', '-A'], env)
+    const links = (await gi('ls-files', '-s', '-z')).split('\0').filter(l => l.startsWith('160000 ')).map(l => ({ sha: l.split(' ')[1], path: l.slice(l.indexOf('\t') + 1) }))
+    if (links.length) await gi('update-index', '--force-remove', '--', ...links.map(l => l.path))
+    await gi('add', '-A')
     // a submodule never checked out (an empty folder, as git worktree add leaves it): nothing for add -A to take back
-    for (const l of links) if (emptyDir(join(ws.path, l.path))) await g(ws, ['update-index', '--add', '--cacheinfo', `160000,${l.sha},${l.path}`], env)
-    return (await g(ws, ['write-tree'], env)).trim()
+    for (const l of links) if (ws.host ? await shOk(ws, '[ -d "$1" ] && [ -z "$(ls -A "$1")" ]', l.path) : emptyDir(join(ws.path, l.path))) await gi('update-index', '--add', '--cacheinfo', `160000,${l.sha},${l.path}`)
+    return (await gi('write-tree')).trim()
   }
   const p = (lines.get(ws.id) ?? Promise.resolve()).then(run1, run1)
   lines.set(ws.id, p.catch(() => {}))
