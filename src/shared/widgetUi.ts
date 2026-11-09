@@ -669,8 +669,8 @@ const itemsOf = (e: El, s: S): [El, S][] => (Array.isArray(e.items) ? e.items.fi
 const STEP: [RegExp, string][] = [
   [/^(done|passed|pass|success|succeeded|ok|complete|completed|finished|shipped)$/i, 'done'],
   [/^(running|current|active|in.progress|doing|building|deploying|started)$/i, 'now'],
-  [/^(failed|failing|fail|failure|error|errored|broken|cancell?ed|timed.out)$/i, 'fail'],
-  [/^(skipped|skip|n\/a)$/i, 'skip'],
+  [/^(failed|failing|fail|failure|error|errored|broken|timed.out)$/i, 'fail'],
+  [/^(skipped|skip|cancell?ed|n\/a)$/i, 'skip'],
 ]
 // a log line's level: its word, else read off the line
 const LEVEL: [RegExp, Tone][] = [

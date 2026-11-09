@@ -839,7 +839,7 @@ line, after the tab restarts.
   labels, a click puts one on or takes it off (as you, by `gh pr edit`; Info's PR has it too); *Merge* ▾, *Approve*,
   GitHub and ⋯; its description,
   rendered, a few lines of it until *Show more*; its checks, failing first, each with how long it ran and a click to its
-  page on GitHub; a failing GitHub Actions check has *Log*: the last 80 lines of its failed steps, each step named,
+  page on GitHub (a cancelled one is grey: not a failure, and not a pass, so *Merge when green* waits for a re-run or a push); a failing GitHub Actions check has *Log*: the last 80 lines of its failed steps, each step named,
   with *Send to the agent* (that check only), *Copy* and *Open on GitHub* (Info's PR has it too); *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
   agent would get), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.

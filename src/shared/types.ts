@@ -888,7 +888,7 @@ export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[];
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
-export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds, a finished one's
+export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip' | 'cancelled'; url?: string; took?: number } // took: seconds, a finished one's
 
 // a GitHub label: color as GitHub keeps it, 6 hex digits (none: anything else)
 export type PRLabel = { name: string; color?: string; description?: string }
@@ -899,7 +899,7 @@ export type PR = {
   number: number
   state: string
   url: string
-  checks: '' | 'pass' | 'fail' | 'pending'
+  checks: '' | 'pass' | 'fail' | 'pending' | 'cancelled'
   list?: Check[]
   title?: string
   author?: string

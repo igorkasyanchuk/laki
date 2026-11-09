@@ -52,6 +52,21 @@ test('GitLab: a gitlab.com project’s MR by glab (its pipeline’s jobs as chec
   await until(async () => !(await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr, 'no MR')
 })
 
+test('GitLab: a canceled job is cancelled, never a pass', async t => {
+  const rig = await fresh(t)
+  execFileSync('git', ['remote', 'add', 'origin', 'git@gitlab.com:o/repo.git'], { cwd: rig.repo })
+  const lab = join(rig.home, 'glab')
+  mkdirSync(lab)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  writeFileSync(join(lab, `mr-${ws.branch.replaceAll('/', '-')}.json`), JSON.stringify({ iid: 12, state: 'opened', web_url: 'https://gitlab.com/o/repo/-/merge_requests/12', title: 'x', author: { username: 'ann' }, sha: 'abc', target_branch: 'main', head_pipeline: { id: 44 } }))
+  writeFileSync(join(lab, 'jobs-44.json'), JSON.stringify([{ name: 'lint', status: 'success' }, { name: 'test', status: 'canceled' }]))
+  await rig.rpc('prRefresh', {})
+  const pr = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr, 'its MR')
+  assert.equal(pr.checks, 'cancelled')
+  assert.deepEqual(pr.list.map((c: any) => `${c.name} ${c.state}`), ['lint pass', 'test cancelled'])
+})
+
 test('GitLab: Ship pushes and opens the MR with glab; an issue by number and the # list by glab; a self-hosted GitLab when glab is signed in to it, else gh as before', async t => {
   const rig = await fresh(t)
   const remote = join(rig.home, 'remote.git')

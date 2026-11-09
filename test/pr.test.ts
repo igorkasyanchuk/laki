@@ -255,6 +255,43 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   c.close()
 })
 
+test('cancelled checks: their own state, under fail and pending, a re-run replaces one cancelled before it started, and nothing goes to the agent', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const at = '2026-10-06T10:00:00Z'
+  const run = (name: string, conclusion: string, startedAt?: string) => ({ __typename: 'CheckRun', name, workflowName: 'CI', status: conclusion ? 'COMPLETED' : 'QUEUED', conclusion, startedAt })
+  const rollup = (list: object[]) => writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 5, state: 'OPEN', url: 'https://example.invalid/pr/5', headRefOid: 'abc', statusCheckRollup: list }))
+  const ok = run('build', 'SUCCESS', at)
+  const gone = run('test', 'CANCELLED', at)
+  rollup([ok, gone])
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const pr = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr
+  const scan = async (list: object[]) => (rollup(list), await rig.rpc('prRefresh'), pr())
+  assert.equal((await until(pr, 'PR scanned')).checks, 'cancelled')
+
+  const failed = await scan([ok, gone, run('lint', 'FAILURE', at)])
+  assert.equal(failed.checks, 'fail')
+  assert.deepEqual(failed.list.filter((c: any) => c.state === 'fail').map((c: any) => c.name), ['lint'], 'only the real one fails')
+  assert.equal((await scan([gone, run('lint', '')])).checks, 'pending')
+  for (const start of ['0001-01-01T00:00:00Z', undefined]) {
+    const early = run('test', 'CANCELLED', start)
+    const again = run('test', 'SUCCESS', '2026-10-06T10:05:00Z')
+    for (const list of [[early, again], [again, early]]) assert.equal((await scan(list)).checks, 'pass', String(start))
+  }
+
+  rollup([ok, gone])
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  await rig.rpc('wsSet', { id: ws.id, autoFix: true })
+  await until(async () => (await rig.rpc('state')).workspaces[0].fix?.pr === 5, 'a scan')
+  await rig.rpc('prRefresh')
+  assert.deepEqual((await rig.rpc('state')).workspaces[0].fix, { pr: 5 }, 'no try recorded')
+  assert.ok(!readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr checks'), 'gh pr checks not called')
+  assert.equal((await rig.tab(ws.id)).status, 'idle', 'nothing typed to it')
+})
+
 test('development mode: a workspace log of PR scans, what the switches did and why not, turns', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

@@ -307,6 +307,7 @@ test('PR scans: fields and the dev log, autoFix waiting, merge when green step b
   const waits: [object, string][] = [
     [{ isDraft: true }, 'a draft'],
     [{ statusCheckRollup: [check('test', '')] }, 'checks pending'],
+    [{ statusCheckRollup: [check('test', 'CANCELLED')] }, 'checks cancelled'],
     [{ statusCheckRollup: [] }, 'checks none yet'],
     [{ mergeable: 'CONFLICTING' }, 'conflicts'],
     [{ mergeable: 'UNKNOWN' }, 'GitHub is still working out whether it merges'],

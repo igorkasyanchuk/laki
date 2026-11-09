@@ -86,13 +86,15 @@ export function prSoon(ws: string) {
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)
 function checkOf(c: any): Check {
   const s = String(c.conclusion || c.state || '').toUpperCase()
-  const state: Check['state'] = ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(s)
-    ? 'fail'
-    : (c.status && c.status !== 'COMPLETED') || s === 'PENDING' || s === 'EXPECTED'
-      ? 'pending'
-      : ['SKIPPED', 'NEUTRAL', 'STALE'].includes(s)
-        ? 'skip'
-        : 'pass'
+  const state: Check['state'] = s === 'CANCELLED'
+    ? 'cancelled'
+    : ['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(s)
+      ? 'fail'
+      : (c.status && c.status !== 'COMPLETED') || s === 'PENDING' || s === 'EXPECTED'
+        ? 'pending'
+        : ['SKIPPED', 'NEUTRAL', 'STALE'].includes(s)
+          ? 'skip'
+          : 'pass'
   const took = Math.round((checkTime(c.completedAt) - checkTime(c.startedAt)) / 1000)
   return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined, took: took > 0 && state !== 'pending' ? took : undefined }
 }
@@ -100,9 +102,12 @@ function checkOf(c: any): Check {
 const checkTime = (t: unknown) => (typeof t === 'string' && !t.startsWith('0001') ? Date.parse(t) : NaN)
 
 // the newest run of each check: a re-run leaves the old one in statusCheckRollup (gh pr checks drops it too), so a
-// fixed check would read as failing; one not started yet (no time, or Go's zero time) is the newest
+// fixed check would read as failing; one not finished and not started yet (no time, or Go's zero time) is the newest. A
+// finished one goes by when it really ran (its start, else its end, else the oldest): cancelled before it started, it
+// never beats the run that replaced it
 function newest(rollup: any[]): any[] {
-  const at = (c: any) => (!c.startedAt || String(c.startedAt).startsWith('0001') ? '9' : String(c.startedAt))
+  const real = (t: unknown) => (t && !String(t).startsWith('0001') ? String(t) : '')
+  const at = (c: any) => (c.status === 'COMPLETED' ? real(c.startedAt) || real(c.completedAt) : real(c.startedAt) || '9')
   const by = new Map<string, any>()
   for (const c of rollup) {
     const k = `${c.workflowName ?? ''}/${c.name || c.context || ''}`
@@ -112,9 +117,9 @@ function newest(rollup: any[]): any[] {
   return [...by.values()]
 }
 
-// all of a PR's checks in one word: fail if any failed, else pending if any runs, else pass
+// all of a PR's checks in one word: fail if any failed, else pending if any runs, else cancelled if any was, else pass
 const checksOf = (list: Check[]): PR['checks'] =>
-  !list.length ? '' : list.some(c => c.state === 'fail') ? 'fail' : list.some(c => c.state === 'pending') ? 'pending' : 'pass'
+  !list.length ? '' : list.some(c => c.state === 'fail') ? 'fail' : list.some(c => c.state === 'pending') ? 'pending' : list.some(c => c.state === 'cancelled') ? 'cancelled' : 'pass'
 
 // the timer's scan (every minute): once settings.prScan minutes have gone by (a little early: the timer drifts)
 let prLast = 0

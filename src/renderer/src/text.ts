@@ -593,7 +593,7 @@ export function rowFact(w: { branch?: string; base?: string; pr?: PR; stat?: Sta
     const stat = w.stat && (w.stat.add || w.stat.del) ? `+${w.stat.add} −${w.stat.del}` : ''
     return { kind: 'done', text: [ROW_WORDS.done, stat, ROW_WORDS.unseen].filter(Boolean).join(' · '), tone: 'done' }
   }
-  if (pr && !pr.draft && pr.checks !== 'pending' && (pr.review === 'APPROVED' || (!pr.review && !!pr.approved?.length))) return { kind: 'ready', text: ROW_WORDS.ready, tone: 'done' }
+  if (pr && !pr.draft && pr.checks !== 'pending' && pr.checks !== 'cancelled' && (pr.review === 'APPROVED' || (!pr.review && !!pr.approved?.length))) return { kind: 'ready', text: ROW_WORDS.ready, tone: 'done' }
   if (w.pending) return { kind: 'later', text: pendingWords(w.pending), tone: w.pending.failed ? 'error' : 'muted' }
   return { kind: 'branch', text: w.branch || 'folder', tone: 'muted' }
 }

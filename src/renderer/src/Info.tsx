@@ -8,13 +8,13 @@ import { prName, prNo, shortPath } from './text'
 import { type Tunnel } from './Tunnel'
 import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
-export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds (an older daemon: none)
+export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip' | 'cancelled'; url?: string; took?: number } // took: seconds (an older daemon: none)
 export type PRInfo = {
   number: number
   forge?: 'gitlab' // a GitLab MR: !n, no PR switches (GitHub's only)
   state: string // OPEN, MERGED, CLOSED
   url: string
-  checks: '' | 'pass' | 'fail' | 'pending'
+  checks: '' | 'pass' | 'fail' | 'pending' | 'cancelled'
   list?: Check[]
   title?: string
   author?: string
@@ -78,6 +78,7 @@ export function ciText(pr: PRInfo, bare = false) {
   const mark = (g: string, s: string) => (bare ? s : s ? `${g} ${s}` : g)
   if (pr.checks === 'fail') return mark('✗', `${some('fail')}failing`)
   if (pr.checks === 'pending') return mark('…', `${some('pending')}running`)
+  if (pr.checks === 'cancelled') return mark('⊘', `${some('cancelled')}cancelled`)
   if (pr.checks === 'pass') return mark('✓', n() ? `${n('pass')}/${n()}` : '')
   return 'no checks'
 }
@@ -276,8 +277,9 @@ export const refLabel = (url: string) => {
 const CK: Record<Check['state'], { order: number; word: string; icon: IconName }> = {
   fail: { order: 0, word: 'failing', icon: 'x' },
   pending: { order: 1, word: 'running', icon: 'unread' },
-  pass: { order: 2, word: 'passing', icon: 'check' },
-  skip: { order: 3, word: 'skipped', icon: 'minus' },
+  cancelled: { order: 2, word: 'cancelled', icon: 'stopCircle' },
+  pass: { order: 3, word: 'passing', icon: 'check' },
+  skip: { order: 4, word: 'skipped', icon: 'minus' },
 }
 const took = (s: number) => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor(s / 60) % 60}m`)
 
@@ -290,7 +292,7 @@ function Checks({ pr, onOpen, onLog }: { pr: PRInfo; onOpen: (url: string) => vo
       <h4>
         Checks
         <span className="pr-sum">
-          {(['fail', 'pending', 'pass', 'skip'] as const).map(s => count(s) > 0 && <span key={s} className={`ck-${s}`}>{`${count(s)} ${CK[s].word}`}</span>)}
+          {(['fail', 'pending', 'cancelled', 'pass', 'skip'] as const).map(s => count(s) > 0 && <span key={s} className={`ck-${s}`}>{`${count(s)} ${CK[s].word}`}</span>)}
         </span>
       </h4>
       {!list.length && <span className="muted small">No checks</span>}
@@ -343,10 +345,12 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, o
         ? 'checks failing'
         : pr.checks === 'pending'
           ? 'checks running'
-          : pr.review === 'CHANGES_REQUESTED'
-            ? 'changes requested'
-            : pr.ready === false
-              ? 'GitHub would not merge it yet'
+          : pr.checks === 'cancelled'
+            ? 'checks cancelled'
+            : pr.review === 'CHANGES_REQUESTED'
+              ? 'changes requested'
+              : pr.ready === false
+                ? 'GitHub would not merge it yet'
               : ''
   const more: MenuItem[] = !pr
     ? []

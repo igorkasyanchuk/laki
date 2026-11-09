@@ -21,6 +21,7 @@ test('nextStep: what waits for you comes first, then what broke, then what moves
   assert.equal(id(ws({ pr: pr({ checks: 'fail' }) })), 'ci')
   assert.equal(id(ws({ pr: pr({ review: 'CHANGES_REQUESTED' }) })), 'review')
   assert.equal(id(ws({ pr: pr({ checks: 'pending' }) })), 'wait')
+  assert.equal(id(ws({ pr: pr({ checks: 'cancelled' }) })), 'wait') // never Merge: they didn't pass
   assert.equal(id(ws({ pr: pr() })), 'merge')
   assert.equal(id(ws({ pr: pr() }), [], { merge: false }), 'wait') // the project doesn't let the app merge
   assert.equal(id(ws({ pr: pr({ review: 'REVIEW_REQUIRED' }) })), 'wait')

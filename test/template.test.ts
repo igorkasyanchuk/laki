@@ -368,6 +368,7 @@ test("the Words sidebar style: a row's one fact, the first that applies; its PR 
   assert.deepEqual([run.text, run.since, run.note, run.tone], ['Working', 5, 'writing tests', 'running'])
   assert.equal(rowFact({ ...w, stat: { add: 38, del: 4, files: 2, dirty: 2 } }, [tab({ done: true })]).text, 'Done · +38 −4 · not looked at')
   assert.equal(rowFact({ ...w, pr: pr({ review: 'APPROVED' }) }, []).text, 'Ready to merge')
+  assert.equal(rowFact({ ...w, pr: pr({ review: 'APPROVED', checks: 'cancelled' }) }, []).kind, 'branch') // cancelled isn't ready
   assert.deepEqual(rowFact(w, [tab({})]), { kind: 'branch', text: 'laki/cart', tone: 'muted' })
   assert.equal(rowFact({ ...w, pr: pr({ state: 'MERGED', checks: 'fail' }) }, []).kind, 'branch') // a merged PR's checks aren't news
   assert.equal(rowFact(w, [tab({ kind: 'shell', status: 'waiting' })]).kind, 'branch') // a shell isn't an agent asking

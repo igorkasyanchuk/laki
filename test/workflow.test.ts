@@ -864,6 +864,22 @@ test('workflow failures: a wait on real PR checks (fail with their names, not tw
   assert.match(r.decisions.at(-1).why, /stopped$/)
 })
 
+test('a wait on checks stays put on cancelled ones: neither way out, so no agent is sent to fix nothing', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'h1', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'CANCELLED', detailsUrl: 'https://ci.invalid/1' }] }))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'checks', text: CHECKS })
+  const run = await rig.rpc('flowStart', { workflow: 'checks', project: p.id, task: 'ci' })
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === run.ws)?.pr?.checks === 'cancelled', 'PR scanned')
+  for (let i = 0; i < 4; i++) await rig.rpc('flowTick', {}), await sleep(200)
+  const r = await rig.rpc('flowGet', { id: run.id })
+  assert.deepEqual([r.status, r.cur, r.decisions.map((d: any) => `${d.block}:${d.exit}`)], ['running', 'wait', ['start:next']])
+  await rig.rpc('flowStop', { id: run.id })
+})
+
 test("a failed wait gives the agent after it the failed checks' logs: {{steps.<id>.log}}, fetched once per head; no log, empty and said", async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

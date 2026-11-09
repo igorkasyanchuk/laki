@@ -26,6 +26,7 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   if (pr?.checks === 'fail') return { id: 'ci', label: 'Fix CI', tip: `#${pr.number}'s failing checks, sent to the agent`, tone: 'bad' }
   if (pr?.review === 'CHANGES_REQUESTED') return { id: 'review', label: 'Address the review', tip: `Changes asked for on #${pr.number}${pr.changes?.length ? ` by ${pr.changes.join(', ')}` : ''}: its comments, sent to the agent`, tone: 'bad' }
   if (pr?.checks === 'pending') return { id: 'wait', label: 'CI runs', tip: `#${pr.number}'s checks are running`, busy: true }
+  if (pr?.checks === 'cancelled') return { id: 'wait', label: 'Checks cancelled', tip: `#${pr.number}: run them again on ${pr.forge === 'gitlab' ? 'GitLab' : 'GitHub'}, or push`, busy: true }
   if (pr && pr.draft) return { id: 'wait', label: 'Draft PR', tip: `#${pr.number} is a draft`, busy: true }
   if (pr && pr.ready !== false && pr.review !== 'REVIEW_REQUIRED' && o.merge) return { id: 'merge', label: `Merge #${pr.number}`, tip: `${pr.title ?? ''}${pr.title ? ': ' : ''}${pr.checks ? 'checks pass' : 'no checks'}, no conflicts`, tone: 'go' }
   if (pr) return { id: 'wait', label: 'In review', tip: `#${pr.number} waits for its reviews`, busy: true }

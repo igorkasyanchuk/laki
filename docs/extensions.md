@@ -161,7 +161,7 @@ Laki keeps them current. When one of them changes, it fetches again (one with no
 
 | fact | what |
 |---|---|
-| `pr` | its PR, or null: `number`, `url`, `title`, `description`, `author`, `state` (OPEN, MERGED, CLOSED), `draft`, `checks` (pass, fail, pending or empty), `review`, `approved` and `changes` (logins), `conflict`, `base`, `additions`, `deletions`, `labels` |
+| `pr` | its PR, or null: `number`, `url`, `title`, `description`, `author`, `state` (OPEN, MERGED, CLOSED), `draft`, `checks` (pass, fail, pending, cancelled or empty), `review`, `approved` and `changes` (logins), `conflict`, `base`, `additions`, `deletions`, `labels` |
 | `stat` | its changes against its base, counted, or null: `files`, `add`, `del`, `dirty` |
 | `changed_files` | each changed file, new ones too: `path`, `status` (M or A), `add`, `del` (500 at most) |
 | `diff` | the diff against its base as git writes it, 32 KB at most |

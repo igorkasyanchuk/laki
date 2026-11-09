@@ -1212,6 +1212,7 @@ function waitTick(r: FlowRun, b: Block, now: number) {
   const seen = r.vars[`steps.${b.id}.head`]
   if (pr.checks === 'fail' && pr.head && pr.head === seen) return // the commit it failed on before: the fix's push isn't scanned yet
   if (pr.checks === 'pass' || (pr.checks === '' && now - (r.at ?? now) > 120000)) return leave(r, b, 'pass', pr.checks ? `PR #${pr.number}'s checks pass` : `PR #${pr.number} has no checks`)
+  // cancelled: neither way out, on purpose. It waits for a re-run or a push, then times out: leaving by fail would send an agent to fix nothing
   if (pr.checks === 'fail') {
     const bad = (pr.list ?? []).filter(c => c.state === 'fail')
     r.vars[`steps.${b.id}.output`] = bad.map(c => `${c.name}${c.url ? ` ${c.url}` : ''}`).join('\n') || 'checks fail'

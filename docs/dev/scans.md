@@ -160,7 +160,7 @@
   moved it off); a scheduled run's local workspace's at its
   turn's end (scans skip local ones; the project's lasting local one would keep the first PR named). Each check has `took`, a finished one's seconds (`completedAt` − `startedAt`). The checks are
   `newest`'s: statusCheckRollup keeps a re-run's old run, so each check (workflow and name) counts by its latest
-  `startedAt` (none, or Go's zero time: queued, the newest), as `gh pr checks` does. The primary PR: a worktree's guessed
+  `startedAt` (none, or Go's zero time: queued, the newest; finished, `status` COMPLETED: by its start, else its `completedAt`, else the oldest, so one cancelled before it started never beats its re-run), as `gh pr checks` does. A cancelled check (GitHub's `CANCELLED`, GitLab's `canceled`) is `cancelled`, not a failure and never a pass; `checksOf`: fail, then pending, then cancelled, then pass. No failure event, no Fix CI, no Merge when green; a workflow's Wait stays put (a re-run or a push, else its timeout). The primary PR: a worktree's guessed
   `prUrl` (`prSaid`: its prompt's, `guessed` in `fromPRLink`, or its agent's; never one attached or asked for with `link`)
   gives way to its branch's own once the branch is on a remote (`onRemote`, `git for-each-ref refs/remotes/*/<branch>`:
   no gh call for a branch nobody pushed), then `gh pr view <branch>`: that one is followed, the other `related` (the

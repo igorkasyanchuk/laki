@@ -76,7 +76,7 @@ test('events: a PR\'s checks failing and its merge, once per head; nothing repla
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
   const pr = (head: string, state: string, conclusion: string) =>
-    writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state, url: 'https://github.com/o/r/pull/7', title: 'Fix it', headRefOid: head, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion, detailsUrl: 'https://ci.invalid/1' }] }))
+    writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state, url: 'https://github.com/o/r/pull/7', title: 'Fix it', headRefOid: head, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion, detailsUrl: 'https://ci.invalid/1' }, ...(conclusion === 'FAILURE' ? [{ __typename: 'CheckRun', name: 'build', status: 'COMPLETED', conclusion: 'CANCELLED' }] : [])] })) // cancelled: never in failing
   pr('aaa', 'OPEN', 'FAILURE')
   make(rig, 'prs', { name: 'PRs', on: { 'pr.checks.failed': 'log', 'pr.merged': 'log', 'pr.checks.passed': 'log' }, actions: { log: `node -e 'const e = JSON.parse(require("fs").readFileSync(0, "utf8")); console.log(e.event, e.pr.number, (e.failing || []).map(f => f.name).join())' >> "${home}/pr.log"` } })
   await on(rig, 'prs')

@@ -50,8 +50,8 @@ export function glabSays(e: any, what: string) {
 const glab = (at: At, args: string[], timeout = 30000) => exec(at, 'glab', args, { timeout }).then(r => String(r.stdout))
 
 // a pipeline job's status as a check's: success passes; failed fails; running, pending, created (and the waits) are
-// pending; skipped, manual and canceled are skipped
-const JOB: Record<string, Check['state']> = { success: 'pass', failed: 'fail', running: 'pending', pending: 'pending', created: 'pending', preparing: 'pending', waiting_for_resource: 'pending', scheduled: 'pending', skipped: 'skip', manual: 'skip', canceled: 'skip' }
+// pending; skipped and manual are skipped; canceled is cancelled (never a pass: Merge when green needs one)
+const JOB: Record<string, Check['state']> = { success: 'pass', failed: 'fail', running: 'pending', pending: 'pending', created: 'pending', preparing: 'pending', waiting_for_resource: 'pending', scheduled: 'pending', skipped: 'skip', manual: 'skip', canceled: 'cancelled' }
 export const jobsOf = (jobs: any[]): Check[] => (Array.isArray(jobs) ? jobs : []).map(j => ({ name: String(j?.name ?? '?'), state: JOB[String(j?.status)] ?? 'pending', ...(typeof j?.web_url === 'string' && { url: j.web_url }), ...(typeof j?.duration === 'number' && { took: Math.round(j.duration) }) }))
 const STATE: Record<string, string> = { opened: 'OPEN', merged: 'MERGED', closed: 'CLOSED', locked: 'CLOSED' }
 

@@ -1256,6 +1256,7 @@ kbd { font-family: var(--mono); }
 .ck-fail { --ck: var(--error); }
 .ck-pending { --ck: var(--waiting); }
 .ck-skip { --ck: var(--muted); }
+.ck-cancelled { --ck: var(--muted); }
 .pr-check .icon-svg, .pr-sum > span { color: var(--ck); }
 .pr-check.ck-skip { color: var(--muted); }
 .pr-fix { display: flex; align-items: center; gap: 8px; min-height: 24px; }
@@ -2428,7 +2429,7 @@ button.board-name:hover { background: none; }
 .board-last { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .board-pr { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); } /* the PR's mark in its state's colors (.ws-pr), its checks and conflicts in theirs: failing red, as everywhere */
 .board-pr { flex-wrap: wrap; } .board-pr > span { white-space: nowrap; }
-.board-pr .ci-fail { color: var(--error); } .board-pr .ci-pass { color: var(--done); } .board-pr .ci-pending { color: var(--waiting); }
+.board-pr .ci-fail { color: var(--error); } .board-pr .ci-pass { color: var(--done); } .board-pr .ci-pending { color: var(--waiting); } .board-pr .ci-cancelled { color: var(--muted); }
 .board-add.nw-card { flex: none; background: var(--bg); }
 .board-add.nw-card.nw-composer textarea { resize: none; field-sizing: content; min-height: 64px; max-height: 12em; padding: 10px 12px 4px; font: inherit; font-size: 13px; }
 .board-add .prompt-images { padding: 4px 12px 6px; }
@@ -2626,7 +2627,7 @@ button.board-name:hover { background: none; }
 .wp-pr-state { flex: none; padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; font-size: 10.5px; line-height: 15px; color: var(--done); }
 .wp-pr-state.draft { color: var(--muted); } .wp-pr-state.merged { color: var(--tc-purple); } .wp-pr-state.closed { color: var(--error); }
 .wp-pr-meta { display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--muted); font-size: 11px; }
-.wp-pr-meta .ci-fail { color: var(--error); } .wp-pr-meta .ci-pass { color: var(--done); } .wp-pr-meta .ci-pending { color: var(--waiting); }
+.wp-pr-meta .ci-fail { color: var(--error); } .wp-pr-meta .ci-pass { color: var(--done); } .wp-pr-meta .ci-pending { color: var(--waiting); } .wp-pr-meta .ci-cancelled { color: var(--muted); }
 .wp-line { color: var(--muted); font-size: 11px; }
 .pr-peek { font: 12px/1.35 var(--ui-font); white-space: normal; text-align: left; } /* the status bar PR's card: not the bar's mono */
 .wp-acts { display: flex; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }

@@ -2566,6 +2566,7 @@ export function App() {
     : pr.checks === 'fail' ? { tone: 'bad', text: 'Its checks fail' }
     : pr.review === 'CHANGES_REQUESTED' ? { tone: 'bad', text: 'Changes were asked for' }
     : pr.checks === 'pending' ? { tone: 'warn', text: 'Its checks still run' }
+    : pr.checks === 'cancelled' ? { tone: 'warn', text: 'Its checks were cancelled' }
     : pr.draft || pr.ready === false ? { tone: 'warn', text: pr.draft ? 'Still a draft' : "GitHub wouldn't merge it now" }
     : pr.review === 'REVIEW_REQUIRED' ? { tone: 'warn', text: 'A review is required first' }
     : !pr.checks ? { tone: 'warn', text: 'No checks ran on it: nothing tested it' }

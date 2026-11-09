@@ -101,7 +101,7 @@ export const TOOL_ASKS = ['always', 'first', 'never'] as const
 // are and fetches it again when one of them changes; templates and ui {{facts.pr.title}}, its fetch and actions
 // $LAKI_FACTS (JSON), a script's facts, an AI prompt's {{facts.…}}
 export const FACTS = {
-  pr: 'its PR, or null: { number, url, title, description, author, state (OPEN, MERGED, CLOSED), draft, checks (pass, fail, pending or ""), review (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED or ""), approved, changes (logins), conflict, base, additions, deletions, labels (names) }',
+  pr: 'its PR, or null: { number, url, title, description, author, state (OPEN, MERGED, CLOSED), draft, checks (pass, fail, pending, cancelled or ""), review (APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED or ""), approved, changes (logins), conflict, base, additions, deletions, labels (names) }',
   stat: 'its changes against its base, counted, or null: { files, add, del, dirty }',
   changed_files: 'each changed file, new ones too: [{ path, status (M changed, A new), add, del }], 500 at most',
   diff: 'the diff against its base as git writes it, 32 KB at most (then "… (cut)")',
