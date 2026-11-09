@@ -97,7 +97,7 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
     else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && waiting && t.ask?.steps && api.keys) e.preventDefault(), api.keys(t, e.key === 'ArrowLeft' ? '\x1b[D' : '\x1b[C') // its other questions
     else if (e.key === 'Enter') e.preventDefault(), api.open(t)
   }
-  const last = t.last?.trim().split('\n').find(l => l.trim())?.trim()
+  const last = t.failed ?? t.last?.trim().split('\n').find(l => l.trim())?.trim()
   const stat = w.stat && (w.stat.add > 0 || w.stat.del > 0) ? w.stat : undefined
   const changed = w.stat ? w.stat.files > 0 || w.stat.dirty > 0 : t.kind === 'agent' && !t.runs // no scan yet: a shell (or an agent typed in one) has none to show
   return (
@@ -149,10 +149,10 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
               </span>
             )}
             <span className="spacer" />
-            {!!w.branch && changed && <button onClick={() => api.review(t)}>Review</button>}
+            {!t.failed && !!w.branch && changed && <button onClick={() => api.review(t)}>Review</button>}
             {t.failed && <button className="on" data-tip={t.failed} onClick={() => api.keep(t)}>Continue</button>}
             {t.failed && <button onClick={() => api.dismiss(t)}>Dismiss</button>}
-            <button onClick={() => api.seen(t)}>Seen</button>
+            {!t.failed && <button onClick={() => api.seen(t)}>Seen</button>}
           </div>
         </>
       )}
