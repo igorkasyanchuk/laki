@@ -21,6 +21,7 @@ export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording &&
 export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   const w = state.settings?.webhook
   const ws = state.workspaces.find(x => x.id === tab.workspace)
+  if ((state.dnd?.until ?? 0) > Date.now() && !(kind === 'waiting' && ws?.important)) return // U8: Do not disturb: an important workspace's ask only
   if (!w?.url?.trim() || (kind === 'waiting' ? w.waiting === false : w.done !== true) || pushed.get(tab.id) === kind || tab.muted || ws?.muted || hidden(ws)) return
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something

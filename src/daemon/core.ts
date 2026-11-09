@@ -685,6 +685,7 @@ export function view(): View {
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
     ...(diskFull && { diskFull }),
+    ...(dndOn() && { dnd: { until: state.dnd!.until } }), // U8
     caps: CAPS,
     built: BUILT,
     today: todayView(),
@@ -3325,6 +3326,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       r.limit = undefined
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
+      dndNote(tab, 'wait', text)
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
       phone(tab, 'waiting', text)
       setTimeout(() => {
@@ -3490,6 +3492,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
       return { tab: tab.id, sent: true, steered: true }
     }
     if (r.status !== 'idle' || r.limit || tab.queue?.length) {
+      if (!tab.queue?.length) delete tab.queueHeld // a new queue: not held by an old Stop all
       tab.queue = [...(tab.queue ?? []), p.text]
       save()
       changed()
@@ -3506,7 +3509,7 @@ function deliver(id: string) {
   const tab = state.tabs.find(t => t.id === id)
   const s = sessions.get(id)
   const r = rt.get(id)
-  if (!tab?.queue?.length || !s || s.exited || r?.status !== 'idle' || r.limit) return false
+  if (!tab?.queue?.length || tab.queueHeld || !s || s.exited || r?.status !== 'idle' || r.limit) return false
   const msg = tab.queue.shift()!
   if (!tab.queue.length) delete tab.queue
   save()
@@ -3517,9 +3520,83 @@ function deliver(id: string) {
   return true
 }
 
+// U8: Stop all agents (⌘K, the menu): each agent turn under way gets its own interrupt key (Esc, as a long turn's Stop
+// does), nothing is killed; what was queued for it stays, held (queueHeld) until its Resume queue
+export function stopAll() {
+  const tabs = state.tabs.filter(t => t.kind === 'agent' && rt.get(t.id)?.status === 'running' && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+  for (const t of tabs) {
+    if (t.queue?.length) t.queueHeld = true
+    input(t.id, '\x1b')
+  }
+  if (tabs.length) save(), changed()
+  log(`stop all: ${tabs.map(t => t.id).join(', ') || 'none running'}`)
+  return { stopped: tabs.map(t => t.id) }
+}
+export function queueResume(target: string) {
+  const tab = resolveTarget(target)
+  delete tab.queueHeld
+  save()
+  changed()
+  deliver(tab.id)
+  return { tab: tab.id, queued: tab.queue?.length ?? 0 }
+}
+
+// U8: Do not disturb (state.dnd: until when, the PRs as it began, what ended or asked meanwhile). While on, the window
+// notifies nothing (the view's dnd: api.ts notify) and no phone push goes (phone.ts), but an important workspace's ask.
+// As it ends (dndTick, or End now): one notice in Laki's window, the digest, from what the daemon has; no model
+export const dndOn = () => (state.dnd?.until ?? 0) > Date.now()
+const prSnap = () => Object.fromEntries(state.workspaces.filter(w => !w.archived && prs.get(w.id)).map(w => [w.id, `${prs.get(w.id)!.state}:${prs.get(w.id)!.checks ?? ''}`]))
+const DND_LOG = 200
+function dndNote(tab: Tab, kind: 'done' | 'wait', text: string) {
+  if (!dndOn() || !tracked(tab)) return
+  const line = text.split('\n').find(l => l.trim())?.trim().slice(0, 140) ?? ''
+  state.dnd!.log = [...state.dnd!.log.filter(x => x.tab !== tab.id || x.kind !== kind), { kind, tab: tab.id, text: line }].slice(-DND_LOG) // a tab's last of each
+}
+turnEnds.add((tab, o) => void (o.limit || dndNote(tab, 'done', o.failed ? `stopped: ${o.last ?? ''}` : (o.last ?? ''))))
+export function dndSet(o: { minutes?: unknown; until?: unknown; off?: unknown }) {
+  if (o.off) return dndEnd()
+  const until = typeof o.until === 'number' ? o.until : Date.now() + Math.max(1, Math.min(24 * 60, Number(o.minutes) || 30)) * 60_000
+  if (!(until > Date.now()) || until > Date.now() + 7 * 864e5) throw new Error('until when? 30 minutes, an hour, or a time in the next week')
+  state.dnd = { since: state.dnd?.since ?? Date.now(), until, prs: state.dnd?.prs ?? prSnap(), log: state.dnd?.log ?? [] }
+  save()
+  changed()
+  return { until }
+}
+// what happened meanwhile, in lines: the turns that ended (their first line), the tabs that wait still, the PRs that moved
+export function dndDigest(d: NonNullable<State['dnd']>) {
+  const name = (id: string) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : ''))(state.tabs.find(t => t.id === id))
+  const done = d.log.filter(x => x.kind === 'done' && name(x.tab)).map(x => `Finished: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
+  const waits = d.log.filter(x => x.kind === 'wait' && name(x.tab) && rt.get(x.tab)?.status === 'waiting').map(x => `Waits: ${name(x.tab)}${x.text ? `: ${x.text}` : ''}`)
+  const moved = state.workspaces.flatMap(w => {
+    const pr = prs.get(w.id)
+    const now = pr && `${pr.state}:${pr.checks ?? ''}`
+    if (!pr || w.archived || now === d.prs[w.id]) return []
+    return [`PR #${pr.number} (${w.name ?? w.id}): ${pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.checks === 'pass' ? 'checks pass' : pr.checks === 'fail' ? 'checks fail' : d.prs[w.id] ? 'checks running' : 'opened'}`]
+  })
+  return [...waits, ...done, ...moved]
+}
+export function dndEnd() {
+  const d = state.dnd
+  if (!d) return { ended: false }
+  delete state.dnd
+  save()
+  changed()
+  const lines = dndDigest(d)
+  const at = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const more = lines.length > 8 ? `\n…and ${lines.length - 8} more` : ''
+  try {
+    void alertShow({ title: `Do not disturb is over (${at(d.since)} to ${at(Date.now())})`, text: lines.length ? lines.slice(0, 8).join('\n').slice(0, 560) + more : 'Nothing finished, asked or moved meanwhile.' }, 'notice')
+  } catch (e) {
+    log(`dnd digest: ${(e as Error).message}`)
+  }
+  return { ended: true, lines }
+}
+export const dndTick = () => void (state.dnd && !dndOn() && dndEnd())
+
 export function clearQueue(target: string) {
   const tab = resolveTarget(target)
   delete tab.queue
+  delete tab.queueHeld
   save()
   changed()
 }

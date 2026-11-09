@@ -135,6 +135,7 @@ export type AppBase = {
   closePreview: () => Promise<undefined>
   closeTabs: (ts: TabView[]) => Promise<void>
   reopenTab: (w?: WorkspaceView | null, index?: number) => Promise<unknown>
+  stopAllAsk: () => Promise<void> // U8: Stop all agents, asked first
   copy: (text: string) => Promise<void>
   copyTab: (t: TabView) => undefined
   costsOn: boolean

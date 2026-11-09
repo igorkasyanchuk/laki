@@ -168,6 +168,12 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   a({ id: 'start', label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
   a({ id: 'browser', label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
   a({ id: 'ssh', label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
+  // U8: Stop all agents, Do not disturb
+  if (app.view?.tabs.some(t => t.kind === 'agent' && t.status === 'running')) a({ id: 'stopAll', label: 'Stop all agents: every turn under way', icon: 'stopCircle', hint: kh('stopAll'), run: () => void app.stopAllAsk() })
+  const at9 = new Date()
+  at9.setHours(24 + 9, 0, 0, 0)
+  if (app.view?.dnd) a({ id: 'dnd', label: 'Do not disturb: end now', icon: 'moon', run: () => void call('dndSet', { off: true }).catch(() => {}) })
+  else for (const [label, o] of [['30 minutes', { minutes: 30 }], ['1 hour', { minutes: 60 }], ['until tomorrow 9:00', { until: at9.getTime() }]] as const) a({ label: `Do not disturb: ${label}`, icon: 'moon', hint: 'no notifications', run: () => void call('dndSet', o).then(() => app.toast(`Do not disturb ${label === '30 minutes' || label === '1 hour' ? `for ${label}` : label}: a digest follows`)).catch(() => {}) })
   a({ id: 'clone', label: 'Clone a repository… (a URL, or owner/repo)', icon: 'github', run: () => setDialog('clone') })
   a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
   a({ id: 'themes', label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit

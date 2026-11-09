@@ -5,7 +5,7 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { pushRequest, replies, tapSig } from '../src/daemon/push.ts'
-import { fresh, sleep, until } from './helpers.ts'
+import { connect, fresh, sleep, until } from './helpers.ts'
 
 const p = { event: 'waiting', workspace: 'fix-login', tab: 't1', agent: 'claude', question: 'Run rm -rf build?' } as const
 
@@ -290,4 +290,55 @@ test("answer from the phone: a workflow's Ask you pushed with its choices, a tap
   assert.equal(plain.title, 'Workflow Pick in repo asks you')
   assert.equal(plain.body, 'Ship it?\nplain\n1. Yes\n2. No')
   assert.equal(pushes().length, 3, 'no JSON with actions')
+})
+
+test('U8: Do not disturb: no push for a finish or an ask; ended, one notice says what waits and what finished; Stop all agents holds a queue', async t => {
+  const got: string[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', d => (body += d))
+    req.on('end', () => (got.push(body), res.writeHead(200).end()))
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const rig = await fresh(t)
+  const proj = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: proj.id, preset: 'claude', name: 'quiet' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  await rig.rpc('settingsSet', { webhook: { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`, format: 'json', done: true } })
+  const app = await connect(rig)
+  const say = async (text: string, status: string) => {
+    await rig.rpc('input', { tab: tab.id, data: `${text}\r` })
+    await until(async () => (await rig.tab(ws.id)).status === status, status, 15000)
+  }
+  // Stop all agents: the turn under way gets Esc, what was queued for it waits for Resume queue
+  await say('slow one', 'running')
+  const sent = await rig.rpc('send', { target: tab.id, text: 'hi', whenIdle: true })
+  assert.deepEqual((await rig.tab(ws.id)).queue, ['hi'], JSON.stringify([sent, (await rig.tab(ws.id)).status, await rig.screen(tab.id)]))
+  await assert.rejects(rig.rpc('stopAll', { from: { ws: ws.id, tab: tab.id } }), /stop every agent's turn/)
+  assert.deepEqual((await rig.rpc('stopAll', {})).stopped, [tab.id])
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'stopped')
+  await sleep(500)
+  const held = await rig.tab(ws.id)
+  assert.deepEqual([held.queue, held.queueHeld], [['hi'], true])
+
+  await assert.rejects(rig.rpc('dndSet', { minutes: 30, from: { ws: ws.id, tab: tab.id } }), /silence the user's notifications/)
+  const { until: end } = await rig.rpc('dndSet', { minutes: 30 })
+  assert.equal((await rig.rpc('state')).dnd.until, end)
+  await sleep(1200) // the stop's own push, if any, is in
+  got.length = 0
+  await rig.rpc('queueResume', { tab: tab.id }) // hi: a turn that ends meanwhile
+  await until(async () => (t => !t.queue && !t.queueHeld && t.status === 'idle' && t.done)(await rig.tab(ws.id)), 'the queued one ran', 15000)
+  await say('ask', 'waiting')
+  await sleep(1500) // a wait's push goes 800 ms later
+  assert.deepEqual(got, [])
+  const r = await rig.rpc('dndSet', { off: true })
+  assert.equal(r.ended, true)
+  assert.ok(r.lines.some((l: string) => l.startsWith('Waits: quiet · claude')), r.lines.join(' | '))
+  assert.ok(r.lines.some((l: string) => l.startsWith('Finished: quiet · claude')), r.lines.join(' | '))
+  const ev = await until(() => app.events.find(e => e.ev === 'notice' && /^Do not disturb is over/.test(e.title)), 'the digest')
+  assert.match(ev.text, /Waits: quiet · claude[\s\S]*Finished: quiet · claude/)
+  assert.equal((await rig.rpc('state')).dnd, undefined)
+  assert.deepEqual(await rig.rpc('dndSet', { off: true }), { ended: false })
 })

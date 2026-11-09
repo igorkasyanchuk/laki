@@ -2488,7 +2488,7 @@ export function LaterStrip({ tab, later, onNow, onEdit, onCancel }: { tab: TabVi
 // TUI is never covered). Each one edited in place (⌘⏎ saves, Esc cancels), removed (App's toast has Undo) or dragged
 // into another place, all through onSave (the daemon's queueSet, with the list it started from); Send now stops the
 // turn and types the first
-export function QueueStrip({ tab, onSave, onNow, onClear, onRemove }: { tab: TabView; onSave: (queue: string[], was: string[]) => Promise<boolean>; onNow: () => void; onClear: () => void; onRemove: (i: number) => void }) {
+export function QueueStrip({ tab, onSave, onNow, onResume, onClear, onRemove }: { tab: TabView; onResume?: () => void; onSave: (queue: string[], was: string[]) => Promise<boolean>; onNow: () => void; onClear: () => void; onRemove: (i: number) => void }) {
   const q = tab.queue ?? []
   const [edit, setEdit] = useState<{ i: number; text: string; was: string } | null>(null)
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
@@ -2505,11 +2505,17 @@ export function QueueStrip({ tab, onSave, onNow, onClear, onRemove }: { tab: Tab
       <div className="queue-head">
         <Icon name="clock" size={13} />
         <span className="queue-what">
-          Queued for <b>{tab.name}</b> · {q.length} · goes when this turn ends
+          Queued for <b>{tab.name}</b> · {q.length} · {tab.queueHeld ? 'paused by Stop all' : 'goes when this turn ends'}
         </span>
-        <button onClick={onNow} data-tip="Stop the turn under way and send the first one">
-          Send now
-        </button>
+        {tab.queueHeld ? (
+          <button onClick={onResume} data-tip="Stop all agents held this queue: send the first one, the rest as each turn ends">
+            Resume queue
+          </button>
+        ) : (
+          <button onClick={onNow} data-tip="Stop the turn under way and send the first one">
+            Send now
+          </button>
+        )}
         <button className="ghost" onClick={onClear}>
           Clear
         </button>

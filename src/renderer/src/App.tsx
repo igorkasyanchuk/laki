@@ -4,7 +4,7 @@ import { aiOn, creatorOf, neverAsks, PERMS, veiled, type Agent, flowsOn as flows
 import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
-import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
+import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { FullReview, type ReviewApi, type Talk } from './FullReview'
@@ -887,6 +887,7 @@ export function App() {
   // L7: no https picture straight from the window: an extension's through the daemon's /img, GitHub's avatars by the switch
   imagesVia(view?.imgKey && base !== null ? u => `${base}/img?k=${view.imgKey}&u=${encodeURIComponent(u)}` : undefined)
   showAvatars(view?.settings.avatars !== false)
+  setQuiet(!!view?.dnd) // U8: Do not disturb: api.ts notify sends nothing but an important ask's card
   // Settings' Dock icon (unset: the app's own, nothing to send)
   const dockIcon = view?.settings.dockIcon
   useEffect(() => {
@@ -1451,6 +1452,16 @@ export function App() {
     if (ts.length === 1 && (ts[0].kind === 'agent' || ts[0].kind === 'shell') && kb.reopenTab) toast(`Closed ${ts[0].name} · ${keyShow(kb.reopenTab)} brings it back`)
   }
   // ⇧⌘T, the + menu's Recently closed: a tab you closed back in its workspace, its chat resumed (the newest, or index's)
+  // U8: Stop all agents (⌘K, the File menu, a key of yours): the turns under way named, asked once, then each gets Esc
+  const stopAllAsk = async () => {
+    const v = viewRef.current
+    const at = v?.tabs.filter(t => t.kind === 'agent' && t.status === 'running') ?? []
+    if (!at.length) return toast('No agent is at work')
+    const names = at.map(t => `${v!.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}`)
+    if (!(await ask(`Stop ${at.length === 1 ? 'the agent' : `all ${at.length} agents`} at work?`, { text: `${names.slice(0, 8).join(', ')}${names.length > 8 ? ` and ${names.length - 8} more` : ''}. Each gets its interrupt key (Esc): nothing is closed, its chat stays. What's queued for one waits for its Resume queue.`, ok: 'Stop all', danger: true }))) return
+    const r = await call<{ stopped: string[] }>('stopAll', {})
+    toast(`Stopped ${r.stopped.length} of ${at.length}`)
+  }
   const reopenTab = async (w = ws, index?: number) => {
     if (!w) return
     if (!w.closed?.length) return toast('No closed tab to bring back here')
@@ -3305,6 +3316,12 @@ export function App() {
             </>
           )}
           {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
+          {view.dnd && ( // U8: Do not disturb: until when; a click ends it now (its digest shows)
+            <button className="sb-rec" data-tip="Do not disturb: no notifications, sounds or phone pushes, but an important workspace's ask · click: end now, and see what happened meanwhile" onClick={() => void call('dndSet', { off: true }).catch(() => {})}>
+              <Icon name="moon" size={11} />
+              until {new Date(view.dnd.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </button>
+          )}
           {settings.recording && ( // Recording mode: private workspaces hidden until this is clicked
             <button className="sb-rec" data-tip="Recording mode: private workspaces and projects are hidden (they keep running). Click to show them" onClick={() => void call('settingsSet', { recording: false }).catch(() => {})}>
               <Icon name="lock" size={11} />
@@ -3360,7 +3377,7 @@ export function App() {
   const appBase: AppBase = {
     budgetSaid, accountsOf, achAll, achHidden, achKept, achN, achRef, achSet, addTimer, aiDock, aiNames, allows, anchor, apps,
     archive, artMenu, artPage, artView, asFile, attachable, bgUrl, busyWith, byId, call, calOn, canLater, cfgSheet,
-    checking, closePage, closePreview, closeTabs, reopenTab, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
+    checking, closePage, closePreview, closeTabs, reopenTab, stopAllAsk, copy, copyTab, costsOn, ctxLook, ctxOn, deskOn, devRunning, devTab,
     dialog, dock, done, doStep, dropAgent, dropOn, dropProps, earn, editor, editorName, editScripts, extCfg,
     extInserts, extItems, extMenus, extModal, extOn, extRun, extWs, fail, find, findIn, fitFoot, floated, floatTab,
     flowItems, flowMenu, flowsHere, flowsOn, fold, folded, fontSize, footButtons, forkWs, full, gallery, gated, git,
@@ -3492,7 +3509,7 @@ export function App() {
                         <WorkerAsks asks={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
-                        {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
+                        {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}
                         {(c => c && c.tab === t.id && !checkHid.includes(`${t.workspace}:${c.at}`) && <CheckStrip tab={t} check={c} onAgain={() => void call('checkAgain', { ws: t.workspace }).catch(() => {})} onStop={() => void call('checkStop', { ws: t.workspace }).catch(() => {})} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).then(() => (setCheckHid(h => [...h, `${t.workspace}:${c.at}`]), toast(`Sent to ${t.name}`)), () => {})} onHide={() => setCheckHid(h => [...h, `${t.workspace}:${c.at}`])} />)(view.workspaces.find(x => x.id === t.workspace)?.check)}
                         {(a => a && notInstalled(t) && (
                           <InstallStrip

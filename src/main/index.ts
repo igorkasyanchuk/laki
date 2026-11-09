@@ -1657,6 +1657,8 @@ const appMenu = () => Menu.setApplicationMenu(
         { type: 'separator' },
         bound('Close Tab', 'closeTab'),
         bound('Reopen Closed Tab', 'reopenTab'),
+        { type: 'separator' },
+        bound('Stop All Agents…', 'stopAll'),
       ],
     },
     {

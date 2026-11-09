@@ -60,6 +60,11 @@ changing it: [AGENTS.md](../AGENTS.md).
   agents can sleep to give their memory back, and resume their chat when you look.
 - **Clone a repository**: Welcome's *Clone a repository…* (⌘K too) takes a URL (`https://`, `ssh://`, `git@host:…`) or
   `owner/repo`, clones it into `~/code` (or the folder you name) and adds it as a project.
+- **Stop all agents**: ⌘K › *Stop all agents* (File menu too; give it a key in Settings › Keys) names the turns under
+  way, asks once and interrupts each (Esc; nothing is closed). A queue it held shows *Resume queue*.
+- **Do not disturb**: ⌘K › *Do not disturb: 30 minutes / 1 hour / until tomorrow 9:00*. No notifications, sounds or
+  phone pushes meanwhile, except an important workspace's ask. The status bar's moon ends it early; as it ends, one card
+  lists what finished, what waits for you and which PRs moved.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›

@@ -278,7 +278,12 @@ export const openKeptLink = async (url: string) => {
 // (main's addCard; the app only): ask, a waiting agent's (its diff with it); alert, laki alert's id; tone, the edge's
 // color (ok: a finish, bad: a limit)
 type Card = { diff?: string; ask?: boolean; alert?: string; tone?: 'ok' | 'bad' | 'info' }
+// U8: Do not disturb (the view's dnd, App sets it): nothing is sent, no sound, but an important workspace's ask and a
+// laki alert (their cards)
+let quiet = false
+export const setQuiet = (on: boolean) => void (quiet = on)
 export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[], card?: Card) {
+  if (quiet && !card?.ask && !card?.alert) return
   if (bridge) return bridge.notify(title, body, tab, sound, actions, card)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()
