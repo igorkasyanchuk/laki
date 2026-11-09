@@ -74,6 +74,21 @@ export function Countdown({ to }: { to: number }) {
 }
 
 // the turn timer (settings.timers): since the earliest turn going among these tabs
+// B6: an empty page shows what it will hold: a few sample rows, faint, not for the screen reader or the pointer
+// ponytail: plain rows (a title and a line), not each page's own row component with sample props
+export function Ghosts({ rows }: { rows: [string, string][] }) {
+  return (
+    <div className="ghosts" aria-hidden>
+      {rows.map(([a, b]) => (
+        <div key={a} className="ghost">
+          <b>{a}</b>
+          <span>{b}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
   const since = Math.min(...tabs.map(t => t.runAt ?? Infinity))
   return since < Infinity ? <Elapsed since={since} /> : null

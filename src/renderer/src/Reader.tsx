@@ -228,7 +228,18 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     <div className="reader">
       <div className="reader-scroll" ref={scroll} onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <div className="reader-col">
-          {none && !said?.length && <div className="reader-empty muted">{tab.name}'s chat shows here once it has said something.</div>}
+          {none && !said?.length && (
+            <div className="reader-empty muted">
+              {tab.name}'s chat shows here once it has said something.
+              <div className="reader-starts">{/* B6: three ways to start: a click fills the box, nothing is sent */}
+                {['Explain how this project is laid out', 'Find a small bug and fix it, with a test', 'What would you clean up here first?'].map(x => (
+                  <button key={x} type="button" onClick={() => (setText(x), box.current?.focus())}>
+                    {x}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {rows}
           {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
           {tab.status === 'running' && (

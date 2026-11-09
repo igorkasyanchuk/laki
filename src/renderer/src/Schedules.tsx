@@ -6,7 +6,7 @@ import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { Ghosts, ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Omit<Schedule, 'archived'>> & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false)
@@ -517,13 +517,16 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               )}
             />
           ) : (
+            <>
+            <Ghosts rows={[['Review yesterday\'s PRs', 'weekdays at 9:00 · claude'], ['Update dependencies', 'Mondays at 8:00 · codex'], ['Check the nightly build', 'once, tomorrow at 7:30']]} />
             <div className="sched-empty">
               <Icon name="clock" size={18} />
               <span>
                 <b>No scheduled tasks{only ? ' in this project' : ''}</b>
-                <span className="muted small">Like “weekdays at 9:00: review yesterday's PRs”. New task makes one.</span>
+                <span className="muted small">An agent on a prompt at a time, once or on repeat. New task makes one.</span>
               </span>
             </div>
+            </>
           )}
         </section>
         )}

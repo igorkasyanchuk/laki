@@ -2226,6 +2226,12 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .sched-row:is(:hover, :focus-within) .sched-acts, .sched-acts:has(.btn-spin) { opacity: 1; }
 .sched-acts > .btn-spin { margin: 0 7px; }
 @media (hover: none) { .sched-acts { opacity: 1; } } /* a touch screen has no hover to show them */
+.ghosts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; opacity: 0.45; pointer-events: none; user-select: none; }
+.ghost { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.ghost b { font-weight: 600; white-space: nowrap; }
+.ghost span { color: var(--muted); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-starts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.reader-starts button { border-radius: 999px; padding: 3px 10px; font-size: var(--fs-2); }
 .sched-empty { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border: 1px dashed var(--line); border-radius: calc(var(--radius) + 4px); color: var(--muted); }
 .sched-empty > span { display: flex; flex-direction: column; gap: 2px; }
 .sched-empty b { color: var(--fg); font-weight: 600; }

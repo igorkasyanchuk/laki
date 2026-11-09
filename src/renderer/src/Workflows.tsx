@@ -15,7 +15,7 @@ import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
 import { Modal } from './panels'
-import { ask, choose, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
+import { Ghosts, ask, choose, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
 import './workflows.css'
 
 export type WorkflowsApi = {
@@ -340,6 +340,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                 }}
               />
             ) : (
+              <>
+              <Ghosts rows={[['Ship a feature', 'plan → ask me → build → test → open a PR'], ['Fix a bug', 'reproduce → fix → run the tests → review'], ['Weekly cleanup', 'find dead code → remove it → one PR']]} />
               <div className="sched-empty">
                 <Icon name="flow" size={18} />
                 <span>
@@ -347,6 +349,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, nav
                   <span className="muted small">Like “plan, ask me, build, test, review, open a PR”. New workflow makes one, or start from a template; Laki AI and your agents can write one too.</span>
                 </span>
               </div>
+              </>
             )}
           </section>
 

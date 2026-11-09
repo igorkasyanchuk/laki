@@ -10,7 +10,7 @@ import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, deskLayout
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
 import { type Img, PromptInput, useDraft } from './PromptInput'
-import { colorVar, Icon, IconButton, iconItems, isIconName, type MenuItem, Page, TAB_COLORS, useMenu } from './ui'
+import { Ghosts, colorVar, Icon, IconButton, iconItems, isIconName, type MenuItem, Page, TAB_COLORS, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export type DeskApi = WidgetApi & {
@@ -320,7 +320,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       )}
       {!here.length ? (
         <div className="desk-empty">
-          <Icon name="desk" size={28} />
+          <Ghosts rows={[['My PRs', '3 open · 1 needs a review'], ['Today', '4 turns · 2 workspaces waiting'], ['Links', 'the staging site, the board, the docs']]} />
           <b>My Desk is empty</b>
           <p className="muted small">
             Put extensions here (your PRs, links, ones you build with Laki AI) as tiles of any size: an overview of what's

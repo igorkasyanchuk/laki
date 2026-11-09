@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ago } from './Info'
 import { SpecEditor } from './SpecEditor'
-import { ask, colorVar, Edge, Icon, IconButton, keep, load as stored, type MenuItem, Page, TAB_COLORS, useMenu, usePageSide } from './ui'
+import { Ghosts, ask, colorVar, Edge, Icon, IconButton, keep, load as stored, type MenuItem, Page, TAB_COLORS, useMenu, usePageSide } from './ui'
 
 const SIDE_W = 'laki.notesW' // the list's width
 const SIDE_INIT = 290
@@ -102,6 +102,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
           )}
           <div className="notes-list">
             {err && <p className="warn small">{err}</p>}
+            {list && !shown.length && !q && !only && <Ghosts rows={[['Release checklist', 'tests, notes, tag'], ['Ideas', 'what to build next'], ['Standup', 'yesterday, today, blocked']]} />}
             {list && !shown.length && <p className="muted small notes-none">{q || only ? 'No note matches.' : 'No notes yet: New note writes one.'}</p>}
             {shown.map(n => (
               <button key={n.id} type="button" className={`note-row ${n.id === open ? 'on' : ''}`} style={colorVar(n.color)} onClick={() => onOpen(n.id)} onContextMenu={e => rowMenu(e, n)}>
