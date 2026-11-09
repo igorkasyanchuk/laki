@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
 import { basename, join, sep } from 'node:path'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
-import { addTab, broadcast, changed, findWs, presets, rtOf, sessions, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
+import { addTab, broadcast, changed, findWs, input, presets, rtOf, sessions, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
 import { phoneLong } from './phone.ts'
 import { widgetEvent } from './widgets.ts'
 import { dir } from './dir.ts'
@@ -76,6 +76,13 @@ export function longTurnTick(now = Date.now()) {
     widgetEvent('turn.long', { minutes: Math.round(l.worked / 60000) }, tab.workspace, tab)
   }
   return told
+}
+// the notification's Stop: that turn's Esc. A notification outlives its turn: under a later turn, or an ask (Esc would answer it), nothing
+export function longStop(p: { tab?: unknown }) {
+  const id = String(p.tab ?? '')
+  const stopped = !!longs.get(id)?.said && rtOf(id).status === 'running'
+  if (stopped) input(id, '\x1b')
+  return { stopped }
 }
 
 // a turn of yours that ended with an answer: not a workflow's (its next prompt is the workflow's), nothing queued after it

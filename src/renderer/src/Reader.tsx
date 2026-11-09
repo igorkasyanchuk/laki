@@ -68,7 +68,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
     if (text !== kept.current) keepDraft(tab.id, (kept.current = text), api.draft)
   }, [text, tab.id, api.draft])
   useEffect(() => {
-    if (tab.drafted && !drafts.has(tab.id)) void api.draft(tab.id).then(r => r.text && setText(now => now || ((kept.current = r.text!), r.text!))).catch(() => {}) // after a restart, or a tab brought back
+    if (tab.drafted && !drafts.get(tab.id) && !draftsDue.has(tab.id)) void api.draft(tab.id).then(r => r.text && setText(now => now || ((kept.current = r.text!), r.text!))).catch(() => {}) // after a restart, or a tab brought back
   }, [tab.id]) // eslint-disable-line
   const [hid, setHid] = useState<string>() // the guess Esc hid (settings.nextPrompt's tab.suggest)
   const ghost = !text && tab.status === 'idle' && tab.suggest && tab.suggest !== hid ? tab.suggest : undefined

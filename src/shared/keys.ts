@@ -98,11 +98,11 @@ export const keyFor = (e: Press, m: KeyMap): KeyId | undefined => {
 
 // what else has these keys: another of KEYS (the first takes them), others ([keys, name]: the global hotkey's, the
 // picker's), a fixed one, or the terminal (⌃ without ⌘ or ⌥: ⌃C, ⌃R). '': nothing
+const clashOr = (k: string, named: string | undefined, others: [string, string][]) => named ?? [...others, ...FIXED].find(([c]) => c === k)?.[1] ?? (k.includes('⌃') && !/[⌥⌘]/.test(k) ? 'the terminal (⌃ keys without ⌘ or ⌥ are its own)' : '')
 export const keyClash = (id: KeyId, m: KeyMap, others: [string, string][] = []) => {
   const k = m[id]
   if (!k) return ''
-  const o = KEYS.find(x => x.id !== id && m[x.id] === k)?.label ?? [...others, ...FIXED].find(([c]) => c === k)?.[1]
-  return o ?? (k.includes('⌃') && !/[⌥⌘]/.test(k) ? 'the terminal (⌃ keys without ⌘ or ⌥ are its own)' : '')
+  return clashOr(k, KEYS.find(x => x.id !== id && m[x.id] === k)?.label, others)
 }
 
 // the command a press is, by the character first, as keyFor
@@ -116,8 +116,7 @@ export const cmdFor = (e: Press, m: CmdMap) => {
 export const cmdClash = (id: string, cmds: CmdMap, keys: KeyMap, others: [string, string][] = []) => {
   const k = cmds[id]
   if (!k) return ''
-  const o = KEYS.find(x => keys[x.id] === k)?.label ?? COMMANDS.find(c => c.id !== id && cmds[c.id] === k)?.label ?? [...others, ...FIXED].find(([c]) => c === k)?.[1]
-  return o ?? (k.includes('⌃') && !/[⌥⌘]/.test(k) ? 'the terminal (⌃ keys without ⌘ or ⌥ are its own)' : '')
+  return clashOr(k, KEYS.find(x => keys[x.id] === k)?.label ?? COMMANDS.find(c => c.id !== id && cmds[c.id] === k)?.label, others)
 }
 // the commands' keys as keyClash's others
 export const cmdOthers = (cmds: CmdMap): [string, string][] => COMMANDS.filter(c => cmds[c.id]).map(c => [cmds[c.id], c.label])

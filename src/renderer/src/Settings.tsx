@@ -297,9 +297,9 @@ export type AppSettings = Paint & {
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
 
-// the PR switches' prompts (Settings › Pull requests): the status bar's names
 const LONG_TURN: [number, string][] = [[0, 'Off'], [30, '30 min'], [60, '1 h'], [120, '2 h'], [240, '4 h']]
 const IDLE_DAYS: [number, string][] = [[0, 'Off'], [3, '3 days'], [7, '7 days'], [14, '14 days'], [30, '30 days']]
+// the PR switches' prompts (Settings › Pull requests): the status bar's names
 const ARCHIVED_DAYS: [number, string][] = [[0, 'Never'], [1, 'After a day'], [3, 'After 3 days'], [7, 'After a week'], [14, 'After 2 weeks'], [30, 'After a month']]
 const PR_KINDS: [FixWhat, string, string][] = [
   ['ci', 'Fix CI', 'the failing checks and the end of their logs go after it'],
@@ -569,6 +569,7 @@ function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay 
       <div className="row keys-find">
         <input className="grow" placeholder="Search by name, or press the keys" aria-label="Search keys" value={pressed ? keyShow(pressed) : q} onFocus={() => (keyRec.on = true)} onBlur={() => (keyRec.on = false)} onChange={e => (setPressed(''), setQ(e.target.value))} onKeyDown={e => {
           if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return
+          if (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && 'acvxz'.includes(e.key.toLowerCase())) return // the box's own
           if (e.metaKey || e.ctrlKey || e.altKey) e.preventDefault(), setPressed(keyLabel(e.nativeEvent)), setQ('')
           else if (pressed) setPressed('')
         }} />
@@ -901,6 +902,8 @@ export function SettingsPage(p: {
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
   const glassy = !!paintOf(s).glass // Glass on, or the Frosted design's
+  const [longTyped, setLongTyped] = useState(false) // Custom picked: its field stays while a typed number passes through a preset's (30 on the way to 300)
+  const longOwn = longTyped || !LONG_TURN.some(([m]) => m === (s.longTurn ?? 0))
   const bgInput = useRef<HTMLInputElement>(null)
   const [bgErr, setBgErr] = useState('')
   // Export / Import (General): every setting in a file, for another Mac; an import goes through the page, so it's
@@ -1307,7 +1310,7 @@ export function SettingsPage(p: {
                     <option key={d} value={d}>{t}</option>
                   ))}
                 </select>
-                <Says title="Archive workspaces untouched for" hint="No prompt, no agent turn, no commit, nobody looking. Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or an Important mark. A toast offers Undo." />
+                <Says title="Archive workspaces untouched for" hint="No prompt, no agent turn, no commit, nobody looking. Never one with uncommitted or unpushed work, a running agent, dev server or terminal program, a queued message, a pin or an Important mark. A toast offers Undo." />
               </label>
                 {!!s.archiveIdle && (
                   <Switch className="switch-row" on={s.archiveIdleKeepPR !== false} onChange={v => set({ archiveIdleKeepPR: v })}>
@@ -1386,8 +1389,8 @@ export function SettingsPage(p: {
                 )}
                 <label className="switch-row">
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    {!LONG_TURN.some(([m]) => m === (s.longTurn ?? 0)) && <input type="number" min={1} style={{ width: 70 }} aria-label="Minutes" value={s.longTurn} onChange={e => set({ longTurn: Math.max(1, Number(e.target.value) || 1) })} />}
-                    <select value={LONG_TURN.some(([m]) => m === (s.longTurn ?? 0)) ? (s.longTurn ?? 0) : -1} onChange={e => set({ longTurn: Number(e.target.value) < 0 ? 90 : Number(e.target.value) })}>
+                    {longOwn && <input type="number" min={1} style={{ width: 70 }} aria-label="Minutes" value={s.longTurn} onChange={e => set({ longTurn: Math.max(1, Number(e.target.value) || 1) })} />}
+                    <select value={longOwn ? -1 : (s.longTurn ?? 0)} onChange={e => (v => (setLongTyped(v < 0), set({ longTurn: v < 0 ? s.longTurn || 90 : v })))(Number(e.target.value))}>
                       {LONG_TURN.map(([m, t]) => (
                         <option key={m} value={m}>{t}</option>
                       ))}

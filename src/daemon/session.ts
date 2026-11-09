@@ -221,10 +221,11 @@ export class Session {
   // screenText is the bottom of the active screen: its last `lines` lines with text, from line `from` on.
   screenText(lines = 20, from = 0): string {
     const b = this.term.buffer.active
+    let end = b.length
+    while (end > from && !b.getLine(end - 1)?.translateToString(true).trim()) end-- // from the bottom: sweepRunning reads every claude's, the scrollback is 5000 lines
     const out: string[] = []
-    for (let i = from; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) ?? '')
-    while (out.length && !out.at(-1)!.trim()) out.pop()
-    return out.slice(-lines).join('\n')
+    for (let i = Math.max(from, end - lines); i < end; i++) out.push(b.getLine(i)?.translateToString(true) ?? '')
+    return out.join('\n')
   }
 
   // the line the cursor is on, counted as screenText(lines) counts them; none while it's hidden

@@ -264,6 +264,7 @@ test('a draft: kept per tab through a restart and a closed tab (⇧⌘T), out of
   // ⇧⌘T: closed, its draft stays out of the view's list; brought back, a new tab with the draft
   await rig.rpc('tabClose', { id: tab.id })
   assert.ok(!(await inView()).includes('half a thought'))
+  assert.ok(!JSON.stringify(await rig.rpc('wsSet', { id: ws.id, color: 'red' })).includes('half a thought'), 'nor what wsSet answers')
   const back = await rig.rpc('tabReopen', { ws: ws.id })
   assert.deepEqual(await draftOf(back.id), { text: 'half a thought' })
   assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === back.id).drafted, true)

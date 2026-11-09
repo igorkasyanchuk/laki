@@ -467,7 +467,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
     done()
     const a = buttons[i]
     if (a?.tool) rpc('widgetToolAnswer', { req: a.tool.req, allow: a.tool.allow }).catch(() => {})
-    else if (a?.stop) rpc('input', { tab, data: '\x1b' }).catch(() => show(tab)) // a long turn's Stop: its Esc
+    else if (a?.stop) rpc('longStop', { tab }).catch(() => show(tab)) // a long turn's Stop: its Esc, if that turn still runs
     else if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
   })
   n.on('close', done)

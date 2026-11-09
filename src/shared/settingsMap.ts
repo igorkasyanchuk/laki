@@ -290,7 +290,7 @@ export const HELP: Record<string, SettingHelp> = {
     cost: 'Nothing waits for your last look: what CI misses is merged.',
   },
   'Archive workspaces untouched for': {
-    what: 'A worktree with no prompt, no agent turn, no commit and nobody looking at it for that long is archived on its own (Undo brings it back). Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or an Important mark.',
+    what: 'A worktree with no prompt, no agent turn, no commit and nobody looking at it for that long is archived on its own (Undo brings it back). Never one with uncommitted or unpushed work, a running agent, dev server or terminal program, a queued message, a pin or an Important mark.',
     when: 'Old worktrees fill your sidebar and your disk.',
     cost: 'Its worktree folder goes (the branch stays); restoring it makes it again.',
   },

@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
@@ -486,6 +486,7 @@ function idleKeep(ws: Workspace) {
   if (tabs.some(t => t.queue?.length)) return 'a message is queued'
   if (tabs.some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return 'an agent is at work'
   if (tabs.some(t => { const a = shellAgents.get(t.id); return a && a.status !== 'idle' })) return 'an agent is at work in a terminal'
+  if (tabs.some(t => busyShells.has(t.id))) return 'a program is running in a terminal'
   if (tabs.some(t => (t.kind === 'dev' || t.kind === 'script') && isLive(t)) || ports.get(ws.id)?.length) return 'a dev server or script is running'
   if (state.flows?.some(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) return 'a workflow is running in it'
 }

@@ -360,7 +360,8 @@ window: it can run the agent browser). Tabs on screen in a focused window get no
 - `tabDraft` (`{ tab, text? }`): a Reader box's unsent text, read or kept; on the tab (`draft`, never in the view: `drafted`; `tabSet` and `tabReopen` answer without it), moved to `closed` by `closeTab` and back by `tabReopen`; agents refused (`agentNo`, by the peer: `FROM`).
 - `tabMode` (`{ tab, mode }`): a running claude's mode by its own ⇧⇥, read back from its footer after each press (`claudeMode`); one at a time per tab; agents refused. The view's `mode` (kept by `sweepRunning`) and `bypassNo` (why not Bypass: the policy, its sandbox, how it started).
 - `failDismiss` (`{ tab }`): clears a tab's `failed`.
-- `archiveIdleTick`, `longTurnTick` (`{ now }`: tests'): the loops below.
+- `archiveIdleTick`, `longTurnTick` (`{ now }`: tests', `archiveIdleTick`'s only under the rig's `LAKI_TEST_PARENT`): the loops below.
+- `longStop` (`{ tab }`, agents refused): a long turn's notification's Stop, `{ stopped }`: its Esc while the turn it told of runs.
 
 ### MCP
 

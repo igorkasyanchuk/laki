@@ -195,7 +195,7 @@ PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's 
   folders; a waiting to-do's stay (an image by its name, a file by its folder). Laki AI never takes a file: `imageOk`
   reads `<data>/images` only.
 
-**Archive when idle** (`pr.ts` `archiveIdleTick`, 30 min, `settings.archiveIdle` days, `archiveIdleKeepPR`): a worktree on this Mac whose last touch (`usedAt`, a client attached or `lookedAt`, `touchedAt`, `created`) and HEAD's commit are that old, kept for a pin, *Important*, a later start, an open PR, a queue, an agent at work (a terminal's too), a dev server, script or port, a live workflow run, unpushed commits (`--not --remotes <base>`) or uncommitted ones; each reason logged once (`idleKept`). `wsArchive` with `by: 'auto'`, so gates hold it; the `archived` event's `idle` is the toast's. `wsRestore` sets `touchedAt`: an Undo counts a full period from there.
+**Archive when idle** (`pr.ts` `archiveIdleTick`, 30 min, `settings.archiveIdle` days, `archiveIdleKeepPR`): a worktree on this Mac whose last touch (`usedAt`, a client attached or `lookedAt`, `touchedAt`, `created`) and HEAD's commit are that old, kept for a pin, *Important*, a later start, an open PR, a queue, an agent at work (a terminal's too), a program running in a shell tab (`busyShells`), a dev server, script or port, a live workflow run, unpushed commits (`--not --remotes <base>`) or uncommitted ones; each reason logged once (`idleKept`). `wsArchive` with `by: 'auto'`, so gates hold it; the `archived` event's `idle` is the toast's. `wsRestore` sets `touchedAt`: an Undo counts a full period from there.
 
 ### Scheduled tasks
 
@@ -286,7 +286,7 @@ whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD`
 PR (`autoArchived`: an Undo stays). It broadcasts `archived`, which App toasts with Undo (`wsRestore`); a merged PR's
 row says *merged* while the setting is on.
 
-A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minutes): only ticks where the tab is `running` and not at a limit add up, each at most `LONG_GAP` (a Mac asleep); once per turn the `long` event (Open, Stop: its Esc through `input`, main's `stop` action), `phoneLong` (no Stop on a phone) and `turn.long`.
+A turn running long (`turns.ts` `longTurnTick`, 60 s, `settings.longTurn` minutes): only ticks where the tab is `running` and not at a limit add up, each at most `LONG_GAP` (a Mac asleep); once per turn the `long` event (Open, Stop: main's `stop` action, `longStop`: its Esc through `input`, only while that turn runs and asks nothing), `phoneLong` (no Stop on a phone) and `turn.long`.
 
 ### Updates
 

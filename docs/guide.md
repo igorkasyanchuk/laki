@@ -960,7 +960,7 @@ PR: *Undo* in the message brings it back for good. One that can't go says *merge
 
 *Archive workspaces untouched for* (the same section, off by default; 3, 7, 14 or 30 days): a worktree with no prompt, no
 agent turn, no commit and nobody looking at it for that long is archived, with *Undo*; undone, it isn't picked again for
-another full period. Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or
+another full period. Never one with uncommitted or unpushed work, a running agent, dev server or terminal program, a queued message, a pin or
 an *Important* mark, nor one on an SSH host or a codespace. *Keep ones with an open PR* (on) leaves those alone too.
 
 What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`

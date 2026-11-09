@@ -632,7 +632,7 @@ export function view(): View {
     workspaces: state.workspaces.filter(w => !hidden.has(w.id)).map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, closed: w.closed?.map(({ draft: _, ...c }) => c), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
+      return { ...wsOut(w), setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), overlaps: collisions.get(w.id), check: checks.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id), artKey: urlKey(`artifact:${w.id}`), pending: w.pending && pendingView(w.pending), ...((t => t && { ticket: t })(ticketOf(w.id))) }
     }),
     tabs: hidden.size ? tabs.filter(t => !hidden.has(t.workspace)) : tabs,
     presets: presets(),
@@ -2173,6 +2173,7 @@ export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
 // what's typed in a tab's Reader box and not sent: read (no text), or kept (debounced by the Reader), through restarts,
 // a closed tab (closeTab, tabReopen) and an archive; deleted with its tab. Yours alone: no agent reads or sets it
 export const DRAFT_MAX = 100_000
+export const wsOut = (w: Workspace) => ({ ...w, closed: w.closed?.map(({ draft: _, ...c }) => c) }) // a workspace as anyone is told of it: closed tabs' drafts stay here
 export function tabDraft(p: { tab?: unknown; text?: unknown }) {
   const t = findTab(String(p.tab ?? ''))
   if (p.text === undefined) return { text: t.draft ?? '' }
@@ -3069,9 +3070,6 @@ function preTool(tab: Tab, pl: any) {
   )
 }
 
-// a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
-// newest hook taken (hookAt: a PreToolUse or PostToolUse run in the background, come after the turn's Stop or the next
-// ask) changes no state, only what it says of the plan and links
 // a turn that ended on an API error: its one line for the Reader and Needs you, what Continue sends, and settings.continueOnError:
 // once per turn, a minute later, unless it was answered, dismissed or something's queued
 const failLine = (err: unknown, last: unknown) => (typeof err === 'string' && err ? err : err ? JSON.stringify(err) : String(last ?? '')).split('\n').find(l => l.trim())?.trim().slice(0, 200) || 'API error'
@@ -3096,6 +3094,9 @@ export function failDismiss(p: { tab?: unknown }) {
   rtOf(findTab(String(p.tab ?? '')).id).failed = undefined
   changed()
 }
+// a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
+// newest hook taken (hookAt: a PreToolUse or PostToolUse run in the background, come after the turn's Stop or the next
+// ask) changes no state, only what it says of the plan and links
 const ASYNC_SKEW = 500 // ponytail: a busy Mac's node start; an answer within it (rare) waits for the tool's next hook
 function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
@@ -3226,6 +3227,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       // an API error's end (overloaded, a 500, the connection): not a limit, a refused model or your Esc
       r.failed = p.state === 'failed' && !r.limit && !refused && !r.escAt ? failLine(err, last) : undefined
       if (r.failed) continueLater(tab, r)
+      else if (p.state !== 'failed') r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
       if (!r.limit) phone(tab, 'done', r.last ?? '')
@@ -3641,7 +3643,7 @@ export const agentRuns = (args: string): Agent | undefined => {
 // An agent typed there (claude, codex…) has no hooks: its status is read off its screen, as an agent tab's would be
 // (a menu: waiting; what BUSY says it shows while it works: running; else idle, ● done if you weren't looking)
 // ponytail: no notifications or turn timers for it; start the agent in its own tab for those
-const busyShells = new Set<string>()
+export const busyShells = new Set<string>()
 export const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // who runs a laki command: the tab main.ts finds its process in (tabOfPeer), else what its $LAKI_WORKSPACE and
 // $LAKI_TAB say (the CLI passes them): an agent when that tab is an agent's, or a shell tab running one (shellAgents: the

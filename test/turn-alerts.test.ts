@@ -59,10 +59,20 @@ test('longTurn: told once per turn past the limit, on the phone too; time waitin
   const got = await until(() => existsSync(join(home, 'long.json')) && (x => (x ? JSON.parse(x) : undefined))(readFileSync(join(home, 'long.json'), 'utf8')), 'turn.long')
   assert.deepEqual([got.event, got.minutes, got.tab.id], ['turn.long', 30, tab.id])
 
+  // the notification's Stop: only for the turn it told of, and never under an ask
+  await hook('waiting')
+  assert.deepEqual(await rig.rpc('longStop', { tab: tab.id }), { stopped: false }, 'an ask: its Esc would answer it')
+  await hook('running')
+  assert.deepEqual(await rig.rpc('longStop', { tab: tab.id }), { stopped: true })
+
   // an Esc ends a turn with no hook: the next prompt starts the clock over, and can be told again
   await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'again' } })
   await tick()
   for (let i = 0; i < 5; i++) assert.deepEqual(await tick(), [], 'from zero')
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'a third' } })
+  assert.deepEqual(await rig.rpc('longStop', { tab: tab.id }), { stopped: false }, 'a later turn: not the one it told of')
+  await tick()
+  for (let i = 0; i < 5; i++) assert.deepEqual(await tick(), [], 'from zero again')
   assert.deepEqual(await tick(), [tab.id], 'told again')
 
   // a Mac asleep: a gap counts as five minutes at most

@@ -873,7 +873,7 @@ test('archiveIdle: a worktree untouched for the period goes, with Undo; each rea
   const c = await rig.connect()
   const set = (o: object) => rig.rpc('wsSet', { id: ws.id, ...o })
   assert.deepEqual(await tick(30), [], 'off by default')
-  await rig.rpc('settingsSet', { archiveIdle: 7 })
+  await rig.rpc('settingsSet', { archiveIdle: 7, archiveIdleKeepPR: false }) // the fake gh's open PR, once a scan comes: the next test's
   assert.deepEqual(await tick(6), [], 'not yet')
 
   // what keeps one, each lifted in turn
@@ -904,6 +904,25 @@ test('archiveIdle: a worktree untouched for the period goes, with Undo; each rea
   assert.ok((await live()).touchedAt >= before)
   assert.deepEqual(await tick(6), [], 'not again until another full period')
   c.close()
+})
+
+test('archiveIdle keeps a workspace whose shell tab runs a program', async t => {
+  const rig = await fresh(t)
+  const c = await rig.connect() // shells are checked only while someone looks
+  t.after(() => c.ws.close())
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
+  const shell = await until(() => rig.tab(ws.id, 'shell'), 'the shell tab')
+  await until(async () => (await rig.screen(shell.id)).includes('$'), 'its prompt')
+  await rig.rpc('settingsSet', { archiveIdle: 3, archiveIdleKeepPR: false, devMode: true }) // the fake gh's open PR
+  await rig.rpc('input', { tab: shell.id, data: 'sleep 100\r' })
+  await until(async () => (await rig.tab(ws.id, 'shell')).status === 'running', 'running', 5000)
+  const tick = () => rig.rpc('archiveIdleTick', { now: Date.now() + 4 * 86400e3 })
+  assert.deepEqual(await tick(), [], 'its job would be killed')
+  assert.ok((await rig.rpc('logs', { key: `ws:${ws.id}` })).some((l: any) => l.text === 'archive when idle: no, a program is running in a terminal'))
+  await rig.rpc('input', { tab: shell.id, data: '\x03' })
+  await until(async () => (await rig.tab(ws.id, 'shell')).status === 'idle', 'back at its prompt', 5000)
+  assert.deepEqual(await tick(), [ws.id])
 })
 
 test('archiveIdle keeps a workspace with a working agent, a queued message, a dev server or an open PR (unless told not to)', async t => {
