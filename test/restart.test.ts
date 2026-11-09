@@ -2,10 +2,11 @@
 // a test's daemon gone with its test process.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { INSTALL, notInstalled, tabAgent } from '../src/shared/install.ts'
 import { API } from '../src/shared/types.ts'
 import { fresh, running, sleep, until } from './helpers.ts'
 
@@ -301,4 +302,27 @@ test('R4: a full disk: the state stays in memory and the view says so; saved onc
   await rig.rpc('settingsSet', { prScan: 8 }) // the next save
   assert.equal((await rig.rpc('state')).diskFull, undefined)
   assert.equal(saved().settings.prScan, 8)
+})
+
+test("R12: an agent that isn't installed ends its tab with 127 (the strip's sign); installed, Enter starts it", async t => {
+  assert.equal(notInstalled({ kind: 'agent', status: 'exited', code: 127 }), true)
+  assert.equal(notInstalled({ kind: 'agent', status: 'exited', code: 1 }), false)
+  assert.equal(notInstalled({ kind: 'shell', status: 'exited', code: 127 }), false)
+  assert.deepEqual([tabAgent({ preset: 'codex' }), tabAgent({ preset: 'fast' }, [{ name: 'fast', agent: 'claude' }]), tabAgent({ preset: 'nope' })], ['codex', 'claude', undefined])
+  for (const a of Object.values(INSTALL)) assert.ok(!a.cmd || /^(curl -fsSL https:\/\/\S+ \| bash|npm install -g @[\w-]+\/[\w-]+)$/.test(a.cmd), a.cmd)
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.stop()
+  const fakes = fileURLToPath(new URL('./fakes', import.meta.url))
+  rig.env.PATH = rig.env.PATH.split(':').filter((d: string) => d !== fakes).join(':') // no agent anywhere
+  await rig.start()
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'none' })
+  const gone = await until(async () => (x => x?.status === 'exited' && x)(await rig.tab(ws.id)), 'its tab ended', 20000)
+  assert.equal(gone.code, 127)
+  assert.equal(notInstalled(gone), true)
+  mkdirSync(join(rig.home, 'bin'), { recursive: true })
+  symlinkSync(join(fakes, 'claude'), join(rig.home, 'bin', 'claude')) // installed
+  await rig.rpc('input', { tab: gone.id, data: '\r' }) // Check again
+  await until(async () => (await rig.tab(ws.id)).status !== 'exited', 'it runs', 20000)
 })

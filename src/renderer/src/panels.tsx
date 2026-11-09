@@ -1,5 +1,6 @@
 import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
+import { INSTALL } from '../../shared/install'
 import { REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, resetOf, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
@@ -1727,7 +1728,9 @@ const CLOUDFLARED_WHY =
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
 export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)
-  useEffect(() => void check().then(setD, () => {}), [])
+  const [busy, setBusy] = useState(false)
+  const again = () => (setBusy(true), void check().then(setD, () => {}).finally(() => setBusy(false))) // R12: no restart of Laki to see a new install
+  useEffect(again, [])
   const mac = /Mac/.test(navigator.userAgent) // Linux's (and WSL's) hints: apt
   const row = (ok: boolean, name: string, hint: string, why?: string) => (
     <div className="check" key={name}>
@@ -1763,8 +1766,26 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
           {d.ghCodespace !== undefined && row(d.ghCodespace, 'codespace scope', d.ghCodespace ? 'there: cloud workspaces work' : 'optional, for cloud workspaces: gh auth refresh -s codespace')}
           {d.cloudflared !== undefined &&
             row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : `optional: ${mac ? 'brew ' : ''}install cloudflared`, CLOUDFLARED_WHY)}
-          {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
-          {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
+          {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install one below, then Check again')}
+          {missing.length > 0 && (
+            <details className="welcome-install" open={!found.length}>
+              <summary className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</summary>
+              {missing.map(a => (
+                <div className="check" key={a.id}>
+                  <b>{AGENT_NAMES[a.id]}</b>
+                  <code className="grow">{INSTALL[a.id].cmd ?? 'see its own docs'}</code>
+                  {INSTALL[a.id].cmd && (
+                    <button type="button" className="sm" onClick={() => void navigator.clipboard.writeText(INSTALL[a.id].cmd!)}>
+                      Copy
+                    </button>
+                  )}
+                </div>
+              ))}
+            </details>
+          )}
+          <button type="button" className="sm" disabled={busy} onClick={again}>
+            {busy ? 'Checking…' : 'Check again'}
+          </button>
           {d.hooks && row(d.hooks.ok, 'hooks', d.hooks.ok ? "Laki's hook command runs: agents tell it when they ask and finish" : d.hooks.why!)}
           {d.hookFiles && row(d.hookFiles.ok, 'hook files', d.hookFiles.ok ? 'written: the agents find the hooks' : d.hookFiles.why!)}
         </div>
@@ -2249,6 +2270,43 @@ export function CheckStrip({ tab, check, onAgain, onStop, onSend, onHide }: { ta
 
 // Hooks not heard (the daemon's hookTick): this agent sends Laki none, so asks and ends are read off its screen; the
 // likely why (hookHealth.ts), Details (a file:line, the args, the command) to copy; Dismiss: this tab, until a reload
+// R12: a tab whose agent isn't installed (the shell's "command not found"): how to get it, and a way on
+export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
+  const i = INSTALL[agent]
+  return (
+    <div className="queue-strip show-strip hook-strip" role="region" aria-label={`${AGENT_NAMES[agent]} isn't installed`}>
+      <div className="queue-head">
+        <Icon name="alertCircle" size={13} />
+        <span className="queue-what">
+          {AGENT_NAMES[agent]} isn't installed, or isn't on the PATH your login shell gives.
+        </span>
+        {i.cmd && (
+          <button type="button" onClick={() => onInstall(i.cmd!)} data-tip="A terminal tab with the command typed, for you to run">
+            Install in a terminal
+          </button>
+        )}
+        <button type="button" onClick={onAgain} data-tip="Starts the tab again">
+          Check again
+        </button>
+      </div>
+      {i.cmd ? (
+        <div className="hook-detail">
+          <pre>{i.cmd}</pre>
+          <button type="button" onClick={() => onCopy(i.cmd!)}>
+            Copy
+          </button>
+          {i.docs && (
+            <a href={i.docs} target="_blank" rel="noreferrer">
+              Its docs ↗
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="show-text">Install it as its own docs say, then Check again.</div>
+      )}
+    </div>
+  )
+}
 export function HookStrip({ tab, onCopy, onHide }: { tab: TabView; onCopy: (text: string) => void; onHide: () => void }) {
   const [open, setOpen] = useState(false)
   const h = tab.hookless
