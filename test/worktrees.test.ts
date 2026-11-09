@@ -477,6 +477,7 @@ for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['Gi
     git(rig.repo, 'remote', 'add', 'origin', origin)
     git(rig.repo, 'config', 'remote.origin.pushurl', remote)
     if (forge === 'GitHub') git(rig.repo, 'config', 'remote.origin.gh-resolved', 'base') // gh repo set-default: no -R, so no --head
+    if (forge === 'GitHub') mkdirSync(rig.env.FAKE_GH, { recursive: true }), writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // so gh pr create runs
     const p = await rig.rpc('projectAdd', { path: rig.repo })
     const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
     git(ws.path, 'init', '-q', 'sub')
@@ -500,7 +501,38 @@ for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['Gi
     const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
     assert.equal(ended.code, 0, await rig.screen(tab.id))
     assert.equal(git(ws.path, 'ls-tree', 'HEAD', 'sub'), '')
+    assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /pr create|mr create/)
     assert.ok(!existsSync(ran), 'its config ran')
+  })
+
+for (const [forge, origin] of [['GitHub', 'https://github.com/o/repo.git'], ['GitLab', 'https://gitlab.com/o/repo.git']])
+  test(`a gitlink put back in the worktree's index while Ship runs (${forge}): gh's or glab's git status doesn't go in`, async t => {
+    const rig = await fresh(t)
+    const ran = join(rig.home, 'ran')
+    const evil = join(rig.home, 'evil.sh')
+    writeFileSync(evil, `#!/bin/sh\necho "$PWD" >> ${ran}\n`, { mode: 0o755 })
+    const git = (at: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: at, stdio: 'pipe', encoding: 'utf8' })
+    const remote = join(rig.home, 'remote.git')
+    git(rig.home, 'init', '-q', '--bare', remote)
+    git(rig.repo, 'remote', 'add', 'origin', origin)
+    git(rig.repo, 'config', 'remote.origin.pushurl', remote)
+    if (forge === 'GitHub') git(rig.repo, 'config', 'remote.origin.gh-resolved', 'base')
+    if (forge === 'GitHub') mkdirSync(rig.env.FAKE_GH, { recursive: true }), writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), 'no pull requests found') // so gh pr create runs
+    const p = await rig.rpc('projectAdd', { path: rig.repo })
+    const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+    git(ws.path, 'init', '-q', 'sub')
+    writeFileSync(join(ws.path, 'sub/b'), 'y\n')
+    git(join(ws.path, 'sub'), 'add', 'b')
+    git(join(ws.path, 'sub'), 'commit', '-qm', 's')
+    git(join(ws.path, 'sub'), 'config', 'core.fsmonitor', evil)
+    writeFileSync(join(ws.path, '.gitignore'), 'sub/\n') // treeOf doesn't take it: the tree passes
+    const sha = git(join(ws.path, 'sub'), 'rev-parse', 'HEAD').trim()
+    writeFileSync(join(rig.repo, '.git/hooks/pre-push'), `#!/bin/sh\ngit update-index --add --cacheinfo 160000,${sha},sub\n`, { mode: 0o755 }) // after read-tree, as a loop in the sandbox would
+    const tab = await rig.rpc('ship', { ws: ws.id, message: 'Shipped' })
+    const ended = await until(async () => (x => x?.status === 'exited' && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)), 'ship done', 15000)
+    assert.equal(ended.code, 0, await rig.screen(tab.id))
+    assert.match(git(ws.path, 'ls-files', '-s', 'sub'), /^160000/, 'the trap was set')
+    assert.ok(!existsSync(ran), `its config ran, in ${existsSync(ran) && readFileSync(ran, 'utf8')}`)
   })
 
 test('a submodule in the base, checked out, still ships', async t => {

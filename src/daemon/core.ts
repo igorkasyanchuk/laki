@@ -33,7 +33,7 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, pushed } from './phone.ts'
 import { daemonPort, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { collisions, inside, scanOverlaps, scanStats, stats, treeOf, viewWs } from './files.ts'
+import { collisions, inside, scanOverlaps, scanStats, stats, treeOf, turnDir, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
@@ -4085,16 +4085,19 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
   const tree = ws.host ? '' : await treeOf(ws, true)
   const nested = tree ? await nestedRepos(ws, tree) : []
-  if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])}${nested.length > 1 ? ` and ${nested.length - 1} more` : ''} is a git repo inside this workspace that ${ws.base} doesn't have, and its config could run a program as you. Delete its folder, or add it as a submodule on ${ws.base} first, then ship again`)
+  if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])} ${nested.length > 1 ? `and ${nested.length - 1} more are git repos` : 'is a git repo'} inside this workspace that ${ws.base} doesn't have, and a repo's config can run a program as you. Delete the folder, or add the submodule on ${ws.base} first, then ship again`)
   const script = [
     'set -e',
     tree ? 'git read-tree --reset "$LAKI_TREE"' : 'git add -A',
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
+    // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send gh's and
+    // glab's git status in. Theirs reads an index of Laki's instead (turnsTidy clears it)
+    ...(tree ? ['export GIT_INDEX_FILE="$LAKI_INDEX"', 'git read-tree "$LAKI_TREE"'] : []),
     lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree, LAKI_INDEX: join(turnDir, `${ws.id}.ship`) }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

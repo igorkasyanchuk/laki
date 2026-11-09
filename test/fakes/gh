@@ -1,6 +1,7 @@
 #!/bin/sh
 # fake gh: a PR for every branch, CI pending; files in $FAKE_GH answer instead when there
 echo "gh $*" >> "${FAKE_LOG:-/dev/null}"
+case "$*" in "pr create"*) case "$*" in *--head*) ;; *) git status --porcelain >/dev/null 2>&1 ;; esac ;; esac # the real one, without --head: into any gitlink in the index
 f() { [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/$1" ] && cat "$FAKE_GH/$1"; }
 case "$*" in
   "pr view --json number,title,url,headRefName"*) # starting a workspace from a PR (--pr)
@@ -42,6 +43,7 @@ case "$1 $2" in
     # --author: that login's (any case, as GitHub's search); @me: anyone's here
     [ -n "$au" ] && [ "$au" != @me ] && out=$(printf '%s' "$out" | jq --arg a "$au" '[.[] | select((.author.login | ascii_downcase) == ($a | ascii_downcase))]')
     if [ -n "$j" ]; then printf '%s' "$out" | jq "$j"; else printf '%s\n' "$out"; fi ;;
+  "pr create") f refuse >&2 && exit 1; echo "https://example.invalid/pr/1" ;;
   "pr view") # a branch's own ($FAKE_GH/pr-<branch>.json), else every branch's; one that isn't JSON is gh's failure, as said
     out=$(f "pr-$(printf %s "$3" | tr / _).json" || f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}')
     case "$out" in "{"*) printf '%s\n' "$out" ;; *) printf '%s\n' "$out" >&2; exit 1 ;; esac ;;
