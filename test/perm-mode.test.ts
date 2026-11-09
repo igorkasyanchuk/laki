@@ -103,7 +103,7 @@ test('tabMode: a tab started with Bypass can come back to it; a mode its build n
   writeFileSync(policy, '{}')
   const rig = await fresh(t, { env: { LAKI_POLICY: policy, FAKE_MODE_LINE: '1' } })
   const { ws, tab } = await started(rig, { perm: 'bypassPermissions' })
-  assert.equal((await rig.tab(ws.id)).mode, 'bypassPermissions')
+  await until(async () => (await rig.tab(ws.id)).mode === 'bypassPermissions', 'its footer read') // read before the footer is drawn: default, on a busy Mac
   assert.equal((await rig.tab(ws.id)).bypassNo, undefined)
   await rig.rpc('tabMode', { tab, mode: 'default' })
   assert.deepEqual(await rig.rpc('tabMode', { tab, mode: 'bypassPermissions' }), { mode: 'bypassPermissions' })

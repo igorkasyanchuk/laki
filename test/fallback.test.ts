@@ -62,13 +62,14 @@ test('auto fallback: with every account at its limit, it goes on on the first on
   const tab = await until(async () => (x => x?.last === 'answer: hi' && x)(await rig.tab(ws.id)), 'its first turn')
   const runs = () => rig.fakeLog().filter(l => l.bin === 'claude' && l.tab === tab.id)
   await rig.rpc('settingsSet', { limitFallback: { claude: ['home', work.id] } })
+  const t0 = Date.now()
   await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: { last_assistant_message: "You've hit your limit · resets in 5 seconds" } })
   await until(() => runs().length === 2, 'on Work')
   await until(async () => (await rig.tab(ws.id)).last === 'answer: continue', 'it went on')
   // Work's resets in 2 hours, the default's in seconds: it waits for the default's, then goes on there
   await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: limit(2) })
   await sleep(1500)
-  assert.equal(runs().length, 2)
+  if (Date.now() - t0 < 4500) assert.equal(runs().length, 2) // past 5 s, on a busy Mac, the default's has reset: nothing to wait for
   await until(() => runs().length === 3, 'back on the default as it reset')
   assert.equal(runs()[2].env.CLAUDE_CONFIG_DIR, runs()[0].env.CLAUDE_CONFIG_DIR)
   assert.equal((await rig.tab(ws.id)).account, 'home')
