@@ -1591,7 +1591,9 @@ the rest; the bar under the terminal has it as a *+N −M* chip, the sidebar's N
 of your other workspaces or projects, and the message goes with a line for each saying what it is: its folder,
 branch and agents, and how to reach it with `laki send` and `laki diff`; nothing starts by itself). The
 terminal stays attached under it, so *Terminal* brings it back as it was. Each tab remembers which; on a phone they
-open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off. What you type
+open in Reader. A tab's right click has it too. Settings › Appearance › *Reader view* turns the switch off. The chip on
+a Claude Code tab's box (and *Permission mode* in its right click) shows its real mode and changes it without a restart,
+mid-turn too: *Ask*, *Accept edits*, *Plan*, or *Bypass* where its sandbox, a managed policy and how it started allow. What you type
 in its box and don't send stays, tab by tab: through a switch of tabs, closing it and ⇧⌘T, a restart or an archive (the
 tab shows *Draft*); agents can't read it. A
 ```` ```diff ```` block in its answer (Laki AI's and Side chat's too) is drawn as a diff, red and green with line numbers,

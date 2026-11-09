@@ -2725,6 +2725,9 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-perm { display: flex; align-items: baseline; gap: 6px; min-width: 0; } .rd-perm .mono { font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 8em; overflow-y: auto; }
 .rd-box { position: relative; display: flex; gap: 8px; align-items: flex-end; } /* @'s menu (pi-complete) over it */
 .rd-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
+.rd-mode { flex: none; align-self: center; font: inherit; font-size: 12px; cursor: pointer; }
+.rd-mode.danger { color: var(--red); border-color: var(--red); }
+.menu-item.off { opacity: 0.45; cursor: default; }
 .rd-app { display: flex; flex-direction: column; gap: 4px; }
 .rd-app-frame { width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
 .rd-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--fg); font-size: 12px; }

@@ -563,7 +563,7 @@ export async function copyImage(img: HTMLImageElement) {
   const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
 }
-type ItemBase = { label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string; font?: string } // font: its label drawn in it (a CSS font-family: the font pickers')
+type ItemBase = { off?: boolean; label: string; icon?: IconName; mark?: ReactNode; hint?: string; key?: string; danger?: boolean; good?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string; font?: string } // font: its label drawn in it (a CSS font-family: the font pickers')
 export type MenuItem =
   | (ItemBase & { run: () => void; cmd?: () => void; items?: never }) // cmd: what a ⌘-click or ⌘⏎ does instead (the + menu's: a tab of its own)
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -732,7 +732,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         role="menuitem"
         aria-haspopup={it.items ? 'menu' : undefined}
         aria-expanded={it.items ? subOf?.it === it : undefined}
-        className={`menu-item ${it.danger ? 'danger' : ''} ${it.good ? 'good' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
+        className={`menu-item ${it.off ? 'off' : ''} ${it.danger ? 'danger' : ''} ${it.good ? 'good' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
         data-tip={it.tip}
         onClick={e => pick(it, e.currentTarget, e.detail === 0, e.metaKey)}
         onPointerEnter={e => hover(it, e.currentTarget)}

@@ -170,8 +170,22 @@ process.stdin.setRawMode(true) // before the first turn's hooks (execSync blocks
 if (positional.length) turn(positional.at(-1))
 else process.stdout.write('> ')
 let line = ''
+// the footer's permission mode, redrawn on the last row; shift-tab cycles it as the real one does (bypass only if it was
+// started so; FAKE_NO_MODES: a build whose footer never changes)
+const CAN_BYPASS = args.some(a => a === '--dangerously-skip-permissions' || a === '--allow-dangerously-skip-permissions') || args[args.indexOf('--permission-mode') + 1] === 'bypassPermissions'
+const MODES = ['default', 'acceptEdits', 'plan', ...(CAN_BYPASS ? ['bypassPermissions'] : [])]
+const FOOT = { default: '', acceptEdits: '⏵⏵ accept edits on', plan: '⏸ plan mode on', bypassPermissions: '⏵⏵ bypass permissions on' }
+let mode = args.includes('--permission-mode') ? args[args.indexOf('--permission-mode') + 1] : 'default'
+if (!MODES.includes(mode)) mode = 'default'
+const drawFoot = () => process.stdout.write(`\x1b7\x1b[${process.stdout.rows || 24};1H\x1b[2K  ${FOOT[mode]}\x1b8`)
+if (process.env.FAKE_MODE_LINE) drawFoot() // at the start only when asked: below the prompt, it changes what other tests read as its last line
 process.stdin.on('data', d => {
-  const s = d.toString().replace(/\x1b\[20[01]~/g, '')
+  let s = d.toString().replace(/\x1b\[20[01]~/g, '')
+  if (s.includes('\x1b[Z')) {
+    s = s.replaceAll('\x1b[Z', '')
+    if (!process.env.FAKE_NO_MODES) (mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length]), drawFoot()
+    if (!s) return
+  }
   if (menu) {
     const keys = s.match(/\x1b[[O][AB]|\r/g) // each key, in order: a busy machine hands keys sent 40 ms apart over in one read
     if (!keys) return

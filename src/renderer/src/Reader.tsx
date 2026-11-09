@@ -7,7 +7,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
-import { ask, Icon, type MenuItem, useMenu } from './ui'
+import { ask, Icon, type MenuItem, ON, useMenu } from './ui'
 import { linkify, Markdown, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
 import { daemonBase, openExternal } from './api'
@@ -18,7 +18,7 @@ import { type Mention, type ReaderLine, readerShown, retrying, retryText, withMe
 import { sendIs } from '../../shared/keys'
 import { optLabel } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
-import { HIDDEN, type TabView } from '../../shared/types'
+import { CLAUDE_MODES, HIDDEN, type TabView } from '../../shared/types'
 
 type Said = ReaderLine // fail: a run of tool calls' failed ones; stopped: you stopped it there; new: a New session line (a /clear)
 // what a claude chat runs in the background (the daemon's share.ts bgOf): subagents and background shells
@@ -26,12 +26,20 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
+export type ReaderApi = { setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[] } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
 // Settings › Appearance's: which tool calls show (text.ts readerShown), and whether sending scrolls to the latest (on unless false)
 export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean }
+
+// a running claude's permission modes (the chip, a tab's menu): the one on ticked, Bypass red, and greyed with why when it can't be had
+export const modeItems = (tab: TabView, set: (mode: string) => unknown): MenuItem[] =>
+  CLAUDE_MODES.map(([id, label, sub]) => {
+    const no = id === 'bypassPermissions' ? tab.bypassNo : undefined
+    return { label, sub: no ?? sub, hint: tab.mode === id ? ON : undefined, danger: id === 'bypassPermissions', off: !!no, run: () => void (no || set(id)) }
+  })
+export const modeLabel = (mode?: string) => (mode === 'auto' ? 'Auto' : CLAUDE_MODES.find(([id]) => id === mode)?.[1])
 
 // the Reader's box, per tab: here at once (a switch of tabs), in the daemon a moment after you stop typing
 const drafts = new Map<string, string>()
@@ -253,6 +261,11 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         </div>
       ) : (
         <form className="rd-box" onSubmit={e => (e.preventDefault(), send())}>
+          {tab.mode && (
+            <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip="Its permission mode: change it without restarting" onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
+              {modeLabel(tab.mode)} ▾
+            </button>
+          )}
           <textarea
             ref={box}
             value={text}

@@ -13,7 +13,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { priorOf, readJson } from '../shared/conn.ts'
-import { type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+import { CLAUDE_MODES, claudeMode, type NativeSeen, SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API, type Doctor, EFFORTS, FAST, FILE_MAX, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate, type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs, PERMS, SANDBOX, SANDBOX_NO, sandboxOff, type PR, type PRAllow, prAllows, type Preset, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template, type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
@@ -38,7 +38,7 @@ import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startP
 import { away, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
 import { ghRepos, headOf, prFromSaid, prSeen, prSoon, relate, retry, scanPRs, unrelate } from './pr.ts'
 import { ticketOf } from './tickets.ts'
-import { managedView, policyAgent, policySettings, policyTick } from './policy.ts'
+import { managedView, policy, policyAgent, policySettings, policyTick } from './policy.ts'
 import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 
@@ -90,7 +90,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { mode?: string; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -618,7 +618,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -2119,6 +2119,49 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   changed()
 }
 
+// why a running claude can't be switched to Bypass (undefined: it can): the managed policy, its sandbox, or that it wasn't
+// started so: claude itself only offers Bypass then
+export function bypassNo(t: Tab) {
+  if (policy()?.bypass === false) return 'Your managed policy requires approvals'
+  if (sandboxed(t)) return 'Its sandbox rules this out'
+  const pr = presetOf(t)
+  const args = pr?.args ?? ''
+  if (!neverAsks(t.preset, t.perm ?? pr?.perm, args) && !/--allow-dangerously-skip-permissions\b/.test(args)) return 'Only a tab started with Bypass can switch to it'
+}
+
+// a running claude's permission mode, by its own ⇧⇥ (mid-turn too), read back from its footer after each press: nothing
+// is assumed about its cycle. Round to where it began: that mode isn't in its cycle. Not persisted: a resume starts as
+// the tab says (t.perm), and the chip reads what's really on. ponytail: claude only, codex's /approvals is a menu to drive
+const MODE_PRESSES = 8
+const MODE_WAIT = 2000
+export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
+  const t = findTab(String(p.tab ?? ''))
+  const s = sessions.get(t.id)
+  if (t.preset !== 'claude' || !s || s.exited || asleep.has(t.id)) throw new Error('only a running Claude Code tab can switch its mode')
+  const mode = String(p.mode ?? '')
+  if (!CLAUDE_MODES.some(([id]) => id === mode)) throw new Error(`no permission mode called ${mode}`)
+  if (asking(t.id)) throw new Error('it is asking you something: answer that first')
+  if (mode === 'bypassPermissions') {
+    const no = bypassNo(t)
+    if (no) throw new Error(no)
+  }
+  const r = rtOf(t.id)
+  const start = claudeMode(s.screenText(6))
+  let now = start
+  for (let i = 0; i < MODE_PRESSES && now !== mode; i++) {
+    const was = now
+    s.write('\x1b[Z') // shift-tab
+    const until = Date.now() + MODE_WAIT
+    while ((now = claudeMode(s.screenText(6))) === was && Date.now() < until && !s.exited) await new Promise(ok => setTimeout(ok, 40))
+    if (now === was) throw new Error("it didn't change mode")
+    if (now === start) throw new Error(`${CLAUDE_MODES.find(([id]) => id === mode)![1]} isn't among the modes it offers`)
+  }
+  if (now !== mode) throw new Error("it didn't reach that mode")
+  r.mode = mode
+  changed()
+  return { mode }
+}
+
 // what's typed in a tab's Reader box and not sent: read (no text), or kept (debounced by the Reader), through restarts,
 // a closed tab (closeTab, tabReopen) and an archive; deleted with its tab. Yours alone: no agent reads or sets it
 export const DRAFT_MAX = 100_000
@@ -3480,6 +3523,7 @@ export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
     const r = rt.get(t.id)
+    if (t.preset === 'claude' && s && !s.exited && r && r.status !== 'waiting' && r.mode !== (r.mode = claudeMode(s.screenText(6)))) changed() // ⇧⇥ in its terminal too; a menu over its footer says nothing
     const screen = tracked(t) && !HOOKED.has(t.preset!) && !r?.hooked // no hooks: the screen and title are all it says
     if (screen && s && !s.exited && r && r.status !== 'idle') {
       const asks = ASKS.test(s.title)

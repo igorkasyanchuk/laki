@@ -6,7 +6,7 @@ import { ask, type MenuItem, ON, iconItems, TAB_COLORS, askText, type IconName }
 import { pendingWords, shortPath } from './text'
 import { isIconName } from '../../shared/icons'
 import { tabsOf, move } from '../../shared/layout'
-import { readable } from './Reader'
+import { modeItems, readable } from './Reader'
 import { wsLink } from './links'
 import { api, bridge } from './api'
 import type { Collision } from '../../shared/overlap'
@@ -114,6 +114,7 @@ export function menusOf(app: AppBase) {
       { label: 'Mark as unread', icon: 'unread', key: 'u', tip: 'Its ● again, so it stays in Needs you until you look', run: () => ts.forEach(t => markUnread(t.id)) },
       ...(readerOn && ts.length === 1 && readable(ts[0]) ? [(r => ({ label: r ? 'Show the terminal' : 'Show as a chat (Reader)', icon: r ? 'terminal' : 'file', tip: r ? 'Its terminal, as the agent draws it' : 'Its chat as a conversation: your messages, its answers, its steps folded', run: () => setRead(ts[0].id, r ? 'term' : 'reader') }) as MenuItem)(inReader(ts[0].id))] : []),
       ...(bridge?.floatTab && ts.length === 1 ? [floated.includes(ts[0].id) ? ({ label: 'Back from its own window', icon: 'popIn', run: () => floatTab(ts[0].id, false) } as MenuItem) : ({ label: 'Float in its own window', icon: 'popOut', sub: 'Over every app, so you can watch it from anywhere', run: () => floatTab(ts[0].id) } as MenuItem)] : []),
+      ...(ts.length === 1 && ts[0].mode ? [{ label: 'Permission mode', icon: 'lock', items: modeItems(ts[0], m => call('tabMode', { tab: ts[0].id, mode: m }).catch(() => {})) } as MenuItem] : []),
       ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', tip: 'Types a message into it at a time you pick, or once its turn ends', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(ts.length === 1 ? [{ label: 'Copy contents', icon: 'copy', sub: 'Its whole terminal as text, the scrollback too', run: () => copyTab(ts[0]) } as MenuItem] : []),
       ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', tip: 'A laki:// link that opens this tab', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),

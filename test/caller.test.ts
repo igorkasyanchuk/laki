@@ -92,6 +92,7 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   assert.match(read.error, /an agent can't read or change what the user is typing/)
   assert.match(wrote.error, /an agent can't read or change/)
   await rig.rpc('tabDraft', { tab, text: '' })
+  assert.match((await agent(curl('tabMode', { tab, mode: 'plan' })))[0].error, /an agent can't change a permission mode/)
 
   // a caller gone before it's looked up (the request sent, its socket closed): refused, never yours
   const half = await new Promise<string>((ok, bad) => {

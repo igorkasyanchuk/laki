@@ -32,6 +32,17 @@ export const PERMS: Partial<Record<Agent, [id: string, label: string, sub: strin
     ['bypassPermissions', 'Bypass permissions', 'No sandbox, never asks: anything goes', ['--dangerously-bypass-approvals-and-sandbox']],
   ],
 }
+// a running claude's permission modes, as the Reader's chip and a tab's menu offer them (tabMode): 'default' asks
+export const CLAUDE_MODES: [id: string, label: string, sub: string][] = [
+  ['default', 'Ask', 'Asks before edits and commands'],
+  ['acceptEdits', 'Accept edits', 'Edits files without asking; asks before commands'],
+  ['plan', 'Plan', 'Reads and plans; changes nothing'],
+  ['bypassPermissions', 'Bypass', 'Never asks: anything goes'],
+]
+// the mode claude's footer shows, from its screen's bottom lines; none shown: 'default'
+const MODE_LINE = /^\s*\S{0,3}\s*(accept edits|plan mode|auto mode|bypass permissions) on\b/gm
+const MODE_IDS: Record<string, string> = { 'accept edits': 'acceptEdits', 'plan mode': 'plan', 'auto mode': 'auto', 'bypass permissions': 'bypassPermissions' }
+export const claudeMode = (screen: string) => (m => (m ? MODE_IDS[m[1]] : 'default'))([...screen.matchAll(MODE_LINE)].at(-1))
 export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
 // a profile's flags that set how freely it acts already: then no mode of Laki's goes in (agentCmd), and one that never
 // asks counts as bypassPermissions
@@ -924,7 +935,7 @@ export type BgTaskView = { id: string; kind: 'agent' | 'shell'; name: string; ou
 // claude waiting out an API error (a rate limit, an overloaded server, a lost connection): its try (n of max), when the
 // next one goes (until), when it said so (at: a turn that started after has none), why in its own words (share.ts meterOf)
 export type Retry = { n?: number; max?: number; until: number; at: number; why?: string }
-export type TabView = Tab & { drafted?: boolean; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number } } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { drafted?: boolean; mode?: string; bypassNo?: string /* mode: a running claude's, read off its screen; bypassNo: why it can't be switched to Bypass */; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; compacting?: boolean; suggest?: string; secret?: { id: string; label: string }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number } } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -1052,7 +1063,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 155
+export const API = 156
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
