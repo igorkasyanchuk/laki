@@ -1870,7 +1870,7 @@ workspaces* turns it off.
 
 ### Keys
 
-The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,. Settings › *Keys* changes
+The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,. Settings › *Keys* also gives any ⌘K command a key of its own (none has one until you do; *Ship*, *Check overlaps*, *Recording mode*, *Share live view*, a layout…), and its list can be searched by name or by pressing a key, or narrowed to *Assigned*. Settings › *Keys* changes
 most of them (not ⌘1…⌘9, ⌘↑ / ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N or the text size); these are the defaults.
 
 Hold ⌘ alone for a moment to see them on the window: a badge beside each tab, button and row that has a key, and the

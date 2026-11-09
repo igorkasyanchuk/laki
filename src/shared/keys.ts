@@ -62,6 +62,20 @@ export const FIXED: [string, string][] = [
   ['⌘M', 'Minimize'],
 ]
 
+// the ⌘K commands that can get a key (Settings › Keys; settings.cmdKeys: { id: keys }): none has one until you give it.
+// Their ids are Palette.tsx's: a command that doesn't apply right now (no workspace, no PR) lets the key go on
+export const COMMANDS: { id: string; label: string }[] = [
+  ['ship', 'Ship: commit, push, open a PR'], ['overlaps', 'Check overlaps'], ['share', 'Share live view'], ['recording', 'Recording mode on / off'], ['notify', 'macOS notifications on / off'],
+  ['layout-agent', 'Layout: Just the agent'], ['layout-preview', 'Layout: Agent | Preview'], ['layout-changes', 'Layout: Agent | Changes'], ['layout-dev', 'Layout: Agent | dev server'], ['layout-shell', 'Layout: Agent / shell'],
+  ['run', 'Run the run script'], ['stopRun', 'Stop the run script'], ['script-test', 'Run the test script'], ['script-lint', 'Run the lint script'], ['script-format', 'Run the format script'], ['script-deploy', 'Run the deploy script'],
+  ['review', 'Review: PR checks and comments'], ['openPR', "Open the workspace's PR"], ['openPort', 'Open localhost at $PORT'], ['projectSettings', 'Project settings'], ['copyTab', "Copy the tab's contents"], ['floatTab', 'Float the tab in its own window'], ['remind', 'Remind me about this workspace'],
+  ['terminal', 'New terminal'], ['browser', 'New browser'], ['ssh', 'Open a project over SSH'], ['start', 'Get started'], ['themes', 'Themes'], ['schedules', 'Scheduled tasks'], ['board', 'Board'], ['achievements', 'Achievements'], ['specs', 'Specs & Brainstorms'], ['workflows', 'Workflows'], ['bird', 'Bird view'], ['usage', 'Usage'], ['calendar', 'Calendar'], ['desk', 'My Desk'], ['notes', 'Notes'], ['todos', 'To-dos'],
+  ['ai', 'Laki AI'], ['aiLater', 'Ask Laki AI later'], ['extensions', 'Extensions'], ['newExtension', 'New extension'], ['starters', 'New extension from a starter'], ['uikit', 'UI kit'], ['icons', 'Icons'], ['resources', 'Resources'], ['about', 'About Laki'], ['collapseAll', 'Collapse all projects'], ['expandAll', 'Expand all projects'], ['timer', 'Start a timer'], ['remote', 'Remote access'], ['remoteStop', 'Stop remote access'],
+].map(([id, label]) => ({ id, label }))
+export type CmdMap = Record<string, string>
+// settings.cmdKeys as usable: known commands, keys Laki may take
+export const cmdMap = (over?: unknown): CmdMap => Object.fromEntries(Object.entries(over && typeof over === 'object' ? (over as Record<string, unknown>) : {}).filter((x): x is [string, string] => typeof x[1] === 'string' && keyOk(x[1]) && COMMANDS.some(c => c.id === x[0])))
+
 // keys Laki may take: ⌘, ⌥ or ⌃ with a key (one alone, or with ⇧, would be typed: a terminal never loses it)
 export const keyOk = (k: string) => (m => !!m && !!(m[1] || m[2] || m[4]) && !/[⌃⌥⇧⌘]/.test(m[5]) && m[5].length <= 12)(/^(⌃?)(⌥?)(⇧?)(⌘?)(.+)$/.exec(k))
 
@@ -90,6 +104,23 @@ export const keyClash = (id: KeyId, m: KeyMap, others: [string, string][] = []) 
   const o = KEYS.find(x => x.id !== id && m[x.id] === k)?.label ?? [...others, ...FIXED].find(([c]) => c === k)?.[1]
   return o ?? (k.includes('⌃') && !/[⌥⌘]/.test(k) ? 'the terminal (⌃ keys without ⌘ or ⌥ are its own)' : '')
 }
+
+// the command a press is, by the character first, as keyFor
+export const cmdFor = (e: Press, m: CmdMap) => {
+  for (const l of [keyLabel(e, true), keyLabel(e)]) {
+    const id = Object.keys(m).find(x => m[x] === l)
+    if (id) return id
+  }
+}
+// what else has this command's keys: as keyClash, with Laki's own actions and the other commands
+export const cmdClash = (id: string, cmds: CmdMap, keys: KeyMap, others: [string, string][] = []) => {
+  const k = cmds[id]
+  if (!k) return ''
+  const o = KEYS.find(x => keys[x.id] === k)?.label ?? COMMANDS.find(c => c.id !== id && cmds[c.id] === k)?.label ?? [...others, ...FIXED].find(([c]) => c === k)?.[1]
+  return o ?? (k.includes('⌃') && !/[⌥⌘]/.test(k) ? 'the terminal (⌃ keys without ⌘ or ⌥ are its own)' : '')
+}
+// the commands' keys as keyClash's others
+export const cmdOthers = (cmds: CmdMap): [string, string][] => COMMANDS.filter(c => cmds[c.id]).map(c => [cmds[c.id], c.label])
 
 // keys to read: ⏎, the arrows and ⌫ for their names
 // Settings › Keys › Send with (sendKey): ⏎ (unset; ⇧⏎ a new line) or ⌘⏎ (mod; ⏎ a new line) in a chat's box: the

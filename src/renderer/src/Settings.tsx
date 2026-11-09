@@ -16,7 +16,7 @@ import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
-import { type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
+import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
@@ -230,6 +230,7 @@ export type AppSettings = Paint & {
   ai?: AiSettings // Laki AI (Settings › AI)
   voice?: VoiceSettings // the mic and hold Fn (Settings › Voice)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
+  cmdKeys?: Record<string, string> // Settings › Keys: ⌘K commands' keys
   archiveIdle?: number // days a worktree is left untouched before it's archived (unset, 0: off)
   archiveIdleKeepPR?: boolean // not one with an open PR (unset: on)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
@@ -549,13 +550,31 @@ function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v
 
 // Settings › Keys: App's own actions (shared/keys.ts KEYS), each recorded over its default (settings.keys: only the
 // ones changed); others: [keys, name] the clash check counts too (the global hotkeys, the picker)
-function KeysSection({ over, others, onChange, overlay, onOverlay }: { over?: Record<string, string>; others: [string, string][]; onChange: (keys: Record<string, string>) => void; overlay: boolean; onOverlay: (on: boolean) => void }) {
+function KeysSection({ cmds, onCmds, over, others, onChange, overlay, onOverlay }: { cmds?: Record<string, string>; onCmds: (c: Record<string, string>) => void;  over?: Record<string, string>; others: [string, string][]; onChange: (keys: Record<string, string>) => void; overlay: boolean; onOverlay: (on: boolean) => void }) {
   const m = keyMap(over)
+  const c = cmdMap(cmds)
+  const [q, setQ] = useState('')
+  const [pressed, setPressed] = useState('') // a press in the search box: the rows with these keys
+  const [only, setOnly] = useState(false) // Assigned
+  useEffect(() => () => void (keyRec.on = false), [])
+  const shown = (label: string, k: string) => (!only || !!k) && (pressed ? k === pressed : !q.trim() || label.toLowerCase().includes(q.trim().toLowerCase()))
+  const setCmd = (id: string, k: string) => onCmds(Object.fromEntries(Object.entries({ ...c, [id]: k }).filter(([, v]) => v)))
   const set = (id: KeyId, k: string) => onChange(Object.fromEntries(KEYS.map(x => [x.id, x.id === id ? k : m[x.id]] as const).filter(([i, v]) => v !== KEYS.find(x => x.id === i)!.key)))
   return (
     <>
       <h2>Keys</h2>
       <p className="muted small">The keys of Laki's own actions: Record, then press new ones (⌘, ⌥ or ⌃ with a key, so typing in a terminal is never taken; ⌫ leaves none). The others (⌘1…⌘9, ⌘↑ ⌘↓, ⌘O, ⌘E, ⌘D, ⌘⇧N, text size) stay; Help lists them all, and the menu bar shows these as you set them.</p>
+      <div className="row keys-find">
+        <input className="grow" placeholder="Search by name, or press the keys" aria-label="Search keys" value={pressed ? keyShow(pressed) : q} onFocus={() => (keyRec.on = true)} onBlur={() => (keyRec.on = false)} onChange={e => (setPressed(''), setQ(e.target.value))} onKeyDown={e => {
+          if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return
+          if (e.metaKey || e.ctrlKey || e.altKey) e.preventDefault(), setPressed(keyLabel(e.nativeEvent)), setQ('')
+          else if (pressed) setPressed('')
+        }} />
+        <span className="seg">
+          <button type="button" className={only ? '' : 'on'} onClick={() => setOnly(false)}>All</button>
+          <button type="button" className={only ? 'on' : ''} onClick={() => setOnly(true)}>Assigned</button>
+        </span>
+      </div>
       <Group
         title="Laki's keys"
         act={
@@ -565,12 +584,25 @@ function KeysSection({ over, others, onChange, overlay, onOverlay }: { over?: Re
         }
       >
         <div className="setting-box">
-          {KEYS.map(x => {
-            const c = keyClash(x.id, m, others)
+          {KEYS.filter(x => shown(x.label, m[x.id])).map(x => {
+            const clash = keyClash(x.id, m, [...others, ...cmdOthers(c)])
             return (
               <div className="switch-row" key={x.id}>
                 <KeyField value={m[x.id]} def={x.key} onSet={k => set(x.id, k)} />
-                <Says title={x.label} hint={c && <span className="warn-soft">{keyShow(m[x.id])} is also {c}: one of them won't get it</span>} />
+                <Says title={x.label} hint={clash && <span className="warn-soft">{keyShow(m[x.id])} is also {clash}: one of them won't get it</span>} />
+              </div>
+            )
+          })}
+        </div>
+      </Group>
+      <Group title="⌘K commands" hint="None has a key until you give it one. A command that doesn't apply where you are lets the key go on">
+        <div className="setting-box">
+          {COMMANDS.filter(x => shown(x.label, c[x.id] ?? '')).map(x => {
+            const clash = cmdClash(x.id, c, m, others)
+            return (
+              <div className="switch-row" key={x.id}>
+                <KeyField value={c[x.id] ?? ''} def="" onSet={k => setCmd(x.id, k)} />
+                <Says title={x.label} hint={clash && <span className="warn-soft">{keyShow(c[x.id])} is also {clash}: one of them won't get it</span>} />
               </div>
             )
           })}
@@ -2302,6 +2334,8 @@ export function SettingsPage(p: {
           {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} emuWindow={s.emuWindow === true} onEmuWindow={emuWindow => set({ emuWindow })} />}
           {sec === 'keys' && (
             <KeysSection
+              cmds={s.cmdKeys}
+              onCmds={cmdKeys => set({ cmdKeys })}
               over={s.keys}
               others={[
                 ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),

@@ -1,7 +1,8 @@
 // Settings › Keys (shared/keys.ts): the keys in use over the defaults, a press to its action, what else has a key
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
+import { readFileSync } from 'node:fs'
+import { cmdClash, cmdFor, cmdMap, cmdOthers, COMMANDS, keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
 
 const press = (key: string, code: string, mods: { meta?: boolean; alt?: boolean; ctrl?: boolean; shift?: boolean } = { meta: true }) => ({ key, code, metaKey: !!mods.meta, altKey: !!mods.alt, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
 
@@ -67,4 +68,28 @@ test('hold ⌘: a badge for each key whose button is on screen, yours over the d
   assert.ok(!o.strip.some(([, l]) => l === 'Send a message later')) // unbound: not in the strip either
   assert.ok(!o.strip.some(([, l]) => l === 'Palette')) // on screen: a badge, not a strip entry
   assert.equal(o.strip.length, KEYS.filter(x => x.key).length - 4) // layout has none by default
+})
+
+test('⌘K commands: none has a key until given one; a press finds it; clashes as for the others; every id the palette uses is listed, and each listed one is used', () => {
+  assert.deepEqual(cmdMap(), {})
+  assert.deepEqual(cmdMap({ ship: '⌥⌘S', bird: 'B', nope: '⌘Y', board: 7 }), { ship: '⌥⌘S' }, 'known commands, keys Laki may take')
+  const m = cmdMap({ ship: '⌥⌘S' })
+  assert.equal(cmdFor(press('s', 'KeyS', { meta: true, alt: true }), m), 'ship')
+  assert.equal(cmdFor(press('s', 'KeyS'), m), undefined)
+  const keys = keyMap()
+  assert.equal(cmdClash('ship', m, keys), '')
+  assert.equal(cmdClash('ship', cmdMap({ ship: '⌘K' }), keys), 'Palette')
+  assert.equal(cmdClash('ship', cmdMap({ ship: '⌘O' }), keys), 'Open a project')
+  assert.equal(cmdClash('ship', cmdMap({ ship: '⌥⌘X', bird: '⌥⌘X' }), keys), 'Bird view')
+  assert.match(cmdClash('ship', cmdMap({ ship: '⌃R' }), keys), /terminal/)
+  assert.equal(cmdClash('ship', cmdMap({}), keys), '')
+  assert.deepEqual(cmdOthers(m), [['⌥⌘S', COMMANDS.find(c => c.id === 'ship')!.label]])
+  assert.equal(keyClash('palette', keyMap({ palette: '⌥⌘S' }), cmdOthers(m)), COMMANDS.find(c => c.id === 'ship')!.label)
+
+  const src = readFileSync(new URL('../src/renderer/src/Palette.tsx', import.meta.url), 'utf8')
+  const used = new Set([...src.matchAll(/\bid: '([\w-]+)'/g)].map(x => x[1]))
+  const ids = COMMANDS.map(c => c.id).filter(id => !/^(layout|script)-/.test(id))
+  assert.deepEqual(ids.filter(id => !used.has(id)), [], 'listed, not in the palette')
+  assert.deepEqual([...used].filter(id => !ids.includes(id)), [], 'in the palette, not listed')
+  assert.equal(new Set(COMMANDS.map(c => c.id)).size, COMMANDS.length)
 })

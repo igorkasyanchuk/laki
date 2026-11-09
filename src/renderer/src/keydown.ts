@@ -4,7 +4,8 @@
 // Settings › Keys' that was given the same keys
 import type { AppCtx } from './appCtx'
 import { keyRec, keyLabel } from './ui'
-import { keyFor, type KeyId } from '../../shared/keys'
+import { cmdFor, cmdMap, keyFor, type KeyId } from '../../shared/keys'
+import { paletteItems } from './Palette'
 import { pressOf } from '../../shared/widgetSchema'
 
 export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: boolean) {
@@ -43,6 +44,11 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
   const run = id && bound[id]
   if (run) return void (e.preventDefault(), e.stopPropagation(), run())
   if (force) return
+  // a ⌘K command given a key (Settings › Keys): the palette's own item, so it does what it does there; one that doesn't
+  // apply now lets the key go on. Not under a yes/no
+  const cmd = !fixed && !e.repeat && !document.querySelector('.ask-overlay') ? cmdFor(e, cmdMap(settings.cmdKeys)) : undefined
+  const it = cmd ? paletteItems(app).find(x => x.id === cmd) : undefined
+  if (it) return void (e.preventDefault(), e.stopPropagation(), it.run())
   // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in;
   // not under a yes/no (its run's own question would replace it: a Deny, a Cancel)
   const hit = (e.altKey || e.ctrlKey) && !e.repeat && !document.querySelector('.ask-overlay') ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined

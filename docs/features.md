@@ -37,7 +37,7 @@ time and AI money per run (`budget: 60 min, $5`).
   (only that turn's diff) and *Undo*. Optionally a guess at your next message, greyed out in the box (Tab takes it).
   Tool calls: show all, hide the ones that worked, or the final answer only; `/clear` keeps the earlier chat above a
   *New session* line; a prompt stopped before an answer: *Edit and resend*; Claude Code waiting out a rate limit says so;
-  ←/→ between the questions of one ask; ⏎ or ⌘⏎ sends (Settings › Keys).
+  ←/→ between the questions of one ask; ⏎ or ⌘⏎ sends (Settings › Keys). Any ⌘K command can get its own key there.
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
   Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card, it gets a file's path. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.

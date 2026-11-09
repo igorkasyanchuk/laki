@@ -659,6 +659,7 @@ export type Settings = {
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railPlans?: PlanPin[] // specs and brainstorms pinned to the rail (RAIL_PINS at most), oldest first
   keys?: Record<string, string> // Settings › Keys: App's own actions' keys over shared/keys.ts' KEYS ({ id: keys } as keyLabel writes them; '': none)
+  cmdKeys?: Record<string, string> // Settings › Keys: ⌘K commands' keys, by shared/keys.ts COMMANDS' ids
   pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
