@@ -355,7 +355,7 @@ const api: Record<string, Handler> = {
   aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
-  send: async p => (agentSend(p), await crossAsk(p, 'send'), core.send(p)),
+  send: async p => (text(p.text, 'text'), agentSend(p), await crossAsk(p, 'send'), core.send(p)),
   prompts: () => core.promptList(), // your prompts, newest first: the prompt boxes' history
   chatList: p => chatList(p), // Import chats: Claude Code's and Codex's sessions in the project's folders, outside Laki
   chatImport: p => chatImport(p),
@@ -448,7 +448,7 @@ const api: Record<string, Handler> = {
   tunnelCheck: p => remoteMod.tunnelCheck(p), // Settings › Tunnels: is the named tunnel ready
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
-  input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), String(p.data ?? '')), core.input(p.tab, p.data, c)),
+  input: async (p, c) => (text(p.data, 'data'), await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), p.data), core.input(p.tab, p.data, c)),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && (core.setView(c, p), alertsSeen(c)),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
@@ -661,7 +661,7 @@ const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|do
 // just be queued, and queueNow's Esc is one the agent asked for.
 // ponytail: these bytes only. A key rebound in claude's keybindings.json, a slash command typed (/permissions), and an
 // agent with a shell posing as a process in no tab get past it; per-tab tokens are the real fix (AGENT_NO's note)
-const SHIFT_TAB = /\x1b\[(?:[\d:;]*Z|9;[\d:;]*u|27;\d+;9~)/
+const SHIFT_TAB = /\x1b\[(?:[\d:;]*Z|9[\d:]*;[\d:;]*u|27;\d+;9~)/ // 9[\d:]*: kitty's alternate keys (9:9;2u)
 const KEY_START = /\x1b(?:\[[\d:;]*)?$/
 const keyTail = new Map<string, string>()
 function shiftTabNo(p: any, tab: string, text: string, keep = true) {
@@ -672,7 +672,14 @@ function shiftTabNo(p: any, tab: string, text: string, keep = true) {
   if (start) keyTail.set(tab, start)
   else keyTail.delete(tab)
 }
+// what goes to a terminal is a string: the checks here read String(x), and node-pty writes an array as its bytes
+// ([27, 91, 90] is "27,91,90" to a pattern and Shift-Tab to the agent), so anything else is refused before them
+function text(v: unknown, what: string) {
+  if (typeof v !== 'string') throw new Error(`${what} must be a string`)
+}
 function agentNo(method: string, p: any) {
+  if (method === 'input') text(p.data, 'data')
+  if (method === 'send') text(p.text, 'text')
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)

@@ -75,6 +75,11 @@ test("an agent can't press Shift-Tab by input, whole or split, nor by send; its 
   const no = /an agent can't change a permission mode/
   const mode = async () => (await rig.tab(ws.id)).mode
   for (const data of ['\x1b[Z', 'x\x1b[Zy', '\x1b[1;2Z', '\x1b[1:2Z', '\x1b[9;2u', '\x1b[27;2;9~']) await assert.rejects(rig.rpc('input', { tab, data, from }), no, JSON.stringify(data))
+  await assert.rejects(rig.rpc('input', { tab, data: '\x1b[9:9;2u', from }), no, "kitty's form with alternate keys")
+  // bytes as an array: "27,91,90" to a pattern, Shift-Tab once node-pty writes it
+  for (const data of [[27, 91, 90], { 0: 27 }, 9, null]) await assert.rejects(rig.rpc('input', { tab, data, from }), /data must be a string/, JSON.stringify(data))
+  await assert.rejects(rig.rpc('input', { tab, data: [27, 91, 90] }), /data must be a string/, "the user's too: no caller sends one")
+  await assert.rejects(rig.rpc('send', { target: tab, text: ['!ls'], enter: false, from }), /text must be a string/)
   await rig.rpc('input', { tab, data: '\x1b', from }) // a plain Esc
   await assert.rejects(rig.rpc('input', { tab, data: '[Z', from }), no, 'the rest of it, in a second call')
   await assert.rejects(rig.rpc('send', { target: tab, text: '[Z', enter: false, from }), no, 'the rest of it, by send')
