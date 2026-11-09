@@ -293,6 +293,7 @@ const api: Record<string, Handler> = {
   tabClose: async p => (t => core.shellCwd(t.workspace, t.id).then(cwd => core.closeTab(t.id, { cwd })))(core.findTab(String(p.id ?? ''))), // kept for ⇧⌘T, a shell with its folder
   tabReopen: p => core.tabReopen(p),
   tabDraft: p => core.tabDraft(p), // { tab, text? }: the Reader's unsent text
+  failDismiss: p => core.failDismiss(p), // { tab }: the Reader's and Needs you's Dismiss
   tabMode: p => core.tabMode(p), // { tab, mode }: a running claude's permission mode, ⇧⇥ pressed for it
   hookList: () => hookList(), // Settings › Webhooks (inbound.ts)
   hookAdd: p => hookAdd(p),

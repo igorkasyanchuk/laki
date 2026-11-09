@@ -116,7 +116,7 @@ let menu = 0
 const drawMenu = () => process.stdout.write(MENU.map((m, i) => `\x1b[2K${i + 1 === menu ? '❯' : ' '} ${i + 1}. ${m}`).join('\r\n') + '\r\n')
 const turn = text => {
   if (text.startsWith('osc ')) process.stdout.write(text.slice(4).replaceAll('\\e', '\x1b').replaceAll('\\a', '\x07')) // a report through the terminal (OSC 7501)
-  hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
+  hook('UserPromptSubmit', { prompt: text, ...(/^(todo|planmode|apierror|continue)/.test(text) && { hook_event_name: 'UserPromptSubmit' }) })
   statusLine()
   // "todo a;b;c": its to-do list (TodoWrite) as its turn starts, the first under way; "todo! …": every one done
   if (text.startsWith('todo')) hook('PreToolUse', { hook_event_name: 'PreToolUse', tool_name: 'TodoWrite', tool_input: { todos: text.replace(/^todo!? /, '').split(';').map((content, i) => ({ content, status: text.startsWith('todo!') ? 'completed' : i ? 'pending' : 'in_progress' })) } })
@@ -157,6 +157,7 @@ const turn = text => {
     fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, tools: Number(text.slice(6)) || 1, ms: Date.now() - t0 }) + '\n')
   }
   if (text.startsWith('run ')) process.stdout.write(require('child_process').spawnSync('/bin/sh', ['-c', text.slice(4)], { encoding: 'utf8' }).stdout.replace(/\n/g, '\r\n')) // its Bash tool: a child of this process
+  if (text.startsWith('apierror') || (text === 'continue' && process.env.FAKE_CONTINUE_FAILS)) return void ((busy = false), process.stdout.write('API Error: 529 Overloaded\r\n> '), hook('StopFailure', { error: 'server_error', error_details: 'API Error: 529 Overloaded\nmore detail' }))
   if (text.startsWith('limit')) return void ((busy = false), process.stdout.write("You've hit your usage limit. Try again in 2 hours.\r\n> "), hook('StopFailure', { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." })) // a usage limit: StopFailure
   setTimeout(() => {
     if (!busy) return

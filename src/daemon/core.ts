@@ -90,7 +90,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { mode?: string; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -618,7 +618,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -3064,6 +3064,30 @@ function preTool(tab: Tab, pl: any) {
 // a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
 // newest hook taken (hookAt: a PreToolUse or PostToolUse run in the background, come after the turn's Stop or the next
 // ask) changes no state, only what it says of the plan and links
+// a turn that ended on an API error: its one line for the Reader and Needs you, what Continue sends, and settings.continueOnError:
+// once per turn, a minute later, unless it was answered, dismissed or something's queued
+const failLine = (err: unknown, last: unknown) => (typeof err === 'string' && err ? err : err ? JSON.stringify(err) : String(last ?? '')).split('\n').find(l => l.trim())?.trim().slice(0, 200) || 'API error'
+const CONTINUE_MS = Number(process.env.LAKI_CONTINUE_MS ?? 60_000)
+function continueLater(tab: Tab, r: Runtime) {
+  if (!state.settings?.continueOnError || r.autoContinued) return
+  r.autoContinued = true
+  const said = r.failed
+  setTimeout(() => {
+    if (r.failed !== said || r.status !== 'idle' || tab.queue?.length || !state.tabs.includes(tab)) return
+    r.contSent = true
+    try {
+      send({ target: tab.id, text: 'continue' })
+      wsLog({ id: tab.workspace }, `continued after: ${said}`)
+    } catch (e) {
+      r.contSent = false
+      log(`continue ${tab.id}: ${(e as Error).message}`)
+    }
+  }, CONTINUE_MS).unref()
+}
+export function failDismiss(p: { tab?: unknown }) {
+  rtOf(findTab(String(p.tab ?? '')).id).failed = undefined
+  changed()
+}
 const ASYNC_SKEW = 500 // ponytail: a busy Mac's node start; an answer within it (rare) waits for the tool's next hook
 function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)
@@ -3107,9 +3131,11 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     case 'running':
       if (!late) {
         r.status = 'running'
-        r.limit = r.escAt = r.suggest = undefined
+        r.limit = r.escAt = r.suggest = r.failed = undefined
       }
       if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') {
+        if (r.contSent) r.contSent = false // the continue it was sent: still that turn's one
+        else r.autoContinued = false
         titleFrom(tab, pl.prompt) // claude's, gemini's
         if (typeof pl.prompt === 'string') r.asked = pl.prompt.slice(0, 4000)
         if (Date.now() - (keysAt.get(tab.id) ?? 0) < 5000 && !typedBy.has(tab.id) && !tab.flow) promptKeep(pl.prompt, tab.workspace) // typed there by you just now
@@ -3189,6 +3215,9 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       // a model the installed claude is too old for (the API's claude_code_version_too_old): kept, said in words
       const refused = p.state === 'failed' && tab.preset === 'claude' ? modelRefused(tab.model || presetOf(tab)?.model?.trim(), `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}`) : undefined
       if (refused) r.last = refused
+      // an API error's end (overloaded, a 500, the connection): not a limit, a refused model or your Esc
+      r.failed = p.state === 'failed' && !r.limit && !refused && !r.escAt ? failLine(err, last) : undefined
+      if (r.failed) continueLater(tab, r)
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '', ...(!r.limit && p.state !== 'failed' && checkHooks.will?.(tab) && { checking: true }) })
       if (!r.limit) phone(tab, 'done', r.last ?? '')

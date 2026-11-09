@@ -38,6 +38,7 @@ export const FIND: [string, string, string?][] = [
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
+  ['general', 'Continue after an API error by itself', 'retry overloaded 500 connection dropped auto resume failed'],
   ['general', 'Tell me when a turn runs longer than', 'long stuck loop hours hung alert notification time'],
   ['general', 'Plan limit nearly used', 'usage 5-hour weekly session quota notify 90% threshold claude codex'],
   ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],

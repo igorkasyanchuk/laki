@@ -132,6 +132,8 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), around
   // the Needs you list's cards: answered as main's notification actions do (answer refuses a menu that changed)
   const needsApi: NeedsApi = {
+    keep: t => void call('send', { target: t.id, text: 'continue' }).catch(() => {}),
+    dismiss: t => void call('failDismiss', { tab: t.id }).catch(() => {}),
     open: t => (setDialog(null), selectTab(t), narrow && setSideOpen(false)),
     answer: (t, n, label) => void api.call('answer', { tab: t.id, n, label }).catch(() => toast('It asks something else now: open it', () => needsApi.open(t), 'Open')),
     pick: (t, pick) => void api.call('answer', { tab: t.id, pick }).catch(e => toast((e as Error).message, () => needsApi.open(t), 'Open')),

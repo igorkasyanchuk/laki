@@ -30,3 +30,9 @@ test('nextStep: what waits for you comes first, then what broke, then what moves
   assert.equal(id(ws({ stat: { add: 0, del: 0, files: 0, dirty: 0 } })), undefined)
   assert.equal(id(ws({ archived: true, pr: pr({ checks: 'fail' }) })), undefined)
 })
+
+test('One next step: Continue for a turn that ended on an API error, after an ask and what works', () => {
+  const failed = { id: 't', workspace: 'w', kind: 'agent', status: 'idle', name: 'claude', failed: 'API Error: 500' } as unknown as TabView
+  assert.equal(id({ id: 'w', kind: 'worktree' } as WorkspaceView, [failed]), 'continue')
+  assert.equal(id({ id: 'w', kind: 'worktree' } as WorkspaceView, [failed, { ...failed, id: 'u', failed: undefined, status: 'waiting' } as TabView]), 'answer')
+})

@@ -72,7 +72,7 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
 type FloatAt = { right: number; bottom: number }
 type FloatSize = { width: number; height: number }
 const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
-const STEP_ICON: Record<StepId, IconName> = { answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
+const STEP_ICON: Record<StepId, IconName> = { continue: 'run', answer: 'bell', plan: 'clipboardCheck', check: 'alertCircle', conflict: 'conflict', ci: 'ciFail', review: 'pr', merge: 'gitMerge', archive: 'archive', look: 'changes', ship: 'ship', working: 'pr', wait: 'pr' } // One next step's button
 const DOCK_MS = 320 // the AI button's way down into the status bar: styles.css' ai-dock
 const OWN_ZOOMS = [0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] // a page's own ⌘± steps, a browser's
 const FIXED_PAGE = '.page-body:has(> :is(.desk-tabs, .desk-grid, .desk-empty, .wf-page))' // pages ⌘± leaves be (styles.css)
@@ -822,7 +822,7 @@ export function App() {
   }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
   const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
-  const needsYou = (t: TabView) => (t.status === 'waiting' || !!t.secret || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
+  const needsYou = (t: TabView) => (t.status === 'waiting' || !!t.secret || !!t.failed || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
   // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
   const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
   const hid = useRef(new Set<string>()) // Recording mode's hidden workspaces (veiled): their events say nothing
@@ -2621,6 +2621,7 @@ export function App() {
   const inReader = (id: string) => readerOn && readable(byId(id)) && (readMode[id] ?? (narrow ? 'reader' : 'term')) === 'reader'
   const setRead = (id: string, m: 'reader' | 'term') => setReadMode(o => ({ ...o, [id]: m }))
   const readerApi: ReaderApi = {
+    dismiss: tab => call('failDismiss', { tab }),
     draft: (tab, text) => api.call('tabDraft', { tab, text }),
     setMode: (tab, mode) => call('tabMode', { tab, mode }),
     read: (tab, v) => api.call('chatRead', { tab, v }),
@@ -2885,6 +2886,7 @@ export function App() {
   const doStep = (w: WorkspaceView, s: Step, e?: React.MouseEvent) => {
     const at = () => (setWsId(w.id), setDialog(null))
     if (s.tab && ['answer', 'plan', 'check', 'working'].includes(s.id)) return selectTab({ id: s.tab, workspace: w.id })
+    if (s.id === 'continue') return void call('send', { target: s.tab, text: 'continue' }).catch(() => {})
     if (s.id === 'conflict' || s.id === 'ci' || s.id === 'review') return void prFix(w, s.id)
     if (s.id === 'merge') return void prAct(w, 'merge')
     if (s.id === 'archive') return void archive(w)

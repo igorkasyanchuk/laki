@@ -190,6 +190,7 @@ export type AppSettings = Paint & {
   usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
+  continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
@@ -1360,6 +1361,9 @@ export function SettingsPage(p: {
                   </span>
                   <Says title="Tell me when a turn runs longer than" hint="Once per turn, also on your phone if pushes are on. Time waiting on you or on a plan limit doesn't count." />
                 </label>
+                <Switch className="switch-row" on={!!s.continueOnError} onChange={v => set({ continueOnError: v })}>
+                  <Says title="Continue after an API error by itself" hint="A turn that ended overloaded, on a 500 or a dropped connection gets one continue a minute later. Never after your Esc, a refused model or a plan limit." />
+                </Switch>
               </div>
               </Group>
               <Group title="Timers" hint="As a timer in the sidebar ends">

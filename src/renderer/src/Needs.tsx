@@ -15,6 +15,8 @@ import { Elapsed, Icon } from './ui'
 
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
+  keep: (t: TabView) => void // a turn that ended on an API error: goes on
+  dismiss: (t: TabView) => void
   open: (t: TabView) => void
   answer: (t: TabView, n: number, label: string) => void
   pick: (t: TabView, pick: 'first' | 'last') => void // a permission prompt with no menu read: Allow / Deny
@@ -148,6 +150,8 @@ function NeedCard({ t, w, api, next, stale }: Need & { api: NeedsApi; next: bool
             )}
             <span className="spacer" />
             {!!w.branch && changed && <button onClick={() => api.review(t)}>Review</button>}
+            {t.failed && <button className="on" data-tip={t.failed} onClick={() => api.keep(t)}>Continue</button>}
+            {t.failed && <button onClick={() => api.dismiss(t)}>Dismiss</button>}
             <button onClick={() => api.seen(t)}>Seen</button>
           </div>
         </>

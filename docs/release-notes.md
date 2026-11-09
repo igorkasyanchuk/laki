@@ -7,6 +7,8 @@ version it builds, with the date. -->
 - Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
   and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
   Two neutral themes made for it: Frosted and Frosted Light.
+- A turn that ends on an API error (overloaded, a 500, a dropped connection) says why, with *Continue* and *Dismiss*, in the
+  Reader and Needs you; One next step offers it. Settings › General › *Continue after an API error by itself* (off) does it once, a minute later.
 - Change a running Claude Code tab's permission mode without restarting it, mid-turn too: the chip on the Reader's box, or
   the tab's right click (*Ask*, *Accept edits*, *Plan*, *Bypass*).
 - Text typed in an agent's Reader box and not sent stays: through switching tabs, closing the tab and ⇧⌘T, a restart or

@@ -5,7 +5,7 @@
 import { planNow } from './todos.ts'
 import type { TabView, WorkspaceView } from './types.ts'
 
-export type StepId = 'answer' | 'plan' | 'check' | 'conflict' | 'ci' | 'review' | 'merge' | 'archive' | 'look' | 'ship' | 'working' | 'wait'
+export type StepId = 'continue' | 'answer' | 'plan' | 'check' | 'conflict' | 'ci' | 'review' | 'merge' | 'archive' | 'look' | 'ship' | 'working' | 'wait'
 export type Step = { id: StepId; label: string; tip?: string; tab?: string; busy?: boolean; tone?: 'ask' | 'bad' | 'go' }
 
 export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): Step | undefined {
@@ -16,6 +16,8 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   if (waits) return { id: 'answer', label: `Answer ${waits.name}`, tip: waits.ask?.question || waits.ask?.options.map(x => x.label).join(' / ') || 'It waits for you', tab: waits.id, tone: 'ask' }
   const runs = mine.find(t => t.status === 'running' && (t.kind === 'agent' || t.runs))
   if (runs) return { id: 'working', label: (runs.plan && !runs.plan.stale && planNow(runs.plan)) || `${runs.name} works`, tip: 'Nothing for you yet: it tells you when it needs you', tab: runs.id, busy: true }
+  const failed = mine.find(t => t.failed)
+  if (failed) return { id: 'continue', label: 'Continue', tip: `${failed.name} stopped: ${failed.failed}`, tab: failed.id, tone: 'bad' }
   if (w.check?.status === 'checking') return { id: 'working', label: 'Checking its work', tip: 'Its Done check runs before you\'re told it\'s done', busy: true }
   if (w.check?.status === 'over') return { id: 'check', label: 'Fix the failing check', tip: `${w.check.steps.find(s => s.state === 'fail')?.name ?? 'Its check'} still fails after ${w.check.tries} tries`, tab: w.check.tab, tone: 'bad' }
   const pr = w.pr

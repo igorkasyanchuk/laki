@@ -162,3 +162,4 @@ hook ping`, 2 s) and `hookFiles`. 147: `flowFirst` (Run First: a queued run's `p
 needs no bump: `settingsSet` keeps any field.
 155: `tabDraft` (`{ tab, text? }`, a Reader box's unsent text, agents refused), a tab's `drafted` in the view.
 156: `tabMode` (`{ tab, mode }`: a running claude's permission mode by its own ⇧⇥, agents refused), a tab's `mode` and `bypassNo` in the view.
+157: a tab's `failed` in the view (a turn ended on an API error), `failDismiss`.
