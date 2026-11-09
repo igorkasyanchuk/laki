@@ -42,6 +42,14 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   else go()
 }
 
+// a turn running too long (turns.ts longTurnTick): told, nothing to tap (Stop is the Mac's: a stray tap ends no turn)
+export function phoneLong(tab: Tab, text: string) {
+  const w = state.settings?.webhook
+  const ws = state.workspaces.find(x => x.id === tab.workspace)
+  if (!w?.url?.trim() || tab.muted || ws?.muted || hidden(ws)) return
+  pushTo(w, { event: 'long', workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, title: text }).catch(e => log(`push ${tab.id}: ${e.message}`))
+}
+
 // what signs ntfy's taps (push.ts tapSig): Laki's own, in its data folder (0600), never in settings or state.json
 let tapKeyIs = ''
 function tapKey() {

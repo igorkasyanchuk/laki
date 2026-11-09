@@ -227,6 +227,7 @@ export type Workspace = {
   from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
   fromTab?: string // …and that agent's tab (the one that ran laki new): Created by on the worker, its asks in that tab
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
+  touchedAt?: number // settings.archiveIdle's: the last look it saw, or when it was restored (ms)
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
   storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab, removed with it unless settings.keepStorage)
@@ -603,7 +604,10 @@ export type Settings = {
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
   inHooks?: InHook[] // Settings › Webhooks: the hooks a POST from outside starts workflows by (inbound.ts; their secrets in <data>/hooks)
+  longTurn?: number // minutes: a turn working that long notifies, once (unset, 0: off)
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
+  archiveIdle?: number // days: a worktree nobody touched for so long is archived when it loses nothing, with Undo (unset, 0: off)
+  archiveIdleKeepPR?: boolean // archiveIdle leaves one with an open PR alone (unset: on)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
   floaterStyle?: 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still' // how a working agent's bubble looks (unset: gradient)
@@ -933,7 +937,7 @@ export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtu
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgetEvents.ts widgetEvent)
-export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held', 'tool.call', 'issue.labeled', 'webhook'] as const
+export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.long', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held', 'tool.call', 'issue.labeled', 'webhook'] as const
 // gates (an action's "gate"): the steps an extension can hold; a hold: who held it and why
 export const GATES = ['ship', 'merge', 'archive', 'tool'] as const // tool: each tool call claude makes (widgetEvents.ts toolGate), the others steps of core's gated
 export type Gate = (typeof GATES)[number]

@@ -28,11 +28,13 @@
 //   issueTick      60 s   slow   issue.labeled: GitHub's issue events, while something listens (inbound.ts)
 //   prTick         60 s   slow   PR scans (gh), each workspace every settings.prScan minutes
 //   sleepTick      60 s   slow   idle tabs put to sleep
+//   longTurnTick   60 s   keep   turns running too long say so (turns.ts, settings.longTurn)
 //   mcpAppSweep    60 s   keep   idle MCP App connections closed (mcpApps.ts)
 //   refusedWs      60 s   keep   refused WebSockets counted, only while there are some
 //   policyTick     5 min  keep   the managed policy read again
 //   aiTick         10 min keep   Laki AI's unused spec chats ended
 //   memoryTick     30 min keep   memory's compaction, when due
+//   archiveIdleTick 30 min keep  worktrees nobody touched archived (pr.ts, settings.archiveIdle)
 //   ghHour         1 h    keep   Laki's own gh calls in its log
 //   tidy           1 h    keep   old pasted images, storage files, archived workspaces, trash
 // Not here: one-shot waits (core.ts whenPrompt, workflow.ts esc), each a few seconds.

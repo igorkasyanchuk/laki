@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
-import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
+import { agentOf, agentSaid, type At, broadcast, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
@@ -463,6 +463,69 @@ async function archiveMerged(ws: Workspace, pr: PR) {
   if (r?.held) return void (log(`archive on merge ${ws.id}: held by ${r.held.map(h => h.name).join(', ')}`), wsLog(ws, `archive on merge: held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}`))
   log(`archived ${ws.id}: PR #${pr.number} merged`)
   broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
+}
+
+// settings.archiveIdle (days): a worktree nobody touched for that long is archived, with Undo (the 'archived' event).
+// Touched: a prompt or an agent's turn (usedAt), a look (a client attached, lookedAt), a commit, being made or restored
+// (touchedAt). Only one that loses nothing and stops nothing: why one stays goes to its log, once per reason.
+// ponytail: this Mac's worktrees only; a host that's down would be waited for at every tick
+const idleKept = new Map<string, string>()
+const lastTouch = (ws: Workspace, now: number) =>
+  tabsOf(ws.id).reduce((at, t) => {
+    const s = sessions.get(t.id)
+    return Math.max(at, t.usedAt ?? 0, s?.attachedClients().length ? now : (s?.lookedAt ?? 0))
+  }, Math.max(ws.created, ws.touchedAt ?? 0))
+function idleKeep(ws: Workspace) {
+  const tabs = tabsOf(ws.id)
+  if (ws.pinned || ws.railPin) return 'pinned'
+  if (ws.important) return 'marked important'
+  if (ws.pending) return 'its agent starts later'
+  if (state.settings?.archiveIdleKeepPR !== false && prs.get(ws.id)?.state === 'OPEN') return 'it has an open PR'
+  if (tabs.some(t => t.queue?.length)) return 'a message is queued'
+  if (tabs.some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return 'an agent is at work'
+  if (tabs.some(t => t.kind === 'dev' && isLive(t)) || Object.keys(ports.get(ws.id) ?? {}).length) return 'a dev server is running'
+}
+export async function archiveIdleTick(now = Date.now()) {
+  const days = Number(state.settings?.archiveIdle)
+  if (!(days > 0)) return idleKept.clear(), []
+  const kept = (ws: Workspace, why: string) => {
+    if (idleKept.get(ws.id) !== why) wsLog(ws, `archive when idle: no, ${why}`)
+    idleKept.set(ws.id, why)
+  }
+  const done: string[] = []
+  for (const ws of state.workspaces.filter(w => w.kind === 'worktree' && !w.archived && !w.host && w.codespace === undefined && !projectArchived(w.project))) {
+    const seen = lastTouch(ws, now)
+    if (seen > (ws.touchedAt ?? 0)) ws.touchedAt = seen // a look is only in memory: kept over a restart
+    if (now - seen < days * 86400e3) continue
+    const why = idleKeep(ws)
+    if (why) {
+      kept(ws, why)
+      continue
+    }
+    const committed = Number(await git(ws, 'log', '-1', '--format=%ct', 'HEAD').catch(() => 0)) * 1000
+    if (now - committed < days * 86400e3) continue
+    if ((await git(ws, 'rev-list', '--count', 'HEAD', '--not', '--remotes', ws.base).catch(() => '?')) !== '0') {
+      kept(ws, 'unpushed commits') // or git can't tell
+      continue
+    }
+    let no = ''
+    try {
+      const r = await wsArchive(ws.id, { ifClean: true, by: 'auto' })
+      no = r?.dirty ? 'uncommitted changes' : r?.held ? `held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}` : ''
+    } catch (e) {
+      no = `failed: ${(e as Error).message}`
+    }
+    if (no) {
+      kept(ws, no)
+      continue
+    }
+    idleKept.delete(ws.id)
+    log(`archived ${ws.id}: untouched for ${days} days`)
+    broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, idle: days })
+    done.push(ws.id)
+  }
+  save()
+  return done
 }
 
 // ---------- PR feedback to the agent: failing CI, review comments (from wb's fix-ci / fix-review)

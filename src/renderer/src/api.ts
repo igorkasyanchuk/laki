@@ -6,7 +6,7 @@ import type { UpdateState } from '../../shared/update'
 import { sendAs } from '../../shared/caps'
 
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
-export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
+export type NotifyAction = { text: string; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[], card?: Card): void

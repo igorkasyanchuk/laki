@@ -38,6 +38,7 @@ export const FIND: [string, string, string?][] = [
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
+  ['general', 'Tell me when a turn runs longer than', 'long stuck loop hours hung alert notification time'],
   ['general', 'Plan limit nearly used', 'usage 5-hour weekly session quota notify 90% threshold claude codex'],
   ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],
   ['notes', 'Release notes', "what's new changelog version changes added recently"],
@@ -131,6 +132,8 @@ export const FIND: [string, string, string?][] = [
   ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
   ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
+  ['git', 'Archive workspaces untouched for', 'idle old stale inactive auto archive cleanup days disk sidebar'],
+  ['git', 'Keep ones with an open PR', 'idle archive pull request open'],
   ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
   ['pr', 'Fix CI', 'pr prompt failing checks auto'],
   ['pr', 'Review', 'pr prompt comments auto'],
@@ -283,6 +286,11 @@ export const HELP: Record<string, SettingHelp> = {
     what: 'A switch per workspace: Laki merges its PR once every check passes, it has no conflicts and it is approved if the repo needs that.',
     when: "Repos with CI you trust, for small changes you've already read.",
     cost: 'Nothing waits for your last look: what CI misses is merged.',
+  },
+  'Archive workspaces untouched for': {
+    what: 'A worktree with no prompt, no agent turn, no commit and nobody looking at it for that long is archived on its own (Undo brings it back). Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or an Important mark.',
+    when: 'Old worktrees fill your sidebar and your disk.',
+    cost: 'Its worktree folder goes (the branch stays); restoring it makes it again.',
   },
   'Archive workspace when its PR merges': {
     what: "A worktree whose PR merged, with nothing uncommitted or unpushed and no agent running, is archived on its own (Undo brings it back).",

@@ -2760,6 +2760,7 @@ export async function wsRestore(ref: string) {
   else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
   ws.archivedAt = undefined
+  ws.touchedAt = Date.now() // archive when idle: a full period from here, so an Undo stays undone
   if (ws.railPin && railTaken() > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()
   save()

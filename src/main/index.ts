@@ -440,7 +440,7 @@ ipcMain.handle('conn', async e => {
 // Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
 // closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
 // collected Notification's events never come
-type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
+type NoteAction = { text: string; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string }; alert?: { id: string; choice: string } } // tool: an extension's tool call, answered (widgetToolAnswer); alert: laki alert's choice (alertAnswer)
 const notes = new Set<Notification>()
 // card: something marked important (a workspace, a timer, a reminder, laki alert) as a card on screen instead (addCard):
 // ask, a waiting agent's (its change's diff with it); alert, laki alert's id (its choices answer it, its × too); tone,
@@ -450,7 +450,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
   if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions, ...(card && { card: true }) }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (a.stop === true || Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string' || (typeof a.alert?.id === 'string' && typeof a.alert.choice === 'string'))).slice(0, 9)
   if (card && typeof card === 'object') {
     if (sound !== 'none') execFile('afplay', [`/System/Library/Sounds/${named ? sound : 'Glass'}.aiff`], () => {})
     const t = typeof tab === 'string' ? tab : ''
@@ -467,6 +467,7 @@ ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: strin
     done()
     const a = buttons[i]
     if (a?.tool) rpc('widgetToolAnswer', { req: a.tool.req, allow: a.tool.allow }).catch(() => {})
+    else if (a?.stop) rpc('input', { tab, data: '\x1b' }).catch(() => show(tab)) // a long turn's Stop: its Esc
     else if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
   })
   n.on('close', done)

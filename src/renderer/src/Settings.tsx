@@ -189,6 +189,7 @@ export type AppSettings = Paint & {
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   usageAt?: number // a plan limit's % that notifies: 75, 90, 95 (unset: 90)
   notifySound?: string // a macOS sound, 'none', or unset: the default
+  longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
@@ -228,6 +229,8 @@ export type AppSettings = Paint & {
   ai?: AiSettings // Laki AI (Settings › AI)
   voice?: VoiceSettings // the mic and hold Fn (Settings › Voice)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
+  archiveIdle?: number // days a worktree is left untouched before it's archived (unset, 0: off)
+  archiveIdleKeepPR?: boolean // not one with an open PR (unset: on)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
@@ -293,6 +296,8 @@ export type AppSettings = Paint & {
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
 
 // the PR switches' prompts (Settings › Pull requests): the status bar's names
+const LONG_TURN: [number, string][] = [[0, 'Off'], [30, '30 min'], [60, '1 h'], [120, '2 h'], [240, '4 h']]
+const IDLE_DAYS: [number, string][] = [[0, 'Off'], [3, '3 days'], [7, '7 days'], [14, '14 days'], [30, '30 days']]
 const ARCHIVED_DAYS: [number, string][] = [[0, 'Never'], [1, 'After a day'], [3, 'After 3 days'], [7, 'After a week'], [14, 'After 2 weeks'], [30, 'After a month']]
 const PR_KINDS: [FixWhat, string, string][] = [
   ['ci', 'Fix CI', 'the failing checks and the end of their logs go after it'],
@@ -1258,6 +1263,23 @@ export function SettingsPage(p: {
                 </Switch>
               </div>
               </Group>
+              <Group title="When nobody touches one">
+              <div className="setting-box">
+              <label className="switch-row">
+                <select value={s.archiveIdle ?? 0} onChange={e => set({ archiveIdle: Number(e.target.value) })}>
+                  {[...IDLE_DAYS, ...(IDLE_DAYS.some(([d]) => d === (s.archiveIdle ?? 0)) ? [] : [[s.archiveIdle!, `${s.archiveIdle} days`] as [number, string]])].map(([d, t]) => (
+                    <option key={d} value={d}>{t}</option>
+                  ))}
+                </select>
+                <Says title="Archive workspaces untouched for" hint="No prompt, no agent turn, no commit, nobody looking. Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or an Important mark. A toast offers Undo." />
+              </label>
+                {!!s.archiveIdle && (
+                  <Switch className="switch-row" on={s.archiveIdleKeepPR !== false} onChange={v => set({ archiveIdleKeepPR: v })}>
+                    <Says title="Keep ones with an open PR" hint="Off: an open PR doesn't save a workspace nobody touches." />
+                  </Switch>
+                )}
+              </div>
+              </Group>
             </>
           )}
           {sec === 'general' && (
@@ -1326,6 +1348,18 @@ export function SettingsPage(p: {
                     </label>
                   </>
                 )}
+                <label className="switch-row">
+                  <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {!LONG_TURN.some(([m]) => m === (s.longTurn ?? 0)) && <input type="number" min={1} style={{ width: 70 }} aria-label="Minutes" value={s.longTurn} onChange={e => set({ longTurn: Math.max(1, Number(e.target.value) || 1) })} />}
+                    <select value={LONG_TURN.some(([m]) => m === (s.longTurn ?? 0)) ? (s.longTurn ?? 0) : -1} onChange={e => set({ longTurn: Number(e.target.value) < 0 ? 90 : Number(e.target.value) })}>
+                      {LONG_TURN.map(([m, t]) => (
+                        <option key={m} value={m}>{t}</option>
+                      ))}
+                      <option value={-1}>Custom (minutes)</option>
+                    </select>
+                  </span>
+                  <Says title="Tell me when a turn runs longer than" hint="Once per turn, also on your phone if pushes are on. Time waiting on you or on a plan limit doesn't count." />
+                </label>
               </div>
               </Group>
               <Group title="Timers" hint="As a timer in the sidebar ends">

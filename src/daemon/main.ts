@@ -38,7 +38,7 @@ import { chatWithApps, mcpAppCall, mcpPage } from './mcpApps.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload, todoListGet, todoListSave } from './notes.ts'
 import { checkAgain, checkStop, checkTidy } from './verify.ts'
-import { sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
+import { longTurnTick, sideAsk, sideNew, sideState, tabHandover, turnDiff, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
 import { alertAnswer, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { secretAsk, secretGive, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
@@ -427,6 +427,8 @@ const api: Record<string, Handler> = {
     throw new Error(`nothing to stop called ${k}`)
   },
   sleepTick: p => resourcesMod.sleepTick(p?.now), // tests move the clock
+  archiveIdleTick: p => prMod.archiveIdleTick(p?.now), // tests move the clock
+  longTurnTick: p => longTurnTick(p?.now), // tests move the clock
   tabSleep: p => resourcesMod.sleepNow(p.tab),
   tabWake: p => resourcesMod.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => remoteMod.tunnelStart(p),
@@ -640,7 +642,7 @@ for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw
 // bots (whose comments go to agents), and the files copied into new worktrees (git's ignored ones: .env); which of your
 // accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
 // yours Laki starts)
-const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks)$/
+const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks)$/
 function agentNo(method: string, p: any) {
   boxNo(method, p)
   if (method === 'settingsSet' && (remoteNo(method, p) || changes(p, AGENT_KEYS))) notAgent(p, 'change that setting')
@@ -945,6 +947,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so
   ticks.register('shellTick', 2000, core.shellTick, { idle: 'pause' })
   ticks.register('sleepTick', 60000, () => resourcesMod.sleepTick(), { idle: 'slow' })
+  ticks.register('longTurnTick', 60000, () => longTurnTick())
   ticks.register('ticketTick', Number(process.env.LAKI_TICKET_TICK_MS || 30000), () => ticketTick(), { idle: 'slow' }) // linked tickets: each due workspace's script
   ticks.register('policyTick', 300000, policyTick)
   ticks.register('scanStats', Number(process.env.LAKI_STAT_SCAN_MS || 10000), filesMod.scanStats, { idle: 'slow' })
@@ -958,6 +961,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('pendingTick', 30000, () => scheduleMod.pendingTick())
   ticks.register('reminderTick', 30000, () => scheduleMod.reminderTick())
   ticks.register('memoryTick', 1800000, () => memoryTick())
+  ticks.register('archiveIdleTick', 1800000, () => prMod.archiveIdleTick())
   ticks.register('widgetTick', 30000, () => widgetTick(), { idle: 'slow' })
   ticks.register('factsTick', Number(process.env.LAKI_FACTS_MS) || 10000, () => factsTick(), { idle: 'pause' }) // workspace facts read again (tests' faster)
   ticks.register('flowTick', 5000, () => flowTick())

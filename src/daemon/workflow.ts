@@ -1664,6 +1664,7 @@ const SAMPLE_PR = { number: 412, url: 'https://github.com/acme/web/pull/412', ti
 const SAMPLE_EVENTS: Record<string, Record<string, unknown>> = {
   'turn.done': { last: 'Done: the redirect goes back to the page you were on; tests pass.', seconds: 95 },
   'turn.failed': { error: 'API Error: 500', limit: false },
+  'turn.long': { minutes: 130 },
   'turn.waiting': { question: 'Claude needs your permission to use Bash', options: ['Yes', 'Yes, and don’t ask again', 'No'] },
   'pr.opened': { pr: SAMPLE_PR },
   'pr.checks.failed': { pr: SAMPLE_PR, failing: [{ name: 'test', url: 'https://github.com/acme/web/actions/runs/1/job/2' }] },
@@ -1682,7 +1683,7 @@ const SAMPLE_EVENTS: Record<string, Record<string, unknown>> = {
   'issue.labeled': { project: { id: 'web', name: 'web' }, number: 128, title: 'The cart total rounds wrong', url: 'https://github.com/acme/web/issues/128', label: 'laki', by: 'octocat', body: 'Adding two items at $0.10 shows $0.30.' },
   webhook: { name: 'deploys', event: 'deployment_status', body: { deployment_status: { state: 'failure' } } },
 }
-const SAMPLE_TAB = ['turn.done', 'turn.failed', 'turn.waiting', 'limit.hit', 'tab.new'] // a tab's events: event.tab too
+const SAMPLE_TAB = ['turn.done', 'turn.failed', 'turn.long', 'turn.waiting', 'limit.hit', 'tab.new'] // a tab's events: event.tab too
 function sampleOf(name: string): Record<string, unknown> {
   const ws = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fix-login', pr: SAMPLE_PR.url }
   return { event: name, at: Date.now(), ws, ...(SAMPLE_TAB.includes(name) && { tab: { id: 'sample', name: 'claude', agent: 'claude' } }), ...(name.startsWith('custom.') && { data: { text: 'hello' } }), ...SAMPLE_EVENTS[name] }

@@ -861,3 +861,79 @@ test("ghCard: a PR's or issue's card by its link (gh, kept a minute); other link
   rmSync(join(gh, 'issue.json'))
   await assert.rejects(rig.rpc('ghCard', { url: 'https://github.com/o/r/issues/8' }), /Issue #8 not found/)
 })
+
+test('archiveIdle: a worktree untouched for the period goes, with Undo; each reason to keep one holds and is logged once', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { devMode: true }) // the workspace's log
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const git = (...a: string[]) => execFileSync('git', a, { cwd: ws.path, env: rig.env, encoding: 'utf8' }).trim()
+  const days = (n: number) => Date.now() + n * 86400e3
+  const tick = (n: number) => rig.rpc('archiveIdleTick', { now: days(n) })
+  const c = await rig.connect()
+  const set = (o: object) => rig.rpc('wsSet', { id: ws.id, ...o })
+  assert.deepEqual(await tick(30), [], 'off by default')
+  await rig.rpc('settingsSet', { archiveIdle: 7 })
+  assert.deepEqual(await tick(6), [], 'not yet')
+
+  // what keeps one, each lifted in turn
+  await set({ pinned: true })
+  assert.deepEqual(await tick(8), [], 'pinned')
+  await set({ pinned: false, important: true })
+  assert.deepEqual(await tick(8), [], 'important')
+  assert.deepEqual(await tick(8), [], 'the same reason: logged once')
+  await set({ important: false })
+  writeFileSync(join(ws.path, 'wip.txt'), 'x')
+  assert.deepEqual(await tick(8), [], 'uncommitted')
+  git('add', '-A')
+  git('commit', '-qm', 'wip')
+  assert.deepEqual(await tick(6), [], 'a commit counts as touched')
+  assert.deepEqual(await tick(8), [], 'unpushed')
+  git('reset', '-q', '--hard', 'HEAD~1')
+  const said = (await rig.rpc('logs', { key: `ws:${ws.id}` })).map((l: any) => l.text).filter((x: string) => x.startsWith('archive when idle'))
+  assert.deepEqual(said, ['archive when idle: no, pinned', 'archive when idle: no, marked important', 'archive when idle: no, uncommitted changes', 'archive when idle: no, unpushed commits'], 'each reason, once')
+
+  assert.deepEqual(await tick(8), [ws.id])
+  const live = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)
+  assert.ok((await live()).archived)
+  await until(() => c.events.some(e => e.ev === 'archived' && e.ws === ws.id && e.idle === 7), 'the toast')
+
+  // Undo: a full period from the restore
+  const before = Date.now()
+  await rig.rpc('wsRestore', { id: ws.id })
+  assert.ok((await live()).touchedAt >= before)
+  assert.deepEqual(await tick(6), [], 'not again until another full period')
+  c.close()
+})
+
+test('archiveIdle keeps a workspace with a working agent, a queued message, a dev server or an open PR (unless told not to)', async t => {
+  const rig = await fresh(t, { config: { run: 'sleep 100' } })
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi' })
+  const tab = await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x?.status === 'idle' && x
+  }, 'first turn')
+  await rig.rpc('settingsSet', { archiveIdle: 3 })
+  const tick = () => rig.rpc('archiveIdleTick', { now: Date.now() + 4 * 86400e3 })
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: {} })
+  assert.deepEqual(await tick(), [], 'an agent at work')
+  await rig.rpc('send', { target: tab.id, text: 'later', whenIdle: true })
+  assert.deepEqual(await tick(), [], 'a queued message')
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: {} })
+  await until(async () => {
+    const x = await rig.tab(ws.id)
+    return x.status === 'idle' && !x.queue?.length
+  }, 'the queue delivered')
+  const pr = { number: 3, state: 'OPEN', url: 'https://example.invalid/pr/3', headRefOid: 'a1', statusCheckRollup: [] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'OPEN', 'scanned', 20000)
+  assert.deepEqual(await tick(), [], 'an open PR')
+  const dev = await rig.rpc('run', { ws: ws.id })
+  await rig.rpc('settingsSet', { archiveIdleKeepPR: false })
+  assert.deepEqual(await tick(), [], 'a dev server')
+  await rig.rpc('tabClose', { id: dev.id })
+  assert.deepEqual(await tick(), [ws.id], 'told not to keep it')
+})

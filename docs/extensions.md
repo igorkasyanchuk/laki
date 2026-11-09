@@ -199,6 +199,7 @@ when it has them) and its own fields, 64 KB at most:
 |---|---|---|
 | `turn.done` | an agent's turn ends | `last` (its answer, 4,000 characters), `seconds` |
 | `turn.failed` | a turn fails, or hits a usage limit | `error`, `limit` (when it resets) |
+| `turn.long` | a turn has worked longer than Settings › Notifications says (once per turn) | `minutes` |
 | `turn.waiting` | an agent asks something | `question`, `options` (its menu's) |
 | `pr.opened` | a workspace gets a PR | `pr: { number, url, title, draft }` |
 | `pr.checks.failed` | checks fail on a head commit (once per commit) | `pr`, `failing: [{ name, url }]` |

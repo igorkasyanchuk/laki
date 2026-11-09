@@ -7,7 +7,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Option = { n: number; label: string }
-export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string } // title: its own (a workflow's); key: what signs ntfy's taps
+export type Push = { event: 'waiting' | 'done' | 'test' | 'long'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string } // title: its own (a workflow's); key: what signs ntfy's taps
 
 // an ntfy tap is nonce:n:<sig>, signed with a key in Laki's data folder (never in settings): a tap made up without it
 // is ignored. ponytail: anyone who reads the pushed topic sees the taps too, so answers need a topic only you read (answerOk)

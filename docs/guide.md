@@ -490,7 +490,7 @@ selected workspace's PR is in the status bar.
 - When an agent asks something with numbered choices (a permission prompt, a question), they show as buttons
   under the terminal: a click picks one, as the arrows and ⏎ would. Its notification has a button per choice
   (macOS shows the first and the rest under *Options*; set Laki's notifications to *Alerts* in System Settings to
-  keep them on screen); a click on the notification itself opens the tab. A choice picked there only goes in while
+  keep them on screen); a click on the notification itself opens the tab. *Tell me when a turn runs longer than* (Settings › General, off) notifies once per turn, with *Stop*, and pushes to your phone; only time the agent is working counts. A choice picked there only goes in while
   the same menu is still on screen. A permission prompt whose menu wasn't read gets *Allow* (the first choice) and
   *Deny* (the last).
 - When Claude Code asks for permission, Laki shows what it wants to do: the tool and its command, file or address,
@@ -957,6 +957,11 @@ refuses it.
 *Archive workspace when its PR merges* (Settings › *Git & worktrees*, off by default): the next check after a merge
 archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
 PR: *Undo* in the message brings it back for good. One that can't go says *merged* in the sidebar.
+
+*Archive workspaces untouched for* (the same section, off by default; 3, 7, 14 or 30 days): a worktree with no prompt, no
+agent turn, no commit and nobody looking at it for that long is archived, with *Undo*; undone, it isn't picked again for
+another full period. Never one with uncommitted or unpushed work, a running agent or dev server, a queued message, a pin or
+an *Important* mark, nor one on an SSH host or a codespace. *Keep ones with an open PR* (on) leaves those alone too.
 
 What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`
 its link, `{{base}}` its base branch; the failing checks or the review threads go after it. *Reset* puts the default
@@ -1949,7 +1954,7 @@ and what it costs.
   bar counts down a minute with *Cancel*, then the Mac does it, and the setting goes back to Do nothing: leave it on for
   the night, not for good), *Each turn's changes* (on: the Reader's card of what each turn changed, [Reader
   view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
-  the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
+  the workspace goes, its branch stays), *Archive workspace when its PR merges* (off) and *Archive workspaces untouched for* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),

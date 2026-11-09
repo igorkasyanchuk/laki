@@ -198,7 +198,7 @@ function toolShow() {
   })
 }
 // the events that notify or toast about a workspace: none for one Recording mode hides
-const QUIET = new Set(['turn', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
+const QUIET = new Set(['turn', 'long', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1274,6 +1274,15 @@ export function App() {
         const text = `${m.agent} started (scheduled${m.late ? `, late: it was due ${new Date(m.late).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : ''})`
         if (viewRef.current?.settings.notify !== false) notify(String(m.name), text, m.tab, open, viewRef.current?.settings.notifySound)
         toast(`${m.name}: ${text}`, open, 'Open')
+      } else if (m.ev === 'long') {
+        // a turn past settings.longTurn (once): Stop is its Esc
+        const v = viewRef.current
+        const t = v?.tabs.find(x => x.id === m.tab)
+        if (t && !t.muted && !v?.workspaces.find(w => w.id === t.workspace)?.muted) {
+          const open = () => (setDialog(null), selectTab(m.tab))
+          if (v?.settings.notify !== false) notify('Laki', String(m.text), m.tab, open, v?.settings.notifySound, [{ text: 'Stop', stop: true }])
+          toast(String(m.text), open, 'Open')
+        }
       } else if (m.ev === 'focus') {
         selectTab(m.tab) // Laki AI's "show me": that tab, in its workspace
       } else if (m.ev === 'archived') {
@@ -1281,7 +1290,8 @@ export function App() {
         const all = (archived.current = [...archived.current, m.ws])
         clearTimeout(archivedTimer.current)
         archivedTimer.current = setTimeout(() => (archived.current = []), 8000)
-        toast(all.length > 1 ? `Archived ${all.length} workspaces: their PRs merged` : `Archived ${m.name}: PR #${m.pr} merged`, () => {
+        const said = m.idle ? (all.length > 1 ? `Archived ${all.length} idle workspaces` : `Archived ${m.name}: untouched for ${m.idle} days`) : all.length > 1 ? `Archived ${all.length} workspaces: their PRs merged` : `Archived ${m.name}: PR #${m.pr} merged`
+        toast(said, () => {
           archived.current = []
           for (const id of all) call('wsRestore', { id }).catch(() => {})
         })

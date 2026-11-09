@@ -7,6 +7,11 @@ version it builds, with the date. -->
 - Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
   and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
   Two neutral themes made for it: Frosted and Frosted Light.
+- Settings › Git & worktrees › *Archive workspaces untouched for*: 3, 7, 14 or 30 days (off by default). Laki archives
+  a worktree nobody has touched, with Undo, and never one with unsaved work, an agent or dev server running, a queued
+  message, a pin or an Important mark.
+- Settings › General › *Tell me when a turn runs longer than*: a notification (Open, Stop) and a phone push when an agent
+  has been working on one turn for that long; time waiting on you doesn't count. Extensions and workflows get `turn.long`.
 
 ## 0.46.0 · Nov 9, 2026
 

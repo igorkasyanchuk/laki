@@ -10,7 +10,9 @@ import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
 import { basename, join, sep } from 'node:path'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type Workspace } from '../shared/types.ts'
-import { addTab, changed, findWs, presets, rtOf, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
+import { addTab, broadcast, changed, findWs, presets, rtOf, sessions, state, storageOf, tracked, turnEnds, turnStarts, wsLog } from './core.ts'
+import { phoneLong } from './phone.ts'
+import { widgetEvent } from './widgets.ts'
 import { dir } from './dir.ts'
 import { diff, g, inside, treeOf, turnDir } from './files.ts'
 import { chatRead } from './meters.ts'
@@ -35,6 +37,44 @@ export async function suggestNext(tab: Tab, last: string) {
   } catch (e) {
     wsLog({ id: tab.workspace }, `next prompt: ${(e as Error).message}`)
   }
+}
+
+// settings.longTurn (minutes): a turn at work that long says so, once. Only working time counts, tick by tick: not an ask
+// or a plan limit it waits on, and a gap between ticks (the Mac asleep) counts as LONG_GAP at most
+const LONG_GAP = 300_000
+const longs = new Map<string, { worked: number; at?: number; said?: boolean }>()
+turnEnds.add(tab => void longs.delete(tab.id))
+const spell = (ms: number) => (m => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`))(Math.round(ms / 60000))
+export function longTurnTick(now = Date.now()) {
+  const min = Number(state.settings?.longTurn)
+  if (!(min > 0)) return longs.clear(), []
+  const told: string[] = []
+  for (const tab of state.tabs.filter(tracked)) {
+    const r = rtOf(tab.id)
+    const s = sessions.get(tab.id)
+    if (r.status === 'idle' || !s || s.exited) { // sweepRunning's end has no hook
+      longs.delete(tab.id)
+      continue
+    }
+    const l = longs.get(tab.id) ?? { worked: 0 }
+    longs.set(tab.id, l)
+    if (r.status !== 'running' || r.limit) {
+      l.at = undefined
+      continue
+    }
+    if (l.at) l.worked += Math.max(0, Math.min(now - l.at, LONG_GAP))
+    l.at = now
+    if (l.said || l.worked < min * 60000) continue
+    l.said = true
+    told.push(tab.id)
+    const ws = state.workspaces.find(w => w.id === tab.workspace)
+    const name = ws?.name || tab.workspace
+    const text = `${name} has been working for ${spell(l.worked)}`
+    broadcast({ ev: 'long', tab: tab.id, ws: tab.workspace, name, text })
+    phoneLong(tab, text)
+    widgetEvent('turn.long', { minutes: Math.round(l.worked / 60000) }, tab.workspace, tab)
+  }
+  return told
 }
 
 // a turn of yours that ended with an answer: not a workflow's (its next prompt is the workflow's), nothing queued after it
