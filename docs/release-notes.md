@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.47.0 · Nov 9, 2026
 
 - A comment or review someone hid on GitHub no longer goes to the agent or shows in Laki's Review, and hiding one doesn't
   send its thread again.
