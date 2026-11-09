@@ -656,19 +656,21 @@ for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw
 // yours Laki starts)
 const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
-// Tab by CSI u or modifyOtherKeys. keyStart: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
-// calls is refused too; a plain Esc goes through, only what would finish the key doesn't.
+// Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
+// calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
+// just be queued, and queueNow's Esc is one the agent asked for.
 // ponytail: these bytes only. A key rebound in claude's keybindings.json, a slash command typed (/permissions), and an
 // agent with a shell posing as a process in no tab get past it; per-tab tokens are the real fix (AGENT_NO's note)
 const SHIFT_TAB = /\x1b\[(?:[\d:;]*Z|9;[\d:;]*u|27;\d+;9~)/
 const KEY_START = /\x1b(?:\[[\d:;]*)?$/
-const keyStart = new Map<string, string>()
-function shiftTabNo(p: any, tab: string, text: string) {
-  const all = (keyStart.get(tab) ?? '') + text
+const keyTail = new Map<string, string>()
+function shiftTabNo(p: any, tab: string, text: string, keep = true) {
+  const all = (keyTail.get(tab) ?? '') + text
   if (SHIFT_TAB.test(all)) notAgent(p, 'change a permission mode')
+  if (!keep) return
   const start = KEY_START.exec(all)?.[0]
-  if (start) keyStart.set(tab, start)
-  else keyStart.delete(tab)
+  if (start) keyTail.set(tab, start)
+  else keyTail.delete(tab)
 }
 function agentNo(method: string, p: any) {
   boxNo(method, p)
@@ -681,7 +683,8 @@ function agentNo(method: string, p: any) {
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
   else if (method === 'input' && core.agentCaller(p.from)) shiftTabNo(p, String(p.tab), String(p.data ?? ''))
-  else if (method === 'send' && core.agentCaller(p.from)) shiftTabNo(p, core.resolveTarget(String(p.target ?? '')).id, core.noKeys(String(p.text ?? ''))) // send strips escapes, but its text can finish an Esc that input left
+  else if (method === 'send' && core.agentCaller(p.from)) shiftTabNo(p, core.resolveTarget(String(p.target ?? '')).id, core.noKeys(String(p.text ?? '')), false) // send strips escapes, but its text can finish an Esc that input left
+  else if (method === 'queueNow' && core.agentCaller(p.from)) keyTail.set(core.resolveTarget(String(p.tab ?? '')).id, '\x1b') // it presses Esc for the agent
   else if (method === 'tabMode') notAgent(p, 'change a permission mode')
   else if (method === 'tabDraft') notAgent(p, "read or change what the user is typing")
   else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)

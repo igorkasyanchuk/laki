@@ -83,6 +83,13 @@ test("an agent can't press Shift-Tab by input, whole or split, nor by send; its 
   await rig.rpc('input', { tab, data: 'a', from }) // anything else, and it's only text
   await rig.rpc('input', { tab, data: '[Z', from })
   await rig.rpc('send', { target: tab, text: '\x1b[Z', enter: false, from }) // typeInto strips it: no key
+  await rig.rpc('input', { tab, data: '\x1b', from })
+  await rig.rpc('send', { target: tab, text: 'x', enter: false, from })
+  await assert.rejects(rig.rpc('input', { tab, data: '[Z', from }), no, 'a send may only be queued: it ends nothing')
+  await rig.rpc('input', { tab, data: 'b', from })
+  await assert.rejects(rig.rpc('queueNow', { tab, from }), /nothing is queued/)
+  await assert.rejects(rig.rpc('input', { tab, data: '[Z', from }), no, "queueNow's Esc counts")
+  await rig.rpc('input', { tab, data: 'c', from })
   await sleep(400)
   assert.equal(await mode(), 'default', 'nothing pressed')
 

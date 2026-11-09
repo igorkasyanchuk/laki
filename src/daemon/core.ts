@@ -4087,6 +4087,8 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
   // git add -A here would go into a nested repo (noNested), so what treeOf stages. ponytail: a host's keeps git add -A
   // (treeOf is this Mac's): a sandboxed agent's nested repo there runs as you on that host
   const tree = ws.host ? '' : await treeOf(ws, true)
+  const index = join(turnDir, `${ws.id}.ship`)
+  if (tree) copyFileSync(join(turnDir, `${ws.id}.index`), index) // now: a turn's treeOf rewrites that one
   const nested = tree ? await nestedRepos(ws, tree) : []
   if (nested.length) throw new Error(`can't ship: ${JSON.stringify(nested[0])} ${nested.length > 1 ? `and ${nested.length - 1} more are git repos` : 'is a git repo'} inside this workspace that ${ws.base} and your checkout don't both have as a submodule, and a repo's config can run a program as you. Delete the folder, or add the submodule on ${ws.base} in your checkout first, then ship again`)
   const script = [
@@ -4095,12 +4097,12 @@ export async function ship(ref: string, message: string, o: GateOpts = {}): Prom
     'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
     'git push -u origin "$LAKI_BRANCH"',
     // the worktree's index is the agent's to write, still running: a gitlink it puts back after read-tree would send gh's and
-    // glab's git status in. Theirs reads an index of Laki's instead (turnsTidy clears it)
-    ...(tree ? ['export GIT_INDEX_FILE="$LAKI_INDEX"', 'git read-tree "$LAKI_TREE"'] : []),
+    // glab's git status in. Theirs reads treeOf's index instead, a copy of Laki's (turnsTidy clears it), its stat data kept
+    ...(tree ? ['export GIT_INDEX_FILE="$LAKI_INDEX"'] : []),
     lab ? gitlab.SHIP_MR : `gh pr view "$LAKI_BRANCH"${R} --json url -q .url 2>/dev/null || gh pr create --fill${R ? `${R} --head "$LAKI_BRANCH"` : ''}`,
   ].join('\n')
   const agent = callerAgent(o.from) ?? o.agent
-  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree, LAKI_INDEX: join(turnDir, `${ws.id}.ship`) }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch, ...(tree && { LAKI_TREE: tree, LAKI_INDEX: index }), ...(lab && { LAKI_BASE: ws.base }), ...(repo && { LAKI_REPO: repo }) }, undefined, agent, o)
   sessions.get(tab.id)!.onExit = code => {
     changed()
     void scanPRs().finally(() => {

@@ -327,7 +327,7 @@ they work).
 
 A turn that ends on an API error (`turn`'s `failed`, not a limit, a refused model or an Esc) keeps its line in `r.failed` (the view's `failed`, only while idle) until a new turn or `failDismiss`: the Reader, Needs you, One next step and the palette offer Continue, which is `send`'s `continue`. `settings.continueOnError`: `continueLater`, once per turn (`autoContinued`, `contSent`: a UserPromptSubmit that isn't its continue starts over), `LAKI_CONTINUE_MS` later, never in a workflow's tab.
 
-A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the chip (`Reader.tsx` `modeItems`, also the tab's menu). Not kept across a restart: a resume starts as `t.perm` says. An agent's `tabMode` is refused, and so is the key itself (main.ts `shiftTabNo`, for `input` and `send`: `SHIFT_TAB`, and `keyStart`, per tab, for an Esc in one call and `[Z` in the next; a plain Esc goes through; `send`'s own escapes are stripped by `typeInto`, `noKeys`). ponytail: only those bytes: a key rebound in claude's `keybindings.json` or a slash command typed isn't.
+A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the chip (`Reader.tsx` `modeItems`, also the tab's menu). Not kept across a restart: a resume starts as `t.perm` says. An agent's `tabMode` is refused, and so is the key itself (main.ts `shiftTabNo`, for `input` and `send`: `SHIFT_TAB`, and `keyTail`, per tab, for an Esc in one call and `[Z` in the next, `queueNow`'s Esc too, moved only by `input` as a `send` may just be queued; a plain Esc goes through; `send`'s own escapes are stripped by `typeInto`, `noKeys`). ponytail: only those bytes: a key rebound in claude's `keybindings.json` or a slash command typed isn't.
 
 ### Resume
 
