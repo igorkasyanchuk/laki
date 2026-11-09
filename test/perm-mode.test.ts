@@ -13,9 +13,12 @@ test('claudeMode: the footer as claude draws it, an answer that mentions a mode 
   assert.equal(claudeMode('  ⏸ plan mode on'), 'plan')
   assert.equal(claudeMode('  ⏵⏵ auto mode on'), 'auto')
   assert.equal(claudeMode('  ⏵⏵ bypass permissions on'), 'bypassPermissions')
-  assert.equal(claudeMode('I turned plan mode on for you'), 'default')
+  assert.equal(claudeMode('> I turned plan mode on for you'), 'default')
   assert.equal(claudeMode('> plan mode on'), 'default', 'typed in its prompt')
-  assert.equal(claudeMode('plan mode on'), 'default')
+  assert.equal(claudeMode('────────────\n❯ \n────────────\n  plan mode on'), 'default')
+  // S9: no footer on screen (no input box, no hint): not known, never taken for Ask
+  for (const s of ['plan mode on', 'I turned plan mode on for you', '', 'Showing detailed transcript · ctrl+o to toggle']) assert.equal(claudeMode(s), undefined, s)
+  assert.equal(claudeMode('some answer\n  ? for shortcuts'), 'default')
   assert.equal(claudeMode("  ⏵⏵ don't ask on"), 'dontAsk')
 })
 

@@ -9,6 +9,7 @@ version it builds, with the date. -->
 - Safer: agents can't change your voice dictionary, Laki AI's instructions or your keys; a ⌘K command's key never takes over ⌘C, ⌘V or ⌘Q.
 - Safer: an agent's `laki rename --asked` of a workspace you named asks you; an HTML artifact opened in your browser asks once first, with *Open in the viewer instead*.
 - Auto-continue after an API error no longer types over a prompt you're writing.
+- A Claude tab's mode chip says *Mode unknown* when Claude's footer isn't on screen, instead of *Ask*.
 - Recording mode now hides private workspaces from agents, Laki AI and remote access too, not only from the window.
 
 ## 0.47.0 · Nov 9, 2026

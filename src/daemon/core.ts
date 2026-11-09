@@ -90,7 +90,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -618,7 +618,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -2151,13 +2151,14 @@ export async function tabMode(p: { tab?: unknown; mode?: unknown }) {
   switching.add(t.id)
   try {
     const start = claudeMode(s.screenText(6))
+    if (!start) throw new Error("its mode isn't on screen now (a menu, a transcript view or a narrow pane hides Claude's footer): show its prompt, then switch") // S9: no press from a mode that was only assumed
     let now = start
     for (let i = 0; i < MODE_PRESSES && now !== mode; i++) {
       if (asking(t.id)) throw new Error('it began asking you something: answer that first') // there ⇧⇥ would pick an answer
       const was = now
       s.write('\x1b[Z') // shift-tab
       const until = Date.now() + MODE_WAIT
-      while ((now = claudeMode(s.screenText(6))) === was && Date.now() < until && !s.exited) await new Promise(ok => setTimeout(ok, 40))
+      while ((now = claudeMode(s.screenText(6)) ?? was) === was && Date.now() < until && !s.exited) await new Promise(ok => setTimeout(ok, 40))
       if (now === was) throw new Error("it didn't change mode")
       if (now === start) throw new Error(`${CLAUDE_MODES.find(([id]) => id === mode)![1]} isn't among the modes it offers`)
     }
@@ -3564,7 +3565,11 @@ export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
     const r = rt.get(t.id)
-    if (t.preset === 'claude' && s && !s.exited && r && r.status !== 'waiting' && r.mode !== (r.mode = claudeMode(s.screenText(6)))) changed() // ⇧⇥ in its terminal too; a menu over its footer says nothing
+    // ⇧⇥ in its terminal too; a menu over its footer says nothing, nor a screen without it (S9: the last one seen stays, marked)
+    if (t.preset === 'claude' && s && !s.exited && r && r.status !== 'waiting') {
+      const m = claudeMode(s.screenText(6))
+      if (m ? r.mode !== m || r.modeUnknown : !r.modeUnknown) (m ? ((r.mode = m), (r.modeUnknown = undefined)) : (r.modeUnknown = true), changed())
+    }
     const screen = tracked(t) && !HOOKED.has(t.preset!) && !r?.hooked // no hooks: the screen and title are all it says
     if (screen && s && !s.exited && r && r.status !== 'idle') {
       const asks = ASKS.test(s.title)

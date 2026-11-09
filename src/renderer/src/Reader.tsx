@@ -37,7 +37,7 @@ export type ReaderLook = { tools?: 'ok' | 'final'; scroll?: boolean }
 export const modeItems = (tab: TabView, set: (mode: string) => unknown): MenuItem[] =>
   CLAUDE_MODES.map(([id, label, sub]) => {
     const no = id === 'bypassPermissions' ? tab.bypassNo : undefined
-    return { label, sub: no ?? sub, hint: tab.mode === id ? ON : undefined, danger: id === 'bypassPermissions', off: !!no, run: () => void (no || set(id)) }
+    return { label, sub: no ?? sub, hint: tab.mode === id ? (tab.modeUnknown ? 'last seen' : ON) : undefined, danger: id === 'bypassPermissions', off: !!no, run: () => void (no || set(id)) }
   })
 export const modeLabel = (mode?: string) => (mode === 'auto' ? 'Auto' : mode === 'dontAsk' ? "Don't ask" : CLAUDE_MODES.find(([id]) => id === mode)?.[1])
 
@@ -277,8 +277,8 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
       ) : (
         <form className="rd-box" onSubmit={e => (e.preventDefault(), send())}>
           {tab.mode && (
-            <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip="Its permission mode: change it without restarting" onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
-              {modeLabel(tab.mode)} ▾
+            <button type="button" className={`rd-chip rd-mode${tab.mode === 'bypassPermissions' ? ' danger' : ''}`} data-tip={tab.modeUnknown ? `Claude's footer isn't on screen (a menu, a transcript view or a narrow pane hides it). Last seen: ${modeLabel(tab.mode)}` : 'Its permission mode: change it without restarting'} onClick={e => openMenu(e, modeItems(tab, m => api.setMode(tab.id, m).catch(() => {})))}>
+              {tab.modeUnknown ? 'Mode unknown' : modeLabel(tab.mode)} ▾
             </button>
           )}
           <textarea
