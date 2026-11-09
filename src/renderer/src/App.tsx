@@ -2265,6 +2265,14 @@ export function App() {
       toolLine.add({ req: m.req, title, text: `Every tab started on it runs with its args and env.\n\n${m.text}`, picks, answer })
       return toolShow()
     }
+    if (m.cross === 'remove') {
+      // an agent's laki rm (main.ts' rmAsk): a workspace, a project or a scheduled task; once only, read in the dialog
+      const title = `${m.agent} in ${m.from} wants to ${m.target}`
+      const picks: Pick[] = [{ label: 'Allow', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, String(m.text ?? ''), m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
+      toolLine.add({ req: m.req, title, text: String(m.text ?? ''), picks, answer })
+      return toolShow()
+    }
     if (m.cross === 'cmd') {
       // an agent's command in a new terminal tab (main.ts' cmdAsk: laki tab --cmd, laki new --tab): once only
       const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`

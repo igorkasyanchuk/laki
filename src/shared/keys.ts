@@ -76,6 +76,10 @@ export type CmdMap = Record<string, string>
 // settings.cmdKeys as usable: known commands, keys Laki may take
 export const cmdMap = (over?: unknown): CmdMap => Object.fromEntries(Object.entries(over && typeof over === 'object' ? (over as Record<string, unknown>) : {}).filter((x): x is [string, string] => typeof x[1] === 'string' && keyOk(x[1]) && COMMANDS.some(c => c.id === x[0])))
 
+// the ones a press runs: none on a fixed key (⌘C, ⌘V, ⌘Q, ⌘1…: a command there would take Copy or Quit away; Settings
+// shows the clash, cmdClash)
+export const cmdLive = (over?: unknown): CmdMap => Object.fromEntries(Object.entries(cmdMap(over)).filter(([, k]) => !FIXED.some(([f]) => f === k)))
+
 // keys Laki may take: ⌘, ⌥ or ⌃ with a key (one alone, or with ⇧, would be typed: a terminal never loses it)
 export const keyOk = (k: string) => (m => !!m && !!(m[1] || m[2] || m[4]) && !/[⌃⌥⇧⌘]/.test(m[5]) && m[5].length <= 12)(/^(⌃?)(⌥?)(⇧?)(⌘?)(.+)$/.exec(k))
 

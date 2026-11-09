@@ -36,6 +36,16 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   assert.match(ship.error, /an agent never overrides a gate/)
   assert.match(sched.error, /an agent can't run a scheduled task now/)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, false)
+  // S2, S7: a delete, a share and (in Recording mode) the state are its process's too, with no from said
+  const hid = await rig.rpc('wsNew', { project: p.id, kind: 'local', name: 'hidden-two' })
+  await rig.rpc('wsSet', { id: hid.id, private: true })
+  await rig.rpc('settingsSet', { recording: true })
+  const [rm, share, seen] = await agent(curl('wsRm', { id: ws.id }), curl('shareStart', { tab }), curl('state', {}))
+  assert.match(rm.error, /says yes in Laki's window, and it isn't open/)
+  assert.match(share.error, /an agent can't share a tab's page/)
+  assert.ok(seen.result.workspaces.some((w: any) => w.id === ws.id) && !JSON.stringify(seen).includes('hidden-two'), 'its state: no private workspace')
+  await rig.rpc('settingsSet', { recording: false })
+  await rig.rpc('wsRm', { id: hid.id })
   // the same from outside any tab, the app's Origin and token: yours
   const app = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { origin: 'file://', authorization: `Bearer ${token}` }, body: JSON.stringify({ method, params }) })).json()
   assert.equal((await app('widgetSet', { id, on: true })).error, undefined)

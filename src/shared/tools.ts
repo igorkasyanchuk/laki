@@ -6,7 +6,7 @@ import { oldName } from './caps.ts'
 import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from './types.ts'
+import { AI_ACTS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -767,4 +767,4 @@ export async function extCall(rpc: Rpc, tool: string, input: unknown, from?: str
 const AI_BY = ['screen', 'browse', 'send'] // said as Laki AI's: its looks (the glow), its sends (not the user's prompt history)
 // chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once);
 // a write names it too: one that's on stays on only from its own page's chat (widget:<id>, the user's), else off
-export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => (m => rpc(method, AI_BY.includes(m) ? { ...params, by: 'ai' } : m === 'widgetWrite' || m === 'alertShow' ? { ...params, by: 'ai', chat } : chat !== undefined && (m === 'aiQuestion' || m === 'aiPermission') ? { ...params, chat } : params, ms))(oldName(method)) // by the old name: a namespaced one gets the same
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => (m => rpc(method, AI_BY.includes(m) ? { ...params, by: 'ai' } : m === 'widgetWrite' || m === 'alertShow' ? { ...params, by: 'ai', chat } : chat !== undefined && (m === 'aiQuestion' || m === 'aiPermission') ? { ...params, chat } : params, ms).then(r => (m === 'state' ? recorded(r) : r)))(oldName(method)) // by the old name: a namespaced one gets the same

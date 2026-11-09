@@ -13,7 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped } from '../shared/conn.ts'
-import { API, HIDDEN } from '../shared/types.ts'
+import { API, HIDDEN, recorded } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -161,7 +161,7 @@ const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charse
 const IMG = /^image\/(png|jpe?g|gif|webp|avif|svg\+xml|x-icon|vnd\.microsoft\.icon)\b/i
 // an https address on the internet, by its name: no IP literal of this Mac or a private network, no localhost.
 // ponytail: a name that resolves to one (DNS) still goes; a lookup before each fetch if that matters
-const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[)/i
+const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.|0\.|\[)/i
 const webOk = (u: string) => URL.canParse(u) && (x => x.protocol === 'https:' && !PRIVATE_HOST.test(x.hostname))(new URL(u))
 async function imgPage(q: URLSearchParams, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
@@ -224,9 +224,9 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
 type Handler = (p: any, c?: core.Conn) => unknown
 const api: Record<string, Handler> = {
   ping: p => (p.caps ? { pong: true, api: API, caps: CAPS } : 'pong'), // plain: 'pong', as every CLI's alive() wants
-  state: () => core.view(),
+  state: p => (core.agentCaller(p?.from) ? recorded(core.view()) : core.view()), // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then)
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
-  projectRm: p => core.projectRm(p.id),
+  projectRm: async p => (await rmAsk(p, `remove the project ${core.findProject(String(p.id ?? '')).name}`, 'Its workspaces list, notes and settings in Laki go; the folder stays.'), core.projectRm(p.id)),
   projectArchive: p => core.projectArchive({ project: p.project, on: p.on !== false }),
   updateIdle: p => core.updateWhenIdle({ on: p.on, caller: p.caller }),
   agentModels: p => agentModels({ agent: p.agent, preset: p.preset }),
@@ -239,7 +239,7 @@ const api: Record<string, Handler> = {
   csMachines: p => hostsMod.csMachines(p),
   wsNew: p => core.wsNew(yours(core.byCaller(p))),
   quickNew: p => core.quickNew(p),
-  wsRm: p => core.wsRm(p.id),
+  wsRm: async p => (await wsRmAsk(p), core.wsRm(p.id)),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
   overlapCheck: p => filesMod.overlapCheck(String(p.ws ?? '')), // the workspace menu's Check overlaps: one worktree's now, the radar on or off
   wsStat: p => filesMod.wsStat(p), // a row's hover card: its diff's size now
@@ -305,7 +305,7 @@ const api: Record<string, Handler> = {
   storageInfo: () => core.storageInfo(), // Settings › General › Storage: its folder and size
   storageTidy: p => core.storageTidy(p.now), // tests move the clock
   presetSave: async p => (await presetAsk(p), core.presetSave(p)), // laki preset: one profile; an agent's asked in the app first
-  openIn: p => core.openIn(p),
+  openIn: ({ from: _, ...p }) => core.openIn(p as Parameters<typeof core.openIn>[0]), // from: whoCalls' (agentNo: no file of an agent's opened by its default app)
   apps: () => core.apps(),
   wsSet: p => core.wsOut(core.wsSet(p)),
   reorder: p => core.reorder(p),
@@ -454,7 +454,7 @@ const api: Record<string, Handler> = {
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
   scheduleSet: ({ from, ...p }) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
-  scheduleRm: p => scheduleMod.scheduleRm(p.id),
+  scheduleRm: async p => (await rmAsk(p, `remove the scheduled task ${String(p.id ?? '')}`, 'It runs no more.'), scheduleMod.scheduleRm(p.id)),
   scheduleRun: p => (notAgent(p, 'run a scheduled task now'), scheduleMod.scheduleRun(p.id)),
   scheduleTick: p => scheduleMod.scheduleTick(p.now), // tests move the clock
   pendingTick: p => scheduleMod.pendingTick(p.now),
@@ -573,7 +573,7 @@ const remoteNo = (method: string, p: any) =>
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
 // (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate'])
+const FROM = new Set(['longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
 const trees = new WeakMap<Socket, Promise<void>>() // per connection: its tab's agent looked for (core.treeAgent)
@@ -588,20 +588,22 @@ const peerOf = (sock: Socket) => {
   return t
 }
 async function whoCalls(sock: Socket, method: string, p: any) {
-  if (!FROM.has(method) && !CALLER.has(method)) return p
+  // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
+  const from = FROM.has(method) || (method === 'state' && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
+  if (!from && !CALLER.has(method)) return p
   const tab = await peerOf(sock).catch(() => null)
   if (tab === null || sock.readableEnded || sock.destroyed) {
     log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
     throw new Error(core.WHO)
   }
   const o = p && typeof p === 'object' ? p : {}
-  const said = FROM.has(method) ? o.from : o.caller // a process in no tab: what its env says (the CLI's caller())
+  const said = from ? o.from : o.caller // a process in no tab: what its env says (the CLI's caller())
   // #14: a shell tab's agent, whatever runs in front; once per connection, as its peer (a window's keys are calls)
   if (!trees.has(sock)) trees.set(sock, core.treeAgent(tab || core.state.tabs.find(t => t.id === said?.tab)))
   await trees.get(sock)
   if (!tab) return p
   const me = { ws: tab.workspace, tab: tab.id }
-  return FROM.has(method) ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
+  return from ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
 }
 // from: FROM's (whoCalls'), caller: CALLER's; the other one an RPC says only makes it stricter
 const notAgent = (p: any, what: string) => {
@@ -612,6 +614,9 @@ const notAgent = (p: any, what: string) => {
 // Run ▾ action (its script reads the worktree the agent writes). A command it asks for runs once you allow it (tabNew's
 // cmdAsk). ponytail: the Done check's scripts, a scheduled task's agent (its profile's sandbox) and git hooks a repo keeps
 // in its tree (husky's core.hooksPath) still run outside it, as the user
+// the editor's and Changes' writes (files.ts): the daemon's own, outside any sandbox and any agent's permission prompts
+const FILE_EDITS = new Set(['fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo'])
+const GIT_PATH = /(^|[\\/])\.git([\\/]|$)/i // .git/config, .git/hooks: what git runs as you
 function boxNo(method: string, p: any) {
   if (!core.boxedCaller(p.caller) && !core.boxedCaller(p.from)) return
   const no = (what: string) => {
@@ -623,6 +628,8 @@ function boxNo(method: string, p: any) {
   if (method === 'run') no('start a Run ▾ action')
   if (method === 'projectAdd') no('add a project (a repo it made, its hooks and config run as you once a workspace starts there)')
   if (method === 'tabReopen') no('reopen a closed tab (a terminal, or an agent outside its sandbox)')
+  if (FILE_EDITS.has(method)) no('change files through Laki (the daemon writes them, not its sandbox)')
+  if (method === 'wsRm' || method === 'projectRm' || method === 'scheduleRm') no(`remove a ${method === 'wsRm' ? 'workspace' : method === 'projectRm' ? 'project' : 'scheduled task'}`)
   if (method === 'send' || method === 'input') {
     const tab = core.resolveTarget(String((method === 'send' ? p.target : p.tab) ?? ''))
     if (!(tab.kind === 'agent' && core.tracked(tab))) no(method === 'send' ? `send into ${tab.name}, a terminal` : `type into ${tab.name}, a terminal`)
@@ -641,7 +648,7 @@ function boxNo(method: string, p: any) {
 // comments, for you to read; an agent gets only trusted reviewers' (autoPR's rule). laki stop: every session ends; the
 // Done check's Check again and Stop: its scripts and its verdict are the user's. ponytail: an agent with a shell can still
 // kill the daemon by daemon.json's pid; per-tab tokens and a user of its own are the real fix
-const AGENT_NO: Record<string, string> = { longStop: "stop a turn from the user's notification", imageRead: "read a picture anywhere on this Mac (the hover card's; its own files: fileRead)", prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)", tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)", accountRm: "remove one of the user's accounts (its sign-in goes with it)", hookAdd: 'add a webhook (what outsiders can start)', hookRm: 'remove a webhook', hookSecret: "read a webhook's secret", hookExpose: 'put the webhook server on the internet' }
+const AGENT_NO: Record<string, string> = { longStop: "stop a turn from the user's notification", imageRead: "read a picture anywhere on this Mac (the hover card's; its own files: fileRead)", prompts: "read the user's prompt history", chatList: "list the user's chats outside Laki", chatImport: "open the user's chats as tabs (the user does, from the project's menu)", sideAsk: "ask in the user's side chat (laki ask asks another agent)", turnUndo: "undo an agent's turn (the user does, from its card)", tabHandover: 'hand its chat to another agent (the user does, from the tab)', secretGive: 'give a secret (the user types it)', alertAnswer: "answer the user's alert (they pick on its card)", widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access', memoryCompact: 'compact memories (they go to a model)', prReview: 'post a PR review as you', prComment: 'comment on a PR as you', prSay: 'comment on a PR as you', prTalk: "read everyone's PR conversation (only trusted reviewers' go to agents)", chatRead: "read a tab's chat (laki screen reads what it shows)", shutdown: "stop Laki's daemon (every agent's session with it)", checkAgain: "run the Done check (its scripts run as the user)", checkStop: 'stop the Done check', worktreeImport: "import worktrees as workspaces (a delete removes their folder; the user does, from the project's menu)", bgSet: "set the app's background picture (it could look like a dialog)", sideNew: "start the user's side chat over", uiReset: "reset the user's settings and turn every extension off", projectArchive: 'archive or bring back a project (the user does, from its menu or Settings)', mcpAppCall: "run an MCP App's tool (the user allows each, in the Reader)", agentUpdate: 'update Claude Code (the user does, from the new-workspace page)', bgOutput: "read a background task's output (laki screen reads what a tab shows)", wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)", tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)", accountRm: "remove one of the user's accounts (its sign-in goes with it)", hookAdd: 'add a webhook (what outsiders can start)', hookRm: 'remove a webhook', hookSecret: "read a webhook's secret", hookExpose: 'put the webhook server on the internet', shareStart: "share a tab's page with anyone who has its link (the user does, from the tab)" }
 // every refusal by name reads a from (or caller) the daemon filled in: one missing from FROM would be the caller's to say,
 // and an agent that leaves it out gets through. Checked as the daemon loads, so every test run fails on it
 for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw new Error(`AGENT_NO's ${k} isn't in FROM: an agent could leave its from out`)
@@ -653,8 +660,9 @@ for (const k of Object.keys(AGENT_NO)) if (!FROM.has(k) && !CALLER.has(k)) throw
 // config holds (refused in projectSet): Run ▾'s actions, prompt templates, the PR switches' prompts and trusted review
 // bots (whose comments go to agents), and the files copied into new worktrees (git's ignored ones: .env); which of your
 // accounts new tabs use and Auto fallback's order (work moved onto an account you never picked); MCP Apps (servers of
-// yours Laki starts)
-const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks)$/
+// yours Laki starts); S6: voice (its dictionary rewrites what you dictate and send), Laki AI's own (ai.context is its
+// instructions), what the Reader hides of a turn, and the keys (yours and ⌘K commands': a key of yours on another action)
+const AGENT_KEYS = /^(browserBudget|accountUse|limitFallback|mcpApps|whenDone|doneCheck|recording|nextPrompt|keepAwake|storageDays|archivedDays|archiveIdle|archiveIdleKeepPR|continueOnError|imageDays|memoryCompact|updateCheck|updateDelay|actions|templates|prPrompts|prBots|copyIgnored|copyUntracked|inHooks|voice|ai|readerTools|keys|cmdKeys)$/
 // Shift-Tab moves a tab to a mode that asks less (tabMode's key). As a terminal sends it: CSI Z with any parameters, or a
 // Tab by CSI u or modifyOtherKeys. keyTail: per tab, an agent's keys that end in the start of one, so \x1b then [Z in two
 // calls is refused too; a plain Esc goes through, only what would finish the key doesn't. Only input moves it: a send may
@@ -694,14 +702,22 @@ function agentNo(method: string, p: any) {
   else if (method === 'queueNow' && core.agentCaller(p.from)) keyTail.set(core.resolveTarget(String(p.tab ?? '')).id, '\x1b') // it presses Esc for the agent
   else if (method === 'tabMode') notAgent(p, 'change a permission mode')
   else if (method === 'tabDraft') notAgent(p, "read or change what the user is typing")
-  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close')) notAgent(p, `${p.act} a PR as you`)
+  else if (method === 'prAct' && (p.act === 'approve' || p.act === 'close' || p.act === 'merge')) notAgent(p, `${p.act} a PR as you${p.act === 'merge' ? ' (turn on Merge when green yourself)' : ''}`) // S3: merge too: code into the base with no one reading it
+  else if (method === 'wsSet' && ['autoFix', 'autoReview', 'autoMerge', 'autoLand'].some(k => p[k] !== undefined)) notAgent(p, "turn a workspace's PR switches on or off (Fix CI, Address reviews, Merge when green: the user's, in the status bar)")
   else if (method === 'prDraft' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can draft or ready its own workspace's PR only")
   else if (method === 'tabReopen' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error('an agent can reopen a closed tab in its own workspace only')
   else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
   else if ((method === 'wsNew' || method === 'tabNew') && p.sandbox === false) notAgent(p, "start an agent outside its profile's sandbox")
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
-  else if (method === 'tabSet' && p.alias !== undefined && p.from?.tab !== p.id) notAgent(p, "name another agent's tab (laki name names your own)") // else it could take a name and its messages
+  else if (method === 'tabSet' && p.from?.tab !== p.id) notAgent(p, p.alias !== undefined ? "name another agent's tab (laki name names your own)" : "rename, color or mute a tab that isn't its own") // an alias: else it could take a name and its messages; S11: the rest too (a muted tab's asks go unseen)
+  else if (FILE_EDITS.has(method) && core.agentCaller(p.from)) {
+    // S2: its own workspace's files (it writes those itself anyway), never git's own: another's is the user's to change
+    if (core.findWs(String(p.ws ?? '')).id !== core.agentCaller(p.from)) throw new Error("an agent can change files in its own workspace only (ask the user)")
+    if (GIT_PATH.test(String(p.path ?? ''))) throw new Error("an agent can't change a workspace's .git through Laki")
+  }
+  else if (method === 'tabClose' && core.agentCaller(p.from) && core.findTab(String(p.id ?? '')).workspace !== core.agentCaller(p.from)) throw new Error('an agent can close tabs in its own workspace only')
+  else if (method === 'openIn' && p.app === 'default' && p.file) notAgent(p, "open a file with its default app (a page it wrote would run outside Laki; laki show opens it in the viewer)")
   else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
 }
 // M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
@@ -757,6 +773,26 @@ async function presetAsk(p: any) {
   const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
   const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'preset', agent, from: ws, to: '', target: `${what} the profile ${name}`, text, ws: by, tab: p.from.tab })
   if (how !== 'once') throw new Error(`${what} the profile ${name}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+}
+// S2: an agent's laki rm (a workspace, a project, a scheduled task): the user says yes in the app first, what goes with
+// it shown; once only. A worker it started itself (laki new from its tab) it may delete unasked, as it may write to it
+async function rmAsk(p: any, what: string, text: string) {
+  const by = core.agentCaller(p.from)
+  if (!by) return
+  if (!core.clients.size) throw new Error(`to ${what} the user says yes in Laki's window, and it isn't open: ask them to do it`)
+  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const ws = core.state.workspaces.find(w => w.id === by)?.name ?? by
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: 'remove', agent, from: ws, to: '', target: what, text, ws: by, tab: p.from.tab })
+  if (how !== 'once') throw new Error(`${what}: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+}
+async function wsRmAsk(p: any) {
+  const by = core.agentCaller(p.from)
+  if (!by) return
+  const ws = core.findWs(String(p.id ?? ''))
+  if (ws.from === by && ws.id !== by) return
+  const n = (await core.wsPeek(ws.id).catch(() => ({}))) as { dirty?: number; ahead?: number; unpushed?: number }
+  const lost = [n.dirty ? `${n.dirty} uncommitted file${n.dirty === 1 ? '' : 's'}` : '', n.unpushed ? `${n.unpushed} commit${n.unpushed === 1 ? '' : 's'} on no remote` : ''].filter(Boolean).join(', ')
+  await rmAsk(p, `delete the workspace ${ws.name ?? ws.id}`, `Its folder and its tabs go${ws.id === by ? ' (its own: the agent ends with it)' : ''}.${lost ? ` With it: ${lost}.` : ''}`)
 }
 async function crossAsk(p: any, kind: 'send' | 'screen' | 'emit', target: string | null = p.target, text = p.text) {
   const by = core.agentCaller(p.from)
@@ -905,20 +941,28 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     return
   }
   wss.handleUpgrade(req, socket, head, ws => {
+    const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
+    // S7: its process is in an agent's tab, couldn't be found, or it's remote access's page (a phone is on camera too): in
+    // Recording mode its state has no private workspace. Until its process is known, in that mode: as an agent's
+    let agent = far || !!core.state.settings?.recording
     const c: core.Conn = {
       id: ++clientSeq,
-      remote: !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin(),
+      remote: far,
       send: msg => {
         if (ws.readyState !== ws.OPEN) return
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
         // re-attaches from a snapshot
         if (ws.bufferedAmount > 32 << 20) return ws.terminate()
+        // ponytail: the state only; a hidden workspace's events (its asks, its notices) still reach an agent that listens here
+        if (agent && core.state.settings?.recording && (typeof msg === 'string' ? msg.startsWith('{"ev":"state"') : (msg as any)?.ev === 'state')) msg = (m => ({ ...m, view: recorded(m.view) }))(typeof msg === 'string' ? JSON.parse(msg) : msg)
         ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg)) // a string: JSON already (core's state, made once for all)
       },
     }
-    if (!c.remote) local.set(c, req.socket), peerOf(req.socket).catch(() => {}) // looked up as it opens: the app's first keys don't wait
+    // looked up as it opens: the app's first keys don't wait. In Recording mode the first state waits for it (S7)
+    const who = c.remote ? undefined : (local.set(c, req.socket), peerOf(req.socket).then(t => void (agent = !!t && !!core.agentCaller({ ws: t.workspace, tab: t.id })), () => void (agent = true)))
     core.clients.add(c)
-    core.hello(c)
+    if (who && core.state.settings?.recording) void who.then(() => core.clients.has(c) && core.hello(c))
+    else core.hello(c)
     widgetAsks(c) // an extension's asks still waiting: this window shows them too
     noticesTo(c) // and the notices up
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile

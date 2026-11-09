@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFileSync } from 'node:fs'
-import { cmdClash, cmdFor, cmdMap, cmdOthers, COMMANDS, keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
+import { cmdClash, cmdFor, cmdLive, cmdMap, cmdOthers, COMMANDS, keyClash, keyFor, keyLabel, keyMap, keyOk, KEYS, keyShow, overlayKeys } from '../src/shared/keys.ts'
 
 const press = (key: string, code: string, mods: { meta?: boolean; alt?: boolean; ctrl?: boolean; shift?: boolean } = { meta: true }) => ({ key, code, metaKey: !!mods.meta, altKey: !!mods.alt, ctrlKey: !!mods.ctrl, shiftKey: !!mods.shift })
 
@@ -80,6 +80,7 @@ test('⌘K commands: none has a key until given one; a press finds it; clashes a
   assert.equal(cmdClash('ship', m, keys), '')
   assert.equal(cmdClash('ship', cmdMap({ ship: '⌘K' }), keys), 'Palette')
   assert.equal(cmdClash('ship', cmdMap({ ship: '⌘O' }), keys), 'Open a project')
+  assert.deepEqual(cmdLive({ ship: '⌘C', bird: '⌘Q', board: '⌘1', start: '⌥⌘X' }), { start: '⌥⌘X' }, 'a fixed key runs no command: Copy and Quit stay')
   assert.equal(cmdClash('ship', cmdMap({ ship: '⌥⌘X', bird: '⌥⌘X' }), keys), 'Bird view')
   assert.match(cmdClash('ship', cmdMap({ ship: '⌃R' }), keys), /terminal/)
   assert.equal(cmdClash('ship', cmdMap({}), keys), '')

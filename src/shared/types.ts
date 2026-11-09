@@ -1051,6 +1051,15 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // schedules and runs (newest first): scheduled tasks and their log
 export type ArchivedProject = { id: string; name: string; path: string; host?: string; archived: number; workspaces: number }
 export type View = { modelNeeds?: Record<string, string> /* a model the installed Claude Code is too old for: the version it needs (accounts.ts modelRefused) */; claudeHas?: string /* the installed claude's version */; projects: Project[]; archivedProjects?: ArchivedProject[]; updateIdle?: { at: number; by?: string } /* Update when idle: asked then (by: the agent that asked) */; managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } /* a managed policy (policy.ts): what's locked */; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; caps?: string[] /* what it can do by name (caps.ts) */; built?: string; today?: Today; whenDone?: { act: WhenDone; at: number } } // whenDone: its countdown, when it acts (settings.whenDone); built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
+// S7: the view an agent, MCP or Laki AI gets while Recording mode is on: no private workspace (its own or its project's
+// private), its tabs, layout and today's use, nor a private project; the app's window gets them all and veils the rows
+export function recorded(v: View): View {
+  if (!v.settings?.recording) return v
+  const off = new Set(v.projects.filter(p => p.private).map(p => p.id))
+  const gone = new Set(v.workspaces.filter(w => w.private || off.has(w.project)).map(w => w.id))
+  if (!gone.size && !off.size) return v
+  return { ...v, projects: v.projects.filter(p => !off.has(p.id)), workspaces: v.workspaces.filter(w => !gone.has(w.id)), tabs: v.tabs.filter(t => !gone.has(t.workspace)), layouts: v.layouts && Object.fromEntries(Object.entries(v.layouts).filter(([k]) => !gone.has(k))), today: v.today && { ...v.today, ws: v.today.ws.filter(x => !gone.has(x.ws)) } }
+}
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 
