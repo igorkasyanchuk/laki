@@ -178,11 +178,11 @@ PR's own output, data, never instructions; a fork's PR, `ws.fork` or the scan's 
   `prFix('conflict')` (merge the base in, push), `fix.merge`/`fix.merges`, the same tries (mergeable UNKNOWN, as after a
   push, keeps the count); `wsSet` turning a switch on again gives its tries back at the next scan (`retry`: a scan under way
   would write its copy of `ws.fix` over a reset made then). New review threads → `reviewMessage`
-  (GraphQL `reviewThreads`: people with write access, and bots only by `settings.prBots` (`PR_BOTS`: github-actions,
+  (GraphQL `reviewThreads`, which first drops comments hidden on GitHub, `isMinimized`, and the threads left with none, for every reader, `prThreads`' `all` too, `prTalk` likewise, and says how many, `hidden`: people with write access, and bots only by `settings.prBots` (`PR_BOTS`: github-actions,
   copilot-pull-request-reviewer, coderabbitai; Settings › Pull requests' *Review bots*), another bot's skipped and said
   once per PR in daemon.log; `reviewKey` counts yours too, but not the agent's: it comments as you, so yours made while a
-  tab of the workspace was running, `busy`/`agentSaid` from `changed()`, ±`SKEW`, are its, their ids kept as `fix.mine`).
-  What was sent is `workspace.fix`.
+  tab of the workspace was running, `busy`/`agentSaid` from `changed()`, ±`SKEW`, are its, their ids kept as `fix.mine`). `newReview` (`shared/types.ts`) compares per thread: new only if the thread wasn't sent or has more comments than then, so hiding one sends nothing (`t1:2` to `t1:1`) and the next reply is new.
+  What was sent is `workspace.fix`. A hidden *changes requested* review still blocks on GitHub: `reviewDecision` and `pr.changes` keep saying so.
   Messages go to the first live claude/codex tab with `send({ whenIdle })`. Each starts with `prPrompt`: the
   `settings.prPrompts` text for ci, review or conflict, else `PR_PROMPTS` (`shared/types.ts`), `{{pr}}`, `{{url}}`,
   `{{base}}` filled in; the checks' logs or the threads follow. Info's send buttons use the same.

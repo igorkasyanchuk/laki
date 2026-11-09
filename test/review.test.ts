@@ -72,16 +72,20 @@ test("everyone's comments for the full review: prThreads all keeps them, the age
   await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
 
   const said = (login: string, body: string, authorAssociation: string) => ({ author: { login, __typename: 'User' }, authorAssociation, body, createdAt: '2026-10-06T10:00:00Z' })
-  const threads = [{ id: 't1', isResolved: false, isOutdated: false, path: 'a.ts', line: 2, comments: { nodes: [said('ann', 'from a member', 'MEMBER'), said('passerby', 'from anyone', 'NONE')] } }]
+  const gone = { ...said('hid', 'hidden on GitHub', 'MEMBER'), isMinimized: true }
+  const threads = [{ id: 't1', isResolved: false, isOutdated: false, path: 'a.ts', line: 2, comments: { nodes: [said('ann', 'from a member', 'MEMBER'), gone, said('passerby', 'from anyone', 'NONE')] } }, { id: 't2', isResolved: false, isOutdated: false, path: 'b.ts', line: 1, comments: { nodes: [gone] } }]
   writeFileSync(join(gh, 'graphql.json'), JSON.stringify({ data: { viewer: { login: 'me' }, repository: { pullRequest: { reviewThreads: { nodes: threads } } } } }))
-  assert.deepEqual((await rig.rpc('prThreads', { ws: ws.id }))[0].comments.map((c: any) => c.author), ['ann'])
-  assert.deepEqual((await rig.rpc('prThreads', { ws: ws.id, all: true }))[0].comments.map((c: any) => c.author), ['ann', 'passerby'])
+  const mineOnly = await rig.rpc('prThreads', { ws: ws.id })
+  assert.deepEqual(mineOnly.map((x: any) => x.comments.map((c: any) => c.author)), [['ann']], 'hidden ones out, t2 with them')
+  const everyone = await rig.rpc('prThreads', { ws: ws.id, all: true })
+  assert.deepEqual(everyone.map((x: any) => x.comments.map((c: any) => c.author)), [['ann', 'passerby']], "everyone's too")
 
   await assert.rejects(rig.rpc('prTalk', { ws: ws.id }), /no comments for PR #7/)
   const talk = {
-    comments: { nodes: [{ author: { login: 'passerby' }, body: 'nice one', createdAt: '2026-10-06T12:00:00Z', url: 'https://example.invalid/c1' }, { author: null, body: 'gone user', createdAt: '2026-10-06T09:00:00Z' }] },
+    comments: { nodes: [{ author: { login: 'passerby' }, body: 'nice one', createdAt: '2026-10-06T12:00:00Z', url: 'https://example.invalid/c1' }, { author: null, body: 'gone user', createdAt: '2026-10-06T09:00:00Z' }, { author: { login: 'spam' }, body: 'hidden', createdAt: '2026-10-06T09:30:00Z', isMinimized: true }] },
     reviews: {
       nodes: [
+        { author: { login: 'spam' }, body: 'hidden review', state: 'COMMENTED', submittedAt: '2026-10-06T09:40:00Z', isMinimized: true },
         { author: { login: 'ann' }, body: '', state: 'APPROVED', submittedAt: '2026-10-06T11:00:00Z', url: 'https://example.invalid/r1' },
         { author: { login: 'bo' }, body: '', state: 'COMMENTED', submittedAt: '2026-10-06T11:30:00Z' }, // only its threads: none here
         { author: { login: 'me' }, body: 'draft', state: 'PENDING', submittedAt: null }, // not sent yet

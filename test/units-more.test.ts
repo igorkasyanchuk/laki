@@ -16,10 +16,21 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, exportable, fileTree, importable, isStale, Line, needsSorted, NOTE_MAX, noteCut, noteWhole, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { type TabView, browseSays, fillTemplate, isAgent, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
+import { type TabView, browseSays, fillTemplate, isAgent, newReview, pageChanges, placesOf, prAllows, rowsOf, taskTitle, VOICE_FIXES, voiceFillers, voiceFix } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
+
+test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
+  assert.equal(newReview('t1:1'), true, 'nothing sent yet')
+  assert.equal(newReview('t1:1 t2:1', 't1:1'), true, 'a new thread')
+  assert.equal(newReview('t1:3', 't1:2'), true, 'a reply')
+  assert.equal(newReview('t1:1', 't1:2'), false, 'one hidden')
+  assert.equal(newReview('t1:2', 't1:2'), false)
+  assert.equal(newReview('', 't1:2'), false)
+  assert.equal(newReview('a:b:2', 'a:b:1'), true, 'split on the last colon')
+  assert.equal(newReview('a:b:1', 'a:b:1'), false)
+})
 
 test('widget templates: objects as JSON, this in each, each over an object, bad dates, ago in every unit', () => {
   assert.equal(render('{{o}}|{{n}}|{{z}}', { o: { a: '<b>' }, n: null, z: 0 }), '{&quot;a&quot;:&quot;&lt;b&gt;&quot;}||0')

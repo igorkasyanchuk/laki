@@ -122,6 +122,11 @@ export type ProjectConfig = { ticket?: string /* prints the workspace's ticket (
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
 export type PRPerm = keyof PRAllow
+// a review key ("thread:n thread:n", pr.ts' reviewKey) has something new since sent: a thread it wasn't in, or more comments
+// on one than then. Fewer (one hidden on GitHub) is nothing new, and autoPR saves that lower count, so the next reply is.
+// ponytail: a hide and a reply between two scans cancel out; ids of comments would tell them apart
+const reviewCounts = (key: string) => new Map(key.split(' ').filter(Boolean).map(t => [t.slice(0, t.lastIndexOf(':')), Number(t.slice(t.lastIndexOf(':') + 1))] as const))
+export const newReview = (key: string, sent = '') => (was => [...reviewCounts(key)].some(([id, n]) => n > (was.get(id) ?? 0)))(reviewCounts(sent))
 export const prAllows = (c: ProjectConfig | undefined, act: PRPerm) => (act === 'land' ? c?.pr?.land === true : c?.pr?.[act] !== false)
 export type MergeMethod = 'squash' | 'merge' | 'rebase'
 export const MERGE_METHODS: MergeMethod[] = ['squash', 'merge', 'rebase']

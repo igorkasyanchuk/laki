@@ -842,7 +842,7 @@ line, after the tab restarts.
   page on GitHub (a cancelled one is grey: not a failure, and not a pass, so *Merge when green* waits for a re-run or a push); a failing GitHub Actions check has *Log*: the last 80 lines of its failed steps, each step named,
   with *Send to the agent* (that check only), *Copy* and *Open on GitHub* (Info's PR has it too); *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
-  agent would get), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.
+  agent would get; a comment someone hid on GitHub stays out, here and in the full review), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.
   A reviewer's suggestion (a ```` ```suggestion ```` block) shows as a small diff, the file's lines now and the
   suggested ones, with *Apply*: it writes them into the file in the workspace, only while those lines are still what
   the review saw (else *changed since the review*, and nothing is written); *Apply all* does each of a file's open

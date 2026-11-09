@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
+import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
 import { inside, MAX_TEXT, textOf } from './files.ts'
@@ -590,7 +590,7 @@ async function autoPR(ws: Workspace, pr: PR) {
     if (t)
       wsLog(ws, () => {
         const open = t.threads.filter(x => !x.isResolved)
-        return `review: ${t.threads.length} inline threads, ${open.length} open, ${open.filter(x => x.comments.nodes.length).length} with comments that count (${t.dropped} from people without write access left out; the agent's own as you: ${ids.size}); ${k && newReview(k, f.review) ? 'something new' : 'nothing new since the last send'}`
+        return `review: ${t.threads.length} inline threads, ${open.length} open, ${open.filter(x => x.comments.nodes.length).length} with comments that count (${t.dropped} from people without write access left out; ${t.hidden} hidden on GitHub; the agent's own as you: ${ids.size}); ${k && newReview(k, f.review) ? 'something new' : 'nothing new since the last send'}`
       })
     if (t && k !== null && newReview(k, f.review))
       try {
@@ -730,7 +730,7 @@ export async function ciLogs(at: At, failing: { name: string; link?: string }[],
   return { text, logs }
 }
 
-type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string; diffHunk?: string }
+type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string; diffHunk?: string; isMinimized?: boolean }
 type Side = 'LEFT' | 'RIGHT'
 type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; startLine?: number | null; diffSide?: Side; startDiffSide?: Side | null; comments: { nodes: Comment[] } }
 
@@ -744,23 +744,25 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   viewer { login }
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes {
     id isResolved isOutdated path line startLine diffSide startDiffSide
-    comments(first: 30) { nodes { id author { login __typename } authorAssociation body createdAt diffHunk } }
+    comments(first: 30) { nodes { id author { login __typename } authorAssociation body createdAt diffHunk isMinimized } }
   } } } }
 }`
 
 // a PR's review threads, and who you are on GitHub; all: everyone's comments (the full review's, for you to read), else
-// only what an agent may act on
-async function reviewThreads(at: At, pr: number, all = false): Promise<{ threads: Thread[]; me: string; dropped: number }> {
+// only what an agent may act on. Hidden on GitHub (spam, off-topic, outdated, resolved): out for every reader, hidden says how many
+async function reviewThreads(at: At, pr: number, all = false): Promise<{ threads: Thread[]; me: string; dropped: number; hidden: number }> {
   const { stdout } = await exec(at, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { timeout: 20000 }).catch(e => {
     throw new Error(`gh couldn't read the review comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
   })
   const d = JSON.parse(stdout).data
-  const threads: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
-  if (!threads) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
+  const got: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
+  if (!got) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
+  const hidden = got.flatMap(t => t.comments.nodes).filter(c => c.isMinimized).length
+  const threads = got.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(c => !c.isMinimized) } })).filter(t => t.comments.nodes.length)
   const dropped = threads.reduce((n, t) => n + t.comments.nodes.filter(c => !trusted(c)).length, 0)
-  if (all) return { threads, me: d.viewer.login, dropped: 0 }
+  if (all) return { threads, me: d.viewer.login, dropped: 0, hidden }
   for (const c of threads.flatMap(t => t.comments.nodes)) if (c.author?.__typename === 'Bot' && !botOk(c) && !botSaid.has(`${pr}:${c.author.login}`)) (botSaid.add(`${pr}:${c.author.login}`), log(`PR #${pr}: ${c.author.login}'s review comments skipped: not a bot in Settings › Pull requests`))
-  return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login, dropped }
+  return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login, dropped, hidden }
 }
 
 // the open threads with how many comments count on each ("id:n id:n"): everyone's but the agent's. It comments as you,
@@ -771,9 +773,6 @@ export const reviewKey = (threads: Thread[], me: string, mine: (c: Comment) => b
     .filter(([t, n]) => !t.isResolved && n > 0)
     .map(([t, n]) => `${t.id}:${n}`)
     .join(' ')
-
-// a thread or reply in key that wasn't there when the last one was sent
-export const newReview = (key: string, sent = '') => key.split(' ').some(t => t && !sent.split(' ').includes(t))
 
 // ponytail: inline threads only, not review summaries or plain PR comments
 function reviewMessage(pr: PR, threads: Thread[]) {
@@ -1144,8 +1143,8 @@ export async function prSay(o: { ws: string; body: string }) {
 
 const TALK_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) {
-    comments(last: 100) { nodes { author { login } body createdAt url } }
-    reviews(last: 100) { nodes { author { login } body state submittedAt url } }
+    comments(last: 100) { nodes { author { login } body createdAt url isMinimized } }
+    reviews(last: 100) { nodes { author { login } body state submittedAt url isMinimized } }
   } }
 }`
 // prTalk: the PR's conversation, everyone's (the full review's): its comments and each review's summary (one with
@@ -1159,11 +1158,11 @@ export async function prTalk(ref: string) {
   })
   const p = JSON.parse(stdout).data?.repository?.pullRequest
   if (!p?.comments || !p.reviews) throw new Error(`no comments for PR #${pr.number} (gh api graphql)`)
-  type Said = { author: { login: string } | null; body: string; url?: string }
+  type Said = { author: { login: string } | null; body: string; url?: string; isMinimized?: boolean }
   const said = [
-    ...(p.comments.nodes as (Said & { createdAt: string })[]).map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt, url: c.url })),
+    ...(p.comments.nodes as (Said & { createdAt: string })[]).filter(c => !c.isMinimized).map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt, url: c.url })),
     ...(p.reviews.nodes as (Said & { state: string; submittedAt: string | null })[])
-      .filter(r => r.state !== 'PENDING' && (r.body.trim() || r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED'))
+      .filter(r => !r.isMinimized && r.state !== 'PENDING' && (r.body.trim() || r.state === 'APPROVED' || r.state === 'CHANGES_REQUESTED'))
       .map(r => ({ author: r.author?.login ?? 'ghost', body: r.body, at: r.submittedAt ?? '', url: r.url, state: r.state })),
   ]
   return said.sort((a, b) => a.at.localeCompare(b.at))

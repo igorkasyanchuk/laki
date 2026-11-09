@@ -292,6 +292,46 @@ test('cancelled checks: their own state, under fail and pending, a re-run replac
   assert.equal((await rig.tab(ws.id)).status, 'idle', 'nothing typed to it')
 })
 
+test('hidden comments: out of Send review and the threads; a thread of only hidden ones goes; hiding one sends nothing, the next reply does', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 6, state: 'OPEN', url: 'https://example.invalid/pr/6', headRefOid: 'abc', statusCheckRollup: [] }))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  const idle = () => until(async () => (x => x.status === 'idle' && !x.queue)(await rig.tab(ws.id)), 'its turn done', 15000)
+  const fix = async () => (await rig.rpc('state')).workspaces[0].fix
+  const bob = said('bob', 'keep this point', 'User', 'OWNER')
+  const ann = said('ann', 'an outdated note', 'User', 'OWNER')
+  const hide = (c: object) => ({ ...c, isMinimized: true })
+
+  graphql(gh, [thread('t1', [bob, hide(ann)]), thread('t2', [hide(ann)])])
+  assert.deepEqual((await rig.rpc('prThreads', { ws: ws.id })).map((x: any) => x.comments.map((c: any) => c.author)), [['bob']])
+  await rig.rpc('prFix', { ws: ws.id, what: 'review' })
+  await until(async () => (await rig.screen(tab.id)).includes('keep this point'), 'sent')
+  assert.ok(!(await rig.screen(tab.id)).includes('an outdated note'), 'the hidden one stays out')
+  await idle()
+  graphql(gh, [thread('t2', [hide(ann)])])
+  assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), [])
+  await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'review' }), /no open review comments on PR #6/)
+
+  graphql(gh, [thread('t1', [bob, ann])])
+  await rig.rpc('wsSet', { id: ws.id, autoReview: true })
+  await until(async () => (await fix())?.review === 't1:2', 'sent, both')
+  await idle()
+  const before = (await rig.tab(ws.id)).last
+  graphql(gh, [thread('t1', [bob, hide(ann)])])
+  await until(async () => (await fix())?.review === 't1:1', 'the lower key saved')
+  const seen = await rig.tab(ws.id)
+  assert.deepEqual([seen.status, seen.queue, seen.last], ['idle', undefined, before], 'nothing sent')
+  graphql(gh, [thread('t1', [bob, hide(ann), said('cy', 'a new reply', 'User', 'OWNER')])])
+  await until(async () => (await fix())?.review === 't1:2', 'the reply sent')
+  await until(async () => (await rig.screen(tab.id)).includes('a new reply'), 'to the agent')
+})
+
 test('development mode: a workspace log of PR scans, what the switches did and why not, turns', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

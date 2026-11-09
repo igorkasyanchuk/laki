@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A comment or review someone hid on GitHub no longer goes to the agent or shows in Laki's Review, and hiding one doesn't
+  send its thread again.
 - A cancelled CI check is its own state: grey, not *CI failing*, no *Fix CI*, and never green, so *Merge when green* waits
   for a re-run or a push. On GitLab a canceled job no longer reads as a pass.
 - *Ship* refuses a workspace with a git repo inside it that its base branch doesn't have, and names it: a repo an agent
