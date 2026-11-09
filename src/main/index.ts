@@ -64,9 +64,9 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     let why: string | undefined
     try {
       await go?.()
-      while (!(await has(sel)) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
-      if (!(await has(sel))) why = `no ${sel} after 8 s`
-      else if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
+      while (!(await has(sel)) && !(await has('.boom')) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
+      if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
+      else if (!(await has(sel))) why = `no ${sel} after 8 s`
       else if (errors.length > seen) why = `console: ${errors.slice(seen).join(' | ').slice(0, 300)}`
       await new Promise(r => setTimeout(r, 250)) // drawn
       writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG())
