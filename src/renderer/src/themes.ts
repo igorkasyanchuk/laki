@@ -30,6 +30,34 @@ export type Theme = { id: string; name: string; aka?: string; light?: boolean; c
 
 export const THEMES: Theme[] = [
   { id: 'default', name: 'Midnight' },
+  // B2: Laki's own pair: the mark's orange (icon.svg's #ff7a45) as the accent, neutrals a little warm, and status colors
+  // of their own, apart from the accent and from each other (blue runs, yellow waits, green is done, a pink-red fails).
+  // ponytail: not the default yet: a new install still starts on Midnight until the pair has been looked at
+  {
+    id: 'laki',
+    name: 'Laki',
+    aka: 'brand orange warm signature',
+    c: {
+      bg: '#171412', side: '#1c1917', panel: '#211d1a', raised: '#2b2622', line: '#38322d', fg: '#ece6df', muted: '#a39a90',
+      accent: '#ff7a45', accentFg: '#1a0f08', sel: '#3a2a20', running: '#6cb6ff', waiting: '#f2c14e', done: '#7ec98f', error: '#ff6b8e',
+      orange: '#ff9e64', pink: '#f38ba8', purple: '#b79cf2',
+    },
+    ansi: ['#2b2622', '#f0627a', '#7ec98f', '#e8b84a', '#6cb6ff', '#b79cf2', '#5fc9c0', '#cfc7be',
+      '#6b625a', '#ff8098', '#98dba6', '#f5cf73', '#8cc8ff', '#cbb5f7', '#7fdcd3', '#f5efe8'],
+  },
+  {
+    id: 'laki-light',
+    name: 'Laki Light',
+    aka: 'brand orange warm signature',
+    light: true,
+    c: {
+      bg: '#fbf8f4', side: '#f3eee8', panel: '#ffffff', raised: '#ebe4dc', line: '#ddd4c9', fg: '#2a2420', muted: '#6b6259',
+      accent: '#c2410c', accentFg: '#ffffff', sel: '#f8dccb', running: '#0b62c4', waiting: '#855600', done: '#166b32', error: '#c01f4a',
+      orange: '#b8480c', pink: '#b83280', purple: '#7a4fd0',
+    },
+    ansi: ['#ebe4dc', '#c4253f', '#1b7a3a', '#946200', '#0b62c4', '#7a4fd0', '#0f7a7a', '#5c544c',
+      '#8f867c', '#a51836', '#136330', '#7a5000', '#084f9e', '#6238b0', '#0a6363', '#2a2420'],
+  },
   {
     id: 'dawn',
     name: 'Dawn',
@@ -1092,7 +1120,7 @@ export const preview = (t: Theme) => {
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
 export type Paint = { themeAuto?: boolean; themeLight?: string; themeDark?: string; theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'themeAuto', 'themeLight', 'themeDark', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background', 'themeAuto', 'themeLight', 'themeDark'] as const
 export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults

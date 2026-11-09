@@ -347,7 +347,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, 
 function ThemeRow({ theme, onTheme, auto, onAuto }: { theme: string; onTheme: (id: string) => void; auto?: boolean; onAuto?: (on: boolean) => void }) {
   const cur = THEMES.find(t => t.id === theme) ?? THEMES[0]
   const [light, setLight] = useState(!!cur.light)
-  const list = THEMES.filter(t => !!t.light === light)
+  const list = THEMES.filter(t => !!t.light === light).sort((a, b) => +b.id.startsWith('laki') - +a.id.startsWith('laki')) // B2: Laki's own pair first
   const row = useRef<HTMLDivElement>(null)
   useEffect(() => {
     row.current?.querySelector<HTMLElement>('.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
