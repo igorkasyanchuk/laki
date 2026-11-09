@@ -12,7 +12,7 @@ import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
-import { readCapped } from '../shared/conn.ts'
+import { readCapped, rotateLog } from '../shared/conn.ts'
 import { API, HIDDEN, recorded } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
@@ -1037,6 +1037,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('scanPorts', Number(process.env.LAKI_PORT_SCAN_MS || 5000), resourcesMod.scanPorts, { idle: 'slow' })
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   ticks.register('prTick', prMs || 60000, () => (prMs ? prMod.scanPRs(process.env.LAKI_PR_BG === '1') : prMod.prTick()), { idle: 'slow' }) // LAKI_PR_BG: tests of the timer's own (bg) scans
+  ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
   ticks.register('sweepRunning', 2000, core.sweepRunning, { idle: 'slow' })
   ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so

@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -65,15 +65,28 @@ export function daemonScript(): string {
   throw new Error('daemon script not found')
 }
 
+// a log past max: what it holds goes to <log>.1 (one kept) and it starts over. live: a process holds it open to append
+// (the daemon's stdout, opened by whoever started it): a rename would take its writes along into .1, so it's copied and
+// cut to nothing instead, and O_APPEND's next write lands at the new end. ponytail: a line written between the copy and
+// the cut is lost
+export const LOG_MAX = 10e6
+export function rotateLog(path: string, live = false, max = LOG_MAX) {
+  try {
+    if (statSync(path).size <= max) return false
+    if (live) copyFileSync(path, `${path}.1`), truncateSync(path, 0)
+    else renameSync(path, `${path}.1`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already.
 export async function ensureDaemon(env: Record<string, string> = {}): Promise<DaemonInfo> {
   if (await alive()) return daemonInfo()!
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 })
   const logPath = join(dataDir(), 'daemon.log')
-  // ponytail: rotated only as a daemon starts; one that runs for months grows until the next start
-  try {
-    if (statSync(logPath).size > 10e6) renameSync(logPath, logPath + '.1')
-  } catch {}
+  rotateLog(logPath) // and each hour as it runs (main.ts' logTick)
   const log = openSync(logPath, 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
   spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log], env: { ...process.env, ...env } }).unref()

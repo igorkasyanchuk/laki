@@ -2,10 +2,10 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { copyTree } from '../src/shared/conn.ts'
+import { copyTree, rotateLog } from '../src/shared/conn.ts'
 import { bgDoneOf, pickProject, readerShown, retrying, retryText } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
 import { sendIs, setSendKey } from '../src/shared/keys.ts'
@@ -461,6 +461,25 @@ test('Word fixes (Settings › Voice): heard → meant as whole words in any cas
   assert.deepEqual(voiceFix('a \u017Fs here', 'ss → x'), { text: 'a x here', fixed: ['\u017Fs → x'] }, 'matched by case folding (long s): its own rule, never a throw')
   assert.deepEqual(voiceFix('a b', undefined), { text: 'a b', fixed: [] })
   assert.equal(voiceFix('x', Array(VOICE_FIXES).fill('y → z').concat('x → past the cap').join('\n')).text, 'x', `${VOICE_FIXES} lines at most`)
+})
+
+test('rotateLog: past its size a log moves to .1; one held open for appending is copied and cut, its next line in the new one', () => {
+  const d = mkdtempSync(join(tmpdir(), 'laki-log-'))
+  const f = join(d, 'daemon.log')
+  writeFileSync(f, 'x'.repeat(200))
+  assert.equal(rotateLog(f, true, 1000), false, 'under the limit')
+  const fd = openSync(f, 'a') // as the daemon's stdout is
+  writeSync(fd, 'y'.repeat(2000))
+  assert.equal(rotateLog(f, true, 1000), true)
+  assert.deepEqual([statSync(f).size, statSync(`${f}.1`).size], [0, 2200])
+  writeSync(fd, 'after\n')
+  closeSync(fd)
+  assert.equal(readFileSync(f, 'utf8'), 'after\n')
+  writeFileSync(f, 'z'.repeat(1500))
+  assert.equal(rotateLog(f, false, 1000), true, 'not held: a rename')
+  assert.deepEqual([existsSync(f), statSync(`${f}.1`).size], [false, 1500])
+  assert.equal(rotateLog(join(d, 'none.log')), false)
+  rmSync(d, { recursive: true, force: true })
 })
 
 test('voiceFillers: standalone hesitations go in each language, with their comma or space; words that mean something stay', () => {
