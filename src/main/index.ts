@@ -3,7 +3,7 @@
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, Notification, screen, session, shell, systemPreferences, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -31,6 +31,54 @@ const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: 
 // none reach a launch from Finder or the Dock
 const capture = app.commandLine.getSwitchValue('laki-capture')
 const notifyLog = app.commandLine.getSwitchValue('laki-notify-log')
+const smoke = app.commandLine.getSwitchValue('laki-smoke') // R8: scripts/ui-smoke.ts' folder
+
+// R8 --laki-smoke=<dir> (npm run test:ui): the real window walked page by page. Each step opens a page (its laki://
+// link, a click, a key), waits for something only that page draws, and fails on ui.tsx' Boundary (.boom) or an error
+// in the console; a screenshot each, result.json at the end, then the app quits (1: a step failed)
+async function uiSmoke(w: BrowserWindow, dir: string) {
+  mkdirSync(dir, { recursive: true })
+  const errors: string[] = []
+  w.webContents.on('console-message', (_e, level, message) => void (level >= 3 && errors.push(message)))
+  const js = <T>(code: string) => w.webContents.executeJavaScript(code, true) as Promise<T>
+  const has = (sel: string) => js<boolean>(`!!document.querySelector(${JSON.stringify(sel)})`)
+  const click = (sel: string) => () => js(`document.querySelector(${JSON.stringify(sel)})?.click()`)
+  const link = (url: string) => async () => w.webContents.send('deep-link', url)
+  const key = (k: string, meta = false) => () => js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, metaKey: ${meta}, bubbles: true, cancelable: true }))`)
+  const steps: [string, (() => Promise<unknown>) | null, string][] = [
+    ['projects', null, '.sidebar .ws'],
+    ['reader', click('.reader-switch button:last-child'), '.reader'],
+    ['review', click('.review-tab'), '.full-review'],
+    ['new-workspace', link('laki://new'), '.nw-composer'],
+    ['settings', link('laki://settings'), '.settings-page'],
+    ['board', link('laki://board'), '.board'],
+    ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
+    ['ai', link('laki://ai'), '.ai-page'],
+    ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
+    ['palette', key('k', true), '.palette-input'],
+  ]
+  const out: { name: string; ok: boolean; ms: number; why?: string }[] = []
+  for (const [i, [name, go, sel]] of steps.entries()) {
+    const at = Date.now()
+    const seen = errors.length
+    let why: string | undefined
+    try {
+      await go?.()
+      while (!(await has(sel)) && Date.now() - at < 8000) await new Promise(r => setTimeout(r, 100))
+      if (!(await has(sel))) why = `no ${sel} after 8 s`
+      else if (await has('.boom')) why = `the page threw: ${await js<string>("document.querySelector('.boom')?.textContent?.slice(0, 200) ?? ''")}`
+      else if (errors.length > seen) why = `console: ${errors.slice(seen).join(' | ').slice(0, 300)}`
+      await new Promise(r => setTimeout(r, 250)) // drawn
+      writeFileSync(join(dir, `${String(i + 1).padStart(2, '0')}-${name}.png`), (await w.webContents.capturePage()).toPNG())
+    } catch (e) {
+      why = (e as Error).message
+    }
+    out.push({ name, ok: !why, ms: Date.now() - at, ...(why && { why }) })
+    if (name === 'palette') await key('Escape')()
+  }
+  writeFileSync(join(dir, 'result.json'), JSON.stringify(out, null, 2))
+  app.exit(out.every(s => s.ok) ? 0 : 1)
+}
 // R2: the main process's own log, <data>/app.log (rotated as daemon.log is): what went wrong here used to leave no
 // trace once the window was gone. Errors that nothing caught are logged and the app goes on (Electron's default is a
 // dialog with the stack); a helper process that died too
@@ -386,6 +434,7 @@ function create() {
     pendingTab = null
     // --laki-capture=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
     if (capture) setTimeout(async () => win && writeFileSync(capture, (await win.webContents.capturePage()).toPNG()), 3000)
+    if (smoke) setTimeout(() => win && void uiSmoke(win, smoke), 1500)
   })
   if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
   else win.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)))

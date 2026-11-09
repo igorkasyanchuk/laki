@@ -3208,6 +3208,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   :where(.needs-cards > div, .needs-cards > button) { animation: b-in var(--t-mid) var(--ease); }
   :where(.ws.needs) { animation: b-lit var(--t-slow) var(--ease); }
 }
+html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-cards > button, .ws.needs) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
 
 /* hold ⌘ (KeyOverlay.tsx): a veil, a badge at each element's top right, a strip of the keys with nothing on screen */
 .key-overlay { position: fixed; inset: 0; z-index: 60; pointer-events: none; background: color-mix(in srgb, var(--bg) 35%, transparent); animation: m-fade 0.12s ease-out; }

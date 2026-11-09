@@ -14,6 +14,7 @@ npm run typecheck                 # tsc --noEmit
 npm test                          # node:test, every file, 4 at a time: ~5 min on an 8-core Mac (6 was no quicker there)
 npm run test:one -- test/pr.test.ts   # only the files named; one test: -- --test-name-pattern='<words>' test/pr.test.ts
 npm run test:fast                 # the files that start no daemon (never call fresh()): ~5 s
+npm run test:ui                   # the real window, page by page (scripts/ui-smoke.ts; npm run build first): ~15 s, screenshots in dist/ui-smoke
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
@@ -50,6 +51,10 @@ npm run dev                       # Electron + renderer dev server on :5199
   windows) fail quietly or fall back. The AppImage's starter is AppImage's static type2 runtime
   (`build.toolsets.appimage`, electron-builder's `1.0.3`): no libfuse2, and on arm64 no `libz.so` (the old toolset's
   wanted both; Ubuntu has neither by default). Tried on Ubuntu 24.04 arm64 (a live session) with `--no-sandbox`.
+- `npm run test:ui` (`scripts/ui-smoke.ts`): a demo world of its own, the built app (`out/`) in Electron with
+  `--laki-smoke=<dir>` (main's `uiSmoke`): Projects, Reader, the Review tab, New workspace, Settings, Board, Schedule,
+  AI, Workflows and ⌘K, each opened (its laki:// link, a click, a key), a selector of its own waited for, failed by
+  ui.tsx' Boundary (`.boom`) or a console error; a screenshot each. Its window shows on your screen for a few seconds.
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
 - The maintainer's own daemon may be running with real agents in it, in `~/.laki` or `~/.laki-electron` (from when
@@ -246,7 +251,7 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
 | `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon` (and by topic: `agents` (each agent's hooks), `presets` (how agents start), `restart`, `worktrees`), `api` (errors, edge cases, daemon start, tunnels, remote access), `shells` (shell tabs, Terminals and Browsers), `pr` (PR feedback), `pr-background` (the scans' GitHub quota, a merged or idle workspace archived), `gitlab` (MRs through `fakes/glab`), `cli`, `cli-agents` (the CLI from an agent's tab), `agent-gates` (what an agent's call may not do: removes ask, its own workspace's files and tabs, no merge, the user's settings, Recording mode), `workflow`, `workflow-runs`, `workflow-agents`, `workflow-events`, `workflow-pause` (Pause after this block, Resume), `remotes` (a fork's GitHub remotes: issues and PRs of each), `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), `ai` (Laki AI's backends, key, log), `plans` (specs and brainstorms, their MCP tools), `meter` (context and usage from fake transcripts, prices), `statusline` (Claude's status line kept, yours run after, its context and limits), `keys` (Settings › Keys' resolution, matching, clashes, ⌘K commands), `perm-mode` (a running claude's permission mode), `turn-alerts` (a long turn, Continue after an API error), `radar` (Collision radar), `check` (Done check), `plan` (the agent's plan, live), `next-step` (One next step), `reader` (Reader view, its chips, MCP Apps, laki-ui), `fallback` (Auto fallback at a plan limit, a model too new for the installed claude), `alerts` (laki alert: the card, its choices, closed), `program` (OSC 7501), `browser-budget` (hidden pages over a memory budget), `css` (no restyle of the whole window: no `*` under a `:has()`, BlockNote's suggested edits out), `load-order` (every daemon module imported first, each in a process of its own: none reads another's const or let as it loads), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `flows.ts` (the workflows' tests' shared files); `fakes/`; `cloudflared` |
-| `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
+| `scripts/` | `demo.ts`, `ui-smoke.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
 
 ## Conventions
 
