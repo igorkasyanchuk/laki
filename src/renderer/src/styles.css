@@ -3316,6 +3316,11 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
 .dz[data-dz~='lineless'] :is(.dz-side, .dz-tabs, .dz-status, .dz-term + .dz-term, .dz-proj) { border-color: transparent; }
 .dz[data-dz~='lineless'] .dz-tabs { background: var(--term-bg, var(--bg)); }
 .dz[data-dz~='lineless'] .dz-proj { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.dz[data-dz~='frosted'] { padding: var(--g); background: color-mix(in oklch, var(--tc-blue) 34%, var(--bg)); }
+.dz[data-dz~='frosted'] :is(.dz-rail, .dz-side) { border: none; }
+.dz[data-dz~='frosted'] .dz-rail { border-radius: var(--dr) 0 0 var(--dr); }
+.dz[data-dz~='frosted'] .dz-side { border-radius: 0 var(--dr) var(--dr) 0; }
+.dz[data-dz~='frosted'] .dz-main { margin-left: var(--g); border-radius: var(--dr); overflow: hidden; }
 /* Check overlaps' dialog: each overlap's line, then what to do about it */
 .overlaps { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
 .overlaps-head { margin-top: 10px; font-size: 12.5px; overflow-wrap: anywhere; }

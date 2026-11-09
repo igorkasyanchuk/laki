@@ -11,7 +11,7 @@ import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
-import { applyTheme, BG, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
+import { applyTheme, BG, GLASS, type Paint, paintKey, paintOf, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { ask, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
@@ -88,6 +88,7 @@ export const DESIGNS: [Design, string, string, string][] = [
   ['inset', 'Inset', 'One raised card for the terminals and the side panel, the sidebar flat beside the rail', 'chrome body joined'],
   ['tiles', 'Tiles', 'Every split pane a tile of its own, projects boxed', 'chrome side-card boxed parts tiles pills shadow'],
   ['soft', 'Soft', 'No lines: tints, round shapes, more room, the side panel floating over the terminals', 'boxed float pills lineless'],
+  ['frosted', 'Frosted', "macOS glass over any theme: its colors, floating panels on your desktop, capsule tabs, Mac controls", 'pills float lineless frosted'], // look.css' Frosted: applyTheme's data-look, always glass
 ]
 export const designTraits = (d?: Design) => DESIGNS.find(x => x[0] === d)?.[3] || undefined
 // Appearance's Icons: each pack drawn by these
@@ -858,6 +859,7 @@ export function SettingsPage(p: {
     ))
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
+  const glassy = !!paintOf(s).glass // Glass on, or the Frosted design's
   const bgInput = useRef<HTMLInputElement>(null)
   const [bgErr, setBgErr] = useState('')
   // Export / Import (General): every setting in a file, for another Mac; an import goes through the page, so it's
@@ -1873,13 +1875,13 @@ export function SettingsPage(p: {
               )}
               <Group title="Window">
               <div className="setting-box">
-                <Switch className="switch-row" on={!!s.glass} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
-                  <Says title="Glass" hint="A see-through window: the desktop shows through, blurred" />
+                <Switch className="switch-row" on={glassy} disabled={s.design === 'frosted'} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
+                  <Says title="Glass" hint={s.design === 'frosted' ? 'Always on in the Frosted design' : 'A see-through window: the desktop shows through, blurred'} />
                 </Switch>
-                {(s.glass || (s.sideClear ?? 0) > 0) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
+                {(glassy || (s.sideClear ?? 0) > 0) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
                   <div className="muted small">macOS's Reduce transparency is on, so the window stays solid: turn it off in System Settings › Accessibility › Display.</div>
                 )}
-                {s.glass && (
+                {glassy && (
                   <>
                     <div className="sliders">
                       <span className="muted small">How see-through</span>
@@ -1914,7 +1916,7 @@ export function SettingsPage(p: {
                     </Switch>
                   </>
                 )}
-                {!s.glass && (
+                {!glassy && (
                   <div className="sliders">
                     <Says title="Sidebar see-through" hint="The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off" />
                     <label className="slider-row">
@@ -1935,7 +1937,7 @@ export function SettingsPage(p: {
                 )}
                 {p.bg && (
                   <div className="sliders">
-                    <Says title="Background image" hint={s.glass ? 'Glass shows the desktop instead: turn it off to see the picture' : 'A picture behind the sidebar and terminals, softly, in any theme'} />
+                    <Says title="Background image" hint={glassy ? 'Glass shows the desktop instead: turn it off to see the picture' : 'A picture behind the sidebar and terminals, softly, in any theme'} />
                     <div className="row bg-pick">
                       {s.background?.file && p.bg.url && <img className="bg-thumb" src={p.bg.url} alt="" />}
                       <button type="button" onClick={() => bgInput.current?.click()}>

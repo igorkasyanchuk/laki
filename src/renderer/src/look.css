@@ -2431,3 +2431,122 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
    theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
 html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
 html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }
+
+/* Frosted (Settings › Appearance › Design; applyTheme's data-look over any theme's): macOS's own look. The window is glass (the desktop through main's vibrancy; a
+   wallpaper where there's none: a browser, Linux; solid under Reduce transparency and in the windows without blur); on it float a sidebar panel and a main card, with
+   a hairline edge and a lit top. No backdrop-filter (html.glass' note): the blur is the window's, floats near solid.
+   [data-dz]: the frame, not on a phone or in full screen; its traits (Settings.tsx DESIGNS) bring pill tabs and a floating side panel */
+[data-look='frosted'] { --radius: 8px; --f-gap: 8px; --f-r: var(--rs, 16px); --f-fill: color-mix(in srgb, var(--fg) 9%, transparent); --f-fill-up: color-mix(in srgb, var(--fg) 15%, transparent);
+  --f-edge: var(--line); --f-hi: light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.09));
+  --f-drop: light-dark(rgb(30 30 50 / 0.16), rgb(0 0 0 / 0.38)); --f-ring: color-mix(in srgb, var(--accent) 38%, transparent);
+  --proj-divider: none; }
+[data-look='frosted'].glass body { background: transparent; }
+[data-look='frosted'].glass body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(70% 60% at 12% 8%, color-mix(in oklch, var(--tc-blue) 62%, var(--bg)), transparent 72%), radial-gradient(60% 55% at 92% 14%, color-mix(in oklch, var(--tc-purple) 58%, var(--bg)), transparent 72%), radial-gradient(75% 70% at 68% 104%, color-mix(in oklch, var(--tc-pink) 42%, var(--bg)), transparent 72%), var(--bg); }
+[data-look='frosted'].vibrant body::before { display: none; }
+[data-look='frosted'] .main { background: var(--app-bg, var(--bg)); }
+[data-look='frosted'] .narrow .sidebar { background: var(--panel); } /* a phone's drawer over the main area: solid */
+
+/* the frame: one rounded panel for the rail and the list, a card for the rest */
+[data-look='frosted'] .app[data-dz] { box-sizing: border-box; padding: var(--f-gap); background: none; }
+[data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .main) { border: 1px solid var(--f-edge); }
+[data-look='frosted'] .app[data-dz] .sidebar { position: relative; z-index: 1; border-radius: var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), 14px 10px 44px -14px var(--f-drop); }
+[data-look='frosted'] .app[data-dz] .rail { border-right: none; border-radius: var(--f-r) 0 0 var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), -14px 10px 44px -14px var(--f-drop); }
+[data-look='frosted'] .app[data-dz].rail-on .sidebar { border-left: none; border-radius: 0 var(--f-r) var(--f-r) 0; }
+[data-look='frosted'] .app[data-dz]:is(.list-off, .strip-right) .rail { border-right: 1px solid var(--f-edge); border-radius: var(--f-r); }
+[data-look='frosted'] .app[data-dz] .side-strip { border: 1px solid var(--f-edge); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi); } /* Terminals' and Browsers' strip: the rail's panel goes on (left), or a panel of its own (right) */
+[data-look='frosted'] .app[data-dz].strip-left .side-strip { border-left: none; border-radius: 0 var(--f-r) var(--f-r) 0; }
+[data-look='frosted'] .app[data-dz].strip-right .side-strip { margin-left: var(--f-gap); border-radius: var(--f-r); }
+[data-look='frosted'] .app[data-dz] .main { margin-left: var(--f-gap); overflow: hidden; border-radius: var(--f-r); box-shadow: inset 0 1px 0 var(--f-hi), 0 14px 44px -12px var(--f-drop); }
+[data-look='frosted'] .app[data-dz].side-closed .main { margin-left: 0; }
+[data-look='frosted'] :is(.tabbar, .status, .settings-head, .settings-nav, .side-foot, .tabstrip) { background: none; border-color: transparent; }
+[data-look='frosted'] .settings-page { background: none; }
+[data-look='frosted'] .main[data-pages] > :not(.settings-page, .ai-fab-wrap, .ai-float), [data-look='frosted'] .main[data-pages] > .tabbar * { visibility: hidden; } /* nothing under a see-through page (styles.css' chrome) */
+[data-look='frosted'] .settings-nav { padding: 6px 10px; border-right: 1px solid var(--f-edge); }
+[data-look='frosted'] .status { border-top: 1px solid var(--f-edge); }
+[data-look='frosted'] .bar::after { background: var(--f-edge); }
+/* the status bar across the window (Settings): a floating strip of its own under the panels */
+[data-look='frosted'] .app[data-dz].wide-status { padding-bottom: calc(var(--f-gap) * 2 + 26px); }
+[data-look='frosted'] .app[data-dz] .status.wide { left: var(--f-gap); right: var(--f-gap); bottom: var(--f-gap); height: 26px; border: 1px solid var(--f-edge); border-radius: var(--rs, 13px); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .status.wide > .sb-foot:first-child { border-right-color: var(--f-edge); }
+[data-look='frosted'] .app[data-dz] .side-handle { transform: translateX(calc(-50% + 4px)); } /* in the gap (its left: App's at, the frame's padding too) */
+[data-look='frosted'] .app[data-dz] .side-scroll > .project { background: none; }
+
+/* the rail: bare icons, a bar of the accent by the one you're on */
+[data-look='frosted'] .rail-kind { position: relative; }
+[data-look='frosted'] .rail-icon { border-radius: var(--rs, 10px); transition: background 0.14s, color 0.14s; }
+[data-look='frosted'] .rail-kind.on .rail-icon { background: var(--f-fill-up); color: var(--fg); }
+[data-look='frosted'] .rail-kind.on:not(.rail-pin)::before { content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--accent); transform: translateY(-50%); }
+[data-look='frosted'] .rail-sep { background: var(--f-edge); }
+[data-look='frosted'] .rail-count { border-color: transparent; }
+
+/* the list */
+[data-look='frosted'] .project-head { font-weight: 600; letter-spacing: 0.7px; color: var(--muted); }
+[data-look='frosted'] .ws { margin-inline: 8px; border-radius: var(--rs, 8px); transition: background-color 0.12s; }
+[data-look='frosted'] .ws.sel:not(.ws-picked) { background-color: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .ws:not(.sel, .ws-picked):hover { background-color: var(--f-fill); }
+
+/* tabs: capsules */
+[data-look='frosted'] .tabbar { align-items: center; padding-right: 8px; }
+[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab) { box-shadow: none; transition: background-color 0.12s, color 0.12s; }
+[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab).sel { border-color: transparent; background: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi), inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 22%, transparent); }
+[data-look='frosted'] :is(.tabbar > .tab, .tabstrip .tab):not(.sel):hover { background: var(--f-fill); }
+[data-look='frosted'] .tabstrip .tab { border: 1px solid transparent; }
+[data-look='frosted'] .tabstrip.bottom { height: 38px; align-items: center; }
+[data-look='frosted'] .tabstrip.bottom .tab { height: 26px; margin: 0 1px; border-radius: 999px; }
+[data-look='frosted'] .tabstrip:is(.left, .right) .tab { margin: 1px 8px; border-radius: var(--rs, 8px); }
+
+/* controls: filled, borderless, a lit top; the accent's blue where it's on */
+:where([data-look='frosted']) button { border-color: transparent; background: linear-gradient(var(--f-hi) 0 1px, transparent 1px) var(--f-fill); /* the lit top in the background: a button drawn without one has none */ transition: background-color 0.12s, filter 0.12s; }
+:where([data-look='frosted']) button:where(:not(.link)):hover { background: linear-gradient(var(--f-hi) 0 1px, transparent 1px) var(--f-fill-up); }
+[data-look='frosted'] button.primary { border-color: transparent; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent)); color: var(--accent-fg); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 1px 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='frosted'] button.primary:hover { filter: brightness(1.08); }
+[data-look='frosted'] button.primary:active { filter: brightness(0.92); }
+[data-look='frosted'] .run-btn { border-color: transparent; border-radius: var(--rs, 8px); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .run-btn button { background: var(--f-fill); }
+[data-look='frosted'] .run-btn button:hover { background: var(--f-fill-up); }
+[data-look='frosted'] .run-btn .run-more { border-left-color: var(--f-edge); }
+[data-look='frosted'] .ib { border-radius: var(--rs, 7px); }
+[data-look='frosted'] :is(.toggle-track, .switch-row .toggle-track) { border-radius: 999px; background: var(--f-fill-up); box-shadow: inset 0 0 0 0.5px var(--f-edge); }
+[data-look='frosted'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='frosted'] .toggle-knob, [data-look='frosted'] .toggle.on .toggle-knob { background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); }
+/* a segmented control: one recessed track, the choice a blue thumb */
+[data-look='frosted'] .seg { --seg-overlap: 0px; gap: 2px; padding: 2px; border-radius: var(--rs, 9px); background: var(--f-fill); }
+[data-look='frosted'] .seg button, [data-look='frosted'] .seg button:first-child, [data-look='frosted'] .seg button:last-child { border-color: transparent; border-radius: var(--rs, 7px); background: none; box-shadow: none; color: var(--muted); }
+[data-look='frosted'] .seg button:hover { background: var(--f-fill); color: var(--fg); }
+[data-look='frosted'] .seg button.on { background: var(--accent); color: var(--accent-fg); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(0 0 0 / 0.25); }
+/* fields, by element only: a class that draws one bare (the palette's, a filter's) keeps it */
+:where([data-look='frosted']) :is(input:not([type='radio'], [type='checkbox'], [type='range']), textarea) { background-color: light-dark(rgb(255 255 255 / 0.55), rgb(0 0 0 / 0.2)); } /* as strong as html.glass' tint, which it replaces */
+:where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])), :where([data-look='frosted']) select, :where([data-look='frosted']) textarea { border: 1px solid var(--f-edge); border-radius: var(--rs, 8px); transition: border-color 0.12s, box-shadow 0.12s; }
+:where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])):focus, :where([data-look='frosted']) select:focus, :where([data-look='frosted']) textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--f-ring); }
+[data-look='frosted'] .menu-filter { box-shadow: none; }
+[data-look='frosted'] :is(.chip-field input, .chips-input input, .finder > input, .sp-tools input, .fr-filter input, .wf-make input, .notes-find input, .tunnel-host input, .nw-chip-input, .nw-composer textarea, .pin-boxes input, .csv-input) { box-shadow: none; background-color: transparent; } /* over html.glass' tint */
+/* a select is a Mac pop-up button, as the font picker (.pick-btn) beside it: filled and raised; only what you type in is recessed */
+[data-look='frosted'] select:not([multiple], [size]) { border-color: transparent; background-color: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] select:not([multiple], [size]):hover { background-color: var(--f-fill-up); }
+[data-look='frosted'] kbd { border-radius: var(--rs, 5px); border-color: var(--f-edge); background: var(--f-fill); }
+
+/* what floats: near solid, big soft corners, a menu's choice in the accent as on a Mac */
+[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
+[data-look='frosted'] .menu { border-radius: var(--rs, 13px); }
+[data-look='frosted'] :is(.modal, .tunnel-pop) { border-radius: var(--rs, 16px); }
+[data-look='frosted'] .toast { border-radius: var(--rs, 13px); }
+[data-look='frosted'] .tip { border-color: var(--f-edge); border-radius: var(--rs, 7px); background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 6px 20px var(--f-drop); }
+[data-look='frosted'] .overlay { background: light-dark(rgb(40 40 60 / 0.18), rgb(0 0 0 / 0.32)); }
+[data-look='frosted'] .menu-item { border-radius: var(--rs, 7px); }
+[data-look='frosted'] .menu-item:hover, [data-look='frosted'] .menu-item.sel { background: var(--accent); color: var(--accent-fg); }
+[data-look='frosted'] .menu-item:is(:hover, .sel) :is(.menu-icon, .menu-hint, .menu-sub, .menu-label, .menu-key) { color: inherit; }
+[data-look='frosted'] .menu-item.danger:is(:hover, .sel) { background: var(--error); color: var(--on-error); }
+[data-look='frosted'] .menu-foot { border-top-color: var(--f-edge); background: none; }
+[data-look='frosted'] .menu-filter { border-color: var(--f-edge); border-radius: var(--rs, 8px); }
+
+/* Settings: a Mac's grouped rows */
+[data-look='frosted'] .set-group { border-color: var(--f-edge); border-radius: var(--rs, 14px); background: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] :is(.set-group > .setting-box, .set-subgroup > .setting-box) > :is(.switch-row, .sliders) + :is(.switch-row, .sliders) { border-top-color: var(--f-edge); }
+[data-look='frosted'] .settings-main .pick-btn { min-height: 31px; padding: 0 10px; } /* as tall as the selects beside it */
+[data-look='frosted'] .settings-nav button { border-radius: var(--rs, 8px); background: none; }
+[data-look='frosted'] .settings-nav button:hover { background: var(--f-fill); }
+[data-look='frosted'] .settings-nav button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='frosted'] .settings-nav button.on svg { color: inherit; }
+[data-look='frosted'] .setting-box:not(.set-group > *, .set-subgroup > *) { border-color: var(--f-edge); border-radius: var(--rs, 12px); background: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .theme { border-radius: var(--rs, 12px); }

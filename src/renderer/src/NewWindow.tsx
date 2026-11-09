@@ -19,7 +19,7 @@ import { ask, AskHost, askText, IconButton, load, Tips } from './ui'
 import { imagesVia, insertMenus } from './Widgets'
 
 // no glass, no see-through sidebar: the window has no blur behind it
-const paint = (p: Paint) => applyTheme({ ...p, glass: false, sideClear: 0 })
+const paint = (p: Paint) => applyTheme(p, true)
 // only in those windows: main.tsx imports this module in the app's too
 const which = new URLSearchParams(location.search).get('window')
 if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim') {

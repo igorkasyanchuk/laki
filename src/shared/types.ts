@@ -746,7 +746,7 @@ export type ProjectLook = { font?: 'theme' | 'ui' | 'mono' | (string & {}); /* a
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
 export type SideStyle = 'compact' | 'default' | 'extended' | 'words' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
-export type Design = 'classic' | 'sections' | 'cards' | 'inset' | 'tiles' | 'soft' // Settings.tsx DESIGNS, styles.css' Design block
+export type Design = 'classic' | 'sections' | 'cards' | 'inset' | 'tiles' | 'soft' | 'frosted' // Settings.tsx DESIGNS, styles.css' Design block
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type ScriptRun = { ws: string; name: string; project: string; kind: 'setup' | 'teardown'; cmd: string; at: number; secs: number; code: number | null; text: string } // scriptLogs': a setup's or teardown's run (development mode)

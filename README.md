@@ -30,7 +30,7 @@ Claude Code · Codex · Gemini · Grok · OpenCode · any command · macOS (Linu
 | **Nothing missed** | A waiting agent is a notification with its choices as buttons; ⌘J jumps to the next one that needs you. |
 | **Review where you work** | Diff, threads, checks and the dev server's preview beside the terminal, not in five browser tabs. |
 | **Your agents, your accounts** | Laki runs the agents you have, signed in as you are; it never writes their settings. |
-| **Make it yours** | 100 themes, extensions in the sidebar and status bar, workflows and scheduled prompts. |
+| **Make it yours** | 102 themes, extensions in the sidebar and status bar, workflows and scheduled prompts. |
 
 ## Install
 

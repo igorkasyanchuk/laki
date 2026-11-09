@@ -2,6 +2,12 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Settings › Appearance › Design › *Frosted*: a macOS look over any theme. The window is glass, the sidebar
+  and the terminals float over your desktop as rounded panels, with capsule tabs, segmented controls and Mac menus.
+  Two neutral themes made for it: Frosted and Frosted Light.
+
 ## 0.46.0 · Nov 9, 2026
 
 - Security: a sandboxed agent's nested git repo can no longer run a program of its own through Laki's git (scans, diffs,

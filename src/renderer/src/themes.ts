@@ -238,6 +238,32 @@ export const THEMES: Theme[] = [
     ansi: ['#e6eef5', '#c53030', '#2f855a', '#b0741e', '#2b6cb0', '#805ad5', '#2c7a7b', '#4a5568',
       '#838f9d', '#e53e3e', '#32915f', '#a37923', '#3182ce', '#906ed4', '#2e8e8c', '#1a202c'],
   },
+  // the neutral palettes made for Settings › Appearance › Design › Frosted (any theme works there)
+  {
+    id: 'frosted',
+    name: 'Frosted',
+    aka: 'macos mac neutral apple',
+    c: {
+      bg: '#1b1b1f', side: '#26262b', panel: '#2b2b30', raised: '#38383e', line: '#3f3f46', fg: '#f4f4f7', muted: '#a3a3ad',
+      accent: '#0975e3', accentFg: '#ffffff', sel: '#3d3d45', running: '#64d2ff', waiting: '#ffd60a', done: '#30d158', error: '#ff827a',
+      orange: '#ff9f0a', pink: '#ff7ab8', purple: '#bf5af2',
+    },
+    ansi: ['#2c2c2e', '#ff6961', '#30d158', '#ffd60a', '#409cff', '#bf5af2', '#64d2ff', '#d1d1d6',
+      '#8e8e93', '#ff8a80', '#4ae374', '#ffe066', '#6ab4ff', '#da8fff', '#8fe2ff', '#ffffff'],
+  },
+  {
+    id: 'frosted-light',
+    name: 'Frosted Light',
+    aka: 'macos mac neutral apple',
+    light: true,
+    c: {
+      bg: '#f6f6f8', side: '#ededf1', panel: '#ffffff', raised: '#e3e3e8', line: '#d1d1d6', fg: '#1d1d1f', muted: '#62626a',
+      accent: '#0a6cdc', accentFg: '#ffffff', sel: '#d3d3da', running: '#075bbd', waiting: '#8f5a00', done: '#166a2d', error: '#b3211a',
+      orange: '#c25e00', pink: '#c2307a', purple: '#7d3fc9',
+    },
+    ansi: ['#e5e5ea', '#c9281f', '#1b7f37', '#8f5a00', '#0a6cdc', '#7d3fc9', '#0b7a94', '#3a3a3c',
+      '#8e8e93', '#e0443e', '#28943f', '#a86a00', '#2b84ea', '#9550dd', '#128ea9', '#0d0d10'],
+  },
   // looks: more than colors (look.css)
   {
     id: 'phosphor',
@@ -1065,9 +1091,9 @@ export const preview = (t: Theme) => {
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
 // and how much moves (motion: styles.css' html[data-motion] rules; unset: low, the usual)
 // iconPack, iconWidth, iconSize: the icons' look (icons.ts lookOf), painted with the rest (the app's windows, Settings' choice at once)
-export type Paint = { theme?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
-const PAINT = ['theme', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
-export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
+export type Paint = { theme?: string; design?: string; uiFont?: string; uiSize?: number; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number; motion?: 'high' | 'low' | 'none'; iconPack?: string; iconWidth?: number; iconSize?: number; highContrast?: boolean; background?: { file?: string; dim?: number; blur?: number } } // highContrast: Appearance's High contrast mode (off unless true)
+const PAINT = ['theme', 'design', 'uiFont', 'uiSize', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear', 'motion', 'iconPack', 'iconWidth', 'iconSize', 'highContrast', 'background'] as const
+export const paintOf = (s?: Paint): Paint => ({ ...Object.fromEntries(PAINT.map(k => [k, s?.[k]])), ...(s?.design === 'frosted' && { glass: true }) }) // Design's Frosted is always glass
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
 // Settings › Appearance › Background image: the picture's blob URL in this window (App's, from the daemon's bgGet; none
@@ -1146,7 +1172,7 @@ export function userCss(css?: unknown) {
 // of all style work: a menu's 150 new elements took 4 ms). The rule stays where it was, its declarations untouched
 // (cssText can't be put back: Chrome writes `background: var(--x)` as empty longhands). Only <html> has data-look and
 // data-motion (applyTheme).
-const GATE = /^(?:html)?\[data-(look|motion)="([\w-]+)"\]/
+const GATE = /^(?::where\((?=(?:html)?\[[^\]]*\]\)))?(?:html)?\[data-(look|motion)="([\w-]+)"\]/
 const OFF = '#laki-off'
 const seen = new WeakSet<CSSStyleSheet>() // sheets looked at
 const gates: { rule: CSSStyleRule; text: string; attr: string; values: string[] }[] = []
@@ -1185,14 +1211,15 @@ export function gateRules(now: Record<string, string | undefined>) {
 }
 
 // paints <html> with a theme (an unknown id is the default), or a whole Paint
-export function applyTheme(p: string | Paint = '') {
-  const o: Paint = { ...(typeof p === 'string' ? { theme: p } : p), ...(asked(LESS_CLEAR) && { glass: false, sideClear: 0 }) }
+// solid: a window with no blur behind it (NewWindow.tsx)
+export function applyTheme(p: string | Paint = '', solid = false) {
+  const o: Paint = { ...paintOf(typeof p === 'string' ? { theme: p } : p), ...((solid || asked(LESS_CLEAR)) && { glass: false, sideClear: 0 }) }
   const t = THEMES.find(x => x.id === o.theme) ?? THEMES[0]
   const root = document.documentElement
   const st = root.style
   for (const k of Array.from(st)) if (k.startsWith('--')) st.removeProperty(k)
   st.colorScheme = ''
-  root.dataset.look = t.look ?? ''
+  root.dataset.look = o.design === 'frosted' ? 'frosted' : t.look ?? '' // Design's Frosted: its shapes over any theme's, the theme's colors kept
   root.dataset.motion = o.motion ?? 'low'
   gateRules({ look: root.dataset.look, motion: root.dataset.motion })
   const icons = lookOf(o)
@@ -1207,6 +1234,7 @@ export function applyTheme(p: string | Paint = '') {
   // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
+  root.classList.toggle('vibrant', !!o.glass && app && /Mac/.test(navigator.userAgent)) // Frosted's wallpaper only where there's no desktop behind (look.css)
   // a background picture (glass shows the desktop instead): behind everything, the surfaces over it see-through
   const bg = !o.glass && !!o.background?.file && bgImage ? o.background : undefined
   root.classList.toggle('has-bg', !!bg)

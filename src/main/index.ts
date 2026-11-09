@@ -277,7 +277,9 @@ const daemon = () =>
 // where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it
 // was either. Only when they're on a screen still there (a monitor unplugged: maximized again, as the first start)
 const winFile = () => join(app.getPath('userData'), 'window.json')
-type WinAt = { x: number; y: number; width: number; height: number; max?: boolean; full?: boolean }
+type WinAt = { x: number; y: number; width: number; height: number; max?: boolean; full?: boolean; float?: boolean }
+let float = false // the Frosted design (glass IPC), kept beside the bounds: the first frame needs it, before the renderer has the settings
+const lights = () => (float ? { x: 22, y: 20 } : { x: 14, y: 12 }) // inside the sidebar's panel, else centered in the 38px sidebar header
 function winAt(): WinAt | null {
   try {
     const w: WinAt = JSON.parse(readFileSync(winFile(), 'utf8'))
@@ -293,13 +295,14 @@ const saveWin = () => {
   clearTimeout(winSave)
   if (!win || win.isDestroyed() || win.isMinimized()) return
   try {
-    writeFileSync(winFile(), JSON.stringify({ ...win.getNormalBounds(), max: win.isMaximized(), full: focusFull ?? win.isFullScreen() }))
+    writeFileSync(winFile(), JSON.stringify({ ...win.getNormalBounds(), max: win.isMaximized(), full: focusFull ?? win.isFullScreen(), float }))
   } catch {}
 }
 const keepWin = () => (clearTimeout(winSave), (winSave = setTimeout(saveWin, 500))) // a drag's moves: once it rests
 
 function create() {
   const at = winAt()
+  float = !!at?.float
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -308,7 +311,7 @@ function create() {
     minHeight: 400,
     backgroundColor: '#0e1014',
     visualEffectState: 'active', // glass keeps its blur when the window isn't focused
-    ...(mac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 12 } } : { autoHideMenuBar: true }), // centered in the 38px sidebar header; Alt shows the menu
+    ...(mac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: lights() } : { autoHideMenuBar: true }), // Alt shows the menu
     show: false, // shown once ready: where it was left (winAt), else maximized
     webPreferences: {
       preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)),
@@ -664,8 +667,10 @@ ipcMain.on('full-screen', (e, on: boolean) => {
   if (!on) focusFull = null
 })
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
-ipcMain.on('glass', (e, on: boolean, light?: boolean) => {
+ipcMain.on('glass', (e, on: boolean, light?: boolean, frosted?: boolean) => {
   if (!from(e)) return
+  float = !!frosted
+  if (mac) win?.setWindowButtonPosition(lights())
   // the blur takes the window's appearance: a light theme's over a dark Mac's blur is grey under its dark text and icons.
   // ponytail: app-wide, so pages that follow prefers-color-scheme (an artifact, an extension's) follow the theme meanwhile
   nativeTheme.themeSource = on ? (light ? 'light' : 'dark') : 'system'

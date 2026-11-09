@@ -874,7 +874,8 @@ export function App() {
   if (view && painted.current !== theme) {
     // the window's own blur, light or dark as the theme is
     const blur = blurred(paint), light = !!THEMES.find(t => t.id === paint.theme)?.light
-    if (glassed.current !== `${blur} ${light}`) (glassed.current = `${blur} ${light}`), bridge?.glass?.(blur, light)
+    const float = paint.design === 'frosted' // the traffic lights inside the floating sidebar
+    if (glassed.current !== `${blur} ${light} ${float}`) (glassed.current = `${blur} ${light} ${float}`), bridge?.glass?.(blur, light, float)
     painted.current = theme
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
@@ -3339,7 +3340,7 @@ export function App() {
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}
-      {sideOpen && !listOff && !strip && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
+      {sideOpen && !listOff && !strip && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (look.css --f-gap) */} />)}
 
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
