@@ -7,6 +7,7 @@ import { Glyph, rollup } from './Glyph'
 import { Modal } from './panels'
 import { type Action, wsName } from './appCtx'
 import { aiOn, HOME_ACCOUNT, AGENT_NAMES } from '../../shared/types'
+const LAB_PAGES = [['calendar', 'Calendar', 'calendar'], ['desk', 'My Desk', 'desk'], ['notes', 'Notes', 'note'], ['todoList', 'To-dos', 'listChecks'], ['specs', 'Specs & Brainstorms', 'spec'], ['workflows', 'Workflows', 'flow']] as const
 import { cmdMap, keyShow } from '../../shared/keys'
 import { LAYOUT_PRESETS } from '../../shared/layout'
 import { api, bridge, openExternal } from './api'
@@ -183,6 +184,8 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   if (settings.desk !== false) a({ id: 'desk', label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
   if (settings.notes !== false) a({ id: 'notes', label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
   if (settings.todoList !== false) a({ id: 'todos', label: 'To-dos: your checklist', icon: 'listChecks', run: () => setDialog('todos') })
+  // a Labs page that's off (a new install's): found here still, turned on from here
+  for (const [k, label, icon] of LAB_PAGES) if (settings[k] === false) a({ label: `Turn on ${label} (Labs)`, icon, hint: 'Settings › General › Pages', run: () => void call('settingsSet', { [k]: true }).catch(() => {}) })
   if (aiOn(settings)) a({ id: 'ai', label: 'Laki AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
   if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
   for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })

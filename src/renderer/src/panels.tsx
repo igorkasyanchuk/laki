@@ -301,7 +301,11 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'workflows', title: 'Try a workflow', hint: 'Blocks Laki runs for a task: agents, commands, your answers, a PR', go: 'Workflows' },
 ]
 
-export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
+const ALL_STEPS = STEPS
+// U1: never a step for a page that's off (a new install's Labs: Workflows)
+export const stepsOf = (s?: { workflows?: boolean }) => STEPS.filter(x => x.id !== 'workflows' || s?.workflows !== false)
+
+export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme, steps: STEPS = ALL_STEPS }: { steps?: typeof ALL_STEPS; done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
   const n = STEPS.filter(x => done.has(x.id)).length
   const next = STEPS.find(x => !done.has(x.id))?.id // the one step in the accent: the rest wait their turn
   return (
@@ -397,15 +401,15 @@ function ThemeRow({ theme, onTheme }: { theme: string; onTheme: (id: string) => 
 }
 
 // what's left of Get started, at the sidebar's foot: a click opens it again, × hides it for good
-export function OnboardBar({ done, onOpen, onOff }: { done: number; onOpen: () => void; onOff: () => void }) {
+export function OnboardBar({ done, of = STEPS.length, onOpen, onOff }: { done: number; of?: number; onOpen: () => void; onOff: () => void }) {
   return (
     <div className="timer-bar onboard-bar" onClick={onOpen} data-tip="Get started: the steps left">
       <Icon name="check" size={13} />
       <span className="timer-what">Get started</span>
       <span className="muted small">
-        {done} of {STEPS.length}
+        {done} of {of}
       </span>
-      <span className="ob-mini" style={{ '--p': `${(done / STEPS.length) * 100}%` } as CSSProperties} />
+      <span className="ob-mini" style={{ '--p': `${(done / of) * 100}%` } as CSSProperties} />
       <IconButton icon="x" title="Hide it (⌘K › Get started brings it back)" onClick={e => (e.stopPropagation(), onOff())} />
     </div>
   )

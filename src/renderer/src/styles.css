@@ -1260,6 +1260,9 @@ kbd { font-family: var(--mono); }
 .pr-check .icon-svg, .pr-sum > span { color: var(--ck); }
 .pr-check.ck-skip { color: var(--muted); }
 .pr-fix { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.auto-chip.on { color: var(--fg); }
+.auto-pop .pr-fix { flex-wrap: wrap; gap: 0 8px; }
+.sb-new { margin-left: 4px; color: var(--accent); font-weight: 600; }
 .pr-fix .pr-send { margin-left: auto; padding: 1px 8px; }
 .pr-sends { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 /* Markdown folded to --lines (Folded: a PR's description, a review comment) */

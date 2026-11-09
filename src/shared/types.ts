@@ -557,6 +557,7 @@ export type Settings = {
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
+  labs?: boolean // Settings › General › Pages' Labs switch: LABS' pages and buttons all at once (core.ts load: a new install starts with false and each of them off)
   specs?: boolean // Settings › General › Pages: Specs & Brainstorms, on unless false (specsOn)
   workflows?: boolean // Settings › General › Pages: Workflows, on unless false (flowsOn)
   birdView?: boolean // Settings › General › Pages: the eye beside Help, every live session's screen at once, on unless false
@@ -695,6 +696,9 @@ export type Settings = {
 export type AchievementsKept = { got?: Record<string, number>; hidden?: string[]; off?: boolean }
 // Settings › General › Pages: Specs & Brainstorms and Workflows, on unless turned off
 export const specsOn = (s?: { specs?: boolean }) => s?.specs !== false
+// Labs: what a new install starts without (each a setting of its own, on unless false): the pages beyond Projects, Board,
+// Schedule, AI and Settings, the rail's Terminal and Browser, the foot's Video, Meme and Timer
+export const LABS = ['desk', 'specs', 'workflows', 'calendar', 'notes', 'todoList', 'railShells', 'railBrowsers', 'videoButton', 'fun', 'timerButton'] as const
 export const flowsOn = (s?: { workflows?: boolean }) => s?.workflows !== false
 
 // Settings › Voice: engine device, macOS dictation (the mic starts it; Fn Fn is macOS's own); cloud, Laki records and

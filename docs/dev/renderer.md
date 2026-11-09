@@ -699,4 +699,17 @@ Laki was built twice while the stack was picked; the Go + Wails build is now its
 and nothing here keeps it in step. Many renderer files were
 shared with it: some class and variable names in `look.css` and `themes.ts` are its, and harmless here.
 
+Labs (U1): `settings.labs` and types.ts' `LABS` (desk, specs, workflows, calendar, notes, todoList, railShells,
+railBrowsers, videoButton, fun, timerButton). core.ts `load`: no state.json yet, each of them is saved `false` with
+`labs: false` and `achievements: { off: true }` (U2); a state from before gets `labs: true` once and nothing else. Every
+check stays the page's own *on unless false*; Settings › General › Pages' *Labs* switch writes them all at once. A test's
+daemon is left alone unless `LAKI_TEST_LEAN=1` (`test/restart.test.ts`). ⌘K lists *Turn on <page> (Labs)* for the off
+ones; Get started's steps are `stepsOf(settings)` (no Workflows step while it's off). Achievements on: one Unlocked toast
+per `ACH_QUIET` (10 min), the rest count on the trophy (`+n`) until its page opens; off, `api.onCall` and the view's
+`upsOf` do nothing.
+
+The status bar (U3), left to right: the context meter, the branch, the codespace, the workflow run, the PR (number,
+checks, conflicts, Info.tsx `AutoChip`: *Auto n/3*, a click opens the switches with a line each), Artifacts; after the
+spacer the ports and the plan's limits (`UsageButton`), then Recording, remote access, the update, widgets, the trophy.
+
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).

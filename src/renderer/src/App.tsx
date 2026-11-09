@@ -206,6 +206,7 @@ const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === '
 // back and forward (settings.history, on unless false): a place is a page (or none: the workspace view) and the workspace
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 const HISTORY_MAX = 25
+const ACH_QUIET = 10 * 60_000 // U2: an Unlocked toast at most this often
 const PAGES = new Set(['settings', 'help', 'board', 'achievements', 'bird', 'ai', 'calendar', 'desk', 'todos', 'schedules', 'usage'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
@@ -1928,6 +1929,9 @@ export function App() {
   const [unlocked, setUnlocked] = useState<string[]>([]) // the unlock toast's, newest last
   const unlockTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const unlockAt = useRef(0)
+  const toastAt = useRef(0)
+  const toasts = useRef(true)
+  const [achMore, setAchMore] = useState(0)
   const achSet = (o: AchievementsKept) => {
     const next = (sent.current = achRef.current = { ...achRef.current, ...o })
     return api.call('settingsSet', { achievements: next }).catch(e => {
@@ -1941,25 +1945,29 @@ export function App() {
     achSet({ got: { ...a.got, [id]: Date.now() } }).catch(() => {})
     const fresh = Date.now() - unlockAt.current > 1500 // one action's unlocks together, not the last toast's too
     unlockAt.current = Date.now()
+    // U2: a toast every ACH_QUIET at most; the ones between count on the trophy (+n) until its page is opened
+    if (fresh && (toasts.current = Date.now() - toastAt.current >= ACH_QUIET)) toastAt.current = Date.now()
+    if (!toasts.current) return setAchMore(n => n + 1)
     setUnlocked(u => (fresh ? [id] : [...u, id]))
     clearTimeout(unlockTimer.current)
     unlockTimer.current = setTimeout(() => setUnlocked([]), 6000)
   }
   const earnRef = useRef(earn)
   earnRef.current = earn
-  useEffect(() => api.onCall((method, params, r) => earnedBy(method, params, r).forEach(id => earnRef.current(id))), [])
+  useEffect(() => api.onCall((method, params, r) => void (achRef.current.off || earnedBy(method, params, r).forEach(id => earnRef.current(id)))), []) // off (a new install's): no bookkeeping per call
   // the view's numbers and values that moved since the last view (the first, and the first after a reconnect: where
   // they start, nothing earned; a new daemon's view, an update's migrations, isn't something you did)
   const ups = useRef<Record<string, number | string>>(undefined)
   useEffect(() => void (connected || (ups.current = undefined)), [connected])
   useEffect(() => {
-    if (!view) return
+    if (!view || achKept.off) return
     const now = upsOf(view)
     if (ups.current) wentUp(ups.current, now).forEach(earn)
     ups.current = now
   }, [view])
   useEffect(() => void (dialog && pageEarns(typeof dialog === 'string' ? dialog : settingsOf(dialog) ? 'settings' : Object.keys(dialog)[0]).forEach(earn)), [dialog])
   useEffect(() => void (find && earn('filter')), [!!find])
+  useEffect(() => void (dialog === 'achievements' && setAchMore(0)), [dialog])
   // Changes or the Simulator on screen, once it wasn't: not the panel as it was left when Laki started
   const onTab = panelShown && ws ? panelTab : ''
   const tabWas = useRef<string>(undefined)
@@ -3188,7 +3196,6 @@ export function App() {
   const statusBar = view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own
             <>
               {ctxOn && tab?.context && (
@@ -3247,6 +3254,28 @@ export function App() {
                     </span>
                   </button>
                 ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
+              <PRStatus w={infoOf(ws)} face={!ws.pr?.mine || settings.ownAvatar !== false} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
+              {attachable(ws) && ws.kind !== 'local' && (
+                <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
+                  + PR
+                </button>
+              )}
+              {ws.setup && <span className="warn-soft">setup running…</span>}
+            </>
+          )}
+          {!!ws?.artifacts && ws.storage && !pageBar && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): shown here; Finder and Files from the strip's ⋯
+            <button
+              className={`listen port-main ${gallery === ws.id ? 'on' : ''}`}
+              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A`}
+              onClick={toggleArtifacts}
+            >
+              Artifacts: {ws.artifacts}
+            </button>
+          )}
+          <span className="spacer" />
+          {/* U3: the right end: the ports, then the plan's limits; left of the spacer what the open work is (branch, PR, checks) */}
+          {ws && ws.browser === undefined && !pageBar && (
+            <>
               {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">
                 <button
@@ -3271,25 +3300,9 @@ export function App() {
                   {portStop(ws, port)}
                 </span>
               ))}
-              <PRStatus w={infoOf(ws)} face={!ws.pr?.mine || settings.ownAvatar !== false} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
-              {attachable(ws) && ws.kind !== 'local' && (
-                <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
-                  + PR
-                </button>
-              )}
-              {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
-          {!!ws?.artifacts && ws.storage && !pageBar && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): shown here; Finder and Files from the strip's ⋯
-            <button
-              className={`listen port-main ${gallery === ws.id ? 'on' : ''}`}
-              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A`}
-              onClick={toggleArtifacts}
-            >
-              Artifacts: {ws.artifacts}
-            </button>
-          )}
-          <span className="spacer" />
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} models={geminiModels} load={() => api.call<AgentUsage[]>('usage').then(limits)} onDays={() => setDialog('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} today={costsOn && view.today ? { ...view.today, ws: view.today.ws.map(w => ({ ...w, name: (x => (x ? wsName(x) : 'a removed workspace'))(view.workspaces.find(x => x.id === w.ws)) })) } : undefined} /> /* remounts as agents are turned on or off */}
           {settings.recording && ( // Recording mode: private workspaces hidden until this is clicked
             <button className="sb-rec" data-tip="Recording mode: private workspaces and projects are hidden (they keep running). Click to show them" onClick={() => void call('settingsSet', { recording: false }).catch(() => {})}>
               <Icon name="lock" size={11} />
@@ -3317,6 +3330,7 @@ export function App() {
             <button className={`sb-trophy ${dialog === 'achievements' ? 'on' : ''}`} aria-label={`Achievements: ${achN} of ${achAll.length}`} data-tip={`Achievements: ${achN} of ${achAll.length} · click: what to try next`} onClick={() => setDialog(d => (d === 'achievements' ? null : 'achievements'))}>
               <Icon name="trophy" size={11} />
               {achN}/{achAll.length}
+              {achMore > 0 && <b className="sb-new" data-tip={`${achMore} more unlocked`}>+{achMore}</b>}
             </button>
           )}
           {aiFab && aiDock && (

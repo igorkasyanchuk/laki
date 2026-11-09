@@ -11,7 +11,7 @@ import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
 import { NoticeCard, ShownDialog, ShownPops } from './Shown'
 import { SharePop } from './Tunnel'
-import { ReplyPop, About, Onboarding, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
+import { ReplyPop, About, Onboarding, stepsOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
 import { WidgetDialog, WidgetModal } from './Widgets'
 import { ExtensionPage } from './Extension'
@@ -319,6 +319,7 @@ export function Pages({ app }: { app: AppCtx }) {
       )}
       {dialog === 'onboard' && (
         <Onboarding
+          steps={stepsOf(settings)}
           done={onboardDone}
           onGo={onboardGo}
           onTick={id => setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))}

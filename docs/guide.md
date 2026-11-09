@@ -58,7 +58,11 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
-- **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI, new review
+- **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
+  Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
+  General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›
+  Achievements). An install from before keeps everything it had.
+- **PRs**: the workspace's PR and its CI in the status bar; the *Auto n/3* chip opens the switches that send failing CI, new review
   comments or merge conflicts to the agent on their own; the side panel's *Info* (⌘I) with the PR and its checks;
   a workspace archived once its PR merges (off by default).
 - **Side panel** (⌥⌘B): the workspace's info (⌘I), its files (search, preview, several open as tabs, new file or folder, changed files marked),

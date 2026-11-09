@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { FIND, findKey, freshOf, SECTIONS } from '../../shared/settingsMap'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { LABS, ACCOUNT_AGENTS, STORAGE_DAYS, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
@@ -247,6 +247,7 @@ export type AppSettings = Paint & {
   floaterMenu?: 'stack' | 'card' // its actions: stacked in the drop, or a menu beside it (unset: stack)
   floaterAt?: 'edge' | 'notch' // where: the screen's edge (unset), or the island at the top
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
+  labs?: boolean // Pages' Labs switch: LABS, all at once
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   videoButton?: boolean // the foot's YouTube button (unset: on)
   timerButton?: boolean // the foot's timers button (unset: on)
@@ -1509,8 +1510,11 @@ export function SettingsPage(p: {
                   <CliField api={p.cli} onSkill={() => openSec('skill')} />
                 </Group>
               )}
-              <Group title="Pages" hint="On unless you turn them off">
+              <Group title="Pages" hint="On unless you turn them off; a new install starts with Labs off">
               <div className="setting-box">
+                <Switch className="switch-row" on={s.labs !== false} onChange={v => set({ labs: v, ...Object.fromEntries(LABS.map(k => [k, v])) })}>
+                  <Says title="Labs: everything beyond the core" hint="All of these at once, and the rail's Terminal and Browser and the sidebar foot's Video, Meme and Timer (Appearance). Off, Laki is Projects, Board, Schedule, AI and Settings. Each keeps its own switch" />
+                </Switch>
                 <Switch className="switch-row" on={s.desk !== false} onChange={v => set({ desk: v })}>
                   <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on My Desk and in the sidebar at once. Shows the rail's My Desk and ⌘K" />
                 </Switch>

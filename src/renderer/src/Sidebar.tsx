@@ -15,7 +15,7 @@ import { short, prState, Avatar, PrCard } from './Info'
 import { RowMarks, rowMarks, WidgetGrid } from './Widgets'
 import { planCount } from '../../shared/todos'
 import { phVars, sideVars, sideAttrs } from './SettingsLook'
-import { Video, TimerBar, StopwatchBar, STEPS, OnboardBar } from './panels'
+import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
@@ -648,7 +648,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         />
       ))}
       <WidgetGrid widgets={ownWidgets} api={widgetApi} desk={settings.desk !== false} />
-      {!onboard.off && onboardDone.size < STEPS.length && dialog !== 'onboard' && <OnboardBar done={STEPS.filter(x => onboardDone.has(x.id)).length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />}
+      {(steps => !onboard.off && steps.some(x => !onboardDone.has(x.id)) && dialog !== 'onboard' && <OnboardBar done={steps.filter(x => onboardDone.has(x.id)).length} of={steps.length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />)(stepsOf(settings))}
       {!wideBar && (
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           {footButtons(labels)}

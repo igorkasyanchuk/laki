@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { INSTALL, notInstalled, tabAgent } from '../src/shared/install.ts'
-import { API } from '../src/shared/types.ts'
+import { API, LABS } from '../src/shared/types.ts'
 import { fresh, running, sleep, until } from './helpers.ts'
 
 test('single instance: a second daemon exits', async t => {
@@ -325,4 +325,25 @@ test("R12: an agent that isn't installed ends its tab with 127 (the strip's sign
   symlinkSync(join(fakes, 'claude'), join(rig.home, 'bin', 'claude')) // installed
   await rig.rpc('input', { tab: gone.id, data: '\r' }) // Check again
   await until(async () => (await rig.tab(ws.id)).status !== 'exited', 'it runs', 20000)
+})
+
+test('U1, U2: a new install starts small (Labs off, no achievements game); one from before keeps its pages', async t => {
+  const rig = await fresh(t)
+  assert.equal((await rig.rpc('state')).settings?.labs, undefined) // a test's daemon: left alone
+  await rig.rpc('settingsSet', { notes: true, fun: false })
+  await rig.stop()
+  rig.env.LAKI_TEST_LEAN = '1'
+  await rig.start() // an install from before Labs
+  let s = (await rig.rpc('state')).settings
+  assert.deepEqual([s.labs, s.notes, s.fun, s.desk, s.achievements], [true, true, false, undefined, undefined])
+  await rig.stop()
+  for (const f of ['state.json', 'state.json.bak']) rmSync(join(rig.data, f), { force: true })
+  await rig.start() // a new one
+  s = (await rig.rpc('state')).settings
+  assert.equal(s.labs, false)
+  for (const k of LABS) assert.equal(s[k], false, k)
+  assert.deepEqual(s.achievements, { off: true })
+  await assert.rejects(rig.rpc('noteList', {}), /Notes are off/)
+  await rig.rpc('settingsSet', { notes: true }) // each its own switch still
+  await rig.rpc('noteList', {})
 })

@@ -16,6 +16,9 @@ version it builds, with the date. -->
 - Updates: *Skip this version*, and an *Earlier versions* link to go back one.
 - An agent that isn't installed: its tab shows the install command (Copy, *Install in a terminal*, *Check again*) instead of only `command not found`; Welcome lists the commands and checks again without a restart.
 - Recording mode now hides private workspaces from agents, Laki AI and remote access too, not only from the window.
+- A new install starts simpler: Projects, Board, Schedule, AI and Settings. Everything else is in *Labs* (Settings › General › Pages), one switch or each on its own; your install keeps what it has.
+- Achievements are off for a new install; on, at most one *Unlocked* toast every 10 minutes, the rest count on the trophy.
+- The status bar: branch, PR and checks first, one *Auto n/3* chip instead of three switches, ports and plan limits at the right end.
 - *Archive if clean* counts a submodule's uncommitted work and ignored files that aren't rebuilt (not `node_modules`), and says what it would lose.
 - Safer Ship: `gh pr create` always gets `--head` (and the base), the ship tab's git never runs a repo's fsmonitor program, a submodule whose `.git` was swapped is refused, and a host's commit is built from Laki's own tree as on this Mac.
 
