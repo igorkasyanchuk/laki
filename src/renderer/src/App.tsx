@@ -464,7 +464,7 @@ export function App() {
   const { notices, answer: answerNotice } = useNotices() // laki notice's cards, in the same corner
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [reply, setReply] = useState<{ tab: string; text: string; x: number; y: number } | null>(null) // Reply on a terminal's selected text
-  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
+  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean; err?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
@@ -1006,13 +1006,14 @@ export function App() {
     fit()
     return () => ro.disconnect()
   }, [])
-  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean) => {
+  // err: an error's (V2: the red edge only for those)
+  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean) => {
     clearTimeout(noteTimer.current) // an older toast's timer would cut this one short
-    setNote({ text, undo, label, ok })
+    setNote({ text, undo, label, ok, err })
     noteTimer.current = setTimeout(() => setNote(null), undo ? 8000 : 6000)
   }
   const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
-  const fail = (e: unknown) => toast((e as Error).message)
+  const fail = (e: unknown) => toast((e as Error).message, undefined, undefined, false, true)
   // a picture in a viewer (a terminal link's card and its larger view, the file preview, Changes' zoom, the artifacts'
   // and Laki AI's big views): its right click copies it, unless the viewer has a menu of its own
   useEffect(() => {
@@ -2398,7 +2399,7 @@ export function App() {
     if (await call('projectTrust', { id: p.id, hash: c.hash }).then(() => true, () => false)) done(`Trusted ${p.name}'s .laki.json`)
   }
   const repoSheet = async (w: WidgetView) => {
-    const what = await call<{ name: string; text: string; hash: string; cut?: string[] }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e)), null))
+    const what = await call<{ name: string; text: string; hash: string; cut?: string[] }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e), undefined, undefined, false, true), null))
     if (!what) return
     const proj = view?.projects.find(p => p.id === w.project)?.name ?? w.project
     const needs = w.options.filter(x => x.required || x.type === 'secret').map(x => `${x.label || x.key}${x.type === 'secret' ? ' (a secret, kept on this Mac)' : ''}${x.required ? ', needed' : ''}`)
@@ -2413,7 +2414,7 @@ export function App() {
       if (!(i >= 1)) return // Cancel, Esc (-1)
       if (i > left.length) return what.hash
       const f = left[i - 1]
-      const full = await call<{ text: string }>('widgetFull', { id: w.id, file: f }).catch(e => (toast(String(e?.message ?? e)), null))
+      const full = await call<{ text: string }>('widgetFull', { id: w.id, file: f }).catch(e => (toast(String(e?.message ?? e), undefined, undefined, false, true), null))
       if (!full) return
       opened.add(f)
       await choose(`${f}, in full`, full.text, [{ label: 'Back', primary: true }])
@@ -2459,7 +2460,7 @@ export function App() {
     },
     reload: () => call('widgetReload'),
     page: id => setDialog({ extension: id, back: dialog }),
-    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))), // a copy to change, on its page
+    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e), undefined, undefined, false, true)), // a copy to change, on its page
     undo: (id, after) => api.call('widgetUndo', { id, after }),
     tryOnce: (id, ws) => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true, ws }),
     folder: (id, e) => {
@@ -2479,7 +2480,7 @@ export function App() {
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
     save: (id, path, text, was, force) => api.call('widgetFileSave', { id, path, text, was, force }),
-    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog === 'starters' ? null : dialog }), e => toast(String(e?.message ?? e))), // ⌘K's picker: its page, then nothing behind it
+    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog === 'starters' ? null : dialog }), e => toast(String(e?.message ?? e), undefined, undefined, false, true)), // ⌘K's picker: its page, then nothing behind it
     check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
     revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),
     wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
@@ -3845,7 +3846,7 @@ export function App() {
         </button>
       )}
       {note && (
-        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''}`} role="status">
+        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''} ${note.err ? 'err' : ''}`} role={note.err ? 'alert' : 'status'}>
           {note.ok && <Icon name="check" size={14} />}
           {note.busy && <Glyph s="running" />}
           <span>{note.text}</span>

@@ -574,7 +574,7 @@ export function Pages({ app }: { app: AppCtx }) {
                   w => [w],
                   e => {
                     const there = (e as Error).message.match(/checked out in workspace (\S+)$/)?.[1]
-                    toast((e as Error).message, there ? () => (setWsId(there), setDialog(null)) : undefined, 'Open it')
+                    toast((e as Error).message, there ? () => (setWsId(there), setDialog(null)) : undefined, 'Open it', false, true)
                     throw e
                   },
                 )

@@ -51,3 +51,23 @@ test("a look's or motion's rules are told apart by their selectors", async () =>
   assert.equal(gateOf('html:not(.theme-font)[data-look] .tab'), undefined)
   assert.equal(gateOf('[data-look="aqua"] .tab, html[data-motion="high"] .tab'), undefined)
 })
+
+// V2: styles.css on the design tokens (its :root): space (--sp-*: a raw px only 0, a 1px hairline or a layout-sized 20px
+// and up), corners (--r-*), elevation (--lift-*: no raw black drop shadow; rings, insets and glows of a color stay),
+// stacking (--z-*: a raw z-index only within a part, under 10), type (a font: shorthand's size a --fs-* step, display
+// sizes over 22px aside; no font-size under 11px). looks.css follows later
+test("V2: styles.css' spacing, corners, shadows, stacking and type are tokens", () => {
+  const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^:root \{[\s\S]*?\n\}/, '')
+  const inner = (v: string) => { let s = v; for (let i = 0; i < 4; i++) s = s.replace(/\b(calc|clamp|min|max|env|var)\([^()]*\)/g, ''); return s }
+  const bad: string[] = []
+  for (const [, p, v] of css.matchAll(/(?<![-\w])(gap|row-gap|column-gap|padding(?:-[a-z-]+)?)\s*:\s*([^;}]+)/g))
+    for (const [, n] of inner(v).matchAll(/(?<![\w.-])(\d+(?:\.\d+)?)px/g)) if (+n !== 1 && +n < 20) bad.push(`${p}: ${v.trim()}`)
+  for (const [, v] of css.matchAll(/(?<![-\w])border(?:-[a-z]+)*-radius\s*:\s*([^;}]+)/g)) if (/\d+(\.\d+)?px/.test(inner(v))) bad.push(`border-radius: ${v.trim()}`)
+  for (const [, v] of css.matchAll(/(?<![-\w])box-shadow\s*:\s*([^;}]+)/g))
+    for (const part of v.split(/,(?![^(]*\))/)) if (/^\s*-?[\d.]+(px)?\s+[1-9][\d.]*px\s+[\d.]+px(\s+-?[\d.]+px)?\s+(rgba\(0,\s*0,\s*0|rgb\(0 0 0|color-mix\(in srgb, #000)/.test(part)) bad.push(`box-shadow: ${part.trim()}`)
+  for (const [, v] of css.matchAll(/(?<![-\w])z-index\s*:\s*(-?\d+)\s*[;}!]/g)) if (+v > 9) bad.push(`z-index: ${v}`)
+  for (const [, v] of css.matchAll(/(?<![-\w])font\s*:\s*([^;}]+)/g)) for (const [, n] of v.matchAll(/(?<![\w./-])(\d+(?:\.\d+)?)px(?!\s*\))/g)) if (+n <= 22 && !new RegExp(`/${n}px`).test(v)) bad.push(`font: ${v.trim()}`)
+  for (const [, n] of css.matchAll(/(?<![-\w])font-size\s*:\s*(\d+(?:\.\d+)?)px/g)) if (+n < 11) bad.push(`font-size: ${n}px`)
+  for (const [, w] of css.matchAll(/(?<![-\w])font-weight\s*:\s*(\d+)/g)) if (!['400', '600', '700'].includes(w)) bad.push(`font-weight: ${w}`)
+  assert.deepEqual(bad, [])
+})

@@ -137,7 +137,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     dismiss: t => void call('failDismiss', { tab: t.id }).catch(() => {}),
     open: t => (setDialog(null), selectTab(t), narrow && setSideOpen(false)),
     answer: (t, n, label) => void api.call('answer', { tab: t.id, n, label }).catch(() => toast('It asks something else now: open it', () => needsApi.open(t), 'Open')),
-    pick: (t, pick) => void api.call('answer', { tab: t.id, pick }).catch(e => toast((e as Error).message, () => needsApi.open(t), 'Open')),
+    pick: (t, pick) => void api.call('answer', { tab: t.id, pick }).catch(e => toast((e as Error).message, () => needsApi.open(t), 'Open', false, true)),
     permission: t => /permission/i.test(waits.current.get(t.id) ?? ''),
     review: t => (setDialog(null), setWsId(t.workspace), showPanel('changes'), narrow && setSideOpen(false)),
     seen: t => void call('seen', { tab: t.id }).catch(() => {}),

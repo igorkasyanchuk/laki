@@ -536,6 +536,11 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
   agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (SettingsProject.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
+- **Design tokens** (V2, styles.css `:root`): `--sp-1…6` (2, 4, 6, 8, 12, 16px), `--r-xs…xl` (each `var(--rs, n)`: Settings'
+  Corners over all; a look's `[data-look]` root sets its own from its `--radius`) and `--r-pill`, `--radius` = `--r-m`,
+  `--lift-1…3`, `--h-s/m/l` (22, 28, 34), `--z-dialog` 10 < toast < page < ask < pop < drag < tip < `--z-top` (a raw
+  z-index only within a part, under 10). Chrome: heads and the tab bar 40px, rows and bars 28. A toast is neutral;
+  `err` (App's `fail`, `toast(…, err)`) gives it the red edge. `test/css.test.ts` checks styles.css; looks.css next.
 - **Keyboard and screen readers** (U11): the sidebar's `.side-scroll` is a `role="tree"` (Sidebar.tsx `treeKey`, `rove`):
   project heads, Pinned and Needs you's head are treeitems at level 1 (`aria-expanded`), groups and rows at 2
   (`aria-selected`), each `.project-ws` a `group`; every treeitem is `tabIndex={-1}` in JSX and a layout effect keeps one

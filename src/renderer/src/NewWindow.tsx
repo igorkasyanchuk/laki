@@ -172,7 +172,7 @@ export function NewWindow() {
         }}
       />
       {err && (
-        <div className="toast" role="alert">
+        <div className="toast err" role="alert">
           {err}
         </div>
       )}

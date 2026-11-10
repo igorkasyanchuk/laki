@@ -372,7 +372,7 @@ export type AppBase = {
   termWhere: (p: Project) => string
   timers: Timer[]
   tint: (w: WorkspaceView) => string | undefined
-  toast: (text: string, undo?: () => void, label?: string, ok?: boolean) => void
+  toast: (text: string, undo?: () => void, label?: string, ok?: boolean, err?: boolean) => void // err: an error's red edge
   todosOn: boolean
   toggleArtifacts: () => void
   toggleFull: (on?: boolean) => void | undefined

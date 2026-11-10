@@ -286,6 +286,9 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
 - **A type from another module is `import type`**, not `import { type X }`: with `verbatimModuleSyntax` the latter keeps
   the module in the bundle, and a lazy page (Dialogs.tsx' `PRELOAD`) lands back in the window's first load.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
+- **Sizes** too (V2): space `--sp-1…6`, corners `--r-xs…xl` and `--r-pill` (a look sets its own), elevation `--lift-1…3`,
+  control heights `--h-s/m/l`, stacking `--z-*`, type `--fs-1…5`; `test/css.test.ts` keeps styles.css on them (a raw px only
+  for 0, a 1px hairline or 20px and up of layout).
 - **No `*` or `:not()` under a `:has()`** (`.main:has(…) > *`): beside any `:has()` Blink can't follow by class
   (`:only-child`, `:nth-child`, `:disabled`: BlockNote's and Mantine's have them), every DOM change then restyles the
   whole window (a brainstorm's 5,600 elements: 90 ms a change). Mark the frame instead (ui.tsx `usePageMark`: `.main[data-pages]`);
