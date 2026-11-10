@@ -280,9 +280,14 @@ export function hookFiles(h: Hooks): Record<string, string> {
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
-  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])] } }
+  // S12: the daemon's own token (daemon.json) isn't a sandboxed claude's to read: its Bash commands (denyRead) and its
+  // Read tool (the deny rule); its laki calls go with its tab's token. ponytail: claude's sandbox only (codex's
+  // workspace-write reads everything), and an agent with no sandbox still reads it
+  const tokenFile = join(dir, 'daemon.json')
+  const box = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, excludedCommands: ['laki *', ...(local ? [`${LAKI_CLI} *`] : [])], ...(local && { filesystem: { denyRead: [tokenFile] } }) } }
+  const boxed = (gated: boolean) => ({ ...box, ...(local && { permissions: { ...settings(gated).permissions, deny: [`Read(/${tokenFile})`] } }) })
   const two = [false, true]
-  const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && box) }, null, 2)]))))
+  const claude = Object.fromEntries(two.flatMap(fast => two.flatMap(gated => two.map(sandbox => [claudeFile({ fast, gated, sandbox }), JSON.stringify({ ...settings(gated), ...(fast && { fastMode: true }), ...(sandbox && boxed(gated)) }, null, 2)]))))
   return {
     ...claude,
     'gemini-settings.json': JSON.stringify(gemini, null, 2),
@@ -1611,6 +1616,9 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // what its hooks carry, new each start: an SSH host's escape codes (hostTab), a local one's laki hook (LAKI_HOOK,
   // main.ts' hookWho): another tab's process can't report this one's turns
   const hookKey = randomBytes(12).toString('hex')
+  // S12: and what its laki calls carry (conn.ts' rpc): the daemon knows the tab by it, whatever its process tree became.
+  // None on a host (no CLI there reaches this daemon)
+  const tabToken = ws.host ? '' : randomBytes(32).toString('hex')
   let argEnv: Record<string, string> | undefined // an agent's values (agentCmd)
   if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey)]]
   else if (tab.kind === 'shell') args = ['-l']
@@ -1624,9 +1632,10 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey }) }), ...lastSize })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv, ...(!ws.host && { LAKI_HOOK: hookKey, LAKI_TAB_TOKEN: tabToken }) }), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   s.hookKey = hookKey
+  s.tabToken = tabToken
   s.agent = tab.kind === 'agent'
   s.onProgram = () => programSeen(tab, s)
   sessions.set(tab.id, s)
@@ -3277,6 +3286,16 @@ export function hookOk(tab: string, key: unknown) {
   const own = Buffer.from(sessions.get(tab)?.hookKey ?? '')
   const said = Buffer.from(typeof key === 'string' ? key : '')
   return own.length > 0 && own.length === said.length && timingSafeEqual(own, said)
+}
+// S12: the tab a token is the live start's of: none once that start ended (its process gone, the tab restarted or
+// closed, the daemon started again). In memory only: never in state.json, the view or a log
+export function tabOfToken(token: unknown) {
+  if (typeof token !== 'string' || token.length !== 64) return
+  const said = Buffer.from(token)
+  for (const [id, s] of sessions) {
+    const own = Buffer.from(s.tabToken)
+    if (!s.exited && own.length === said.length && timingSafeEqual(own, said)) return state.tabs.find(t => t.id === id)
+  }
 }
 export function hook(p: { tab: string; state: string; payload?: any; at?: number }) {
   const tab = state.tabs.find(t => t.id === p.tab)

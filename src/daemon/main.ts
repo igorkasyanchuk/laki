@@ -13,7 +13,7 @@ import { chatImport, chatList } from './chats.ts'
 import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, rotateLog } from '../shared/conn.ts'
-import { API, HIDDEN, recorded } from '../shared/types.ts'
+import { API, HIDDEN, recorded, type Tab } from '../shared/types.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -578,7 +578,7 @@ const remoteNo = (method: string, p: any) =>
 // started from a Laki tab counts as that tab). Looked up once per connection as a method first needs it (a WebSocket's
 // as it opens), a hook's only without its key (hookWho); nothing found, or the client gone before the answer (its port may be another
 // process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree and its terminal
-// (setsid, launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
+// (setsid, launchctl submit, open x.command, a tmux server) still counts as you unless it kept its tab's token (S12: LAKI_TAB_TOKEN, an agent tab's is that agent whatever its tree).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList', 'chatImport', 'turnUndo', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct', 'prDraft', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd', 'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo', 'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd', 'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'tabClose', 'openIn', 'gateRestart'])
 const CALLER = new Set(['updateIdle', 'tabNew', 'wsNew', 'wsFan', 'run', 'flowSave', 'flowStart', 'flowEvent', 'flowTrust', 'flowPause', 'flowRevert', 'flowRm', 'flowRestore'])
@@ -594,11 +594,11 @@ const peerOf = (sock: Socket) => {
   }
   return t
 }
-async function whoCalls(sock: Socket, method: string, p: any) {
+async function whoCalls(sock: Socket, method: string, p: any, known?: Tab) {
   // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
   const from = FROM.has(method) || (method === 'state' && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
   if (!from && !CALLER.has(method)) return p
-  const tab = await peerOf(sock).catch(() => null)
+  const tab = known ?? (await peerOf(sock).catch(() => null)) // S12: its tab's token says who, no lookup
   if (tab === null || sock.readableEnded || sock.destroyed) {
     log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
     throw new Error(core.WHO)
@@ -855,12 +855,12 @@ async function cmdAsk(from: any, by: string, ws: string, cmd: string) {
 // the Done check), run the tool gates on input it chose and fire tool.call. A hook is looked up only without its key
 // (whoCalls never does: one per tool call). ponytail: the key is in the agent's env, which a process of yours can
 // read; per-tab users are the real fix
-async function hookWho(sock: Socket, p: any) {
+async function hookWho(sock: Socket, p: any, known?: Tab) {
   if (p.key !== undefined) {
     if (core.hookOk(String(p.tab ?? ''), p.key)) return
     throw new Error("not this tab's start: a tab's state comes from its own agent")
   }
-  const tab = await peerOf(sock).catch(() => null)
+  const tab = known ?? (await peerOf(sock).catch(() => null))
   if (tab === null || sock.readableEnded || sock.destroyed) throw new Error(core.WHO)
   if (tab && tab.id !== p.tab) {
     log(`hook refused: ${tab.id} reported ${String(p.tab).slice(0, 40)}'s state`)
@@ -872,15 +872,16 @@ async function hookWho(sock: Socket, p: any) {
 // clock is the Mac's, else a date years ahead deletes every storage folder's files at once
 const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's daemon that takes none (api.test's)
 
-async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {
+// known: the agent's tab a call's token is of (S12, /rpc only)
+async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c), known?: Tab) {
   method = oldName(method) // note.list → noteList, before every check keyed by the name: an alias passes the same ones
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
   if (!TEST_CLOCK && params && typeof params === 'object' && 'now' in params) params = { ...params, now: undefined }
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
-  if (sock) params = await whoCalls(sock, method, params)
+  if (sock) params = await whoCalls(sock, method, params, known)
   if (sock) agentNo(method, params ?? {})
-  if (sock && method === 'hook') await hookWho(sock, params ?? {})
+  if (sock && method === 'hook') await hookWho(sock, params ?? {}, known)
   return await h(params ?? {}, c)
 }
 
@@ -919,7 +920,14 @@ const server = createServer(async (req, res) => {
     }
   }
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
-  if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''), req.headers.origin)) return reply(401, { error: 'bad token' })
+  // S12: a tab's own token (LAKI_TAB_TOKEN, this start's: core's spawnTab) is as good as ours, and an agent tab's says
+  // who calls: that tab, whatever its process tree became (setsid, a double fork, launchctl) and whatever its env says.
+  // A shell tab's only lets the call in: who typed there is looked up as before (an agent's ps reads its env). Never
+  // from remote access's page, and not on the WebSocket (the app's)
+  const bearer = req.headers.authorization?.replace(/^Bearer /, '')
+  const far = !!req.headers.origin && req.headers.origin === remoteMod.remoteOrigin()
+  const mine = far ? undefined : core.tabOfToken(bearer)
+  if (!mine && !tokenOk(bearer, req.headers.origin)) return reply(401, { error: 'bad token' })
   let body = ''
   for await (const chunk of req) {
     body += chunk
@@ -927,9 +935,7 @@ const server = createServer(async (req, res) => {
   }
   try {
     const { method, params } = JSON.parse(body)
-    const o = req.headers.origin
-    const remote = !!o && o === remoteMod.remoteOrigin()
-    reply(200, { result: (await call(method, params, undefined, remote, remote ? undefined : req.socket)) ?? null })
+    reply(200, { result: (await call(method, params, undefined, far, far ? undefined : req.socket, mine?.kind === 'agent' ? mine : undefined)) ?? null })
   } catch (e) {
     reply(200, { error: (e as Error).message })
   }

@@ -368,3 +368,44 @@ test("an agent can't set When everything is done or its like, import worktrees, 
   assert.equal((await rig.rpc('settingsSet', { whenDone: 'off', doneCheck: false })).doneCheck, false)
   await rig.rpc('hook', { tab: other, state: 'idle' })
 })
+
+test("S12: an agent tab's token says who calls, from any process; the daemon's own from no tab is you; a start that ended is refused; a sandboxed claude can't read daemon.json", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  const { port, token } = rig.info()
+  const said = join(rig.home, 'tab-token')
+  const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
+  const ls = join(rig.home, 'stale-ls')
+  // its own token, and the CLI with one of a start that ended: the daemon's own instead, as before
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run printenv LAKI_TAB_TOKEN > ${said}; LAKI_TAB_TOKEN=${'0'.repeat(64)} ${laki} ls > ${ls} 2>&1` })
+  const mine = (await until(() => existsSync(ls) && readFileSync(ls, 'utf8').length > 0 && readFileSync(said, 'utf8').trim(), 'its token', 60000)) as string
+  assert.match(mine, /^[0-9a-f]{64}$/)
+  assert.match(readFileSync(ls, 'utf8'), /\w/)
+  assert.doesNotMatch(readFileSync(ls, 'utf8'), /bad token/)
+  assert.ok(!readFileSync(join(rig.data, 'state.json'), 'utf8').includes(mine), 'in memory only')
+  assert.ok(!JSON.stringify(await rig.rpc('state')).includes(mine), 'never in the view')
+  const post = async (bearer: string, method: string, params: object) => {
+    const r = await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${bearer}` }, body: JSON.stringify({ method, params }) })
+    return { code: r.status, ...((await r.json()) as { result?: any; error?: string }) }
+  }
+  // this process is in no tab: with the tab's token it's that agent all the same (a detached child's, a launchd job's)
+  assert.match((await post(mine, 'settingsSet', { nextPrompt: true })).error ?? '', /an agent can't change that setting/)
+  assert.match((await post(mine, 'hook', { tab: 'another', state: 'waiting' })).error ?? '', /comes from its own agent/)
+  assert.equal((await post(mine, 'ping', {})).result, 'pong')
+  // the daemon's own, from no tab: you
+  assert.equal((await post(token, 'settingsSet', { nextPrompt: true })).error, undefined)
+  // a wrong one, and remote access's page with a tab's
+  assert.equal((await post('f'.repeat(64), 'ping', {})).code, 401)
+  // a sandboxed claude's settings: daemon.json out of its Bash commands' reach and its Read tool's
+  const box = JSON.parse(readFileSync(join(rig.data, 'claude-settings-sandbox.json'), 'utf8'))
+  assert.deepEqual(box.sandbox.filesystem.denyRead, [join(rig.data, 'daemon.json')])
+  assert.deepEqual(box.permissions.deny, [`Read(/${join(rig.data, 'daemon.json')})`])
+  assert.ok(box.permissions.allow.length > 0, 'its allow rules kept')
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'claude-settings.json'), 'utf8')).permissions.deny, undefined)
+  // the start ends: its token with it
+  await rig.rpc('tabClose', { id: tab })
+  await until(async () => (await post(mine, 'ping', {})).code === 401, 'its token refused')
+})

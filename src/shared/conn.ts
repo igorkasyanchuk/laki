@@ -39,12 +39,18 @@ export async function rpc<T = any>(method: string, params: any = {}, timeoutMs =
 async function post(method: string, params: any, timeoutMs: number) {
   const info = daemonInfo()
   if (!info) throw new Error('daemon not running')
-  const res = await fetch(`http://127.0.0.1:${info.port}/rpc`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${info.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ method, params }),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
+  const send = (token: string) =>
+    fetch(`http://127.0.0.1:${info.port}/rpc`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ method, params }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  // S12: in a Laki tab, with that tab's token (LAKI_TAB_TOKEN, this start's): the daemon knows the caller by it. One
+  // of a start that ended (its tab restarted under a process that lives on, another Laki's): the daemon's own, as before
+  const mine = process.env.LAKI_TAB_TOKEN
+  let res = await send(mine || info.token)
+  if (mine && res.status === 401) (await res.arrayBuffer(), (res = await send(info.token)))
   const body = await res.json()
   if (body.error) throw new Error(body.error)
   return body.result

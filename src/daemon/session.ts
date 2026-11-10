@@ -85,6 +85,7 @@ export class Session {
   readonly program = new ProgramRecords() // what it says through OSC 7501 (program.ts): this start's only
   onProgram: () => void = () => {} // its root record, once it has stood PROGRAM_SETTLE
   private settle?: ReturnType<typeof setTimeout>
+  tabToken = '' // S12: this start's token, LAKI_TAB_TOKEN in its env: a call with it is this tab's (core.ts tabOfToken)
   hookKey = '' // this start's key, LAKI_HOOK in its env: what its hooks carry (core.ts spawnTab, hookOk)
 
   constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number }) {

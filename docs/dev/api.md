@@ -433,33 +433,28 @@ Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote ac
 `recorded` (no private workspace, its tabs, nor a private project); `whoCalls` looks the caller of `state` up only
 while that mode hides something.
 
-### Design: per-tab tokens (S12, not built)
+### Per-tab tokens (S12)
 
-A proposal, for the maintainer's OK before any code. Today `whoCalls` names a caller by its socket's process (`peerOf`);
-its own ponytail note says a process that leaves its tab's tree (setsid, launchctl, tmux) counts as you. A token per tab
-makes the caller a fact the daemon holds instead of something it looks up.
+`whoCalls` names a caller by its socket's process (`peerOf`); a process that leaves its tab's tree (setsid, launchctl,
+tmux) used to count as you. A token per tab makes an agent's caller a fact the daemon holds.
 
-- **The token.** `spawnTab` makes 32 random bytes per start, as it does `LAKI_HOOK`, and puts it in the tab's
-  environment as `LAKI_TAB_TOKEN`. The daemon keeps `token → { tab, start }` in memory only. A restart of the tab makes
-  a new one; the old one dies with its session.
-- **Who sends it.** `src/shared/conn.ts` `rpc` sends `Authorization: Bearer <LAKI_TAB_TOKEN>` when the variable is set,
-  else daemon.json's token as now; `laki mcp` and `laki hook` the same (the hook's key folds into it).
-- **What the daemon does.** `tokenOk` accepts the main token (the app's window, your own terminal, a cron job) or a
-  live tab token. With a tab token the caller is that tab for every method: `from`/`caller` filled, `agentNo` and
-  `boxNo` applied, no `FROM` list needed to opt a method in. The main token from a process found in a tab (`peerOf`)
-  stays an agent's, as today, so reading daemon.json gains nothing.
-- **The sandbox.** daemon.json is 0600 in the data folder. Claude's and codex's sandboxes allow reads outside the
-  worktree unless told otherwise, so the profile must deny reads of `<data>/daemon.json` (claude: a `Read` deny rule in
-  the generated settings; codex: its read-only roots don't exclude it, so that case stays on `peerOf`). Without the
-  deny, a sandboxed agent that reads the file is still found by its process.
-- **Lifetime.** Resume and restart: a new token per start. Daemon restart: tokens are lost with the sessions (they die
-  with the daemon today), so nothing outlives it. Sleep/wake: a wake is a start.
-- **SSH hosts.** The tab's shell on the host has no route to the daemon (hooks come back as escape codes); no token
-  there. **Remote access** keeps its own token and origin, untouched.
-- **What breaks.** A script of yours that runs inside a Laki tab and expects to be you (for example one that calls
-  `laki rm` from an agent's shell) becomes that tab's agent, which is already the case by process today. A program
-  that copies its environment to a detached child now carries the tab with it, which is the point.
-- **Tests.** `test/caller.test.ts`: a detached child (setsid) with the tab token is the tab's; with daemon.json's token
-  and no tab ancestry it is you; a token of an ended start is refused; a sandboxed claude can't read daemon.json.
-- **Rollout.** Send the token first (daemon accepts both, behavior unchanged); then prefer it over `peerOf` when
-  present; `peerOf` stays as the fallback for the main token.
+- **The token.** `spawnTab` makes 32 random bytes per start (`LAKI_TAB_TOKEN` in the tab's environment, beside
+  `LAKI_HOOK`), kept on its `Session` (`tabToken`) in memory only: never in state.json, the view or a log. A restart of
+  the tab makes a new one; `core.tabOfToken` finds none once the start ended (exited, restarted, closed, a new daemon).
+- **Who sends it.** `src/shared/conn.ts` `rpc` (the CLI, `laki mcp`, `laki hook`) sends `Authorization: Bearer
+  <LAKI_TAB_TOKEN>` when the variable is set. A 401 with it (a start that ended, another Laki's tab) is sent again with
+  daemon.json's token: as before, by its process.
+- **What the daemon does.** `/rpc` takes the main token or a live tab token (never from remote access's page; the
+  WebSocket takes the main one only). With an **agent** tab's token the caller is that tab for every `FROM` and `CALLER`
+  method and for `hook`, with no lookup (no lsof or ps per connection). A **shell** tab's token only lets the call in:
+  who typed there is still looked up (`peerOf`, `treeAgent`), since an agent's `ps` can read a shell's environment. The
+  main token from a process found in a tab stays an agent's, so reading daemon.json gains nothing while it's in the tree.
+- **The sandbox.** A sandboxed claude's generated settings deny reads of `<data>/daemon.json`: its Bash commands
+  (`sandbox.filesystem.denyRead`) and its Read tool (a `Read(//…)` deny rule). Its `laki` calls run outside the sandbox
+  with the tab's token. ponytail: codex's sandbox reads everything, and an agent with no sandbox can still read the
+  file, drop its environment and leave its tree: then it's you, as before.
+- **SSH hosts** have no token (no CLI there reaches the daemon). **Remote access** keeps its own token and origin.
+- **Tests.** `test/caller.test.ts` (S12): a process in no tab with the tab's token is that agent; with daemon.json's
+  it's you; a wrong token and an ended start's are 401; the CLI with a stale one still works; the sandbox settings.
+- **Not built.** The hook's key folded into the token; `from` filled on methods outside `FROM`/`CALLER`; tokens kept
+  across a daemon restart (R6's pty host would need them in state.json).

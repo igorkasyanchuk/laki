@@ -177,7 +177,8 @@ SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as 
 - `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
 - an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
-- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`; `LAKI_HOOK` (a key per start, the Session's `hookKey`: `laki hook` sends it, and
+- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`; `LAKI_TAB_TOKEN` (S12, a token per start: its `laki` calls' bearer, by which the
+  daemon knows an agent tab's caller: `docs/dev/api.md`); `LAKI_HOOK` (a key per start, the Session's `hookKey`: `laki hook` sends it, and
   main.ts' `hookWho` takes a tab's state with its key only, else from a process of that tab or of none (`peerOf`: tests'
   direct `hook` calls), never another tab's; never from remote access, `REMOTE_NO`);
 - `LAKI_STORAGE_FOLDER` (`storageOf`; `STORAGE_NOTE`, the start note's and the laki skill's words: files, and a
