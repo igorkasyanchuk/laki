@@ -44,7 +44,10 @@ only when the last view's caps list its namespace, else the old one; the CLI's `
 - `wsUpdate { ws, how?: 'rebase' }` (F8): refused while another agent's turn is under way in it (git would move HEAD and files under it); a worktree's base merged into its branch when `git merge-tree --write-tree` says that's clean, or has no answer (an old git: a merge that then conflicts is aborted) (`{ merged }`), else its agent is told to merge it in and resolve the conflicts (`{ told }`, queued while it works); `rebase`: `git rebase <base>`, aborted and put back when it stops. No fetch, no push. `Stat` (the view's `stat`, `wsStat`) has `behind`, `ahead` and `clean` while the base (as this clone has it) is ahead: `rev-list --left-right --count base...HEAD`. An agent: its own workspace's only.
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `color` (`TAB_COLORS`, shared/types.ts)
   and `icon` (an `ICONS` name or icons.ts `emojiOf`'s emoji): '' (a color's `none` too) clears one, anything else is
-  refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; `notes`: the user's Markdown, the
+  refused before any change; the project's ⋯ › *Color* and *Icon…*, Settings' `ProjectSection`; F14's `allow`: its
+  auto-answer rules, the whole list, each through shared/ask.ts `rulePattern` (else refused whole), refused to agents
+  (`agentNo`) and remote access (`remoteNo`) and under a managed policy's `allowRules: false` (policy.ts; the view's
+  `managed.allowRules`); `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
   the project page's Memory, the whole list (the user's `MEMORY_MAX`, refused past it unless it had more; agents'
   `auto` ones, the newest `MEMORY_MAX`), likewise left out of MCP's state (MCP's `laki_memory` reads it); `seps`: the sidebar's groups (the app's word: a

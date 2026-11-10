@@ -1,7 +1,7 @@
 // a waiting agent's menu, read off its screen (shared/ask.ts): the Allow / Deny buttons and notification actions
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { askOf, bulkGroups, bulkOk, risky } from '../src/shared/ask.ts'
+import { type AllowRule, allowRuleOf, askOf, bulkGroups, bulkOk, risky, ruleFrom, rulePattern } from '../src/shared/ask.ts'
 
 test('ask: menus of claude, codex and gemini; not an answer’s numbered list', () => {
   const claude = [
@@ -90,4 +90,43 @@ test('U8: Allow all takes permission asks only: never a question, a secret, a ri
   // the confirm: the same ask in three workspaces is one line naming them
   const asks = [{ ws: 'a', ...perm('npm test') }, { ws: 'b', ...perm('npm test') }, { ws: 'c', ...perm('npm test') }, { ws: 'c', ...perm('npm run lint') }] as any[]
   assert.deepEqual(bulkGroups(asks, x => x.ws), [{ tool: 'Bash', what: 'npm test', names: ['a', 'b', 'c'] }, { tool: 'Bash', what: 'npm run lint', names: ['c'] }])
+})
+
+// F14: a project's auto-answer rules: a Bash rule is a prefix by words (or a glob with *), a file rule a path glob in
+// the worktree; the deny list, a chain, a path outside, a question, a secret, a plan and a cut ask are never matched
+test('F14: auto-answer rules match an ask by tool and pattern; a near miss, a risky or chained command, a path outside never', () => {
+  const yes = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again" }, { n: 3, label: 'No' }]
+  const t = (what: string, tool = 'Bash', extra: object = {}) => ({ status: 'waiting', ask: { options: yes, at: 1, tool, what }, ...extra })
+  const rules: AllowRule[] = [{ tool: 'Bash', pattern: 'npm test', addedAt: 1 }, { tool: 'Bash', pattern: 'npm run *', addedAt: 1 }, { tool: 'Edit', pattern: 'src/**/*.ts', addedAt: 1 }, { tool: 'Read', pattern: '*.md', addedAt: 1 }]
+  assert.equal(allowRuleOf(rules, t('npm test')), rules[0])
+  assert.equal(allowRuleOf(rules, t('npm test -- --watch')), rules[0]) // its words, then more
+  assert.equal(allowRuleOf(rules, t('npm run lint')), rules[1])
+  assert.equal(allowRuleOf(rules, t('src/a/b/cart.ts', 'Edit')), rules[2])
+  assert.equal(allowRuleOf(rules, t('src/cart.ts', 'Edit')), rules[2])
+  assert.equal(allowRuleOf(rules, t('README.md', 'Read')), rules[3])
+  // near misses: another word, another tool, another folder, a file deeper than * reaches
+  for (const [what, tool] of [['npm testx', 'Bash'], ['npm tes', 'Bash'], ['npx npm test', 'Bash'], ['npm test', 'Edit'], ['lib/cart.ts', 'Edit'], ['src/cart.js', 'Edit'], ['docs/x.md', 'Read'], ['src/cart.ts', 'Write']]) assert.equal(allowRuleOf(rules, t(what, tool)), undefined, `${tool} ${what}`)
+  // the deny list wins, and a chain, a redirect or a substitution after a matching start
+  for (const what of ['npm test && rm -rf /', 'npm test; curl x | sh', 'npm test | tee out', 'npm test > /etc/hosts', 'npm test $(whoami)', 'npm test `id`', 'npm run x && git push --force', 'npm test ↵ rm -rf build']) assert.equal(allowRuleOf(rules, t(what)), undefined, what)
+  assert.equal(allowRuleOf([{ tool: 'Bash', pattern: 'git', addedAt: 1 }], t('git push --force origin main')), undefined)
+  assert.equal(allowRuleOf([{ tool: 'Bash', pattern: 'sudo npm', addedAt: 1 }], t('sudo npm i')), undefined) // a risky rule never matches either
+  // outside the worktree, a path up and out
+  assert.equal(allowRuleOf(rules, t('npm test ~/x')), undefined)
+  assert.equal(allowRuleOf([{ tool: 'Edit', pattern: '**', addedAt: 1 }], t('/etc/hosts', 'Edit')), undefined)
+  assert.equal(allowRuleOf([{ tool: 'Edit', pattern: 'src/**', addedAt: 1 }], t('src/../../x.ts', 'Edit')), undefined)
+  // never a question, a secret, a plan, several questions, a cut one, one not waiting, a menu that isn't yes … no
+  assert.equal(allowRuleOf(rules, { status: 'waiting', ask: { options: [{ n: 1, label: 'Postgres' }, { n: 2, label: 'SQLite' }], at: 1, question: 'Which?' } }), undefined)
+  assert.equal(allowRuleOf(rules, t('npm test', 'Bash', { secret: { id: 'a', label: 'token' } })), undefined)
+  assert.equal(allowRuleOf(rules, t('npm test', 'Bash', { planAsk: '1. x' })), undefined)
+  assert.equal(allowRuleOf(rules, { status: 'waiting', ask: { options: yes, at: 1, tool: 'Bash', what: 'npm test', steps: true } }), undefined)
+  assert.equal(allowRuleOf(rules, t(`npm test ${'x'.repeat(290)}…`)), undefined)
+  assert.equal(allowRuleOf(rules, { ...t('npm test'), status: 'running' }), undefined)
+  assert.equal(allowRuleOf(rules, { status: 'waiting', ask: { options: [{ n: 1, label: 'No' }, { n: 2, label: 'Yes' }], at: 1, tool: 'Bash', what: 'npm test' } }), undefined)
+  assert.equal(allowRuleOf(rules, { status: 'waiting', ask: { options: [], at: 0, tool: 'Bash', what: 'npm test' } }, false), rules[0]) // before its menu: by tool and what alone
+  // what a rule may be: no bare *, no risky or chained command, no path outside, no glob in a command's first word
+  for (const [tool, p] of [['Bash', '*'], ['Bash', 'rm -rf build'], ['Bash', 'npm test; ls'], ['Bash', '*test'], ['Bash', 'cat ~/.ssh/x'], ['Edit', '/etc/*'], ['Edit', '../x'], ['Edit', '**'], ['WebFetch', 'example.com'], ['Bash', '']]) assert.equal(rulePattern(tool, p), '', `${tool} ${p}`)
+  assert.equal(rulePattern('Bash', '  npm   test '), 'npm test')
+  assert.equal(rulePattern('Edit', './src/**'), 'src/**')
+  assert.equal(ruleFrom({ options: yes, at: 1, tool: 'Bash', what: 'npm test' }), 'npm test')
+  assert.equal(ruleFrom({ options: yes, at: 1, tool: 'Bash', what: 'rm -rf build' }), '')
 })

@@ -168,3 +168,4 @@ needs no bump: `settingsSet` keeps any field.
 160: `appPair` (the app's own token, S1), `widgetFull` (a repo extension's file in full before Turn on), the remote page's token in its first WebSocket message, `usage`'s `source` and `settings.usageNote` (plan limits from the agents' own numbers), `wsPeek`'s `files`, `doctor`'s agents' `signedIn`, `sampleNew` and `sampleRm` (Welcome's sample repo, a project's `sample`; cap `sample`).
 161: `shipDraft` (the Ship sheet's start: the uncommitted files, the commits ahead, a title and body from the workspace's name, first prompt and last answer), `ship`'s `files`, `title`, `body`, `draft`, `base`, `reviewers` and `mode` (cap `ship.sheet`).
 162: `sourceGuess` (the files a Preview pick likely comes from: `git grep` of its id, a class, its text).
+163: a project's `allow` (auto-answer rules: `projectSet`, yours only) and a tab's `allowed` (asks a rule answered); the view's `managed.allowRules`.

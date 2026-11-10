@@ -1,7 +1,7 @@
 import { unloadStep } from '../../shared/browserBudget'
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { aiOn, creatorOf, neverAsks, PERMS, veiled, type TurnKept, type Agent, flowsOn as flowsOnIn, specsOn as specsOnIn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type ScriptRun, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView, type ActionFile, type Blame, type Stat } from '../../shared/types'
-import { alwaysOf, diffCounts, optLabel, permVerb } from '../../shared/ask'
+import { alwaysOf, diffCounts, optLabel, permVerb, ruleFrom } from '../../shared/ask'
 import { parseAt, stamp } from '../../shared/when'
 import type { UpdateState } from '../../shared/update'
 import { api, bridge, daemonBase, reportView, type Msg, notify, setQuiet, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -2165,6 +2165,18 @@ export function App() {
         .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === ed && !where.file ? '⌘E' : undefined, run: () => openIn(a.id, where) })))(editorOf(projectOf(where)))
   // typed into an agent's prompt, unsent: the focused one if it's this workspace's, else its first live one; then its
   // pane gets the keys
+  // F14: Always allow in this project (the ask bar's, the Reader's): its command or path as a rule of the project's, as
+  // you edit it, then this ask answered Allow
+  const alwaysAllow = async (t: TabView) => {
+    const p = view?.projects.find(x => x.id === view.workspaces.find(w => w.id === t.workspace)?.project)
+    const a = t.ask
+    const first = a?.options[0]
+    if (!p || !a?.tool || !first) return
+    const pattern = await askText(`Always allow ${a.tool} in ${p.name}?`, { text: a.tool === 'Bash' ? 'Any agent here running a command that starts with this (or matches its *) is allowed without asking. Never a risky command (rm -rf, sudo, a force push…), one chained with ; && | or one outside the worktree. Edit or remove it in Settings › the project.' : 'Any agent here doing this to a path that matches it (* and ** as in a glob) is allowed without asking, inside the worktree only. Edit or remove it in Settings › the project.', value: ruleFrom(a), ok: 'Always allow' })
+    if (!pattern?.trim()) return
+    await call('projectSet', { id: p.id, allow: [...(p.allow ?? []), { tool: a.tool, pattern: pattern.trim(), addedAt: Date.now() }] })
+    await call('answer', { tab: t.id, n: first.n, label: first.label }).catch(() => {})
+  }
   const intoAgent = (wsId: string, text: string) => {
     const live = view?.tabs.filter(t => t.workspace === wsId && t.kind === 'agent' && t.status !== 'exited') ?? []
     const to = live.find(t => t.id === tab?.id) ?? live[0]
@@ -2759,6 +2771,7 @@ export function App() {
       selectTab(sh)
     },
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
+    ...(!view?.managed?.allowRules && { alwaysAllow: t => void alwaysAllow(t).catch(() => {}) }),
     answer: (tab, n, label) => void call('answer', { tab, n, label }).catch(() => {}), // label: a menu changed meanwhile (the next of several questions) isn't answered by it (call's toast says so)
     review: () => ((turnNext.on = true), window.dispatchEvent(new CustomEvent('laki-scope', { detail: 'turn' })), showPanel('changes')), // Changes open already: the event; else turnNext as it mounts
     undo: t =>
@@ -3789,6 +3802,11 @@ export function App() {
                 </button>
               )
             })}
+            {!view.managed?.allowRules && ruleFrom(tab.ask) && (
+              <button className="link small" data-tip="A rule of the project's: the same ask from any agent here is answered Allow (Settings › the project › Auto-answer rules)" onClick={() => void alwaysAllow(tab).catch(() => {})}>
+                Always allow here
+              </button>
+            )}
           </div>
           )}</AskWrap>
         )}

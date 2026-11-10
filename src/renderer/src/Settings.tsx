@@ -24,6 +24,7 @@ import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
 import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
+import type { AllowRule } from '../../shared/ask'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, type AiApi, AiSection, type SkillApi, SkillSection, VoiceSection } from './SettingsAgents'
 import { type RemoteApi, RemoteSection, type SimApi, SimSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
@@ -751,6 +752,7 @@ export function SettingsPage(p: {
   onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown
+  onAllowProject?: (id: string, allow: AllowRule[]) => Promise<unknown> // F14: a project's auto-answer rules (none under a policy that turns them off)
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
@@ -1182,6 +1184,7 @@ export function SettingsPage(p: {
               onGlobal={openSec}
               onMemory={p.onMemory && (() => p.onMemory!(project.id))}
               onSave={o => p.onSaveProject?.(project.id, o)}
+              onAllow={p.onAllowProject && (a => p.onAllowProject!(project.id, a))}
             />
           )}
           {on('git') && (

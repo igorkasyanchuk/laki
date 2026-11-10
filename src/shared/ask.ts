@@ -195,3 +195,41 @@ export function bulkGroups<T extends { ask?: Ask }>(list: T[], name: (x: T) => s
   }
   return [...m.values()]
 }
+
+// ---------- F14: auto-answer rules, per project and the same for every agent (project.allow): an ask a rule matches
+// is answered Allow as your click would. Only you add them (Settings › the project, a card's Always allow in this
+// project); never agents or remote access (main.ts), none under a managed policy's allowRules: false
+export type AllowRule = { tool: string; pattern: string; addedAt: number; hits?: number }
+export const RULE_TOOLS = ['Bash', 'Edit', 'Write', 'MultiEdit', 'Read']
+const CHAIN = /[;&|`<>\n\\]|\$[({]|↵/ // more than one command, a redirect, a substitution, an escape: a prefix says nothing of the rest
+// a path glob as a pattern: ** any folders, * anything but a /, ? one character
+function globRe(g: string) {
+  let re = ''
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i]
+    if (c === '*' && g[i + 1] === '*') (re += g[i + 2] === '/' ? '(?:.*/)?' : '.*'), (i += g[i + 2] === '/' ? 2 : 1)
+    else re += c === '*' ? '[^/]*' : c === '?' ? '[^/]' : c.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  }
+  return new RegExp(`^${re}$`)
+}
+// a rule's pattern as Laki takes it: a command (a prefix, or a glob with *) for Bash, a path glob in the worktree for
+// the file tools; '' when it isn't one (refused: a risky or chained command, a bare *, a path out of the worktree)
+export function rulePattern(tool: string, pattern: unknown): string {
+  const p = typeof pattern === 'string' ? pattern.trim().replace(/\s+/g, tool === 'Bash' ? ' ' : '') : ''
+  if (!RULE_TOOLS.includes(tool) || !p || p.length > 300 || /^[*\s/.]*$/.test(p)) return ''
+  if (tool === 'Bash') return CHAIN.test(p) || risky(p) || OUTSIDE.test(p) || /^\S*\*/.test(p) ? '' : p // its command's first word spelled out
+  return OUTSIDE.test(p) || p.split('/').includes('..') ? '' : p.replace(/^\.\//, '')
+}
+// does this ask (a tab's, as the view has it) fall under a rule: its tool's, its command or path matched; never a
+// question, a secret, a plan, a cut one, several questions, a menu that isn't yes … no, a risky or chained command, or
+// anything outside the worktree (the deny list and those win over any rule). menu: false before its menu is drawn
+export function allowRuleOf(rules: AllowRule[] | undefined, t: { status?: string; ask?: Ask; secret?: unknown; planAsk?: unknown }, menu = true) {
+  const a = t.ask
+  if (!rules?.length || t.status !== 'waiting' || t.secret || t.planAsk || !a?.tool || !a.what || a.what.endsWith('…') || a.steps || !RULE_TOOLS.includes(a.tool)) return
+  if (menu && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return
+  const w = a.what.trim()
+  if (risky(w) || OUTSIDE.test(w) || (a.tool === 'Bash' ? CHAIN.test(w) : w.split('/').includes('..'))) return
+  return rules.find(r => r.tool === a.tool && (p => !!p && (a.tool === 'Bash' ? (p.includes('*') ? globRe(p).test(w) : w === p || w.startsWith(`${p} `)) : globRe(p).test(w)))(rulePattern(r.tool, r.pattern)))
+}
+// what Always allow in this project offers for an ask: its own command or path as the pattern, when one could be a rule
+export const ruleFrom = (a?: Ask) => (a?.tool && a.what && !a.what.endsWith('…') ? rulePattern(a.tool, a.what) : '')

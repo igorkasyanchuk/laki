@@ -8,7 +8,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
-import { type Perm, permOf } from '../shared/ask.ts'
+import { type AllowRule, allowRuleOf, type Perm, permOf, rulePattern } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -92,7 +92,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+export type Runtime = { allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string }; changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait; changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit, codex's input-messages); suggest: the next one, guessed (turns.ts, settings.nextPrompt) until a turn starts; compacting: claude's PreCompact, until its next hook; bg: since when its turn is paused on its own subagents (turn); hookAt: when the newest hook it took started (turn); later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 export const rt = new Map<string, Runtime>()
 export const ports = new Map<string, number[]>()
 export const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -677,7 +677,7 @@ export function view(): View {
     const menu = status === 'waiting' && s ? s.ask(shellAgents.has(t.id)) : undefined
     const ask = menu && r.perm ? { ...menu, ...r.perm } : menu
     // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
-    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
+    return { ...t, usedAt: undefined, bgTold: undefined, draft: undefined, ...(r.allowed && { allowed: r.allowed }), ...(t.draft && { drafted: true }), ...(uncovered(t) && { ungated: true }), ...(r.failed && status === 'idle' && { failed: r.failed }), ...(t.preset === 'claude' && status !== 'exited' && !asleep.has(t.id) && r.mode && { mode: r.mode, ...(r.modeUnknown && { modeUnknown: true }), bypassNo: bypassNo(t) }), ...((c => c && { card: c })(cards.get(t.id))), status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ...((n => n && { needAt: n })(status === 'waiting' ? r.waitAt : r.done && status === 'idle' ? r.idleAt : undefined)), ask, ...(asleep.has(t.id) && { asleep: true }), ...(queued.has(t.id) && !dormant.has(t.id) && { queued: true }), ...(r.progress && { progress: r.progress }), ...(r.compacting && status === 'running' && { compacting: true }), ...(r.suggest && status === 'idle' && { suggest: r.suggest }), ...(r.secret && { secret: r.secret }), ...(r.changes && { changes: r.changes }), ...(r.plan && state.settings?.livePlan !== false && { plan: r.plan }), ...(r.planAsk && status === 'waiting' && state.settings?.livePlan !== false && { planAsk: r.planAsk }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)), ...meterView(t) }
   })
   for (const t of tabs) (h => h && (t.hookless = h))(deafOf(t.id)) // hooks not heard (hookTick)
   // an archived project: none of it in the lists (sidebar, pickers, ⌘K, MCP's state), but Settings' Archived projects
@@ -1093,8 +1093,22 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown }) {
   const p = findProject(ref)
+  // F14: its auto-answer rules, the whole list as Settings has it (main.ts refuses it to agents and remote access);
+  // each one Laki takes (rulePattern: no risky or chained command, no path out of the worktree), else refused whole
+  if (o.allow !== undefined) {
+    if (policy()?.allowRules === false) throw new Error('auto-answer rules are turned off by your organization')
+    if (!Array.isArray(o.allow) || o.allow.length > 100) throw new Error('allow: a list of up to 100 rules')
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
+    const rules = o.allow.map((x: any) => {
+      const pattern = rulePattern(String(x?.tool ?? ''), x?.pattern)
+      if (!pattern) throw new Error(`${String(x?.tool ?? '?')} ${String(x?.pattern ?? '')}: not a rule Laki takes (a Bash command or a path in the worktree; never a risky or chained command, a bare *, or a path outside)`)
+      return { tool: String(x.tool), pattern, addedAt: ok(x.addedAt) && x.addedAt > 0 ? x.addedAt : Date.now(), ...(ok(x.hits) && x.hits > 0 && { hits: Math.floor(x.hits) }) }
+    })
+    p.allow = rules.length ? rules : undefined
+    log(`auto-answer rules of ${p.id}: ${rules.map(r => `${r.tool} ${r.pattern}`).join(', ') || 'none'}`)
+  }
   // its color (TAB_COLORS') and icon (an ICONS name or an emoji): '' (a color's none too) clears it; anything else is
   // refused before any change
   if (o.color !== undefined && !['', 'none', ...TAB_COLORS].includes(o.color)) throw new Error(`${o.color} isn't a color: one of ${TAB_COLORS.join(', ')}`)
@@ -1888,6 +1902,57 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   }
   widgetEvent('tab.new', { kind: tab.kind, ...causeRun(o) }, ws.id, tab, causeEv(o.agent, o))
   return tab
+}
+
+// a tab's wait, told: Do not disturb's log, the clients, the phone, then (its menu drawn by then) extensions' turn.waiting
+// and workflows' turnWaits
+function told(tab: Tab, r: Runtime, text: string) {
+  dndNote(tab, 'wait', text)
+  broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
+  phone(tab, 'waiting', text)
+  setTimeout(() => {
+    // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
+    const s = sessions.get(tab.id)
+    if (r.status !== 'waiting') return
+    const options = s && !s.exited ? s.ask()?.options : undefined
+    widgetEvent('turn.waiting', { question: text.slice(0, 2000), options, ...(r.perm && { tool: r.perm.tool, what: r.perm.what }) }, tab.workspace, tab)
+    for (const f of turnWaits)
+      try {
+        f(tab, { question: text.slice(0, 2000), options: options ?? [] })
+      } catch (e) {
+        log(`waits ${tab.id}: ${(e as Error).message}`)
+      }
+  }, 800)
+}
+// F14: the tab's project's auto-answer rules (none under a managed policy's allowRules: false)
+const rulesOf = (tab: Tab) => (policy()?.allowRules === false ? undefined : state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.allow)
+// F14: Allow, once its menu is drawn (3 s at most) and the ask still falls under the rule with it: the first choice, as
+// answer() picks it for your click; counted on the rule, in the workspace's log and on the tab (the Reader's line).
+// Anything else (no menu, another ask, a menu that isn't yes … no): told as any ask
+async function autoAllow(tab: Tab, rule: AllowRule, perm: Perm, tell: () => void) {
+  const r = rtOf(tab.id)
+  for (let i = 0; i < 15; i++) {
+    await new Promise(res => setTimeout(res, 200))
+    if (r.status !== 'waiting' || r.perm !== perm) return // answered meanwhile, or another ask now
+    const s = sessions.get(tab.id)
+    const a = s && !s.exited ? s.ask() : undefined
+    if (!a) continue
+    if (allowRuleOf(rulesOf(tab), { status: 'waiting', ask: { ...a, ...perm }, secret: r.secret, planAsk: r.planAsk }) !== rule) break
+    try {
+      await answer({ tab: tab.id, n: a.options[0].n, label: a.options[0].label })
+    } catch {
+      break
+    }
+    rule.hits = (rule.hits ?? 0) + 1
+    const said = `${rule.tool}: ${rule.pattern}`
+    r.allowed = [...(r.allowed ?? []), { at: Date.now(), tool: perm.tool, what: perm.what, rule: said }].slice(-20)
+    const line = `${tab.name}: allowed ${perm.tool} ${perm.what} by the project's rule (${said})`
+    wsLog({ id: tab.workspace }, line)
+    log(`auto-answer ${tab.workspace} ${line}`) // the audit: daemon.log always, the workspace's log in dev mode
+    save()
+    return changed()
+  }
+  if (r.status === 'waiting' && r.perm === perm) tell()
 }
 
 // answer: a choice of the menu a waiting agent shows (n, or the first or last), as its arrows and Enter would pick it;
@@ -3544,22 +3609,13 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       r.limit = undefined
       if (again) break
       const text = pl.message ?? (r.perm ? `Claude needs your permission to use ${r.perm.tool}` : '')
-      dndNote(tab, 'wait', text)
-      broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text })
-      phone(tab, 'waiting', text)
-      setTimeout(() => {
-        // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
-        const s = sessions.get(tab.id)
-        if (r.status !== 'waiting') return
-        const options = s && !s.exited ? s.ask()?.options : undefined
-        widgetEvent('turn.waiting', { question: text.slice(0, 2000), options, ...(r.perm && { tool: r.perm.tool, what: r.perm.what }) }, tab.workspace, tab)
-        for (const f of turnWaits)
-          try {
-            f(tab, { question: text.slice(0, 2000), options: options ?? [] })
-          } catch (e) {
-            log(`waits ${tab.id}: ${(e as Error).message}`)
-          }
-      }, 800)
+      // F14: an ask a project rule allows is answered as your click would, told to no one; one it can't answer is told
+      const rule = pl.hook_event_name === 'PermissionRequest' && r.perm ? allowRuleOf(rulesOf(tab), { status: 'waiting', ask: { options: [], at: 0, ...r.perm }, secret: r.secret, planAsk: r.planAsk }, false) : undefined
+      if (rule && r.perm) {
+        autoAllow(tab, rule, r.perm, () => told(tab, r, text))
+        break
+      }
+      told(tab, r, text)
       break
     }
     case 'idle':

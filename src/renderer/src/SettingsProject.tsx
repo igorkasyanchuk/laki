@@ -7,6 +7,7 @@ import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templ
 import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
+import { type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
 
 const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
@@ -121,7 +122,7 @@ export function FolderField({ value, placeholder, label, onChange }: { value?: s
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[] }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Shell (a command)']]
@@ -292,6 +293,42 @@ export function ActionsField({ value = [], onChange, taken = [] }: { value?: Run
   )
 }
 
+// F14: a project's auto-answer rules: each one's tool, pattern and how often it answered; Remove; a new one checked
+// as the daemon checks it (rulePattern), which says why when it refuses one
+function AllowRules({ rules, onSave }: { rules: AllowRule[]; onSave: (allow: AllowRule[]) => Promise<unknown> }) {
+  const [tool, setTool] = useState('Bash')
+  const [pattern, setPattern] = useState('')
+  const [err, setErr] = useState('')
+  const save = (l: AllowRule[]) => onSave(l).then(() => (setErr(''), true), (e: Error) => (setErr(e.message), false))
+  const add = () => rulePattern(tool, pattern) && void save([...rules, { tool, pattern: pattern.trim(), addedAt: Date.now() }]).then(ok => ok && setPattern(''))
+  return (
+    <Group title="Auto-answer rules" hint="Permission asks Laki answers Allow for every agent in this project, as your click would: a command that starts with a Bash rule (or matches its *), a path inside the worktree that matches a file rule (* and ** as in a glob). Never a risky command (rm -rf, sudo, a force push…), one chained with ; && |, a path outside the worktree, a question, a plan or a secret. Only you add them; each answer is in daemon.log">
+      <div className="setting-box">
+        {rules.map((r, i) => (
+          <div key={`${r.tool}:${r.pattern}`} className="switch-row allow-rule">
+            <span className="tag">{r.tool}</span>
+            <code className="grow">{r.pattern}</code>
+            <span className="muted small">{r.hits ? `${r.hits} answered` : 'not used yet'}</span>
+            <IconButton icon="x" title="Remove this rule" onClick={() => void save(rules.filter((_, j) => j !== i))} />
+          </div>
+        ))}
+        <div className="switch-row allow-rule">
+          <select value={tool} aria-label="Tool" onChange={e => setTool(e.target.value)}>
+            {RULE_TOOLS.map(t => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+          <input className="mono grow" value={pattern} aria-label="Pattern" placeholder={tool === 'Bash' ? 'npm test' : 'src/**/*.ts'} onChange={e => (setPattern(e.target.value), setErr(''))} onKeyDown={e => e.key === 'Enter' && add()} />
+          <button type="button" disabled={!rulePattern(tool, pattern)} data-tip={pattern.trim() && !rulePattern(tool, pattern) ? 'Not one Laki takes: a risky or chained command, a bare *, or a path outside the worktree' : undefined} onClick={add}>
+            Add
+          </button>
+        </div>
+      </div>
+      {err && <div className="warn small">{err}</div>}
+    </Group>
+  )
+}
+
 export function ProjectSection(p: {
   project: ProjectInfo
   noNotes?: boolean // the project page: its own Notes tab has them
@@ -302,6 +339,7 @@ export function ProjectSection(p: {
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onMemory?: () => void // Settings' Memory row: the project page's Memory
+  onAllow?: (allow: AllowRule[]) => Promise<unknown> // F14: its auto-answer rules, the whole list (refused: the daemon says why)
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
 }) {
   const [name, setName] = useState(p.project.name)
@@ -376,6 +414,7 @@ export function ProjectSection(p: {
           </div>
         </Group>
       )}
+      {p.onAllow && <AllowRules rules={p.project.allow ?? []} onSave={p.onAllow} />}
       {!p.noNotes && (
         <Group title="Notes" hint="Markdown, yours: links, how to run it, who to ask. The project's ⋯ › Notes shows them; agents never see them">
           <textarea className="mono notes-field" rows={Math.min(16, Math.max(4, notes.split('\n').length + 1))} value={notes} aria-label="Notes" placeholder="# Links&#10;- Staging: https://…" onChange={e => setNotes(e.target.value)} />

@@ -6,6 +6,7 @@
 //   remote: false        nothing on the internet through Laki: remote access, tunnels (Expose to the world), shared tabs
 //   bypass: false        approvals required: no agent starts in a mode, or with args, that never ask (neverAsks)
 //   agents: [ids]        only these agents start (claude, codex, gemini, grok, opencode); a command tab that starts one too
+//   allowRules: false    no auto-answer rules (F14): none answers an ask, and none can be added or changed
 // The view's `managed` says what's locked (Settings' banner). ponytail: what's running isn't stopped (until it
 // restarts: checked as tabs are made and at each start, core's spawnTab)
 import { execFileSync } from 'node:child_process'
@@ -15,7 +16,7 @@ import { isAgent, neverAsks } from '../shared/types.ts'
 import { changed, log, save, state } from './core.ts'
 import { inRig } from './dir.ts'
 
-export type Policy = { settings?: Record<string, unknown>; remote?: false; bypass?: false; agents?: string[]; from: string }
+export type Policy = { settings?: Record<string, unknown>; remote?: false; bypass?: false; agents?: string[]; allowRules?: false; from: string }
 // LAKI_POLICY in the test rig only (dir.ts' inRig): read first, a file holding {} would cancel what an admin deployed
 const SOURCES = () => [inRig() && process.env.LAKI_POLICY, '/Library/Managed Preferences/dev.laki.app.plist', '/Library/Application Support/Laki/policy.json', '/etc/laki/policy.json'].filter((x): x is string => !!x)
 let now: Policy | undefined
@@ -30,7 +31,7 @@ function read(): Policy | undefined {
       if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('not an object')
       const settings = j.settings && typeof j.settings === 'object' && !Array.isArray(j.settings) ? (j.settings as Record<string, unknown>) : undefined
       const agents = Array.isArray(j.agents) ? j.agents.filter((a: unknown): a is string => typeof a === 'string') : undefined
-      return { from: f, ...(settings && { settings }), ...(j.remote === false && { remote: false as const }), ...(j.bypass === false && { bypass: false as const }), ...(agents && { agents }) }
+      return { from: f, ...(settings && { settings }), ...(j.remote === false && { remote: false as const }), ...(j.bypass === false && { bypass: false as const }), ...(j.allowRules === false && { allowRules: false as const }), ...(agents && { agents }) }
     } catch (e) {
       // a policy that doesn't read locks nothing: said once in daemon.log (an admin's typo shouldn't lock the user out)
       if (said !== `${f}:${(e as Error).message}`) log(`policy ${f} unreadable: ${(said = `${f}:${(e as Error).message}`).slice(f.length + 1)}`)
@@ -72,4 +73,4 @@ export function policyRemote(what = 'remote access') {
   if (now?.remote === false) throw new Error(`${what} is turned off by your organization`)
 }
 // the view's: what's locked, for Settings' banner
-export const managedView = () => now && { from: now.from, keys: Object.keys(now.settings ?? {}), ...(now.remote === false && { remote: false as const }), ...(now.bypass === false && { bypass: false as const }), ...(now.agents && { agents: now.agents }) }
+export const managedView = () => now && { from: now.from, keys: Object.keys(now.settings ?? {}), ...(now.remote === false && { remote: false as const }), ...(now.bypass === false && { bypass: false as const }), ...(now.agents && { agents: now.agents }), ...(now.allowRules === false && { allowRules: false as const }) }

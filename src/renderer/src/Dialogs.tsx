@@ -189,6 +189,7 @@ export function Pages({ app }: { app: AppCtx }) {
           onUnarchive={id => void call('projectArchive', { project: id, on: false }).then(() => done(`${view.archivedProjects?.find(x => x.id === id)?.name ?? 'The project'} is back`), () => {})}
           projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
           onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
+          onAllowProject={view.managed?.allowRules === false ? undefined : (id, allow) => call('projectSet', { id, allow })}
           onMemory={id => setDialog({ project: id, tab: 'memory' })}
           achievements={{ n: achN, of: achAll.length, hidden: achHidden.length, off: !!achKept.off, setOff: off => void achSet({ off }).catch(fail), unhide: () => void achSet({ hidden: [] }).catch(fail), open: () => setDialog('achievements') }}
           renameProjects

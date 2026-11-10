@@ -1475,6 +1475,11 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .web-body.sized .web-host { flex: none; transform-origin: top center; outline: 1px solid var(--line); }
 .web-view { flex: 1; display: flex; width: 100%; height: 100%; border: 0; }
 .web-shot { position: static; width: auto; }
+/* F14: Settings › the project's auto-answer rules */
+.allow-rule { display: flex; align-items: center; gap: var(--sp-4); }
+.allow-rule code { min-width: 0; overflow-wrap: anywhere; }
+.allow-rule input { flex: 1; }
+.rd-allowed { color: var(--done); }
 /* F5: Pick's composer, over the page by the element picked (SidePanel.tsx PickBox, pickAt) */
 .web-pick { position: absolute; z-index: 3; width: 340px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
 .web-pick-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }

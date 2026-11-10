@@ -609,7 +609,7 @@ const remoteNo = (method: string, p: any) =>
   method === 'tunnelStart' ||
   method === 'scheduleSet' ||
   (method === 'shareStart' && Number(p?.hours ?? 0) === 0) ||
-  (method === 'projectSet' && scriptsChange(p))
+  (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined)) // F14: a project's auto-answer rules: the Mac's own
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
@@ -787,6 +787,7 @@ function agentNo(method: string, p: any) {
   else if (method === 'updateIdle' && p.on !== false && core.agentCaller(p.caller) && (core.state.settings?.updateCheck === false || (core.state.settings?.updateDelay ?? 0) > 0)) throw new Error("an agent can't update Laki while Check for updates is off or an Update delay is set: it's the user's (ask them)") // its caller, not from (CALLER)
   else if (method === 'projectSet' && (p.config !== undefined || p.memory !== undefined)) notAgent(p, `change a project's ${p.config !== undefined ? 'scripts, env and settings' : 'memory list (laki memory add adds to it)'}`)
   else if ((method === 'wsSet' || method === 'projectSet') && p.private !== undefined) notAgent(p, 'change what Recording mode hides')
+  else if (method === 'projectSet' && p.allow !== undefined) notAgent(p, "change a project's auto-answer rules (what Laki allows for every agent: the user's, in Settings)")
   else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")

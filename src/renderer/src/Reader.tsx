@@ -16,7 +16,7 @@ import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
 import { historyKey, useComplete, usePromptHistory } from './PromptInput'
 import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, withMentions } from './text'
 import { sendIs } from '../../shared/keys'
-import { optLabel } from '../../shared/ask'
+import { optLabel, ruleFrom } from '../../shared/ask'
 import { planNow } from '../../shared/todos'
 import { CLAUDE_MODES, HIDDEN, type TabView } from '../../shared/types'
 
@@ -26,7 +26,7 @@ type BgTask = { id: string; kind: 'agent' | 'shell'; name: string; out?: string 
 type BgOut = { text: string; size: number; cut?: boolean }
 // an MCP App (the daemon's mcpApps.ts): a tool call's app, under the said line it's in (at); src: its page on the daemon
 type App = { id: string; at: number; server: string; tool: string; src: string; input: unknown; result?: unknown; error?: boolean }
-export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string) => unknown } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
+export type ReaderApi = { dismiss: (tab: string) => Promise<unknown>; setMode: (tab: string, mode: string) => Promise<unknown>; draft: (tab: string, text?: string) => Promise<{ text?: string }>; keys?: (tab: string, data: string) => void; read: (tab: string, v?: number) => Promise<{ none?: boolean; v?: number; said?: Said[]; bg?: BgTask[]; apps?: App[] }>; bgOutput?: (tab: string, id: string) => Promise<BgOut>; appCall?: (tab: string, id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number, label: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void; mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string) => unknown } // review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell block's command typed into the workspace's terminal
 
 // the agents whose chats Laki reads (meters.ts' tailOf)
 export const readable = (t?: TabView) => !!t && t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
@@ -209,6 +209,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         <summary>
           {(n => `${n} ${n === 1 ? 'step' : 'steps'}`)(x.text.split('\n').length)}
           {x.fail ? ` · ${x.fail} failed` : ''} · {x.text.split('\n').at(-1)}
+          {(a => a.length > 0 && <span className="rd-allowed" data-tip={a.map(r => `${r.tool} ${r.what}: allowed by the project's rule ${r.rule}`).join('\n')}> · {a.length} allowed by rule</span>)((tab.allowed ?? []).filter(r => x.text.includes(r.what)))}
         </summary>
         <pre>{linkify(x.text)}</pre>
       </details>
@@ -301,6 +302,11 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
                 {o.n}. {optLabel(tab.ask!, o)}
               </button>
             ))}
+            {api.alwaysAllow && ruleFrom(tab.ask) && (
+              <button type="button" className="link small" data-tip="A rule of the project's: the same ask from any agent here is answered Allow (Settings › the project › Auto-answer rules)" onClick={() => api.alwaysAllow!(tab)}>
+                Always allow in this project
+              </button>
+            )}
           </div>
         </div>
       ) : (

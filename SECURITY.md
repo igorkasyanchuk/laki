@@ -47,6 +47,18 @@ Out of scope:
 - an agent doing what its own permission mode allows;
 - a repo's `.laki.json`, workflows and extensions after you trust (allow) them.
 
+### Auto-answer rules
+
+A project's auto-answer rules (Settings › the project, or *Always allow in this project* on an ask's card) answer a
+matching permission ask Allow for every agent there, the way your click would. Only you can add or change them: an
+agent's call and remote access's page are refused, and a managed policy's `"allowRules": false` turns them off. A Bash
+rule matches a command that starts with its words (or fits its `*`); a file rule (Edit, Write, MultiEdit, Read) a path
+glob inside the worktree. A fixed list wins over any rule: a command that deletes, force pushes, rewrites history, runs
+as root or pipes the web into a shell, one chained with `;`, `&&`, `|`, a redirect or a substitution, a path outside
+the worktree, a question, a plan to approve, a secret and an ask cut short are always asked. Each answer is in
+`daemon.log` with its rule. A rule is only as narrow as you write it: `npm test` lets an agent run whatever the
+project's test script is, which the agent can edit.
+
 ## Known limits
 
 - Any program running as your user can read daemon.json's token (`ponytail:` in `src/daemon/main.ts`). A process an

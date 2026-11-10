@@ -286,3 +286,34 @@ test("S7: an agent's file in a browser is refused; its tunnel asks (a no leaves 
   await rig.rpc('tunnelStop', { ws: ws.id, port: 5173 })
   app.close()
 })
+
+// F14: a project's auto-answer rules are the user's: an agent can't add or change one; a matching ask is answered Allow
+// as the user's click would (counted on the rule, said on the tab), a near miss and a risky command stay asked
+test("F14: an agent can't add an auto-answer rule; a matching ask is answered, a near miss and the deny list aren't", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id))
+  await until(async () => /> $/m.test(await rig.screen(tab.id)), 'claude up')
+  const from = { ws: ws.id, tab: tab.id }
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, allow: [{ tool: 'Bash', pattern: 'npm test' }], from }), /an agent can't change a project's auto-answer rules/)
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, allow: [{ tool: 'Bash', pattern: 'rm -rf build' }] }), /not a rule Laki takes/)
+  await rig.rpc('projectSet', { id: p.id, allow: [{ tool: 'Bash', pattern: 'npm test' }, { tool: 'Bash', pattern: 'git' }] })
+  const now = async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)
+  // npm test: answered with Yes, no one asked
+  await rig.rpc('send', { target: tab.id, text: 'perm bash :: npm test -- --watch' })
+  await until(async () => /picked: Yes\b/.test(await rig.screen(tab.id)), 'answered Yes by the rule', 15000)
+  const after = await until(async () => (t => t.allowed?.length && t)(await now()), 'the tab says so')
+  assert.deepEqual(after.allowed.map((a: any) => [a.tool, a.what, a.rule]), [['Bash', 'npm test -- --watch', 'Bash: npm test']])
+  assert.equal((await rig.rpc('state')).projects.find((x: any) => x.id === p.id).allow[0].hits, 1)
+  // a near miss and a risky command under a matching rule (git …): asked as ever
+  for (const cmd of ['npm testx', 'git push --force origin main']) {
+    await rig.rpc('send', { target: tab.id, text: `perm bash :: ${cmd}` })
+    await until(async () => (t => t.status === 'waiting' && t.ask?.what === cmd)(await now()), `${cmd} asked`)
+    await new Promise(r => setTimeout(r, 1500)) // past the rule's wait for the menu
+    assert.equal((await now()).status, 'waiting', cmd)
+    await rig.rpc('answer', { tab: tab.id, pick: 'last' })
+    await until(async () => (await now()).status !== 'waiting', 'answered No')
+  }
+  assert.equal((await now()).allowed.length, 1)
+})

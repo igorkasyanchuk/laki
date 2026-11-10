@@ -289,6 +289,15 @@ selected workspace's PR is in the status bar.
   question, a secret, a command that deletes, force pushes, rewrites history, runs as root or pipes the web into a
   shell, one cut short, or (unless the tab's sandbox is on) one that touches a path outside the worktree; those stay
   on their cards. ⇧A, with a card focused, is Allow all (Settings › Keys).
+- **Auto-answer rules**: *Always allow in this project* on a permission ask's card (the ask bar's *Always allow here*,
+  the Reader's) turns its command or path into a rule of the project's, which you can edit first; from then on the
+  same ask from any agent there (Claude Code's permission asks) is answered Allow as your click would, no one
+  notified. A Bash rule matches a command that starts with its words (`npm test` takes `npm test -- --watch`, not
+  `npm testx`) or fits its `*` (`npm run *`); a file rule (Edit, Write, MultiEdit, Read) is a path glob inside the
+  worktree (`src/**/*.ts`, `*.md`). Never answered by a rule: a risky command (rm -rf, sudo, a force push…), one chained
+  with `;`, `&&` or `|`, a redirect or `$(…)`, a path outside the worktree, a question, a plan or a secret. Settings ›
+  the project › *Auto-answer rules* lists them with how often each answered, removes and adds them; the Reader says
+  *allowed by rule* on the steps they answered, and `daemon.log` has each. Agents and remote access can't change them.
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message

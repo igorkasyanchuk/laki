@@ -243,7 +243,7 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 |---|---|
 | SessionStart | records the resume id |
 | UserPromptSubmit, Pre/PostToolUse | running |
-| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule, an Edit's, MultiEdit's or Write's change: `permDiff`, a Write's file read first only inside its workspace, `priorOf`): prints nothing, so claude asks in its own menu |
+| PermissionRequest | waiting, and the tab's `perm` (the tool, what it touches, the rule, an Edit's, MultiEdit's or Write's change: `permDiff`, a Write's file read first only inside its workspace, `priorOf`): prints nothing, so claude asks in its own menu. F14: one a project rule matches (`project.allow`, shared/ask.ts `allowRuleOf` by tool and what) isn't told (`told`: Do not disturb, clients, phone, turn.waiting); core's `autoAllow` waits up to 3 s for its menu, checks it again with the menu (yes first, no last), then `answer`s the first choice, counts `hits`, logs it (daemon.log, the workspace's) and keeps it on the tab (`allowed`, the last 20: the Reader's *allowed by rule*); one it can't answer is told as any |
 | Notification (permission prompts) | waiting |
 | Stop | idle, plus the last answer, then delivers the next queued message; with `background_tasks` of agents still going (subagent, workflow, teammate: `bgAgents`), running instead (`Runtime.bg`: no ●, no done notice, no turn's end; sweepRunning leaves it `BG_MAX`): they report back as a new turn |
 | StopFailure | usage limit (`limits.ts`) |
