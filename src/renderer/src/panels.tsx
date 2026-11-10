@@ -582,8 +582,8 @@ export type NewWsParams = { project: string; base?: string; preset: string; cmd?
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
-type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'perm' | 'fast' | 'sandbox' | 'place'>> & { tpl?: string; agent?: string } // not the base: the repo's main one each time, unless picked
-const LAST_NEW = 'laki.newWs'
+export type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'perm' | 'fast' | 'sandbox' | 'place'>> & { tpl?: string; agent?: string } // not the base: the repo's main one each time, unless picked
+export const LAST_NEW = 'laki.newWs'
 // what the page held as it closed without making it (Esc, ✕, a click in the sidebar): back as it opens again, until it's
 // made or cleared
 const DRAFT = 'laki.newDraft'

@@ -360,7 +360,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   `floater-menu-at`; keys 1-5, arrows, ⏎, Esc; closed on blur, the bar told by `floater-menu`: a press on the + while
   open, or just after a blur closed it (`menuShut`), closes it); its picks are `floater-act` (`new`, `ai`: `aiWin`, `area`: `screenshot`,
   `screen`: `screenPick`, with more than one screen a menu of `screenItems` at the pointer, as the menu bar's submenu; `mic` from the menu: `floater-voice`, the bar opens `#voice`, the stack's opens it itself); New task is
-  `new` (main's `newWsWin`, also the menu bar's *New Workspace…*: the renderer's `?window=new`, `NewWindow.tsx`, the new-workspace page alone in a `type: 'panel'`
+  `new` (Q1: main's `quickWin`, the quick bar below; its *More…* is `quick-more`: `newWsWin`, the renderer's `?window=new`, `NewWindow.tsx`, the new-workspace page alone in a `type: 'panel'`
   window, compact (`.new-window` in styles.css; as tall as the page: `new-fit`, a `ResizeObserver` on the form), pinned over every app and Space, focused without bringing Laki's window forward (`own` leaves it out, so the
   bubbles stay); one at a time, a voice prompt to it is `new-prompt`; it closes itself (`window.close()`) once `wsNew`
   answers, or on Esc), Say it opens `#voice`; a click on a circle is `floater-open`: `show(tab)`; a drag from
@@ -834,3 +834,17 @@ leaves `nativeTheme.themeSource` at `system` (forced, the page's `prefers-color-
 ponytail: the bubbles, the cards on screen and the Dock icon keep what they had.
 
 Long lists (R10): `.sp-change` (a file's diff in Changes and Review), `.rd-agent` (an answer in the Reader) and `.board-card` have `content-visibility: auto` with `contain-intrinsic-block-size: auto <n>px`: off screen they're neither laid out nor painted, and keep the height they had once shown. They contain their paint, so nothing of theirs may hang outside their box; code that measures them asks the block itself, not a child inside one that may be skipped (FullReview's `spy`).
+
+### The quick bar (Q1)
+
+Main's `quickWin` (its global hotkey `quick`: `bindKey`, Settings' `quickOn` and `quickKey`, off until turned on,
+`QUICK_KEY` ⌥Space suggested, `quick-hotkey` IPC; the menu bar's *New Task…*; the bubbles' New task; `laki://quick`,
+which main opens itself): `panelWin({ window: 'quick' }, …, down 0.16)`, a `type: 'panel'` near the top of the screen
+with the mouse, one at a time. `NewWindow.tsx` `QuickWindow`: `targetsOf(view)`: a new workspace in `LAST_NEW`'s project
+(else the first), each agent tab that waits or is idle (`send` with `whenIdle`, `agent`), Laki AI when `aiOn`; Tab or ⇧Tab
+in the box, or `@word ` at the start, turns the chip; `PromptInput` (⏎ sends: `wsNew` with the last picks when it's
+the same project, `send`, `aiAsk`), then `window.close()`, so the app you were in keeps the keyboard; a failure leaves
+the text and says why. Its mic (⌘⇧M: cloud voice, else macOS dictation) and screenshot (⌘⇧S: `quick-shot`, main's
+`screenshot` with the bar hidden; its PNG into the box as `PromptInput`'s `shot`); *More…*: `quick-more`, the bar closed
+and `newWsWin(text)`. Its height follows the page (`quick-height`). Every IPC checks its sender (the quick window's
+webContents, `from(e, 'quick')`). ui-smoke's `quick-bar` step: the link, a line typed, Send, one more workspace.

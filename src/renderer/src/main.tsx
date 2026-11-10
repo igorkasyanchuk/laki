@@ -23,7 +23,7 @@ const MORE = ['Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 
 const w = new URLSearchParams(location.search).get('window') // main's new-workspace, AI and floating tab windows: the page alone
 // E8: each window loads only what it draws (the app window App, a floated one NewWindow.tsx), while the fonts load
 const page: Promise<ReactNode> = w
-  ? import('./NewWindow').then(m => (w === 'new' ? <m.NewWindow /> : w === 'ai' ? <><m.AiWindow /><FloatNotices /></> : w === 'tab' ? <><m.TabWindow /><FloatNotices /></> : w === 'sim' ? <><m.SimWindow /><FloatNotices /></> : null))
+  ? import('./NewWindow').then(m => (w === 'new' ? <m.NewWindow /> : w === 'ai' ? <><m.AiWindow /><FloatNotices /></> : w === 'tab' ? <><m.TabWindow /><FloatNotices /></> : w === 'sim' ? <><m.SimWindow /><FloatNotices /></> : w === 'quick' ? <m.QuickWindow /> : null))
   : import('./App').then(m => <m.App />)
 Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')))
   .catch(() => {})

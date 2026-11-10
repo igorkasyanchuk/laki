@@ -33,6 +33,10 @@ type Bridge = {
   hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
   keys?(over: Record<string, string>): void // Settings › Keys' (settings.keys): the menu bar's items show them, a Browsers page's ⌘T/⌘W follow them
   shotKey?(label: string | false): Promise<boolean> // Screenshot to Laki AI's ('' none; false: off, no menu bar item either)
+  quickKey?(label: string): Promise<boolean> // Q1: the quick bar's global keys ('' none)
+  quickMore?(text: string): void // the quick bar's More: the whole new-workspace page with its text
+  quickShot?(): Promise<string> // its screenshot button: a part of the screen ('' cancelled)
+  quickHeight?(h: number): void // its window as tall as the page
   update?(op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<UpdateState | null> // main's update.ts
   updateAuto?(on: boolean, days?: number): void // Settings' Check for updates (at launch, then every 4 hours) and Update delay
   onUpdate?(cb: (s: UpdateState) => void): () => void // its state as it changes; the function stops listening

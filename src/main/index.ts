@@ -26,7 +26,7 @@ const appPage = (url: string | undefined) => isAppPage(url, devOrigin)
 const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => senderOk({ type: e.sender.getType(), main: e.senderFrame === e.sender.mainFrame, url: e.senderFrame?.url }, devOrigin)
 // from the app window, or one of the app's other pages by name: new (the new-workspace window), ai, tab (a floated
 // tab: ?window=), voice (the bubbles' Say it); nothing else (a site in a webview, a frame, another window)
-type Page = 'new' | 'ai' | 'tab' | 'voice'
+type Page = 'new' | 'ai' | 'tab' | 'voice' | 'quick' // quick: the quick bar (Q1)
 const from = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent, ...pages: Page[]) =>
   fromApp(e) && ((!!win && e.sender === win.webContents) || pages.some(p => (p === 'voice' ? !!voice && e.sender === voice.webContents : pageIs(e.senderFrame?.url, p))))
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
@@ -65,6 +65,7 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
   const row = (id: string) => `[data-row="ws:${id}"]`
   const fakeLog = () => (f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))(join(process.env.HOME ?? '', 'fake.log'))
   const ws: Record<string, View['workspaces'][number]> = {}
+  let before = 0 // the quick bar's step: workspaces before it sends
   const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
   const checkout = () => join(ws.co.path, 'src/checkout.js')
   const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
@@ -94,6 +95,17 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     // V9: behind another app the accent's fills and the picked row go neutral (the status colors don't); then back
     ['inactive', async () => (await key('Escape')(), w.webContents.send('front', false)), () => js<boolean>("document.documentElement.classList.contains('away') && getComputedStyle(document.querySelector('.app')).getPropertyValue('--accent').trim() !== getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()")],
     ['active', async () => w.webContents.send('front', true), () => js<boolean>("!document.documentElement.classList.contains('away')")],
+    // Q1: the quick bar (its laki:// link), a line typed and sent: a new workspace in the demo's project, the bar gone
+    ['quick-bar', async () => {
+      before = (await rpc<View>('state')).workspaces.filter(x => !x.archived).length
+      openLink('laki://quick')
+      const q = <T>(code: string) => (quickW && !quickW.isDestroyed() ? (quickW.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => q<boolean>("!!document.querySelector('.quick-bar textarea') && !!document.querySelector('.quick-chip')?.textContent.includes('New workspace in')"), 'the quick bar')
+      await q(`(e => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(e, 'Add a dark mode toggle'); e.dispatchEvent(new Event('input', { bubbles: true })) })(document.querySelector('.quick-bar textarea'))`)
+      await nap(200)
+      if (quickW && !quickW.isDestroyed()) writeFileSync(join(dir, 'quick-bar-window.png'), (await quickW.webContents.capturePage()).toPNG()) // its own window: the main one's screenshot doesn't have it
+      await q("document.querySelector('.quick-bar button.primary').click()")
+    }, async () => (!quickW || quickW.isDestroyed()) && (await rpc<View>('state')).workspaces.filter(x => !x.archived).length === before + 1],
     // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
     ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back
@@ -251,6 +263,7 @@ if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
 // laki://… (Info.plist names the scheme): the renderer routes it; it only selects and opens pages, never creates
 const openLink = (url: string) => {
+  if (/^laki:\/\/quick\/?$/.test(url) && app.isReady()) return quickWin() // Q1: the quick bar, over the app you're in (it only opens: you type and send)
   if (linkReady && win) win.webContents.send('deep-link', url)
   else link = url
   if (app.isReady()) show()
@@ -614,9 +627,9 @@ function accelOf(label: string) {
   if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
   return accel(m)
 }
-type Key = 'open' | 'shot' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk)
-const keys: Record<Key, string> = { open: '', shot: '' } // what each holds
-const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show] } // what each asked for
+type Key = 'open' | 'shot' | 'quick' // open: Laki forward; shot: Screenshot to Laki AI (shotAsk); quick: the quick bar (Q1)
+const keys: Record<Key, string> = { open: '', shot: '', quick: '' } // what each holds
+const wants: Record<Key, [string, () => void]> = { open: ['', show], shot: ['', show], quick: ['', show] } // what each asked for
 let shotOn = false // Screenshot to Laki AI is on (Settings › General): the menu bar has it too
 function grab(which: Key) {
   const [a, fn] = wants[which]
@@ -631,13 +644,15 @@ function bindKey(which: Key, label: unknown, fn: () => void) {
   const a = typeof label === 'string' ? accelOf(label) : ''
   wants[which] = [a, fn]
   grab(which)
-  grab(which === 'open' ? 'shot' : 'open') // the keys the other one asked for may be free now
+  for (const k of Object.keys(keys) as Key[]) if (k !== which) grab(k) // the keys another one asked for may be free now
   trayMenu() // its items show the keys
   return a ? keys[which] === a : !label // false: another app (or the other hotkey) has them, or they can't be a global hotkey
 }
 ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label, () => (app.focus({ steal: true }), show(), earn('hotkey'))))
 // Screenshot to Laki AI's keys ('' none); false: it's off (no menu bar item either)
 ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label !== false), bindKey('shot', shotOn ? label : '', shotAsk)))
+// Q1: the quick bar's keys ('' none: off until set, Settings › Keys)
+ipcMain.handle('quick-hotkey', (e, label: unknown) => from(e) && bindKey('quick', label, () => quickWin()))
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // updates (./update.ts): its state to the app window as it changes. Installing quits for good: quitAndInstall emits
@@ -940,7 +955,7 @@ function trayMenu() {
     Menu.buildFromTemplate([
       ...trayTabs,
       ...(trayTabs.length ? [{ type: 'separator' as const }] : []),
-      { label: 'New Workspace…', click: () => newWsWin() }, // the bubbles' + window: over the app you're in
+      { label: 'New Task…', click: () => quickWin() }, // the quick bar (Q1), over the app you're in
       { label: 'Recording Mode', type: 'checkbox', checked: recording, click: () => void rpc('settingsSet', { recording: !recording }).catch(() => {}) }, // private workspaces hidden
       { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
       { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
@@ -1371,7 +1386,7 @@ ipcMain.on('floater-seen', (e, tab: string) => floater && e.sender === floater.w
 ipcMain.on('floater-act', (e, what: unknown) => {
   if (!(floater && e.sender === floater.webContents) && !(menu && e.sender === menu.webContents)) return
   menu?.close()
-  if (what === 'new') newWsWin()
+  if (what === 'new') quickWin() // New task: the quick bar (Q1); its More is the whole page
   else if (what === 'ai' && floats.ai) aiWin()
   else if (what === 'area') screenshot(true)
   else if (what === 'screen') screenPick()
@@ -1393,6 +1408,42 @@ function newWsWin(prompt?: string) {
   const w = (newWin = panelWin({ window: 'new', ...(prompt && { prompt }) }, 640, 340, { minWidth: 480, minHeight: 200 })) // then new-fit: as tall as the page
   w.on('closed', () => newWin === w && (newWin = null))
 }
+// Q1: the quick bar (?window=quick: NewWindow.tsx' QuickWindow), its global hotkey, the menu bar's and the bubbles' New
+// task: one line to a new workspace, an agent that waits or is idle, or Laki AI, in a panel near the top of the screen
+// with the mouse, over every app; one at a time. Sent, or Esc: it closes, and the app you were in has the keyboard again
+// (a panel never brought Laki forward). More: the whole new-workspace page with the text
+let quickW: BrowserWindow | null = null
+function quickWin(prompt?: string) {
+  if (quickW && !quickW.isDestroyed()) {
+    if (prompt) quickW.webContents.send('new-prompt', prompt)
+    return void (quickW.show(), quickW.focus())
+  }
+  const w = (quickW = panelWin({ window: 'quick', ...(prompt && { prompt }) }, 640, 132, { minWidth: 440, minHeight: 112, resizable: false }, 0.16))
+  w.on('closed', () => quickW === w && (quickW = null))
+}
+ipcMain.on('quick-more', (e, text: unknown) => {
+  if (!quickW || e.sender !== quickW.webContents) return
+  quickW.close()
+  newWsWin(typeof text === 'string' ? text.slice(0, 20000) : undefined)
+})
+// its screenshot button: a part of the screen, the bar out of the picture meanwhile; '' cancelled
+ipcMain.handle('quick-shot', e => {
+  const w = quickW
+  if (!w || e.sender !== w.webContents || !from(e, 'quick')) return ''
+  w.hide()
+  return new Promise<string>(done =>
+    screenshot(
+      true,
+      undefined,
+      png => (w.isDestroyed() || (w.show(), w.focus()), done(png)),
+      () => (w.isDestroyed() || (w.show(), w.focus()), done('')),
+    ),
+  )
+})
+ipcMain.on('quick-height', (e, h: unknown) => {
+  if (!quickW || quickW.isDestroyed() || e.sender !== quickW.webContents || typeof h !== 'number' || !Number.isFinite(h)) return
+  quickW.setContentSize(quickW.getContentSize()[0], Math.round(Math.min(Math.max(h, 100), 520)))
+})
 // the bubbles' Ask Laki AI: the AI page alone (?window=ai), a chat in a panel like the new-workspace one; one at a time
 let aiW: BrowserWindow | null = null
 let aiReady = false // its page listens for screenshots (ai-shot-ready)
@@ -1453,13 +1504,13 @@ ipcMain.on('sim-float', (e, device: unknown, ws: unknown, on: unknown) => {
 })
 
 // a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the
-// mouse is on, a third down
-function panelWin(query: Record<string, string>, width: number, height: number, more: BrowserWindowConstructorOptions) {
+// mouse is on, a third down (down: how far, of the room left)
+function panelWin(query: Record<string, string>, width: number, height: number, more: BrowserWindowConstructorOptions, down = 1 / 3) {
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
   ;[width, height] = [Math.min(width, d.width - 40), Math.min(height, d.height - 40)]
   const w = new BrowserWindow({
     x: Math.round(d.x + (d.width - width) / 2),
-    y: Math.round(d.y + (d.height - height) / 3),
+    y: Math.round(d.y + (d.height - height) * down),
     width,
     height,
     ...more,

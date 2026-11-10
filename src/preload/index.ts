@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('laki', {
   keys: (over: Record<string, string>) => ipcRenderer.send('keys', over), // Settings › Keys' over shared/keys.ts' defaults: the menu shows them
   // Screenshot to Laki AI's ('' none; false: it's off); macOS only: main's screenshot is screencapture
   ...(process.platform === 'darwin' && { shotKey: (label: string | false): Promise<boolean> => ipcRenderer.invoke('shot-hotkey', label) }),
+  quickKey: (label: string): Promise<boolean> => ipcRenderer.invoke('quick-hotkey', label), // Q1: the quick bar's global keys ('' none)
+  quickMore: (text: string) => ipcRenderer.send('quick-more', text), // the quick bar's More: the whole new-workspace page with its text
+  quickShot: (): Promise<string> => ipcRenderer.invoke('quick-shot'), // its screenshot: a part of the screen, a PNG in base64 ('' cancelled)
+  quickHeight: (h: number) => ipcRenderer.send('quick-height', h), // as tall as its page
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
   update: (op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<object | null> => ipcRenderer.invoke('update', op),
   updateAuto: (on: boolean, days?: number) => ipcRenderer.send('update-auto', on, days),

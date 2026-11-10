@@ -14,7 +14,7 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, macApp, type Paint, paintKey, paintOf, preview, systemAccent, termTheme, themeFor, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
-import { ask, askText, cardOpen, HOTKEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, HOTKEY, QUICK_KEY, SHOT_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { cmdClash, cmdMap, cmdOthers, COMMANDS, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HOSTS } from './Usage'
@@ -232,6 +232,8 @@ export type AppSettings = Paint & {
   hotkey?: string // its keys (unset: HOTKEY; '': none)
   shotAsk?: boolean // Screenshot to Laki AI (on unless false)
   shotKey?: string // its keys (unset: SHOT_KEY; '': none)
+  quickOn?: boolean // Q1: the quick bar's global hotkey (unset: off)
+  quickKey?: string // its keys (unset: QUICK_KEY)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
   updateDelay?: number // a release is offered once it's this many days old (Update delay; unset: at once)
   recording?: boolean // not this page's (⌘K's, the menu bar's): App's onSave leaves it out, as it does modelEfforts
@@ -1076,6 +1078,18 @@ export function SettingsPage(p: {
           bind={k => bridge!.shotKey!(k)}
           onOn={shotAsk => set({ shotAsk })}
           onKeys={shotKey => set({ shotKey })}
+        />
+      )}
+      {bridge.quickKey && (
+        <HotkeyField
+          on={s.quickOn === true}
+          keys={s.quickKey ?? QUICK_KEY}
+          def={QUICK_KEY}
+          title="Quick bar"
+          hint="From any app: a line to type a task, to a new workspace in your last project, an agent that waits or is idle, or Laki AI (Tab changes where). ⏎ sends, Esc closes. The menu bar's and the bubbles' New task open it too."
+          bind={k => bridge!.quickKey!(k || '')}
+          onOn={quickOn => set({ quickOn })}
+          onKeys={quickKey => set({ quickKey })}
         />
       )}
     </Group>
@@ -2392,6 +2406,7 @@ export function SettingsPage(p: {
               others={[
                 ...(s.hotkeyOn !== false && s.hotkey !== '' ? ([[s.hotkey ?? HOTKEY, 'the global hotkey']] as [string, string][]) : []),
                 ...(s.shotAsk !== false && aiOn(s) && s.shotKey !== '' ? ([[s.shotKey ?? SHOT_KEY, 'Screenshot to Laki AI']] as [string, string][]) : []),
+                ...(s.quickOn === true && s.quickKey !== '' ? ([[s.quickKey ?? QUICK_KEY, 'the quick bar']] as [string, string][]) : []),
                 ...(s.pickerKey !== '' ? ([[s.pickerKey ?? PICKER_KEY, 'Pick an element (development mode)']] as [string, string][]) : []),
               ]}
               onChange={keys => set({ keys })}

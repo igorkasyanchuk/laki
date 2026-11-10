@@ -16,12 +16,13 @@ type Sec = { id: string; title: string; kind?: 'list' | 'pre'; items: Item[] }
 const GUIDE = `${REPO}/blob/main/docs/guide.md`
 
 // m: the keys in use (Settings › Keys); g: the global hotkeys in use ('' none or off)
-export type GlobalKeys = { open: string; shot: string }
+export type GlobalKeys = { open: string; shot: string; quick?: string }
 const keysOf = (m: KeyMap, g: GlobalKeys): [string, string][] => {
   const k = (id: KeyId) => keyShow(m[id]) || 'none'
   return [
     [keyShow(g.open) || 'none', 'from any app: bring Laki forward (Settings › Keys › Global hotkey)'],
     [keyShow(g.shot) || 'none', 'from any app: a part of the screen to Laki AI, the mic listening; the menu bar has it too (Settings › Keys › Global hotkey)'],
+    [keyShow(g.quick ?? '') || 'none', 'from any app: the quick bar, one line to a new workspace, an agent that waits or Laki AI (Tab changes where; Settings › Keys › Global hotkey)'],
     ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
     [k('newWs'), 'new workspace'],
     [`${k('newTab')} / ${k('closeTab')}`, 'new shell tab / close the tab (or the file in front in the preview); in a browser: a new page / close it'],

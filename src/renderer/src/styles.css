@@ -1931,6 +1931,15 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .new-window .page-body > .new-ws { max-width: none; margin: 0; gap: var(--sp-4); }
 .new-window .nw-composer textarea { min-height: 64px; height: 92px; resize: vertical; }
 .new-window .new-ws .nw-foot { margin-top: 0; }
+/* Q1: the quick bar (NewWindow.tsx QuickWindow): one line in a panel, its chip above */
+.quick-window, .quick-window body { background: var(--panel); }
+.quick-bar { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) var(--sp-3); -webkit-app-region: drag; }
+.quick-bar button, .quick-bar textarea, .quick-bar input, .quick-bar .menu { -webkit-app-region: no-drag; }
+.quick-head { display: flex; align-items: center; gap: var(--sp-2); }
+.quick-chip { display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--h-s); padding: 0 var(--sp-3); border-radius: var(--r-pill); background: var(--sel); color: var(--fg); font-size: var(--fs-2); max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-chip:disabled { opacity: 1; cursor: default; }
+.quick-more { height: var(--h-s); font-size: var(--fs-2); }
+.quick-bar textarea { min-height: 28px; max-height: 160px; font-size: var(--fs-4); }
 .schedules { display: flex; flex-direction: column; gap: 20px; }
 .schedules p { margin: 0; }
 .schedules section { display: flex; flex-direction: column; gap: var(--sp-4); }

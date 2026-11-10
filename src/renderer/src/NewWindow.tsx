@@ -3,29 +3,31 @@
 // workspace made, or Esc: it closes; the app's sidebar shows the new one. Its Ask Laki AI: the AI page, compact, in one
 // too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
 // window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
-import { useEffect, useState } from 'react'
-import { type ActionFile, veiled, type View, type WorkspaceView } from '../../shared/types'
+import { type KeyboardEvent, useEffect, useState } from 'react'
+import { type ActionFile, aiOn, veiled, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, daemonBase, openExternal, reportView } from './api'
 import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
-import { type Inserts, VoiceBar } from './PromptInput'
-import { NewWorkspace } from './panels'
+import { type Img, type Inserts, PromptInput, VoiceBar, withImages } from './PromptInput'
+import { LAST_NEW, type LastNew, NewWorkspace } from './panels'
 import { DeviceTab } from './SidePanel'
 import { FONT_SIZE, termLook } from './settingsBase'
 import { Term } from './Term'
 import { setSendKey } from '../../shared/keys'
 import { applyTheme, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
-import { ask, AskHost, askText, IconButton, load, Tips } from './ui'
+import { ask, AskHost, askText, Icon, IconButton, load, Tips } from './ui'
+import { cloudVoice, voiceStart } from './voice'
 import { imagesVia, insertMenus } from './Widgets'
 
 // no glass, no see-through sidebar: the window has no blur behind it
 const paint = (p: Paint) => applyTheme(p, true)
 // only in those windows: main.tsx imports this module in the app's too
 const which = new URLSearchParams(location.search).get('window')
-if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim') {
+if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim' || which === 'quick') {
   const last = load<string | Paint>('laki.theme', '') // the app's, until the daemon's settings arrive
   paint(typeof last === 'string' ? { theme: last } : last)
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
+  if (which === 'quick') document.documentElement.classList.add('quick-window') // the quick bar's: .quick-* rules
 }
 
 // the state, and the theme as it changes; an extension's or Laki AI's https pictures through the daemon's /img, as the
@@ -180,5 +182,136 @@ export function NewWindow() {
       <VoiceBar />
       <Tips />
     </>
+  )
+}
+
+// Q1: the quick bar (main's quickWin, ?window=quick): one line from any app, to where its chip says: a new workspace in
+// the project you last made one in (the new-workspace page's last picks), an agent that waits or is idle (send), or
+// Laki AI. Tab (⇧Tab) or "@word " at the start changes the chip; ⏎ sends and closes it (the app you were in has the
+// keyboard again); Esc closes; a failed send keeps the text. The mic and a screenshot (⌘⇧M, ⌘⇧S); More: the whole
+// new-workspace page with the text, its project, agent and template pickers
+type Target = { kind: 'new'; project: string; label: string } | { kind: 'send'; tab: string; label: string } | { kind: 'ai'; label: string }
+function targetsOf(view: View): Target[] {
+  const last = load<LastNew>(LAST_NEW, {})
+  const projects = view.projects.filter(p => !p.kind && !p.archived)
+  const proj = projects.find(p => p.id === last.project) ?? projects[0]
+  const live = new Set(view.workspaces.filter(w => !w.archived).map(w => w.id))
+  return [
+    ...(proj ? [{ kind: 'new' as const, project: proj.id, label: `New workspace in ${proj.name}` }] : []),
+    ...view.tabs
+      .filter(t => t.kind === 'agent' && live.has(t.workspace) && (t.status === 'waiting' || t.status === 'idle'))
+      .map(t => ({ kind: 'send' as const, tab: t.id, label: `${t.name} · ${(w => w?.name || w?.id || '')(view.workspaces.find(w => w.id === t.workspace))}` })),
+    ...(aiOn(view.settings) ? [{ kind: 'ai' as const, label: 'Laki AI' }] : []),
+  ]
+}
+const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+export function QuickWindow() {
+  const view = useView()
+  const [text, setText] = useState(new URLSearchParams(location.search).get('prompt') ?? '')
+  const [images, setImages] = useState<Img[]>([])
+  const [pick, setPick] = useState(0)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [shot, setShot] = useState<{ n: number; png: string }>()
+  useEffect(() => void bridge?.onNewPrompt?.(p => setText(p)), []) // another New task with words: into the box
+  useEffect(() => void (document.title = 'New task — Laki'), [])
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('.quick-bar')
+    if (!el || !bridge?.quickHeight) return
+    const o = new ResizeObserver(() => bridge!.quickHeight!(Math.ceil(el.offsetHeight)))
+    o.observe(el)
+    return () => o.disconnect()
+  }, [!!view])
+  if (!view) return null
+  const targets = targetsOf(view)
+  const at = Math.min(pick, Math.max(0, targets.length - 1))
+  const t = targets[at]
+  const turn = (d: number) => targets.length && setPick((at + d + targets.length) % targets.length)
+  // "@word " at the start: the target whose name has it, the word taken out
+  const change = (v: string) => {
+    const m = /^@(\S+)\s/.exec(v)
+    const i = m ? targets.findIndex(x => squash(x.label).includes(squash(m[1]))) : -1
+    if (i >= 0) return setPick(i), setText(v.slice(m![0].length))
+    setText(v)
+  }
+  const mic = () => {
+    const box = document.querySelector<HTMLTextAreaElement>('.quick-bar textarea')
+    box?.focus()
+    if (cloudVoice()) void voiceStart()
+    else setTimeout(() => bridge?.dictate?.(), 150) // macOS dictation types where the cursor is: once the box has it
+  }
+  const snap = () => void bridge?.quickShot?.().then(png => png && setShot(s => ({ n: (s?.n ?? 0) + 1, png })))
+  const send = async () => {
+    const body = withImages(text, images).trim()
+    if (!t || !body || busy || saving) return
+    setBusy(true)
+    setErr('')
+    try {
+      if (t.kind === 'new') {
+        const last = load<LastNew>(LAST_NEW, {})
+        const same = last.project === t.project
+        await api.call('wsNew', { project: t.project, prompt: body, place: same && last.place ? last.place : 'top', ...(same && { preset: last.preset, cmd: last.cmd, local: last.local, model: last.model, effort: last.effort, perm: last.perm, fast: last.fast, sandbox: last.sandbox }) })
+      } else if (t.kind === 'send') await api.call('send', { target: t.tab, text: body, whenIdle: true, agent: true })
+      else await api.call('aiAsk', { text, images: images.map(i => i.path), queue: true })
+      window.close()
+    } catch (e) {
+      setErr((e as Error).message) // the text stays
+      setBusy(false)
+    }
+  }
+  const keys = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') return e.preventDefault(), window.close()
+    if (e.key === 'Tab' && (e.target as HTMLElement).tagName === 'TEXTAREA') return e.preventDefault(), turn(e.shiftKey ? -1 : 1)
+    if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'm') return e.preventDefault(), mic()
+    if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 's') return e.preventDefault(), snap()
+  }
+  return (
+    <div className="quick-bar" onKeyDownCapture={keys}>
+      <div className="quick-head">
+        <button type="button" className="quick-chip" onClick={() => turn(1)} title="Where it goes: Tab (⇧Tab) or @name changes it" disabled={targets.length < 2}>
+          <Icon name={t?.kind === 'ai' ? 'ai' : t?.kind === 'send' ? 'send' : 'plus'} size={13} />
+          {t?.label ?? 'Open a folder first (⌘O in Laki)'}
+        </button>
+        <span className="grow" />
+        {t?.kind === 'new' && (
+          <button type="button" className="quick-more" onClick={() => bridge?.quickMore?.(withImages(text, images))} title="The whole new-workspace page: project, agent, template">
+            More…
+          </button>
+        )}
+      </div>
+      <PromptInput
+        value={text}
+        onChange={change}
+        images={images}
+        onImages={setImages}
+        save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+        onBusy={setSaving}
+        onSubmit={send}
+        enter
+        rows={1}
+        shot={shot}
+        placeholder={t?.kind === 'send' ? 'Tell the agent…' : t?.kind === 'ai' ? 'Ask Laki AI…' : 'What should the agent do?'}
+        tools={
+          <>
+            <IconButton icon="mic" title="Speak (⌘⇧M)" onClick={mic} />
+            {bridge?.quickShot && <IconButton icon="camera" title="A screenshot of a part of the screen (⌘⇧S)" onClick={snap} />}
+          </>
+        }
+        send={
+          <button type="button" className="primary" disabled={!t || busy || saving || !(text.trim() || images.length)} onClick={() => void send()}>
+            {busy ? 'Sending…' : 'Send ⏎'}
+          </button>
+        }
+      />
+      {err && (
+        <p className="field-err" role="alert">
+          {err}
+        </p>
+      )}
+      <AskHost />
+      <VoiceBar />
+      <Tips />
+    </div>
   )
 }

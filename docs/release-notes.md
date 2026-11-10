@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- A quick bar from any app (Settings › Keys › Global hotkey, off until you turn it on; ⌥Space suggested): one line to a new workspace in your last project, an agent that waits, or Laki AI, Tab to change where, ⏎ to send and get back to what you were doing. The mic and a screenshot are on it, *More…* opens the whole new-workspace page, and the menu bar's and the bubbles' *New task* open it too.
 - Trusted devices for remote access: at a stable address (Tailscale or My domain) the phone that opens the link is paired and gets back in by itself for 30 days (1 to 90), a closed tab or a restart notwithstanding. Settings › Remote access › Devices lists them with when each was last seen; *Add a device* for another, *Revoke* drops one at once, and the Mac says when a new one joins.
 - Wrong PINs no longer lock you out: after the tries, remote access takes no PIN for 1 minute, then 5, then 30, and tells you each time with the address it came from; 20 in a day stop it. *After wrong PINs* › *Stop remote access* keeps the old way.
 - Remote access keeps its address and stays up: Settings › Remote access › *Address* picks Tailscale, *My domain* (a name on your own named tunnel, with a PIN) or a quick tunnel, and says which keep a bookmark working. If its tunnel drops, the Mac wakes from sleep or Laki restarts, it starts again by itself, with the same time left; a quick tunnel comes back with a new link, and Laki says so.

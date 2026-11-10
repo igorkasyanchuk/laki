@@ -190,6 +190,7 @@ export const FIND: [string, string, string?][] = [
   ...KEYS.map((x): [string, string, string] => ['keys', x.label, 'key shortcut rebind']),
   ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
   ['general', 'Screenshot to Laki AI', 'global hotkey screenshot region area capture dictation voice mic ask ai menu bar tray'],
+  ['general', 'Quick bar', 'global hotkey new task quick prompt spotlight launcher option space send agent ai from any app'],
   ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'pages overview all sessions screens preview eye running'],
