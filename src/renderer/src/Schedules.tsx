@@ -6,7 +6,7 @@ import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
+import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Omit<Schedule, 'archived'>> & { archived?: boolean }): Promise<Schedule> // archived: Archive (true) or Restore (false)
@@ -119,7 +119,7 @@ export function Grouped<T>({ items, keyOf, groupOf, onOf, row, store, what, onMo
           const on = mine.filter(onOf).length
           return (
             <div key={`g:${g}`} className="grp">
-              <div className={`grp-head ${over === g ? 'over' : ''}`} {...dropOn(g)} onClick={() => fold(g)} onContextMenu={e => keysMenu(e, mine.map(keyOf))} data-tip={`${mine.length} ${what}, ${on} on · a click ${shut.includes(g) ? 'opens' : 'folds'} it · drop rows here to move them in`}>
+              <div className={`grp-head ${over === g ? 'over' : ''}`} {...dropOn(g)} {...act(() => fold(g))} aria-expanded={!shut.includes(g)} onContextMenu={e => keysMenu(e, mine.map(keyOf))} data-tip={`${mine.length} ${what}, ${on} on · a click ${shut.includes(g) ? 'opens' : 'folds'} it · drop rows here to move them in`}>
                 <Icon name={shut.includes(g) ? 'chevronRight' : 'chevron'} size={12} />
                 <Icon name="folder" size={13} />
                 <span className="grp-name">{g}</span>

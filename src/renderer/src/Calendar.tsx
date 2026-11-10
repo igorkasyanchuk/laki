@@ -6,7 +6,7 @@ import { type FormEvent, useMemo, useState } from 'react'
 import type { Reminder, Schedule, ScheduleRun } from '../../shared/types'
 import { describe, parseWhen, partsOf, type Rule, stamp, whenOf } from '../../shared/when'
 import { Modal } from './panels'
-import { Icon, IconButton, load, keep, Page } from './ui'
+import { Icon, IconButton, load, keep, Page, act } from './ui'
 
 export type CalendarApi = {
   add(r: { at: number; every?: string; text: string; ws?: string; important?: boolean }): Promise<unknown>
@@ -113,7 +113,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
       )}
       <span className="cal-time">{hm(i.at)}</span>
       {i.r?.every && <Icon name="repeat" size={10} />}
-      <span className="cal-text" onClick={() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules())}>{i.text}</span>
+      <span className="cal-text" {...act(() => (i.ws && workspaces.some(w => w.id === i.ws) ? api.openWs(i.ws) : i.kind !== 'reminder' && api.openSchedules()))}>{i.text}</span>
       {i.kind === 'reminder' && <IconButton icon="alertCircle" title={i.r!.important ? 'Important: rings as a card on screen (a click: a notification again)' : 'Make it important: it rings as a card on screen, until you close it'} className={`cal-imp ${i.r!.important ? 'on' : ''}`} onClick={() => api.set({ id: i.r!.id, important: !i.r!.important }).catch(() => {})} />}
       {i.kind === 'reminder' && <IconButton icon="x" title="Remove the reminder" className="cal-rm" onClick={() => api.rm(i.r!.id).catch(() => {})} />}
     </div>
@@ -195,7 +195,7 @@ export function CalendarPage({ schedules, runs, reminders, workspaces, api, onCl
               const shown = mode === 'month' ? list.slice(0, 3) : list
               const out = mode === 'month' && new Date(d).getMonth() !== new Date(anchor).getMonth()
               return (
-                <div key={d} className={`cal-day ${d === today ? 'today' : ''} ${d < today ? 'past' : ''} ${out ? 'out' : ''} ${d === sel ? 'sel' : ''}`} onClick={e => !(e.target as Element).closest('button, .cal-text') && setSel(d)}>
+                <div key={d} className={`cal-day ${d === today ? 'today' : ''} ${d < today ? 'past' : ''} ${out ? 'out' : ''} ${d === sel ? 'sel' : ''}`} {...act(e => !(e.target as Element).closest('button, .cal-text') && setSel(d))}>
                   <button type="button" className="cal-date" data-tip="This day, whole" onClick={() => setSel(d)}>
                     {mode === 'week' && new Date(d).toLocaleDateString([], { weekday: 'short' })} {new Date(d).getDate()}
                   </button>

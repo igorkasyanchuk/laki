@@ -11,7 +11,7 @@ import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, type SayModal, sayOf, uiBehave, WIDGET_CSS, type WidgetButton, type WidgetSay } from '../../shared/widget'
 import { DO, type UiDo, uiHtml, type UiSpec } from '../../shared/widgetUi'
 import { daemonBase } from './api'
-import { ask, escapes, Icon, IconButton, isIconName, type MenuItem } from './ui'
+import { ask, escapes, Icon, IconButton, isIconName, type MenuItem, act as press } from './ui'
 
 export type WidgetApi = {
   render: (id: string, full: boolean, sample?: boolean | string, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data (a name: fixtures/<name>.json's); cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
@@ -321,7 +321,7 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
         const i = w.inst![ws]
         const go = w.click ? () => runClick(w, api, ws) : w.full ? () => api.full(w.id, ws) : undefined
         return (
-          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={w.hide?.tip && !i.error ? undefined : `${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={go && (e => (e.stopPropagation(), go()))}>
+          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : i.tone ? `t-${i.tone}` : ''}`} data-tip={w.hide?.tip && !i.error ? undefined : `${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} {...press(go && ((e: React.MouseEvent) => (e.stopPropagation(), go())))}>
             <Glyph w={w} size={10} />
             {i.badge || i.label}
           </span>

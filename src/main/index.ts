@@ -162,6 +162,16 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await waitFor(() => has('.tabbar [aria-label^="Ship:"]'), 'the Ship button')
       await click('.tabbar [aria-label^="Ship:"]')()
     }, async () => (await hasText('.ship-file', 'notes.txt')) && (await js<string>("document.querySelector('.ship-form input')?.value ?? ''")) !== '' && (await hasText('.ship button.primary', 'Open PR'))],
+    // U11: the sidebar from the keyboard: its one tab stop, ↓ to another workspace's row, Enter opens it
+    ['tree-keys', async () => {
+      await key('Escape')()
+      const press = async (keyCode: string) => (w.webContents.sendInputEvent({ type: 'keyDown', keyCode }), w.webContents.sendInputEvent({ type: 'keyUp', keyCode }), await nap(60))
+      if ((await js<number>("document.querySelectorAll('.side-scroll [role=treeitem][tabindex=\"0\"]').length")) !== 1) throw new Error('not one tab stop in the tree')
+      await js("document.querySelector('.side-scroll [role=treeitem][tabindex=\"0\"]').focus()")
+      for (let i = 0; i < 12 && !(await js<boolean>("(e => !!e && e.matches('.ws[data-row]:not(.sel)'))(document.activeElement)")); i++) await press('Down')
+      ws.keyed = (await named((await js<string>("document.activeElement?.dataset.row ?? ''")).slice(3)))
+      await press('Enter')
+    }, async () => !!ws.keyed && (await has(`.ws.sel${row(ws.keyed.id)}`))],
     // U4, last (it empties the world): no project, Welcome; the demo's gh is signed out: its row has Sign in, what passes one line
     ['welcome', async () => {
       for (const w of (await rpc<View>('state')).workspaces) await rpc('wsRm', { id: w.id }).catch(() => {})

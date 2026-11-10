@@ -3,7 +3,7 @@
 // sign-in, at most every 5 minutes (usage.ts); Settings › Appearance picks the agents. Under them, today's tokens and
 // their ≈ cost at API prices (the daemon's meters, View.today); and the words a tab's context and usage are said in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { IconButton, Page } from './ui'
+import { IconButton, Page, act } from './ui'
 
 import { type AgentUsage, HOME_ACCOUNT, type Today, type UsageWindow } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
@@ -19,6 +19,8 @@ const NAMES = USAGE_AGENTS
 // a window whose reset has passed starts over
 const live = (w: UsageWindow, now: number) => (w.resets && w.resets <= now ? 0 : w.used)
 export const level = (p: number) => (p >= 90 ? 'high' : p >= 70 ? 'mid' : 'low') // amber past 70%, red past 90%
+// U11: the level in words, beside its color (a tip, a screen reader's label)
+export const levelWord = (p: number) => ({ high: 'nearly full', mid: 'filling up', low: 'room left' })[level(p)]
 
 // a tab's context (142K of 200K tokens · 71%) and what its chat used (≈ $0.42 · 1.2M tokens)
 export const tokensText = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n < 1e7 ? 1 : 0)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : `${n}`)
@@ -300,7 +302,7 @@ export function UsagePage({ load, onClose }: { load: () => Promise<{ keep: numbe
                 </thead>
                 <tbody>
                   {byModel.map(m => (
-                    <tr key={`${m.agent}|${m.model}`} className={model === m.model ? 'on' : ''} onClick={() => setModel(model === m.model ? '' : m.model)} data-tip={model === m.model ? 'All models again' : 'Only this model'}>
+                    <tr key={`${m.agent}|${m.model}`} className={model === m.model ? 'on' : ''} {...act(() => setModel(model === m.model ? '' : m.model))} data-tip={model === m.model ? 'All models again' : 'Only this model'}>
                       <td className="mono">{m.model}</td>
                       <td>{NAMES[m.agent] ?? m.agent}</td>
                       <td className="num">{tokensText(m.tokens)}</td>

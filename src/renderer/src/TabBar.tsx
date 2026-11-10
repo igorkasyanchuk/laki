@@ -3,9 +3,9 @@
 import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
-import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton } from './ui'
+import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act } from './ui'
 import { type TabView, HOME_ACCOUNT, creatorOf } from '../../shared/types'
-import { ctxPct, ctxText, usageText, level, Ring } from './Usage'
+import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
 import { timeLeft } from './Tunnel'
 import { retrying, retryText } from './text'
@@ -90,7 +90,7 @@ export function TabList({ app }: { app: AppCtx }) {
             key={ts[0]?.id}
             className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
             style={colorVar(colorOf(ts[0]))}
-            onClick={() => selectGroup(g)}
+            {...act(() => selectGroup(g))}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
@@ -118,7 +118,7 @@ export function TabList({ app }: { app: AppCtx }) {
               </span>
             )}
             {queued > 0 && <span className="badge">+{queued}</span>}
-            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} style={{ width: `${ctxPct(ctx)}%` }} />}
+            {ctx && ctxLook === 'line' && <i className={`tab-ctx ${level(ctxPct(ctx))}`} role="img" aria-label={`Context ${ctxPct(ctx)}%, ${levelWord(ctxPct(ctx))}`} style={{ width: `${ctxPct(ctx)}%` }} />}
             {ctx && ctxLook === 'ring' && <Ring p={ctxPct(ctx)} />}
             <button className="x" data-tip={kt('Close', 'closeTab')} aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
               <Icon name="x" size={10} />

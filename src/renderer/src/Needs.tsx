@@ -58,8 +58,8 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
   // the key: a new wait or finish, or one going stale, starts the card over (its detail open or not)
   const card = (x: Need, old = false) => <NeedCard key={`${x.t.id}@${x.t.needAt ?? 0}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} stale={old} />
   return (
-    <div className="project needs-list">
-      <div className="project-head" onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
+    <div className="project needs-list" role="group" aria-label="Needs you">
+      <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={`Needs you: ${items.length}`} tabIndex={-1} onClick={onFold} data-tip={`Agents waiting for you or done while you looked away · ⌘J goes to the next · click to ${shut ? 'expand' : 'collapse'}`}>
         <span className="project-chev">
           <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
         </span>

@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type HTMLAttrib
 import { Folded } from './MarkdownView'
 import { ago, Avatar } from './Info'
 import { type Gap, gapsOf, linesAt, reviewedLines, sameLines, splitRows, type Suggestion, suggestionOf } from './text'
-import { escapes, Icon, IconButton, type MenuItem, useMenu } from './ui'
+import { escapes, Icon, IconButton, type MenuItem, useMenu, act } from './ui'
 import { diffCounts } from '../../shared/ask'
 import type { FileContent, PanelApi, PRFiles, Thread } from './SidePanel'
 
@@ -393,7 +393,7 @@ export function ImageDiff({ api, path, status }: { api: PanelApi; path: string; 
         <ImageSide key={label} label={label} c={c} onZoom={setZoom} />
       ))}
       {zoom && (
-        <div className="img-zoom" onClick={() => setZoom(null)} data-tip="Click or Esc to close">
+        <div role="presentation" className="img-zoom" onClick={() => setZoom(null)} data-tip="Click or Esc to close">
           <img src={zoom} alt={path} />
         </div>
       )}
@@ -412,7 +412,7 @@ function ImageSide({ label, c, onZoom }: { label: string; c: FileContent | strin
     )
   return (
     <figure className="img-side">
-      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} onClick={() => onZoom(c.image!)} />
+      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} {...act(() => onZoom(c.image!))} />
       <figcaption className="muted small">
         {label} · {px}
         {sizeText(c.size)}

@@ -546,3 +546,6 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .narrow .plan-chat { position: static; height: 70vh; }
 :root:has(.sd-modal) .overlay { z-index: 1001; } /* an ask (Close without saving?) over the diagram editor */
 .plan-saved { color: var(--done); }
+
+/* U11: a ring the keyboard can see on the editor's own fields */
+.sd-edge-label input:focus-visible, .sd-edit input:focus-visible, .sd-edit textarea:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }

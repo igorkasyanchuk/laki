@@ -536,6 +536,14 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
   agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (SettingsProject.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
+- **Keyboard and screen readers** (U11): the sidebar's `.side-scroll` is a `role="tree"` (Sidebar.tsx `treeKey`, `rove`):
+  project heads, Pinned and Needs you's head are treeitems at level 1 (`aria-expanded`), groups and rows at 2
+  (`aria-selected`), each `.project-ws` a `group`; every treeitem is `tabIndex={-1}` in JSX and a layout effect keeps one
+  at 0 (the selected row, else the first) unless the focus is in the tree. Keys go to the focused treeitem only (a
+  button inside keeps its own). A click on anything that isn't a control goes through ui.tsx `act` (role button,
+  tabIndex 0, Enter and Space) or carries a role of its own (a backdrop's `presentation`): `test/a11y.test.ts` `mute`.
+  Inputs ring on `:focus-visible`; a PR's mark has a shape per state (merged, ×, dashed draft) and an `aria-label`;
+  the context meters say their level in words (Usage.tsx `levelWord`).
 - **Settings' Basic view** (U10): `view` (`laki.settingsView`; unset: Basic with no projects, else All; a `section`/`spot`
   or Find a setting: All). Basic's nav is settingsMap.ts `BASIC` (four heads, each `[section, card title]`s, `*` all of
   one); `on(id)` renders those sections, SettingsKit's `Shown` context makes `Group` return null for a card not named,

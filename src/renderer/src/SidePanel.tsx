@@ -10,7 +10,7 @@ import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, Dif
 import type { MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu } from './ui'
+import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu, act } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -207,7 +207,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
           ? found.map(f => (
-              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), preview(f))} onContextMenu={e => (setSel(f), menu(e, f, false))}>
+              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} {...act(() => (setSel(f), preview(f)))} onContextMenu={e => (setSel(f), menu(e, f, false))}>
                 <Icon name="file" />
                 <span className="sp-name">
                   {f.slice(f.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f)}</span>
@@ -220,7 +220,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
                 key={n.path}
                 className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
-                onClick={e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path))} // a double-click's second opens the editor
+                {...act(e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path)))} // a double-click's second opens the editor
                 onDoubleClick={() => !n.dir && (art ? art.open(n.path) : api.openFile(n.path))}
                 onContextMenu={e => (setSel(n.path), menu(e, n.path, n.dir))}
               >
@@ -321,7 +321,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
   const shutDir = (d: string) => setDirsShut(o => (o.has(d) ? (o.delete(d), new Set(o)) : new Set(o.add(d))))
   const fileEl = (f: (typeof files)[number], depth?: number) => (
           <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
-            <div className="sp-row" style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} onClick={() => toggle(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
+            <div className="sp-row" style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => toggle(f.path))} onContextMenu={e => fileMenu(e, f.path)} data-tip={all ? `${f.path} · right click: open it on remote` : `${f.path} · right click: Revert this file, open it on remote`}>
               <span className="sp-chev">
                 <Icon name={open.has(f.path) ? 'chevron' : 'chevronRight'} />
               </span>
@@ -434,7 +434,7 @@ function ChangesTab({ api: wsApi, ws, pr, linked, empty, worktree, turn, onOpen 
         {tree
           ? fileTree(files, dirsShut).map(r =>
               'dir' in r ? (
-                <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} onClick={() => shutDir(r.dir)} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
+                <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} {...act(() => shutDir(r.dir))} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
                   <span className="sp-chev">
                     <Icon name={dirsShut.has(r.dir) ? 'chevronRight' : 'chevron'} />
                   </span>
@@ -472,7 +472,7 @@ function CommitsTab({ api }: { api: PanelApi }) {
         {err && <div className="warn small pad">{err}</div>}
         {d && !list.length && <div className="muted small pad">{d.base ? `No commits over ${d.base} yet: Changes shows what isn't committed.` : 'Every commit here is on a remote.'}</div>}
         {list.map(c => (
-          <div key={c.sha} className="sp-row sp-commit" onClick={() => setAt(c)} data-tip={`${c.subject} · ${c.author}, ${new Date(c.at).toLocaleString()} · ${c.pushed ? 'pushed' : 'not pushed yet'}`}>
+          <div key={c.sha} className="sp-row sp-commit" {...act(() => setAt(c))} data-tip={`${c.subject} · ${c.author}, ${new Date(c.at).toLocaleString()} · ${c.pushed ? 'pushed' : 'not pushed yet'}`}>
             <span className={`sp-pushed ${c.pushed ? 'on' : ''}`} aria-label={c.pushed ? 'pushed' : 'not pushed'}>
               <Icon name={c.pushed ? 'cloud' : 'upload'} size={12} />
             </span>
@@ -507,7 +507,7 @@ function CommitView({ api, c, onBack }: { api: PanelApi; c: Commit; onBack: () =
         {d && !files.length && <div className="muted small pad">This commit changes no file's text.</div>}
         {files.map(f => (
           <div key={f.path} className="sp-change">
-            <div className="sp-row" onClick={() => toggle(f.path)} data-tip={f.path}>
+            <div className="sp-row" {...act(() => toggle(f.path))} data-tip={f.path}>
               <span className="sp-chev">
                 <Icon name={shut.has(f.path) ? 'chevronRight' : 'chevron'} />
               </span>
@@ -1362,7 +1362,7 @@ function CsvTable({ path, text, edit, onText }: { path: string; text: string; ed
                 )}
               </td>
               {[...Array(cols)].map((_, c) => (
-                <td key={c} className={`${edit ? 'csv-edit' : ''} ${c >= row.length ? 'csv-none' : ''}`} onClick={() => pick(i + 1, c)}>
+                <td key={c} className={`${edit ? 'csv-edit' : ''} ${c >= row.length ? 'csv-none' : ''}`} {...act(() => pick(i + 1, c))}>
                   {cell(i + 1, c)}
                 </td>
               ))}
@@ -1614,7 +1614,7 @@ export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: s
           {err && <div className="warn small pad">{err}</div>}
           {!all && !err && <div className="muted small pad">Loading the files…</div>}
           {found.map((f, k) => (
-            <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} onClick={() => pick(f.path)}>
+            <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} {...act(() => pick(f.path))}>
               <Icon name="file" />
               {mark(f.path, f.hits)}
             </div>

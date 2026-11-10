@@ -20,7 +20,7 @@ import { atHead, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffB
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
-import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu } from './ui'
+import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act } from './ui'
 import { fileTree, prName, prNo } from './text'
 
 export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
@@ -233,7 +233,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           className={`dl-blame ${zero ? 'mine' : ''}`}
           data-tip={zero ? 'Not committed yet' : `${c.sha.slice(0, 8)} · ${c.author} · ${new Date(c.at * 1000).toLocaleString()} · ${c.summary} · click: copy its id`}
           onMouseDown={e => e.stopPropagation()}
-          onClick={e => (e.stopPropagation(), zero || void navigator.clipboard.writeText(c.sha).catch(() => {}))}
+          {...act(e => (e.stopPropagation(), zero || void navigator.clipboard.writeText(c.sha).catch(() => {})))}
         >
           {again ? '' : zero ? 'not committed' : `${c.author.split(/\s+/)[0]} · ${when(c.at)}`}
         </span>
@@ -434,7 +434,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   // an expanded line: its numbers (a thread's or a comment's jump), the file's right click; no comment or Revert
   const ctxAttrs = (path: string, l: DiffLine) => ({ 'data-old': l.old, 'data-new': l.new, onContextMenu: (e: MouseEvent) => fileMenu(e, path, l) }) as HTMLAttributes<HTMLDivElement>
   const fileRow = (f: (typeof files)[number], depth?: number) => (
-            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} onClick={() => go(f.path)} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
+            <div key={f.path} className={`sp-row ${f.path === here ? 'sel' : ''} ${viewed(f.path) ? 'fr-done' : ''} ${f.path === lastPin ? 'fr-pin-end' : ''}`} style={depth === undefined ? undefined : { paddingLeft: 8 + depth * 12 }} {...act(() => go(f.path))} onContextMenu={e => fileMenu(e, f.path)} data-tip={`${f.path} · right click: more`}>
               <span className={`st st-${f.status[0] === '?' ? 'A' : f.status[0]}`}>{f.status[0] === '?' ? 'A' : f.status[0]}</span>
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} {depth === undefined && <span className="muted">{parentOf(f.path)}</span>}
@@ -512,7 +512,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 ...listed.filter(f => pins.includes(f.path)).map(f => fileRow(f)),
                 ...fileTree(listed.filter(f => !pins.includes(f.path)), dirsShut).map(r =>
                   'dir' in r ? (
-                    <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} onClick={() => shutDir(r.dir)} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
+                    <div key={`dir:${r.dir}`} className="sp-row sp-dir" style={{ paddingLeft: 8 + r.depth * 12 }} {...act(() => shutDir(r.dir))} data-tip={`${r.dir}: ${r.n} file${r.n === 1 ? '' : 's'}`}>
                       <Icon name={dirsShut.has(r.dir) ? 'folder' : 'folderOpen'} size={12} />
                       <span className="sp-name">{r.name}</span>
                       <span className="muted small">{r.n}</span>
@@ -541,7 +541,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             const blaming = !all && blamed.has(f.path)
             return (
               <section key={f.path} className={`sp-change fr-file ${viewed(f.path) ? 'viewed' : ''}`}>
-                <div className="sp-row" data-file={f.path} onClick={fold} onContextMenu={e => fileMenu(e, f.path)}>
+                <div className="sp-row" data-file={f.path} {...act(fold)} onContextMenu={e => fileMenu(e, f.path)}>
                   <span className="sp-chev">
                     <Icon name={shown(f.path) ? 'chevron' : 'chevronRight'} />
                   </span>
@@ -585,7 +585,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                             </div>
                           ))}
                           {notes.filter(n => n.path === f.path && n.line === numOf(l, n.side) && n.quote === l.text).map(n => (
-                            <div key={n.id} className="fr-inline" onClick={() => (pickTab('mine'), hideNotes(false), setEditing(n.id))}>
+                            <div key={n.id} className="fr-inline" {...act(() => (pickTab('mine'), hideNotes(false), setEditing(n.id)))}>
                               <Icon name="message" size={11} /> {n.body}
                             </div>
                           ))}
@@ -661,7 +661,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                           onBlur={e => (setNotes(ns => ns.map(x => (x.id === n.id && e.target.value.trim() ? { ...x, body: e.target.value.trim() } : x))), setEditing(null))}
                         />
                       ) : (
-                        <p className="fr-note-body" onClick={() => setEditing(n.id)}>
+                        <p className="fr-note-body" {...act(() => setEditing(n.id))}>
                           {n.body}
                         </p>
                       )}

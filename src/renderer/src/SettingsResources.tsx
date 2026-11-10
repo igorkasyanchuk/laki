@@ -3,7 +3,7 @@
 import { type ProcUse, type Resources, SLEEP_AFTER, type TabView } from '../../shared/types'
 import { type ReactNode, useEffect, useState } from 'react'
 import { BUDGET_DEFAULT } from '../../shared/browserBudget'
-import { Icon, Switch } from './ui'
+import { Icon, Switch, act } from './ui'
 import { Group } from './SettingsKit'
 
 // Resources: what Laki and each tab use now (the daemon's ps, every 3 s while it's open), and idle agents put to sleep
@@ -111,7 +111,7 @@ export function ResourcesSection({ api, sleepAfter, onSleepAfter, browserBudget,
   const browsers = total(held.filter(p => p.name.includes('Browser: ')))
   const canSleep = (t: TabView) => (t.preset === 'claude' || t.preset === 'codex') && !!t.resumeId && t.status === 'idle'
   const row = (key: string, name: ReactNode, kb: number, cpu: number, acts?: ReactNode) => (
-    <div className={`res-row${open === key ? ' open' : ''}`} onClick={() => setOpen(open === key ? null : key)}>
+    <div className={`res-row${open === key ? ' open' : ''}`} {...act(() => setOpen(open === key ? null : key))}>
       <Icon name={open === key ? 'chevron' : 'chevronRight'} size={12} />
       <span className="res-name">
         <span>{name}</span>

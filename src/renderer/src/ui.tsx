@@ -1,6 +1,6 @@
 // Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
 // rows dragged into a new order.
-import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
+import { Component, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as KE, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { menuKeys } from './text'
@@ -43,6 +43,11 @@ export function Icon({ name, size = 14, look }: { name: IconName; size?: number;
 // label: words beside the icon (the sidebar's foot)
 // tip false: its name for screen readers only, no tooltip
 // keyId: its Settings › Keys action (data-key: the hold-⌘ overlay's badge beside it)
+// U11: a click target that isn't a <button> (a row, a cell, a picture): a button to the keyboard and a screen reader
+// too: focusable, Enter and Space click it (its own key, not a child's). none: nothing to press, no role
+export const act = <E extends Element>(f: ((e: MouseEvent<E>) => unknown) | false | null | undefined) =>
+  f ? { role: 'button', tabIndex: 0, onClick: f, onKeyDown: (e: KE<E>) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), f(e as unknown as MouseEvent<E>)) } : {}
+
 export function IconButton({ icon, title, onClick, on, className = '', label, tip = true, disabled, onContextMenu, keyId }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean; disabled?: boolean; onContextMenu?: (e: MouseEvent<HTMLButtonElement>) => void; keyId?: string }) {
   return (
     <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} data-key={keyId} aria-label={title} disabled={disabled} onClick={onClick} onContextMenu={onContextMenu}>

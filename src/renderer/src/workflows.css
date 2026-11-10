@@ -267,3 +267,6 @@
 .wf-meter i { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--p), var(--hover) var(--p)); }
 .wf-meter[data-level='near'] i { background: linear-gradient(90deg, var(--waiting) var(--p), var(--hover) var(--p)); }
 .wf-meter[data-level='over'] i { background: var(--error); }
+
+/* U11: its field has no border of its own: the box rings as you type in it */
+.wf-make:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }

@@ -80,6 +80,8 @@ button.icon.small { font-size: var(--fs-4); padding: 0 5px; min-width: 20px; min
 button.link { background: none; border: none; color: var(--accent-ink); padding: 0 4px; }
 input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+/* U11: a ring the keyboard can see (a border change alone is easy to miss) */
+input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
 textarea { resize: vertical; font-family: inherit; }
 .env-field { resize: none; field-sizing: content; max-height: 50vh; } /* it grows with its lines: no grip */
 /* a select's arrow: a chevron in the theme's muted color, inset like the app's own (the system's hugs the edge, in its gray);
@@ -2488,6 +2490,7 @@ button.board-name:hover { background: none; }
 /* a browser without field-sizing (remote access in another one): the prompts can't grow, so they keep the grip (after the rules it undoes) */
 @supports not (field-sizing: content) { :is(.nw-composer, .board-add, .ai-composer) textarea, .env-field { resize: vertical; } }
 .ws-pr.draft { color: var(--muted); }
+.ws-pr.draft > .icon-svg { stroke-dasharray: 2.5 2; } /* U11: a draft by its shape too, not its color alone */
 .ws-pr.closed { color: var(--error); }
 .ws-pr.merged { color: var(--tc-purple); }
 .ws-pr.ci { color: var(--error); } /* an open PR's failing checks: a mark of their own, GitHub's keeps the PR's state */
@@ -2800,6 +2803,7 @@ html.away .shown-pop { animation-play-state: running !important; } /* one that c
 .rd-out-text { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font-family: var(--mono); font-size: var(--fs-2); }
 .rd-box textarea { flex: 1; resize: none; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--fg); font: inherit; }
 .rd-box textarea:focus { outline: none; border-color: var(--accent); }
+.rd-box textarea:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
 .reader-switch { flex: none; display: inline-flex; align-items: stretch; margin: 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); overflow: hidden; } /* U2: in the tab bar or a split pane's header, never over the terminal */
 .pane-head .reader-switch { margin: 0 2px; }
 .pane-head .reader-switch button { padding: 0 7px; font-size: var(--fs-1); }
@@ -3487,3 +3491,11 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .settings-view button { flex: 1; }
 .settings-main[data-basic] > :not(.set-group, .basic-head) { display: none; }
 .settings-main button.danger { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }
+
+/* U11: the sidebar's tree from the keyboard: the row in focus ringed, its ⋯ and the project's + ⋯ shown as on hover */
+.side-scroll [role='treeitem']:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ws:focus-within > .ws-acts { display: inline-flex; width: 20px; margin: 0 -6px 0 0; opacity: 1; transform: none; }
+.project-head:focus-within .ib, .ws-sep:focus-within .ib { opacity: 1; }
+.ws-sep:focus-within .ws-acts { display: inline-flex; }
+
+.form label.tunnel-host:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }

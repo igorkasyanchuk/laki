@@ -73,7 +73,7 @@ export function ChipsInput({ value, onChange: save, placeholder }: { value: stri
     if (more.length) onChange([...items, ...more].join(','))
   }
   return (
-    <div className="chips-input" onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.focus()}>
+    <div role="presentation" className="chips-input" onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.focus()}>
       {items.map(x => (
         <span key={x} className="chip" data-tip={x.length > 40 ? x : undefined}>
           <span>{x}</span>

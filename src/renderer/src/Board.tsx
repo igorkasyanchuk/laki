@@ -11,7 +11,7 @@ import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
 import { completeOf, FileChip, type Img, PromptInput } from './PromptInput'
 import { wsShown } from './text'
-import { Icon, IconButton, Page, TurnTime } from './ui'
+import { Icon, IconButton, Page, TurnTime, act } from './ui'
 
 export type BoardApi = {
   open: (ws: string) => void
@@ -147,7 +147,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                 const last = tabs.find(t => t.kind === 'agent' && t.last)?.last
                 return (
                   // a click anywhere opens it; from the keyboard its name does (a button), its ⋯ is one of its own
-                  <div key={w.id} className={`board-card opens ${going[w.id] ? 'busy' : ''}`} onClick={() => api.open(w.id)} onContextMenu={e => api.menu(e, w)}>
+                  <div key={w.id} className={`board-card opens ${going[w.id] ? 'busy' : ''}`} {...act(() => api.open(w.id))} onContextMenu={e => api.menu(e, w)}>
                     <div className="board-foot">
                       <Glyph s={w.setup ? 'running' : rollup(tabs)} />
                       <button type="button" className="board-name" onClick={e => (e.stopPropagation(), api.open(w.id))}>

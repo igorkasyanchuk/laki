@@ -11,7 +11,7 @@ import { Markdown } from './MarkdownView'
 import { preview, THEMES } from './themes'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, groupNew, laterText, nameOf, type PalKind, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
-import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu } from './ui'
+import { AGENT_COLORS, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, ProjectMark, Switch, useMenu, act } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -418,7 +418,7 @@ function ThemeRow({ theme, onTheme, auto, onAuto }: { theme: string; onTheme: (i
 // U3: it pulses once as it shows and as a step is done (App keys it by the count: a new one each time)
 export function OnboardBar({ done, of = STEPS.length, onOpen, onOff }: { done: number; of?: number; onOpen: () => void; onOff: () => void }) {
   return (
-    <div className="timer-bar onboard-bar pulse" onClick={onOpen} data-tip="Get started: the loop, five steps">
+    <div className="timer-bar onboard-bar pulse" {...act(onOpen)} data-tip="Get started: the loop, five steps">
       <Icon name="check" size={13} />
       <span className="timer-what">Get started</span>
       <span className="muted small">

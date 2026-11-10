@@ -1,6 +1,6 @@
 // ⌘K: the palette (Palette) and what App puts in it (paletteItems: built as it shows, from what appCtx.ts says it reads)
 import type { AppCtx } from './appCtx'
-import { type IconName, type MenuItem, Icon, ON, ProjectMark } from './ui'
+import { type IconName, type MenuItem, Icon, ON, ProjectMark, act } from './ui'
 import { type ReactNode, useState, useMemo, useRef, useEffect } from 'react'
 import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
 import { Glyph, rollup } from './Glyph'
@@ -62,7 +62,7 @@ export function Palette({ items, onClose, forName }: { items: PaletteItem[]; onC
     const p = x as PaletteItem
     const m = x as (typeof shown)[number]
     return (
-      <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''} ${step && m.danger ? 'danger' : ''}`} onMouseMove={() => setI(n)} onClick={() => (step ? runAct(m) : pick(p))}>
+      <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''} ${step && m.danger ? 'danger' : ''}`} onMouseMove={() => setI(n)} {...act(() => (step ? runAct(m) : pick(p)))}>
         <span className="pg">{x.icon ? <Icon name={x.icon} /> : !step && p.glyph && <Glyph s={p.glyph} />}</span>
         <span className="pl">{x.label}</span>
         <span className="ph muted">

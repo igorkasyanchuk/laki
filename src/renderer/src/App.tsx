@@ -46,7 +46,7 @@ import { actionsFor, forgeName, mentionsOf, prName, prNo, rmVerdict, applySugges
 import { applyTheme, blurred, css, DARK, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, setBgImage, THEMES, transparent, userCss } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, type ShownWin, useNotices } from './Shown'
-import { type AgentUsage, ctxPct, ctxText, level, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
+import { type AgentUsage, ctxPct, ctxText, level, levelWord, USAGE_AGENTS, UsageButton, type UsageDay, usageText } from './Usage'
 import { BgButton } from './BgTasks'
 import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown, type Fact, type Verdict, Icon, IconButton, keyTip, tipKeys, type IconName, ProjectMark, keep as store, load, type MenuItem, moveId, moveIds, ON, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag, HOTKEY, SHOT_KEY } from './ui'
 import { emojiOf, isIconName } from '../../shared/icons'
@@ -3322,7 +3322,7 @@ export function App() {
             <>
               {ctxOn && tab?.context && (
                 // the focused tab's context: how full, so you compact or start a new chat in time
-                <span className="sb-ctx" data-tip={`${tab.name}'s context: ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
+                <span className="sb-ctx" role="img" aria-label={`${tab.name}'s context: ${ctxPct(tab.context)}%, ${levelWord(ctxPct(tab.context))}`} data-tip={`${tab.name}'s context (${levelWord(ctxPct(tab.context))}): ${ctxText(tab.context)}${costsOn && tab.usage ? ` · its chat used ${usageText(tab.usage)} at API prices` : ''} · /compact or a new chat before it fills`}>
                   <span className={`usage-bar ${level(ctxPct(tab.context))}`}>
                     <i style={{ width: `${ctxPct(tab.context)}%` }} />
                   </span>
@@ -3524,7 +3524,7 @@ export function App() {
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}
-      {sideOpen && !listOff && !strip && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (look.css --f-gap) */} />)}
+      {sideOpen && !listOff && !strip && (narrow ? <div role="presentation" className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (look.css --f-gap) */} />)}
 
       <main className="main">
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}

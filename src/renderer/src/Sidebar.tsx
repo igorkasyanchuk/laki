@@ -3,14 +3,14 @@
 // the peek card App shows over everything). App renders them with what appCtx.ts says they read.
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
-import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark } from './ui'
+import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
 import { type Collision, spanText } from '../../shared/overlap'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, type KeyboardEvent as ReactKey, useLayoutEffect, useRef } from 'react'
 import { short, prState, Avatar, PrCard } from './Info'
 import { RowMarks, rowMarks, WidgetGrid } from './Widgets'
 import { planCount } from '../../shared/todos'
@@ -196,6 +196,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
+        role="treeitem"
+        aria-level={2}
+        aria-selected={w.id === ws?.id}
+        aria-label={wsName(w)}
+        tabIndex={-1}
         data-keys={moves || undefined}
         data-group={pin ? 'pinned' : w.project}
         onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
@@ -215,7 +220,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
-        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), doStep(w, st, e))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
+        {(simple || (stepsOn && mark('step'))) && !projOf(w)?.kind && !w.term && (st => st && !st.busy && (simple || !['conflict', 'ci'].includes(st.id)) /* its ⚠ and red mark say those (B4: a simple row has no marks) */ && <span className={`ws-step t-${st.tone ?? 'none'}`} data-tip={`${st.label}: ${st.tip}`} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), doStep(w, st, e)))}>{STEP_CHIP[st.id] ?? st.label}</span>)(stepOf(w))}
         {pctSide && !more && !words && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {(settings.timers || simple) && (simple ? <span className="ws-keep"><TurnTime tabs={wt} /></span> : <TurnTime tabs={wt} />)}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
@@ -225,14 +230,14 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           </span>
         )}
         {w.ticket && mark('ticket') && (
-          <span className="ws-ticket" data-tip={[w.ticket.key, w.ticket.title, w.ticket.status && `(${w.ticket.status})`].filter(Boolean).join(' ') + (w.ticket.url ? '\nClick: open it' : '')} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), w.ticket?.url && openExternal(w.ticket.url))}>
+          <span className="ws-ticket" data-tip={[w.ticket.key, w.ticket.title, w.ticket.status && `(${w.ticket.status})`].filter(Boolean).join(' ') + (w.ticket.url ? '\nClick: open it' : '')} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), w.ticket?.url && openExternal(w.ticket.url)))}>
             {w.ticket.key}
           </span>
         )}
         <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
         {mark('plan') && (t => t?.plan && !t.plan.stale && <span className="ws-plan" data-tip={`${t.name}'s plan: ${t.plan.items.map(i => `${i.state === 'done' ? '✓' : i.state === 'now' ? '›' : '○'} ${i.text}`).join('\n')}`}>{planCount(t.plan)}</span>)(wt.find(t => t.plan))}
         {mark('radar') && (n => n > 0 && (
-          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), setOverlapsAt({ w: w.id, list: radarOf(w) }))}>
+          <span className="ws-radar" data-tip={radarTip(w)} onPointerDown={e => e.stopPropagation()} {...act(e => (e.stopPropagation(), setOverlapsAt({ w: w.id, list: radarOf(w) })))}>
             <Icon name="gitCompare" size={11} />
             {n}
           </span>
@@ -305,9 +310,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         )}
         {marksAt === 'end' && yes}
         {!words && w.pr && mark('pr') && (
-          <span className={`ws-pr ${prState(w.pr)}`} /* failing checks: their own mark, before it; red here is a closed PR */>
+          <span className={`ws-pr ${prState(w.pr)}`} role="img" aria-label={`PR #${w.pr.number}: ${prState(w.pr)}`} /* failing checks: their own mark, before it; red here is a closed PR. U11: its shape says the state too: merged a merge, closed an ×, a draft dashed */>
             {mark('author') && (!w.pr.mine || settings.ownAvatar !== false) && <Avatar login={w.pr.author} size={16} />}
-            <Icon name="github" size={11} />
+            <Icon name={w.pr.state === 'MERGED' ? 'gitMerge' : w.pr.state === 'CLOSED' ? 'xCircle' : 'github'} size={11} />
           </span>
         )}
         {/* on hover, after the marks (they slide left): its menu */}
@@ -447,6 +452,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         className={`ws-sep ${s.color && s.color !== 'none' ? 'tinted' : ''} ${rows.at('ws', s.id)}` /* not .ws: the looks' workspace styles stay off it */}
         style={colorVar(s.color)}
         data-row={`ws:${s.id}`}
+        role="treeitem"
+        aria-level={2}
+        aria-expanded={!shut}
+        aria-label={s.name || 'Group'}
+        tabIndex={-1}
         data-group={p.id}
         data-head=""
         data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'}${s.template ? ` · new ones start with the template ${s.template}` : ''}${s.preset ? ` · new ones start ${s.preset}` : ''} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
@@ -502,7 +512,47 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
 }
 
 // the sidebar itself (App keeps it, hidden, while a video plays)
+// U11: the list is a tree: one tab stop (the selected workspace's row, else the first), ↑↓ Home End move, → opens or
+// goes in, ← closes or goes up, Enter opens, Space picks (as ⌘-click), ⇧F10 or the Menu key its menu. A button in a row
+// keeps its own keys
+const ITEM = '[role=treeitem]'
+const rove = (tree: HTMLElement, to: HTMLElement) => {
+  for (const x of tree.querySelectorAll<HTMLElement>(`${ITEM}[tabindex="0"]`)) if (x !== to) x.tabIndex = -1
+  to.tabIndex = 0
+}
+function treeKey(e: ReactKey<HTMLElement>) {
+  const el = e.target as HTMLElement
+  if (el.getAttribute('role') !== 'treeitem' || e.metaKey || e.ctrlKey || e.altKey) return
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>(ITEM)].filter(x => x.offsetParent)
+  const i = items.indexOf(el)
+  const level = (x: HTMLElement) => Number(x.getAttribute('aria-level') ?? 1)
+  const to = (x?: HTMLElement) => x && (e.preventDefault(), rove(e.currentTarget, x), x.focus())
+  const open = el.getAttribute('aria-expanded')
+  const toggle = () => (e.preventDefault(), (el.querySelector<HTMLElement>('.project-chev') ?? el).click())
+  if (e.key === 'ArrowDown') to(items[i + 1])
+  else if (e.key === 'ArrowUp') to(items[i - 1])
+  else if (e.key === 'Home') to(items[0])
+  else if (e.key === 'End') to(items.at(-1))
+  else if (e.key === 'ArrowRight') open === 'false' ? toggle() : open === 'true' && to(items[i + 1])
+  else if (e.key === 'ArrowLeft') open === 'true' ? toggle() : to(items.slice(0, i).reverse().find(x => level(x) < level(el)))
+  else if (e.key === 'Enter') e.preventDefault(), el.click()
+  else if (e.key === ' ') e.preventDefault(), el.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: el.classList.contains('ws') && !el.classList.contains('ws-new') }))
+  else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+    e.preventDefault()
+    const r = el.getBoundingClientRect()
+    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: r.x + 16, clientY: r.bottom - 4 }))
+  }
+}
+
 export function Sidebar({ app }: { app: AppCtx }) {
+  const tree = useRef<HTMLDivElement>(null)
+  // its one tab stop: kept where the keys left it while the focus is in it, else the selected row (or the first)
+  useLayoutEffect(() => {
+    const t = tree.current
+    if (!t || t.contains(document.activeElement)) return
+    const stop = t.querySelector<HTMLElement>(`.ws.sel${ITEM}`) ?? t.querySelector<HTMLElement>(ITEM)
+    if (stop) rove(t, stop)
+  })
   const { addMenu, busiest, dialog, find, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
   return (
     <aside className="sidebar" hidden={!sideOpen || listOff || !!strip} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
@@ -563,20 +613,20 @@ export function Sidebar({ app }: { app: AppCtx }) {
           <IconButton icon="x" title="Clear (Esc)" onClick={() => setPicked([])} />
         </div>
       )}
-      <div className="side-scroll">
+      <div className="side-scroll" role="tree" aria-label="Workspaces" ref={tree} onKeyDown={treeKey} onFocus={e => (e.target as HTMLElement).getAttribute('role') === 'treeitem' && rove(e.currentTarget, e.target as HTMLElement)}>
         {find && !found && <div className="empty-side muted">No workspace matches.</div>}
         {!find && (!rail || railKind === 'projects') && settings.needsList !== false && (
           <NeedsList items={needsSorted(needing, staleMin).flatMap(t => (w => (w ? [{ t, w }] : []))(live.find(w => w.id === t.workspace)))} shut={folded.includes('needs')} onFold={() => fold('needs')} api={needsApi} next={needNext?.id} staleAfter={staleMin} />
         )}
         {pins.length > 0 && (
           <div className="project pinned">
-            <div className="project-head">
+            <div className="project-head" role="treeitem" aria-level={1} aria-expanded aria-label="Pinned" tabIndex={-1}>
               <span className="project-icon">
                 <Icon name="pin" size={12} />
               </span>
               <span className="project-name">Pinned</span>
             </div>
-            <div className="project-ws">{pins.map(w => wsRow(w, true))}</div>
+            <div className="project-ws" role="group">{pins.map(w => wsRow(w, true))}</div>
           </div>
         )}
         {listed.map(p => {
@@ -590,6 +640,11 @@ export function Sidebar({ app }: { app: AppCtx }) {
           <div key={p.id} className={`project ${rows.at('project', p.id)}`} data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
             <div
               className={`project-head ${p.color && p.color !== 'none' ? 'tinted' : ''}`}
+              role="treeitem"
+              aria-level={1}
+              aria-expanded={!shut}
+              aria-label={p.name}
+              tabIndex={-1}
               style={colorVar(p.color)}
               data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · ${p.kind ? `click to ${shut ? 'expand' : 'collapse'}` : `click for its page (notes, tasks, memory, settings) · the arrow ${shut ? 'expands' : 'collapses'} it`} · drag to move`}
               onPointerDown={e => rows.start(e, 'project', p.id)}
@@ -614,16 +669,16 @@ export function Sidebar({ app }: { app: AppCtx }) {
               <IconButton icon="plus" title={p.kind || !termsOk ? newWord(p) : 'New workspace or terminal'} onClick={e => (p.kind || !termsOk ? newIn(p) : openMenu(e, plusMenu(p)))} />
               <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
             </div>
-            <div className="project-ws">{/* under its project, on a guide line */}
+            <div className="project-ws" role="group">{/* under its project, on a guide line */}
             {hits ? hits.map(w => wsRow(w)) : shut ? [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id))] : shownRows(p, mine)}{/* folded: only one on its way stays */}
             {!shut && !hits && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // nothing here yet (none pinned either): the way to start
-              <div className="ws ws-new" onClick={() => newIn(p)}>
+              <div className="ws ws-new" role="treeitem" aria-level={2} tabIndex={-1} onClick={() => newIn(p)}>
                 <Icon name="plus" size={12} />
                 <span className="ws-name">{newWord(p)}</span>
               </div>
             )}
             {!shut && !hits && !p.kind && termsOk && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // or just a shell there
-              <div className="ws ws-new" onClick={() => termIn(p)}>
+              <div className="ws ws-new" role="treeitem" aria-level={2} tabIndex={-1} onClick={() => termIn(p)}>
                 <Icon name="terminal" size={12} />
                 <span className="ws-name">Terminal</span>
               </div>
@@ -636,7 +691,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
           (railKind === 'projects' || !rail || find ? (
             <div className="empty-side muted">Open a folder (⌘O) or drop one here.</div>
           ) : (
-            <div className="ws ws-new" onClick={() => quickNew(railKind)}>{/* Terminals and Browsers: the first one makes the project */}
+            <div className="ws ws-new" role="treeitem" aria-level={2} tabIndex={-1} onClick={() => quickNew(railKind)}>{/* Terminals and Browsers: the first one makes the project */}
               <Icon name="plus" size={12} />
               <span className="ws-name">{railKind === 'shells' ? 'New terminal' : 'New browser'}</span>
             </div>

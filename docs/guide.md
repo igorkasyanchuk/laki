@@ -1956,6 +1956,8 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘J | the next tab that needs you (waiting first, then done unseen), across workspaces |
+| ↑ ↓ ← → Home End (the sidebar's list focused) | move between projects, groups and workspaces; → opens a folded one, ← folds it or goes up; Enter opens, Space picks, ⇧F10 or the Menu key its menu (one Tab stop: the selected row) |
+| ⇧A (a Needs you card focused) | Allow all (it lists each first) |
 | ⌘G | the workspace's next step (first in its ⋯) |
 | ⌘⇧F | filter the sidebar: its box gets the keys (again in the box: closed) |
 | ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
