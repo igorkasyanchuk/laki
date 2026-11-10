@@ -27,7 +27,7 @@ test('a new worktree gets the ignored files .worktreeinclude and .laki.json copy
 })
 
 test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them; an edit stops them; ZDOTDIR refused; older projects trusted", async t => {
-  const rig = await fresh(t, { config: { setup: 'echo "$FOO-$ZDOTDIR" > env.txt', env: { FOO: 'bar', ZDOTDIR: '/tmp/evil' }, ports: { 3000: 'web' } } })
+  const rig = await fresh(t, { config: { setup: 'echo "$FOO-$ZDOTDIR-$GIT_SSH_COMMAND$PYTHONSTARTUP$npm_config_script_shell" > env.txt', env: { FOO: 'bar', ZDOTDIR: '/tmp/evil', GIT_SSH_COMMAND: 'evil', PYTHONSTARTUP: '/tmp/evil.py', npm_config_script_shell: '/tmp/evil' }, ports: { 3000: 'web' } } })
   const p = await rig.rpc('projectAdd', { path: rig.repo, untrusted: true })
   const proj = async () => (await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id)
   assert.ok((await proj()).cfgWait)
@@ -48,7 +48,7 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   // trusting runs the setup that waited, with its env, ZDOTDIR refused (and said once)
   // its line, not just the file: the shell's > makes it empty first, echo writes it a moment later
   await until(() => existsSync(join(a.path, 'env.txt')) && readFileSync(join(a.path, 'env.txt'), 'utf8').endsWith('\n'), 'the waiting setup runs')
-  assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar-\n')
+  assert.equal(readFileSync(join(a.path, 'env.txt'), 'utf8'), 'bar--\n') // S12: git's ssh, Python's startup, npm's config too
   assert.equal((await ws(a.id)).setupWait, undefined)
   assert.equal((await ws(skip.id)).setupWait, undefined)
   await sleep(1000)

@@ -182,7 +182,7 @@ xattr -dr com.apple.quarantine /Applications/Laki.app
 ```
 
 `npm run pack:x64` builds the Intel app on an Apple silicon Mac (it adds node-pty's Intel binary to
-`node_modules`, unsaved; the next `npm install` drops it).
+`node_modules`, the one package-lock.json pins, checked; the next `npm install` drops it).
 
 ### Linux, and Windows through WSL
 

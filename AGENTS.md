@@ -76,9 +76,13 @@ npm run dev                       # Electron + renderer dev server on :5199
   `codesign --verify --deep --strict` on the built app must pass. `npm run release` overrides it with the Developer ID
   in the Keychain (`.env`'s `LAKI_SIGN_ID`, gitignored: `.env.example`), the hardened runtime and notarization (`laki-notary`): what goes to
   `igorkasyanchuk/laki-releases`, a plain double-click everywhere.
-- Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, so another
-  program can't run its code as Laki (and borrow its privacy grants); `runAsNode` stays (the daemon, the CLI, hooks, MCP,
-  widget scripts and `--headless` run through `ELECTRON_RUN_AS_NODE`), and the asar ones (asar is off). Cookie encryption
+- Fuses (`build.electronFuses`, electron-builder's `@electron/fuses`): `--inspect` and `NODE_OPTIONS` off, and main quits
+  on Chromium's `--remote-debugging-*` switches. But `runAsNode` stays on (the daemon, the CLI, hooks, MCP, widget
+  scripts and `--headless` run through `ELECTRON_RUN_AS_NODE`), so any local program can still run its own JavaScript
+  inside Laki's signed binary (`ELECTRON_RUN_AS_NODE=1 Laki x.js`, `open --env`) and inherit Laki's privacy grants
+  (Screen Recording, Accessibility, the microphone, Keychain items allowed to Laki): the fuses don't stop that. The
+  planned fix: the daemon, CLI and hooks on a helper binary of their own, the app's with the fuse off (SECURITY.md's
+  known limits). The asar ones stay off (asar is off). Cookie encryption
   stays off: Chromium's cookie store then waits on the Keychain's *Laki Safe Storage*, the window never reaches the daemon
   until it's answered (pack-smoke's temp home: never), and an ad-hoc signature asks again after each update.
   `npx electron-fuses read --app dist/mac-arm64/Laki.app` shows them.
@@ -276,7 +280,8 @@ redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, 
   (`.bn-suggestion-node`, `-mark`: Yjs collaboration, never used here) for the same reason.
 - **`asar` is off**, because node-pty's helper must be a real file. The packaged daemon runs on Electron's node.
 - **Intel**: node-pty is `@lydell/node-pty`, a prebuilt binary per platform in an optional package; npm installs only
-  this Mac's, so `pack:x64` adds `@lydell/node-pty-darwin-x64` (`--no-save --force`) before `electron-builder --x64`.
+  this Mac's, so `pack:x64` adds `@lydell/node-pty-darwin-x64` (`scripts/x64-pty.ts`: the tarball package-lock.json pins,
+  checked against its integrity; it's in `optionalDependencies` too) before `electron-builder --x64`.
   Nothing else is native. The CLI's `open` and the scripts pick `dist/mac-arm64` or `dist/mac` by architecture.
 - **User-facing text** is short and plain. When adding commands or keys, update `docs/guide.md` (keys, CLI),
   `README.md` when it's a main one, and the CLI's usage (`src/shared/usage.ts`, which the agent skill quotes).

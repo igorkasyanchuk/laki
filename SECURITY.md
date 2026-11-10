@@ -81,6 +81,11 @@ Out of scope:
   source (`npm run pack`) is ad-hoc signed: macOS asks you to allow it once (Privacy & Security › Open Anyway; the
   guide's [Install](docs/guide.md#install)).
 - Electron's cookie encryption fuse is off: turned on, the Keychain prompt keeps the window from reaching the daemon.
+- Electron's `runAsNode` fuse is on (the daemon, the CLI, hooks and MCP run as Electron's node): any program running as
+  you can run its own JavaScript inside Laki's signed binary (`ELECTRON_RUN_AS_NODE=1`) and borrow the privacy grants
+  you gave Laki (Screen Recording, Accessibility, the microphone, Keychain items allowed to Laki). The `--inspect` and
+  `NODE_OPTIONS` fuses are off and Chromium's debugging switches are refused, but that one stays until the planned fix:
+  the daemon, CLI and hooks on a helper binary of their own, with the app's binary's fuse off.
 - A public tunnel (Expose to the world, *anyone with the link*) comes back after Laki restarts or updates, at a new
   address, until its time runs out or you stop it. A permanent tunnel (your own domain) has no lock of Laki's: protect
   it with Cloudflare Access, as Settings › Tunnels says.

@@ -45,8 +45,8 @@ from inside the page, main's `before-input-event` takes ⌘W and ⌘T from it an
 agent without Laki's and Electron's names; on accounts.google.com (main's `googleSignIn`, every webContents of the session: the page and a sign-in popup) Firefox's (`FIREFOX`, the request's header too, no `sec-ch-ua*`), which Google lets sign in; its rejected page opens the sign-in in your browser (`shell.openExternal`, its `continue`), a popup closed, and `BrowserPane` says so. `text.ts` `browserUrl` reads the address bar (a URL, a site, else a
 DuckDuckGo search).
 
-The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, the preview's
-partition, sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
+The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, a partition of
+its own, `AGENT_BROWSER`, in memory: S12, never the Preview's cookies; `PREVIEW_OK` permissions; sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
 click and fill run in the page (`pageJs`: the first match, scrolled into view; fill sets the value through the
 native setter and fires input and change), then wait 300 ms (`settle`: and a load it started, 5 s at most). Open,
 click and fill answer with what they caused (shared/types.ts `BrowseDid`): `nav` (moved), `errors` (`console-message`

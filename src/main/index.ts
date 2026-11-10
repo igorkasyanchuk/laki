@@ -154,6 +154,7 @@ ipcMain.on('deep-link-ready', e => {
 // the preview pane's <webview>: it starts on this Mac's localhost and can go to any website (the address bar, links),
 // in its own session, without node or a preload (and, with no allowpopups, without popups)
 const PREVIEW = 'persist:preview'
+const AGENT_BROWSER = 'agent-browser' // S12: the agent browser's hidden windows: in memory, never the Preview's cookies
 const BROWSER = 'persist:browser' // the sidebar's Browsers: any site, its sign-ins kept between runs
 const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
 // Google turns away sign-in in an app's web view ("This browser or app may not be secure"): on its sign-in pages a
@@ -292,7 +293,7 @@ function spellMenu(wc: Electron.WebContents) {
 // sensitive ones (camera, microphone, location, clipboard reads, notifications…)
 const PREVIEW_OK = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock'])
 app.whenReady().then(() => {
-  for (const s of [session.fromPartition(PREVIEW), session.fromPartition(BROWSER)]) {
+  for (const s of [session.fromPartition(PREVIEW), session.fromPartition(BROWSER), session.fromPartition(AGENT_BROWSER)]) {
     s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
     s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
   }
@@ -647,7 +648,7 @@ ipcMain.handle('browse', async (e, r: Browse) => {
   if (e.sender !== win?.webContents) throw new Error('not the app window')
   let a = agentWins.get(r.ws)
   if (!a || a.w.isDestroyed()) {
-    const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: PREVIEW, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
+    const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: AGENT_BROWSER, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
     const made: AgentWin = { w, errors: [], blocked: [], turn: Promise.resolve() }
     const block = (u: string) => made.blocked.length < 20 && made.blocked.push(u.slice(0, 300))
     w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))

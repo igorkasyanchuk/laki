@@ -27,7 +27,7 @@
     "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",
     "pack": "electron-vite build && electron-builder --dir --publish never",
     "dmg": "npm run check && npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg --publish never -c.directories.output=dist/release",
-    "pack:x64": "npm i --no-save --force @lydell/node-pty-darwin-x64@$(node -p \"require('./node_modules/@lydell/node-pty/package.json').version\") && electron-vite build && electron-builder --dir --x64 --publish never",
+    "pack:x64": "node --experimental-strip-types --no-warnings scripts/x64-pty.ts && electron-vite build && electron-builder --dir --x64 --publish never",
     "pack:linux": "bash scripts/linux.sh",
     "release": "bash scripts/release.sh",
     "daemon": "node --experimental-strip-types --no-warnings src/daemon/main.ts",
@@ -39,6 +39,9 @@
     "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",
     "ws": "^8.22.1"
+  },
+  "optionalDependencies": {
+    "@lydell/node-pty-darwin-x64": "1.2.0-beta.18"
   },
   "devDependencies": {
     "@blocknote/core": "^0.57.0",

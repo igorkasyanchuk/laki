@@ -1033,7 +1033,8 @@ export const cfgHash = (c: ProjectConfig) => createHash('sha256').update(JSON.st
 export const cfgWait = (p: Project) => (({ c, h }) => (Object.keys(c).some(k => k !== 'ports') && h !== p.trusted ? h : undefined))(cfgRead(p))
 // env a .laki.json never sets, trusted or not: they change how programs start (a shell's rc, node, the linker, an
 // agent's endpoint or its folder); each refused once in daemon.log
-const ENV_BAD = /^(ZDOTDIR|BASH_ENV|ENV|NODE_OPTIONS|PATH|DYLD_.*|LD_.*|.*_BASE_URL|CLAUDE_CONFIG_DIR|CODEX_HOME)$/
+// S12: and what makes git, Python, Ruby, Perl or npm run code of a repo's choosing in every tab and script
+const ENV_BAD = /^(ZDOTDIR|BASH_ENV|ENV|NODE_OPTIONS|PATH|DYLD_.*|LD_.*|.*_BASE_URL|CLAUDE_CONFIG_DIR|CODEX_HOME|GIT_SSH_COMMAND|GIT_SSH|GIT_EXEC_PATH|GIT_CONFIG_.*|GIT_CONFIG|PYTHONSTARTUP|PYTHONPATH|RUBYOPT|PERL5OPT|PERL5LIB|npm_config_.*|NPM_CONFIG_.*|BASH_FUNC_.*)$/
 const envSaid = new Set<string>()
 const envOk = (p: Project, env: unknown) =>
   env && typeof env === 'object'
@@ -1540,7 +1541,12 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   }
   const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
-  return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
+  const line = [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' ')
+  // S12: the values emptied for the agent itself (sh, bash, zsh: an assignment before a command takes effect after its
+  // words are expanded, and an alias still expands): its children don't inherit its prompt and note. ponytail: fish
+  // sets it first (its args would be empty), and a host's shell is unknown: those keep them
+  const clear = h === localHooks && n && !/(^|\/)fish$/.test(shell) ? `${Object.keys(env).filter(k => k.startsWith('LAKI_ARG_')).map(k => `${k}=`).join(' ')} ` : ''
+  return { cmd: `${clear}${line}`, env }
 }
 
 // codex's sandbox: workspace-write, unless its mode or its profile's flags pick a sandbox already (read-only is

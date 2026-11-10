@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Safer: an agent's prompt and note no longer reach every program it starts, the agent browser keeps its cookies apart from the Preview's, and a repo's `.laki.json` env can't set git's ssh command, Python's, Ruby's, Perl's or npm's start-up hooks.
 - Safer remote access: the link's key is in its `#` part (never sent to a server or kept in a log), the page's connection sends its token in its first message, and a phone can't expose a port, schedule a task, share a tab for good or change a project's scripts. A webhook delivery sent twice runs once.
 - Safer: a `laki alert` card always says who sent it (agent, project, workspace, tab) on its first line and no longer looks like a permission ask; a repo extension's turn-on sheet says when it cut a file and has you open it whole first; `laki secret` won't write through a link.
 - Safer: a sandboxed Claude can't read Laki's data folder (its keys, state and accounts), only pasted images and files, storage folders and worktrees.

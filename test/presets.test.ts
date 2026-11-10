@@ -20,7 +20,8 @@ async function slyPrompt(t: TestContext, env?: Record<string, string>) {
   assert.match(line, /"\$LAKI_ARG_\d+"/)
   assert.ok(!line.includes("';echo"), line)
   assert.match(run.args[run.args.indexOf('--append-system-prompt') + 1], /Laki/) // the note, whole
-  await sleep(500)
+  // S12: emptied for claude itself, so its children don't inherit them (fish: kept, its args would be empty)
+  if (!env?.SHELL) assert.ok(run.largs.length > 0 && run.largs.every((v: string) => v === ''), JSON.stringify(run.largs))
   assert.ok(!existsSync(join(rig.home, 'pwned')), 'nothing ran')
 }
 test("an agent's prompt goes in as an env var, never shell-quoted: one ending in \\';echo pwned;# reaches claude unchanged", async t => {

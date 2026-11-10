@@ -193,7 +193,9 @@ Queries (DA, DSR/CPR, DECRQM, DECRQSS, XTVERSION, OSC color) are answered exactl
 
 Commands run as `$SHELL -lic '<cmd>'`. An agent's values (its prompt, Laki's note, paths, flags: `agentCmd`) are
 never quoted into that line: a plain word (`PLAIN`) goes in as it is, anything else in the tab's env as `LAKI_ARG_n`,
-named `"$LAKI_ARG_n"` (sh, bash, zsh and fish expand it whole; fish reads `\'` inside single quotes as an escape); on an
+named `"$LAKI_ARG_n"` (sh, bash, zsh and fish expand it whole; fish reads `\'` inside single quotes as an escape); S12:
+the line starts with `LAKI_ARG_0= …` (not in fish, nor on a host): sh, bash and zsh expand the words first, so the
+agent gets them whole and its own environment has them empty, and its children never inherit the prompt; on an
 SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as written. The environment adds:
 - `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
 - an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
