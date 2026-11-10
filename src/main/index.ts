@@ -8,7 +8,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
+import { appToken, dataDir, ensureDaemon, logLine, rpc } from '../shared/conn.ts'
 import { cardQueue, cardRect, type CardEvent, type CardLife, fullScreen, islandDisplay, lifeStep, pillRect, type Rect } from '../shared/island.ts'
 import { type KeyId, keyFor, keyMap } from '../shared/keys.ts'
 import { type BrowseDid, pageChanges, urlIs, type View } from '../shared/types.ts'
@@ -108,6 +108,9 @@ if (headless > 0) {
   process.exit(r.status ?? 1)
 }
 
+// S1: Chromium's debugger switches would hand any program the window's JavaScript, the app's token with it (the fuses
+// cover node's --inspect only): a start with one ends here
+if (['remote-debugging-port', 'remote-debugging-pipe', 'remote-debugging-address'].some(k => app.commandLine.hasSwitch(k))) app.exit(1)
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
 // laki://… (Info.plist names the scheme): the renderer routes it; it only selects and opens pages, never creates
@@ -324,12 +327,16 @@ app.whenReady().then(() => {
   )
 })
 
+// S1: as the app: its token too (the user's), which only its windows get (conn)
 const daemon = () =>
-  ensureDaemon({
-    ELECTRON_RUN_AS_NODE: '1',
-    LAKI_FROM_APP: '1',
-    ...(dev ? { LAKI_DEV_ORIGIN: devOrigin } : {}),
-  })
+  ensureDaemon(
+    {
+      ELECTRON_RUN_AS_NODE: '1',
+      LAKI_FROM_APP: '1',
+      ...(dev ? { LAKI_DEV_ORIGIN: devOrigin } : {}),
+    },
+    true,
+  )
 
 // where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it
 // was either. Only when they're on a screen still there (a monitor unplugged: maximized again, as the first start)
@@ -508,7 +515,7 @@ ipcMain.handle('conn', async e => {
   if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
-  return { port, token }
+  return { port, token: appToken() ?? token } // S1: the app's; daemon.json's only when it couldn't be had (its calls that ask who are refused)
 })
 // sound: a macOS sound's name (Settings › General), 'none', or unset: the default. actions: buttons (a waiting agent's
 // choices, or a permission prompt's Allow and Deny; macOS shows the first with the Alerts style and the rest under

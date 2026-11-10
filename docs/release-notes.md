@@ -4,6 +4,10 @@ version it builds, with the date. -->
 
 ## Next
 
+- Safer: an agent can't open a page it wrote in a browser, and its *Expose to the world* asks you first; a project's *Expose* list (who gets in) now holds for every tunnel to it, yours too.
+- Safer: agents can no longer read or change your notes and To-dos, Laki AI's key, the `laki` command on PATH, remote access or Settings › Resources; their deletes of a spec, a note or an extension ask you first.
+- Safer: `laki` in a Laki tab never starts a daemon (`laki daemon`, `laki serve`, or a call when none runs): an agent can't start a second, unsandboxed one in a folder of its own.
+- Safer: a process that leaves its agent's tab (`setsid`, a launchd job) no longer counts as you: only Laki's window (a token of its own, never on disk) and `laki` from a terminal of yours do. `laki` from a cron job or another app's MCP server is refused what only you may do.
 - Archive keeps uncommitted work: what a worktree hadn't committed is saved with the archive and comes back with *Restore* (local projects; gone once the archive is deleted).
 - Safer: `laki archive`, a workflow's Archive and an agent's archive stop on uncommitted work (`laki archive --force` goes on); `laki rm` refuses when uncommitted or unpushed work would go with it (`--force`).
 - Safer: a merge from Laki (the button, Merge when green) only merges the commit whose checks it saw; a push in between refuses it, and the checks run again.

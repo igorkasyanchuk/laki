@@ -13,6 +13,13 @@ export const dataDir = (home = homedir()) =>
 
 export type DaemonInfo = { port: number; token: string; pid: number }
 
+// S4: in a Laki tab ($LAKI_TAB or $LAKI_TAB_TOKEN, set at all: an empty one too): the CLI only talks to a daemon that
+// runs, never starts one (ensureDaemon, laki daemon, laki serve): a sandboxed claude runs laki outside its sandbox, and
+// a LAKI_HOME of its own with a state.json it wrote would start a second daemon there, outside it. The launcher on PATH
+// pins LAKI_HOME to its daemon's; one pointed elsewhere finds no daemon there and fails
+export const inTab = () => 'LAKI_TAB' in process.env || 'LAKI_TAB_TOKEN' in process.env
+export const NO_START = "Laki's daemon isn't running, and laki in a Laki tab never starts one: open Laki"
+
 export function daemonInfo(): DaemonInfo | null {
   try {
     return JSON.parse(readFileSync(join(dataDir(), 'daemon.json'), 'utf8'))
@@ -36,6 +43,22 @@ export async function rpc<T = any>(method: string, params: any = {}, timeoutMs =
   }
 }
 
+// S1: the app's own token (main.ts' appToken: the user's), for the daemon whose pid it's of: read on fd 3 from a daemon
+// the app started, else asked for (appPair). Never on disk or in a child's env: LAKI_APP_TOKEN (a test's CLI, the UI
+// smoke's app) is taken out of this process's env as it's read
+let app = process.env.LAKI_APP_TOKEN ? { token: process.env.LAKI_APP_TOKEN, pid: 0 } : undefined
+delete process.env.LAKI_APP_TOKEN
+let appMode = false // the app's main (ensureDaemon's app): a daemon started again is paired with again
+export const appToken = () => app?.token
+async function pair(info: DaemonInfo) {
+  appMode = true
+  if (app && (!app.pid || app.pid === info.pid)) return
+  app = undefined
+  const r = await fetch(`http://127.0.0.1:${info.port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${info.token}` }, body: '{"method":"appPair"}', signal: AbortSignal.timeout(10000) }).then(r => r.json())
+  if (r.error) throw new Error(r.error)
+  app = { token: r.result.token, pid: info.pid }
+}
+
 async function post(method: string, params: any, timeoutMs: number) {
   const info = daemonInfo()
   if (!info) throw new Error('daemon not running')
@@ -48,7 +71,8 @@ async function post(method: string, params: any, timeoutMs: number) {
     })
   // S12: in a Laki tab, with that tab's token (LAKI_TAB_TOKEN, this start's): the daemon knows the caller by it. One
   // of a start that ended (its tab restarted under a process that lives on, another Laki's): the daemon's own, as before
-  const mine = process.env.LAKI_TAB_TOKEN
+  if (appMode && app?.pid && app.pid !== info.pid) await pair(info).catch(() => {}) // the app's daemon started again
+  const mine = process.env.LAKI_TAB_TOKEN || app?.token // a tab's first: a CLI in a tab is that tab's, whatever else it has
   let res = await send(mine || info.token)
   if (mine && res.status === 401) (await res.arrayBuffer(), (res = await send(info.token)))
   const body = await res.json()
@@ -95,19 +119,33 @@ export function logLine(path: string, ...a: unknown[]) {
   } catch {}
 }
 
-// ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already.
-export async function ensureDaemon(env: Record<string, string> = {}): Promise<DaemonInfo> {
-  if (await alive()) return daemonInfo()!
+// ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already. app (the app's main, the
+// demo world): the app's token too (S1), on fd 3 from the one it starts, else asked for
+export async function ensureDaemon(env: Record<string, string> = {}, asApp = false): Promise<DaemonInfo> {
+  const paired = async (info: DaemonInfo) => (asApp && (await pair(info).catch(e => console.error(`laki: no app token: ${(e as Error).message}`))), info)
+  if (await alive()) return paired(daemonInfo()!)
+  if (inTab()) throw new Error(NO_START)
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 })
   const logPath = join(dataDir(), 'daemon.log')
   rotateLog(logPath) // and each hour as it runs (main.ts' logTick)
   const log = openSync(logPath, 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
-  spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log], env: { ...process.env, ...env } }).unref()
+  const child = spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log, ...(asApp ? (['pipe'] as const) : [])], env: { ...process.env, ...env, ...(asApp && { LAKI_APP_PIPE: '3' }) } })
+  child.unref()
+  let said = ''
+  const pipe = asApp ? (child.stdio[3] as import('node:net').Socket) : undefined
+  pipe?.on('data', d => (said += d)).on('error', () => {}).unref()
   for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 100))
-    if (await alive()) return daemonInfo()!
+    if (await alive()) {
+      const info = daemonInfo()!
+      for (let j = 0; asApp && !said.includes('\n') && j < 20 && !pipe!.readableEnded; j++) await new Promise(r => setTimeout(r, 50)) // written after daemon.json
+      pipe?.destroy()
+      if (/^[0-9a-f]{64}\n/.test(said)) ((app = { token: said.slice(0, 64), pid: info.pid }), (appMode = true))
+      return paired(info) // another start's daemon won the lock: asked for
+    }
   }
+  pipe?.destroy()
   throw new Error(`daemon didn't start; see ${logPath}`)
 }
 

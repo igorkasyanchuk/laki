@@ -1,8 +1,10 @@
 // The laki CLI against a daemon in a temp home.
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { dataDir } from '../src/shared/conn.ts'
 import { fresh, running, until } from './helpers.ts'
 
@@ -237,8 +239,9 @@ test('cli: starts the daemon when none runs; stop ends it', async t => {
   assert.deepEqual(JSON.parse(r.out).projects, [])
   const { pid } = rig.info()
   assert.match(readFileSync(join(rig.data, 'daemon.log'), 'utf8'), new RegExp(`laki daemon on 127\\.0\\.0\\.1:\\d+ \\(pid ${pid}`))
-  r = await rig.cli('stop')
-  assert.equal(r.code, 0)
+  // S1: from a terminal of yours (script gives it one): a daemon the CLI started gives no app token
+  const term = (...a: string[]) => execFileSync('script', ['-q', '/dev/null', process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url)), ...a], { env: rig.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  term('stop')
   await until(() => !running(pid), 'daemon gone')
   assert.ok(!existsSync(join(rig.data, 'daemon.json')))
   r = await rig.cli('stop') // none running: nothing to do

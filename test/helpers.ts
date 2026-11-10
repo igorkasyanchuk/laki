@@ -95,16 +95,21 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     env,
     data: env.LAKI_HOME,
     out: '', // what the daemon said (its daemon.log when detached), every start's
+    app: '', // S1: the app's token, as main reads it from the daemon it starts (fd 3): the rig's calls are the app's window
     async start() {
-      daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+      daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env: { ...env, LAKI_APP_PIPE: '3' }, stdio: ['ignore', 'pipe', 'pipe', 'pipe'] })
       daemon.stdout!.on('data', d => (rig.out += d))
       daemon.stderr!.on('data', d => (rig.out += d))
+      let said = ''
+      daemon.stdio[3]!.on('data', d => (said += d))
+      await until(() => /^[0-9a-f]{64}\n/.test(said) && (rig.app = said.slice(0, 64)), `daemon start (${rig.out})`)
       await until(() => rig.rpc('ping').then(r => r === 'pong'), `daemon start (${rig.out})`)
     },
     async stop() {
       if (!daemon) return
       const d = daemon
       daemon = null
+      rig.app = '' // that daemon's: a CLI's autostart gives none (S1)
       const gone = new Promise(r => d.once('exit', r))
       d.kill('SIGTERM')
       await gone
@@ -112,11 +117,14 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     info: () => JSON.parse(readFileSync(join(env.LAKI_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string; pid: number },
     async rpc(method: string, params: object = {}): Promise<any> {
       const { port, token } = rig.info()
-      const res = await fetch(`http://127.0.0.1:${port}/rpc`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
-        body: JSON.stringify({ method, params }),
-      })
+      // the app's token; a daemon the CLI started (no fd 3) or a stopped one's: daemon.json's
+      const ask = (t: string) => fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${t}` }, body: JSON.stringify({ method, params }) })
+      let res = await ask(rig.app || token)
+      if (res.status === 401 && rig.app) res = await ask(token)
+      return rig.answer(method, params, res)
+    },
+    async answer(method: string, params: object, res: Response): Promise<any> {
+      if (res.status === 401) throw new Error('bad token')
       const b = await res.json()
       if (b.error) throw new Error(b.error)
       // a test's own .laki.json is trusted as its project comes (H1's tests add with untrusted: true)
@@ -134,7 +142,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     },
     cliIn(stdin: string | undefined, ...args: string[]): Promise<{ code: number; out: string; err: string }> {
       return new Promise(r => {
-        const p = spawn(node[0], [...node.slice(1), join(root, 'src/cli/main.ts'), ...args], { env })
+        const p = spawn(node[0], [...node.slice(1), join(root, 'src/cli/main.ts'), ...args], { env: { ...env, ...(rig.app && { LAKI_APP_TOKEN: rig.app }) } }) // S1: the app's, as your window's calls
         if (stdin !== undefined) p.stdin.end(stdin)
         let out = ''
         let err = ''
@@ -157,10 +165,13 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   }
   t.after(async () => {
     await rig.stop()
-    // a daemon the CLI started in this home (autostart): shut down through its own daemon.json
+    // a daemon the CLI started in this home (autostart): shut down by its pid (SIGTERM: its shutdown), daemon.json's
     if (existsSync(join(env.LAKI_HOME, 'daemon.json'))) {
       const { pid } = rig.info()
-      if (await rig.rpc('shutdown').then(() => true, () => false)) await until(() => !running(pid), 'autostarted daemon gone').catch(() => {})
+      try {
+        process.kill(pid, 'SIGTERM')
+        await until(() => !running(pid), 'autostarted daemon gone').catch(() => {})
+      } catch {}
     }
     // a child the daemon started (a PR scan's gh) may still write here a moment after it stopped
     for (let i = 0; ; i++) {
@@ -175,9 +186,9 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
 }
 
 // A WebSocket client like the renderer's: requests by id, events collected.
-export async function connect(rig: { info(): { port: number; token: string } }, origin?: string, token?: string) {
+export async function connect(rig: { info(): { port: number; token: string }; app?: string }, origin?: string, token?: string) {
   const { port, token: tk } = rig.info()
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token ?? tk}`, origin ? { origin } : {})
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token ?? (rig.app || tk)}`, origin ? { origin } : {}) // S1: the app's window's token
   let seq = 0
   const waiting = new Map<number, (m: any) => void>()
   const events: any[] = []

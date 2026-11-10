@@ -76,7 +76,7 @@ test('gates: a no holds a ship (nothing pushed), says why, gate.held; ok lets it
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', force: true, from: { ws: ws.id, tab: ag.id } }), /an agent never overrides a gate/)
   const ca = await new Promise<{ code: number; err: string }>(done => {
     const root = fileURLToPath(new URL('..', import.meta.url))
-    const c = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/main.ts'), 'ship', ws.id, '-m', 'x', '--force'], { env: { ...rig.env, LAKI_WORKSPACE: ws.id, LAKI_TAB: ag.id } })
+    const c = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/main.ts'), 'ship', ws.id, '-m', 'x', '--force'], { env: { ...rig.env, LAKI_WORKSPACE: ws.id, LAKI_TAB: ag.id, LAKI_APP_TOKEN: rig.app } })
     let err = ''
     c.stderr.on('data', d => (err += d))
     c.on('exit', code => done({ code: code ?? 1, err }))

@@ -21,7 +21,7 @@ const hookRun = (rig: any, tab: string, payload: object) =>
   new Promise<{ out: string; ms: number }>(done => {
     const root = fileURLToPath(new URL('..', import.meta.url))
     const t0 = Date.now()
-    const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/hook.ts'), 'hook', 'running'], { env: { ...rig.env, LAKI_TAB: tab } })
+    const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/hook.ts'), 'hook', 'running'], { env: { ...rig.env, LAKI_TAB: tab, LAKI_APP_TOKEN: rig.app } })
     let out = ''
     p.stdout.on('data', d => (out += d))
     p.on('exit', () => done({ out, ms: Date.now() - t0 }))

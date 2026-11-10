@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
+import { alive, daemonScript, ensureDaemon, inTab, NO_START, rpc } from '../shared/conn.ts'
 import { AGENTS, type AgentUsage, creatorOf, SECRET_WAIT, ALERT_WAIT, type AiCall, type AiMsg, type AiTotals, browseSays, cellsOf, DEVICE_OPS, eventOk, type Memory, type Plan, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type Preset, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
@@ -203,6 +203,7 @@ async function main() {
     case 'hook':
       return import('./hook.ts') // runs as it loads (agents' hooks run it directly: hookArgv)
     case 'daemon':
+      if (inTab()) throw new Error(NO_START) // S4
       return import(pathToFileURL(daemonScript()).href)
     case 'open': {
       // the app this CLI ships in, else this checkout's build (dist/mac-arm64: Apple silicon, dist/mac: Intel), else
@@ -220,6 +221,7 @@ async function main() {
     case 'stop':
       return rpc('shutdown', { from: caller(), ...(flags.keep && { keep: true }) }).catch(e => (e instanceof TypeError || /daemon not running/.test((e as Error).message) ? undefined : Promise.reject(e))) // none running, or gone before it answered: fine; a refusal (an agent's) or no answer says so
     case 'serve':
+      if (inTab()) throw new Error(NO_START) // S4: a daemon in this process
       return serve(rest)
     case 'remote': {
       // laki remote [stop]: remote access's link (and PIN) now, as Settings shows it; a headless server's way to it

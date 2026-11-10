@@ -15,10 +15,11 @@ const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home, LAKI
 const node = (...a: string[]) => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', ...a], { cwd: root, env, encoding: 'utf8' })
 let code = 1
 try {
-  node('scripts/demo.ts', home)
+  const demo = JSON.parse(node('scripts/demo.ts', home).trim().split('\n').pop()!) as { token?: string }
   // a new install starts without Labs: Workflows on for its step
   process.env.HOME = home
   process.env.LAKI_HOME = join(home, 'data')
+  if (demo.token) env.LAKI_APP_TOKEN = process.env.LAKI_APP_TOKEN = demo.token // S1: the app's token (the demo daemon isn't the app's to pair with: plain node)
   const { rpc } = await import('../src/shared/conn.ts')
   await rpc('settingsSet', { labs: true, workflows: true }) // Workflows on the rail (the other Labs pages stay off: it fits)
   const app = spawn(join(root, 'node_modules/.bin/electron'), [join(root, 'out/main/index.js'), `--user-data-dir=${join(home, 'userdata')}`, `--laki-smoke=${join(home, 'shots')}`], { cwd: root, env, stdio: 'ignore' })

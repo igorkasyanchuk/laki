@@ -87,7 +87,10 @@ Cloudflare's universal certificate covers one level), `routeDns` (`tunnel route 
 `url` is `https://<host>` and stays. A tunnel's `via` is the named tunnel its record goes to: after another name in
 Settings, `connect` leaves the others out, `down` (*stop it, remove that record…*). A random start on a port a permanent
 one has is refused, as the other way round; the hostname is checked free again after `routeDns`. Who gets in is Cloudflare Access's (your dashboard): Laki sets none, and the popup
-and Settings say so. An agent's `tunnelStart` with `host` is refused (main.ts `agentNo`; `tunnelStart` in `FROM`); a
+and Settings say so. An agent's `tunnelStart` with `host` is refused (main.ts `agentNo`; `tunnelStart` in `FROM`); S7: any other of an
+agent's asks you in the app first (main.ts `exposeAsk`, *Expose localhost:<port> to the world?*), unless the project
+has an `expose`, which `exposeRule` holds every caller to (only those addresses and domains, a bare domain as `*@` it;
+never anyone with the link); a
 remote client can't change `settings.tunnel` (`REMOTE_KEYS`). Resources' *Permanent tunnels* row stops them all
 (`tunnel:named`). Tested in `test/tunnel.test.ts` (the fake `test/cloudflared`'s `tunnel list`, `route dns`, `run`).
 Every `publisher` child (cloudflared, tailscale serve or funnel) is in `<data>/children.json` (pid, `ps -o lstart=`, its

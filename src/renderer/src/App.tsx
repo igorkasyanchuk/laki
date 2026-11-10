@@ -2342,6 +2342,14 @@ export function App() {
       toolLine.add({ req: m.req, title, text: String(m.text ?? ''), picks, answer })
       return toolShow()
     }
+    if (m.cross === 'expose') {
+      // S7: an agent's Expose to the world (main.ts' exposeAsk): who and how long in the text; once only
+      const title = String(m.target ?? 'Expose a port to the world?')
+      const picks: Pick[] = [{ label: 'Expose it', allow: 'once' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, `${m.agent} in ${m.from} asks`, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
+      toolLine.add({ req: m.req, title, text: `${m.agent} in ${m.from} asks for a public address.\n\n${m.text ?? ''}`, picks, answer })
+      return toolShow()
+    }
     if (m.cross === 'cmd') {
       // an agent's command in a new terminal tab (main.ts' cmdAsk: laki tab --cmd, laki new --tab): once only
       const title = `${m.agent} in ${m.from} wants to run a command in ${m.to}`

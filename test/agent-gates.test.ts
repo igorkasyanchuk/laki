@@ -2,10 +2,11 @@
 // the user, files and tabs are its own workspace's, a PR isn't merged as you, the settings and switches that are yours,
 // and Recording mode's private workspaces. test/caller.test.ts proves the from is its process's, whatever it says
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { existsSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { recorded, type View } from '../src/shared/types.ts'
 import { connect, fresh, seen, until } from './helpers.ts'
 
@@ -155,4 +156,133 @@ test("S3: the view's secrets are your window's alone: the CLI's and an agent's s
   // the whole view: stateOwn, never an agent's
   await assert.rejects(rig.rpc('stateOwn', { from: { ws: ws.id, tab } }), /an agent can't read the view's secrets/)
   assert.equal((await rig.rpc('stateOwn')).remote, undefined)
+})
+
+// S1: daemon.json's token says nothing of who calls: a process in no tab is you only with a terminal of its own (yours),
+// else (an agent's setsid and double fork out of its tab) it's refused; the app's own token is you, from anywhere
+test("S1: a detached process with daemon.json's token is refused what's yours; the CLI from a terminal and the app's window aren't", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, kind: 'local', name: 'one' })
+  const tab = (await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })).id
+  const { port, token } = rig.info()
+  const cli = fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))
+  const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
+  const env = { ...rig.env } // no LAKI_APP_TOKEN: daemon.json's
+  // setsid (detached): no terminal, its parent in no tab, not the daemon's
+  const loose = (code: string) =>
+    new Promise<string>(ok => {
+      const c = spawn(node[0], [...node.slice(1), '-e', code], { env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] })
+      let out = ''
+      c.stdout.on('data', d => (out += d))
+      c.on('exit', () => ok(out))
+    })
+  const post = (method: string, params: object) => `fetch('http://127.0.0.1:${port}/rpc', { method: 'POST', headers: { authorization: 'Bearer ${token}' }, body: ${JSON.stringify(JSON.stringify({ method, params }))} }).then(r => r.json())`
+  const calls = { tabNew: { ws: ws.id, cmd: 'touch pwned' }, settingsSet: { nextPrompt: true }, answer: { tab, n: 1 }, prAct: { ws: ws.id, act: 'merge' }, wsSet: { id: ws.id, name: 'taken' } }
+  const said = JSON.parse(await loose(`Promise.all([${Object.entries(calls).map(([m, x]) => post(m, x)).join(', ')}, ${post('ping', {})}, ${post('appPair', {})}]).then(r => console.log(JSON.stringify(r)))`))
+  for (const [i, m] of Object.keys(calls).entries()) assert.equal(said[i].error, "couldn't tell who's calling: try again", m)
+  assert.equal(said[5].result, 'pong', 'what asks no one who: still answered')
+  assert.match(said[6].error, /only Laki's app gets its token/)
+  assert.ok(!existsSync(join(ws.path, 'pwned')))
+  assert.equal((await rig.rpc('state')).settings.nextPrompt, undefined)
+  // the CLI from a terminal of yours (script gives it one): you
+  execFileSync('script', ['-q', '/dev/null', ...node, cli, 'rename', ws.id, 'by-you'], { env, stdio: 'ignore' })
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name, 'by-you')
+  // the same command detached: refused
+  const d = await loose(`require('node:child_process').execFile(${JSON.stringify(node[0])}, ${JSON.stringify([...node.slice(1), cli, 'rename', ws.id, 'by-it'])}, (e, o, er) => console.log(er))`)
+  assert.match(d, /couldn't tell who's calling/)
+  // the app's window (its token, from main's conn): yours, no terminal needed
+  const app = await connect(rig)
+  await app.call('settingsSet', { nextPrompt: true })
+  await app.call('wsSet', { id: ws.id, name: 'from-the-app' })
+  assert.equal((await rig.rpc('state')).settings.nextPrompt, true)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name, 'from-the-app')
+  app.close()
+})
+
+// S5: deny unless allowed: every method of api is classified (main.ts checks it as it loads; this reads its source)
+test('S5: every api method is in FROM, CALLER or OPEN', () => {
+  const s = readFileSync(fileURLToPath(new URL('../src/daemon/main.ts', import.meta.url)), 'utf8')
+  const at = s.indexOf('const api: Record<string, Handler> = {')
+  const keys = [...s.slice(at, s.indexOf('\n}\n', at)).matchAll(/^ {2}(\w+): /gm)].map(m => m[1])
+  const set = (n: string) => new Set(JSON.parse(`[${new RegExp(`const ${n} = new Set\\(\\[([^\\]]*)\\]`).exec(s)![1].replace(/'/g, '"')}]`) as string[])
+  const [from, caller, open] = ['FROM', 'CALLER', 'OPEN'].map(set)
+  assert.ok(keys.length > 250, 'the api table read')
+  assert.deepEqual(keys.filter(k => !from.has(k) && !caller.has(k) && !open.has(k)), [])
+  assert.deepEqual(keys.filter(k => open.has(k) && (from.has(k) || caller.has(k))), [], 'in one class each')
+})
+
+test("S5: what was never classified: Laki AI's key, the CLI, remote access, a test push, Resources, notes and to-dos are yours; PR links and ports its own; removals ask", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const two = await rig.rpc('wsNew', { project: p.id, kind: 'local', name: 'two' })
+  const tab = (await until(() => rig.tab(one.id))).id
+  const from = { ws: one.id, tab }
+  const note = await rig.rpc('noteNew', { title: 'mine' })
+  const no: [string, object][] = [
+    ['aiKey', { key: 'fake-secret' }],
+    ['cliInstall', {}],
+    ['cliRemove', {}],
+    ['remoteStop', {}],
+    ['webhookTest', { url: 'https://example.com/x' }],
+    ['resourceStop', { key: 'ai' }],
+    ['flowTest', {}],
+    ['noteList', {}],
+    ['noteGet', { id: note.id }],
+    ['noteFile', { id: note.id, name: 'x' }],
+    ['noteNew', {}],
+    ['noteSave', { id: note.id, md: 'x' }],
+    ['noteUpload', { id: note.id, data: '' }],
+    ['todoListGet', {}],
+    ['todoListSave', { items: [] }],
+  ]
+  for (const [m, x] of no) await assert.rejects(rig.rpc(m, { ...x, from }), /an agent can't .*: it's the user's \(ask them\)/, m)
+  for (const m of ['prAttach', 'prDetach', 'prLabel']) await assert.rejects(rig.rpc(m, { ws: two.id, pr: '1', label: 'x', on: true, from }), /its own workspace's PR only/, m)
+  await assert.rejects(rig.rpc('portKill', { ws: two.id, port: 1, from }), /its own workspace only/)
+  // removals: asked in the app (none open here: refused)
+  await assert.rejects(rig.rpc('noteRm', { id: note.id, from }), /says yes in Laki's window, and it isn't open/)
+  await assert.rejects(rig.rpc('planRm', { project: p.id, kind: 'spec', slug: 'nope', from }), /isn't open/)
+  await assert.rejects(rig.rpc('widgetRm', { id: 'nope', from }), /isn't open/)
+  assert.equal((await rig.rpc('noteGet', { id: note.id })).title, 'mine', 'yours: kept')
+  // a sandboxed agent: no Terminals workspace either
+  const boxed = await rig.rpc('tabNew', { ws: one.id, preset: 'claude', sandbox: true, perm: '' })
+  await assert.rejects(rig.rpc('quickNew', { kind: 'shells', from: { ws: one.id, tab: boxed.id } }), /a sandboxed agent can't open a terminal/)
+  // yours: a test push never to your network's addresses; the rest as before
+  await assert.rejects(rig.rpc('webhookTest', { url: 'https://192.168.1.2/hook' }), /on the internet/)
+  await rig.rpc('noteRm', { id: note.id })
+  await assert.rejects(rig.rpc('noteGet', { id: note.id }))
+})
+
+// S7: a page an agent wrote runs nowhere outside Laki's viewer (no browser either), and its Expose to the world asks you
+// unless the project says who gets in, which then holds for every caller
+test("S7: an agent's file in a browser is refused; its tunnel asks (a no leaves none); a project's expose holds for everyone", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const tab = (await until(() => rig.tab(ws.id))).id
+  const from = { ws: ws.id, tab }
+  await rig.rpc('fileNew', { ws: ws.id, path: 'page.html', from })
+  for (const app of ['chrome', 'safari', 'default']) await assert.rejects(rig.rpc('openIn', { ws: ws.id, app, file: 'page.html', from }), /an agent can't open a file (in a browser|with its default app)/, app)
+  await rig.rpc('openIn', { ws: ws.id, app: 'chrome', file: 'page.html' }) // yours
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  // no window: refused; asked: a no, no tunnel
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173, hours: 0, from }), /says yes in Laki's window, and it isn't open/)
+  const app = await connect(rig)
+  const going = rig.rpc('tunnelStart', { ws: ws.id, port: 5173, hours: 0, from }).then(() => '', e => String(e.message))
+  const ask = await seen(app, m => m.ev === 'toolAsk' && m.cross === 'expose', 'asked in the app')
+  assert.equal(ask.target, 'Expose localhost:5173 to the world?')
+  assert.match(ask.text, /Anyone with the link, until you stop it/)
+  await rig.rpc('widgetToolAnswer', { req: ask.req, allow: 'deny' })
+  assert.match(await going, /the user said no/)
+  assert.deepEqual((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).tunnels ?? [], [])
+  // the project's expose: no ask, and only those, for you too
+  await rig.rpc('projectSet', { id: p.id, config: { expose: 'me@x.dev, team.dev' } })
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), /lets in only me@x\.dev, \*@team\.dev \(its expose\), not anyone with the link/)
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: ['you@y.dev'], from }), /not you@y\.dev/)
+  const tn = await rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: ['bob@team.dev'], from })
+  assert.deepEqual(tn.mails, ['bob@team.dev'])
+  assert.ok(!app.events.some(m => m.ev === 'toolAsk' && m.cross === 'expose' && m.req !== ask.req), 'not asked')
+  await rig.rpc('tunnelStop', { ws: ws.id, port: 5173 })
+  app.close()
 })

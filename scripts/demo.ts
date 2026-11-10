@@ -30,7 +30,7 @@ Object.assign(process.env, {
   GIT_COMMITTER_EMAIL: 'demo@example.invalid',
 })
 for (const k of Object.keys(process.env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_')) delete process.env[k]
-const { ensureDaemon, rpc } = await import('../src/shared/conn.ts')
+const { appToken, ensureDaemon, rpc } = await import('../src/shared/conn.ts')
 
 const git = (...a: string[]) => execFileSync('git', a, { cwd: repo })
 // a PR with a failing check, for the status bar and the info panel
@@ -87,7 +87,7 @@ writeFileSync(join(repo, 'src/cart.js'), 'export function total(items) {\n  retu
 execFileSync('git', ['commit', '-qam', 'An empty cart'], { cwd: repo, env: { ...process.env, GIT_AUTHOR_NAME: 'Bob Builder' } })
 git('remote', 'add', 'origin', 'git@github.com:acme/shop.git')
 
-const info = await ensureDaemon()
+const info = await ensureDaemon({}, true) // S1: as the app: its token, which the page needs (yours)
 const p = await rpc('projectAdd', { path: repo })
 await rpc('projectTrust', { id: p.id, hash: (await rpc<{ hash: string }>('projectTrust', { id: p.id })).hash }) // its .laki.json, as you would in the app
 const a = await rpc('wsNew', { project: p.id, preset: 'claude', name: 'fix-cart-total', prompt: 'fix the cart total rounding' })
@@ -143,4 +143,4 @@ if (process.env.LAKI_DEMO_RICH) {
   for (const w of [api, mob]) await rpc('projectTrust', { id: w.id, hash: (await rpc<{ hash: string }>('projectTrust', { id: w.id })).hash }).catch(() => {})
   await rpc('prRefresh', {}).catch(() => {})
 }
-console.log(JSON.stringify({ home, url: `${origins.split(',')[0]}/#port=${info.port}&token=${info.token}` }))
+console.log(JSON.stringify({ home, token: appToken(), url: `${origins.split(',')[0]}/#port=${info.port}&token=${appToken() ?? info.token}` }))

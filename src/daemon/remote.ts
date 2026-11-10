@@ -198,6 +198,7 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
   const mails = [...new Set((o.mails ?? []).map(m => m.trim()).filter(Boolean))]
   const bad = mails.find(m => !MAIL.test(m))
   if (bad) throw new Error(`not an email address or *@domain: ${bad}`)
+  exposeRule(ws, mails)
   await cfReady(mails.length > 0)
   if (!live()) throw new Error(`no workspace ${o.ws}`) // archived, or gone while cloudflared answered
   const cur = tunnels.get(key)
@@ -214,6 +215,15 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
     throw e
   }
   return t.url ? viewOf(t) : { port, mails } // no url: stopped first (tunnelStop took it out)
+}
+// S7: a project's expose (Settings › the project, a trusted .laki.json: who gets in) is the rule for every caller: only
+// those addresses and domains (a bare domain is *@ it), never anyone with the link
+function exposeRule(ws: { name?: string; id: string }, mails: string[]) {
+  const only = (projectConfig(ws as Parameters<typeof projectConfig>[0]).expose ?? '').split(/[\s,;]+/).map(m => m.trim().toLowerCase()).filter(Boolean).map(m => (m.includes('@') ? m : `*@${m}`))
+  if (!only.length) return
+  const ok = (m: string) => only.includes(m.toLowerCase()) || only.some(x => x.startsWith('*@') && m.toLowerCase().endsWith(x.slice(1)))
+  const out = mails.length ? mails.find(m => !ok(m)) : 'anyone with the link'
+  if (out) throw new Error(`${ws.name ?? ws.id}'s project lets in only ${only.join(', ')} (its expose), not ${out}`)
 }
 const viewOf = (t: TunnelRun): Tunnel => ({ port: t.port, url: t.url, mails: t.mails, ...(t.until && { until: t.until }), ...(t.host && { host: t.host }) })
 

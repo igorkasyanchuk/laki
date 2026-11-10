@@ -18,3 +18,5 @@ export async function procPeer(port: number, ours: number, proc = '/proc') {
 }
 // a process's parent: /proc/<pid>/stat's, after its name (which may hold spaces and parentheses): state, ppid
 export const procParent = async (pid: number, proc = '/proc') => Number((await readFile(join(proc, String(pid), 'stat'), 'utf8').catch(() => '')).replace(/^[^]*\) /, '').split(' ')[1]) || 0
+// S1: a process's controlling terminal: /proc/<pid>/stat's tty_nr (the field after the session's), '' for none
+export const procTty = async (pid: number, proc = '/proc') => (n => (n && n !== '0' ? n : ''))((await readFile(join(proc, String(pid), 'stat'), 'utf8').catch(() => '')).replace(/^[^]*\) /, '').split(' ')[4])

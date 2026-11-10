@@ -407,10 +407,12 @@ tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, 
 `FROM` or `CALLER` methods, asks `core.tabOfPeer` (the socket's other end by `lsof -iTCP@127.0.0.1:<port>`, its parents by
 `ps`; on Linux `peer.ts`' `procPeer` and `procParent` over /proc; to a live session's PTY, else (#14: a double fork) the tab whose PTY is its terminal, `ps -o tty=`, one call; then a shell tab's `treeAgent`: every process under it by one `ps -Ao`, an agent among them makes it an agent's, with no window too; once per connection, `peerOf`, as
 a method first needs it, a WebSocket's as it opens; `/usr/sbin/lsof` and `/bin/ps` by path: a daemon with no PATH; the
-app's window is Electron's, in no tab; the daemon's own process, `laki serve`'s, is yours) and puts that tab in `from`
+app's window comes with the app's token and isn't looked up (S1, below); the daemon's own process, `laki serve`'s, and
+its children are yours) and puts that tab in `from`
 or `caller` over what the env said (`wsNew` and `wsFan`, both `CALLER`: `byCaller`'s `from` is the found agent's workspace,
 else a non-blank one the RPC says (`saidFrom`, `tabNew`'s too), else none; N14: `from: ''` skipped `agentNoCmd`, `cloudCheck`
-and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab: the env's (yours, a cron job's); none at all, or the client gone
+and the agent's mark; `wsFan` checks each preset's `agentNoCmd` before any worktree); a process in no tab with a terminal
+of its own: the env's (yours); one in no tab with no terminal (S1), none at all, or the client gone
 before the answer: refused, `core.WHO` (fails closed; daemon.log says which). `scheduleSet` from an agent saves it off,
 `scheduleRun` and `flowAnswer` refuse one (`notAgent`), `agentNo` refuses `AGENT_NO`'s (`widgetToolAnswer`, `aiAnswer`,
 `answer`, `widgetFileSave`, `remoteStart`, `memoryCompact`, `prReview`, `prComment`: gh posts them as you; `prAct` approve, close and merge too (S3: a merge puts code in the base unread; `wsSet`'s `autoFix`, `autoReview`, `autoMerge`, `autoLand` are the user's as well); `shutdown`, `laki stop`; `checkAgain`, `checkStop`; each one in `FROM` or `CALLER`, checked as the daemon loads, and `notAgent` reads `from` or `caller`: a `from` the RPC says alone was an agent's to leave out), `projectTrust` with a `hash`, `projectSet` with `config` or
@@ -437,8 +439,10 @@ every caller (`text()`: the gates read `String(x)`, node-pty writes an array as 
 `scheduleRm` from an agent ask in the app (`rmAsk`: a `toolAsk` with `cross: 'remove'`, once only; a worker the agent
 started itself is its own to delete; no window: refused); `fileWrite`, `fileNew`, `fileUndo`, `hunkUndo`, `hunkRedo`
 (`FILE_EDITS`) only in the agent's own workspace and never under `.git`; `tabClose` only its own workspace's tabs;
-`tabSet` only its own tab; `shareStart` never; `openIn` with `app: 'default'` and a `file` never (a page it wrote would
-run outside Laki). A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
+`tabSet` only its own tab; `shareStart` never; `openIn` with a `file` in its default app or a browser (`BROWSERS`,
+`fileApp`; S7) never (a page it wrote would run outside Laki); `tunnelStart` asks in the app (`exposeAsk`: a `toolAsk`
+with `cross: 'expose'`, who and how long shown, once only) unless the project has an `expose`, which remote.ts'
+`exposeRule` holds every caller to. A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
 `AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`. Recording mode (S7): `state` from an agent,
 Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
 `recorded` (no private workspace, its tabs, nor a private project), and `turnList` and `turnDiff` refuse an agent a
@@ -472,3 +476,57 @@ tmux) used to count as you. A token per tab makes an agent's caller a fact the d
   it's you; a wrong token and an ended start's are 401; the CLI with a stale one still works; the sandbox settings.
 - **Not built.** The hook's key folded into the token; `from` filled on methods outside `FROM`/`CALLER`; tokens kept
   across a daemon restart (R6's pty host would need them in state.json).
+
+### The app's token (S1)
+
+daemon.json's token says nothing of who calls: an agent that `setsid`s and double-forks out of its tab used to count as
+you (`if (!tab) return p`). Now only two kinds of caller in no tab are you.
+
+- **The app.** main.ts' `appToken`: 32 random bytes per daemon start, never on disk. The starter that asks for it
+  (`ensureDaemon(env, true)`: the app's main, `scripts/demo.ts`; the test rig) spawns the daemon with a pipe on fd 3 and
+  `LAKI_APP_PIPE=3`, and the daemon writes it there once daemon.json is written. An app that finds a daemon running (the
+  CLI's, or one an earlier app left) sends `appPair` with daemon.json's token: `core.appPeer` gives it only to a GUI app
+  on the daemon's own binary that LaunchServices knows finished launching (`lsappinfo`'s
+  `LSApplicationHasSignalledItIsReady`: Electron as node, `open --env ELECTRON_RUN_AS_NODE=1` too, never says so), in no
+  tab; Linux: `/proc/<pid>/exe` and no `ELECTRON_RUN_AS_NODE` in its first environment. conn.ts keeps it in memory
+  (`appToken()`, paired again when the daemon's pid changes) and main's `conn` IPC gives it to the app's pages, whose
+  WebSocket sends it. A call or socket with it is yours with no lookup (`whoCalls`' `app`, `apps`); a `from` it says
+  still makes it stricter. `LAKI_APP_TOKEN` in the environment is read once and deleted (a test's CLI, the UI smoke's
+  app); the daemon deletes it from its own. main quits when started with Chromium's `--remote-debugging-*` switches.
+- **A terminal of yours.** With daemon.json's token, `core.tabOfPeer` (`peerInfo`) returns no tab for a process whose
+  controlling terminal (`ps -o tty=`; Linux: `/proc/<pid>/stat`'s `tty_nr`, `peer.ts` `procTty`) is none of Laki's
+  ptys, or one under the daemon's own process (Laki AI's `laki mcp`, an extension's script); anything else in no tab
+  throws `core.WHO`, and `FROM` and `CALLER` methods (and a hook without its key) are refused. A WebSocket of such a
+  process gets the masked view. Methods outside `FROM`/`CALLER` (`ping`, `state`) still answer.
+- **What stops working.** `laki` from a launchd or cron job, an app's MCP server (`laki mcp` in another app) or
+  `ssh -T`: refused what asks who. ponytail: a process that gives itself a terminal (`script`, `expect`, a tmux server
+  it starts) passes as yours; a native addon in Electron run as node could pass `appPeer`.
+- **Tests.** `test/agent-gates.test.ts` (S1): a detached child with daemon.json's token is refused `tabNew` with `cmd`,
+  `settingsSet`, `answer`, `prAct` merge, `wsSet` and `appPair`; the CLI under `script` (a terminal) and the app's
+  WebSocket aren't. The rig's `rpc` and `connect` use the app's token, `rig.cli` passes it as `LAKI_APP_TOKEN`.
+
+### Every method is classified (S5)
+
+**A new method must be classified.** main.ts' `FROM` (the caller's tab goes in `from`: `agentNo` and the asks read it),
+`CALLER` (in `caller`), or `OPEN` (any caller, as it is: reads of the view and a workspace's facts, the ticks tests
+move, a connection's own `view`, `resize` and `detach`, `hook`, which `hookWho` checks); the daemon throws as it loads
+when a key of `api` is in none (and `test/agent-gates.test.ts` reads the source for it), so a method is never open by
+default. A method that's the user's alone also goes in `AGENT_NO` (in `FROM`: `notAgent` reads `from`).
+
+S5 classified what had been missed: `aiKey`, `cliInstall`, `cliRemove`, `remoteStop`, `webhookTest`, `resourceStop`,
+`flowTest`, and the notes and To-dos (`noteList`, `noteGet`, `noteFile`, `noteNew`, `noteSave`, `noteUpload`,
+`todoListGet`, `todoListSave`) are `AGENT_NO`; `prAttach`, `prDetach`, `prLabel` and `portKill` only in the agent's own
+workspace; `quickNew`'s Terminals workspace is a terminal for `boxNo`; `planRm`, `noteRm` and `widgetRm` from an agent
+ask in the app (`rmAsk`), as `wsRm` does (`aiChatRm` stays `AGENT_NO`); `aiState` already gave an agent its own chat.
+`webhookTest` also refuses an https address on your network (`PRIVATE_HOST`, as `/img`'s `webOk`), not this Mac's own
+relay (`webhookUrl`'s http exception).
+
+### No daemon started from a tab (S4)
+
+A sandboxed claude runs `laki *` outside its sandbox (core.ts' `excludedCommands`), and the CLI honours `LAKI_HOME`: an
+agent could write a state.json in a folder of its own and have the CLI start a second daemon there, unsandboxed. With
+`LAKI_TAB` or `LAKI_TAB_TOKEN` in the environment at all (an empty one too: `LAKI_TAB= laki …`), conn.ts' `inTab`:
+`ensureDaemon` only finds a running daemon (`NO_START` otherwise), and `laki daemon` and `laki serve` are refused. The
+launcher on PATH (`cliText`) pins `LAKI_HOME` to its daemon's anyway; one set by hand is still read, and with no daemon
+there the call fails. The rig sets `LAKI_HOME` without `LAKI_TAB`, so its own CLI calls start one as before. Tested in
+`test/cli-agents.test.ts` (S4).

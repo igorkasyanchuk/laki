@@ -25,7 +25,7 @@ import { transcriptOf } from './share.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
-import { procParent, procPeer } from './peer.ts'
+import { procParent, procPeer, procTty } from './peer.ts'
 import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyUp } from './ptyHost.ts'
 import { ptySock } from '../ptyhost/proto.ts'
@@ -4144,12 +4144,16 @@ const causeRun = (c: Cause) => (c.run ? { run: c.run } : {})
 const causeEv = (agent: string | undefined, c: Cause) => ({ ...fromAgent(agent), ...(c.hops && { hops: c.hops }) })
 // M5: the tab a local connection comes from, by its process, not its env (an agent's env -u LAKI_TAB changes nothing):
 // the socket's other end (lsof; Linux: /proc, procPeer), up its parents (ps; /proc/<pid>/stat) to a tab's own process.
-// undefined: a process in no tab (your terminal, the app, Laki AI's, a cron job); no process at all (it closed, or the
-// port can't be read) throws WHO: main.ts refuses the call, never takes it for yours. ponytail: an lsof and a ps per
-// connection asked about (main.ts' FROM and CALLER methods only); a process that left its tab's tree (setsid and a
-// double fork: launchd's then) reads as yours, as a cron job's would
+// undefined: a process of yours in no tab: one with a terminal of its own that isn't a Laki tab's (your Terminal's, an
+// editor's, an ssh session's), or one the daemon started (Laki AI's laki mcp, an extension's script). S1: one with
+// neither (a setsid and a double fork out of its tab, a launchd job, an app's MCP server) throws WHO, as one with no
+// process at all does (it closed, or the port can't be read): main.ts refuses the call, never takes it for yours. The
+// app's own window and calls carry its token instead (main.ts' appToken). ponytail: an lsof and a ps per connection
+// asked about (main.ts' FROM and CALLER methods only); a process that gives itself a new terminal (script, expect, a
+// tmux server it starts) passes as yours; a user per agent is the real fix
 export const WHO = "couldn't tell who's calling: try again"
-export async function tabOfPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Tab | undefined> {
+type Peer = { pid: number; tab?: Tab; term?: boolean; own?: boolean } // term: a terminal of its own, not a tab's; own: the daemon's child
+async function peerInfo(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Peer> {
   let pid: number | undefined
   let up: (p: number) => Promise<number>
   if (proc) {
@@ -4165,15 +4169,52 @@ export async function tabOfPeer(port: number, proc = process.platform === 'linux
     up = async p => pp.get(p) ?? 0
   }
   if (!pid) throw new Error(WHO)
-  if (pid === process.pid) return // the daemon's own process: laki serve's, in it (yours)
+  if (pid === process.pid) return { pid, own: true } // the daemon's own process: laki serve's, in it (yours)
   const roots = new Map<number, string>()
   for (const [id, s] of sessions) if (!s.exited) roots.set(s.pty.pid, id)
-  for (let p = pid, n = 0; p > 1 && n < 100; p = await up(p), n++) if (roots.has(p)) return state.tabs.find(t => t.id === roots.get(p))
-  // #14: one that left its tab's tree (a double fork: launchd's then) keeps its terminal: the tab whose PTY that is. One ps
-  // for it and every tab's own process. ponytail: setsid (a session of its own, no terminal) still escapes
-  const tty = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', [pid, ...roots.keys()].join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
+  const tabOf = (id?: string) => state.tabs.find(t => t.id === id)
+  for (let p = pid, n = 0; p > 1 && n < 100; p = await up(p), n++) {
+    if (roots.has(p)) return { pid, tab: tabOf(roots.get(p)) }
+    if (p === process.pid) return { pid, own: true } // under the daemon, not under a tab's terminal
+  }
+  // #14: one that left its tab's tree (a double fork: launchd's then) keeps its terminal: the tab whose PTY that is. One
+  // lookup for it and every tab's own process
+  const tty = await ttys([pid, ...roots.keys()], proc)
   const mine = tty.get(pid)
-  if (mine && !/^\?+$/.test(mine)) for (const [p, id] of roots) if (tty.get(p) === mine) return state.tabs.find(t => t.id === id)
+  if (!mine) return { pid }
+  for (const [p, id] of roots) if (tty.get(p) === mine) return { pid, tab: tabOf(id) }
+  return { pid, term: true }
+}
+// each process's controlling terminal, none left out when it has none: ps's tty (?? for none); Linux: /proc/<pid>/stat's tty_nr
+async function ttys(pids: number[], proc: string) {
+  if (proc) return new Map((await Promise.all(pids.map(async p => [p, await procTty(p, proc)] as const))).filter(([, t]) => t))
+  const rows = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
+  return new Map([...rows].filter(([, t]) => t && !/^\?+$/.test(t)))
+}
+export async function tabOfPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Tab | undefined> {
+  const p = await peerInfo(port, proc)
+  if (p.tab || p.term || p.own) return p.tab
+  throw new Error(WHO) // S1: in no tab, with no terminal of its own, not the daemon's: an agent's that left its tab, as likely as yours
+}
+// S1: the app's own process asking for its token (main.ts' appPair: a daemon the app didn't start, the CLI's or the
+// one an earlier app left running): a GUI app on this daemon's own binary that LaunchServices knows has finished
+// launching (Electron run as node, open --env ELECTRON_RUN_AS_NODE=1 too, never signals it), in no tab. Linux: its
+// binary, and no ELECTRON_RUN_AS_NODE in the environment it started with. ponytail: a native addon loaded into Electron
+// run as node could signal it too; the app's binary without the runAsNode fuse (SECURITY.md) is the real fix
+export async function appPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<boolean> {
+  const p = await peerInfo(port, proc).catch(() => undefined)
+  if (!p || p.tab || p.own) return false
+  const bin = realpathSync(process.execPath)
+  if (proc) {
+    const exe = await readlink(join(proc, String(p.pid), 'exe')).catch(() => '')
+    const env = await readFile(join(proc, String(p.pid), 'environ'), 'utf8').catch(() => 'ELECTRON_RUN_AS_NODE=')
+    return exe === bin && !env.split('\0').some(l => l.startsWith('ELECTRON_RUN_AS_NODE='))
+  }
+  const asn = (await run('/usr/bin/lsappinfo', ['find', `pid=${p.pid}`]).catch(() => ({ stdout: '' }))).stdout.trim()
+  if (!asn) return false
+  const info = (await run('/usr/bin/lsappinfo', ['info', '-only', 'pid,CFBundleExecutablePath,LSApplicationHasSignalledItIsReady', asn]).catch(() => ({ stdout: '' }))).stdout
+  const at = /"CFBundleExecutablePath"="([^"]*)"/.exec(info)?.[1] ?? ''
+  return new RegExp(`^"pid"=${p.pid}$`, 'm').test(info) && /^"LSApplicationHasSignalledItIsReady"=true$/m.test(info) && !!at && (() => { try { return realpathSync(at) === bin } catch { return false } })()
 }
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {

@@ -46,8 +46,8 @@ test("M5: an agent's call is its tab's with Origin: file:// too; answers, keys i
   assert.ok(seen.result.workspaces.some((w: any) => w.id === ws.id) && !JSON.stringify(seen).includes('hidden-two'), 'its state: no private workspace')
   await rig.rpc('settingsSet', { recording: false })
   await rig.rpc('wsRm', { id: hid.id })
-  // the same from outside any tab, the app's Origin and token: yours
-  const app = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { origin: 'file://', authorization: `Bearer ${token}` }, body: JSON.stringify({ method, params }) })).json()
+  // the same from outside any tab, the app's Origin and token (S1: its own, not daemon.json's): yours
+  const app = async (method: string, params: object) => (await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { origin: 'file://', authorization: `Bearer ${rig.app}` }, body: JSON.stringify({ method, params }) })).json()
   assert.equal((await app('widgetSet', { id, on: true })).error, undefined)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id).on, true)
 
@@ -395,8 +395,8 @@ test("S12: an agent tab's token says who calls, from any process; the daemon's o
   assert.match((await post(mine, 'settingsSet', { nextPrompt: true })).error ?? '', /an agent can't change that setting/)
   assert.match((await post(mine, 'hook', { tab: 'another', state: 'waiting' })).error ?? '', /comes from its own agent/)
   assert.equal((await post(mine, 'ping', {})).result, 'pong')
-  // the daemon's own, from no tab: you
-  assert.equal((await post(token, 'settingsSet', { nextPrompt: true })).error, undefined)
+  // the app's, from no tab: you (S1: daemon.json's needs a terminal of its own: agent-gates.test.ts)
+  assert.equal((await post(rig.app, 'settingsSet', { nextPrompt: true })).error, undefined)
   // another tab's token in this tab's process (read out of its environment): still this tab, which can't report the other's state
   const other = (await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })).id
   await until(async () => (await rig.screen(`${ws.id}/${other}`)).includes('> '), "the other's prompt")

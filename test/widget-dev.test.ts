@@ -30,7 +30,7 @@ test('widget dev: linked on and first, watched, the last good version kept, runs
   const real = realpathSync(code) // the CLI's cwd: /private/var… on macOS
 
   // laki widget dev: the line it prints, then each run as it comes
-  const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/main.ts'), 'widget', 'dev'], { cwd: code, env: rig.env })
+  const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', join(root, 'src/cli/main.ts'), 'widget', 'dev'], { cwd: code, env: { ...rig.env, LAKI_APP_TOKEN: rig.app } })
   t.after(() => p.kill())
   let out = ''
   p.stdout.on('data', d => (out += d))

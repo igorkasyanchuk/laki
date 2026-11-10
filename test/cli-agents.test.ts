@@ -445,3 +445,30 @@ test('a name you gave a workspace stays: an agent renames it only when you asked
   await rig.rpc('wsSet', { id: b.id, browser: 'https://example.com/b', name: 'Page B', auto: true })
   assert.deepEqual([(await now(b.id)).name, (await now(b.id)).browser], ['Docs', 'https://example.com/b'])
 })
+
+// S4: a sandboxed claude runs laki outside its sandbox: in a tab ($LAKI_TAB, an empty one too) laki never starts a
+// daemon, so a LAKI_HOME of the agent's own (a state.json it wrote) gets none
+test('S4: laki in a tab with a LAKI_HOME of its own starts no daemon there; laki daemon and serve are refused', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, kind: 'local' })
+  const tab = (await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })).id
+  const planted = join(rig.home, 'planted')
+  mkdirSync(planted)
+  writeFileSync(join(planted, 'state.json'), '{"projects":[],"workspaces":[],"tabs":[],"settings":{}}')
+  const before = rig.env.LAKI_HOME
+  for (const said of [tab, '']) {
+    Object.assign(rig.env, { LAKI_TAB: said, LAKI_HOME: planted })
+    for (const args of [['ls'], ['daemon'], ['serve', '--tailscale']]) {
+      const r = await rig.cli(...args)
+      assert.notEqual(r.code, 0, args.join(' '))
+      assert.match(r.err, /laki in a Laki tab never starts one/, args.join(' '))
+    }
+    assert.ok(!existsSync(join(planted, 'daemon.json')), 'no daemon there')
+  }
+  // its own daemon's LAKI_HOME: the original, as before
+  Object.assign(rig.env, { LAKI_TAB: tab, LAKI_HOME: before })
+  const r = await rig.cli('ls', '--json')
+  assert.equal(r.code, 0, r.err)
+  assert.ok(JSON.parse(r.out).workspaces.some((w: { id: string }) => w.id === ws.id))
+})

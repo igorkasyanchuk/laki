@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer, request } from 'node:http'
-import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -15,7 +15,7 @@ const cliPath = fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))
 // the CLI run in another folder (rig.cli runs in this checkout's)
 function cliAt(rig: Rig, cwd: string, ...args: string[]): Promise<{ code: number; out: string; err: string }> {
   return new Promise(r => {
-    const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', cliPath, ...args], { env: rig.env, cwd })
+    const p = spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', cliPath, ...args], { env: { ...rig.env, ...(rig.app && { LAKI_APP_TOKEN: rig.app }) }, cwd }) // S1: as rig.cli
     let out = ''
     let err = ''
     p.stdout.on('data', d => (out += d))
@@ -429,7 +429,8 @@ test('daemon start from the CLI: a big log is rotated first, a lock it cannot re
   assert.equal(res.status, 404)
   assert.match(await res.text(), /^(not found|no app page here: build it \(npm run build\))$/)
   // a lock that is a link to nothing: removed, not followed, and the daemon starts
-  assert.equal((await rig.cli('stop')).code, 0) // the one the CLI started
+  process.kill(rig.info().pid, 'SIGTERM') // the one the CLI started (S1: it gave no app token; a terminal's laki stop: cli.test.ts)
+  await until(() => !existsSync(join(rig.data, 'daemon.json')), 'the daemon gone')
   rmSync(lock, { force: true })
   symlinkSync(join(rig.data, 'gone'), lock)
   const again = await rig.cli('ls', '--json')

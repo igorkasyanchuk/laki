@@ -24,9 +24,13 @@ What helps a report:
 ## Threat model
 
 Laki runs on one person's computer. Its daemon listens on 127.0.0.1 only, behind a 256-bit token (`daemon.json`,
-0600) and Origin and Host allow-lists. An agent in a tab can read that token too, so the daemon tells an agent's calls
-from yours by the calling process (the tab whose process tree it runs in: lsof and ps, /proc on Linux), whatever
-Origin it sends, the app's included; a local call it can't place is refused (it fails closed). Extensions an agent
+0600) and Origin and Host allow-lists. An agent in a tab can read that token too, so it says nothing of who calls: the
+daemon tells an agent's calls from yours by the calling process (the tab whose process tree or terminal it runs in:
+lsof and ps, /proc on Linux), whatever Origin it sends. Only two callers in no tab are you: the app (its window and its
+own calls carry a second token the daemon hands the app alone, never written to disk) and a process with a terminal of
+its own that isn't a Laki tab's (your Terminal, an editor's, an ssh session). Anything else in no tab (an agent's
+process that left its tab with `setsid`, a launchd job) is refused what's yours, as a call the daemon can't place is (it
+fails closed). Extensions an agent
 makes, restores or links stay off until you look at what they run, and go off again as their files change.
 
 In scope:
@@ -45,10 +49,14 @@ Out of scope:
 
 ## Known limits
 
-- Any program running as your user can read the daemon's token (`ponytail:` in `src/daemon/main.ts`), and a process
-  an agent starts that leaves both its tab's process tree and its terminal (`setsid`, `launchctl submit`,
-  `open x.command`, a tmux server) counts as yours: per-tab tokens would close that. A double fork keeps the tab's
-  terminal, so it's the tab's.
+- Any program running as your user can read daemon.json's token (`ponytail:` in `src/daemon/main.ts`). A process an
+  agent starts that leaves its tab's tree and its terminal (`setsid`, `launchctl submit`) is refused what asks who calls;
+  one that then gives itself a terminal of its own (`script`, `expect`, a tmux server it starts, `open x.command`)
+  still counts as yours. A double fork keeps the tab's terminal, so it's the tab's. A user per agent would close that.
+- The app's token goes to a daemon's starter on a pipe, or to a running daemon's app after a check that it's Laki's
+  own window process on the daemon's binary (LaunchServices says it finished launching): a native addon loaded into
+  Electron run as node could pass that check (the runAsNode fuse below).
+- `laki` from a launchd or cron job, or `laki mcp` run by another app, has no terminal: what asks who calls is refused.
 - Gates (an extension's `gate`) are a team rule, not a sandbox: they hold Laki's ship, merge and archive, but an
   agent with a shell can still run `gh pr merge` or `git push` itself. Its permission mode is what stops that.
 - An agent's `laki send` reaches agents, or a terminal of its own workspace; what runs in that terminal then counts as
