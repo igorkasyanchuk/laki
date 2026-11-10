@@ -2053,7 +2053,7 @@ and what it costs.
   (a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, like macOS's own sidebars, their
   hovers, lines and selection tints as with glass; the rest stays solid), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
-  one by name; the ☆ on a card's corner makes it a favorite: *Favorites*, a group of its own above the rest, and still in the full list): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
+  one by name; the ☆ on a card's corner makes it a favorite: *Favorites*, a group of its own above the rest, and still in the full list): Laki and Laki Light (a new install's, as the system is light or dark), Midnight (the default of an install from before), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,
   Aurora, Sunset and Snowy (light); and eighty ✦ themes that change more than colors: Phosphor (a CRT: mono,
   dashed, glowing, scanlines), Neon Arcade (pills and glow), Brutalist (light: thick black lines, hard

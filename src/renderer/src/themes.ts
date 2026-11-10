@@ -32,7 +32,7 @@ export const THEMES: Theme[] = [
   { id: 'default', name: 'Midnight' },
   // B2: Laki's own pair: the mark's orange (icon.svg's #ff7a45) as the accent, neutrals a little warm, and status colors
   // of their own, apart from the accent and from each other (blue runs, yellow waits, green is done, a pink-red fails).
-  // ponytail: not the default yet: a new install still starts on Midnight until the pair has been looked at
+  // A new install starts on it, following the system (core.ts load); one from before keeps its theme, Midnight if unset
   {
     id: 'laki',
     name: 'Laki',

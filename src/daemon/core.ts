@@ -175,7 +175,7 @@ export function load() {
   // once). One from before keeps what it had: labs true, once. A test's daemon (dir.ts' inRig) leaves it all alone, the
   // tests being of those pages, unless LAKI_TEST_LEAN=1
   if (state.settings?.labs === undefined && (!inRig() || process.env.LAKI_TEST_LEAN === '1'))
-    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true } }) }
+    state.settings = { ...state.settings, labs: had, ...(!had && { ...Object.fromEntries(LABS.map(k => [k, false])), achievements: { off: true }, theme: 'laki', themeAuto: true, themeLight: 'laki-light', themeDark: 'laki' }) } // B2: and Laki's own theme pair, light or dark as the system is
   slugActions() // actions from before slugs
 }
 

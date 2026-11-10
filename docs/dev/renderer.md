@@ -733,7 +733,10 @@ animated: the terminal fits once), menus and dialogs, a Needs you card arriving,
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with
 `prefers-color-scheme`. A listener in themes.ts paints the last `applyTheme` again as the system turns (every window);
-App's paint key has the system's side too, so terminals repaint. With it on, the `glass` IPC gets no `light`, and main
+App's paint key has the system's side too, so terminals repaint. The bubbles and the cards on screen (main's
+windows) are painted with the colors App reads after its own paint (`floatColors`, keyed on that paint key, sent with
+`floats`), so they turn with it; the Dock icon is a picked picture (dock.ts), no theme's. A new install (core.ts `load`)
+starts with `themeAuto` on the Laki pair (B2). With it on, the `glass` IPC gets no `light`, and main
 leaves `nativeTheme.themeSource` at `system` (forced, the page's `prefers-color-scheme` would stop following the Mac).
 ponytail: the bubbles, the cards on screen and the Dock icon keep what they had.
 

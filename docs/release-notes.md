@@ -24,6 +24,7 @@ version it builds, with the date. -->
 - *Clone a repository…* on the Welcome screen and in ⌘K: a URL or `owner/repo`, cloned with your git or gh and added as a project; the dialog shows git's progress as it goes.
 - *Stop all agents* (⌘K, the File menu, a key of yours in Settings › Keys): every turn under way is interrupted after one question; queued prompts wait for *Resume queue*.
 - *Do not disturb* (⌘K): 30 minutes, an hour or until tomorrow 9:00 without notifications, sounds or phone pushes, except an important workspace's ask; a moon in the status bar ends it, and a *While you were away* card lists what waits, what finished and which PRs moved, each a click from its tab.
+- A new install starts on the *Laki* theme pair and follows the system's light or dark; an install from before keeps its theme.
 - One type scale: five text sizes (11, 12, 13, 15, 20) instead of fourteen; body text is 13px.
 - Small, even motion: hover colors, menus, dialogs, the side panel and a row that starts to need you ease in (off with *Animations: none* or the system's Reduce motion).
 - *Follow the system* (Settings › Appearance › Theme, Get started's *Match the system*): a light theme while macOS is light, a dark one while it's dark, each your pick.

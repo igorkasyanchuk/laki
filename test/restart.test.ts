@@ -335,7 +335,7 @@ test('U1, U2: a new install starts small (Labs off, no achievements game); one f
   rig.env.LAKI_TEST_LEAN = '1'
   await rig.start() // an install from before Labs
   let s = (await rig.rpc('state')).settings
-  assert.deepEqual([s.labs, s.notes, s.fun, s.desk, s.achievements], [true, true, false, undefined, undefined])
+  assert.deepEqual([s.labs, s.notes, s.fun, s.desk, s.achievements, s.theme, s.themeAuto], [true, true, false, undefined, undefined, undefined, undefined]) // its theme too
   await rig.stop()
   for (const f of ['state.json', 'state.json.bak']) rmSync(join(rig.data, f), { force: true })
   await rig.start() // a new one
@@ -343,6 +343,7 @@ test('U1, U2: a new install starts small (Labs off, no achievements game); one f
   assert.equal(s.labs, false)
   for (const k of LABS) assert.equal(s[k], false, k)
   assert.deepEqual(s.achievements, { off: true })
+  assert.deepEqual([s.theme, s.themeAuto, s.themeLight, s.themeDark], ['laki', true, 'laki-light', 'laki']) // B2: Laki's own pair, as the system is
   await assert.rejects(rig.rpc('noteList', {}), /Notes are off/)
   await rig.rpc('settingsSet', { notes: true }) // each its own switch still
   await rig.rpc('noteList', {})
