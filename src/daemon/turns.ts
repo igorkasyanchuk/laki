@@ -273,7 +273,7 @@ async function filesOf(ws: Workspace, from: string, to: string): Promise<TurnFil
 // prompt's first line, when, the trees before and after, the files, the cost when the transcript says), the newest
 // settings.turnsKept (50 unset; 0: none) of the last KEEP_DAYS. The trees stay alive through refs of Laki's own,
 // refs/laki/turns/<ws>/<n>/before and /after, each a commit of the tree on the HEAD of then (never under refs/heads or
-// refs/tags, so no push takes them: Ship and every push name their refs); a turn let go loses its refs, a workspace
+// refs/tags, so no push of Laki's takes them: Ship and every push name their refs; a --mirror of the user's would); a turn let go loses its refs, a workspace
 // removed all of them (turnsTidy, after wsRm). turnList reads them; turnDiff one's diff; turnRewind puts the worktree's
 // files back as they were before turn n, keeping what was there as a turn of its own (a rewind of that one undoes it);
 // turnFork starts a workspace on turn n's commit. Rewind and fork are yours, not an agent's (main.ts' AGENT_NO).

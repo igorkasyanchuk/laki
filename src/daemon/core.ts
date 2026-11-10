@@ -1694,8 +1694,9 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     s.term.write('', () => {
       wsLog(ws, () => `${tab.name}: ended with code ${code} after ${Math.round((Date.now() - born) / 1000)} s: ${s.screenText(4).trim().slice(-300)}`) // why a chat didn't come back (development mode)
       // a chat id claude/codex don't have (e.g. one with no message was never saved): Enter starts a new one. Only as it
-      // starts (RESUME_FAIL): later, a chat's own words on the screen ("session not found") don't drop its id
-      if (tab.resumeId && code !== 0 && Date.now() - born < RESUME_FAIL && CHAT_GONE.test(s.screenText(8))) {
+      // starts (RESUME_FAIL): later, a chat's own words on the screen ("session not found") don't drop its id; an adopted
+      // one (R6) started long before `born`
+      if (tab.resumeId && code !== 0 && !o.adopt && Date.now() - born < RESUME_FAIL && CHAT_GONE.test(s.screenText(8))) {
         tab.resumeId = undefined
         save()
         s.output('\x1b[2m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')

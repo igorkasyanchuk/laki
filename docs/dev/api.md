@@ -430,7 +430,8 @@ started itself is its own to delete; no window: refused); `fileWrite`, `fileNew`
 run outside Laki). A sandboxed agent (`boxNo`) is refused the file edits and the removes outright. `settingsSet`'s
 `AGENT_KEYS` also hold `voice`, `ai`, `readerTools`, `keys`, `cmdKeys`. Recording mode (S7): `state` from an agent,
 Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
-`recorded` (no private workspace, its tabs, nor a private project); `whoCalls` looks the caller of `state` up only
+`recorded` (no private workspace, its tabs, nor a private project), and `turnList` and `turnDiff` refuse an agent a
+private workspace that isn't its own (`turnsSeen`); `whoCalls` looks the caller of those three (`RECORDED`) up only
 while that mode hides something.
 
 ### Per-tab tokens (S12)

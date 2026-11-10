@@ -94,6 +94,11 @@ test('S7: Recording mode: an agent gets no private workspace, its tabs or a priv
   assert.doesNotMatch(JSON.stringify(theirs), /secret-client/)
   assert.ok(theirs.workspaces.some((w: any) => w.id === one.id) && !theirs.tabs.some((x: any) => x.workspace === two.id))
   assert.match(JSON.stringify(await rig.rpc('state')), /secret-client/, 'yours: all of it (the window veils its rows)')
+  // its kept turns neither (their prompts, their diffs); its own workspace's are its to read, all of them yours
+  await assert.rejects(rig.rpc('turnList', { ws: two.id, from }), /no workspace/)
+  await assert.rejects(rig.rpc('turnDiff', { ws: two.id, from }), /no workspace/)
+  assert.deepEqual(await rig.rpc('turnList', { ws: one.id, from }), [])
+  assert.deepEqual(await rig.rpc('turnList', { ws: two.id }), [])
 })
 
 test('U7: Clone a repository: a local repo or a URL into a folder, added as a project; no program-running transport; not an agent', async t => {

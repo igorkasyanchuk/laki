@@ -77,7 +77,8 @@ what the view shows on the tab's runtime:
   the prompt's first line (`rt.asked`), started, ended, the trees, counts, the first `TURN_FILES` files, claude's cost
   from `chatRead`), one change at a time per workspace (`inLine`). The trees stay alive as commits (`commit-tree` on
   the HEAD of then, Laki as author, never signed) under `refs/laki/turns/<ws>/<n>/before` and `/after`: outside
-  refs/heads and refs/tags, and every push in the code names its refs. A turn past the count or the days loses its
+  refs/heads and refs/tags, and every push in the code names its refs (a `git push --mirror` of the user's takes
+  them, `git log --all` lists them). A turn past the count or the days loses its
   refs; `turnsTidy` (hourly, and after `wsRm`) drops a gone workspace's list and refs (`turnsGone`; archived ones
   stay). `turnList { ws | tab }`; `turnDiff { n }` (none in memory: the newest kept); `turnRewind { ws, n }`: refused
   while a tab of the workspace runs, `treeOf` now, kept as a turn (`rewind: n`, name You), then `git restore

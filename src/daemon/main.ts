@@ -325,9 +325,9 @@ const api: Record<string, Handler> = {
   scriptLogs: () => core.scriptLogs(), // development mode's setup and teardown runs, the last 30 workspaces'
   progress: p => core.progress(p),
   tabHandover: p => tabHandover(p), // a tab's Continue in Codex / Claude Code
-  turnDiff: p => turnDiff(p), // Changes' This turn
+  turnDiff: p => (turnsSeen(p), turnDiff(p)), // Changes' This turn
   turnUndo: p => turnUndo(p), // the Reader's card's Undo
-  turnList: p => turnList(p), // F1: a workspace's kept turns (the strip under a tab, Changes' picker)
+  turnList: p => (turnsSeen(p), turnList(p)), // F1: a workspace's kept turns (the strip under a tab, Changes' picker)
   turnRewind: p => turnRewind(p), // its files as before turn n
   turnFork: p => turnFork(p), // a new workspace on turn n's files
   sideAsk: p => sideAsk(p), // Side chat: a question about an agent's work beside it (its chat forked)
@@ -607,9 +607,17 @@ const callerOf = async (sock: Socket, known?: Tab) => {
   const peer = await peerOf(sock).catch(() => null)
   return known ? (peer && peer.id !== known.id ? peer : known) : peer
 }
+// S7: what Recording mode keeps from an agent in another workspace: the state's private rows, a private workspace's
+// kept turns (their prompts, their diffs). ponytail: its diff, files and screen go by their own gates (crossAsk)
+const RECORDED = new Set(['state', 'turnList', 'turnDiff'])
+const turnsSeen = (p: any) => {
+  const me = core.agentCaller(p?.from)
+  const ws = core.state.workspaces.find(w => w.id === (p?.ws ?? core.state.tabs.find(t => t.id === p?.tab)?.workspace))
+  if (me && ws && ws.id !== me && phoneMod.hidden(ws)) throw new Error(`no workspace ${ws.id}`)
+}
 async function whoCalls(sock: Socket, method: string, p: any, known?: Tab) {
   // S7: the state too while Recording mode hides something (only then: every laki ls would pay the lookup)
-  const from = FROM.has(method) || (method === 'state' && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
+  const from = FROM.has(method) || (RECORDED.has(method) && !!core.state.settings?.recording && (core.state.workspaces.some(w => w.private) || core.state.projects.some(x => x.private)))
   if (!from && !CALLER.has(method)) return p
   const tab = await callerOf(sock, known)
   if (tab === null || sock.readableEnded || sock.destroyed) {

@@ -2697,11 +2697,12 @@ export function App() {
     bgOutput: (tab, id) => api.call('bgOutput', { tab, id }),
     appCall: (tab, id, name, args) => api.call('mcpAppCall', { tab, id, name, arguments: args }),
     send: (tab, text) => call('send', { target: tab, text, whenIdle: true, steer: true }),
-    // F6: a shell block's command into the workspace's terminal (its first shell tab, else a new one), typed and not
+    // F6: a shell block's command into the workspace's terminal (its first shell tab at its prompt: one running a
+    // program would take it as that program's keys; else a new one), typed and not
     // run: the tab shows, ⏎ there runs it. ponytail: a shell that just started has no bracketed paste yet, so a block
     // of several lines lands as one
     run: async (t, text) => {
-      const sh = viewRef.current?.tabs.find(x => x.workspace === t.workspace && x.kind === 'shell') ?? (await call<TabView>('tabNew', { ws: t.workspace, preset: 'shell' }).catch(() => null))
+      const sh = viewRef.current?.tabs.find(x => x.workspace === t.workspace && x.kind === 'shell' && x.status === 'idle' && !x.runs) ?? (await call<TabView>('tabNew', { ws: t.workspace, preset: 'shell' }).catch(() => null))
       if (!sh) return
       await call('send', { target: sh.id, text: text.replace(/\n+$/, ''), enter: false }).catch(() => {})
       selectTab(sh)

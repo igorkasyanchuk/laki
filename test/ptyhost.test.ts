@@ -47,10 +47,11 @@ test('the pty host: a socket of the user alone; spawn, write, resize, attach fro
   const a = await client(home)
   assert.equal(statSync(join(home, 'pty.sock')).mode & 0o777, 0o600)
   assert.deepEqual((({ version, pid }) => ({ version, pid }))(await a.ask({ op: 'hello' })), { version: PTY_PROTO, pid: h.pid })
-  a.post({ op: 'spawn', id: 'one', file: '/bin/sh', args: ['-c', 'echo hello; read x; echo "got $x"; stty size; sleep 30'], cwd: home, env: { PATH: process.env.PATH ?? '' }, cols: 90, rows: 20 })
+  a.post({ op: 'spawn', id: 'one', file: '/bin/sh', args: ['-c', 'echo hello; echo "mask $(umask)"; read x; echo "got $x"; stty size; sleep 30'], cwd: home, env: { PATH: process.env.PATH ?? '' }, cols: 90, rows: 20 })
   const pid = (await until(() => a.got.find(x => x.ev === 'spawned' && x.id === 'one'), 'spawned')).pid
   assert.ok(running(pid))
-  await until(() => a.text('one').includes('hello'), 'its first line')
+  await until(() => a.text('one').includes('mask '), 'its first lines')
+  assert.match(a.text('one'), new RegExp(`mask 0*${process.umask().toString(8)}\\b`), "the host's own umask (the socket's 077) isn't its terminals'")
   a.post({ op: 'resize', id: 'one', cols: 100, rows: 30 })
   a.post({ op: 'write', id: 'one', data: 'abc\r' })
   await until(() => a.text('one').includes('30 100'), 'what it read and its new size')

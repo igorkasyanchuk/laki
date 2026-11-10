@@ -1660,8 +1660,8 @@ newest in the accent color. Hover one for its prompt, files, time, length and co
 
 It covers files only: not installs, migrations or pushes, nothing git ignores, and no workspaces over SSH; the agent's
 chat isn't rewound. Settings › Git & worktrees › *Turns kept*: how many per workspace (50; 0: none), 14 days at most.
-The snapshots are refs of Laki's own in the repo (`refs/laki/turns/…`): no push takes them, and they go with the
-workspace.
+The snapshots are refs of Laki's own in the repo (`refs/laki/turns/…`): a push of branches or tags never takes them
+(`git push --mirror` would), `git log --all` lists them, and they go with the workspace.
 
 With Settings › AI › *Guess my next prompt* (off: it's one more request to Laki AI's model per turn), the empty box shows,
 greyed out, what you'd likely send next, guessed from your last message and the answer: Tab takes it, Esc hides it.

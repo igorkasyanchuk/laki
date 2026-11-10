@@ -115,7 +115,16 @@ const ops: Record<string, (s: Socket, m: any) => void> = {
   quit: () => quit('asked to'),
 }
 
-process.umask(0o077)
+// the socket is the user's alone from the moment it's bound (the chmod below is for a umask-less filesystem); only
+// around the bind (it's bound in the call): a umask kept would be every terminal's, its files 0600
+const listen = () => {
+  const was = process.umask(0o077)
+  try {
+    server.listen(path)
+  } finally {
+    process.umask(was)
+  }
+}
 const server = createServer(s => {
   // one daemon at a time: while it's connected nothing else gets in (an agent's process could otherwise type into any
   // terminal past the daemon's gates). ponytail: with no daemon up, the first to connect is taken for it, as any
@@ -143,10 +152,10 @@ server.on('error', (e: NodeJS.ErrnoException) => {
   // a socket file there: another host's (it stays, this one goes), or one left by a host that died
   const probe = connect(path)
   probe.once('connect', () => process.exit(0))
-  probe.once('error', () => (rmSync(path, { force: true }), server.listen(path)))
+  probe.once('error', () => (rmSync(path, { force: true }), listen()))
 })
 server.on('listening', () => (chmodSync(path, 0o600), log(`listening on ${path} (protocol ${VERSION}, pid ${process.pid})`)))
-server.listen(path)
+listen()
 
 const parent = Number(process.env.LAKI_TEST_PARENT)
 setInterval(() => {
