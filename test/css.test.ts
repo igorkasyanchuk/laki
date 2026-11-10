@@ -71,3 +71,14 @@ test("V2: styles.css' spacing, corners, shadows, stacking and type are tokens", 
   for (const [, w] of css.matchAll(/(?<![-\w])font-weight\s*:\s*(\d+)/g)) if (!['400', '600', '700'].includes(w)) bad.push(`font-weight: ${w}`)
   assert.deepEqual(bad, [])
 })
+
+// V6: the other style sheets' corners are tokens too (0, 50% and the pill allowed); looks.css keeps each look's own shapes
+test("V6: no raw border-radius outside looks.css", () => {
+  const bad: string[] = []
+  for (const f of ['styles', 'components', 'plans', 'workflows', 'floater']) {
+    const css = readFileSync(new URL(`../src/renderer/src/${f}.css`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^:root \{[\s\S]*?\n\}/m, '')
+    const inner = (v: string) => { let s = v; for (let i = 0; i < 4; i++) s = s.replace(/\b(calc|clamp|min|max|var)\([^()]*\)/g, ''); return s }
+    for (const [, v] of css.matchAll(/(?<![\w])-?-?(?:bn-)?border(?:-[a-z]+)*-radius\s*:\s*([^;}]+)/g)) if (/\d+(\.\d+)?(px|rem|em)/.test(inner(v)) && !/^999px$/.test(v.trim())) bad.push(`${f}.css: ${v.trim()}`)
+  }
+  assert.deepEqual(bad, [])
+})

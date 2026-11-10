@@ -33,6 +33,9 @@
   --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px;
   --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px); --r-pill: 999px;
   --radius: var(--r-m);
+  /* V6: corners by what they are, concentric: a window's (dialogs, menus, popovers), a panel's (cards), a control's
+     (buttons, fields, rows, tabs, items), a chip's (counts, status); one inside another takes its parent's minus the gap */
+  --r-window: var(--r-xl); --r-panel: var(--r-l); --r-control: calc(var(--r-m) + 1px); --r-chip: var(--r-pill);
   --lift-1: 0 1px 3px rgba(0, 0, 0, 0.25);
   --lift-2: 0 8px 24px rgba(0, 0, 0, 0.35);
   --lift-3: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -77,7 +80,7 @@ html.side-clear .narrow .sidebar { background: var(--panel); } /* a drawer over 
    never solid blocks of the theme's (glass does the whole window: themes.ts) */
 html.side-clear:not(.glass) :is(.sidebar, .rail) { --hover: color-mix(in srgb, var(--fg) 9%, transparent); --line: color-mix(in srgb, var(--fg) 14%, transparent); }
 html.side-clear:not(.glass) .sidebar .ws.sel { background-color: color-mix(in srgb, var(--sel) 70%, transparent); }
-button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
+button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
 button:hover { background: var(--hover); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 button.on { border-color: var(--accent); color: var(--accent-ink); }
@@ -87,7 +90,7 @@ button.icon { background: none; border: none; font-size: var(--fs-4); line-heigh
 button.icon:hover { color: var(--fg); background: var(--hover); }
 button.icon.small { font-size: var(--fs-4); padding: 0 var(--sp-3); min-width: 20px; min-height: 20px; }
 button.link { background: none; border: none; color: var(--accent-ink); padding: 0 var(--sp-2); }
-input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); outline: none; width: 100%; }
+input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-3) var(--sp-4); outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 /* U11: a ring the keyboard can see (a border change alone is easy to miss) */
 input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
@@ -414,7 +417,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .project-ws:empty { display: none; }
 /* the Needs you list (Needs.tsx) above Pinned: a card each, waiting ones edged in --waiting, done ones in --done */
 .needs-cards { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-1) var(--sp-4) var(--sp-4) var(--sp-4); }
-.need { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: var(--r-l); background: color-mix(in srgb, var(--fg) 3%, transparent); cursor: pointer; font-size: var(--fs-2); min-width: 0; }
+.need { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-left: 3px solid var(--waiting); border-radius: var(--r-panel); background: color-mix(in srgb, var(--fg) 3%, transparent); cursor: pointer; font-size: var(--fs-2); min-width: 0; }
 .need.need-done { border-left-color: var(--done); }
 .need:hover { background: var(--hover); }
 .need:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -477,10 +480,10 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
    left in its color or the accent (--ws-bar), a workspace's color (--tab-c, set inline) that bar dimmer and a tint, its
    project's (--proj-c) the bar alone where it has none of its own; one that needs you (.needs: waiting, or done unseen)
    has its name in bold */
-.ws { --ws-bar: color-mix(in srgb, var(--tab-c, var(--proj-c, transparent)) 70%, transparent); display: flex; align-items: center; gap: var(--sp-3); height: var(--ws-h, 28px); margin: var(--ws-gap, 1px) 6px var(--ws-gap, 1px) 4px; padding: 0 var(--sp-4) 0 var(--sp-4); border-radius: min(var(--radius), var(--r-l)); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
+.ws { --ws-bar: color-mix(in srgb, var(--tab-c, transparent) 70%, transparent); display: flex; align-items: center; gap: var(--sp-3); height: var(--ws-h, 28px); margin: var(--ws-gap, 1px) 8px; padding: 0 var(--sp-4) 0 var(--sp-4); border-radius: var(--r-control); cursor: pointer; border-left: 2px solid transparent; min-width: 0;
   background: linear-gradient(var(--ws-bar), var(--ws-bar)) 0 50% / 3px 55% no-repeat, linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 16%, transparent), transparent 85%); }
 .ws:hover { background-color: var(--hover); }
-.ws.sel { --ws-bar: var(--tab-c, var(--proj-c, var(--accent))); background-color: var(--sel); }
+.ws.sel { --ws-bar: var(--tab-c, transparent); background-color: color-mix(in srgb, var(--accent) 20%, transparent); } /* V6: an accent fill; a bar only in the workspace's own color */
 .ws.needs .ws-name { font-weight: 600; }
 .ws-new { color: var(--muted); }
 .ws-new:hover { color: var(--fg); }
@@ -546,7 +549,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .help-q { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; vertical-align: 1px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); font-size: var(--fs-1); font-weight: 600; line-height: 1; cursor: help; } /* SettingsKit's HelpQ: a setting's ? */
 .help-q::after { content: ''; position: absolute; inset: -6px; } /* a bigger target than it looks */
 .help-q:hover, .help-q:focus-visible { color: var(--accent-ink); border-color: var(--accent); outline: none; }
-.help-card { position: fixed; inset: auto; margin: 6px 0; position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; width: min(340px, calc(100vw - 32px)); padding: var(--sp-5) var(--sp-5); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); color: var(--fg); box-shadow: var(--lift-3); font-size: var(--fs-2); font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; cursor: auto; }
+.help-card { position: fixed; inset: auto; margin: 6px 0; position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; width: min(340px, calc(100vw - 32px)); padding: var(--sp-5) var(--sp-5); border: 1px solid var(--line); border-radius: var(--r-window); background: var(--panel); color: var(--fg); box-shadow: var(--lift-3); font-size: var(--fs-2); font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; cursor: auto; }
 .help-card:popover-open { display: flex; flex-direction: column; gap: var(--sp-3); }
 .help-card b { font-size: var(--fs-3); }
 .help-k { margin-right: 4px; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: var(--fs-1); letter-spacing: 0.04em; }
@@ -561,7 +564,7 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .settings-main p { margin: 0; }
 /* a settings page's blocks (SettingsKit.tsx Group): each a card with its title, apart from the next */
 .set-title { display: flex; flex-direction: column; gap: var(--sp-2); }
-.set-group { display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-6); border: 1px solid var(--line); border-radius: calc(var(--radius) + var(--r-s)); background: var(--panel); }
+.set-group { display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-6); border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--panel); }
 .two-ways { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin: 4px 0 14px; } /* Settings › Tunnels and Remote access: which is which */
 .two-ways > div { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4) var(--sp-4); border: 1px solid var(--line); border-radius: var(--radius); }
 .two-ways > button.go { align-items: flex-start; text-align: left; font: inherit; color: inherit; background: none; cursor: pointer; }
@@ -638,14 +641,14 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
    (the bar scrolls), the pill looks or a Design with pill tabs, whose tabs float over their line. Between two other tabs, a short divider.
    ponytail: without anchor positioning (older browsers) the bar has no line beside the tab */
 .tabbar { --tab-line: 1px solid var(--line); position: relative; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *):has(> .tab.sel) { border-bottom-width: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *) > .tab { margin-bottom: 0; } /* on the bar's bottom, the line drawn beside them */
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *) > .tab.sel { position: relative; anchor-name: --laki-tab; border: var(--tab-line); border-bottom: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *):has(> .tab.sel)::before,
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *):has(> .tab.sel)::after { content: ''; position: absolute; bottom: 0; border-bottom: var(--tab-line); border-image: var(--tab-line-img, none); background: var(--tab-line-bg, none) fixed 0 0 / 100vw 100%; pointer-events: none; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel) { border-bottom-width: 0; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab { margin-bottom: 0; } /* on the bar's bottom, the line drawn beside them */
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab.sel { position: relative; anchor-name: --laki-tab; border: var(--tab-line); border-bottom: 0; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel)::before,
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *):has(> .tab.sel)::after { content: ''; position: absolute; bottom: 0; border-bottom: var(--tab-line); border-image: var(--tab-line-img, none); background: var(--tab-line-bg, none) fixed 0 0 / 100vw 100%; pointer-events: none; }
 .tabbar::before { left: 0; right: anchor(--laki-tab left); }
 .tabbar::after { left: anchor(--laki-tab right); right: 0; }
-.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *) > .tab.sel::before { content: ''; position: absolute; inset: calc(-1 * var(--tab-line-w, 1px)) calc(-1 * var(--tab-line-w, 1px)) 0; border: var(--tab-line-w, 1px) solid transparent; border-top-width: max(2px, var(--tab-line-w, 1px)); border-bottom: 0; border-radius: inherit; background: var(--tab-line-bg) fixed 0 0 / 100vw 100% border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.tabbar:not(.narrow *, [data-look='clay'] *, [data-look='groovy'] *, [data-look='diner'] *, [data-dz~='pills'] *, :where(.app:not([data-dz])) *) > .tab.sel::before { content: ''; position: absolute; inset: calc(-1 * var(--tab-line-w, 1px)) calc(-1 * var(--tab-line-w, 1px)) 0; border: var(--tab-line-w, 1px) solid transparent; border-top-width: max(2px, var(--tab-line-w, 1px)); border-bottom: 0; border-radius: inherit; background: var(--tab-line-bg) fixed 0 0 / 100vw 100% border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
 .tabbar > .tab:not(.sel) { position: relative; }
 .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; border-left: 1px solid var(--line); pointer-events: none; }
 .tabbar > .tab:not(.sel):hover::after, .tabbar > .tab:hover + .tab::after { display: none; }
@@ -712,10 +715,10 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .ib.labeled { width: auto; gap: var(--sp-3); padding: 0 var(--sp-3) 0 var(--sp-3); font-size: var(--fs-2); }
 .ib-label { white-space: nowrap; }
 .menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); -webkit-app-region: no-drag; }
-.menu { --mp: 5px; position: fixed; display: flex; flex-direction: column; min-width: 190px; max-height: 70vh; overflow: hidden; padding: var(--mp); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--lift-3), var(--lift-2); }
+.menu { --mp: 6px; position: fixed; display: flex; flex-direction: column; min-width: 190px; max-height: 70vh; overflow: hidden; padding: var(--mp); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-window); box-shadow: var(--lift-3), var(--lift-2); }
 .menu-list { min-height: 0; overflow-y: auto; }
-.menu-item { display: flex; align-items: center; gap: var(--sp-4); width: 100%; padding: var(--sp-3) var(--sp-4); background: none; border: none; border-radius: var(--r-m); text-align: left; font-size: var(--fs-3); }
-.menu-item:hover { background: var(--sel); }
+.menu-item { display: flex; align-items: center; gap: var(--sp-4); width: 100%; padding: var(--sp-3) var(--sp-4); background: none; border: none; border-radius: max(0px, calc(var(--r-window) - var(--mp))); text-align: left; font-size: var(--fs-3); }
+.menu-item:hover { background: var(--hover); }
 .menu-item.danger { color: var(--error); }
 .menu-item.indent { padding-left: 26px; }
 .menu-icon { width: 14px; display: inline-flex; color: var(--muted); }
@@ -755,7 +758,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .menu.rich .menu-label { font-size: var(--fs-3); }
 .menu.rich .menu-label.mono { font-size: var(--fs-3); }
 .menu.rich .menu-head { padding: var(--sp-3) var(--sp-4) var(--sp-2); }
-.menu-item.sel { background: var(--sel); }
+.menu-item.sel { background: color-mix(in srgb, var(--accent) 20%, transparent); } /* V6: the choice in the accent, hover neutral */
 .menu-key { min-width: 16px; padding: 0 var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-s); color: var(--muted); font: var(--fs-1)/14px var(--mono); text-align: center; }
 .menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
 .menu-colors { display: flex; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
@@ -778,7 +781,7 @@ code.var { font: 0.92em var(--mono); color: var(--accent-ink); background: color
 .del { color: var(--del); }
 
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; z-index: var(--z-dialog); }
-.modal { width: 520px; max-width: calc(100vw - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--lift-3); padding: var(--sp-5); max-height: 76vh; display: flex; flex-direction: column; }
+.modal { width: 520px; max-width: calc(100vw - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-window); box-shadow: var(--lift-3); padding: var(--sp-5); max-height: 76vh; display: flex; flex-direction: column; }
 .modal.wide { width: 680px; }
 .modal-title { font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
 .modal-title > .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1000,8 +1003,9 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 @media (prefers-reduced-motion: reduce) { .nw-bar::after { animation: none; left: 0; width: 100%; opacity: 0.5; } .nw-making { animation: none; } }
 .palette-input { font-size: var(--fs-4); padding: var(--sp-4) var(--sp-4); }
 .palette-list { overflow-y: auto; margin-top: 8px; }
-.palette-item { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius); cursor: pointer; }
-.palette-item.sel { background: var(--sel); }
+.palette-item { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); margin-inline: var(--sp-1); border-radius: var(--r-control); cursor: pointer; }
+.palette-item:hover { background: var(--hover); }
+.palette-item.sel { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .palette-item .pg { width: 16px; }
 .palette-item .pl { white-space: nowrap; }
 /* a project's mark (ui.tsx ProjectMark): its icon in its color, an emoji with a line in it; an accent, never the text's color */
@@ -2595,7 +2599,7 @@ button.board-name:hover { background: none; }
 .tab-pct { flex: none; padding: 0 var(--sp-3); border-radius: var(--r-l); font: 600 var(--fs-1)/15px var(--mono); color: var(--fg); background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent) var(--p), color-mix(in srgb, var(--line) 70%, transparent) var(--p)); font-variant-numeric: tabular-nums; }
 /* the sidebar's styles (Settings › Appearance › The sidebar): compact, a short line; extended and cards, a second line
    (branch, state, progress, PR, diff); cards, a box each with the agent's last answer */
-.sidebar[data-style='compact'] .ws { height: var(--ws-h, 22px); }
+.sidebar[data-style='compact'] .ws { height: var(--ws-h, 22px); margin-inline: 6px; } /* compact: a smaller step of the same scale */
 .sidebar[data-style='compact'] .ws :is(.ws-pr, .ws-stat, .ws-mark, .ws-sched, .ws-merged, .elapsed, .ws-proj) { display: none; }
 .sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws { flex-wrap: wrap; height: auto; min-height: var(--ws-h, 28px); padding-block: var(--sp-2); row-gap: 1px; }
 .sidebar:is([data-style='extended'], [data-style='words'], [data-style='cards']) .ws > .ws-stat { display: none; } /* on the second line */
@@ -2672,7 +2676,7 @@ button.board-name:hover { background: none; }
 .preset:focus-within > .vars { display: flex; }
 /* a workspace's card as the mouse rests on its row (App's peekCard), beside the sidebar: its links and buttons take
    clicks; the row's color on its left edge */
-.ws-peek { position: fixed; z-index: calc(var(--z-drag) + 50); width: 320px; max-width: calc(100vw - 16px); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-left: 3px solid var(--tab-c, var(--line)); border-radius: var(--r-l); box-shadow: var(--lift-3); font-size: var(--fs-2); line-height: 1.35; }
+.ws-peek { position: fixed; z-index: calc(var(--z-drag) + 50); width: 320px; max-width: calc(100vw - 16px); box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-left: 3px solid var(--tab-c, var(--line)); border-radius: var(--r-window); box-shadow: var(--lift-3); font-size: var(--fs-2); line-height: 1.35; }
 .wp-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .wp-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wp-head .muted { margin-left: auto; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-1); }
@@ -3359,6 +3363,13 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .app[data-dz~='pills'] .tabbar > .tab.sel { border-color: var(--line); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-c, var(--accent)) 45%, transparent), var(--d-lift); }
 .app[data-dz~='pills'] .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='pills'] .tabbar > .tab.review-tab { flex: none; justify-content: center; width: 34px; padding: 0; } /* only its icon: in the middle (a tab's room is for its ✕) */
+/* V6: Classic's tabs (no Design traits; not on a phone or the pill looks, which have their own): segments on
+   --r-control, the open one a soft fill instead of the top line; a tab's color a line under it, its marks as they are */
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar { align-items: center; }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab { height: var(--h-m); margin: 0 1px; border: 1px solid transparent; border-radius: var(--r-control); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner']) .app:not([data-dz], .narrow) .tabbar) > .tab.sel { background: color-mix(in srgb, var(--fg) 9%, transparent); } /* a look's own selected tab wins */
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab.sel { border-color: transparent; color: var(--fg); box-shadow: inset 0 -2px 0 var(--tab-c, transparent); }
+:where(:root:not([data-look='clay'], [data-look='groovy'], [data-look='diner'])) .app:not([data-dz], .narrow) .tabbar > .tab:not(.sel) + .tab:not(.sel)::after { display: none; }
 .app[data-dz~='joined'] .tabbar { padding-left: max(6px, var(--d-r)); }
 .app[data-dz~='joined'] .tabbar::before, .app[data-dz~='joined'] .tabbar::after { display: none; } /* the card's own edge is the line */
 .app[data-dz~='joined'] .tabbar > .tab.sel { z-index: 1; margin-bottom: -1px; } /* over the card's edge: open into it */

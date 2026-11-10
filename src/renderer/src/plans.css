@@ -508,7 +508,7 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .editor-wrap { margin-left: -54px; min-width: 0; }
 .bn-root.bn-root[data-color-scheme] { /* twice: over BlockNote's own, loaded after this */
   --bn-font-family: var(--ui-font);
-  --bn-border-radius: var(--rs, 8px);
+  --bn-border-radius: var(--r-control);
   --bn-colors-editor-background: transparent;
   --bn-colors-editor-text: var(--fg);
   --bn-colors-menu-background: var(--panel);

@@ -541,6 +541,12 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `--lift-1…3`, `--h-s/m/l` (22, 28, 34), `--z-dialog` 10 < toast < page < ask < pop < drag < tip < `--z-top` (a raw
   z-index only within a part, under 10). Chrome: heads and the tab bar 40px, rows and bars 28. A toast is neutral;
   `err` (App's `fail`, `toast(…, err)`) gives it the red edge. `test/css.test.ts` checks styles.css; looks.css next.
+- **Concentric corners and inset selection** (V6): `--r-window` (dialogs, menus, popovers, the peek card), `--r-panel`
+  (cards: Needs you's, a settings group), `--r-control` (buttons, fields, rows, tabs), `--r-chip` (counts, status chips); a
+  nested one is its parent's minus the gap (`.menu`'s `--mp`). Sidebar rows, palette and menu items sit inset (a margin
+  each side) on `--r-control`: hover a neutral fill, selected the accent at 20% (a row's own color bar stays). Classic's
+  tabs (no Design traits: `.app:not([data-dz], .narrow)`, not the pill looks) are segments, the open one a soft fill and its
+  color a line under it, out of the joined-tab rules' `:not()` lists. css.test: no raw px corner in any sheet but looks.css.
 - **Keyboard and screen readers** (U11): the sidebar's `.side-scroll` is a `role="tree"` (Sidebar.tsx `treeKey`, `rove`):
   project heads, Pinned and Needs you's head are treeitems at level 1 (`aria-expanded`), groups and rows at 2
   (`aria-selected`), each `.project-ws` a `group`; every treeitem is `tabIndex={-1}` in JSX and a layout effect keeps one

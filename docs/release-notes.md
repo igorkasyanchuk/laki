@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Rounder, calmer selection: sidebar rows, ⌘K's items and menu items sit inset with rounded corners and a soft accent fill (no side bar), dialogs and menus have matching corners, and Classic's tabs are rounded segments, the open one filled instead of a top line.
 - A tidier window: spacing, corners, shadows and text sizes on one scale, the heads and the tab bar 40px tall, rows and bars 28, the status bar in the interface font (the branch and the port stay monospace), and a toast gets a red edge only for an error.
 - The sidebar works from the keyboard: one Tab stop, arrows move and fold, Enter opens, Space picks, ⇧F10 opens a row's menu, and a row's ⋯ shows as it gets the focus. Rows, cells and pictures you click are reachable by keyboard too, fields ring as they get the focus, a PR's mark has a shape per state (merged, closed ×, a dashed draft), and the context meter says its level in words.
 - Settings has *Basic | All*: Basic is the settings most people change, in four parts (Agents, Notifications, Look, Git & PRs). Appearance is now *Theme & type*, *Layout* and *Extras*, the Theme first. Long hints are one line, with the rest in a ? card. *Reset the interface* has its own group at the end of General and asks you to type reset. New installs fetch the base from origin before a worktree, show the row's next-step chip, keep memory compaction off until you turn it on, and don't notify as a turn finishes (Needs you still has it).
