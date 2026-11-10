@@ -58,9 +58,9 @@ test('the Frosted design is always glass', async () => {
   assert.equal(paintOf({ theme: 'kraft', design: 'cards' }).glass, undefined)
 })
 
-test('themes: unique ids, and every look has rules in look.css', async () => {
+test('themes: unique ids, and every look has rules in looks.css', async () => {
   const { THEMES } = await import('../src/renderer/src/themes.ts')
-  const css = (await import('node:fs')).readFileSync(new URL('../src/renderer/src/look.css', import.meta.url), 'utf8')
+  const css = (await import('node:fs')).readFileSync(new URL('../src/renderer/src/looks.css', import.meta.url), 'utf8')
   assert.equal(new Set(THEMES.map(t => t.id)).size, THEMES.length)
   for (const t of THEMES) if (t.look) assert.ok(css.includes(`[data-look='${t.look}']`), t.look)
 })

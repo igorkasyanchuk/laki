@@ -431,13 +431,13 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   labels on those fills (`onAccent`). `test/contrast.test.ts` holds every theme to WCAG ratios (text 4.5; hints, status
   marks and terminal colors 3, a mark on the selection 2.5 (its shape tells it too), the dim grey 2.5; on the main area,
   the sidebar, the rail, panels and the selection; a gradient theme's on both ends): a new theme or color must pass it. A look that fills a selected tab or row gives its marks the text's
-  color (look.css' last rules).
-- **`look.css`**: the bundled fonts (Inter, JetBrains Mono, the other terminal fonts and the interface ones, `themes.ts` `UI_FONTS`; `fonts/NOTICE.md`), syntax colors (`.hl-*`), a look's tab bar
+  color (looks.css' last rules).
+- **`fonts.css`, `components.css`, `looks.css`** (V2: once one `looks.css`, in that order after `styles.css`, main.tsx): the bundled fonts (Inter, JetBrains Mono, the other terminal fonts and the interface ones, `themes.ts` `UI_FONTS`; `fonts/NOTICE.md`), syntax colors (`.hl-*`), a look's tab bar
   line as `--tab-line` (a gradient across it as `--tab-line-bg` and `--tab-line-w`, one down it as `--tab-line-img`):
   styles.css' real tab draws it beside the selected tab (the bar's `::before`/`::after`, CSS anchor positioning on the
   tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
-  (`html.glass`; Design's Frosted: `paintOf` forces glass, `applyTheme` sets `data-look` to it over the theme's, main's `glass` IPC moves the traffic lights into the sidebar's panel and `window.json` keeps that for the next start, look.css' last block) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
-  else look.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
+  (`html.glass`; Design's Frosted: `paintOf` forces glass, `applyTheme` sets `data-look` to it over the theme's, main's `glass` IPC moves the traffic lights into the sidebar's panel and `window.json` keeps that for the next start, looks.css' last block) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
+  else looks.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Animations, styles.css'
   last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
@@ -559,7 +559,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`), `termPad` (*Padding*: `.app[data-pad]`, the `.term`'s inset and the preview's padding; tiny on a phone too, roomy not) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight, a ☆ on each (`favThemes`: Favorites, a group first, each one still in All themes too);
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's (`radius`
-  also as `--rs`, which every fixed px radius in look.css and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
+  also as `--rs`, which every fixed px radius in looks.css and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
   pills (999px, or half their height: `.pr`, `.tag`, the switch's track) and circles (50%) stay),
   `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them
@@ -567,7 +567,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   unset `auto`): `--accent-ink` in every theme but the looks whose head is a band of their own (starship, luna, mission,
   islander), `own` the project's color, `theme` none; `SIDE_LOOK`,
   `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
-  `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
+  `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of looks.css;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's; the global sections, it and Actions, open with a `Scope` note, `.set-scope`: Global, everywhere, and where a project's own go; a project's two say *This project*: only there, with the global ones, counted (`mergeActions`, `templatesFor`), and a link to the global list), Keys (`KeysSection`: a `KeyField` per `KEYS` action, Reset all, `keyClash` against the global hotkeys and the picker as `others`; `settings.keys` only the changed ones), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…72h or Forever, then the QR code and link), and `ScriptsField` (a project's
@@ -736,7 +736,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 
 Laki was built twice while the stack was picked; the Go + Wails build is now its own repository
 and nothing here keeps it in step. Many renderer files were
-shared with it: some class and variable names in `look.css` and `themes.ts` are its, and harmless here.
+shared with it: some class and variable names in `looks.css` and `themes.ts` are its, and harmless here.
 
 Labs (U1): `settings.labs` and types.ts' `LABS` (desk, specs, workflows, calendar, notes, todoList, railShells,
 railBrowsers, videoButton, fun, timerButton). core.ts `load`: no state.json yet, each of them is saved `false` with

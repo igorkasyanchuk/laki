@@ -2,7 +2,7 @@
 
 Inter and JetBrains Mono: Latin, Latin Extended and Cyrillic subsets; the other terminal fonts and the interface fonts
 (Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope): Latin only (woff2, from Google Fonts; Iosevka from
-Fontsource and Hack from its own webfonts, cut to the same Latin set). Used by `look.css`.
+Fontsource and Hack from its own webfonts, cut to the same Latin set). Used by `fonts.css`.
 
 - **Inter**: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter).
 - **JetBrains Mono**: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono).

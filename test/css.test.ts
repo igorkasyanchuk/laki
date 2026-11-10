@@ -17,7 +17,7 @@ test("BlockNote's suggested edits left out; its slash menu and what's grouped wi
 
 test('no * or :not() under a :has() in our stylesheets', () => {
   const under = /:has\((?:[^()]|\([^()]*\))*\)\)?[^,{]*?[ >~+]\s*(\*|:not\()/ // ponytail: commas inside :is() split too, harmless here
-  for (const f of ['styles.css', 'look.css', 'plans.css', 'workflows.css', 'floater.css']) {
+  for (const f of ['styles.css', 'fonts.css', 'components.css', 'looks.css', 'plans.css', 'workflows.css', 'floater.css']) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const sel of css.match(/[^{};]+(?=\{)/g) ?? []) for (const s of sel.split(',')) assert.ok(!under.test(s), `${f}: ${s.trim()}`)
   }
@@ -29,7 +29,7 @@ test('no * or :not() under a :has() in our stylesheets', () => {
 // B1: the type scale. A size in px is one of --fs-1…5; its own only under 10px (badges) or over 22px (display numbers);
 // em, rem, inherit, a setting's variable and a calc() are relative to something else
 test('every font-size is a step of the type scale', () => {
-  for (const f of ['styles.css', 'look.css', 'plans.css', 'workflows.css']) {
+  for (const f of ['styles.css', 'fonts.css', 'components.css', 'looks.css', 'plans.css', 'workflows.css']) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const [, v] of css.matchAll(/font-size:\s*([^;}]+)/g)) {
       const px = /^(\d+(?:\.\d+)?)px( !important)?$/.exec(v.trim())

@@ -15,7 +15,7 @@ export const DESIGNS: [Design, string, string, string][] = [
   ['inset', 'Inset', 'One raised card for the terminals and the side panel, the sidebar flat beside the rail', 'chrome body joined'],
   ['tiles', 'Tiles', 'Every split pane a tile of its own, projects boxed', 'chrome side-card boxed parts tiles pills shadow'],
   ['soft', 'Soft', 'No lines: tints, round shapes, more room, the side panel floating over the terminals', 'boxed float pills lineless'],
-  ['frosted', 'Frosted', "macOS glass over any theme: its colors, floating panels on your desktop, capsule tabs, Mac controls", 'pills float lineless frosted'], // look.css' Frosted: applyTheme's data-look, always glass
+  ['frosted', 'Frosted', "macOS glass over any theme: its colors, floating panels on your desktop, capsule tabs, Mac controls", 'pills float lineless frosted'], // looks.css' Frosted: applyTheme's data-look, always glass
 ]
 export const designTraits = (d?: Design) => DESIGNS.find(x => x[0] === d)?.[3] || undefined
 

@@ -1,5 +1,5 @@
 // Syntax colors for the file preview: one regex per language family finds comments, strings, numbers,
-// keywords, calls, types, keys and tags. It never builds HTML: tokens become React text (look.css colors
+// keywords, calls, types, keys and tags. It never builds HTML: tokens become React text (components.css colors
 // the classes). Text over HL_MAX, or of an unknown kind, stays plain.
 
 import { EXITS, WHOLE } from '../../shared/workflow.ts'

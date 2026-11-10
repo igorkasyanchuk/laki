@@ -36,7 +36,7 @@ async function localFonts() {
   return local ?? []
 }
 const SHORT = [...new Set([...UI_FONTS.filter(f => f !== 'system'), 'SF Pro', 'SF Mono', 'Menlo', 'Helvetica', 'Arial', 'Georgia', 'Times New Roman', 'Courier New'])].sort((a, b) => a.localeCompare(b))
-const LAKI = ['Inter', 'Geist', 'IBM Plex Sans', 'Roboto', 'Source Sans 3', 'Fira Sans', 'Manrope'] // look.css's own, bundled
+const LAKI = ['Inter', 'Geist', 'IBM Plex Sans', 'Roboto', 'Source Sans 3', 'Fira Sans', 'Manrope'] // fonts.css's own, bundled
 // a font picked by name from Laki's own menu (a native select's options can't show their font on a Mac), each name drawn
 // in its own typeface, in groups: first (unset's word, the theme's…), Laki's own, dev (the terminal's monospace ones
 // this Mac draws, Settings' installedFonts), then the rest this Mac has (mac false: not those); a filter on top; other:

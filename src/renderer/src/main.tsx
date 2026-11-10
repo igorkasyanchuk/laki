@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { FloatNotices } from './Shown'
 import { Boundary } from './ui'
 import './styles.css'
-import './look.css'
+import './fonts.css'
+import './components.css'
+import './looks.css'
 
 // a phone's keyboard shrinks only the visual viewport (iOS Safari): the narrow layout fits what's left (--vh), in
 // the page's pixels (× scale: a pinch-zoom shrinks the visual viewport too)

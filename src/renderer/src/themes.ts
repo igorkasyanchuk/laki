@@ -1,6 +1,6 @@
 // Color themes (Settings → Appearance). A theme sets the app's CSS variables on
 // <html>; 'default' keeps the app's own (:root in its stylesheet). The terminal's 16 colors are --ansi-0…15
-// and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (look.css,
+// and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (looks.css,
 // <html data-look>). Glass makes the window see-through, as much as its sliders say.
 import { lookOf, setIconLook } from '../../shared/icons.ts'
 
@@ -24,7 +24,7 @@ type Colors = {
   purple: string // a violet: a theme's magenta can be its pink
 }
 // grad: a gradient behind the sidebar and the terminals (Warp-style); side is then see-through.
-// look: look.css's [data-look] rules for it
+// look: looks.css's [data-look] rules for it
 // aka: what it's after, for Settings' finder only (a theme's name is its own)
 export type Theme = { id: string; name: string; aka?: string; light?: boolean; c?: Colors; ansi?: string[]; grad?: [string, string]; look?: string }
 
@@ -292,7 +292,7 @@ export const THEMES: Theme[] = [
     ansi: ['#e5e5ea', '#c9281f', '#1b7f37', '#8f5a00', '#0a6cdc', '#7d3fc9', '#0b7a94', '#3a3a3c',
       '#8e8e93', '#e0443e', '#28943f', '#a86a00', '#2b84ea', '#9550dd', '#128ea9', '#0d0d10'],
   },
-  // looks: more than colors (look.css)
+  // looks: more than colors (looks.css)
   {
     id: 'phosphor',
     name: 'Phosphor',
@@ -958,7 +958,7 @@ export const THEMES: Theme[] = [
     ansi: ['#efe4c4', '#d8473a', '#2f9869', '#ae7e0a', '#2f86b8', '#b05aa8', '#299595', '#5a4632',
       '#aa9a7c', '#e8594a', '#349f77', '#b5861b', '#3497c2', '#c272bb', '#319c9c', '#2a2016'],
   },
-  // games and films, each in its own look (look.css)
+  // games and films, each in its own look (looks.css)
   {
     id: 'llama',
     aka: 'winamp music player',
@@ -1176,7 +1176,7 @@ export function readable(c: string, bgs: string[], min = 4.5) {
   return contrast('#000000', bgs[0]) >= contrast('#ffffff', bgs[0]) ? '#000000' : '#ffffff'
 }
 export const UI_FALLBACK = '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-// sans first (Geist to Manrope bundled, Latin only: look.css), then the developers' monospace ones (the terminal's too)
+// sans first (Geist to Manrope bundled, Latin only: looks.css), then the developers' monospace ones (the terminal's too)
 export const UI_FONTS = ['Inter', 'system', 'Geist', 'IBM Plex Sans', 'Roboto', 'Source Sans 3', 'Fira Sans', 'Manrope', 'Avenir Next', 'Helvetica Neue', 'Futura', 'Gill Sans', 'Optima',
   'JetBrains Mono', 'Geist Mono', 'IBM Plex Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'Roboto Mono', 'Menlo']
 
@@ -1275,12 +1275,12 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
-  root.classList.toggle('vibrant', !!o.glass && app && /Mac/.test(navigator.userAgent)) // Frosted's wallpaper only where there's no desktop behind (look.css)
+  root.classList.toggle('vibrant', !!o.glass && app && /Mac/.test(navigator.userAgent)) // Frosted's wallpaper only where there's no desktop behind (looks.css)
   // a background picture (glass shows the desktop instead): behind everything, the surfaces over it see-through
   const bg = !o.glass && !!o.background?.file && bgImage ? o.background : undefined
   root.classList.toggle('has-bg', !!bg)
   seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad || !!bg
-  // the interface font: unset, SF Pro (Inter off a Mac) whatever the theme; 'theme': its look's own (look.css' last rules)
+  // the interface font: unset, SF Pro (Inter off a Mac) whatever the theme; 'theme': its look's own (looks.css' last rules)
   const font = o.uiFont?.trim()
   root.classList.toggle('theme-font', font === 'theme')
   if (font && font !== 'theme') st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
