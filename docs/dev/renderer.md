@@ -441,7 +441,9 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   else looks.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Animations, styles.css'
-  last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
+  last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `vertText`:
+  Appearance's Vertical text, `--vt` on <html> (`sideways-lr` up, `vertical-rl` down), which every sideways label's
+  `writing-mode: var(--vt, <its own>)` takes (`.fr-vert`, the Board's empty columns, plans.css' `.sd-lane .sd-label`); `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
   see-through `--app-bg` (with the glow's radial gradients), `--side` and `--rail-bg` (`glassSide`) and `--term-bg` (`#rrggbbaa`: xterm reads only
   that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
   (a clear body, `.main` alone on `--app-bg`; glass in the app too: the sidebar's slider is over the desktop, not the Window one's background) and the window's blur (`blurred`; the new-workspace window never: `NewWindow`'s paint); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:

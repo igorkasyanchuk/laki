@@ -2051,7 +2051,9 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   it comes, the rest of the app's icons scaled with it; an icon you pick for a project, a Desk tab or an extension is a
   name, drawn by whichever pack is on, Laki's own where a pack lacks it), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
   keeps them on top), *Animations* (*Low* by default; *High*: pages, dialogs, menus and lists come in with a little
-  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *High contrast mode* (off by default:
+  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *Vertical text* (how sideways labels read: the
+  Board's empty columns, the workspace and file strips, a diagram's lanes; by default those on the left from the bottom up, the
+  rest from the top down; or all *Top to bottom*, or all *Bottom to top*), *High contrast mode* (off by default:
   hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
   three rows as you set them; its font, any on this Mac; its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,

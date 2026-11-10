@@ -93,6 +93,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Pages size', 'zoom text font size small bigger larger readable page settings help scheduled tasks workflows specs brainstorms'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
+  ['appearance', 'Vertical text', 'sideways rotated direction text up down bottom top reverse board columns strip lanes writing'],
   ['appearance', 'High contrast mode', 'contrast accessibility readable legible stronger muted lines text hard to see'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
   ['layout', 'Sidebar', 'project names font case letter spacing size weight rows text'],

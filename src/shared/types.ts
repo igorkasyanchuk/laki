@@ -621,6 +621,7 @@ export type Settings = {
   iconSize?: number
   highContrast?: boolean // Appearance's High contrast mode (themes.ts' Paint): hints, labels and lines most of the way to the text, the accent as text at 7:1 (off unless true)
   motion?: 'high' | 'low' | 'none' // Appearance's Animations (themes.ts' Paint, html[data-motion]): more of them, the usual (unset), or none
+  vertText?: 'down' | 'up' // Appearance's Vertical text (themes.ts' Paint, --vt): every sideways label read top to bottom or bottom to top (unset: each its own)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
