@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Needs you answers in bulk: with two or more permission asks waiting, *Allow all (n)* lists each (the same command in several workspaces on one line) and asks first; *Deny all* is beside it. Risky commands, questions, secrets and paths outside the worktree stay on their cards. ⇧A with a card focused.
 - Ship is a sheet now: tick the files that go in (the rest stay uncommitted), see each one's diff, edit the commit message, the PR's title and body (drafted from the task and the agent's last answer), base and reviewers, and turn on Draft, Merge when green or Send CI failures to the agent. A line on top says how the Done check went, any overlaps and how far behind its base the branch is. Commit only, Push or Open PR (⌘↵). `laki ship` takes `--title`, `--body`, `--draft`, `--base` and `--files`.
 - Welcome fixes what it finds: Install and Sign in buttons (a terminal with the command typed), each agent's sign-in checked, what's ready on one line; and *Try it on a sample repo* to take Laki for a spin on a tiny project with a failing test.
 - Get started is the loop now: add a project, start a task, answer the agent, review its changes, ship or archive (the rest under Explore more). It no longer opens by itself: its bar at the sidebar's foot does.

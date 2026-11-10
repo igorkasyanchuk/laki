@@ -3475,3 +3475,9 @@ html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-c
 .ship input[type='checkbox'] { width: auto; flex: none; margin: 0; padding: 0; }
 .ship label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 6px; }
 .ship-file .st { flex: none; width: 1.2em; text-align: center; }
+
+/* U8: Needs you's Allow all and Deny all, in its head */
+.needs-bulk { display: flex; gap: 3px; margin-left: auto; flex: none; }
+.needs-bulk button { font-size: var(--fs-1); height: 20px; padding: 0 6px; white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.needs-list > .project-head .project-name { flex: 0 1 auto; min-width: 0; }
+.needs-bulk .needs-allow-all { color: var(--accent-ink); border-color: var(--accent); }

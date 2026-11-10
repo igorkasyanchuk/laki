@@ -152,3 +152,46 @@ export const permVerb = (tool: string) =>
   : tool === 'WebFetch' ? 'wants to fetch'
   : tool === 'WebSearch' ? 'wants to search'
   : `wants to use ${tool}`
+
+// ---------- U8: Needs you's Allow all and Deny all: which waiting asks one click may answer
+
+// a command one click never allows: what deletes, rewrites history, runs as root or pipes the web into a shell
+// ponytail: a list of patterns, not a shell parser; a command it misses is still on its card, and the confirm names it
+const RISKY = [
+  /\brm\s+(-\S*[rRf]|--recursive|--force)/,
+  /\bgit\s+push\b.*(\s-\S*f\b|\s--force|\s--mirror|\s--delete|\s:\S)/,
+  /\bgit\s+(reset\s+--hard|clean\s+-\S*f|checkout\s+(--\s|\.\s*$)|restore\b|branch\s+-D|stash\s+(drop|clear)|filter-(branch|repo)|update-ref\s+-d|reflog\s+expire)/,
+  /\bsudo\b|\bsu\s/,
+  /\b(chmod|chown)\s+-\S*R/,
+  /\b(mkfs|shred|diskutil\s+erase|dd\s+if=)/,
+  /\b(curl|wget)\b[^|;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/,
+  /\bdrop\s+(table|database|schema)\b|\btruncate\s+table\b/i,
+  /\b(kill|pkill|killall)\s+-9\b/,
+  /\bfind\b.*\s-delete\b/,
+  /(^|[;&|]\s*)>\s*\/|\b(tee|cp|mv)\b.*\s\/(etc|usr|bin|System|Library)\//,
+]
+export const risky = (cmd: string) => RISKY.some(r => r.test(cmd))
+// a path out of the worktree: absolute, the home folder's, or up out of it (nearPath writes the worktree's as relative)
+const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$))/
+const FILES = /^(Bash|Edit|Write|MultiEdit|NotebookEdit|Read)$/ // what a path in its text is written or read
+const YES = /^(yes|allow|approve|proceed|run)\b/i
+const NO = /^(no|deny|reject|cancel|don['’]t)\b/i
+// a permission ask (claude's PermissionRequest: its tool and what it touches, the exact text the confirm shows), its
+// first option an allow and its last a no (or no menu read: Allow / Deny), never a secret, one of several questions,
+// a risky command, or, unless the tab's sandbox is known on, one that touches a path outside the worktree
+export function bulkOk(t: { status?: string; ask?: Ask; secret?: unknown }, sandboxOn = false) {
+  const a = t.ask
+  if (t.status !== 'waiting' || t.secret || !a?.tool || !a.what?.trim() || a.what.endsWith('…') || a.steps) return false // cut (permOf's 300): its end unseen
+  if (a.options.length && !(a.options.length >= 2 && YES.test(a.options[0].label) && NO.test(a.options.at(-1)!.label))) return false
+  return !risky(a.what) && (sandboxOn || !FILES.test(a.tool) || !OUTSIDE.test(a.what))
+}
+// the confirm's lines: the same tool and the same text in several workspaces, one line
+export function bulkGroups<T extends { ask?: Ask }>(list: T[], name: (x: T) => string) {
+  const m = new Map<string, { tool: string; what: string; names: string[] }>()
+  for (const x of list) {
+    const k = `${x.ask!.tool}\0${x.ask!.what}`
+    const g = m.get(k) ?? (m.set(k, { tool: x.ask!.tool!, what: x.ask!.what!, names: [] }), m.get(k)!)
+    if (!g.names.includes(name(x))) g.names.push(name(x))
+  }
+  return [...m.values()]
+}

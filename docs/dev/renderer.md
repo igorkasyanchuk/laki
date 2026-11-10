@@ -205,6 +205,12 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
     `settings.staleAfter` minutes ago by its `needAt`; unset `STALE_AFTER` 30, 0 never; waiting never). Needs.tsx folds
     the stale ones under *Earlier · n* (`laki.needsEarlier`: unfolded; *Seen all*: `seen` each, Undo `unread`), dimmed,
     one line; each card's chevron shows or hides its detail (open but for a stale one), the rest of it opens the tab.
+    U8: its head's *Allow all (n)* / *Deny all* take shared/ask.ts `bulkOk`'s asks (claude's PermissionRequest: `tool`
+    and `what`, the menu's first a yes and last a no or none read; never `risky`, a cut `what`, a secret, `steps`, or a
+    file tool's path outside the worktree unless the tab's `sandbox` is on and not bypass), two or more; Sidebar's
+    `needsApi.bulk`: Allow's confirm lists `bulkGroups` (one line per tool and text), then `answer` each one after
+    another (`n` and `label`, or `pick`), the ones refused named in the toast. ⇧A (`KEYS` `allowAll`): keydown.ts
+    clicks it, only with the focus in `.needs-list`.
     App's `minute` tick moves one across while nothing else changes. The Dock's count is all of them.
   - Picked rows (`picked`, ⌘-click and ⇧-click, `pickRow`, `anchor`; `pickable`: a project's live workspaces, not
     terminals' or browsers'; not on a phone): `.ws.ws-picked`, `.pick-bar` over the list (Archive: `wsArchive` `ifClean`

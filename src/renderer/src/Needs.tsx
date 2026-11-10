@@ -8,6 +8,7 @@
 // 1–9 answer and Enter opens.
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { TabView, WorkspaceView } from '../../shared/types'
+import { bulkOk } from '../../shared/ask'
 import { AskDiff } from './Diff'
 import { Glyph } from './Glyph'
 import { isStale, STALE_AFTER } from './text'
@@ -26,6 +27,8 @@ export type NeedsApi = {
   seenAll: (ts: TabView[]) => void // Earlier's Seen all
   name: (w: WorkspaceView) => string
   keys?: (t: TabView, data: string) => void // ←/→ between the questions of one ask (Ask.steps)
+  bulk?: (ts: TabView[], allow: boolean) => void // U8: Allow all (it asks first, naming each) and Deny all
+  allowKey?: string // Allow all's key, for its tip
 }
 
 const EARLIER = 'laki.needsEarlier' // '1': the Earlier row unfolded
@@ -49,6 +52,9 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
       localStorage.setItem(EARLIER, early ? '' : '1')
     } catch {}
   }
+  // U8: the asks one click may answer (shared/ask.ts bulkOk: permission asks, none risky, none outside the worktree
+  // unless its sandbox is on), two or more
+  const many = items.map(x => x.t).filter(t => bulkOk(t, t.sandbox === true && t.perm !== 'bypassPermissions'))
   // the key: a new wait or finish, or one going stale, starts the card over (its detail open or not)
   const card = (x: Need, old = false) => <NeedCard key={`${x.t.id}@${x.t.needAt ?? 0}${old ? ':old' : ''}`} {...x} api={api} next={x.t.id === next} stale={old} />
   return (
@@ -62,6 +68,16 @@ export function NeedsList({ items, shut, onFold, api, next, staleAfter = STALE_A
         </span>
         <span className="project-name">Needs you</span>
         <span className="project-count">{items.length}</span>
+        {many.length > 1 && api.bulk && (
+          <span className="needs-bulk" onClick={e => e.stopPropagation()}>
+            <button type="button" className="needs-allow-all" data-tip={`Allow the ${many.length} permission asks: it asks first, naming each${api.allowKey ? ` · ${api.allowKey} with a card focused` : ''}`} onClick={() => api.bulk!(many, true)}>
+              Allow all ({many.length})
+            </button>
+            <button type="button" className="needs-deny-all" data-tip={`Deny the ${many.length} permission asks`} onClick={() => api.bulk!(many, false)}>
+              Deny all
+            </button>
+          </span>
+        )}
       </div>
       {!shut && (
         <div className="needs-cards">

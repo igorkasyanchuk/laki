@@ -17,6 +17,7 @@ import { planCount } from '../../shared/todos'
 import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
+import { bulkGroups } from '../../shared/ask'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
 
@@ -143,6 +144,21 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     seenAll: ts => (ts.forEach(t => needsApi.seen(t)), done(`Marked ${ts.length} as seen`, () => ts.forEach(t => markUnread(t.id)))),
     name: wsName,
     keys: (t, data) => void api.call('input', { tab: t.id, data }).catch(() => {}),
+    // U8: each answered as its card would be (its first option or Allow; its last or Deny), one after another; the
+    // daemon refuses a menu that changed since, named in the toast
+    bulk: async (ts, allow) => {
+      const nameOf = (t: TabView) => (w => (w ? wsName(w) : t.workspace))(view.workspaces.find(w => w.id === t.workspace))
+      if (allow && !(await ask(`Allow ${ts.length} permission asks?`, { text: 'Each agent goes on with what it asked for:', facts: bulkGroups(ts, nameOf).map(g => ({ label: g.names.join(', '), value: `${g.tool}: ${g.what}` })), ok: `Allow all (${ts.length})` }))) return
+      const failed: string[] = []
+      for (const t of ts) {
+        const o = t.ask?.options.length ? (allow ? t.ask.options[0] : t.ask.options.at(-1)) : undefined
+        await api.call('answer', o ? { tab: t.id, n: o.n, label: o.label } : { tab: t.id, pick: allow ? 'first' : 'last' }).catch(() => failed.push(`${nameOf(t)} · ${t.name}`))
+      }
+      const word = allow ? 'Allowed' : 'Denied'
+      if (failed.length) toast(`${word} ${ts.length - failed.length}; not answered (it asks something else now): ${failed.join(', ')}`)
+      else done(`${word} ${ts.length}`)
+    },
+    allowKey: kh('allowAll'),
   }
   // a folded project's or sep's busiest workspace state (a setup script counts as running, as on its row)
   const busiest = (list: WorkspaceView[]) => rollup([...view.tabs.filter(t => list.some(w => w.id === t.workspace)), ...(list.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])])

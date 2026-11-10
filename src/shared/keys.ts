@@ -34,6 +34,7 @@ export const KEYS = [
   { id: 'help', label: 'Help', key: '⌘/' },
   { id: 'layout', label: 'Layout menu', key: '' }, // none until you give it one
   { id: 'stopAll', label: 'Stop all agents', key: '' }, // U8: the File menu's and ⌘K's
+  { id: 'allowAll', label: 'Allow all in Needs you (a card focused; it asks first)', key: '⇧A' },
 ] as const
 export type KeyId = (typeof KEYS)[number]['id']
 export type KeyMap = Record<KeyId, string>

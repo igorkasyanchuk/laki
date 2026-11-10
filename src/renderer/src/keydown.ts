@@ -20,6 +20,8 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     newTab: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
     closeTab: () => (ws?.browser !== undefined ? dialog || closePage(ws) : previewed ? closePreview() : tab && closeTabs([tab])), // a Browsers page: it closes (not under a page or dialog: it isn't in sight); else the file preview first
     stopAll: () => stopAllAsk(),
+    // U8: only with the focus in Needs you (⇧A types an A anywhere else); its head's Allow all, which asks first
+    allowAll: !!(e.target as HTMLElement | null)?.closest?.('.needs-list') && (b => !!b && (() => b.click()))(document.querySelector<HTMLElement>('.needs-allow-all')),
     reopenTab: !!ws && ws.browser === undefined && (() => reopenTab()), // ponytail: a Browsers page's ⇧⌘T does nothing (Browser.tsx keeps no closed pages)
     sidebar: () => setSideOpen(o => !o),
     panel: () => ws && togglePanel(),

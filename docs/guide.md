@@ -283,7 +283,12 @@ selected workspace's PR is in the status bar.
   dimmed; *Seen all* clears them). The chevron at a card's end shows or hides its detail; anywhere else on it opens the
   tab; with a card focused, 1–9 answer and Enter opens. ⌘J goes through the same list, and the floating bubbles also
   take older finishes last (no green). Settings › *Needs you* turns it off and sets when a finish counts as older
-  (5, 15, 30 or 60 minutes, or never).
+  (5, 15, 30 or 60 minutes, or never). With two or more permission asks waiting, its head has *Allow all (n)* and
+  *Deny all*: Allow all lists each first (the same command in several workspaces on one line, with their names) and
+  asks; then each is answered as its card would be, and any that asks something else by then is named. Never in it: a
+  question, a secret, a command that deletes, force pushes, rewrites history, runs as root or pipes the web into a
+  shell, one cut short, or (unless the tab's sandbox is on) one that touches a path outside the worktree; those stay
+  on their cards. ⇧A, with a card focused, is Allow all (Settings › Keys).
 - **Drop on a row**: drag files, an image or selected text onto a workspace's row (or its rail pin) to hand them to its
   agent: the row says *to claude* while you hold it there. Images and files are kept by Laki (25 MB at most) and their
   paths sent, a folder by its path; the agent you were last on there gets them, queued while it works (the message

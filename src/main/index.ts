@@ -138,6 +138,20 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
       await clickText('.palette-item', 'Merge #63')
       await answer('Squash and merge')
     }, async () => /gh pr merge/.test(fakeLog())],
+    // U8: two agents ask to run npm test: Needs you's Allow all lists it once with both names, then answers both
+    ['allow-all-asks', async () => {
+      await key('Escape')()
+      const v = await rpc<View>('state')
+      const ids = ['fix-cart-total', 'checkout-flow'].map(n => v.workspaces.find(x => x.name === n || x.id === n)!.id)
+      // a claude tab of its own in each (the demo's have prompts of their own going in), started before it's asked
+      const agents = await Promise.all(ids.map(id => rpc<{ id: string }>('tabNew', { ws: id, preset: 'claude' }).then(t => t.id)))
+      for (const id of agents) await waitFor(async () => (await rpc<string>('screen', { target: id, lines: 10 })).includes('fake claude'), 'its claude started', 15000)
+      for (const id of agents) await rpc('send', { target: id, text: 'perm bash :: npm test' })
+      await waitFor(() => hasText('.needs-allow-all', 'Allow all (2)'), 'Allow all (2) in Needs you')
+      await click('.needs-allow-all')()
+      await waitFor(() => has('.ask-box'), 'its confirm')
+    }, async () => (await js<number>(`[...document.querySelectorAll('.ask-box *')].filter(e => !e.children.length && e.textContent.trim() === 'Bash: npm test').length`)) === 1 && (await hasText('.ask-box', 'fix-cart-total')) && (await hasText('.ask-box', 'checkout-flow'))],
+    ['allow-all-answered', () => answer('Allow all (2)'), async () => !(await rpc<View>('state')).tabs.some(t => t.status === 'waiting' && t.ask?.what === 'npm test')],
     // U5: the Ship sheet on dark-mode (notes.txt uncommitted): its file with a box, the PR's title drafted, Open PR
     ['ship-sheet', async () => {
       await key('Escape')()
