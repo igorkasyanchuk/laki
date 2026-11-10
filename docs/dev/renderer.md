@@ -439,7 +439,7 @@ drives it (Electron); `pageChanges` and `browseSays` are tested in `test/units-m
   (`html.glass`; Design's Frosted: `paintOf` forces glass, `applyTheme` sets `data-look` to it over the theme's, main's `glass` IPC moves the traffic lights into the sidebar's panel and `window.json` keeps that for the next start, looks.css' last block) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
   else looks.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
-  `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Animations, styles.css'
+  `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Motion, styles.css'
   last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
   see-through `--app-bg` (with the glow's radial gradients), `--side` and `--rail-bg` (`glassSide`) and `--term-bg` (`#rrggbbaa`: xterm reads only
   that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
@@ -781,10 +781,20 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 
 The type scale (B1): `--fs-1`…`--fs-5` (11, 12, 13, 15, 20px: counts and kbd, secondary, body, panel titles, page
 titles) in styles.css `:root`; every `font-size` in px is one of them, but under 10px (badges) and over 22px (display
-numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). Motion (B5): `--t-fast`, `--t-mid`,
-`--t-slow` and `--ease`, used by one block under `prefers-reduced-motion: no-preference`, each selector in `:where()` so
-an element's own rule and Animations: high win: hover colors, the side panel and the sidebar coming in (no width is
-animated: the terminal fits once), menus and dialogs, a Needs you card arriving, a row that starts to need you (`b-lit`).
+numbers); em, rem, a setting's variable and `calc()` stay (`test/css.test.ts`). Motion (B5, V7): `--t-fast`, `--t-mid`
+(200ms), `--t-slow`, `--ease-out` (`--ease` its old name) and `--ease-pop` (a gentle overshoot), used by one block under
+`prefers-reduced-motion: no-preference`, each selector in `:where()` so an element's own rule and Motion: high win. Only
+`translate`, `scale` and `opacity` move (never a size: a list of many rows would lay out each frame; no `:has()`, so no
+restyle of the whole window), nothing in the terminal: hover colors and a press's `scale: 0.985` on rows, tabs and
+buttons; the side panel and the sidebar coming in; `.overlay` fading and `.menu`, `.modal` (⌘K is one), `.toast`
+scaling in (`v-in`, 6px and 0.97); `.tip` fading; a Needs you card arriving; a row that starts to need you (`b-lit`); a
+waiting glyph breathing (opacity, 1.8 s); a glyph turning done ticking once (Glyph.tsx `g-pop`, 400 ms, from the render
+where its status changed: not as it's first drawn); a new row or tab growing in (`v-new`: motion.ts `fresh(id)`, an id
+not seen since App's first view, `settle`; a drag reorders keyed elements, so nothing replays). Leaving: motion.ts
+`exits` watches the body for a removed `.menu-backdrop`, `.menu`, `.overlay`, `.tip` or `.toast` (all `position:
+fixed`, so a copy takes no room) and puts an inert copy back with `.leaving` (120 ms out, `!important` over Motion:
+high's), removed by a timer. The side panel is in the flow: it only comes in. Motion: Off (`html[data-motion='none']`)
+and the system's Reduce motion end it all (`exits` and `fresh` check both).
 
 Follow the system (B3): `themeAuto`, `themeLight`, `themeDark` in `Paint`; themes.ts `themeFor(paint, dark)` picks the id
 (your two; unset, the picked theme for its own kind, Paper or Midnight for the other), and `applyTheme` asks it with

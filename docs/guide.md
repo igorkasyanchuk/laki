@@ -2050,8 +2050,10 @@ receives the text), and no macOS notification as a turn finishes (asks still not
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Icons* (Tabler by default, Lucide, or Laki's own; *Line width* 0.5 to 2.5, each pack's own 2; *Size* 12 to 18, 14 as
   it comes, the rest of the app's icons scaled with it; an icon you pick for a project, a Desk tab or an extension is a
   name, drawn by whichever pack is on, Laki's own where a pack lacks it), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
-  keeps them on top), *Animations* (*Low* by default; *High*: pages, dialogs, menus and lists come in with a little
-  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *High contrast mode* (off by default:
+  keeps them on top), *Motion* (*Low* by default: menus, dialogs and ⌘K
+  scale in and fade out, a new row or tab grows in, buttons give when pressed, a workspace that needs you breathes, a
+  finished one ticks once; *High*: pages and lists come in too; *Off*: nothing moves, spinners stand still, as with the
+  system's *Reduce motion*), *High contrast mode* (off by default:
   hints, labels and lines nearly as strong as the text, the accent as text at 7:1), *The sidebar* (a preview of a project and
   three rows as you set them; its font, any on this Mac; its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,

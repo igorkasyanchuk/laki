@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { TabView } from '../../shared/types'
 import { shownStatus } from './text'
 
@@ -21,11 +22,19 @@ export function rollup(tabs: TabView[]) {
 // ✖ exited, ○ idle, ✓ ended fine.
 // R13: said, not only drawn: a screen reader hears the status (the glyph and its color say it to the eye)
 const SAID: Record<string, string> = { waiting: 'needs you', running: 'working', setup: 'setting up', done: 'finished', idle: 'idle', exited: 'ended with an error', ok: 'ended', finished: 'ended', limit: 'at its usage limit' }
+// V7: one that turns to done (or ended fine) ticks once, 400 ms (g-pop), as it changes: not as it's first drawn
+const ENDS = new Set(['done', 'ok', 'finished'])
 export function Glyph({ s }: { s: string }) {
+  const was = useRef(s)
+  const at = useRef(0)
+  if (was.current !== s) {
+    if (ENDS.has(s)) at.current = performance.now()
+    was.current = s
+  }
   if (s === 'running' || s === 'setup') return <span className={`glyph spin g-${s}`} role="img" aria-label={SAID[s]} title={s} />
   const ch = { waiting: '◆', done: '●', idle: '○', exited: '✖', ok: '✓', finished: '✓', limit: '◷' }[s] ?? '·'
   return (
-    <span className={`glyph g-${s || 'none'}`} role="img" aria-label={SAID[s] ?? 'a terminal'} title={s || 'shell'}>
+    <span className={`glyph g-${s || 'none'}${performance.now() - at.current < 400 ? ' g-pop' : ''}`} role="img" aria-label={SAID[s] ?? 'a terminal'} title={s || 'shell'}>
       {ch}
     </span>
   )

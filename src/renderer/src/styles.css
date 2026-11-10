@@ -3226,7 +3226,7 @@ button.tag.ext-problems { cursor: pointer; border: none; font: inherit; }
 @keyframes ach-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .ach-toast { animation: none; } }
 
-/* Settings › Appearance › Animations (themes.ts' Paint motion, html[data-motion]; low, the usual, has no rules of its
+/* Settings › Appearance › Motion (themes.ts' Paint motion, html[data-motion]; low, the usual, has no rules of its
    own). none: every animation and transition ends at once (animationend and transitionend still come: PeekGlow's,
    the dock's), so spinners stand still. high: pages, dialogs, menus, tips, toasts, the side panel, new tabs and lists
    (the sidebar's rows, cards, Settings' groups) come in, staggered a little; buttons give when pressed, cards lift.
@@ -3260,23 +3260,44 @@ html[data-motion='high'] .rail-kind:hover .rail-icon { scale: 1.08; }
 html[data-motion='high'] :is(.board-card, .ach-card) { transition: translate 0.15s, box-shadow 0.15s; }
 html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; box-shadow: var(--lift-2); }
 
-/* B5: the usual motion (Animations: low, unset), small and the same everywhere: three lengths, one easing. :where(), so
-   any rule of an element's own, and Animations: high above, wins. Only these: hover and press colors; the side panel and
-   the sidebar coming in (no width animated: the terminal fits once); menus, the palette and dialogs; a Needs you card
-   arriving; a row that starts to need you, lit once. Nothing in the terminal. ponytail: nothing animates as it leaves
-   (a card answered, a menu closed): that takes the element kept a moment longer, in JS */
-:root { --t-fast: 120ms; --t-mid: 180ms; --t-slow: 320ms; --ease: cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* B5 and V7: the usual motion (Motion: low, unset), small and the same everywhere: three lengths, two easings (a
+   standard ease-out; a gentle overshoot for what pops up). :where(), so any rule of an element's own, and Motion: high
+   above, wins. Only transform (translate, scale) and opacity move, never a size (a list of many rows would lay out every
+   frame); nothing in the terminal. Hover and press on rows, tabs and buttons; menus, ⌘K, dialogs, tooltips and toasts
+   scale in, and fade out faster (motion.ts' exits: a copy of what React removed, .leaving); the side panel and the
+   sidebar come in (in the flow: no way out); a new row or tab grows in (motion.ts' fresh: not one seen before, never a
+   drag); a status that needs you breathes, one that ends ticks once (Glyph.tsx' g-pop). Off under Motion: Off (above) and
+   the system's Reduce motion (the media query, and the catch-all further up) */
+:root { --t-fast: 120ms; --t-mid: 200ms; --t-slow: 320ms; --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1); --ease: var(--ease-out); }
 @keyframes b-in { from { opacity: 0; translate: 0 4px; } }
 @keyframes b-lit { from { background-color: color-mix(in srgb, var(--accent) 24%, transparent); } }
+@keyframes v-in { from { opacity: 0; translate: 0 6px; scale: 0.97; } }
+@keyframes v-out { to { opacity: 0; translate: 0 6px; scale: 0.97; } }
+@keyframes v-fade-in { from { opacity: 0; } }
+@keyframes v-fade-out { to { opacity: 0; } }
+@keyframes v-row { from { opacity: 0; scale: 1 0.6; } }
+@keyframes v-tab { from { opacity: 0; scale: 0.6 1; } }
+@keyframes v-breathe { 50% { opacity: 0.4; } }
+@keyframes v-tick { 0% { scale: 0.4; opacity: 0; } 60% { scale: 1.35; opacity: 1; } }
+.leaving { pointer-events: none !important; animation: v-fade-out var(--t-fast) var(--ease-out) forwards !important; } /* !important: over an element's own (Motion: high's) */
+.leaving:is(.menu, .toast), .leaving :is(.menu, .modal) { animation: v-out var(--t-fast) var(--ease-out) forwards !important; }
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ws, .tab, .menu-item, .palette-item, .sp-row, .rail-icon, .ib, button) { transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
-  :where(.side-panel) { animation: m-side var(--t-mid) var(--ease); }
-  :where(.sidebar) { animation: m-row var(--t-mid) var(--ease); }
-  :where(.menu, .modal) { animation: b-in var(--t-mid) var(--ease); }
-  :where(.needs-cards > div, .needs-cards > button) { animation: b-in var(--t-mid) var(--ease); }
-  :where(.ws.needs) { animation: b-lit var(--t-slow) var(--ease); }
+  :where(.ws, .tab, .menu-item, .palette-item, .sp-row, .rail-icon, .ib, button) { transition: background-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), scale var(--t-fast) var(--ease-out); }
+  :where(.ws, .tab, .menu-item, .palette-item, .sp-row, button):active { scale: 0.985; }
+  :where(.side-panel) { animation: m-side var(--t-mid) var(--ease-out); }
+  :where(.sidebar) { animation: m-row var(--t-mid) var(--ease-out); }
+  :where(.overlay) { animation: v-fade-in var(--t-mid) var(--ease-out); }
+  :where(.menu, .modal, .toast) { animation: v-in var(--t-mid) var(--ease-pop); }
+  :where(.menu) { transform-origin: top left; }
+  :where(.tip) { animation: v-fade-in var(--t-fast) var(--ease-out); }
+  :where(.needs-cards > div, .needs-cards > button) { animation: b-in var(--t-mid) var(--ease-out); }
+  :where(.ws.needs) { animation: b-lit var(--t-slow) var(--ease-out); }
+  :where(.ws.v-new) { animation: v-row var(--t-mid) var(--ease-out); transform-origin: top; }
+  :where(.tab.v-new) { animation: v-tab var(--t-mid) var(--ease-out); transform-origin: left; }
+  :where(.glyph.g-waiting) { animation: v-breathe 1.8s ease-in-out infinite; }
+  :where(.glyph.g-pop) { animation: v-tick 400ms var(--ease-pop); }
 }
-html.away :is(.sidebar, .side-panel, .menu, .modal, .needs-cards > div, .needs-cards > button, .ws.needs) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
+html.away :is(.sidebar, .side-panel, .overlay, .menu, .modal, .toast, .needs-cards > div, .needs-cards > button, .ws.needs, .ws.v-new, .tab.v-new, .glyph.g-pop) { animation-play-state: running !important; } /* paused at its first frame (Laki in the background) it would stay unseen */
 
 /* hold ⌘ (KeyOverlay.tsx): a veil, a badge at each element's top right, a strip of the keys with nothing on screen */
 .key-overlay { position: fixed; inset: 0; z-index: calc(var(--z-pop) + 10); pointer-events: none; background: color-mix(in srgb, var(--bg) 35%, transparent); animation: m-fade 0.12s ease-out; }

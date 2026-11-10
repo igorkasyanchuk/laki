@@ -52,6 +52,7 @@ import { ask, askText, copyImage, AskHost, choose, unchoose, colorVar, Countdown
 import { emojiOf, isIconName } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, colorOf, type Dialog, EDITOR_IDS, extKey, extOf, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, STATE_WORDS, tabGlyph, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
 import { menusOf } from './menus'
+import { settle } from './motion'
 import { onKey } from './keydown'
 import { layoutOf, TabBar, TabStrip } from './TabBar'
 import { sideOf, Sidebar } from './Sidebar'
@@ -1184,6 +1185,7 @@ export function App() {
       if (m.ev === 'state') {
         const v = veiled(m.view) // Recording mode: private workspaces out of everything drawn
         hid.current = v === m.view ? new Set() : new Set(m.view.workspaces.filter((w: WorkspaceView) => !v.workspaces.includes(w)).map((w: WorkspaceView) => w.id))
+        settle([...m.view.workspaces.map((w: WorkspaceView) => w.id), ...m.view.tabs.map((t: TabView) => t.id)]) // V7: what's here as the window opens doesn't grow in
         setView(v)
       } else if (QUIET.has(m.ev) && hid.current.has(m.ws)) return // and their notifications and toasts
       else if (m.ev === 'widget-say' && typeof m.notify === 'string') {

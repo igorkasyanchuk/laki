@@ -18,6 +18,7 @@ import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
 import { bulkGroups } from '../../shared/ask'
+import { fresh } from './motion'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
 
@@ -199,7 +200,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     return (
       <div
         key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${fresh(w.id) ? 'v-new' : ''} ${rows.at('ws', w.id)}`}
         style={{ ...colorVar(w.color), ...(pc && ({ '--proj-c': `var(--tc-${pc})` } as CSSProperties)), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}

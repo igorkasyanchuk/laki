@@ -84,7 +84,7 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
 // Appearance's Icons: each pack drawn by these
 const PACK_SAMPLE: IconName[] = ['folder', 'terminal', 'pr', 'search', 'bell', 'settings', 'trash']
 // Appearance's corners (--radius) and where the tabs go
-const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'None']]
+const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'Off']]
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
 const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
@@ -1678,8 +1678,8 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
-                <label data-tip="High: pages, dialogs, menus and lists come in with a little motion, buttons give a little when pressed. None: nothing moves (spinners stand still)">
-                  Animations
+                <label data-tip="Low: menus, dialogs and ⌘K scale in and fade out, rows and tabs grow in, buttons give a little when pressed, a workspace that needs you breathes. High: pages and lists come in too. Off: nothing moves (spinners stand still); the system's Reduce motion does the same">
+                  Motion
                   <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>
                     {MOTION.map(([v, name]) => (
                       <option key={v} value={v}>

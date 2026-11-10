@@ -13,6 +13,7 @@ import { Glyph, rollup } from './Glyph'
 import type { CSSProperties } from 'react'
 import { WidgetStrip } from './Widgets'
 import { api } from './api'
+import { fresh } from './motion'
 
 // the tab bar's Layout menu: a preset or a saved layout lays out the workspace's tabs, and the side panel as it says
 export function layoutOf(app: AppBase) {
@@ -88,7 +89,7 @@ export function TabList({ app }: { app: AppCtx }) {
         return (
           <div
             key={ts[0]?.id}
-            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
+            className={`tab nodrag ${g === group && !reviewOn ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}${fresh(ts[0]?.id) ? ' v-new' : ''}`}
             style={colorVar(colorOf(ts[0]))}
             {...act(() => selectGroup(g))}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
