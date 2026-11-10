@@ -300,7 +300,7 @@ test('laki limits: each agent read or its own error, --agent, --json; the policy
   const { code, out } = await rig.cli('limits')
   assert.equal(code, 0)
   const [claude, codex] = out.trim().split('\n')
-  assert.match(claude, /^claude\s+Default\s+5-hour 62% used · resets \d\d:\d\d\s+Weekly 41% used$/)
+  assert.match(claude, /^claude\s+Default\s+5-hour 62% used · resets (\d\d:\d\d|[A-Z][a-z]{2})\s+Weekly 41% used$/) // in an hour: tomorrow's weekday after 23:00
   assert.match(codex, /^codex\s+Default\s+error: HTTP 500$/)
 
   const one = JSON.parse((await rig.cli('limits', '--agent', 'claude', '--json')).out)
