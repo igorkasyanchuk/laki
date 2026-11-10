@@ -41,6 +41,8 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     forward: historyOn && !field && (() => travel(hist.current.i + 1)),
     settings: () => toSettings(),
     help: () => setDialog(d => (d === 'help' ? null : 'help')),
+    // F5: the Preview's Pick, with the focus in it (its page's own press comes from main: force)
+    previewPick: (force === 'previewPick' || !!document.activeElement?.closest('.web-tools, .web-body')) && (() => window.dispatchEvent(new CustomEvent('laki-preview-pick'))),
     layout: !dialog && (() => (b => (b ? b.click() : (r => r && openMenu(r, layoutMenu(), 'right'))(document.querySelector('.ws-more')?.getBoundingClientRect())))(document.querySelector<HTMLElement>('.layout-btn'))), // a phone (no button): its menu at ⋯
   }
   const id = force ?? (fixed ? undefined : keyFor(e, kb))

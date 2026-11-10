@@ -672,6 +672,22 @@ export function imageRead(p: { path?: unknown }) {
   return { size: buf.length, image: `data:${IMAGES[ext]};base64,${buf.toString('base64')}` }
 }
 
+// F5: the files that likely draw an element picked in the Preview: git grep for each of its words in turn (its id, a
+// class, its text), the first that's in one or two files (more says nothing). Best effort: none on a host, past 3 s
+// a word, or for a word under 3 characters; built and vendored files left out
+const GUESS_SKIP = [':!*.min.*', ':!*.map', ':!*.lock', ':!package-lock.json', ':!dist/', ':!build/', ':!out/', ':!vendor/', ':!node_modules/']
+export async function sourceGuess(o: { ws: string; words?: unknown }) {
+  const ws = findWs(o.ws)
+  const words = Array.isArray(o.words) ? o.words.filter((w): w is string => typeof w === 'string' && w.trim().length >= 3 && w.length <= 80).slice(0, 4) : []
+  if (ws.host || !existsSync(ws.path)) return []
+  for (const w of words) {
+    const r = await run('git', ['grep', '-l', '-I', '-F', '--untracked', '-e', w.trim(), '--', '.', ...GUESS_SKIP], { cwd: ws.path, timeout: 3000, maxBuffer: 1 << 20 }).catch(() => null) // none found: exit 1
+    const files = String(r?.stdout ?? '').split('\n').filter(Boolean)
+    if (files.length && files.length <= 2) return files
+  }
+  return []
+}
+
 export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean; uncommitted?: boolean; media?: boolean; stat?: boolean }) { // stat: its size and time only (an open artifact's look for a change)
   let ws = findWs(o.ws)
   if (o.storage) {

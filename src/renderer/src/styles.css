@@ -93,7 +93,7 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
    Here, before their own rules, so what they keep (a peek's colored edge, a tooltip's small corners) wins. Solid under
    Reduce transparency, in glass (components.css: the window's blur is native, a backdrop-filter over it flickers) and
    in looks marked opaque (html.opaque: themes.ts OPAQUE_LOOKS). Never on a list's rows: only these float */
-:is(.menu, .modal, .finder, .tip, .help-card, .toast, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
+:is(.menu, .modal, .finder, .tip, .help-card, .toast, .ach-toast, .shown-pop, .tunnel-pop, .ws-peek, .link-peek, .nw-start-pop, .pi-complete, .key-strip, .web-pick) { background: var(--surface-bg); backdrop-filter: var(--surface-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-window); box-shadow: var(--surface-lift); }
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --surface-blur: blur(24px) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
@@ -1436,7 +1436,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .sp-tools.web-sizes .seg { flex: 1 1 100%; min-width: 0; }
 .web-sizes input { flex: none; width: 92px; }
 .web-sizes input.on { border-color: var(--accent); }
-.web-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.web-body { position: relative; flex: 1; display: flex; min-height: 0; overflow: hidden; }
 /* the panel's Simulator (SidePanel.tsx' DeviceTab): the phone's screen as big as the panel lets it, its own shape kept */
 .sim-screen { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: var(--sp-4); overflow: hidden; }
 .sim-screen img { max-width: 100%; max-height: 100%; border-radius: var(--r-xl); box-shadow: 0 0 0 1px var(--line), var(--lift-2); cursor: pointer; touch-action: none; user-select: none; }
@@ -1475,6 +1475,13 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .web-body.sized .web-host { flex: none; transform-origin: top center; outline: 1px solid var(--line); }
 .web-view { flex: 1; display: flex; width: 100%; height: 100%; border: 0; }
 .web-shot { position: static; width: auto; }
+/* F5: Pick's composer, over the page by the element picked (SidePanel.tsx PickBox, pickAt) */
+.web-pick { position: absolute; z-index: 3; width: 340px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+.web-pick-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.web-pick-head code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-2); }
+.web-pick-what { display: flex; flex-direction: column; gap: var(--sp-1); overflow-wrap: anywhere; }
+.web-pick img { max-height: 90px; max-width: 100%; align-self: flex-start; object-fit: contain; border: 1px solid var(--line); border-radius: var(--r-s); }
+.web-pick textarea { resize: none; }
 .web-shot img { max-height: 140px; object-fit: contain; align-self: flex-start; max-width: 100%; border: 1px solid var(--line); border-radius: var(--r-s); }
 .dl-comment textarea { width: 100%; resize: vertical; font: inherit; font-size: var(--fs-2); }
 .dl-comment .row { gap: var(--sp-3); flex-wrap: wrap; }

@@ -83,6 +83,14 @@ async function uiSmoke(w: BrowserWindow, dir: string) {
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     ['palette', key('k', true), '.palette-input'],
+    // F5: the Preview of a workspace's dev server (localhost) has Pick; then the side panel shut again
+    ['preview-pick', async () => {
+      await key('Escape')()
+      await js("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', metaKey: true, altKey: true, bubbles: true, cancelable: true }))")
+      await waitFor(() => has('[role=tab][aria-label="Preview"]'), 'the Preview tab')
+      await click('[role=tab][aria-label="Preview"]')()
+    }, '.web-tools .web-pick-btn'],
+    ['preview-shut', () => js("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', metaKey: true, altKey: true, bubbles: true, cancelable: true }))"), async () => !(await has('.web-tools'))],
     // V9: behind another app the accent's fills and the picked row go neutral (the status colors don't); then back
     ['inactive', async () => (await key('Escape')(), w.webContents.send('front', false)), () => js<boolean>("document.documentElement.classList.contains('away') && getComputedStyle(document.querySelector('.app')).getPropertyValue('--accent').trim() !== getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()")],
     ['active', async () => w.webContents.send('front', true), () => js<boolean>("!document.documentElement.classList.contains('away')")],
@@ -311,6 +319,11 @@ app.on('web-contents-created', (_e, wc) => {
   // a Browsers page's link to a new tab opens in that page; a window.open popup (a sign-in's: Google, GitHub) gets a
   // small window of its own, in the same session with its opener kept, sandboxed, no node (else it can't hand back)
   wc.on('did-attach-webview', (_e, guest) => {
+    // F5: the Preview's Pick (⌥⌘P, Settings › Keys' previewPick) while its page has the focus: the app's, not the page's
+    if (guest.session === session.fromPartition(PREVIEW))
+      guest.on('before-input-event', (e, i) => {
+        if (i.type === 'keyDown' && keyFor({ key: i.key, code: i.code, metaKey: i.meta, ctrlKey: i.control, altKey: i.alt, shiftKey: i.shift }, keysNow) === 'previewPick') e.preventDefault(), wc.send('browser-key', 'previewPick')
+      })
     if (guest.session !== session.fromPartition(BROWSER)) return
     // a page's script can call window.open in a loop (no click needed here): at most 5 new tabs or popups in 10 s
     let opened: number[] = []

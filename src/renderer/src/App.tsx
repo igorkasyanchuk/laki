@@ -1856,6 +1856,7 @@ export function App() {
     toAgent: (text, line, tab) => api.call('send', { target: tab ?? w.id, text, whenIdle: true, steer: true }).then(() => (line && earn('comment'), toast(`Sent to ${(tab && view?.tabs.find(t => t.id === tab)?.name) || 'the agent'}`))),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
+    sourceGuess: words => api.call<string[]>('sourceGuess', { ws: w.id, words }).catch(() => []),
     sim: p => api.call('sim', p),
     setup: () => setDialog({ section: 'simulator' }),
     float: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id)),

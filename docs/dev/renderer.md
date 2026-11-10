@@ -20,13 +20,19 @@ isn't `http://localhost` or `127.0.0.1` (the first page; after it, the address b
 `SITE`, a bare `example.com`, is https), or a partition other than `persist:preview`, whose session grants only
 `PREVIEW_OK` permissions (Electron grants all by default). No `allowpopups`: its popups are blocked. `capture` (IPC) takes a webview of the
 asking window by its `webContentsId` and returns a PNG (base64); `ShotBox` saves it (`imageSave`) and sends its path to
-the agent. The crosshair (`pick`, the app only) runs `pickElement`'s source in the page (`executeJavaScript`): it
-outlines what's under the mouse and resolves the clicked element (a short unique CSS selector, its opening tag, text,
-size, its outerHTML up to 1,500 characters, the computed CSS of `CSS_KEYS` that isn't a default, its rect and the
-page's width, the URL), or null on Esc (`window.__lakiPick(null)` cancels it from outside); the app then captures the
-webview and `crop`s it to the element (a canvas, scaled by the image's width over the page's), saves it, and
-`PanelApi.toPrompt` types all of it, with the screenshot's path, into the focused agent tab, else the first live one
-(`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+the agent. The crosshair (F5's design mode: `pick`, the app only, a local page only: `LOCAL`, the button shown and the pick
+refused elsewhere; ⌥⌘P, `KEYS`' `previewPick`: keydown.ts with the focus in `.web-tools` or `.web-body`, or main's
+`before-input-event` on a `persist:preview` guest, sent as `browser-key`; both fire `laki-preview-pick`) runs
+`pickElement`'s source in the page (the webview's `executeJavaScript`, the guest's webContents': no preload, no bridge):
+it outlines what's under the mouse and resolves the clicked element (a short unique CSS selector, its opening tag, id,
+classes, text up to 200 characters, size, its outerHTML up to 1,500 characters, the computed CSS of `CSS_KEYS` that
+isn't a default, its rect and the page's width, the URL), or null on Esc (`window.__lakiPick(null)` cancels it from
+outside); the app then captures the webview and `crop`s it to the element (a canvas, scaled by the image's width over
+the page's) and opens `PickBox` over `.web-body` by the element (`pickAt`: under it, above when there's no room): the
+selector, size, text, the screenshot, `sourceGuess`'s files (daemon files.ts: `git grep -l -F` of `pickWords`, its id,
+hand-written classes and text's start, the first in one or two files, 3 s a word), your words; *Send to* the first of
+`PanelApi.agents` (`toAgent`, as its turn ends). text.ts `pickPrompt`: your words, then the element in a fence
+(shared/fence.ts `fenced`, `untrusted`: the page's own text, data), the saved screenshot's path, `Likely source:`. In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
 
 A Browsers page's camera (`BrowserPane` `shot`, preload's `pageShot`, main's `page-shot`: the app window's own webview
 only; what's in sight by `capturePage`, the whole page by `wholePage`, DevTools' protocol `Page.captureScreenshot`

@@ -9,7 +9,7 @@ import { Markdown } from './MarkdownView'
 import { atHead, CommentBox, DiffFind, diffByFile, useExpand, type DiffLine, DiffRows, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, sameLine, type Scope, ScopeSeg, turnNext, sizeText, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems } from './Diff'
 import type { MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
+import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
 import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu, act } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
@@ -49,6 +49,7 @@ export type PanelApi = {
   toAgent: (text: string, line?: boolean, tab?: string) => Promise<unknown> // to the workspace's agent (tab: that one), when its turn ends; line: a comment on a line (an achievement)
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
+  sourceGuess?: (words: string[]) => Promise<string[]> // F5: the worktree's files a picked element likely comes from (one or two, or none)
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
   setup?: () => void // Settings › Simulators: what a simulator needs on this Mac, the devices to start
   float?: (device: string) => void // the Simulator tab's device in a window of its own (Electron's)
@@ -943,6 +944,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   const [err, setErr] = useState('')
   const [shot, setShot] = useState<{ data: string; url: string } | null>(null)
   const [picking, setPicking] = useState(0) // a pick in progress (its number: a later one wins)
+  const [picked, setPicked] = useState<{ p: Picked; shot: string } | null>(null) // F5: the composer over the page, by the pick
   const [size, setSize] = useState<Size>(keptSize)
   const [sizes, setSizes] = useState(() => !!keptSize()) // the bar
   const [typed, setTyped] = useState(() => (size ? `${size.w}×${size.h}` : '')) // its own size, as typed
@@ -1013,13 +1015,17 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     const id = on(v => v.getWebContentsId())
     if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url }), e => setErr(String(e?.message ?? e)))
   }
-  // an element of the page, picked with the mouse, into the agent's prompt: what it is and where
+  // F5: design mode. An element of the page, picked with the mouse (this Mac's pages only: never a site's), then a
+  // composer by it: what it is, a screenshot of it, your words, Send to the workspace's agent
+  const local = LOCAL.test(url)
   const pick = () => {
     if (picking) return setPicking(0), on(v => v.executeJavaScript('window.__lakiPick?.(null)').catch(() => {}))
+    if (!LOCAL.test(on(v => v.getURL()) || url)) return setErr('Pick works on this Mac’s pages (localhost) only')
     const id = Date.now()
     const end = () => setPicking(p => (p === id ? 0 : p))
     const r = on(v => v.executeJavaScript(`(${pickElement})()`, true)) as Promise<Picked | null> | undefined
     if (!r) return setErr('The page isn’t ready yet')
+    setPicked(null)
     setPicking(id)
     on(v => v.focus()) // for Esc
     r.then(async p => {
@@ -1027,10 +1033,17 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       if (!p) return
       // and a screenshot of just that element, when the app can take one
       const id = on(v => v.getWebContentsId())
-      const path = bridge?.capture && id ? await bridge.capture(id).then(png => crop(png, p)).then(api.saveImage).catch(() => '') : ''
-      await api.toPrompt(pickedText(p, path)).catch(e => setErr(String(e?.message ?? e)))
+      const shot = bridge?.capture && id ? await bridge.capture(id).then(png => crop(png, p)).catch(() => '') : ''
+      setPicked({ p, shot })
     }, end)
   }
+  const pickRef = useRef(pick)
+  pickRef.current = pick
+  useEffect(() => {
+    const f = () => pickRef.current()
+    window.addEventListener('laki-preview-pick', f) // ⌥⌘P (keydown.ts' previewPick)
+    return () => window.removeEventListener('laki-preview-pick', f)
+  }, [])
   if (!bridge && !canFrame) return <div className="muted small pad">The preview shows this Mac's localhost: open {w.name || w.id} in the app there. To open a port from here, share it with the globe in the status bar.</div>
   const own = size && !SIZES.some(([, sw, sh]) => sw === size.w && sh === size.h)
   return (
@@ -1041,7 +1054,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
         <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), parked ? setParked(false) : bridge ? on(v => v.reload()) : setN(x => x + 1))} />
         <input value={addr} spellCheck={false} placeholder="localhost:3000/ · :5173 · example.com" data-tip="A path on this port (/x), another port (:5173), or any address" onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} onFocus={e => e.target.select()} />
         <IconButton icon="devices" title="Sizes: a phone's, a tablet's, HD…" on={sizes} onClick={() => (sizes && pickSize(null), setSizes(!sizes))} />
-        {bridge && <IconButton icon="pick" title={picking ? 'Picking: click an element (Esc stops)' : "Pick an element: its CSS selector into the agent's prompt"} on={!!picking} onClick={pick} />}
+        {bridge && local && <IconButton icon="pick" className="web-pick-btn" title={picking ? 'Picking: click an element (Esc stops)' : keyTip('Pick an element, then say what to change: to the agent', 'previewPick')} on={!!picking} onClick={pick} />}
         {bridge?.capture && <IconButton icon="camera" title="Screenshot to the agent" onClick={capture} />}
         <IconButton icon="link" title="Open in the browser" onClick={() => onOpen(url)} />
       </div>
@@ -1086,23 +1099,71 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
         <div className="web-host" ref={host} style={size ? { width: size.w, height: size.h, transform: `scale(${k})` } : undefined}>
           {!bridge && <iframe key={n} className="web-view" src={url} title="Preview" />}
         </div>
+        {picked && <PickBox {...picked} api={api} at={pickAt(picked.p, host.current, stage.current, k)} onClose={() => setPicked(null)} />}
       </div>
     </>
   )
 }
 
-// an element the picker returned: its selector, opening tag, text, size, its HTML (cut) and computed CSS (what isn't a
-// default), where it is on the page (CSS pixels, vw: the page's width), and the page
-type Picked = { selector: string; tag: string; text: string; size: string; url: string; html?: string; css?: string; rect?: { x: number; y: number; w: number; h: number }; vw?: number }
-const pickedText = (p: Picked, shot?: string) =>
-  [
-    `In the preview (${p.url}), the element \`${p.selector}\` (${[p.text && `"${p.text}"`, p.size].filter(Boolean).join(', ')}):`,
-    p.html ? `HTML: ${p.html}` : p.tag,
-    p.css && `CSS: ${p.css}`,
-    shot && `A screenshot of it: ${shot}`,
-  ]
-    .filter(Boolean)
-    .join('\n') + '\n'
+// where the composer goes in .web-body: under the element (above it when there's no room), in the stage
+const pickAt = (p: Picked, host: HTMLElement | null, stage: HTMLElement | null, k: number) => {
+  if (!p.rect || !host || !stage) return { left: 8, top: 8 }
+  const h = host.getBoundingClientRect()
+  const b = stage.getBoundingClientRect()
+  const W = 340
+  const H = 230
+  const x = h.left - b.left + p.rect.x * k
+  const below = h.top - b.top + (p.rect.y + p.rect.h) * k + 8
+  const top = below + H <= b.height ? below : Math.max(8, h.top - b.top + p.rect.y * k - H - 8)
+  return { left: Math.max(8, Math.min(x, b.width - W - 8)), top: Math.max(8, Math.min(top, b.height - H - 8)) }
+}
+
+// F5's composer by the picked element: what it is, its screenshot, your words, Send to the workspace's agent (its
+// first live one; when its turn ends, as Send does)
+function PickBox({ p, shot, api, at, onClose }: { p: Picked; shot: string; api: PanelApi; at: { left: number; top: number }; onClose: () => void }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [files, setFiles] = useState<string[]>([])
+  useEffect(() => void api.sourceGuess?.(pickWords(p)).then(setFiles, () => {}), [p])
+  const to = api.agents[0]
+  const send = async () => {
+    if (busy || !to) return
+    setBusy(true)
+    try {
+      const path = shot ? await api.saveImage(shot) : ''
+      await api.toAgent(pickPrompt(text, p, path, files), false, to.id)
+      onClose()
+    } catch (e: any) {
+      setErr(String(e?.message ?? e))
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="web-pick" style={at} role="dialog" aria-label="Send the picked element to the agent">
+      <div className="web-pick-head">
+        <code>{p.selector}</code>
+        <span className="muted small">{p.size}</span>
+        <span className="grow" />
+        <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
+      </div>
+      {(p.text || files.length > 0) && (
+        <div className="muted small web-pick-what">
+          {p.text && <span>“{p.text.length > 80 ? `${p.text.slice(0, 79)}…` : p.text}”</span>}
+          {files.length > 0 && <span>Likely in {files.join(', ')}</span>}
+        </div>
+      )}
+      {shot && <img src={`data:image/png;base64,${shot}`} alt="The picked element" />}
+      <textarea autoFocus rows={2} value={text} placeholder="What should change? · ⌘⏎ sends" onChange={e => setText(e.target.value)} onKeyDown={e => (e.key === 'Escape' ? onClose() : e.key === 'Enter' && e.metaKey && void send())} />
+      {err && <div className="warn small">{err}</div>}
+      <div className="row">
+        <button className="primary" disabled={busy || !to} onClick={() => void send()}>
+          {to ? `Send to ${to.name}` : 'No agent runs here'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // the element's part of the page's screenshot (its CSS pixels scaled to the image's, a little around it, inside the
 // page), as base64 PNG
@@ -1210,7 +1271,9 @@ function pickElement(): Promise<Picked | null> {
       finish({
         selector: selector(el),
         tag: tag.length > 200 ? `${tag.slice(0, 199)}…` : tag,
-        text: text.length > 120 ? `${text.slice(0, 119)}…` : text,
+        text: text.length > 200 ? `${text.slice(0, 199)}…` : text,
+        id: el.id || undefined,
+        classes: [...el.classList].slice(0, 8),
         size: `${Math.round(r.width)}×${Math.round(r.height)}`,
         url: location.href,
         html: html.length > 1500 ? `${html.slice(0, 1499)}…` : html,

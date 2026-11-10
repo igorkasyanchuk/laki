@@ -897,10 +897,12 @@ line, after the tab restarts.
   sizes: *Fit* (the panel's), iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`, Enter):
   one click lays the page out at that width and height, scaled down to fit (the percentage says how much); the
   arrows swap width and height. Only the size: no touch, no phone's user agent. The camera takes a screenshot of the page and sends it to the agent
-  with what you write. The crosshair picks an element: hover outlines it, a click types its CSS selector, text,
-  size, HTML (cut at 1,500 characters), its computed CSS (what isn't a default) and the path of a screenshot of
-  just that element into the agent's prompt, without Enter, for you to say what to do with it; Esc stops (in the
-  app only). It starts on this Mac (`localhost`); the address bar and links go anywhere, without
+  with what you write. The crosshair (*Pick*, ⌥⌘P while the
+  Preview has the focus; Settings › Keys) is design mode, on this Mac's pages (`localhost`) only: hover outlines an
+  element, a click opens a small composer by it with its selector, size, text, a screenshot of just that element and
+  the file it likely comes from (a quick search of the worktree for its id, a class or its text, when one or two files
+  have it); say what to change and *Send to* the workspace's agent (as its turn ends). The page's text goes in a fence
+  the agent is told is data, not instructions. Esc stops (in the app only). It starts on this Mac (`localhost`); the address bar and links go anywhere, without
   popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
   click outside it first. In a browser (remote access), it works only on the Mac itself.
 - *Simulator*: a booted iOS Simulator, an Android emulator or a phone on `adb` (USB debugging), its screen live in the

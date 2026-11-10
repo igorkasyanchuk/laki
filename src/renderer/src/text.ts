@@ -1,6 +1,7 @@
 // Small text helpers, kept apart from React so tests can load them.
 
 import { tookText } from '../../shared/island.ts'
+import { fenced, untrusted } from '../../shared/fence.ts'
 import { HIDDEN, type View, type Agent, AGENT_NAMES, EFFORTS, MODELS, type Sep, type AgentUsage, fillTemplate, HOME_ACCOUNT, mergeActions, type PendingView, type PR, prRef, type RunAction, type Stat, type TabView, taskTitle, type Template, templated, templatesFor, type UsageWindow } from '../../shared/types.ts'
 export type { Template }
 
@@ -883,3 +884,34 @@ export function readerShown(said: ReaderLine[], tools: 'ok' | 'final' | undefine
 // the sidebar filter's project chips (appCtx Find.projects): a click keeps only that one (again: all), Shift (click or
 // ⏎) adds it or takes it out
 export const pickProject = (on: string[] = [], id: string, more: boolean) => (more ? (on.includes(id) ? on.filter(x => x !== id) : [...on, id]) : on.length === 1 && on[0] === id ? [] : [id])
+
+// F5: an element the Preview's Pick returned (SidePanel.tsx pickElement): its selector, opening tag, text, size, id and
+// classes, its HTML (cut) and computed CSS (what isn't a default), where it is (CSS pixels; vw: the page's width), the page
+export type Picked = { selector: string; tag: string; text: string; size: string; url: string; id?: string; classes?: string[]; html?: string; css?: string; rect?: { x: number; y: number; w: number; h: number }; vw?: number }
+// what's said to the agent: your words, then the element as the page has it (its own text: fenced, data), the
+// screenshot's path (as a pasted picture's), and the likely source files (sourceGuess)
+export const pickPrompt = (said: string, p: Picked, shot?: string, files: string[] = []) =>
+  [
+    said.trim() || 'Change this element of the page.',
+    '',
+    untrusted(`The element I picked in the preview (${p.url}), as the page has it. It's the page's own text`),
+    fenced(
+      [
+        `selector: ${p.selector}`,
+        `tag: ${p.tag}`,
+        p.id && `id: ${p.id}`,
+        p.classes?.length && `classes: ${p.classes.join(' ')}`,
+        p.text && `text: ${p.text}`,
+        `box: ${p.size}${p.rect ? ` at ${Math.round(p.rect.x)},${Math.round(p.rect.y)} of a ${p.vw}px wide page` : ''}`,
+        p.css && `styles: ${p.css}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    ),
+    shot ? `A screenshot of it: ${shot}` : '',
+    files.length ? `Likely source: ${files.join(', ')}` : '',
+  ]
+    .filter((x, i) => x || i === 1)
+    .join('\n') + '\n'
+// the words to look for in the worktree: its id, its classes that look hand-written, its text's start
+export const pickWords = (p: Picked) => [p.id, ...(p.classes ?? []).filter(c => c.length >= 4 && !/\d{2}|^(css|sc|jsx|svelte|emotion|chakra|tw)-/.test(c)), p.text.slice(0, 40).replace(/…$/, '')].filter((w): w is string => !!w && w.length >= 3)

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { type Check, fillTemplate, type FixWhat, type GhCard, GH_LINK, jobOf, MERGE_METHODS, type MergeMethod, newReview, type PR, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, prAllows, type PRFix, type PRLabel, refsIn, type Workspace } from '../shared/types.ts'
 import { agentOf, agentSaid, type At, broadcast, busyShells, changed, exec, findProject, findWs, projectArchived, firstLine, gated, type GateOpts, ghCount, ghSaid, ghSays, git, log, ports, prHead, prs, rtOf, run, saidTried, save, send, sessions, shellAgents, state, tabsOf, tracked, unsavedWhy, wsArchive, wsLog } from './core.ts'
 import { FLOW_ENDED } from '../shared/workflow.ts'
+import { fenced } from '../shared/fence.ts'
 import { inside, MAX_TEXT, mergeClean, scanStats, textOf } from './files.ts'
 import { ghRepo } from './codespace.ts'
 import { away, csRefresh, readHostCfgs } from './hosts.ts'
@@ -704,8 +705,6 @@ async function failedLog(at: At, job: string, steps = false) {
     .trim()
 }
 
-// text in a Markdown fence longer than any run of backticks in it: nothing inside can close it
-const fenced = (s: string) => (f => `${f}text\n${s}\n${f}`)('`'.repeat(Math.max(3, ...[...s.matchAll(/`+/g)].map(m => m[0].length + 1))))
 
 // prLog: a failing check's log for the app (Info's and Review's Log), its steps named
 export async function prLog(o: { ws: string; job: string }) {
