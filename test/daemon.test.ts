@@ -360,7 +360,8 @@ test("U5: the Ship sheet: its draft from the chat; only the files picked are com
   // what's refused before anything runs
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: ['../x'] }), /not a path inside the workspace/)
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: ['nope.txt'] }), /not one of the workspace's uncommitted changes/)
-  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: [] }), /no files picked/)
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: [] }), /nothing to ship: no files picked/) // and no commits to push
+  await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', files: [], mode: 'commit' }), /no files picked to commit/)
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', reviewers: ['--x'] }), /reviewer --x\?/)
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', base: '-x' }), /base -x\?/)
   await assert.rejects(rig.rpc('ship', { ws: ws.id, message: 'x', mode: 'merge' }), /mode merge\?/)
@@ -393,4 +394,10 @@ test("U5: the Ship sheet: its draft from the chat; only the files picked are com
   assert.deepEqual(tree(ws.branch), ['a.txt', 'b.txt'])
   assert.equal((readFileSync(rig.env.FAKE_LOG, 'utf8').match(/^gh pr create/gm) ?? []).length, prs)
   assert.equal((await rig.rpc('shipDraft', { ws: ws.id })).ahead, 2)
+  // none picked: the commits already there go, the uncommitted file stays out (no commit made)
+  writeFileSync(join(ws.path, 'c.txt'), 'c\n')
+  const n = await rig.rpc('ship', { ws: ws.id, message: 'x', files: [], mode: 'push' })
+  await done(n.id)
+  assert.equal(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'Add b')
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: ws.path, encoding: 'utf8' }), '?? c.txt\n')
 })

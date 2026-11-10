@@ -159,7 +159,7 @@ export const permVerb = (tool: string) =>
 // ponytail: a list of patterns, not a shell parser; a command it misses is still on its card, and the confirm names it
 const RISKY = [
   /\brm\s+(-\S*[rRf]|--recursive|--force)/,
-  /\bgit\s+push\b.*(\s-\S*f\b|\s--force|\s--mirror|\s--delete|\s:\S)/,
+  /\bgit\s+push\b.*(\s-\S*f\b|\s--force|\s--mirror|\s--delete|\s:\S|\s\+\S)/, // +branch: a force push too
   /\bgit\s+(reset\s+--hard|clean\s+-\S*f|checkout\s+(--\s|\.\s*$)|restore\b|branch\s+-D|stash\s+(drop|clear)|filter-(branch|repo)|update-ref\s+-d|reflog\s+expire)/,
   /\bsudo\b|\bsu\s/,
   /\b(chmod|chown)\s+-\S*R/,
@@ -172,7 +172,7 @@ const RISKY = [
 ]
 export const risky = (cmd: string) => RISKY.some(r => r.test(cmd))
 // a path out of the worktree: absolute, the home folder's, or up out of it (nearPath writes the worktree's as relative)
-const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$))/
+const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$|[\s;&|)]))|\$\{?(HOME|TMPDIR)\b/ // $HOME and $TMPDIR are out of it too
 const FILES = /^(Bash|Edit|Write|MultiEdit|NotebookEdit|Read)$/ // what a path in its text is written or read
 const YES = /^(yes|allow|approve|proceed|run)\b/i
 const NO = /^(no|deny|reject|cancel|don['’]t)\b/i

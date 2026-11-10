@@ -42,7 +42,9 @@ export function ShipSheet({ ws, title, busy, land, call, onClose, onShip }: { ws
     if (!msg.trim() || going || nothing) return
     setGoing(mode)
     try {
-      await onShip({ message: msg.trim(), files: picked.length < all.length ? picked.map(f => f.path) : undefined, title: prTitle.trim() || undefined, body, draft, base: base.trim() && base.trim() !== d?.base ? base.trim() : undefined, reviewers: reviewers.split(/[\s,]+/).filter(Boolean), mode, autoLand, autoFix })
+      // the files as ticked, always: one an agent wrote since the sheet opened isn't in it, so it stays out; no title but a
+      // body: the commit message as its title (a title-less PR is gh's --fill, which has no room for it)
+      await onShip({ message: msg.trim(), files: picked.map(f => f.path), title: prTitle.trim() || (body.trim() ? msg.trim() : undefined), body, draft, base: base.trim() && base.trim() !== d?.base ? base.trim() : undefined, reviewers: reviewers.split(/[\s,]+/).filter(Boolean), mode, autoLand, autoFix })
     } catch (e) {
       setErr(String((e as Error)?.message ?? e))
     } finally {

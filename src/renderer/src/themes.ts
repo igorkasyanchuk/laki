@@ -1136,7 +1136,7 @@ export const LESS_CLEAR = '(prefers-reduced-transparency: reduce)'
 export const MORE_CONTRAST = '(prefers-contrast: more)'
 const asked = (q: string) => !!globalThis.matchMedia?.(q).matches
 // the window's own blur (main's vibrancy): glass, or a see-through sidebar without it
-export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || material(o) || (!macApp() && (o.sideClear ?? 0) > 0))
+export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || material(o) || ((o.sideClear ?? 0) > 0 && !(macApp() && o.translucent === false)))
 // V5: Settings › Appearance › Translucent sidebar (on unless false; macOS's app only, the Classic design, not with glass
 // or Reduce transparency): the sidebar and the rail over macOS's sidebar material, the main area a card on it (html.material)
 const macApp = () => !!(globalThis as { laki?: unknown }).laki && /Mac/.test(globalThis.navigator?.userAgent ?? '')
@@ -1285,7 +1285,7 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   const app = !!(globalThis as { laki?: unknown }).laki
   const mat = material(o)
   const own = Math.min(100, Math.max(0, o.sideClear ?? 0))
-  const clear = o.glass || !app ? 0 : mat ? own || 100 - MATERIAL : macApp() ? 0 : own // a Mac's switch off: solid
+  const clear = o.glass || !app ? 0 : mat ? own || 100 - MATERIAL : macApp() && o.translucent === false ? 0 : own // a Mac's switch off: solid; another Design: Sidebar see-through as before
   root.classList.toggle('material', mat && clear > 0) // the main area a card over it (styles.css)
   // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it

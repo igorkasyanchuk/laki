@@ -2,7 +2,7 @@
 // made), the timers and the foot (Sidebar), and what its rows are made of (sideOf: a workspace's row, a group's head,
 // the peek card App shows over everything). App renders them with what appCtx.ts says they read.
 import type { menusOf } from './menus'
-import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
+import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR, View } from '../../shared/types'
 import { ask, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act } from './ui'
 import { type AppBase, type AppCtx, clip, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
@@ -150,7 +150,14 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       const nameOf = (t: TabView) => (w => (w ? wsName(w) : t.workspace))(view.workspaces.find(w => w.id === t.workspace))
       if (allow && !(await ask(`Allow ${ts.length} permission asks?`, { text: 'Each agent goes on with what it asked for:', facts: bulkGroups(ts, nameOf).map(g => ({ label: g.names.join(', '), value: `${g.tool}: ${g.what}` })), ok: `Allow all (${ts.length})` }))) return
       const failed: string[] = []
+      // the asks as they are now, after the confirm: one that changed meanwhile (a new command behind the same Yes) is skipped
+      const now = await api.call<View>('state').then(v => new Map(v.tabs.map(x => [x.id, x])), () => new Map<string, TabView>())
       for (const t of ts) {
+        const cur = now.get(t.id)
+        if (!cur || cur.status !== 'waiting' || cur.ask?.tool !== t.ask?.tool || cur.ask?.what !== t.ask?.what) {
+          failed.push(`${nameOf(t)} · ${t.name}`)
+          continue
+        }
         const o = t.ask?.options.length ? (allow ? t.ask.options[0] : t.ask.options.at(-1)) : undefined
         await api.call('answer', o ? { tab: t.id, n: o.n, label: o.label } : { tab: t.id, pick: allow ? 'first' : 'last' }).catch(() => failed.push(`${nameOf(t)} · ${t.name}`))
       }

@@ -2895,7 +2895,7 @@ export function App() {
   }
   // U4: Welcome's Install or Sign in: a terminal with the command typed (not run), `; exit` after it, so it ends as the
   // command does; as it exits, it goes and Welcome is back (its checks run again as it shows)
-  const [fixTab, setFixTab] = useState<{ tab: string; ws: string } | null>(null)
+  const [fixTab, setFixTab] = useState<{ tab: string; ws: string; seen?: boolean } | null>(null) // seen: its tab in the view once (the socket's view can lag the state call)
   const welcomeRun = async (cmd: string) => {
     const w = await call<WorkspaceView>('quickNew', { kind: 'shells' }).catch(() => null)
     if (!w) return
@@ -2913,7 +2913,8 @@ export function App() {
   useEffect(() => {
     if (!fixTab || !view) return
     const t = view.tabs.find(x => x.id === fixTab.tab)
-    if (t && t.status !== 'exited') return
+    if (t && t.status !== 'exited') return void (fixTab.seen || setFixTab({ ...fixTab, seen: true }))
+    if (!t && !fixTab.seen) return // not in this view yet
     setFixTab(null)
     if (view.workspaces.some(w => w.id === fixTab.ws)) void call('wsRm', { id: fixTab.ws }).catch(() => {}) // a shell's tab goes as it exits: its terminal's workspace too
     setWsId(null)

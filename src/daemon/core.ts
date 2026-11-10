@@ -4513,9 +4513,10 @@ export async function sampleNew(): Promise<Project> {
   changed()
   return p
 }
-export function sampleRm() {
+export async function sampleRm() {
   const p = state.projects.find(x => x.sample)
   if (!p) return false
+  await spareDrop(p) // its spare worktree while the repo is there (projectRm's own drop isn't awaited); made again if it refuses
   projectRm(p.id) // its worktrees first: projectRm says so
   if ([join(dir, 'sample'), join(realpathSync(dir), 'sample')].includes(p.path)) rmSync(p.path, { recursive: true, force: true }) // Laki's own folder only
   return true
@@ -4633,6 +4634,7 @@ async function changedIn(ws: Workspace, tree: string) {
 }
 // files: a tree of HEAD with only those paths taken from tree (each checked inside the workspace, and changed)
 async function treePick(ws: Workspace, tree: string, files: string[]) {
+  if (!files.length) return (await git(ws, 'rev-parse', 'HEAD^{tree}')).trim() // none: HEAD's (ls-tree with no path lists all)
   const all = new Set((await changedIn(ws, tree)).map(f => f.path))
   for (const f of files) {
     inside(ws, f)
@@ -4677,8 +4679,8 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   if (!['commit', 'push', 'pr'].includes(mode)) throw new Error(`mode ${mode}? commit, push or pr`)
   const reviewers = (o.reviewers ?? []).map(r => String(r).trim().replace(/^@/, '')).filter(Boolean)
   for (const r of reviewers) if (!NAME_OK.test(r)) throw new Error(`reviewer ${r}? a GitHub login or org/team`)
-  const files = o.files?.map(String)
-  if (files && !files.length) throw new Error('no files picked to commit')
+  const files = o.files?.map(String) // []: none committed (the commits already there pushed)
+  if (files && !files.length && mode === 'commit') throw new Error('no files picked to commit')
   const prBase = o.base?.trim().replace(/^origin\//, '')
   if (prBase !== undefined && (!prBase || prBase.startsWith('-') || !/^[\w./-]+$/.test(prBase))) throw new Error(`base ${prBase || '(none)'}? a branch name`)
   // nothing to commit and no commit the base hasn't: gh would open no PR (no commits between them), so said here, before
@@ -4686,6 +4688,7 @@ export async function ship(ref: string, message: string, o: ShipOpts = {}): Prom
   const pk = await wsPeek(ws.id)
   if (pk.dirty === 0 && pk.ahead === 0) throw new Error(`nothing to ship: no changes, and no commits that ${ws.base} doesn't have`)
   if (mode === 'commit' && pk.dirty === 0) throw new Error('nothing to commit: no uncommitted changes')
+  if (files && !files.length && pk.ahead === 0) throw new Error(`nothing to ship: no files picked, and no commits that ${ws.base} doesn't have`)
   const h = await gated('ship', ws, o)
   if (h) return h
   // gh asks which repo a PR goes to when origin's network has two (a fork and its parent) and none was picked (gh repo

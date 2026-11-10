@@ -2089,9 +2089,9 @@ export function SettingsPage(p: {
                     <Says title="Translucent sidebar" hint={s.design && s.design !== 'classic' ? 'With the Classic design (Layout › Design)' : "The sidebar and the rail over macOS's sidebar material, the terminals a card on it"} />
                   </Switch>
                 )}
-                {!glassy && (!/Mac/.test(navigator.userAgent) || !bridge || (s.translucent !== false && (!s.design || s.design === 'classic'))) && (
+                {!glassy && (!/Mac/.test(navigator.userAgent) || !bridge || s.translucent !== false) && (
                   <div className="sliders">
-                    <Says title="Sidebar see-through" hint={/Mac/.test(navigator.userAgent) && bridge ? 'How much of the desktop shows through. Auto: as much as keeps its words readable over any wallpaper' : "The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off"} />
+                    <Says title="Sidebar see-through" hint={/Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'How much of the desktop shows through. Auto: as much as keeps its words readable over any wallpaper' : "The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off"} />
                     <label className="slider-row">
                       <span>Sidebar</span>
                       <input
@@ -2104,7 +2104,7 @@ export function SettingsPage(p: {
                         style={{ '--p': s.sideClear ?? 0 } as CSSProperties}
                         onChange={e => paint({ sideClear: Number(e.target.value) })}
                       />
-                      <span className="slider-val">{!s.sideClear && /Mac/.test(navigator.userAgent) && bridge ? 'Auto' : `${s.sideClear ?? 0}%`}</span>
+                      <span className="slider-val">{!s.sideClear && /Mac/.test(navigator.userAgent) && bridge && (!s.design || s.design === 'classic') ? 'Auto' : `${s.sideClear ?? 0}%`}</span>
                     </label>
                   </div>
                 )}
